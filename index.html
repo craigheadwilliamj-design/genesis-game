@@ -371,6 +371,35 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="7" rx="1" fill="#B08654" stroke="#1D2B22" stroke-width="1.2"/><path d="M5 16v4M19 16v4M3 9l3-3h12l3 3" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>
             <span class="tl"><b>Viewing Platform</b><span class="price">$20,000, research first</span></span></button>
         </div>
+        <div class="tgroup" role="toolbar" aria-label="Logistics">
+          <button data-tool="zone" aria-pressed="false" title="Work zone: group keepers, exhibits and stores">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/></svg>
+            <span class="tl"><b>Work Zone</b><span class="price">Free, group staff</span></span></button>
+          <button data-tool="dock" aria-pressed="false" title="Delivery Dock: buys animal food overnight. Beside a service road">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#3E5C7A"/><text x="12" y="12" class="glyph" font-size="10">D</text></svg>
+            <span class="tl"><b>Delivery Dock</b><span class="price">$10,000, buy food</span></span></button>
+          <button data-tool="warehouse" aria-pressed="false" title="Warehouse: stores hay and insect feed">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#6B5B3E"/><text x="12" y="12" class="glyph" font-size="10">W</text></svg>
+            <span class="tl"><b>Warehouse</b><span class="price">$9,000, dry storage</span></span></button>
+          <button data-tool="coldstore" aria-pressed="false" title="Cold Store: keeps meat, fish and medicine fresh (needs power)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#4A7FA0"/><text x="12" y="12" class="glyph" font-size="10">❄</text></svg>
+            <span class="tl"><b>Cold Store</b><span class="price">$16,000, needs power</span></span></button>
+          <button data-tool="farm" aria-pressed="false" title="Hay Farm: grows hay (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#7A9A36"/><text x="12" y="12" class="glyph" font-size="10">F</text></svg>
+            <span class="tl"><b>Hay Farm</b><span class="price">$18,000, research first</span></span></button>
+          <button data-tool="ranch" aria-pressed="false" title="Livestock Ranch: raises meat (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#9A4A3A"/><text x="12" y="12" class="glyph" font-size="10">L</text></svg>
+            <span class="tl"><b>Livestock Ranch</b><span class="price">$22,000, research first</span></span></button>
+          <button data-tool="hatchery" aria-pressed="false" title="Fish Hatchery: breeds fish (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#3A7FA8"/><text x="12" y="12" class="glyph" font-size="10">H</text></svg>
+            <span class="tl"><b>Fish Hatchery</b><span class="price">$22,000, research first</span></span></button>
+          <button data-tool="insectary" aria-pressed="false" title="Insectary: breeds insects (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#A8832E"/><text x="12" y="12" class="glyph" font-size="10">I</text></svg>
+            <span class="tl"><b>Insectary</b><span class="price">$16,000, research first</span></span></button>
+          <button id="supplyBtn" aria-pressed="false" title="Show the routes keepers haul goods along">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18L12 6l8 12" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2"/><circle cx="4" cy="18" r="2" fill="#E0A030"/><circle cx="20" cy="18" r="2" fill="#E0A030"/></svg>
+            <span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button>
+        </div>
         <div class="tgroup" role="toolbar" aria-label="Science departments">
           <button data-tool="oracle" aria-pressed="false" title="ORACLE: research time periods and request expeditions">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#4B3A8C"/><text x="12" y="12" class="glyph" font-size="10">O</text></svg>
@@ -488,6 +517,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/power.js"></script>
 <script src="js/maintenance.js"></script>
 <script src="js/medicine.js"></script>
+<script src="js/logistics.js"></script>
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/logiui.js"></script>
 <script src="js/main.js"></script>

@@ -244,6 +244,9 @@ const UPGRADES = [
   {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits 2.5 times faster.", needs:"shovels"},
   {id:"wheelbarrow", label:"Wheelbarrows", price:6000, text:"Keepers carry 2.5 times as much food per trip."},
   {id:"boots",       label:"Work boots",   price:3000, text:"Keepers tire 40% more slowly while walking."},
+  {id:"crates",      label:"Stacking crates", price:4000, text:"Every store holds 30% more."},
+  {id:"coolers",     label:"Cooler boxes",    price:7000, text:"Food spoils 40% more slowly in every store."},
+  {id:"forklift",    label:"Pallet forklift", price:10000, text:"Keepers restocking stores carry 3 times as much per trip.", needs:"wheelbarrow"},
 ];
 
 // Dirty exhibits
@@ -357,6 +360,71 @@ BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyp
                    tech:"vehicles", serviceOnly:true,
                    full:"Staff vehicle depot", blurb:"Adds 3 ATVs for staff to share. They drive five times faster than walking, but only on service roads, and an ATV stays where it was left. Mechanics keep it running."};
 
+
+/* ---------------------------------------------------------------------
+   LOGISTICS
+   Food and medicine are real goods. They are bought at a Delivery Dock or made on site,
+   sit in stores where they can spoil, and keepers carry them to where they're needed.
+   --------------------------------------------------------------------- */
+// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at CERES.
+//   spoil   share of a store's stock lost to rot each night
+const GOODS = {
+  plants: {label:"Hay",      spoil:.04},
+  meat:   {label:"Meat",     spoil:.15},
+  fish:   {label:"Fish",     spoil:.20},
+  insects:{label:"Insects",  spoil:.10},
+  meds:   {label:"Medicine", spoil:.02},
+};
+const FEED_GOODS = ["plants", "meat", "fish", "insects"];
+const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F"};
+const LOGI = {
+  hubDays:1.5,         // a station keeps this many days of its zone's food on hand
+  bulkDays:2.5,        // warehouses and cold stores keep this many days of the whole park's food
+  crateBoost:1.3,      // stacking crates multiply store sizes
+  coolerCut:.6,        // cooler boxes multiply spoilage
+  forklift:3,          // a forklift multiplies a restock trip's load
+  urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
+  pmcDoses:20,         // doses the PMC keeps on hand
+  dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
+  rushMarkup:1.75,     // a rush order costs this much
+  rushLot:50,          // units in a rush order
+  autoDays:2,          // auto-ordering keeps the dock stocked with this many days of the park's food
+  coldPower:25,        // kW a cold store draws
+  coldSpoil:.2,        // a powered cold store multiplies spoilage by this
+};
+const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1};   // multiplied by the markup and FOOD_UNIT_COST
+
+// Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
+BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
+BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: keepers restock them from bigger stores.";
+BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:9000, upkeep:50, w:16, d:12, dept:true,
+                       store:{cap:600, holds:["plants", "insects"], spoil:.7, bulk:true},
+                       full:"Dry goods warehouse", blurb:"Stores a lot of hay and insect feed, and keeps it better than a station does. Keepers restock stations from here."};
+BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:16000, upkeep:120, w:14, d:10, dept:true,
+                       store:{cap:400, holds:["meat", "fish", "meds"], spoil:1, cold:true, bulk:true},
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, and medicine from rotting, as long as it has power from a generator."};
+BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:10000, upkeep:80, w:16, d:10, dept:true, serviceOnly:true,
+                  store:{cap:300, holds:FEED_GOODS, spoil:1, bulk:true, dock:true},
+                  full:"Supplier deliveries", blurb:"Order animal food overnight from suppliers. Trucks need a service road to the entrance. Keepers carry it from here."};
+// Production. Needs the food production research. Output goes into the building's own store.
+//   makes   units a day
+BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:150, w:20, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["plants"], spoil:1, source:true}, makes:{plants:60},
+                       full:"Hay and forage farm", blurb:"Grows 60 units of hay a day."};
+BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:22000, upkeep:200, w:20, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["meat"], spoil:1, source:true}, makes:{meat:40},
+                       full:"Feed livestock ranch", blurb:"Raises 40 units of meat a day. Meat spoils fast, so keep a cold store nearby."};
+BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:22000, upkeep:200, w:18, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["fish"], spoil:1, source:true}, makes:{fish:40},
+                       full:"Fish hatchery", blurb:"Breeds 40 units of fish a day. It spoils fastest of all."};
+BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:16000, upkeep:120, w:14, d:10, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
+                       full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
+
+// Work zones: groups of keepers, exhibits, and stores. Keepers in a zone look after that zone's exhibits.
+const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
+const ZONE_MIN_AREA = 200;
+
 // Things ORACLE can research besides time periods
 const TECH = [
   {id:"bars",     label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
@@ -371,6 +439,7 @@ const TECH = [
   {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
   {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
   {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
+  {id:"foodprod",  label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"The PMC can treat Paleogene, Neogene, and Quaternary animals. CERES makes the medicine."},
   {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"The PMC can treat Triassic, Jurassic, and Cretaceous animals. CERES makes the medicine."},
   {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"The PMC can treat Carboniferous and Permian animals. CERES makes the medicine."},
@@ -440,6 +509,8 @@ const VET = {
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:30000, upkeep:250, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
+BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
+
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};
 
@@ -455,9 +526,11 @@ const GOALS = [
   {id:"food",     text:"Build a food stand",                 hint:"Pick Food stand and tap next to a path. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="food")},
   {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
+  {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
+  {id:"zone",     text:"Draw a work zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",    text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"period",   text:"Unlock a time period",               hint:"Tap ORACLE and hire a paleontologist. They earn research points each night. Then open a period's tab and unlock it.", reward:4000, check:g=>g.state.science.unlocked.length>0},

@@ -42,7 +42,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -93,6 +93,17 @@ function upgradeSave(s){
   // parks from before medicine existed get 5 days before animals start falling ill
   if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
   if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
+  // and any medicine waiting at CERES moves to the PMC
+  if(!s.zones) s.zones = [];
+  if(!s.logi){
+    s.logi = freshLogi();
+    if(s.staff.keepers.length || s.buildings.some(b => b.type === "station")){ s.staff.feedFrom = Math.max(s.staff.feedFrom, s.day + 2); s.logi.notice = true; }
+    const pmc = s.buildings.find(b => b.type === "pmc");
+    if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
+  }
+  for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
+  for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
@@ -325,6 +336,7 @@ function tick(dtMin){
 
   // Animals eat, keepers walk
   ceresTick(m1 - m0);
+  logiTick(m1 - m0);
   medTick(m1 - m0);
   eatTick(m1 - m0);
   dirtTick(m1 - m0);
@@ -366,9 +378,10 @@ function guestLeaves(){
 }
 
 function dailyCosts(){
+  // partner parks bill for feeding while they do it; after that animal food is bought at the dock or made on site
   let feed = 0, wages = 0, upkeep = 0;
   for(const e of state.exhibits){
-    for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
+    if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
@@ -534,6 +547,7 @@ function endDay(){
   spend(c.feed, "feed"); spend(c.wages, "wages"); spend(c.upkeep, "upkeep"); spend(c.research, "science");
   scienceNight();
   keepersNight();
+  logiNight();
   escapesNight();
   mechanicsNight();
   healthNight();
