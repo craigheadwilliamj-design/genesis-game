@@ -212,7 +212,7 @@ function syncAnimals(){
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8;
       // sick animals get a red ring
-      h.el.innerHTML = (a.sick ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
+      h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
         `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
       h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);

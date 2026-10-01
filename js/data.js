@@ -408,6 +408,12 @@ const HEALTH = {
   illWorsen:12, injuryWorsen:8,      // how much worse it gets each day untreated; 100 kills
   sickHappy:12,        // happiness lost per sick animal, as a share of the herd
   dartMinutes:8,       // how long a vet takes to dart a sick animal
+  obviousAt:40,        // an illness this bad shows; milder ones stay hidden until a vet checks the exhibit (0 shows everything)
+  checkEvery:3,        // days between vet check-ups before an exhibit is overdue
+  checkMinutes:5,      // time a vet spends looking over an exhibit's animals
+  minorBelow:40,       // illnesses under this are minor: a vet treats them on the spot, and medicated feed clears them up
+  fieldMinutes:12,     // time a vet takes to treat a minor illness on the spot
+  fieldDose:1,         // medicine doses an on-the-spot treatment uses
   beds:6,              // patients the PMC holds at once
   healPerNight:45,     // severity a treated patient recovers each night
   dose:2,              // medicine doses one patient's treatment uses
@@ -421,8 +427,7 @@ const MEDICINE = {
   storeDays:3,         // CERES holds this many days of medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
-  feedHeal:10,         // and heals mild cases (under mildBelow) this much a day in the exhibit
-  mildBelow:40,
+  feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
@@ -433,7 +438,7 @@ const VET = {
   patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:30000, upkeep:250, w:20, d:14, dept:true, unique:true,
-                 full:"Veterinary hospital and dart team", blurb:"Vets are based here. They dart sick and escaped animals, and treat patients with medicine from CERES."};
+                 full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};

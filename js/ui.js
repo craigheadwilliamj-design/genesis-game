@@ -220,7 +220,8 @@ function healthHtml(e){
   let h = `<section><h3>Health</h3>`;
   if(!healthActive()) h += `<div class="meta">Animals start falling ill on day ${state.health.from}.</div>`;
   if(hr.sick.length) h += `<ul class="herd">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  else if(e.animals.length) h += `<div class="meta">Everyone is healthy.</div>`;
+  else if(e.animals.length) h += `<div class="meta">Everyone looks healthy.</div>`;
+  if(e.animals.length){ const d = daysSinceCheck(e); h += `<div class="meta" style="margin-top:6px">${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${d >= HEALTH.checkEvery ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.</div>`; }
   if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
   if(e.animals.length > hr.sick.length){
     h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
@@ -491,13 +492,16 @@ function pmcHtml(b){
   const vs = state.staff.vets, ward = state.health.ward;
   h += `<section><h3>Vets (${vs.length})</h3>`;
   h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).atv ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span><button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} patients a night.</span></div></section>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} PMC patients a night.</span></div></section>`;
   h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
   h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
   h += `<div class="meta" style="margin-top:6px">Patients don't get worse here. Each treatment uses ${HEALTH.dose} doses of CERES medicine.</div></section>`;
   h += `<section><h3>Medicine</h3><ul class="issues">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "treatable" : "research at ORACLE"}</li>`).join("")}</ul>`;
   h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES starts making medicine once ORACLE researches any of it." : `CERES has ${Math.floor(state.ceres.meds || 0)} of ${medCap()} doses and makes ${medRate()} a day.`}</div></section>`;
-  const sick = state.exhibits.flatMap(e => e.animals.filter(a => a.sick).map(a => ({e, a})));
+  const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
+  // every exhibit's check-up, most overdue first
+  const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
+  if(herds.length) h += `<section><h3>Check-ups</h3><div class="meta">Vets check every exhibit every ${HEALTH.checkEvery} days. Mild illness doesn't show until it gets worse, so check-ups catch it while it can still be treated on the spot.</div><ul class="issues" style="margin-top:6px">${herds.map(e => { const d = daysSinceCheck(e); return `<li class="${d >= HEALTH.checkEvery ? "bad" : ""}">${esc(e.name)}: ${d >= 99 ? "never checked" : d === 0 ? "checked today" : `checked ${d} day${d === 1 ? "" : "s"} ago`}</li>`; }).join("")}</ul></section>`;
   if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="bad">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}, ${Math.round(a.sick.sev)}%: ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   return h;
 }

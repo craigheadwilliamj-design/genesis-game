@@ -70,6 +70,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
     startWith(newPark(), false); setSpeed(0);
+    // no surprise illnesses or injuries from the nightly rolls; this block sets up its own cases
+    const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
     const H = Math.PI / 2;
     state.buildings.push({id:"b-st", type:"station", points:rectPts(196, 290, 14, 10, H)});
@@ -81,13 +83,27 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
     state.science.tech.push("medpaleo"); state.ceres.meds = 10;
-    viv.animals[0].sick = {kind:"illness", sev:30};
+    viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
-    healthNight(); vetsNight(); keepersNight();
+    healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
     const cured = state.health.ward[0] && state.health.ward[0].cured;
     out.treated = !!cured && state.ceres.meds === 10 - HEALTH.dose;
     out.curedGoesHome = run(600, () => viv.animals.length === 2 && !state.health.ward.length) && !viv.animals.some(a => a.sick);
+
+    // a check-up finds a hidden mild illness, and the vet treats it on the spot (no dart, no PMC)
+    vetsNight(); keepersNight();
+    viv.vetCheck = state.day - HEALTH.checkEvery;
+    fallSick(viv.animals[1], "illness", HEALTH.illStart);
+    out.mildStartsHidden = !!viv.animals[1].sick.hidden;
+    const meds0 = state.ceres.meds;
+    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && state.ceres.meds === meds0 - HEALTH.fieldDose &&
+      !state.health.ward.length && !state.staff.transfers.length && viv.animals.length === 2;
+    // injuries always go to the PMC
+    vetsNight(); keepersNight();
+    viv.animals[1].sick = {kind:"injury", sev:20};
+    out.injuryGoesToWard = run(600, () => state.health.ward.length === 1);
+    state.health.ward = []; viv.animals.push({id:"a-t", sp:"arth"}); vetsNight(); keepersNight();
 
     // without the era's medicine, a patient only stabilizes
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
@@ -113,6 +129,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits.push(pen); recompute();
     out.territorialInjury = injuryChance(pen, pen.animals[0]).p > HEALTH.territorial;
     state.exhibits.pop(); recompute();
+    Math.random = realRandom;
     return out;
   }));
 

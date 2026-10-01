@@ -220,8 +220,11 @@ function exhibitReport(e){
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = conflict(kinds[i], kinds[j]);
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
   // Sick and hurt animals drag the whole herd down
-  const sick = e.animals.filter(a => a.sick).length;
-  if(sick){ target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length)); issues.push({bad:true, text:`${sick} sick or hurt. ${sick === 1 ? "It needs" : "They need"} a vet. See Health below.`}); }
+  // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
+  const sick = e.animals.filter(a => a.sick).length, known = e.animals.filter(noticed).length;
+  if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
+  if(known) issues.push({bad:true, text:`${known} sick or hurt. ${known === 1 ? "It needs" : "They need"} a vet. See Health below.`});
+  else if(sick) issues.push({bad:true, text:"Some of the animals seem off. A vet's check-up would find out why."});
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
 

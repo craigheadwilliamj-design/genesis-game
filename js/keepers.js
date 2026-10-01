@@ -123,7 +123,7 @@ function buildKeeperGraph(){
   // point everyone at the new map (the old one is thrown away)
   for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
   for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
-  for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; if(v.job !== "darting"){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; } }
+  for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; if(!["darting", "treating", "checking"].includes(v.job)){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; v.check = null; } }
 }
 
 // Shortest walk from one stop to every other (distances and the way back)
