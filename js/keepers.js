@@ -356,13 +356,12 @@ function dirtPerDay(e){
   return m * CLEAN.messRate / Math.sqrt(Math.max(area(e.points), 20) / 1000);
 }
 // Dirt removed per minute of work
-function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
+function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("shovels") ? 1 : CLEAN.bareFactor) * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
 function dirtTick(dtMin){
   for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / (CLOSE_MIN - OPEN_MIN));
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
 function cleanJob(c, k){
-  if(!hasUpgrade("shovels")) return null;
   const taken = new Set(crew.filter(x => x !== c && x.cleanId).map(x => x.cleanId));
   return state.exhibits.filter(e => (e.dirt || 0) >= CLEAN.dirtyAt && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
 }

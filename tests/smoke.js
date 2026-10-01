@@ -234,6 +234,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.zoneDropClears = !viv.zone && !st.zone;
     state.exhibits = state.exhibits.filter(e => e !== far);
 
+    // a keeper with nothing else to do cleans a dirty exhibit, even with no shovels
+    state.staff.keepers = [{id:"k-1", name:"K", stamina:100}]; crew = []; syncCrew();
+    viv.stock = {plants:storeMax(viv, "paleoflora"), paleoflora:storeMax(viv, "paleoflora")}; viv.dirt = 80;
+    out.cleansBareHanded = run(900, () => viv.dirt < 60) && !hasUpgrade("shovels");
+    keepersNight();
+
     // production fills its own store through the day, and stops when full
     const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();

@@ -246,8 +246,8 @@ for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
 
 // Upgrades bought at the Tool Shed
 const UPGRADES = [
-  {id:"shovels",     label:"Shovels",      price:1500, text:"Keepers can muck out dirty exhibits. Without shovels, nothing gets cleaned."},
-  {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits 2.5 times faster.", needs:"shovels"},
+  {id:"shovels",     label:"Shovels",      price:1500, text:"Keepers clean exhibits 2.5 times faster than with bare hands."},
+  {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits another 2.5 times faster.", needs:"shovels"},
   {id:"wheelbarrow", label:"Wheelbarrows", price:6000, text:"Keepers carry 2.5 times as much food per trip."},
   {id:"boots",       label:"Work boots",   price:3000, text:"Keepers tire 40% more slowly while walking."},
   {id:"crates",      label:"Stacking crates", price:4000, text:"Every store holds 30% more."},
@@ -262,7 +262,8 @@ const CLEAN = {
   dirtyAt:35,          // keepers start cleaning an exhibit this dirty
   penaltyFrom:40,      // animals start getting unhappy above this much dirt
   penaltyPer:.6,       // happiness lost per point of dirt above that
-  handRate:1.2,        // cleaning speed by hand (slower in bigger exhibits)
+  handRate:1.2,        // cleaning speed with shovels (slower in bigger exhibits)
+  bareFactor:.4,       // keepers without shovels clean at this share of that speed
   hoseBoost:2.5,       // hoses make cleaning this much faster
   tirePerMin:.3,       // keeper stamina lost per minute of mucking
 };

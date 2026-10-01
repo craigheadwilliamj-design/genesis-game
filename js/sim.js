@@ -222,7 +222,7 @@ function exhibitReport(e){
   // Dirt: a filthy exhibit makes animals miserable fast
   if(e.animals.length && (e.dirt || 0) > CLEAN.penaltyFrom){
     target -= (e.dirt - CLEAN.penaltyFrom) * CLEAN.penaltyPer;
-    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%). ${hasUpgrade("shovels") ? (state.staff.keepers.length ? "Keepers will muck it out when they're free." : "Hire keepers to clean it.") : "Keepers need shovels from the Tool Shed to clean it."}`});
+    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%). ${state.staff.keepers.length ? "Keepers will muck it out when they're free." + (hasUpgrade("shovels") ? "" : " Shovels from the Tool Shed make it much faster.") : "Hire keepers to clean it."}`});
   }
   // Barriers: say which animals could get out
   if(!e.viv && state.safety){
