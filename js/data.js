@@ -1,0 +1,416 @@
+/* =====================================================================
+   GAME DATA
+   This is the easiest file to tinker with. Change a price, add an
+   animal, or make the game harder or easier here. Everything else reads
+   from these lists.
+   ===================================================================== */
+
+// How the park starts
+const START = {
+  money: 60000,
+  ticket: 25,          // ticket price in dollars
+  rating: 1,           // starting star rating (0 to 5)
+};
+
+// How fast time passes. At 1x speed, one real second is this many park minutes.
+// The park is open 8:00 AM to 8:00 PM (720 minutes), so 12 means a day lasts 60 seconds.
+const MINUTES_PER_SECOND = 12;
+
+// How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
+const WALK_SPEED = 8;
+// The same speed in meters per park minute, which is what the simulation counts in
+const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
+const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
+
+// Building costs
+const COST = {
+  fencePerMeter: 25,     // exhibit fence, charged around the edge
+  landPerSqM: 1,        // clearing and landscaping the inside of an exhibit
+  pathPerMeter: 15,
+  refundShare: 0.25,     // how much money you get back when you bulldoze something
+  animalResale: 0.5,     // how much you get back when you sell an animal
+};
+
+// Daily running costs, charged when the park closes each night
+const UPKEEP = {
+  exhibitPerSqM: 0.02,
+  pathPerMeter: 0.2,
+};
+
+// Animals.
+//   price    what one costs to buy, or to clone at TAR
+//   food     feed cost per animal per day
+//   space    square meters each animal needs
+//   group    [fewest, most] of this species that are happy living together
+//   appeal   how much guests want to see it
+//   stars    park rating needed before you can buy or clone it
+//   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore
+//   predator true means it attacks any other species, so it can only live with its own kind
+//   bug      true for insects, arachnids, and other arthropods
+//
+//   Who can share an exhibit (size means how much room each animal needs):
+//     predators share with no other species
+//     carnivores hunt any species smaller than themselves
+//     insectivores and omnivores eat bugs smaller than themselves
+//     herbivores and piscivores don't bother land animals
+//   shop     true means partner parks sell it, so you can buy it without cloning
+//   viv      "S", "M", or "L" means it lives in a vivarium at least that size, not an open exhibit
+const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
+
+const SPECIES = [
+  // Carboniferous
+  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   shop:true, viv:"L"},
+  {id:"pulm",  name:"Pulmonoscorpius",     period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
+  {id:"mega",  name:"Meganeura",           period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
+  // Permian
+  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   shop:true},
+  {id:"dcau",  name:"Diplocaulus",         period:"Permian",       diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
+  {id:"dime",  name:"Dimetrodon",          period:"Permian",       diet:["carnivore"], predator:true, price:9000,  food:90,  space:400,  group:[1,4],  appeal:6,  stars:1},
+  {id:"scut",  name:"Scutosaurus",         period:"Permian",       diet:["herbivore"], price:8000,  food:90,  space:500,  group:[2,6],  appeal:6,  stars:1},
+  {id:"inos",  name:"Inostrancevia",       period:"Permian",       diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
+  {id:"prio",  name:"Prionosuchus",        period:"Permian",       diet:["piscivore"], price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
+  // Triassic
+  {id:"coel",  name:"Coelophysis",         period:"Triassic",      diet:["carnivore"], predator:true, price:6000,  food:60,  space:200,  group:[3,8],  appeal:4,  stars:0.5},
+  {id:"plat",  name:"Plateosaurus",        period:"Triassic",      diet:["herbivore"], price:12000, food:160, space:900,  group:[3,8],  appeal:8,  stars:1.5},
+  {id:"post",  name:"Postosuchus",         period:"Triassic",      diet:["carnivore"], predator:true, price:14000, food:130, space:700,  group:[1,3],  appeal:9,  stars:2},
+  // Jurassic
+  {id:"comp",  name:"Compsognathus",       period:"Jurassic",      diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
+  {id:"yiqi",  name:"Yi qi",               period:"Jurassic",      diet:["insectivore"], price:5500,  food:8,   space:10,   group:[2,6],  appeal:5,  stars:1,   viv:"M"},
+  {id:"arch",  name:"Archaeopteryx",       period:"Jurassic",      diet:["insectivore","carnivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
+  {id:"dryo",  name:"Dryosaurus",          period:"Jurassic",      diet:["herbivore"], price:9000,  food:90,  space:400,  group:[3,10], appeal:6,  stars:1},
+  {id:"dimo",  name:"Dimorphodon",         period:"Jurassic",      diet:["insectivore","carnivore"], price:7000,  food:50,  space:200,  group:[3,10], appeal:6,  stars:1},
+  {id:"dilo",  name:"Dilophosaurus",       period:"Jurassic",      diet:["carnivore"], predator:true, price:16000, food:140, space:700,  group:[2,4],  appeal:12, stars:2.5},
+  {id:"steg",  name:"Stegosaurus",         period:"Jurassic",      diet:["herbivore"], price:22000, food:260, space:1500, group:[2,6],  appeal:12, stars:2.5},
+  {id:"allo",  name:"Allosaurus",          period:"Jurassic",      diet:["carnivore"], predator:true, price:40000, food:500, space:3000, group:[1,3],  appeal:17, stars:3.5},
+  {id:"cama",  name:"Camarasaurus",        period:"Jurassic",      diet:["herbivore"], price:45000, food:600, space:4500, group:[2,6],  appeal:17, stars:3.5},
+  {id:"torv",  name:"Torvosaurus",         period:"Jurassic",      diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
+  {id:"dipl",  name:"Diplodocus",          period:"Jurassic",      diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
+  // Cretaceous
+  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   shop:true},
+  {id:"micr",  name:"Microraptor",         period:"Cretaceous",    diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
+  {id:"psit",  name:"Psittacosaurus",      period:"Cretaceous",    diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
+  {id:"prot",  name:"Protoceratops",       period:"Cretaceous",    diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
+  {id:"ovir",  name:"Oviraptor",           period:"Cretaceous",    diet:["omnivore"], price:8000,  food:60,  space:250,  group:[2,8],  appeal:5,  stars:1},
+  {id:"para",  name:"Parasaurolophus",     period:"Cretaceous",    diet:["herbivore"], price:14000, food:180, space:900,  group:[3,10], appeal:8,  stars:2},
+  {id:"igua",  name:"Iguanodon",           period:"Cretaceous",    diet:["herbivore"], price:18000, food:240, space:1200, group:[3,10], appeal:10, stars:2},
+  {id:"velo",  name:"Velociraptor",        period:"Cretaceous",    diet:["carnivore"], predator:true, price:15000, food:120, space:500,  group:[3,6],  appeal:11, stars:2.5},
+  {id:"pter",  name:"Pteranodon",          period:"Cretaceous",    diet:["piscivore"], price:16000, food:120, space:800,  group:[3,10], appeal:11, stars:2.5},
+  {id:"nige",  name:"Nigersaurus",         period:"Cretaceous",    diet:["herbivore"], price:20000, food:260, space:1500, group:[3,8],  appeal:10, stars:2.5},
+  {id:"utah",  name:"Utahraptor",          period:"Cretaceous",    diet:["carnivore"], predator:true, price:24000, food:220, space:1200, group:[2,5],  appeal:14, stars:3},
+  {id:"styr",  name:"Styracosaurus",       period:"Cretaceous",    diet:["herbivore"], price:26000, food:300, space:1800, group:[2,6],  appeal:13, stars:3},
+  {id:"bary",  name:"Baryonyx",            period:"Cretaceous",    diet:["piscivore","carnivore"], price:30000, food:300, space:1800, group:[1,3],  appeal:14, stars:3},
+  {id:"dsuc",  name:"Deinosuchus",         period:"Cretaceous",    diet:["carnivore","piscivore"], predator:true, price:32000, food:350, space:2000, group:[1,3],  appeal:15, stars:3.5},
+  {id:"anky",  name:"Ankylosaurus",        period:"Cretaceous",    diet:["herbivore"], price:34000, food:380, space:2200, group:[1,4],  appeal:15, stars:3.5},
+  {id:"tric",  name:"Triceratops",         period:"Cretaceous",    diet:["herbivore"], price:35000, food:400, space:2500, group:[1,5],  appeal:16, stars:3.5},
+  {id:"cnot",  name:"Carnotaurus",         period:"Cretaceous",    diet:["carnivore"], predator:true, price:36000, food:380, space:2200, group:[1,2],  appeal:16, stars:3.5},
+  {id:"dche",  name:"Deinocheirus",        period:"Cretaceous",    diet:["omnivore","piscivore"], price:38000, food:420, space:2500, group:[1,3],  appeal:16, stars:3.5},
+  {id:"quet",  name:"Quetzalcoatlus",      period:"Cretaceous",    diet:["carnivore"], price:45000, food:400, space:3000, group:[1,4],  appeal:19, stars:4},
+  {id:"spin",  name:"Spinosaurus",         period:"Cretaceous",    diet:["piscivore","carnivore"], price:55000, food:600, space:3500, group:[1,2],  appeal:20, stars:4},
+  {id:"carc",  name:"Carcharodontosaurus", period:"Cretaceous",    diet:["carnivore"], predator:true, price:70000, food:750, space:4000, group:[1,2],  appeal:22, stars:4.5},
+  {id:"trex",  name:"Tyrannosaurus rex",   period:"Cretaceous",    diet:["carnivore"], predator:true, price:80000, food:800, space:4000, group:[1,2],  appeal:25, stars:4.5},
+  // Paleogene
+  {id:"hyae",  name:"Hyaenodon",           period:"Paleogene",     diet:["carnivore"], predator:true, price:9000,  food:80,  space:500,  group:[3,8],  appeal:7,  stars:1.5},
+  {id:"ambu",  name:"Ambulocetus",         period:"Paleogene",     diet:["piscivore","carnivore"], price:12000, food:110, space:700,  group:[1,3],  appeal:8,  stars:2},
+  {id:"andr",  name:"Andrewsarchus",       period:"Paleogene",     diet:["carnivore","omnivore"], predator:true, price:20000, food:200, space:1200, group:[1,2],  appeal:11, stars:2.5},
+  {id:"bari",  name:"Barinasuchus",        period:"Paleogene",     diet:["carnivore"], predator:true, price:20000, food:180, space:1100, group:[1,2],  appeal:10, stars:2.5},
+  {id:"tita",  name:"Titanoboa",           period:"Paleogene",     diet:["carnivore","piscivore"], predator:true, price:30000, food:250, space:1500, group:[1,2],  appeal:16, stars:3},
+  {id:"pcer",  name:"Paraceratherium",     period:"Paleogene",     diet:["herbivore"], price:40000, food:550, space:4000, group:[1,4],  appeal:17, stars:3.5},
+  // Neogene
+  {id:"daeo",  name:"Daeodon",             period:"Neogene",       diet:["omnivore"], predator:true, price:11000, food:120, space:700,  group:[2,5],  appeal:8,  stars:1.5},
+  {id:"kele",  name:"Kelenken",            period:"Neogene",       diet:["carnivore"], predator:true, price:14000, food:100, space:700,  group:[1,3],  appeal:10, stars:2},
+  {id:"plty",  name:"Platybelodon",        period:"Neogene",       diet:["herbivore"], price:20000, food:250, space:1500, group:[2,6],  appeal:10, stars:2.5},
+  // Quaternary
+  {id:"dire",  name:"Dire wolf",           period:"Quaternary",    diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
+  {id:"arct",  name:"Arctodus",            period:"Quaternary",    diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
+  {id:"mgth",  name:"Megatherium",         period:"Quaternary",    diet:["herbivore"], price:20000, food:260, space:1500, group:[1,4],  appeal:11, stars:2.5},
+  {id:"mlan",  name:"Megalania",           period:"Quaternary",    diet:["carnivore"], predator:true, price:22000, food:180, space:1200, group:[1,2],  appeal:12, stars:2.5},
+  {id:"smil",  name:"Smilodon",            period:"Quaternary",    diet:["carnivore"], predator:true, price:18000, food:150, space:900,  group:[2,5],  appeal:11, stars:3},
+  {id:"mast",  name:"American mastodon",   period:"Quaternary",    diet:["herbivore"], price:24000, food:300, space:1900, group:[2,8],  appeal:12, stars:3},
+  {id:"elas",  name:"Elasmotherium",       period:"Quaternary",    diet:["herbivore"], price:22000, food:280, space:1800, group:[1,4],  appeal:12, stars:3},
+  {id:"mamm",  name:"Woolly mammoth",      period:"Quaternary",    diet:["herbivore"], price:26000, food:320, space:2000, group:[2,8],  appeal:13, stars:3},
+];
+
+// Vivariums: ready-made glass enclosures for small animals. Placed like buildings.
+// w and d are the size in meters; the inside space is w × d.
+const VIVARIUMS = {
+  S: {label:"Small vivarium",  w:6,  d:4,  price:3000,  upkeep:30},
+  M: {label:"Medium vivarium", w:10, d:6,  price:7000,  upkeep:60},
+  L: {label:"Large vivarium",  w:16, d:10, price:15000, upkeep:120},
+};
+
+/* ---------------------------------------------------------------------
+   SCIENCE: ORACLE, GHOST, and TAR
+   --------------------------------------------------------------------- */
+
+// Time periods GHOST can travel to.
+//   research   ORACLE research points needed to unlock trips there
+//   trip       what one expedition costs
+//   days       how long an expedition takes
+//   risk       chance an expedition comes back with nothing
+//   quality    [worst, best] DNA quality a sample can have. Deeper time gives worse DNA.
+const TIME_PERIODS = [
+  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:6000,  days:2, risk:.05, quality:[70,100]},
+  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:7000,  days:2, risk:.07, quality:[65,98]},
+  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:9000,  days:2, risk:.10, quality:[60,96]},
+  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:15000, days:3, risk:.15, quality:[55,95]},
+  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:14000, days:3, risk:.15, quality:[50,90]},
+  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:10000, days:3, risk:.12, quality:[45,88]},
+  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:9000,  days:2, risk:.12, quality:[40,85]},
+  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:8000,  days:2, risk:.10, quality:[35,80]},
+];
+
+// Science staff, hired at their department's building
+//   dept       the building they work in
+//   hireCost   one-time cost to hire
+//   wage       pay per day
+const SCIENTISTS = {
+  paleo:    {label:"Paleontologist",     plural:"Paleontologists",     dept:"oracle", hireCost:3000, wage:250,
+             text:"Each one earns 5 research points every night."},
+  temporal: {label:"Temporal Researcher", plural:"Temporal Researchers", dept:"ghost",  hireCost:4000, wage:400,
+             text:"Each one runs an expedition team. More researchers means more trips at the same time."},
+  gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
+             text:"Each one runs an incubator, so TAR can grow that many clones at the same time."},
+};
+const RESEARCH_PER_PALEO = 5;   // research points each paleontologist earns per night
+
+// What one expedition sample adds to a species' genome, in percent
+const SAMPLE_GAIN = [25, 45];
+
+// How long a clone takes at TAR, in days: 1 day plus 1 more for every this many m² the species needs
+const CLONE_DAYS_PER_SPACE = 1000;
+
+// Period colors, the same ones the planning map uses
+const PERIOD_COLOR = {
+  Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
+  Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
+};
+
+// Guest buildings. w and d are width and depth in meters.
+//   perGuest   money each guest spends there
+//   capacity   guests per day it can serve before it's too busy
+const BUILDINGS = {
+  food:     {label:"Food stand", one:"a food stand", glyph:"D", color:"#2F6E8F", price:6000, upkeep:60, w:10, d:8,  perGuest:7, capacity:500},
+  shop:     {label:"Gift shop",  one:"a gift shop",  glyph:"S", color:"#8C4F7D", price:8000, upkeep:80, w:12, d:10, perGuest:5, capacity:500},
+  restroom: {label:"Restrooms",  one:"restrooms",    glyph:"R", color:"#56708A", price:4000, upkeep:40, w:8,  d:6,  perGuest:0, capacity:700},
+
+  // Backstage science departments. You can have one of each. They must touch a path or service road.
+  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:30000, upkeep:300, w:24, d:16, dept:true,
+             full:"Operational Requests for Ancestral & Chronological Life Evidence",
+             blurb:"The GHOST hub. Researches time periods and sends expedition requests."},
+  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:50000, upkeep:500, w:28, d:20, dept:true,
+             full:"Genetic Harvesting of Organic Specimens through Time",
+             blurb:"The time travel unit. Brings back DNA samples from unlocked periods."},
+  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:40000, upkeep:400, w:26, d:18, dept:true,
+             full:"Terrestrial Animal Reconstruction",
+             blurb:"The cloning lab. Turns complete genomes into living animals."},
+};
+
+// Each vivarium size is also a building you can place
+for(const [size, v] of Object.entries(VIVARIUMS))
+  BUILDINGS["viv" + size] = {label:v.label, one:"a " + v.label.toLowerCase(), glyph:"V" + size, color:"#5E9AA6", price:v.price, upkeep:v.upkeep, w:v.w, d:v.d, viv:size};
+
+/* ---------------------------------------------------------------------
+   KEEPERS
+   --------------------------------------------------------------------- */
+const KEEPER = {
+  hireCost:2000,       // one-time cost to hire a keeper
+  wage:120,            // each keeper's pay per day
+  carry:40,            // food units a keeper can carry by hand
+  speed:WALK_PER_MIN,  // keepers walk at the same pace as guests
+  tirePerMeter:.15,    // stamina lost per meter walked
+  tirePerDelivery:2,   // stamina lost loading or unloading
+  restBelow:25,        // keepers take a break when stamina drops under this
+  restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)
+};
+const FOOD_UNIT_COST = 20;   // one food unit per $20 of an animal's daily food cost
+const STORE_DAYS = 1.5;      // exhibits hold this many days of food
+const GATE_COST = 1500;
+const GATE_REACH = 4;        // a gate counts as on a road within this many meters
+
+const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
+
+// Staff buildings. They go beside a path or service road.
+BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:12000, upkeep:100, w:14, d:10, dept:true,
+                       full:"Food storage and keeper lockers", blurb:"Keepers start here, load food here, and swap food types here."};
+BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:8000, upkeep:60, w:10, d:8, dept:true,
+                       full:"Break room and locker room", blurb:"Tired keepers rest here four times faster than at a station."};
+BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:6000, upkeep:40, w:10, d:8, dept:true, unique:true,
+                       full:"Equipment for keepers", blurb:"Buy upgrades that make keepers' work easier."};
+for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
+
+// Upgrades bought at the Tool Shed
+const UPGRADES = [
+  {id:"shovels",     label:"Shovels",      price:1500, text:"Keepers can muck out dirty exhibits. Without shovels, nothing gets cleaned."},
+  {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits 2.5 times faster.", needs:"shovels"},
+  {id:"wheelbarrow", label:"Wheelbarrows", price:6000, text:"Keepers carry 2.5 times as much food per trip."},
+  {id:"boots",       label:"Work boots",   price:3000, text:"Keepers tire 40% more slowly while walking."},
+];
+
+// Dirty exhibits
+const CLEAN = {
+  messRate:.3,         // how fast animals make a mess (bigger animals make more)
+  dietMess:{carnivore:1.3, piscivore:1.2, omnivore:1.1, herbivore:1, insectivore:.6},   // meat scraps are the worst
+  dirtyAt:35,          // keepers start cleaning an exhibit this dirty
+  penaltyFrom:40,      // animals start getting unhappy above this much dirt
+  penaltyPer:.6,       // happiness lost per point of dirt above that
+  handRate:1.2,        // cleaning speed by hand (slower in bigger exhibits)
+  hoseBoost:2.5,       // hoses make cleaning this much faster
+  tirePerMin:.3,       // keeper stamina lost per minute of mucking
+};
+
+/* ---------------------------------------------------------------------
+   BARRIERS AND ESCAPES
+   --------------------------------------------------------------------- */
+
+// Exhibit barriers. An animal escapes if its strength is more than the barrier's.
+//   perMeter   cost to upgrade, per meter of fence
+//   view       how well guests can see in (concrete hides the animals)
+//   tech       what ORACLE has to research first
+const BARRIERS = {
+  wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
+  bars:     {label:"Metal bars",        strength:45,  perMeter:40,  view:.95,  tech:"bars",     color:"#4A4F57"},
+  electric: {label:"Electrified fence", strength:65,  perMeter:60,  view:.95,  tech:"electric", color:"#D8B04A"},
+  acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
+  concrete: {label:"Concrete wall",     strength:140, perMeter:90,  view:.45,  tech:"concrete", color:"#9A958C"},
+};
+
+// How each barrier wears.
+//   wear     condition lost per day from weather and age (percent)
+//   repair   materials to fix a whole fence, per meter, from broken to 100%
+Object.assign(BARRIERS.wood,     {wear:3.0, repair:6});
+Object.assign(BARRIERS.bars,     {wear:2.0, repair:10});
+Object.assign(BARRIERS.electric, {wear:2.5, repair:14});
+Object.assign(BARRIERS.acrylic,  {wear:1.5, repair:25});
+Object.assign(BARRIERS.concrete, {wear:1.0, repair:12});
+
+// Clever animals that test and attack their fences, like predators do
+const SMART = ["velo", "utah", "dire", "arct", "andr", "kele", "hyae"];
+
+const MAINT = {
+  attackWear:4,        // condition lost per day by each attacking animal (more if it's much stronger than the fence)
+  inspectEvery:2,      // days between inspections before a fence is overdue
+  repairBelow:85,      // mechanics fix fences under this condition
+  inspectMinutes:5,    // time to inspect a fence
+  repairPerMinute:4,   // condition restored per minute of work
+  speed:WALK_PER_MIN,  // mechanics walk at the same pace as guests
+  hireCost:2000,
+  wage:150,
+};
+BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:10000, upkeep:60, w:12, d:10, dept:true,
+                      full:"Maintenance workshop", blurb:"Mechanics are based here. They inspect and repair exhibit barriers."};
+
+/* ---------------------------------------------------------------------
+   PALEOFLORA AND CERES
+   --------------------------------------------------------------------- */
+
+// Which era each period belongs to
+const ERA_OF = {Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
+                Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
+
+// What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
+//   perSqM   cost to replant, per square meter (needs CERES for anything but Cenozoic)
+//   tech     what ORACLE has to research first
+const FLORA = {
+  cenozoic:  {label:"Cenozoic",  plants:"grasses and flowering plants",              perSqM:0,   tech:null},
+  mesozoic:  {label:"Mesozoic",  plants:"cycads, conifers, ginkgos, and ferns",      perSqM:1.5, tech:"mesoplant"},
+  paleozoic: {label:"Paleozoic", plants:"lycopod trees, horsetails, and seed ferns", perSqM:1.5, tech:"paleoplant"},
+};
+// CERES makes Paleoflora food at a steady rate and keeps a stock of it
+const PALEOFLORA = {
+  perDay:60,          // units CERES grows each day on its own
+  greenhouse:40,      // extra units per day from each greenhouse
+  storeDays:2,        // CERES holds this many days of production
+};
+const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
+// Herbivores from these periods never evolved to eat grass, and get sick on it
+const GRASS_INTOLERANT = ["Carboniferous", "Permian", "Triassic", "Jurassic"];
+const GRASS_HIT = {intolerant:-15, cretaceous:-5};
+
+BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:35000, upkeep:300, w:26, d:18, dept:true, unique:true,
+                   full:"Cultivated Ecosystem Rations & Environmental Synthesis",
+                   blurb:"Grows Paleoflora food for prehistoric plant-eaters, and Mesozoic and Paleozoic plants for exhibits, once ORACLE has researched them. Keepers collect Paleoflora here."};
+// Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
+BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:12000, upkeep:80, w:12, d:8, dept:true,
+                        tech:"greenhouse", needsDept:"ceres",
+                        full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to CERES."};
+
+// Power for electrified fences
+const POWER = {
+  perMeter:.5,            // kW each meter of electrified fence draws
+  unpoweredStrength:20,   // an electric fence with no power is just wire
+  genWear:4,              // generator condition lost per day
+  offlineBelow:25,        // generators cut out below this condition
+  repairPerPercent:60,    // materials to restore 1% of a generator's condition
+};
+BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:15000, upkeep:150, w:12, d:10, dept:true, power:600,
+                       full:"Diesel generator", blurb:"Powers every electrified fence in the park. Mechanics keep it running."};
+
+// Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk.
+const VEHICLES = {
+  perDepot:3,             // ATVs each depot holds, so this many staff can drive at once
+  speedMult:5,            // how much faster than walking an ATV goes
+  wear:3,                 // depot condition lost per day
+  offlineBelow:25,        // a depot this worn grounds its ATVs
+  repairPerPercent:50,    // materials to restore 1% of a depot's condition
+};
+BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyph:"A", color:"#4F6273", price:25000, upkeep:300, w:16, d:12, dept:true,
+                   tech:"vehicles", serviceOnly:true,
+                   full:"Staff vehicle depot", blurb:"Holds 3 ATVs. Staff drive them five times faster than walking, but only on service roads. Mechanics keep it running."};
+
+// Things ORACLE can research besides time periods
+const TECH = [
+  {id:"bars",     label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
+  {id:"electric", label:"Electrified fence", points:30, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
+  {id:"concrete", label:"Concrete walls",    points:35, text:"Strength 140. Holds anything, but guests can barely see in."},
+  {id:"acrylic",  label:"Acrylic walls",     points:50, text:"Strength 85. Clear walls that guests love looking through."},
+  {id:"aviary",   label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
+  {id:"moat",     label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
+  {id:"platform", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
+  {id:"vehicles",   label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
+  {id:"paleoflora", label:"Paleoflora",       points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass."},
+  {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
+  {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
+  {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
+];
+const MOAT_PER_METER = 150;
+const AVIARY_PER_SQM = 4;
+
+// Flying animals. Outside an aviary or vivarium they escape almost at once.
+const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi"];
+
+const ESCAPE = {
+  lawsuit:75000,       // cost of each guest killed
+  shutdownDeaths:5,    // this many deaths and the park is shut down
+  sedateMinutes:10,    // how long a keeper takes to dart and sedate an animal
+  looseSpeed:WALK_PER_MIN * .75,   // escaped animals wander a bit slower than people walk
+  bigHerbivore:1500,   // herbivores needing this much room or more are dangerous when loose
+};
+
+// Viewing platforms snap onto an exhibit's fence
+BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};
+
+// Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
+const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
+
+// Goals give new players something to aim for, and pay a reward.
+// Each check() looks at the park and returns true when the goal is met.
+const GOALS = [
+  {id:"exhibit",  text:"Draw your first exhibit",            hint:"Pick Exhibit in the build tools, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
+  {id:"connect",  text:"Connect an exhibit to the path",     hint:"Guests only see exhibits that touch a path from the entrance. Use the Path tool to reach it.", reward:2000,  check:g=>g.state.exhibits.some(e=>g.isReachable(e))},
+  {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:3000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
+  {id:"food",     text:"Build a food stand",                 hint:"Pick Food stand and tap next to a path. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="food")},
+  {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
+  {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
+  {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
+  {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
+  {id:"g100",     text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
+  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"period",   text:"Unlock a time period",               hint:"Tap ORACLE and hire a paleontologist. They earn research points each night. Then open a period's tab and unlock it.", reward:4000, check:g=>g.state.science.unlocked.length>0},
+  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to unlocked periods. Hire a Temporal Researcher at GHOST, then request a trip from the period's tab in ORACLE.", reward:6000, check:g=>Object.keys(g.state.science.dna).length>0},
+  {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:6000, check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
+  {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:8000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
+  {id:"sp4",      text:"Show 4 different species",           hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  check:g=>g.speciesShown()>=4},
+  {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
+  {id:"cash150",  text:"Have $150,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=150000},
+  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Cretaceous, collect a full T. rex genome, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+];
