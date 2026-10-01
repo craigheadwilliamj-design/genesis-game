@@ -328,7 +328,7 @@ const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:35000, upkeep:300, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
-                   blurb:"Grows Paleoflora food for prehistoric plant-eaters, and Mesozoic and Paleozoic plants for exhibits, once ORACLE has researched them. Keepers collect Paleoflora here."};
+                   blurb:"Grows Paleoflora food for prehistoric plant-eaters, Mesozoic and Paleozoic plants for exhibits, and medicine for the PMC, once ORACLE has researched them. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:12000, upkeep:80, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -371,6 +371,9 @@ const TECH = [
   {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
   {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
   {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
+  {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"The PMC can treat Paleogene, Neogene, and Quaternary animals. CERES makes the medicine."},
+  {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"The PMC can treat Triassic, Jurassic, and Cretaceous animals. CERES makes the medicine."},
+  {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"The PMC can treat Carboniferous and Permian animals. CERES makes the medicine."},
 ];
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
@@ -381,10 +384,56 @@ const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi"];
 const ESCAPE = {
   lawsuit:75000,       // cost of each guest killed
   shutdownDeaths:5,    // this many deaths and the park is shut down
-  sedateMinutes:10,    // how long a keeper takes to dart and sedate an animal
+  sedateMinutes:10,    // how long a vet (or a keeper, if there are no vets) takes to dart and sedate an escaped animal
   looseSpeed:WALK_PER_MIN * .75,   // escaped animals wander a bit slower than people walk
   bigHerbivore:1500,   // herbivores needing this much room or more are dangerous when loose
 };
+
+/* ---------------------------------------------------------------------
+   PALEO-MEDICINE
+   --------------------------------------------------------------------- */
+
+// Animals fall ill or get hurt. Vets from the Paleo-Medicine Center (PMC) dart them,
+// keepers carry them in, and the PMC treats them with medicine from CERES.
+const HEALTH = {
+  startDay:10,         // new parks: nobody gets sick before this day
+  illChance:.008,      // chance a well-kept animal falls ill each day
+  hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
+  dirtPer:25,          // every this many points of dirt above the unhappy line adds 1× more risk
+  frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
+  grassSick:2,         // old plant-eaters eating grass get sick this much more
+  territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
+  attacked:.15,        // chance a day an animal is hurt by a species that preys on it
+  illStart:20, injuryStart:25,       // how bad a new case starts (0 to 100)
+  illWorsen:12, injuryWorsen:8,      // how much worse it gets each day untreated; 100 kills
+  sickHappy:12,        // happiness lost per sick animal, as a share of the herd
+  dartMinutes:8,       // how long a vet takes to dart a sick animal
+  beds:6,              // patients the PMC holds at once
+  healPerNight:45,     // severity a treated patient recovers each night
+  dose:2,              // medicine doses one patient's treatment uses
+};
+// Territorial species fight rivals of their own kind, more so when cramped
+const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
+                     "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
+// CERES makes medicine once ORACLE has researched any of it
+const MEDICINE = {
+  perDay:8,            // doses CERES makes each day
+  storeDays:3,         // CERES holds this many days of medicine
+  feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
+  feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
+  feedHeal:10,         // and heals mild cases (under mildBelow) this much a day in the exhibit
+  mildBelow:40,
+};
+// The medicine each era's animals need
+const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
+const VET = {
+  hireCost:3000,
+  wage:200,
+  speed:WALK_PER_MIN,  // vets walk at the same pace as guests
+  patients:3,          // patients each vet can treat each night
+};
+BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:30000, upkeep:250, w:20, d:14, dept:true, unique:true,
+                 full:"Veterinary hospital and dart team", blurb:"Vets are based here. They dart sick and escaped animals, and treat patients with medicine from CERES."};
 
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};
@@ -403,7 +452,8 @@ const GOALS = [
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
-  {id:"g100",     text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
+  {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
+  {id:"g100",    text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"period",   text:"Unlock a time period",               hint:"Tap ORACLE and hire a paleontologist. They earn research points each night. Then open a period's tab and unlock it.", reward:4000, check:g=>g.state.science.unlocked.length>0},
   {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to unlocked periods. Hire a Temporal Researcher at GHOST, then request a trip from the period's tab in ORACLE.", reward:6000, check:g=>Object.keys(g.state.science.dna).length>0},

@@ -108,7 +108,7 @@ function startWith(s, fresh){
   inPark = []; arrivalCarry = 0; powerShortNotified = -1; repairsHaltedDay = -1;
   herd.forEach(h => h.el.remove()); herd.clear();
   sel = null; if(draw) endDraw(); setTool("select");
-  crew = []; mcrew = []; keeperEls.forEach(el => el.remove()); keeperEls.clear();
+  crew = []; mcrew = []; vcrew = []; keeperEls.forEach(el => el.remove()); keeperEls.clear();
   recompute(); buildGraph(); buildKeeperGraph(); clearWalkers();
   fit(); ui.panel(); ui.hud(true);
   setSpeed(state.over ? 0 : 1);

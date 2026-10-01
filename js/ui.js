@@ -82,7 +82,7 @@ function overviewHtml(){
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
     <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research)}</dd>
-  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, keepers ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}.</div></section>`;
+  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}.</div></section>`;
 
   // science at a glance
   const sc = state.science;
@@ -138,6 +138,7 @@ function exhibitHtml(e){
       ${movesHtml(e)}
       <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
   }
+  h += healthHtml(e);
 
   // barriers, moats, and aviary netting
   if(!e.viv){
@@ -211,9 +212,35 @@ function exhibitHtml(e){
   return h;
 }
 
+// Sick animals, illness risk, and medicated feed for one exhibit
+function healthHtml(e){
+  const away = state.health.ward.filter(p => p.home === e.id);
+  if(!e.animals.length && !away.length) return "";
+  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`;
+  let h = `<section><h3>Health</h3>`;
+  if(!healthActive()) h += `<div class="meta">Animals start falling ill on day ${state.health.from}.</div>`;
+  if(hr.sick.length) h += `<ul class="herd">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
+  else if(e.animals.length) h += `<div class="meta">Everyone is healthy.</div>`;
+  if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
+  if(e.animals.length > hr.sick.length){
+    h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
+    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", rivals:"territorial rivals", attacks:"species that attack each other"};
+    if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
+    h += `</div>`;
+  }
+  // medicated feed from CERES
+  if(anyMedTech()){
+    const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
+    h += `<div class="meta">${e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : ""}Medicated feed cuts illness by ${Math.round((1 - MEDICINE.feedCut) * 100)}% and clears up mild cases without a vet${treatable < e.animals.length ? `, but only for animals whose era's medicine ORACLE has researched (${treatable} of ${e.animals.length} here)` : ""}.</div>`;
+  } else h += `<div class="meta" style="margin-top:6px">Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed.</div>`;
+  return h + `</section>`;
+}
+
 // Moves waiting on keepers, into or out of this exhibit
 function movesHtml(e){
-  const ts = state.staff.transfers.filter(t => t.from === e.id || t.to === e.id);
+  // trips to and from the PMC show under Health instead
+  const ts = state.staff.transfers.filter(t => !t.med && (t.from === e.id || t.to === e.id));
   if(!ts.length) return "";
   const name = id => (state.exhibits.find(x => x.id === id) || {name:"a removed exhibit"}).name;
   return `<div class="meta" style="margin-top:6px">Waiting for keepers: ${ts.map(t => `${esc(SPECIES_BY_ID[t.sp].name)} ${t.from === e.id ? `to ${esc(name(t.to))}` : `from ${esc(name(t.from))}`}${t.keeper ? " (on the way)" : ""}`).join(", ")}. <button class="btn" data-action="cancelMoves" style="padding:2px 8px">Cancel waiting moves</button></div>`;
@@ -445,9 +472,33 @@ function ceresHtml(b){
     if(need > ceresRate()) h += `<div class="meta" style="color:var(--bad)">CERES can't keep up. ${hasTech("greenhouse") ? "Build greenhouses." : "Research greenhouses at ORACLE."} When it runs dry, keepers bring grass hay instead.</div>`;
   }
   h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect CERES to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
+  h += `<section><h3>Medicine</h3>`;
+  if(!anyMedTech()) h += `<div class="meta">Research medicine at ORACLE and CERES will make doses for the PMC and for medicated feed.</div>`;
+  else {
+    const fed = state.exhibits.filter(e => e.medFeed && e.animals.length), use = fed.reduce((s, e) => s + feedDoses(e), 0);
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter((state.ceres.meds || 0) / medCap() * 100, "#B0384F")}<span>${Math.floor(state.ceres.meds || 0)}/${medCap()}</span></div>`;
+    h += `<dl class="kv" style="margin-top:6px"><dt>Makes</dt><dd>${medRate()} doses a day</dd><dt>Medicated feed</dt><dd style="color:${use > medRate() ? "var(--bad)" : "inherit"}">${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}</dd></dl>`;
+  }
+  h += `</section>`;
   // exhibits whose plants don't suit their animals
   const mismatched = state.exhibits.filter(e => e.animals.length && e.animals.some(a => ERA_OF[SPECIES_BY_ID[a.sp].period] !== (e.flora || "cenozoic")));
   h += `<section><h3>Exhibits to replant</h3>${mismatched.length ? `<ul class="issues">${mismatched.map(e => { const eras = [...new Set(e.animals.map(a => FLORA[ERA_OF[SPECIES_BY_ID[a.sp].period]].label))]; return `<li class="bad">${esc(e.name)}: planted ${FLORA[e.flora || "cenozoic"].label}, animals want ${eras.join(" or ")}</li>`; }).join("")}</ul><div class="meta" style="margin-top:6px">Tap an exhibit and change its flora in the Plants section.</div>` : `<div class="meta">Every exhibit's plants suit its animals.</div>`}</section>`;
+  return h;
+}
+
+function pmcHtml(b){
+  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.pmc.blurb)}</div>`;
+  const vs = state.staff.vets, ward = state.health.ward;
+  h += `<section><h3>Vets (${vs.length})</h3>`;
+  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).atv ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span><button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} patients a night.</span></div></section>`;
+  h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
+  h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
+  h += `<div class="meta" style="margin-top:6px">Patients don't get worse here. Each treatment uses ${HEALTH.dose} doses of CERES medicine.</div></section>`;
+  h += `<section><h3>Medicine</h3><ul class="issues">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "treatable" : "research at ORACLE"}</li>`).join("")}</ul>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES starts making medicine once ORACLE researches any of it." : `CERES has ${Math.floor(state.ceres.meds || 0)} of ${medCap()} doses and makes ${medRate()} a day.`}</div></section>`;
+  const sick = state.exhibits.flatMap(e => e.animals.filter(a => a.sick).map(a => ({e, a})));
+  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="bad">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}, ${Math.round(a.sick.sev)}%: ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   return h;
 }
 
@@ -463,8 +514,8 @@ function depotHtml(b){
   h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs ready` : "ATVs grounded"}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   h += `<div class="meta">Grounds its ATVs below ${VEHICLES.offlineBelow}%. Wears about ${VEHICLES.wear}% a day.</div>`;
-  const staff = state.staff.keepers.concat(state.staff.mechanics), slots = vehicleSlots();
-  h += `<section><h3>Who drives</h3><div class="meta">${slots} ATV${slots === 1 ? "" : "s"} across ${depots().filter(depotWorking).length} working depot${depots().filter(depotWorking).length === 1 ? "" : "s"} for ${staff.length} staff. Keepers get them first, then mechanics.${staff.length > slots ? ` ${staff.length - slots} still walk everywhere. Build more depots to put them on wheels.` : ""}</div>`;
+  const staff = allStaff(), slots = vehicleSlots();
+  h += `<section><h3>Who drives</h3><div class="meta">${slots} ATV${slots === 1 ? "" : "s"} across ${depots().filter(depotWorking).length} working depot${depots().filter(depotWorking).length === 1 ? "" : "s"} for ${staff.length} staff. Keepers get them first, then mechanics, then vets.${staff.length > slots ? ` ${staff.length - slots} still walk everywhere. Build more depots to put them on wheels.` : ""}</div>`;
   if(staff.length) h += `<ul class="issues" style="margin-top:6px">${staff.map((s, i) => `<li class="${i < slots ? "" : "bad"}">${esc(s.name)}: ${i < slots ? "has an ATV" : "walking"}</li>`).join("")}</ul>`;
   h += `<div class="meta" style="margin-top:6px">ATVs never go on guest paths. Staff park and walk those stretches, so a connected service road network makes them much faster.</div></section>`;
   return h;
@@ -472,6 +523,7 @@ function depotHtml(b){
 
 function buildingHtml(b){
   if(b.type === "depot") return depotHtml(b) + demolishRow(b);
+  if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);
   if(b.type === "ceres") return ceresHtml(b) + demolishRow(b);
   if(b.type === "generator") return generatorHtml(b) + demolishRow(b);
@@ -540,7 +592,10 @@ panelEl.addEventListener("click", e => {
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
-  if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || (t.from !== it.id && t.to !== it.id)); done(); return; }
+  if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
+  if(a === "hireVet"){ const why = hireVet(); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "fireVet"){ state.staff.vets = state.staff.vets.filter(v => v.id !== b.dataset.id); syncVets(); done(); return; }
+  if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
   if(a === "hireMech"){ const why = hireMechanic(); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireMech"){ state.staff.mechanics = state.staff.mechanics.filter(m => m.id !== b.dataset.id); done(); return; }
   if(a === "hire"){ const why = hireKeeper(); if(why) ui.toast(why, "bad"); done(); return; }

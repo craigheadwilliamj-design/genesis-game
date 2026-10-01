@@ -42,7 +42,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0},
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -62,6 +62,7 @@ function upgradeSave(s){
   if(!s.science.tech) s.science.tech = [];
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
+  if(!s.staff.vets) s.staff.vets = [];
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
     s.ceres = {stock:0};
@@ -88,6 +89,11 @@ function upgradeSave(s){
   }
   // parks from before escapes existed get 3 days to upgrade their barriers
   if(!s.safety){ s.safety = freshSafety(); s.safety.escapesFrom = s.day + 3; }
+  // parks from before medicine existed get 5 days before animals start falling ill
+  if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
+  if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  // a dart that was mid-flight when the park was saved never landed
+  for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   return s;
@@ -111,17 +117,17 @@ for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
 const eats = (s, d) => s.diet.includes(d);
 const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.bug ? ", bug" : "");
 
-// Can two different species share an exhibit? Returns why not, or null if they get along.
+// Does species x go after species y? Returns how, or null if it leaves it alone.
 // The rules are explained next to SPECIES in data.js.
-function conflict(a, b){
-  if(a.id === b.id) return null;
-  for(const [x, y] of [[a, b], [b, a]]){
-    if(x.predator) return `${x.name} is a predator and will attack the ${y.name}.`;
-    if(eats(x, "carnivore") && y.space < x.space) return `${x.name} will hunt the smaller ${y.name}.`;
-    if((eats(x, "insectivore") || eats(x, "omnivore")) && y.bug && y.space <= x.space) return `${x.name} will eat the ${y.name}.`;
-  }
+function attackReason(x, y){
+  if(x.id === y.id) return null;
+  if(x.predator) return `${x.name} is a predator and will attack the ${y.name}.`;
+  if(eats(x, "carnivore") && y.space < x.space) return `${x.name} will hunt the smaller ${y.name}.`;
+  if((eats(x, "insectivore") || eats(x, "omnivore")) && y.bug && y.space <= x.space) return `${x.name} will eat the ${y.name}.`;
   return null;
 }
+// Can two different species share an exhibit? Returns why not, or null if they get along.
+function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
 function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(s.viv) : !s.viv; }
@@ -213,6 +219,9 @@ function exhibitReport(e){
   let fight = null;
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = conflict(kinds[i], kinds[j]);
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
+  // Sick and hurt animals drag the whole herd down
+  const sick = e.animals.filter(a => a.sick).length;
+  if(sick){ target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length)); issues.push({bad:true, text:`${sick} sick or hurt. ${sick === 1 ? "It needs" : "They need"} a vet. See Health below.`}); }
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
 
@@ -312,11 +321,13 @@ function tick(dtMin){
 
   // Animals eat, keepers walk
   ceresTick(m1 - m0);
+  medTick(m1 - m0);
   eatTick(m1 - m0);
   dirtTick(m1 - m0);
   keepersTick(m1 - m0);
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
+  vetsTick(m1 - m0);
   escapesTick(m1 - m0);
   if(state.over) return;
 
@@ -358,7 +369,8 @@ function dailyCosts(){
   }
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
-  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage;
+  for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
+  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage;
   // science staff are paid as research costs
   let research = 0;
   for(const [k, n] of Object.entries(state.science.crew)) research += n * SCIENTISTS[k].wage;
@@ -520,6 +532,8 @@ function endDay(){
   keepersNight();
   escapesNight();
   mechanicsNight();
+  healthNight();
+  vetsNight();
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
   if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
 

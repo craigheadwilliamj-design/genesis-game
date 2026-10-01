@@ -84,7 +84,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if(["station", "breakroom", "workshop", "generator", "ceres", "depot"].includes(b.type) && isReachable(b)){
+  for(const b of state.buildings) if(["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc"].includes(b.type) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -123,6 +123,7 @@ function buildKeeperGraph(){
   // point everyone at the new map (the old one is thrown away)
   for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
   for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
+  for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; if(v.job !== "darting"){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; } }
 }
 
 // Shortest walk from one stop to every other (distances and the way back)
@@ -198,19 +199,26 @@ function goTo(c, n, job){ const w = walkFrom(c.at, c.atv); if(!w.dist.has(n)){ c
 /* ---------- catching escaped animals ---------- */
 
 // An escape nobody is chasing yet gets this keeper. Escapes come before feeding and breaks.
+// With vets on duty, vets do the darting and keepers only carry darted animals home.
+const needsKeeper = l => !l.keeper && (vetsOnDuty() ? l.status === "sedated" : l.status === "loose");
 function huntJob(c){
   if(!state.safety) return null;
   const mine = state.safety.loose.find(l => l.keeper === c.id);
   if(mine) return mine;
-  const free = state.safety.loose.find(l => l.status === "loose" && !l.keeper);
+  const free = state.safety.loose.find(needsKeeper);
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
 function keeperPos(c){ const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at.x) * c.t, c.at.y + (nx.y - c.at.y) * c.t] : [c.at.x, c.at.y]; }
 
 function chase(c, l){
-  if(!c.gun){ const st = nearestOf(c, stations()); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
-  if(l.status === "loose"){ const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; if(!goTo(c, n, "hunting")){ l.keeper = null; return false; } if(!c.route.length) arrive(c, null); return true; } }
+  // a vet already darted it: walk over and pick it up
+  if(l.status === "sedated" && l.byVet){ const n = kGraph.nodes.get(l.at); if(n && goTo(c, n, "toSedated")){ c.hunt = l; return true; } return false; }
+  if(l.status === "loose"){
+    if(vetsOnDuty()){ l.keeper = null; return false; }
+    if(!c.gun){ const st = nearestOf(c, stations()); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
+    const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; if(!goTo(c, n, "hunting")){ l.keeper = null; return false; } if(!c.route.length) arrive(c, null); return true; }
+  }
   if(l.status === "carried"){
     const e = state.exhibits.find(x => x.id === l.from), n = e && kGraph.anchors[e.id];
     if(n && goTo(c, n, "returning")){ c.hunt = l; return true; }
@@ -239,7 +247,8 @@ function moveJob(c){
   const ts = state.staff.transfers;
   const mine = ts.find(t => t.keeper === c.id);
   if(mine) return mine;
-  const free = ts.find(t => !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to]);
+  const open = t => !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to];
+  const free = ts.find(t => t.med && open(t)) || ts.find(open);
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
@@ -247,9 +256,22 @@ function doMove(c, t){
   if(c.cargo){ goTo(c, kGraph.anchors[t.to], "toDropoff"); return c.route.length || c.job === "toDropoff"; }
   return goTo(c, kGraph.anchors[t.from], "toPickup");
 }
+// Take the animal out of wherever it's waiting: an exhibit, or the PMC ward
+function pickUp(t){
+  const e = state.exhibits.find(x => x.id === t.from);
+  if(!e) return discharge(t.animalId);
+  const a = e.animals.find(x => x.id === t.animalId);
+  if(a) e.animals.splice(e.animals.indexOf(a), 1);
+  return a || null;
+}
 // Finish a move: the animal goes into its new home, or holding if that's gone
 function dropOff(t, a){
   state.staff.transfers = state.staff.transfers.filter(x => x !== t);
+  const pmc = pmcBuilding();
+  if(pmc && t.to === pmc.id){ admit(a, t); return; }
+  // a sick animal whose PMC is gone goes back where it came from
+  if(t.med && !state.exhibits.some(x => x.id === t.to) && state.exhibits.some(x => x.id === t.from)){ sendHome(a, t.from); events.changed(); return; }
+  delete a.darted;
   const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp];
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); events.toast(`Keepers moved a ${s.name} into ${e.name}.`, "good"); }
   else { state.science.ready.push({id:a.id, sp:a.sp, q:a.q ?? 90}); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in holding.`, "bad"); }
@@ -306,9 +328,9 @@ function decide(c, k){
 function arrive(c, k){
   if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toPickup"){
-    const t = c.move, e = t && state.exhibits.find(x => x.id === t.from), a = e && e.animals.find(x => x.id === t.animalId);
+    const t = c.move, a = t && pickUp(t);
     if(!t || !a){ if(t) state.staff.transfers = state.staff.transfers.filter(x => x !== t); c.move = null; c.job = "idle"; return; }
-    e.animals.splice(e.animals.indexOf(a), 1); c.cargo = a; t.cargo = a;   // kept on the transfer too, so a save mid-move doesn't lose the animal
+    c.cargo = a; t.cargo = a;   // kept on the transfer too, so a save mid-move doesn't lose the animal
     k.stamina -= KEEPER.tirePerDelivery; events.changed();
     if(!goTo(c, kGraph.anchors[t.to] || c.at, "toDropoff")) c.job = "toDropoff";
     return;
@@ -321,6 +343,11 @@ function arrive(c, k){
   }
   if(c.job === "toClean"){ c.job = state.exhibits.some(x => x.id === c.cleanId) ? "mucking" : "idle"; return; }
   if(c.job === "toGun"){ c.gun = true; c.job = "idle"; c.wait = 0; return; }
+  if(c.job === "toSedated"){
+    const l = c.hunt;
+    if(l && l.status === "sedated" && state.safety.loose.includes(l)){ l.status = "carried"; if(!chase(c, l)){ c.job = "idle"; c.wait = 5; } return; }
+    c.hunt = null; c.job = "idle"; c.wait = 0; return;
+  }
   if(c.job === "hunting"){
     const l = c.hunt, lp = l && loosePos(l);
     if(!l || l.status !== "loose"){ c.job = "idle"; return; }
@@ -382,7 +409,7 @@ function keepersTick(dtMin){
         // stop when it's clean, when the keeper is worn out, or when an escape needs everyone
         const need = Math.max(0, (e.dirt || 0) - 2) / cleanRate(e), w = Math.min(left, need);
         e.dirt = Math.max(0, (e.dirt || 0) - cleanRate(e) * w); k.stamina -= CLEAN.tirePerMin * w; left -= w;
-        if(e.dirt <= 2 || k.stamina < KEEPER.restBelow || state.safety.loose.some(l => l.status === "loose" && !l.keeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
+        if(e.dirt <= 2 || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
       if(c.job === "sedating"){
@@ -420,6 +447,8 @@ function eatTick(dtMin){
     e.stock = e.stock || {};
     const need = dailyNeed(e);
     e.grassFed = false;
+    // time spent with some food run out makes animals more likely to fall ill
+    if(!free && Object.keys(need).some(t => stockFor(e, t) <= 0.01)) e.hungryMin = (e.hungryMin || 0) + dtMin;
     for(const t of Object.keys(need)){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
       let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN);
@@ -458,8 +487,9 @@ function keeperStatus(k){
           toClean:`Heading to muck out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`, mucking:`Mucking out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`,
           toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
-          sedating:"Sedating an escaped animal", returning:"Bringing a sedated animal back",
-          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} to move`, toDropoff:`Moving a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "animal"}`}[c.job] || (carry ? `Waiting${carry}` : "Waiting for work");
+          sedating:"Sedating an escaped animal", returning:"Bringing a sedated animal back", toSedated:`Collecting a darted ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
+          toDropoff:`${c.move && c.move.med && pmcBuilding() && c.move.to === pmcBuilding().id ? "Carrying a sick" : "Moving a"} ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "animal"}`}[c.job] || (carry ? `Waiting${carry}` : "Waiting for work");
 }
 
 /* ---------- staff vehicles ---------- */
@@ -467,11 +497,13 @@ function keeperStatus(k){
 const depots = () => state.buildings.filter(b => b.type === "depot");
 const depotWorking = b => isReachable(b) && condOf(b) >= VEHICLES.offlineBelow;
 function vehicleSlots(){ return hasTech("vehicles") ? depots().filter(depotWorking).length * VEHICLES.perDepot : 0; }
-// Hand out ATVs: keepers first, then mechanics, as many as the working depots hold
+// Hand out ATVs: keepers first, then mechanics, then vets, as many as the working depots hold
+const allStaff = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets);
 function assignVehicles(){
-  const lucky = new Set(state.staff.keepers.concat(state.staff.mechanics).slice(0, vehicleSlots()).map(s => s.id));
+  const lucky = new Set(allStaff().slice(0, vehicleSlots()).map(s => s.id));
   for(const c of crew) c.atv = lucky.has(c.id);
   for(const c of mcrew) c.atv = lucky.has(c.id);
+  for(const c of vcrew) c.atv = lucky.has(c.id);
 }
 // Is this person driving right now? Only with an ATV, and only on a service road.
 function onAtv(c){ const nx = c.route && c.route[0]; return !!(c.atv && nx && c.at && c.at.svc && c.at.svc.has(nx)); }

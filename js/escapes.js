@@ -94,9 +94,9 @@ function breakOut(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
   const n = nearestNode(cx, cy);
-  state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
+  state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
   state.rating = Math.max(0, state.rating - .05);
-  events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} Keepers with dart guns are on the way.`, "bad");
+  events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} ${vetsOnDuty() ? "Vets with dart guns are on the way." : "Keepers with dart guns are on the way."}`, "bad");
   events.changed();
 }
 
@@ -150,7 +150,7 @@ function fearFactor(){
 function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
-  if(e){ e.animals.push({id:l.id, sp:l.sp, cl:l.cl, q:l.q}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
+  if(e){ e.animals.push({id:l.id, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
   else { state.science.ready.push({id:l.id, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in holding. Tap an exhibit to move it in.`, "good"); }
   events.changed();
 }
@@ -158,7 +158,7 @@ function returnAnimal(l, e){
 // At night, anything sedated is put away; loose animals stay loose
 function escapesNight(){
   for(const l of [...state.safety.loose]){
-    l.keeper = null;
-    if(l.status === "sedated" || l.status === "carried"){ const e = state.exhibits.find(x => x.id === l.from); returnAnimal(l, e && kGraph.anchors[e.id] ? e : null); }
+    l.keeper = null; l.vet = null;
+    if(l.status === "sedated" || l.status === "carried" || l.status === "darting"){ const e = state.exhibits.find(x => x.id === l.from); returnAnimal(l, e && kGraph.anchors[e.id] ? e : null); }
   }
 }

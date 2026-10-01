@@ -3,13 +3,14 @@
 Browser park-builder game (Jurassic Park style). Plain JS, no build step, no modules: every file is a classic `<script>` sharing one global scope. Published as a claude.ai Artifact.
 
 ## Files (script load order, from index.html)
-- `js/data.js`: all tuning constants and content (`SPECIES`, `BUILDINGS`, `BARRIERS`, `TECH`, `GOALS`, `KEEPER`, `MAINT`, `POWER`, `ESCAPE`, ...). Balance changes go here.
+- `js/data.js`: all tuning constants and content (`SPECIES`, `BUILDINGS`, `BARRIERS`, `TECH`, `GOALS`, `KEEPER`, `MAINT`, `POWER`, `ESCAPE`, `HEALTH`, `MEDICINE`, `VET`, ...). Balance changes go here.
 - `js/geometry.js`: pure shape math (`area`, `perimeter`, `inPoly`, `segProj`, `shapesOverlap`, ...).
 - `js/sim.js`: the core loop `tick(dtMin)` → `endDay()`, plus guests, money (`spend`/`earn`/`canAfford`), happiness (`exhibitReport`), rating, science (ORACLE/GHOST/TAR), goals, and save migration (`newPark`, `upgradeSave`).
 - `js/keepers.js`: keepers, food (`dailyNeed`, `shortages`), cleaning, animal transfers, ATVs, and the staff path graph (`buildKeeperGraph`, `walkFrom` Dijkstra).
 - `js/escapes.js`: barrier strength, breakouts, loose animals, guest deaths, viewing platforms, `researchTech`.
 - `js/power.js`: generators and electric-fence power allocation (`updatePower`).
 - `js/maintenance.js`: fence/generator/depot wear, plus mechanics who inspect and repair.
+- `js/medicine.js`: sickness and injuries (`illChance`, `injuryChance`, `healthNight`), the PMC ward (`admit`, `discharge`, `pmcRemoved`), vets who dart sick and escaped animals (`vetsTick`), and CERES medicine (`medTick`).
 - `js/map.js`: SVG rendering, camera, build tools, walkers. Also defines `$` and `esc`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
 - `js/main.js`: the rAF loop (`frame` → `step`), saving (localStorage plus the claude.ai `db` capability), and `startWith`.
@@ -18,7 +19,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `state`: the whole saved game (JSON-serialized). **Anything that must survive a reload lives in `state`.**
 - `derived`: computed from `state` by `recompute()` (reach, reports, demand, rating parts). Call `recompute()` after layout changes.
 - `kGraph`: the staff walking graph. Rebuild it with `buildKeeperGraph()` after paths, buildings or gates change.
-- `crew` / `mcrew`: live keeper and mechanic walkers. These are NOT saved, so mirror anything persistent onto `state.staff.*` (see `setCarry`, `transfer.cargo`).
+- `crew` / `mcrew` / `vcrew`: live keeper, mechanic, and vet walkers. These are NOT saved, so mirror anything persistent onto `state.staff.*` (see `setCarry`, `transfer.cargo`).
 - `events`: hooks the sim calls (`toast`, `changed`, `dayEnded`, `gameOver`, `guestArrived`, `guestLeft`), wired in main.js.
 - Time: `state.minute` runs from `OPEN_MIN` to `CLOSE_MIN`, and `*Night()` functions run in `endDay()`.
 

@@ -211,7 +211,9 @@ function syncAnimals(){
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8;
-      h.el.innerHTML = `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
+      // sick animals get a red ring
+      h.el.innerHTML = (a.sick ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
+        `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
       h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
     }
@@ -655,6 +657,20 @@ function drawKeepers(){
     }
     el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
   }
+  // vets: white with a red cross
+  for(const c of vcrew){
+    if(!c.at) continue;
+    seen.add(c.id);
+    let el = keeperEls.get(c.id);
+    if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "darting", drive = onAtv(c), key = `v${r.toFixed(3)}|${working}|${drive}`;
+    if(el.dataset.key !== key){
+      el.dataset.key = key;
+      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#fff" stroke="#B0384F" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${-r*.55} 0H${r*.55}M0 ${-r*.55}V${r*.55}" stroke="#B0384F" stroke-width="${r*.35}"/>` +
+        (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
+    }
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+  }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
 }
 
@@ -745,6 +761,7 @@ function removeItem(kind, it){
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
   const l = listFor(kind); l.splice(l.indexOf(it), 1);
+  if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   // viewing platforms go with their exhibit
   if(kind === "exhibit") state.buildings = state.buildings.filter(b => b.exhibitId !== it.id);
   if(sel && sel.id === it.id) sel = null;
