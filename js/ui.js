@@ -14,7 +14,7 @@ const ui = {
     set("money", money(state.money));
     $("#roMoney").classList.toggle("neg", state.money < 0);
     set("guests", state.today.guests.toLocaleString());
-    set("inpark", inPark.length.toLocaleString());
+    set("inpark", guestCount().toLocaleString());
     set("clock", fmtClock(state.minute));
     set("dayLabel", `Day ${state.day}`);
     set("parkName", state.name);
@@ -96,6 +96,7 @@ function overviewHtml(){
     </ul></section>`;
   }
 
+  h += guestsOverviewHtml();
   h += logiOverviewHtml();
   const expected = Math.round(d.demand);
   h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
@@ -546,17 +547,11 @@ function buildingHtml(b){
   if(b.type === "oracle") return oracleHtml(b) + demolishRow(b);
   if(b.type === "ghost") return ghostHtml(b) + demolishRow(b);
   if(b.type === "tar") return tarHtml(b) + demolishRow(b);
+  if(guestBuilding(b)) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
-  const same = state.buildings.filter(x => x.type === b.type && isReachable(x)).length || 1;
-  const served = b.type === "food" ? state.today.servedFood : b.type === "shop" ? state.today.servedShop : null;
-  h += `<dl class="kv"><dt>Serves up to</dt><dd>${t.capacity} guests a day</dd>`;
-  if(t.perGuest) h += `<dt>Each guest spends</dt><dd>${money(t.perGuest)}</dd>`;
-  if(served != null) h += `<dt>Served today (all ${t.label.toLowerCase()}s)</dt><dd>${served.toLocaleString()} of ${(t.capacity * same).toLocaleString()}</dd>`;
-  h += `<dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
-  if(b.type === "restroom") h += `<div class="meta">Restrooms don't earn money, but guests rate the park higher when there are enough of them.</div>`;
-  if(served != null && served >= t.capacity * same) h += `<div class="meta" style="color:var(--bad)">Sold out today. Build another to serve more guests.</div>`;
+  h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   return h + demolishRow(b);
 }
 function demolishRow(b){ return `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("building", b))}</button></div>`; }

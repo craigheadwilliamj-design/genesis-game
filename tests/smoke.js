@@ -289,6 +289,83 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // Guests: parties walk to food and restrooms, pay where they're served, and their mood sets guest comfort
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    state.money = 1e6; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
+    state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    const ex = (id, pts, sp, n) => state.exhibits.push({id, name:id, points:pts, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100});
+    ex("e-g1", [[104,124],[180,124],[180,231],[104,231]], "lyst", 4);
+    ex("e-g2", [[220,124],[296,124],[296,231],[220,231]], "dryo", 4);
+    const B = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, 0)});
+    B("b-f", "food", 92, 150); B("b-r", "restroom", 305, 150); B("b-s", "shop", 240, 242);
+    afterChange();
+    out.guestStops = ["b-f", "b-r", "b-s", "e-g1", "e-g2", "gate"].every(id => !!gGraph.anchors[id]);
+    // a party's route to a stop matches a plain walk there
+    const f = guestField("b-f"), w = walkFrom(gGraph.anchors.gate, null, new Set());
+    out.guestField = Math.abs(f.dist.get(gGraph.anchors.gate) - w.dist.get(gGraph.anchors["b-f"])) < 1e-6;
+
+    // a thirsty party walks to the food stand, pays, and stops being thirsty
+    state.minute = OPEN_MIN + 60; const t0 = state.today.tickets;
+    guestsArrive(2); const p = parties[0];
+    out.ticketPaid = state.today.tickets - t0 === state.ticket * 2;
+    p.needs = {hunger:10, thirst:70, bladder:0}; p.until = CLOSE_MIN;
+    // only the parties set up here: nobody new comes in
+    const run = (mins, until) => { for(let i = 0; i < mins; i++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); state.minute++; if(until()) return true; } return false; };
+    // (it may grab a meal too if it got hungry on the way)
+    out.partyDrinks = run(400, () => p.needs.thirst < 5) && state.today.food >= BUILDINGS.food.drink * 2 && state.buildings.find(b => b.id === "b-f").served.money === state.today.food;
+    // and then the restroom
+    p.needs.bladder = 75;
+    out.partyRestroom = run(400, () => p.needs.bladder < 5);
+    // nowhere to eat: they say so
+    const fs = state.buildings.find(b => b.id === "b-f"); state.buildings = state.buildings.filter(b => b !== fs); afterChange();
+    p.needs.hunger = 80;
+    out.noFoodThought = run(5, () => p.thought.has("noFood"));
+    state.buildings.push(fs); afterChange();
+    // going home: the party walks out the gate and its mood counts
+    const before = state.today.moodN; goHome(p);
+    out.partyLeaves = run(600, () => p.gone) && !parties.includes(p) && state.today.moodN === before + 2;
+
+    // a desperate party gives up on a long queue
+    guestsArrive(1); const q = parties[parties.length - 1];
+    svcQ.set("b-r", {queue:[q], busy:[{done:1e9}, {done:1e9}, {done:1e9}, {done:1e9}]}); q.in = "b-r"; q.waited = 0; q.why = "bladder"; q.dest = "b-r";
+    run(GUEST.patience + 2, () => false);
+    out.queueGivesUp = !q.in && q.thought.has("queue") && !svcQ.get("b-r").queue.includes(q);
+    svcQ.clear();
+
+    // a death takes one guest from the party nearest the loose animal
+    resetParties(); guestsArrive(3); const v = parties[0];
+    const n0 = guestCount();
+    state.safety.loose = [{id:"l-x", sp:"trex", status:"loose", at:null, x:v.at.x, y:v.at.y}];
+    const rr = Math.random; Math.random = () => 0; harmGuests(1); Math.random = rr;
+    out.deathTakesGuest = guestCount() === n0 - 1 && v.n === 2 && state.safety.deaths === 1;
+    state.safety.loose = []; state.safety.deaths = 0;
+
+    // a full day: guests come, go, and leave a mood behind for the rating
+    resetParties(); state.minute = OPEN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
+    const day = state.day;
+    while(state.day === day) tick(2);
+    const h = state.history[state.history.length - 1];
+    out.dayOfGuests = h.guests > 20 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
+    out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
+
+    // lots of guests stay quick to simulate
+    state.minute = OPEN_MIN + 120;
+    for(let i = 0; i < 1500; i++) guestsArrive(2);
+    out.partyCap = parties.length === GUEST.maxParties && guestCount() === 3000;
+    for(let i = 0; i < 30; i++) tick(.8);
+    const tp = performance.now(); for(let i = 0; i < 50; i++) tick(.8);
+    out.guestPerf = (performance.now() - tp) / 50 < 15;
+
+    // old saves get a guest log
+    const old = JSON.parse(JSON.stringify(state)); delete old.guestLog; delete old.today.moodSum;
+    const up = upgradeSave(old);
+    out.oldSaveGuests = !!up.guestLog && up.guestLog.mood === null && up.today.moodSum === 0;
+    resetParties();
+    return out;
+  }));
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }

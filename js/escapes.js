@@ -126,10 +126,15 @@ function loosePos(l){
 function harmGuests(dtMin){
   const sf = state.safety;
   for(const l of sf.loose){
-    if(l.status !== "loose" || !isDangerous(SPECIES_BY_ID[l.sp]) || !inPark.length) continue;
-    const p = .01 * Math.min(1, inPark.length / 100);
+    if(l.status !== "loose" || !isDangerous(SPECIES_BY_ID[l.sp]) || !parties.length) continue;
+    const p = .01 * Math.min(1, guestCount() / 100);
     if(Math.random() < 1 - Math.pow(1 - p, dtMin)){
-      inPark.pop(); events.guestLeft();
+      // the victim comes from the party closest to the animal
+      const at = loosePos(l);
+      let v = parties[0], vd = Infinity;
+      if(at) for(const q of parties){ const d = q.at ? Math.hypot(q.at.x - at[0], q.at.y - at[1]) : Infinity; if(d < vd){ vd = d; v = q; } }
+      if(--v.n <= 0){ leaveQueue(v); v.gone = true; parties = parties.filter(q => q !== v); }
+      else { thinks(v, "scared"); goHome(v); }
       sf.deaths++;
       spend(ESCAPE.lawsuit, "fines");
       state.rating = Math.max(0, state.rating - .3);

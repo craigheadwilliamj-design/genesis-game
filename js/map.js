@@ -267,10 +267,8 @@ function animateAnimals(dt){
 }
 
 /* ---------- guests walking the paths ---------- */
-let graph = null;       // {nodes: Map(key -> {x, y, adj:Set}), gate}
-let walkers = [];
-const MAX_WALKERS = 350;
 const SHIRTS = ["#C8452B", "#2F6E8F", "#E3B23C", "#F4F1E8"];
+const MOOD_SHIRTS = ["#3E9B4F", "#E3B23C", "#D9483B"];   // happy, so-so, unhappy
 const shirtPaths = SHIRTS.map(c => {
   const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
   el.setAttribute("stroke", c); el.setAttribute("stroke-width", "5"); el.setAttribute("stroke-linecap", "round");
@@ -284,63 +282,24 @@ guestLayer.insertBefore(outline, guestLayer.firstChild);
 
 const nodeKey = p => Math.round(p[0]*4) + ":" + Math.round(p[1]*4);
 
-function buildGraph(){
-  const nodes = new Map();
-  const node = p => { const k = nodeKey(p); if(!nodes.has(k)) nodes.set(k, {k, x:p[0], y:p[1], adj:new Set()}); return nodes.get(k); };
-  const link = (a, b) => { if(a !== b){ a.adj.add(b); b.adj.add(a); } };
-  const live = state.paths.filter(p => derived.joined.has(p.id));
-  for(const p of live) for(let i = 1; i < p.points.length; i++) link(node(p.points[i-1]), node(p.points[i]));
-  // a corner of one path that sits on the middle of another path joins them there
-  for(const p of live) for(const v of p.points){
-    for(const q of live){
-      if(q === p) continue;
-      for(let i = 1; i < q.points.length; i++){
-        const r = segProj(v[0], v[1], q.points[i-1], q.points[i]);
-        if(r.d < 1.5 && r.t > 0.01 && r.t < 0.99){ const n = node(v); link(n, node(q.points[i-1])); link(n, node(q.points[i])); }
-      }
-    }
+// Parties walk off to one side of the path. Ones standing in a queue bunch up around the spot.
+function partyPos(p){
+  if(p.to){
+    const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1;
+    return [p.at.x + dx*p.t - dy/L*p.off, p.at.y + dy*p.t + dx/L*p.off];
   }
-  let gate = null, gd = Infinity;
-  for(const n of nodes.values()){ const d = Math.hypot(n.x - state.gate[0], n.y - state.gate[1]); if(d < gd){ gd = d; gate = n; } }
-  graph = {nodes, gate: gd < 3 ? gate : null};
-  walkers = walkers.filter(w => nodes.has(w.a.k) && nodes.has(w.b.k)).map(w => ({...w, a:nodes.get(w.a.k), b:nodes.get(w.b.k)}));
+  const a = p.off * 4.4;
+  return [p.at.x + Math.cos(a) * Math.abs(p.off) * 1.5, p.at.y + Math.sin(a) * Math.abs(p.off) * 1.5];
 }
-
-function nextNode(at, from){
-  const opts = [...at.adj].filter(n => n !== from);
-  if(!opts.length) return from || at;
-  return opts[Math.floor(Math.random() * opts.length)];
-}
-
-function addWalker(){
-  if(!graph || !graph.gate || walkers.length >= MAX_WALKERS) return;
-  const a = graph.gate, b = nextNode(a, null);
-  walkers.push({a, b, t:0, off:(Math.random()*2-1) * 1.4, spd:.85 + Math.random()*.3, shirt:Math.floor(Math.random()*SHIRTS.length)});
-}
-function removeWalker(){ if(walkers.length) walkers.splice(Math.floor(Math.random()*walkers.length), 1); }
-function clearWalkers(){ walkers = []; drawWalkers(); }
-
-function moveWalkers(dt){
-  for(const w of walkers){
-    const len = Math.hypot(w.b.x - w.a.x, w.b.y - w.a.y) || 1;
-    w.t += w.spd * WALK_SPEED * dt / len;
-    while(w.t >= 1){
-      w.t -= 1;
-      const prev = w.a; w.a = w.b; w.b = nextNode(w.a, prev);
-      if(w.b === w.a){ w.t = 0; break; }
-    }
-  }
-}
-
-function drawWalkers(){
-  const d = SHIRTS.map(() => []), all = [];
-  for(const w of walkers){
-    const dx = w.b.x - w.a.x, dy = w.b.y - w.a.y, L = Math.hypot(dx, dy) || 1;
-    const x = w.a.x + dx*w.t - dy/L*w.off, y = w.a.y + dy*w.t + dx/L*w.off;
+function drawParties(){
+  const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
+  for(const p of parties){
+    if(!p.at) continue;
+    const [x, y] = partyPos(p);
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[w.shirt].push(m); all.push(m);
+    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : p.shirt].push(m); all.push(m);
   }
-  shirtPaths.forEach((el, i) => el.setAttribute("d", d[i].join("")));
+  shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
 }
 
@@ -1047,7 +1006,7 @@ document.addEventListener("keydown", e => {
 // Call after anything in the park changes shape: rework the numbers, the walkers' routes, goals, and save
 function afterChange(){
   recompute();
-  buildGraph();
+  buildGuestGraph();
   buildKeeperGraph();
   checkGoals();
   ui.panel(); ui.hud(true);

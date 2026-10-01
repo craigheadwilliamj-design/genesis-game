@@ -10,11 +10,10 @@ const uid = p => p + Math.random().toString(36).slice(2, 9);
 
 let state = null;     // the saved game
 let derived = null;   // numbers worked out from the saved game, rebuilt when it changes
-let inPark = [];      // departure time (in park minutes) for each guest in the park right now
 let arrivalCarry = 0; // fractions of a guest carried between frames
 
 // Hooks other files fill in, so the simulation can tell the screen what happened
-const events = { guestArrived(){}, guestLeft(){}, toast(){}, dayEnded(){}, changed(){}, gameOver(){} };
+const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){} };
 
 // Starter species partner parks sell in this park: random picks from each pool
 function pickStarters(){
@@ -26,7 +25,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0}; }
 
 function freshScience(){
   return {
@@ -52,7 +51,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -107,6 +106,7 @@ function upgradeSave(s){
   // and any medicine waiting at CERES moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
+  if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.logi){
     s.logi = freshLogi();
     if(s.staff.keepers.length || s.buildings.some(b => b.type === "station")){ s.staff.feedFrom = Math.max(s.staff.feedFrom, s.day + 2); s.logi.notice = true; }
@@ -276,15 +276,23 @@ function recompute(){
   }
   const fair = fairTicket();
   const priceF = clamp(1 - 1.2 * (state.ticket - fair) / fair, 0.05, 1.3);
-  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor();
+  // word of mouth: yesterday's guests tell their friends how it went
+  const told = state.guestLog.mood;
+  const wom = told == null ? 1 : clamp(1 + GUEST.wordOfMouth * (told - 60) / 40, 1 - GUEST.wordOfMouth, 1 + GUEST.wordOfMouth);
+  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor() * wom;
 
-  // How well the park looks after its guests
-  const cap = t => state.buildings.filter(b => b.type === t && reach[b.id]).length * BUILDINGS[t].capacity;
+  // How well the park looks after its guests: how happy they are when they leave.
+  // Before anyone has left, guess from how many food stands and restrooms there are.
+  const cap = t => state.buildings.filter(b => b.type === t && reach[b.id]).length * BUILDINGS[t].slots * (CLOSE_MIN - OPEN_MIN) / BUILDINGS[t].serveMin * 2.5;
   const last = state.history.length ? state.history[state.history.length-1].guests : 0;
   const ref = Math.max(last, demand);
   const cover = c => ref > 0 ? Math.min(1, c / ref) : (c > 0 ? 1 : 0);
   const foodCover = cover(cap("food")), restCover = cover(cap("restroom"));
-  const satisfaction = 0.3 + 0.35 * foodCover + 0.35 * restCover;
+  const t = state.today, mood = t.moodN >= 20 ? t.moodSum / t.moodN : told;
+  const comfort = mood == null ? (0.35 * foodCover + 0.35 * restCover) / .7 : clamp((mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
+  const gripe = topThoughts(3).find(x => !x.good && x.share >= .1);
+  const comfortNote = mood == null ? `Food ${Math.round(foodCover*100)}%, restrooms ${Math.round(restCover*100)}% of what your guests need.`
+    : `Guests leave ${Math.round(mood)}% happy. ${GUEST.goodMood}% gets full marks.${gripe ? ` ${Math.round(gripe.share * 100)}% say "${gripe.text}"` : ""}`;
   const avgHappy = animals ? happySum / animals : 0;
   // Stars come from four things: happy animals, looked-after guests, variety, and how much there is to see.
   // Each part is scored 0 to 1. Animals count as fully happy at 90% or more.
@@ -292,7 +300,7 @@ function recompute(){
   const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / 150);
   const parts = animals ? [
     {label:"Animal happiness", score:welfare,              max:1.25, note:`${Math.round(avgHappy)}% average. 90% counts as full marks.`},
-    {label:"Guest comfort",    score:(satisfaction-.3)/.7, max:.75,  note:`Food ${Math.round(foodCover*100)}%, restrooms ${Math.round(restCover*100)}% of what your guests need.`},
+    {label:"Guest comfort",    score:comfort,              max:.75,  note:comfortNote},
     {label:"Variety",          score:variety,              max:1.5,  note:shown.size >= 10 ? `${shown.size} species on show. Full marks.` : `${shown.size} species on show. 10 gets full marks.`},
     {label:"Things to see",    score:size,                 max:1.5,  note:"Bigger, happier groups of popular animals."},
   ] : [];
@@ -301,7 +309,7 @@ function recompute(){
   if(pricey) ratingTarget -= 0.3;
 
   derived = {joined, joinedAll, reach, reports, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
-             satisfaction, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5), capFood:cap("food"), capShop:cap("shop")};
+             comfort, mood, wom, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
   return derived;
 }
 
@@ -326,13 +334,6 @@ function refundFor(kind, item){
 }
 
 /* ---------- time passing ---------- */
-
-// Arrivals follow a hump: few at opening, busiest late morning, none after 4 PM.
-const ARRIVE_START = OPEN_MIN, ARRIVE_END = 16 * 60;
-function arrivalShare(m0, m1){
-  const f = m => { const t = clamp((m - ARRIVE_START) / (ARRIVE_END - ARRIVE_START), 0, 1); return (1 - Math.cos(Math.PI * t)) / 2; };
-  return f(m1) - f(m0);
-}
 
 let sinceRecompute = 0;
 
@@ -365,27 +366,10 @@ function tick(dtMin){
     e.happy += (target - e.happy) * Math.min(1, (m1 - m0) / 240);
   }
 
-  // Guests arrive
-  arrivalCarry += derived.demand * arrivalShare(m0, m1);
-  while(arrivalCarry >= 1){
-    arrivalCarry -= 1;
-    inPark.push(m1 + 120 + Math.random() * 150);
-    state.today.guests++;
-    earn(state.ticket, "tickets");
-    events.guestArrived();
-  }
-
-  // Guests leave, spending money on the way out
-  for(let i = inPark.length - 1; i >= 0; i--) if(inPark[i] <= m1){ inPark.splice(i, 1); guestLeaves(); }
+  // Guests arrive, walk around, eat, and go home
+  guestsTick(m0, m1);
 
   if(m1 >= CLOSE_MIN) endDay();
-}
-
-function guestLeaves(){
-  const t = state.today;
-  if(t.servedFood < derived.capFood){ t.servedFood++; earn(BUILDINGS.food.perGuest, "food"); }
-  if(t.servedShop < derived.capShop){ t.servedShop++; earn(BUILDINGS.shop.perGuest, "shop"); }
-  events.guestLeft();
 }
 
 function dailyCosts(){
@@ -550,8 +534,7 @@ function scienceNight(){
 }
 
 function endDay(){
-  while(inPark.length){ inPark.pop(); guestLeaves(); }
-  arrivalCarry = 0;
+  flushParties();
   recompute();
 
   const c = dailyCosts();
@@ -578,6 +561,7 @@ function endDay(){
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});
   if(state.history.length > 60) state.history.shift();
+  guestsNight();
 
   // Warn about unhappy animals
   for(const e of state.exhibits) if(e.animals.length && e.happy < 30) events.toast(`${e.name}: the animals are unhappy. Tap the exhibit to see why.`, "bad");

@@ -192,12 +192,13 @@ const STARTER_POOLS = {
 };
 
 // Guest buildings. w and d are width and depth in meters.
-//   perGuest   money each guest spends there
-//   capacity   guests per day it can serve before it's too busy
+//   serves     the guest needs it takes care of
+//   perGuest   what each guest pays for a meal or a souvenir (drink is the price of a drink)
+//   slots      parties served at once, each taking serveMin minutes
 const BUILDINGS = {
-  food:     {label:"Food stand", one:"a food stand", glyph:"D", color:"#2F6E8F", price:6000, upkeep:60, w:10, d:8,  perGuest:7, capacity:500},
-  shop:     {label:"Gift shop",  one:"a gift shop",  glyph:"S", color:"#8C4F7D", price:8000, upkeep:80, w:12, d:10, perGuest:5, capacity:500},
-  restroom: {label:"Restrooms",  one:"restrooms",    glyph:"R", color:"#56708A", price:4000, upkeep:40, w:8,  d:6,  perGuest:0, capacity:700},
+  food:     {label:"Food stand", one:"a food stand", glyph:"D", color:"#2F6E8F", price:6000, upkeep:60, w:10, d:8,  serves:["hunger", "thirst"], perGuest:7, drink:3, slots:4, serveMin:4},
+  shop:     {label:"Gift shop",  one:"a gift shop",  glyph:"S", color:"#8C4F7D", price:8000, upkeep:80, w:12, d:10, serves:["shop"], perGuest:12, slots:3, serveMin:5},
+  restroom: {label:"Restrooms",  one:"restrooms",    glyph:"R", color:"#56708A", price:4000, upkeep:40, w:8,  d:6,  serves:["bladder"], perGuest:0, slots:4, serveMin:3},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:30000, upkeep:300, w:24, d:16, dept:true,
@@ -209,6 +210,59 @@ const BUILDINGS = {
   tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:40000, upkeep:400, w:26, d:18, dept:true,
              full:"Terrestrial Animal Reconstruction",
              blurb:"The cloning lab. Turns complete genomes into living animals."},
+};
+
+/* ---------------------------------------------------------------------
+   GUESTS
+   Guests come in parties. Needs run from 0 (fine) to 100 (desperate).
+   --------------------------------------------------------------------- */
+const GUEST = {
+  maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
+  sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
+  stay:[180, 360],     // minutes a party plans to spend before heading home
+  cash:[20, 45],       // money each guest brings to spend inside
+  walk:5,              // guests stroll this many times faster than staff walk with a load
+  speed:[.85, 1.15],   // each party's own pace, times that
+  startMood:62,        // mood on arrival, plus 4 for each star
+  quitBelow:20,        // a party this unhappy heads home early
+  tire:.03,            // mood lost each minute just from being on their feet
+  seeGain:14,          // mood from seeing a really good exhibit for the first time
+  needHurt:.2,         // mood lost each minute by a desperate need
+  leftWanting:15,      // mood lost on the way out for each need left desperate (less for one just past bad)
+  desperate:88,        // a need this bad makes a party drop what it's doing
+  patience:25,         // minutes a party will wait in a queue before giving up
+  queueMeters:10,      // each party already queuing makes a place feel this many meters further away
+  farWalk:180,         // a walk longer than this to fix a need gets a complaint
+  lastStop:80,         // on the way out, a party will still pop into a restroom or stand this close
+  crowd:8,             // parties per 10 m of path before it feels packed
+  crowdHurt:.04,       // mood lost each minute on a packed path
+  fleeRange:60,        // guests within this many meters of a loose dangerous animal run for the gate
+  shopChance:.7,       // chance a happy party stops at a gift shop on the way out
+  wordOfMouth:.25,     // yesterday's mood moves today's crowd by up to this share
+  goodMood:75,         // an average leaving mood this high gets full marks for guest comfort
+  badMood:30,          // and this low gets none
+};
+const NEEDS = {
+  hunger: {rate:.2,  seek:55, start:30},
+  thirst: {rate:.25, seek:55, start:30},
+  bladder:{rate:.22, seek:60, start:25},
+};
+// What guests think. good ones are compliments.
+const THOUGHTS = {
+  noFood:     {text:"I'm hungry and there's nowhere to eat."},
+  noDrink:    {text:"I'm thirsty and there's nothing to drink."},
+  noRestroom: {text:"I can't find a restroom."},
+  accident:   {text:"I couldn't find a restroom in time."},
+  queue:      {text:"The queue was so long I gave up."},
+  far:        {text:"Everything is such a long walk."},
+  broke:      {text:"I can't afford anything here."},
+  crowded:    {text:"The paths are packed."},
+  bored:      {text:"There isn't much to see."},
+  sadAnimals: {text:"The animals looked miserable."},
+  scared:     {text:"An animal got loose. We're getting out of here!"},
+  pricey:     {text:"The ticket cost far too much."},
+  wow:        {text:"The animals were amazing!", good:true},
+  fed:        {text:"That hit the spot.", good:true},
 };
 
 // Each vivarium size is also a building you can place
