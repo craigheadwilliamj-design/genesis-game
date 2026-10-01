@@ -149,9 +149,9 @@ function syncVets(){
 }
 
 function vetGo(c, n, job){
-  const w = walkFrom(c.at, c.atv);
+  const w = walkFrom(c.at, c);
   if(!n || !w.dist.has(n)) return false;
-  c.route = routeTo(w, n).slice(1); c.job = job;
+  setRoute(c, w, n); c.job = job;
   return true;
 }
 
@@ -286,7 +286,7 @@ function vetsTick(dtMin){
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = VET.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
-        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; if(!c.route.length) vetArrive(c); }
+        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; atNode(c); if(!c.route.length) vetArrive(c); }
         continue;
       }
       if(c.job !== "idle"){ vetArrive(c); continue; }
@@ -297,7 +297,7 @@ function vetsTick(dtMin){
   }
 }
 
-function vetsNight(){ for(const c of vcrew){ c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; } }
+function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; } }
 
 function hireVet(){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center first.";

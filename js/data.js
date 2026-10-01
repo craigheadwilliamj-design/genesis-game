@@ -345,9 +345,9 @@ const POWER = {
 BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:15000, upkeep:150, w:12, d:10, dept:true, power:600,
                        full:"Diesel generator", blurb:"Powers every electrified fence in the park. Mechanics keep it running."};
 
-// Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk.
+// Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk, and the ATV stays parked where they got off for the next person.
 const VEHICLES = {
-  perDepot:3,             // ATVs each depot holds, so this many staff can drive at once
+  perDepot:3,             // ATVs each depot brings to the park, shared by all staff
   speedMult:5,            // how much faster than walking an ATV goes
   wear:3,                 // depot condition lost per day
   offlineBelow:25,        // a depot this worn grounds its ATVs
@@ -355,7 +355,7 @@ const VEHICLES = {
 };
 BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyph:"A", color:"#4F6273", price:25000, upkeep:300, w:16, d:12, dept:true,
                    tech:"vehicles", serviceOnly:true,
-                   full:"Staff vehicle depot", blurb:"Holds 3 ATVs. Staff drive them five times faster than walking, but only on service roads. Mechanics keep it running."};
+                   full:"Staff vehicle depot", blurb:"Adds 3 ATVs for staff to share. They drive five times faster than walking, but only on service roads, and an ATV stays where it was left. Mechanics keep it running."};
 
 // Things ORACLE can research besides time periods
 const TECH = [

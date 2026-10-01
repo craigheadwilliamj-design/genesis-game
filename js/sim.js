@@ -63,6 +63,7 @@ function upgradeSave(s){
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.vets) s.staff.vets = [];
+  if(!s.staff.atvs) s.staff.atvs = [];
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
     s.ceres = {stock:0};

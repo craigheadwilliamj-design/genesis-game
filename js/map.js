@@ -671,10 +671,21 @@ function drawKeepers(){
     }
     el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
   }
+  // ATVs parked out on the roads, waiting for someone to come back to them
+  for(const a of usableAtvs()){
+    if(a.by || !a.at) continue;
+    const n = atvNode(a); if(!n) continue;
+    const id = "atv:" + a.id; seen.add(id);
+    let el = keeperEls.get(id);
+    if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
+    const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
+    if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
+    el.setAttribute("transform", `translate(${n.x.toFixed(2)} ${n.y.toFixed(2)})`);
+  }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
 }
 
-// A little ATV under a staff member who is driving
+// A little ATV: under a staff member who is driving, or parked on its own
 function atvSvg(r, on){ return on ? `<rect x="${-r*1.9}" y="${-r*1.2}" width="${r*3.8}" height="${r*2.4}" rx="${r*.6}" fill="#4F6273" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ""; }
 
 /* ---------- escaped animals on the map ---------- */
