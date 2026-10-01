@@ -11,13 +11,16 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `js/power.js`: generators and electric-fence power allocation (`updatePower`).
 - `js/maintenance.js`: fence/generator/depot wear, plus mechanics who inspect and repair.
 - `js/medicine.js`: sickness and injuries (`illChance`, `injuryChance`, `healthNight`), the PMC ward (`admit`, `discharge`, `pmcRemoved`), vets who dart sick and escaped animals (`vetsTick`), and CERES medicine (`medTick`).
+- `js/logistics.js`: food and medicine as goods. Stores (`b.store`, `storeOf`, `addGood`/`takeGood`), spoilage, dock orders, farms, work zones (`state.zones`, `e.zone`/`b.zone`/`k.zone`), and restock hauls (`pickHaul`, `supplyLines`).
 - `js/map.js`: SVG rendering, camera, build tools, walkers. Also defines `$` and `esc`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
+- `js/logiui.js`: panels for stores, the dock, zones, and the park-office supply summary, plus their click/change handlers.
 - `js/main.js`: the rAF loop (`frame` → `step`), saving (localStorage plus the claude.ai `db` capability), and `startWith`.
 
 ## Key globals
 - `state`: the whole saved game (JSON-serialized). **Anything that must survive a reload lives in `state`.**
 - `derived`: computed from `state` by `recompute()` (reach, reports, demand, rating parts). Call `recompute()` after layout changes.
+- `state.zones` / `state.logi`: work zones and logistics bookkeeping. Food is physical: it lives in `b.store` of stations, docks, warehouses, cold stores, and farms, and the PMC holds medicine. Exhibits only get what keepers carry.
 - `kGraph`: the staff walking graph. Rebuild it with `buildKeeperGraph()` after paths, buildings or gates change.
 - `crew` / `mcrew` / `vcrew`: live keeper, mechanic, and vet walkers. These are NOT saved, so mirror anything persistent onto `state.staff.*` (see `setCarry`, `transfer.cargo`).
 - `events`: hooks the sim calls (`toast`, `changed`, `dayEnded`, `gameOver`, `guestArrived`, `guestLeft`), wired in main.js.

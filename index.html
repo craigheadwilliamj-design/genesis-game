@@ -345,13 +345,13 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <div class="tgroup" role="toolbar" aria-label="Staff">
           <button data-tool="station" aria-pressed="false" title="Keeper Station: hire keepers, store food">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#3F6B2E"/><text x="12" y="12" class="glyph" font-size="10">K</text></svg>
-            <span class="tl"><b>Keeper Station</b><span class="price">$12,000, food and staff</span></span></button>
+            <span class="tl"><b>Keeper Station</b><span class="price">$8,000, food and staff</span></span></button>
           <button data-tool="breakroom" aria-pressed="false" title="Break Room: keepers rest here">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#7A5A2E"/><text x="12" y="12" class="glyph" font-size="10">B</text></svg>
-            <span class="tl"><b>Break Room</b><span class="price">$8,000, rest</span></span></button>
+            <span class="tl"><b>Break Room</b><span class="price">$5,000, rest</span></span></button>
           <button data-tool="workshop" aria-pressed="false" title="Workshop: hire mechanics to inspect and repair fences">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#B8642A"/><text x="12" y="12" class="glyph" font-size="10">W</text></svg>
-            <span class="tl"><b>Workshop</b><span class="price">$10,000, mechanics</span></span></button>
+            <span class="tl"><b>Workshop</b><span class="price">$7,000, mechanics</span></span></button>
           <button data-tool="generator" aria-pressed="false" title="Generator: powers electrified fences">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#A88A1E"/><path d="M13 7l-5 6h4l-1 4 5-6h-4z" fill="#fff"/></svg>
             <span class="tl"><b>Generator</b><span class="price">$15,000, 600 kW</span></span></button>
@@ -363,13 +363,42 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
             <span class="tl"><b>Paleo-Medicine</b><span class="price">$30,000, vets</span></span></button>
           <button data-tool="toolshed" aria-pressed="false" title="Tool Shed: upgrades for keepers">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#5B6470"/><text x="12" y="12" class="glyph" font-size="10">S</text></svg>
-            <span class="tl"><b>Tool Shed</b><span class="price">$6,000, upgrades</span></span></button>
+            <span class="tl"><b>Tool Shed</b><span class="price">$4,000, upgrades</span></span></button>
           <button data-tool="gate" aria-pressed="false" title="Put a keeper gate on an exhibit fence">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h5M16 12h5" stroke="currentColor" stroke-width="2.5"/><rect x="8" y="8" width="8" height="8" rx="1" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.4"/></svg>
             <span class="tl"><b>Gate</b><span class="price">$1,500, on service roads</span></span></button>
           <button data-tool="platform" aria-pressed="false" title="Viewing platform: snaps onto an exhibit's fence (research at ORACLE)">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="9" width="18" height="7" rx="1" fill="#B08654" stroke="#1D2B22" stroke-width="1.2"/><path d="M5 16v4M19 16v4M3 9l3-3h12l3 3" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>
             <span class="tl"><b>Viewing Platform</b><span class="price">$20,000, research first</span></span></button>
+        </div>
+        <div class="tgroup" role="toolbar" aria-label="Logistics">
+          <button data-tool="zone" aria-pressed="false" title="Work zone: group keepers, exhibits and stores">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/></svg>
+            <span class="tl"><b>Work Zone</b><span class="price">Free, group staff</span></span></button>
+          <button data-tool="dock" aria-pressed="false" title="Delivery Dock: buys animal food overnight. Beside a service road">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#3E5C7A"/><text x="12" y="12" class="glyph" font-size="10">D</text></svg>
+            <span class="tl"><b>Delivery Dock</b><span class="price">$6,000, buy food</span></span></button>
+          <button data-tool="warehouse" aria-pressed="false" title="Warehouse: stores hay and insect feed">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#6B5B3E"/><text x="12" y="12" class="glyph" font-size="10">W</text></svg>
+            <span class="tl"><b>Warehouse</b><span class="price">$9,000, dry storage</span></span></button>
+          <button data-tool="coldstore" aria-pressed="false" title="Cold Store: keeps meat, fish and medicine fresh (needs power)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#4A7FA0"/><text x="12" y="12" class="glyph" font-size="10">❄</text></svg>
+            <span class="tl"><b>Cold Store</b><span class="price">$16,000, needs power</span></span></button>
+          <button data-tool="farm" aria-pressed="false" title="Hay Farm: grows hay (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#7A9A36"/><text x="12" y="12" class="glyph" font-size="10">F</text></svg>
+            <span class="tl"><b>Hay Farm</b><span class="price">$18,000, research first</span></span></button>
+          <button data-tool="ranch" aria-pressed="false" title="Livestock Ranch: raises meat (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#9A4A3A"/><text x="12" y="12" class="glyph" font-size="10">L</text></svg>
+            <span class="tl"><b>Livestock Ranch</b><span class="price">$22,000, research first</span></span></button>
+          <button data-tool="hatchery" aria-pressed="false" title="Fish Hatchery: breeds fish (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#3A7FA8"/><text x="12" y="12" class="glyph" font-size="10">H</text></svg>
+            <span class="tl"><b>Fish Hatchery</b><span class="price">$22,000, research first</span></span></button>
+          <button data-tool="insectary" aria-pressed="false" title="Insectary: breeds insects (research food production first)">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#A8832E"/><text x="12" y="12" class="glyph" font-size="10">I</text></svg>
+            <span class="tl"><b>Insectary</b><span class="price">$16,000, research first</span></span></button>
+          <button id="supplyBtn" aria-pressed="false" title="Show the routes keepers haul goods along">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18L12 6l8 12" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2"/><circle cx="4" cy="18" r="2" fill="#E0A030"/><circle cx="20" cy="18" r="2" fill="#E0A030"/></svg>
+            <span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button>
         </div>
         <div class="tgroup" role="toolbar" aria-label="Science departments">
           <button data-tool="oracle" aria-pressed="false" title="ORACLE: research time periods and request expeditions">
@@ -425,7 +454,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 
 <dialog id="dlgIntro">
   <h2>Welcome to Genesis Park</h2>
-  <p>You have $60,000 and an empty plot. Turn it into a park people will pay to see.</p>
+  <p>You have $100,000 and an empty plot. Turn it into a park people will pay to see.</p>
   <ol>
     <li><b>Draw an exhibit</b> with the Exhibit tool. Tap corners on the map, then tap the first corner to close it.</li>
     <li><b>Connect it with a path</b> that starts from the entrance at the bottom. Guests only see exhibits beside a path.</li>
@@ -488,6 +517,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/power.js"></script>
 <script src="js/maintenance.js"></script>
 <script src="js/medicine.js"></script>
+<script src="js/logistics.js"></script>
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/logiui.js"></script>
 <script src="js/main.js"></script>

@@ -23,11 +23,15 @@ const isBuildTool = t => !!BUILDINGS[t];
 const GRID_STEP = 5;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone";
+// Exhibits and zones are closed shapes. Paths are open lines.
+const isPoly = k => k === "exhibit" || k === "zone";
+let supplyOn = false;
+let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : null; }
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
 function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
 
@@ -63,6 +67,12 @@ function render(){
 
   const isDoomed = (kind, id) => (doomed && doomed.kind === kind && doomed.id === id) || (tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id);
   const isSel = (kind, id) => sel && sel.kind === kind && sel.id === id;
+
+  // work zones: a tinted wash and a dashed edge, under everything else
+  for(const z of state.zones){
+    const on = isSel("zone", z.id), dead = isDoomed("zone", z.id);
+    s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
 
   // exhibits
   for(const e of state.exhibits){
@@ -146,6 +156,18 @@ function render(){
     s += `<text class="sublbl" x="${cx}" y="${cy + 8*inv}" font-size="${11.5*inv}" stroke-width="${3*inv}" fill="${col}">${sub}</text>`;
   }
 
+  // supply lines: what keepers have hauled lately. Nobody draws these, they come from the zones and stores.
+  const showLines = supplyOn || tool === "zone" || (sel && (sel.kind === "zone" || (sel.kind === "building" && storeOf(findItem("building", sel.id) || {type:"food"}))));
+  if(showLines) for(const l of supplyLines()){
+    const w = Math.min(5, 1.5 + l.n / 40);
+    s += `<g pointer-events="none"><line x1="${l.a[0]}" y1="${l.a[1]}" x2="${l.b[0]}" y2="${l.b[1]}" stroke="#E0A030" stroke-opacity=".85" stroke-width="${w}" stroke-dasharray="${7*inv} ${5*inv}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`
+      + `<circle cx="${l.b[0]}" cy="${l.b[1]}" r="${4*inv}" fill="#E0A030"/></g>`;
+  }
+  for(const z of state.zones){
+    const [zx, zy] = centroid(z.points), on = isSel("zone", z.id), fs = 11*inv;
+    s += `<g data-kind="zone" data-id="${esc(z.id)}" style="cursor:pointer"><rect x="${zx - 34*inv}" y="${zy - 9*inv}" width="${68*inv}" height="${18*inv}" rx="${4*inv}" fill="${z.color}" fill-opacity="${on ? 1 : .85}" stroke="${on ? "var(--sel)" : "none"}" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" x="${zx}" y="${zy}" font-size="${fs}" style="fill:#fff">${esc(z.name.slice(0, 12))}</text></g>`;
+  }
+
   world.innerHTML = s;
   renderOverlay();
   syncAnimals();
@@ -159,9 +181,9 @@ function renderOverlay(){
   const inv = 1/view.k;
   let s = "";
   if(draw){
-    const poly = draw.kind === "exhibit";
+    const poly = isPoly(draw.kind);
     let all = draw.hover ? draw.pts.concat([draw.hover]) : draw.pts;
-    if(poly) all = closeAlong(all);
+    if(draw.kind === "exhibit") all = closeAlong(all);
     const err = draw.error;
     const col = err ? "var(--bad)" : "var(--sel)";
     if(poly && all.length >= 3) s += `<polygon points="${polyStr(all)}" fill="${col}" fill-opacity=".18" stroke="none"/>`;
@@ -181,6 +203,17 @@ function renderOverlay(){
   if(gateGhost){
     const gr = Math.max(1.6, 5*inv);
     s += `<rect x="${gateGhost.x-gr}" y="${gateGhost.y-gr}" width="${gr*2}" height="${gr*2}" fill="${gateGhost.ok ? "#D8B04A" : "var(--bad)"}" fill-opacity=".8" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  }
+  if(tool === "zoneedit" && zedit){
+    const z = zoneById(zedit.id);
+    if(z){
+      z.points.forEach((p, i) => {
+        const q = z.points[(i + 1) % z.points.length];
+        s += `<circle cx="${(p[0] + q[0]) / 2}" cy="${(p[1] + q[1]) / 2}" r="${5*inv}" fill="${z.color}" fill-opacity=".9" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+        s += `<path d="M${(p[0] + q[0]) / 2 - 2.5*inv} ${(p[1] + q[1]) / 2}h${5*inv}M${(p[0] + q[0]) / 2} ${(p[1] + q[1]) / 2 - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+      });
+      z.points.forEach((p, i) => { s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(zedit.sel === i ? 8 : 6.5)*inv}" fill="${zedit.sel === i ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`; });
+    }
   }
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   overlay.innerHTML = s;
@@ -407,11 +440,13 @@ function pathProblem(pts, type){
 const DRAW_TEXT = {
   exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it, or start and end on a neighbor's fence and tap the last corner again to share its wall."],
   path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
+  zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."]
 };
 const drawType = () => draw && draw.kind === "service" ? "service" : undefined;
 
 function setTool(t){
+  if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
   ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null;
   tool = t;
@@ -425,10 +460,14 @@ function setTool(t){
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
-    showBar(`Place ${b.one}`, b.dept ? "Backstage building, one per park. Point beside a path or service road and tap."
+    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and tap.`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Tap beside a path. Fits ${fits.join(", ")}.`
       : "Point beside a path and tap. It turns to face the path by itself.",
       `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:false, finish:false, cancel:"Done"});
+  }
+  else if(t === "zoneedit" && zedit){
+    showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
+    updateZoneEditBar();
   }
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a service road meets it. Keepers won't use a gate that opens onto a guest path. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -438,6 +477,7 @@ function setTool(t){
 
 function showBar(title, hint, stat, o){
   $("#dTitle").textContent = title; $("#dHint").textContent = hint; setStat(stat);
+  $("#dUndo").textContent = o.undoText || "Undo point"; $("#dFinish").textContent = o.finishText || "Build";
   $("#dUndo").hidden = !o.undo; $("#dFinish").hidden = !o.finish; $("#dCancel").textContent = o.cancel || "Cancel";
   $("#drawbar").classList.add("on");
 }
@@ -461,32 +501,82 @@ function updateDrawbar(){
   if(draw.kind === "exhibit"){
     const shape = closeAlong(all);
     if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of fence. ${money(exhibitCost(shape))}`; err = exhibitProblem(shape); }
+  } else if(draw.kind === "zone"){
+    if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
   draw.error = err;
   setStat(err || stat, !!err);
   $("#dUndo").disabled = !draw.pts.length;
-  const ready = draw.kind === "exhibit" ? closeAlong(draw.pts).length >= 3 && !exhibitProblem(closeAlong(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
+  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "exhibit" ? closeAlong(draw.pts).length >= 3 && !exhibitProblem(closeAlong(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
   $("#dFinish").disabled = !ready;
 }
 
 function endDraw(){ draw = null; snapMark = null; hideBar(); }
+// Zone reshaping: corners are dragged, and a + on each edge adds a corner
+function zoneHandleAt(clientX, clientY){
+  const z = zedit && zoneById(zedit.id); if(!z) return null;
+  const p = toWorld(clientX, clientY), R = 14 / view.k;
+  for(let i = 0; i < z.points.length; i++) if(Math.hypot(p.x - z.points[i][0], p.y - z.points[i][1]) < R) return {type:"v", i};
+  for(let i = 0; i < z.points.length; i++){ const a = z.points[i], b = z.points[(i + 1) % z.points.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {type:"m", i}; }
+  return null;
+}
+function updateZoneEditBar(){
+  const z = zedit && zoneById(zedit.id); if(!z) return;
+  $("#dUndo").disabled = zedit.sel == null || z.points.length <= 3; $("#dFinish").disabled = false;
+  setStat(`${z.name}: ${fmtArea(area(z.points))}, ${z.points.length} corners`);
+  renderOverlay();
+}
+function deleteZoneCorner(){
+  const z = zedit && zoneById(zedit.id); if(!z || zedit.sel == null || z.points.length <= 3) return;
+  const keep = z.points.map(p => p.slice()); z.points.splice(zedit.sel, 1);
+  const why = zoneProblem(z.points);
+  if(why){ z.points = keep; setStat(why, true); return; }
+  zedit.sel = null; updateZoneEditBar(); render();
+}
+function finishZoneEdit(){
+  const z = zedit && zoneById(zedit.id); if(!z) return;
+  const why = zoneProblem(z.points); if(why){ setStat(why, true); return; }
+  // anything unassigned that now sits inside joins the zone
+  let joined = 0;
+  for(const e of state.exhibits) if(!e.zone && inPoly(...centroid(e.points), z.points)){ e.zone = z.id; joined++; }
+  for(const b of state.buildings) if(!b.zone && !b.exhibitId && inPoly(...centroid(b.points), z.points)){ b.zone = z.id; joined++; }
+  zedit.done = true; const id = z.id;
+  afterChange(); toolDone({kind:"zone", id});
+  ui.toast(joined ? `${z.name} reshaped. ${joined} more thing${joined === 1 ? "" : "s"} joined it.` : `${z.name} reshaped.`);
+}
+function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
+  if(tool === "zoneedit"){ finishZoneEdit(); return; }
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = (d.kind === "exhibit" ? closeAlong(d.pts) : d.pts).map(p => [p[0], p[1]]);
-  const problem = d.kind === "exhibit" ? exhibitProblem(pts) : pathProblem(pts, type);
+  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "exhibit" ? exhibitProblem(pts) : pathProblem(pts, type);
   if(problem){ setStat(problem, true); return; }
+  if(d.kind === "zone"){
+    const used = new Set(state.zones.map(x => x.name));
+    let n = 1; while(used.has(`Zone ${n}`)) n++;
+    const z = {id:uid("z-"), name:`Zone ${n}`, color:ZONE_COLORS[(n - 1) % ZONE_COLORS.length], points:pts};
+    state.zones.push(z);
+    for(const e of state.exhibits) if(!e.zone && inPoly(...centroid(e.points), pts)) e.zone = z.id;
+    for(const b of state.buildings) if(!b.zone && !b.exhibitId && inPoly(...centroid(b.points), pts)) b.zone = z.id;
+    afterChange();
+    toolDone({kind:"zone", id:z.id});
+    const m = zoneMembers(z);
+    ui.toast(`${z.name}: ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"} and ${m.stores.length} building${m.stores.length === 1 ? "" : "s"} inside. Assign keepers to it from its panel.`);
+    return;
+  }
   if(d.kind === "exhibit"){
     const cost = exhibitCost(pts);
     spend(cost, "built");
     const used = new Set(state.exhibits.map(x => x.name));
     let n = 1; while(used.has(`Exhibit ${n}`)) n++;
     const e = {id:uid("e-"), name:`Exhibit ${n}`, points:pts, animals:[], happy:70, cond:100, inspected:{day:state.day, cond:100}};
+    autoZone(e);
     state.exhibits.push(e);
     afterChange();
     toolDone({kind:"exhibit", id:e.id});
@@ -516,10 +606,10 @@ function toolDone(newSel){
 function drawTap(e){
   const sn = snapAt(e.clientX, e.clientY, e), k = view.k;
   const near = q => q && Math.hypot(q[0] - sn.x, q[1] - sn.y) * k < 14;
-  if(draw.kind === "exhibit" && draw.pts.length >= 3 && near(draw.pts[0])){ finishDraw(); return; }
+  if(isPoly(draw.kind) && draw.pts.length >= 3 && near(draw.pts[0])){ finishDraw(); return; }
   // tapping the last corner again finishes an open shape that ends on a neighbor's fence
   if(draw.kind === "exhibit" && draw.pts.length >= 2 && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
-  if(draw.kind !== "exhibit" && draw.pts.length && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
+  if(!isPoly(draw.kind) && draw.pts.length && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
   draw.pts.push([sn.x, sn.y]); draw.snaps.push(sn.info);
   snapMark = null; updateDrawbar(); renderOverlay();
 }
@@ -574,12 +664,14 @@ function placeBuilding(e){
     const used = new Set(state.exhibits.map(x => x.name));
     let n = 1; while(used.has(`${t.label} ${n}`)) n++;
     const e = {id:uid("e-"), name:`${t.label} ${n}`, points:ghost.pts, animals:[], happy:70, viv:t.viv};
+    autoZone(e);
     state.exhibits.push(e);
     afterChange(); render();
     ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but its path doesn't reach the entrance yet.`, isReachable(e) ? "" : "bad");
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts};
+  autoZone(b);
   state.buildings.push(b);
   afterChange();
   render();
@@ -773,6 +865,7 @@ function removeItem(kind, it){
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
   const l = listFor(kind); l.splice(l.indexOf(it), 1);
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
+  if(kind === "zone") dropZone(it.id);
   // viewing platforms go with their exhibit
   if(kind === "exhibit") state.buildings = state.buildings.filter(b => b.exhibitId !== it.id);
   if(sel && sel.id === it.id) sel = null;
@@ -827,6 +920,16 @@ svg.addEventListener("pointerdown", e => {
     return;
   }
   if(pointers.size > 2) return;
+  if(tool === "zoneedit"){
+    const h = zoneHandleAt(e.clientX, e.clientY), z = h && zedit && zoneById(zedit.id);
+    if(h && z){
+      const start = z.points.map(p => p.slice());
+      let i = h.i;
+      if(h.type === "m"){ const a = z.points[i], b = z.points[(i + 1) % z.points.length]; z.points.splice(i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); i++; }
+      drag = {zv:i, sx:e.clientX, sy:e.clientY, moved:false, added:h.type === "m", start, hit:{kind:null, id:null}};
+      return;
+    }
+  }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
 
@@ -849,6 +952,16 @@ svg.addEventListener("pointermove", e => {
     const mx = (a.x+b.x)/2 - r.left, my = (a.y+b.y)/2 - r.top;
     view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender(); return;
   }
+  if(drag && drag.zv !== undefined){
+    const z = zedit && zoneById(zedit.id); if(!z) return;
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
+    z.points[drag.zv] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const why = zoneProblem(z.points);
+    setStat(why || `${fmtArea(area(z.points))}`, !!why);
+    queueRender(); return;
+  }
   if(!drag) return;
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if(!drag.moved && Math.hypot(dx, dy) < 6) return;
@@ -861,7 +974,17 @@ function endPointer(e){
   if(pinch){ if(pointers.size < 2) pinch = null; drag = null; render(); return; }
   if(!drag) return;
   const d = drag; drag = null;
+  if(d.zv !== undefined){
+    const z = zedit && zoneById(zedit.id);
+    if(z){
+      if(d.moved){ const why = zoneProblem(z.points); if(why){ z.points = d.start; setStat(why, true); } else zedit.sel = d.zv; }
+      else zedit.sel = zedit.sel === d.zv && !d.added ? null : d.zv;
+      updateZoneEditBar();
+    }
+    render(); return;
+  }
   if(d.moved){ render(); return; }
+  if(tool === "zoneedit") return;
   // a tap
   if(draw){ drawTap(e); return; }
   if(tool === "platform"){ platformTap(e); return; }
@@ -900,6 +1023,7 @@ function setGridSnap(on){
   if(state) render();
 }
 $("#gridBtn").onclick = () => setGridSnap(!gridSnap);
+$("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Shows hauls" : "Off"; render(); };
 setGridSnap(gridSnap);
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;

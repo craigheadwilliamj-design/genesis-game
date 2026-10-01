@@ -16,6 +16,16 @@ let arrivalCarry = 0; // fractions of a guest carried between frames
 // Hooks other files fill in, so the simulation can tell the screen what happened
 const events = { guestArrived(){}, guestLeft(){}, toast(){}, dayEnded(){}, changed(){}, gameOver(){} };
 
+// Starter species partner parks sell in this park: random picks from each pool
+function pickStarters(){
+  const out = [];
+  for(const {pick, ids} of Object.values(STARTER_POOLS)){
+    const pool = ids.slice();
+    for(let i = 0; i < pick && pool.length; i++) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return out;
+}
+const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0}; }
 
 function freshScience(){
@@ -42,7 +52,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -93,6 +103,18 @@ function upgradeSave(s){
   // parks from before medicine existed get 5 days before animals start falling ill
   if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
   if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
+  // and any medicine waiting at CERES moves to the PMC
+  if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
+  if(!s.zones) s.zones = [];
+  if(!s.logi){
+    s.logi = freshLogi();
+    if(s.staff.keepers.length || s.buildings.some(b => b.type === "station")){ s.staff.feedFrom = Math.max(s.staff.feedFrom, s.day + 2); s.logi.notice = true; }
+    const pmc = s.buildings.find(b => b.type === "pmc");
+    if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
+  }
+  for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
+  for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
@@ -200,7 +222,7 @@ function exhibitReport(e){
   // Dirt: a filthy exhibit makes animals miserable fast
   if(e.animals.length && (e.dirt || 0) > CLEAN.penaltyFrom){
     target -= (e.dirt - CLEAN.penaltyFrom) * CLEAN.penaltyPer;
-    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%). ${hasUpgrade("shovels") ? (state.staff.keepers.length ? "Keepers will muck it out when they're free." : "Hire keepers to clean it.") : "Keepers need shovels from the Tool Shed to clean it."}`});
+    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%). ${state.staff.keepers.length ? "Keepers will muck it out when they're free." + (hasUpgrade("shovels") ? "" : " Shovels from the Tool Shed make it much faster.") : "Hire keepers to clean it."}`});
   }
   // Barriers: say which animals could get out
   if(!e.viv && state.safety){
@@ -325,6 +347,7 @@ function tick(dtMin){
 
   // Animals eat, keepers walk
   ceresTick(m1 - m0);
+  logiTick(m1 - m0);
   medTick(m1 - m0);
   eatTick(m1 - m0);
   dirtTick(m1 - m0);
@@ -366,9 +389,10 @@ function guestLeaves(){
 }
 
 function dailyCosts(){
+  // partner parks bill for feeding while they do it; after that animal food is bought at the dock or made on site
   let feed = 0, wages = 0, upkeep = 0;
   for(const e of state.exhibits){
-    for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
+    if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
@@ -449,7 +473,7 @@ function tripReturns(t){
   let msg = r.gain ? `GHOST brought back ${s.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
                    : `GHOST brought back more ${s.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than what TAR already has."}`;
   // Sometimes the team finds something else along the way
-  const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && !x.shop);
+  const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && !isStarter(x));
   if(others.length && Math.random() < .3){
     const o = others[Math.floor(Math.random() * others.length)];
     const r2 = addSample(o.id, rand(5, 12), Math.round(rand(p.quality[0], p.quality[1])));
@@ -534,6 +558,7 @@ function endDay(){
   spend(c.feed, "feed"); spend(c.wages, "wages"); spend(c.upkeep, "upkeep"); spend(c.research, "science");
   scienceNight();
   keepersNight();
+  logiNight();
   escapesNight();
   mechanicsNight();
   healthNight();

@@ -30,6 +30,7 @@ const ui = {
     if(!sel) h = overviewHtml();
     else if(sel.kind === "exhibit") h = exhibitHtml(it);
     else if(sel.kind === "building") h = buildingHtml(it);
+    else if(sel.kind === "zone") h = zoneHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
@@ -95,6 +96,7 @@ function overviewHtml(){
     </ul></section>`;
   }
 
+  h += logiOverviewHtml();
   const expected = Math.round(d.demand);
   h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
     <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
@@ -176,10 +178,11 @@ function exhibitHtml(e){
   const g = gateCheck(e), need = dailyNeed(e);
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
+  h += zoneRow("exhibit", e);
   if(n){
     const dirt = e.dirt || 0;
     h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
-    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. ${!hasUpgrade("shovels") ? "<b style='color:var(--bad)'>Keepers need shovels from the Tool Shed to clean.</b>" : `Keepers clean it at ${CLEAN.dirtyAt}%, taking about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : " by hand"}.`}</div>`;
+    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until day ${state.staff.feedFrom}.` : ""}</div>`;
   }
@@ -206,7 +209,7 @@ function exhibitHtml(e){
   h += `</section>`;
 
   // starter animals from partner parks
-  const forSale = SPECIES.filter(s => s.shop && fitsHabitat(s, e));
+  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
   h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
   return h;
@@ -337,7 +340,7 @@ function oracleHtml(b){
     return `<button role="tab" class="ptab" data-action="ptab" data-p="${id}" aria-selected="${id === oracleTab}" style="--pc:${PERIOD_COLOR[id]}">${open ? "" : `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="locked"><rect x="1" y="5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`}${id}</button>`;
   }).join("")}</div>`;
 
-  const p = PERIOD_BY_ID[oracleTab], open = sc.unlocked.includes(p.id), list = SPECIES.filter(s => s.period === p.id && !s.shop);
+  const p = PERIOD_BY_ID[oracleTab], open = sc.unlocked.includes(p.id), list = SPECIES.filter(s => s.period === p.id && !isStarter(s));
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips cost ${money(p.trip)}, take ${p.days} days, fail ${Math.round(p.risk*100)}% of the time, and bring back DNA of ${p.quality[0]}–${p.quality[1]}% quality.</div>`;
   if(!open){
     const why = unlockProblem(p.id);
@@ -405,13 +408,14 @@ function tarHtml(b){
 
 function stationHtml(b){
   let h = deptHead(b);
-  h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>`;
+  h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>` + zoneRow("building", b);
+  h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
   const ks = state.staff.keepers;
   h += `<section><h3>Keepers (${ks.length})</h3>`;
-  if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span><button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
+  if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span>${zoneSelect("keeper", k.id, k.zone)}<button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
   else h += `<div class="meta">No keepers yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hire"${canAfford(KEEPER.hireCost) ? "" : " disabled"}>Hire a keeper, ${money(KEEPER.hireCost)}</button><span class="meta">${money(KEEPER.wage)} a day each</span></div></section>`;
-  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Exhibits need a gate on a service road. Vivariums don't.</div>`;
+  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
   h += `</section>`;
@@ -438,7 +442,7 @@ function workshopHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.workshop.blurb)} They check every fence every ${MAINT.inspectEvery} days and fix anything under ${MAINT.repairBelow}%, broken fences first.</div>`;
   const ms = state.staff.mechanics;
   h += `<section><h3>Mechanics (${ms.length})</h3>`;
-  h += ms.length ? `<ul class="herd">${ms.map(m => `<li><span class="dot" style="background:#C8642A"></span><span><b>${esc(m.name)}</b>${(mcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(mechanicStatus(m))}</span></span><button class="btn sell" data-action="fireMech" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No mechanics yet.</div>`;
+  h += ms.length ? `<ul class="herd">${ms.map(m => `<li><span class="dot" style="background:#C8642A"></span><span><b>${esc(m.name)}</b>${(mcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(mechanicStatus(m))}</span></span>${zoneSelect("mechanic", m.id, m.zone)}<button class="btn sell" data-action="fireMech" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No mechanics yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireMech"${canAfford(MAINT.hireCost) ? "" : " disabled"}>Hire a mechanic, ${money(MAINT.hireCost)}</button><span class="meta">${money(MAINT.wage)} a day each</span></div></section>`;
   // every fence, worst first, as of its last inspection
   const fences = state.exhibits.filter(e => !e.viv).sort((a, b) => knownCond(a) - knownCond(b));
@@ -449,7 +453,7 @@ function workshopHtml(b){
 }
 
 function generatorHtml(b){
-  let h = deptHead(b);
+  let h = deptHead(b) + zoneRow("building", b);
   const sup = powerSupply(), dem = powerDemand(), online = genOnline(b), k = knownCond(b);
   h += `<div class="meta">${esc(BUILDINGS.generator.blurb)}</div>`;
   h += `<div class="row"><span class="status ${online ? "ok" : "no"}">${online ? `Running, ${BUILDINGS.generator.power} kW` : "Broken down"}</span></div>`;
@@ -477,7 +481,8 @@ function ceresHtml(b){
   if(!anyMedTech()) h += `<div class="meta">Research medicine at ORACLE and CERES will make doses for the PMC and for medicated feed.</div>`;
   else {
     const fed = state.exhibits.filter(e => e.medFeed && e.animals.length), use = fed.reduce((s, e) => s + feedDoses(e), 0);
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter((state.ceres.meds || 0) / medCap() * 100, "#B0384F")}<span>${Math.floor(state.ceres.meds || 0)}/${medCap()}</span></div>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>At CERES</span>${meter((state.ceres.meds || 0) / medCap() * 100, "#B0384F")}<span>${Math.floor(state.ceres.meds || 0)}/${medCap()}</span></div>`;
+    h += `<div class="meta">Keepers carry doses to the PMC${stores().some(s => storeOf(s).cold) ? " and cold stores" : ""}. Doses spoil slowly, and slower in a powered cold store.</div>`;
     h += `<dl class="kv" style="margin-top:6px"><dt>Makes</dt><dd>${medRate()} doses a day</dd><dt>Medicated feed</dt><dd style="color:${use > medRate() ? "var(--bad)" : "inherit"}">${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}</dd></dl>`;
   }
   h += `</section>`;
@@ -491,13 +496,13 @@ function pmcHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.pmc.blurb)}</div>`;
   const vs = state.staff.vets, ward = state.health.ward;
   h += `<section><h3>Vets (${vs.length})</h3>`;
-  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span><button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
+  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span>${zoneSelect("vet", v.id, v.zone)}<button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} PMC patients a night.</span></div></section>`;
   h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
   h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
   h += `<div class="meta" style="margin-top:6px">Patients don't get worse here. Each treatment uses ${HEALTH.dose} doses of CERES medicine.</div></section>`;
   h += `<section><h3>Medicine</h3><ul class="issues">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "treatable" : "research at ORACLE"}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES starts making medicine once ORACLE researches any of it." : `CERES has ${Math.floor(state.ceres.meds || 0)} of ${medCap()} doses and makes ${medRate()} a day.`}</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES starts making medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(state.ceres.meds || 0)} of ${medCap()} and makes ${medRate()} a day. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:6px"><span>On site</span>${meter(pmcStock() / storeCap(b) * 100, "#B0384F")}<span>${Math.floor(pmcStock())}/${storeCap(b)}</span></div>` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
@@ -513,7 +518,7 @@ function greenhouseHtml(b){
 }
 
 function depotHtml(b){
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.depot.blurb)}</div>`;
+  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.depot.blurb)}</div>` + zoneRow("building", b);
   const working = depotWorking(b), k = knownCond(b);
   h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs on site` : "ATVs grounded"}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
@@ -527,6 +532,8 @@ function depotHtml(b){
 }
 
 function buildingHtml(b){
+  if(b.type === "dock") return dockHtml(b) + demolishRow(b);
+  if(storeOf(b) && !["station", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
   if(b.type === "depot") return depotHtml(b) + demolishRow(b);
   if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);
@@ -635,7 +642,7 @@ panelEl.addEventListener("click", e => {
 });
 panelEl.addEventListener("input", e => {
   const it = selItem();
-  if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || "Exhibit"; render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
+  if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
 });
 $("#sheetToggle").onclick = () => aside.classList.toggle("open");
 
@@ -678,7 +685,7 @@ let catFilter = "all";
 function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id], p = PERIOD_BY_ID[s.period];
   const lock = state.rating + 1e-9 < s.stars ? `Needs ${s.stars}★. You have ${state.rating.toFixed(1)}.` : "";
-  if(s.shop) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
+  if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
   if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete, quality ${d.quality}%. Send GHOST for more.`, lock};

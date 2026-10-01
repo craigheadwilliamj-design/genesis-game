@@ -74,7 +74,7 @@ function healthReport(e){
 function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && sev < HEALTH.obviousAt) a.sick.hidden = true; }
 // Can a vet cure this one where it stands?
 function fieldTreatable(a){
-  return noticed(a) && !a.darted && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && canTreat(SPECIES_BY_ID[a.sp]) && (state.ceres.meds || 0) >= HEALTH.fieldDose;
+  return noticed(a) && !a.darted && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && canTreat(SPECIES_BY_ID[a.sp]) && medOnHand() >= HEALTH.fieldDose;
 }
 
 // What's happening to one sick animal, in words
@@ -162,12 +162,14 @@ function vetHuntJob(c){
 }
 // The worst known sick animal vets can reach: minor ones are treated where they stand,
 // the rest need a free PMC bed
+const vetZone = c => (state.staff.vets.find(v => v.id === c.id) || {}).zone;   // a vet in a zone only treats that zone's exhibits
 function pickPatient(c){
   if(!dept("pmc")) return null;
+  const vz = vetZone(c);
   const taken = new Set(vcrew.filter(x => x !== c && x.patient).map(x => x.patient.a)), beds = bedsFree() > 0;
   let best = null;
   for(const e of state.exhibits){
-    if(!kGraph.anchors[e.id]) continue;
+    if(!kGraph.anchors[e.id] || (vz && e.zone !== vz)) continue;
     for(const a of e.animals){
       if(!noticed(a) || a.darted || taken.has(a.id)) continue;
       const field = fieldTreatable(a);
@@ -179,10 +181,10 @@ function pickPatient(c){
 // The exhibit most overdue for a check-up that no other vet is heading to
 function pickCheck(c){
   if(!healthActive()) return null;
-  const taken = new Set(vcrew.filter(x => x !== c && x.check).map(x => x.check));
+  const taken = new Set(vcrew.filter(x => x !== c && x.check).map(x => x.check)), vz = vetZone(c);
   let best = null;
   for(const e of state.exhibits){
-    if(!e.animals.length || !kGraph.anchors[e.id] || taken.has(e.id) || daysSinceCheck(e) < HEALTH.checkEvery) continue;
+    if(!e.animals.length || !kGraph.anchors[e.id] || taken.has(e.id) || (vz && e.zone !== vz) || daysSinceCheck(e) < HEALTH.checkEvery) continue;
     if(!best || daysSinceCheck(e) > daysSinceCheck(best)) best = e;
   }
   return best;
@@ -245,8 +247,8 @@ function treatDone(c){
   const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a), v = state.staff.vets.find(x => x.id === c.id);
   c.patient = null; c.job = "idle"; c.wait = 0;
   if(!a || !a.sick) return;
-  if((state.ceres.meds || 0) < HEALTH.fieldDose){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`, "bad"); return; }
-  state.ceres.meds -= HEALTH.fieldDose;
+  if(medOnHand() < HEALTH.fieldDose){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`, "bad"); return; }
+  useMeds(HEALTH.fieldDose);
   delete a.sick;
   events.toast(`${v ? v.name : "A vet"} treated a ${SPECIES_BY_ID[a.sp].name} in ${e.name} on the spot.`, "good");
   events.changed();
@@ -326,7 +328,7 @@ function healthNight(){
     e.medFedOk = false;
     if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;
     const need = feedDoses(e);
-    if(hungerShare(e) < .5 && (state.ceres.meds || 0) >= need){ state.ceres.meds -= need; e.medFedOk = true; }
+    if(hungerShare(e) < .5 && medOnHand() >= need){ useMeds(need); e.medFedOk = true; }
   }
   if(healthActive()){
     for(const e of state.exhibits){
@@ -357,7 +359,7 @@ function healthNight(){
   let cap = pmc ? state.staff.vets.length * VET.patients : 0;
   for(const p of [...h.ward].sort((x, y) => (y.a.sick ? y.a.sick.sev : 0) - (x.a.sick ? x.a.sick.sev : 0))){
     if(p.cured || cap <= 0 || !canTreat(SPECIES_BY_ID[p.a.sp])) continue;
-    if(!p.dosed){ if((state.ceres.meds || 0) < HEALTH.dose) continue; state.ceres.meds -= HEALTH.dose; p.dosed = true; }
+    if(!p.dosed){ if(medOnHand() < HEALTH.dose) continue; useMeds(HEALTH.dose); p.dosed = true; }
     cap--;
     p.a.sick.sev -= HEALTH.healPerNight;
     if(p.a.sick.sev <= 0){

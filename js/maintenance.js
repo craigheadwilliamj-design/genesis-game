@@ -76,9 +76,10 @@ function syncMechanics(){
 // The most urgent fence nobody else is working on: broken first, then overdue inspections, then worn ones
 function pickFence(c){
   const taken = new Set(mcrew.filter(x => x !== c && x.target).map(x => x.target));
+  const mz = (state.staff.mechanics.find(m => m.id === c.id) || {}).zone;   // a mechanic in a zone only looks after that zone
   let best = null;
   for(const e of state.exhibits.filter(x => !x.viv).concat(generators(), depots())){
-    if(taken.has(e.id) || !anchorFor(e)) continue;
+    if(taken.has(e.id) || !anchorFor(e) || (mz && e.zone !== mz)) continue;
     const k = knownCond(e), overdue = daysSinceInspect(e) >= MAINT.inspectEvery;
     let score = 0;
     if(isDown(e)) score = 1000;                               // broken fences and dead generators are obvious

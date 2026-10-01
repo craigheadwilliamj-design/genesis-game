@@ -7,7 +7,7 @@
 
 // How the park starts
 const START = {
-  money: 60000,
+  money: 100000,
   ticket: 25,          // ticket price in dollars
   rating: 1,           // starting star rating (0 to 5)
 };
@@ -59,11 +59,11 @@ const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectiv
 
 const SPECIES = [
   // Carboniferous
-  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   shop:true, viv:"L"},
+  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
   {id:"pulm",  name:"Pulmonoscorpius",     period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
   {id:"mega",  name:"Meganeura",           period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
   // Permian
-  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   shop:true},
+  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
   {id:"dcau",  name:"Diplocaulus",         period:"Permian",       diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"dime",  name:"Dimetrodon",          period:"Permian",       diet:["carnivore"], predator:true, price:9000,  food:90,  space:400,  group:[1,4],  appeal:6,  stars:1},
   {id:"scut",  name:"Scutosaurus",         period:"Permian",       diet:["herbivore"], price:8000,  food:90,  space:500,  group:[2,6],  appeal:6,  stars:1},
@@ -86,7 +86,7 @@ const SPECIES = [
   {id:"torv",  name:"Torvosaurus",         period:"Jurassic",      diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
   {id:"dipl",  name:"Diplodocus",          period:"Jurassic",      diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
   // Cretaceous
-  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   shop:true},
+  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
   {id:"micr",  name:"Microraptor",         period:"Cretaceous",    diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
   {id:"psit",  name:"Psittacosaurus",      period:"Cretaceous",    diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
   {id:"prot",  name:"Protoceratops",       period:"Cretaceous",    diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
@@ -185,6 +185,12 @@ const PERIOD_COLOR = {
   Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
 };
 
+// Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
+const STARTER_POOLS = {
+  a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
+  b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel"]},
+};
+
 // Guest buildings. w and d are width and depth in meters.
 //   perGuest   money each guest spends there
 //   capacity   guests per day it can serve before it's too busy
@@ -230,30 +236,35 @@ const GATE_REACH = 4;        // a gate counts as on a road within this many mete
 const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
 
 // Staff buildings. They go beside a path or service road.
-BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:12000, upkeep:100, w:14, d:10, dept:true,
+BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:8000, upkeep:80, w:14, d:10, dept:true,
                        full:"Food storage and keeper lockers", blurb:"Keepers start here, load food here, and swap food types here."};
-BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:8000, upkeep:60, w:10, d:8, dept:true,
+BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:5000, upkeep:40, w:10, d:8, dept:true,
                        full:"Break room and locker room", blurb:"Tired keepers rest here four times faster than at a station."};
-BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:6000, upkeep:40, w:10, d:8, dept:true, unique:true,
+BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:4000, upkeep:30, w:10, d:8, dept:true, unique:true,
                        full:"Equipment for keepers", blurb:"Buy upgrades that make keepers' work easier."};
 for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
 
 // Upgrades bought at the Tool Shed
 const UPGRADES = [
-  {id:"shovels",     label:"Shovels",      price:1500, text:"Keepers can muck out dirty exhibits. Without shovels, nothing gets cleaned."},
-  {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits 2.5 times faster.", needs:"shovels"},
+  {id:"shovels",     label:"Shovels",      price:1500, text:"Keepers clean exhibits 2.5 times faster than with bare hands."},
+  {id:"hoses",       label:"Hoses",        price:5000, text:"Keepers clean exhibits another 2.5 times faster.", needs:"shovels"},
   {id:"wheelbarrow", label:"Wheelbarrows", price:6000, text:"Keepers carry 2.5 times as much food per trip."},
   {id:"boots",       label:"Work boots",   price:3000, text:"Keepers tire 40% more slowly while walking."},
+  {id:"crates",      label:"Stacking crates", price:4000, text:"Every store holds 30% more."},
+  {id:"coolers",     label:"Cooler boxes",    price:7000, text:"Food spoils 40% more slowly in every store."},
+  {id:"forklift",    label:"Pallet forklift", price:10000, text:"Keepers restocking stores carry 3 times as much per trip.", needs:"wheelbarrow"},
 ];
 
 // Dirty exhibits
 const CLEAN = {
   messRate:.3,         // how fast animals make a mess (bigger animals make more)
   dietMess:{carnivore:1.3, piscivore:1.2, omnivore:1.1, herbivore:1, insectivore:.6},   // meat scraps are the worst
-  dirtyAt:35,          // keepers start cleaning an exhibit this dirty
+  dirtyAt:35,          // keepers go clean an exhibit this dirty before routine feeding
+  tidyAbove:2,         // a keeper with nothing else to do cleans any exhibit dirtier than this
   penaltyFrom:40,      // animals start getting unhappy above this much dirt
   penaltyPer:.6,       // happiness lost per point of dirt above that
-  handRate:1.2,        // cleaning speed by hand (slower in bigger exhibits)
+  handRate:1.2,        // cleaning speed with shovels (slower in bigger exhibits)
+  bareFactor:.4,       // keepers without shovels clean at this share of that speed
   hoseBoost:2.5,       // hoses make cleaning this much faster
   tirePerMin:.3,       // keeper stamina lost per minute of mucking
 };
@@ -296,7 +307,7 @@ const MAINT = {
   hireCost:2000,
   wage:150,
 };
-BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:10000, upkeep:60, w:12, d:10, dept:true,
+BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:7000, upkeep:50, w:12, d:10, dept:true,
                       full:"Maintenance workshop", blurb:"Mechanics are based here. They inspect and repair exhibit barriers."};
 
 /* ---------------------------------------------------------------------
@@ -357,6 +368,71 @@ BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyp
                    tech:"vehicles", serviceOnly:true,
                    full:"Staff vehicle depot", blurb:"Adds 3 ATVs for staff to share. They drive five times faster than walking, but only on service roads, and an ATV stays where it was left. Mechanics keep it running."};
 
+
+/* ---------------------------------------------------------------------
+   LOGISTICS
+   Food and medicine are real goods. They are bought at a Delivery Dock or made on site,
+   sit in stores where they can spoil, and keepers carry them to where they're needed.
+   --------------------------------------------------------------------- */
+// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at CERES.
+//   spoil   share of a store's stock lost to rot each night
+const GOODS = {
+  plants: {label:"Hay",      spoil:.04},
+  meat:   {label:"Meat",     spoil:.15},
+  fish:   {label:"Fish",     spoil:.20},
+  insects:{label:"Insects",  spoil:.10},
+  meds:   {label:"Medicine", spoil:.02},
+};
+const FEED_GOODS = ["plants", "meat", "fish", "insects"];
+const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F"};
+const LOGI = {
+  hubDays:1.5,         // a station keeps this many days of its zone's food on hand
+  bulkDays:2.5,        // warehouses and cold stores keep this many days of the whole park's food
+  crateBoost:1.3,      // stacking crates multiply store sizes
+  coolerCut:.6,        // cooler boxes multiply spoilage
+  forklift:3,          // a forklift multiplies a restock trip's load
+  urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
+  pmcDoses:20,         // doses the PMC keeps on hand
+  dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
+  rushMarkup:1.75,     // a rush order costs this much
+  rushLot:50,          // units in a rush order
+  autoDays:2,          // auto-ordering keeps the dock stocked with this many days of the park's food
+  coldPower:25,        // kW a cold store draws
+  coldSpoil:.2,        // a powered cold store multiplies spoilage by this
+};
+const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1};   // multiplied by the markup and FOOD_UNIT_COST
+
+// Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
+BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
+BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: keepers restock them from bigger stores.";
+BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:9000, upkeep:50, w:16, d:12, dept:true,
+                       store:{cap:600, holds:["plants", "insects"], spoil:.7, bulk:true},
+                       full:"Dry goods warehouse", blurb:"Stores a lot of hay and insect feed, and keeps it better than a station does. Keepers restock stations from here."};
+BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:16000, upkeep:120, w:14, d:10, dept:true,
+                       store:{cap:400, holds:["meat", "fish", "meds"], spoil:1, cold:true, bulk:true},
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, and medicine from rotting, as long as it has power from a generator."};
+BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:6000, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
+                  store:{cap:300, holds:FEED_GOODS, spoil:1, bulk:true, dock:true},
+                  full:"Supplier deliveries", blurb:"Order animal food overnight from suppliers. Trucks need a service road to the entrance. Keepers carry it from here."};
+// Production. Needs the food production research. Output goes into the building's own store.
+//   makes   units a day
+BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:260, w:20, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["plants"], spoil:1, source:true}, makes:{plants:60},
+                       full:"Hay and forage farm", blurb:"Grows 60 units of hay a day."};
+BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:22000, upkeep:380, w:20, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["meat"], spoil:1, source:true}, makes:{meat:40},
+                       full:"Feed livestock ranch", blurb:"Raises 40 units of meat a day. Meat spoils fast, so keep a cold store nearby."};
+BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:22000, upkeep:380, w:18, d:14, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["fish"], spoil:1, source:true}, makes:{fish:40},
+                       full:"Fish hatchery", blurb:"Breeds 40 units of fish a day. It spoils fastest of all."};
+BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:16000, upkeep:220, w:14, d:10, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
+                       full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
+
+// Work zones: groups of keepers, exhibits, and stores. Keepers in a zone look after that zone's exhibits.
+const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
+const ZONE_MIN_AREA = 200;
+
 // Things ORACLE can research besides time periods
 const TECH = [
   {id:"bars",     label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
@@ -371,6 +447,7 @@ const TECH = [
   {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
   {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
   {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
+  {id:"foodprod",  label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"The PMC can treat Paleogene, Neogene, and Quaternary animals. CERES makes the medicine."},
   {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"The PMC can treat Triassic, Jurassic, and Cretaceous animals. CERES makes the medicine."},
   {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"The PMC can treat Carboniferous and Permian animals. CERES makes the medicine."},
@@ -440,6 +517,8 @@ const VET = {
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:30000, upkeep:250, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
+BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
+
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};
 
@@ -455,9 +534,11 @@ const GOALS = [
   {id:"food",     text:"Build a food stand",                 hint:"Pick Food stand and tap next to a path. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="food")},
   {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
+  {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
+  {id:"zone",     text:"Draw a work zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",    text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"period",   text:"Unlock a time period",               hint:"Tap ORACLE and hire a paleontologist. They earn research points each night. Then open a period's tab and unlock it.", reward:4000, check:g=>g.state.science.unlocked.length>0},

@@ -21,8 +21,13 @@ function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLOR
 function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / (CLOSE_MIN - OPEN_MIN)); }
 // Keepers only go for Paleoflora when CERES has some to give
 const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && state.ceres.stock >= 1;
-// Where keepers pick up a food: Paleoflora at CERES, everything else at a Keeper Station
-function sourcesFor(t){ return t === "paleoflora" ? state.buildings.filter(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]) : stations(); }
+// Where keepers pick up a food: Paleoflora at CERES, everything else from a store that has some.
+// A keeper in a zone uses that zone's stores first.
+function sourcesFor(t, k){
+  if(t === "paleoflora") return cereses();
+  const have = stores().filter(b => stockOf(b, t) >= 1), kz = k && k.zone, mine = kz ? have.filter(b => b.zone === kz) : [];
+  return mine.length ? mine : have;
+}
 // Food an exhibit has for a need. Without Paleoflora, plain plant food (grass hay) stands in.
 function stockFor(e, t){ const s = e.stock || {}; return (s[t] || 0) + (t === "paleoflora" ? (s.plants || 0) * (dailyNeed(e).plants ? 0 : 1) : 0); }
 // Room an exhibit has for a delivery
@@ -36,7 +41,7 @@ const unitsPerDay = s => Math.max(1, Math.round(s.food / FOOD_UNIT_COST));
 let kGraph = null;     // {nodes: Map(key -> node), anchors: {id -> node}}
 let crew = [];         // keepers walking around right now (positions aren't saved)
 
-function freshStaff(){ return {keepers:[], mechanics:[], transfers:[], atvs:[], upgrades:[], feedFrom:5}; }
+function freshStaff(){ return {keepers:[], mechanics:[], transfers:[], atvs:[], upgrades:[], feedFrom:7}; }
 
 /* ---------- what each exhibit needs ---------- */
 
@@ -84,7 +89,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if(["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc"].includes(b.type) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc"].includes(b.type) || storeOf(b)) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -222,17 +227,24 @@ function syncCrew(){
   for(const k of state.staff.keepers) if(!crew.some(c => c.id === k.id)) crew.push({id:k.id, at:null, route:[], t:0, job:"idle", carry:k.carry || null, wait:0, plan:null});
 }
 function setCarry(c, v){ c.carry = v; const k = state.staff.keepers.find(x => x.id === c.id); if(k) k.carry = v; }
-// Hand back anything a keeper is holding: Paleoflora returns to CERES, station food is unlimited
+// Hand back anything a keeper is holding: Paleoflora returns to CERES, other goods go back into a store
 function returnCarry(c){
-  if(c.carry && c.carry.type === "paleoflora" && c.carry.amount > 0) state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + c.carry.amount);
+  const h = c.carry;
+  if(h && h.amount > 0){
+    if(h.type === "paleoflora") state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + h.amount);
+    else if(h.type === "meds" && !stashGood("meds", h.amount, null) && cereses().length) state.ceres.meds = Math.min(medCap(), (state.ceres.meds || 0) + h.amount);
+    else if(h.type !== "meds") stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : c.plan && c.plan.src));
+  }
+  c.haul = null;
   setCarry(c, null);
 }
 
 // How much of each food each exhibit is short, minus what keepers are already bringing
-function shortages(){
+function shortages(k){
   const out = [];
   for(const e of state.exhibits){
     if(!e.animals.length || !kGraph.anchors[e.id]) continue;
+    if(k && k.zone && e.zone !== k.zone) continue;   // keepers in a zone only feed that zone
     const need = dailyNeed(e); e.stock = e.stock || {};
     for(const need_t of Object.keys(need)){
       // with no CERES, keepers bring plain plant food in place of Paleoflora
@@ -344,15 +356,14 @@ function dirtPerDay(e){
   return m * CLEAN.messRate / Math.sqrt(Math.max(area(e.points), 20) / 1000);
 }
 // Dirt removed per minute of work
-function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
+function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("shovels") ? 1 : CLEAN.bareFactor) * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
 function dirtTick(dtMin){
   for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / (CLOSE_MIN - OPEN_MIN));
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
-function cleanJob(c){
-  if(!hasUpgrade("shovels")) return null;
+function cleanJob(c, k, min = CLEAN.dirtyAt){
   const taken = new Set(crew.filter(x => x !== c && x.cleanId).map(x => x.cleanId));
-  return state.exhibits.filter(e => (e.dirt || 0) >= CLEAN.dirtyAt && kGraph.anchors[e.id] && !taken.has(e.id)).sort((a, b) => b.dirt - a.dirt)[0] || null;
+  return state.exhibits.filter(e => (e.dirt || 0) >= min && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
 }
 
 function decide(c, k){
@@ -365,21 +376,41 @@ function decide(c, k){
   if(mv && doMove(c, mv)){ c.move = mv; return; }
   if(mv && !c.cargo){ mv.keeper = null; }
   if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots()); if(r){ goTo(c, r.n, "toRest"); return; } }
+  // goods in hand for a store: finish the delivery
+  if(c.carry && c.carry.amount > 0 && c.carry.dst){
+    const d = buildingById(c.carry.dst), n = d && kGraph.anchors[d.id];
+    if(n && goTo(c, n, "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
+    returnCarry(c);
+  }
   if(c.carry && c.carry.amount > 0){
-    const jobs = shortages().filter(j => j.t === c.carry.type);
+    const jobs = shortages(k).filter(j => j.t === c.carry.type);
     const w = walkFrom(c.at, c); const j = jobs.filter(j => w.dist.has(kGraph.anchors[j.e.id])).sort((a, b) => w.dist.get(kGraph.anchors[a.e.id]) - w.dist.get(kGraph.anchors[b.e.id]))[0];
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); return; }
   }
-  const job = shortages()[0];
+  // one map of the walk from here serves every choice below
+  const w = walkFrom(c.at, c);
+  const near = list => { let best = null; for(const b of list){ const n = kGraph.anchors[b.id]; if(n && w.dist.has(n) && (!best || w.dist.get(n) < best.d)) best = {b, n, d:w.dist.get(n)}; } return best; };
+  // the neediest exhibit that a store can actually supply
+  let job = null, st = null;
+  for(const j of shortages(k)){ const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
+  const haul = pickHaul(k, near);
+  const feed = () => { c.plan = {exhibitId:job.e.id, type:job.t, src:st.b.id}; goTo(c, st.n, "toStation"); };
+  const restock = () => {
+    c.haul = {t:haul.t, src:haul.src.id, dst:haul.d.id, amount:haul.amount};
+    if(!goTo(c, kGraph.anchors[haul.src.id], "toHaulSrc")) c.haul = null;
+  };
+  if(job && job.ratio < .3){ feed(); return; }
+  if(haul && haul.ratio < LOGI.urgentBelow){ restock(); if(c.haul) return; }
   // cleaning comes before routine feeding, but not before food that's running out
-  if(!job || job.ratio >= .3){
-    const dirty = cleanJob(c);
-    if(dirty){ c.cleanId = dirty.id; if(goTo(c, kGraph.anchors[dirty.id], "toClean")) return; c.cleanId = null; }
-  }
-  const st = job ? nearestOf(c, sourcesFor(job.t)) : nearestOf(c, stations());
-  if(!job || !st){ c.job = "idle"; c.wait = 15; c.plan = null; const home = nearestOf(c, stations()); if(home && home.d > 1) goTo(c, home.n, "home"); return; }
-  c.plan = {exhibitId:job.e.id, type:job.t};
-  goTo(c, st.n, "toStation");
+  const dirty = cleanJob(c, k);
+  if(dirty){ c.cleanId = dirty.id; c.cleanLow = false; if(goTo(c, kGraph.anchors[dirty.id], "toClean")) return; c.cleanId = null; }
+  if(job){ feed(); return; }
+  if(haul){ restock(); if(c.haul) return; }
+  // nothing else to do: tidy up whatever is dirtiest, however little muck there is
+  const tidy = cleanJob(c, k, CLEAN.tidyAbove + .01);
+  if(tidy){ c.cleanId = tidy.id; c.cleanLow = true; if(goTo(c, kGraph.anchors[tidy.id], "toClean")) return; c.cleanId = null; }
+  c.job = "idle"; c.wait = 15; c.plan = null;
+  const home = near(stations()); if(home && home.d > 1) goTo(c, home.n, "home");
 }
 
 function arrive(c, k){
@@ -420,16 +451,41 @@ function arrive(c, k){
   if(c.job === "toStation"){
     // drop off whatever's left, pick up a full load of the food that's needed most
     returnCarry(c);
-    const t = c.plan && c.plan.type || (shortages()[0] || {}).t;
+    const t = c.plan && c.plan.type || (shortages(k)[0] || {}).t;
     if(!t){ c.job = "idle"; c.wait = 10; return; }
-    const want = shortages().filter(j => j.t === t).reduce((s, j) => s + j.short, 0);
+    const want = shortages(k).filter(j => j.t === t).reduce((s, j) => s + j.short, 0);
     let amount = Math.min(carryMax(), Math.max(1, Math.ceil(want)));
-    // CERES can only hand out what it has grown
+    // CERES can only hand out what it has grown, and stores only what's on their shelves
+    const src = buildingById(c.plan && c.plan.src);
     if(t === "paleoflora"){ amount = Math.min(amount, Math.floor(state.ceres.stock)); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } state.ceres.stock -= amount; }
+    else { amount = Math.min(amount, src ? Math.floor(stockOf(src, t)) : 0); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } takeGood(src, t, amount); }
     setCarry(c, {type:t, amount});
     k.stamina -= KEEPER.tirePerDelivery;
-    const j = shortages().find(j => j.t === t);
+    const j = shortages(k).find(j => j.t === t);
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); } else c.job = "idle";
+    return;
+  }
+  if(c.job === "toHaulSrc"){
+    const h = c.haul, src = h && buildingById(h.src), dst = h && buildingById(h.dst);
+    returnCarry(c); c.haul = h;
+    // hand over what's there, up to the load asked for and the room the other end still has
+    const amount = src && dst ? Math.min(h.amount, supplyOf(src, h.t), Math.floor(storeRoom(dst, h.t))) : 0;
+    if(amount < 1){ c.haul = null; c.job = "idle"; c.wait = 5; return; }
+    takeSupply(src, h.t, amount);
+    setCarry(c, {type:h.t, amount, dst:h.dst});
+    k.stamina -= KEEPER.tirePerDelivery;
+    if(!goTo(c, kGraph.anchors[h.dst] || c.at, "toHaulDst")) c.job = "toHaulDst";
+    return;
+  }
+  if(c.job === "toHaulDst"){
+    const d = buildingById(c.carry && c.carry.dst);
+    if(d && c.carry){
+      const give = addGood(d, c.carry.type, c.carry.amount);
+      c.carry.amount -= give; noteFlow(c.haul && c.haul.src, d.id, give);
+      k.stamina -= KEEPER.tirePerDelivery;
+    }
+    returnCarry(c);
+    c.job = "idle"; c.wait = 0;
     return;
   }
   if(c.job === "toExhibit"){
@@ -466,7 +522,9 @@ function keepersTick(dtMin){
         // stop when it's clean, when the keeper is worn out, or when an escape needs everyone
         const need = Math.max(0, (e.dirt || 0) - 2) / cleanRate(e), w = Math.min(left, need);
         e.dirt = Math.max(0, (e.dirt || 0) - cleanRate(e) * w); k.stamina -= CLEAN.tirePerMin * w; left -= w;
-        if(e.dirt <= 2 || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
+        // light tidying gives way to real work: food that a store can supply
+        const busy = c.cleanLow && shortages(k).some(j => sourcesFor(j.t, k).length);
+        if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
       if(c.job === "sedating"){
@@ -525,7 +583,7 @@ function keepersNight(){
   for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
-  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; } }
+  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; } }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(){
@@ -541,7 +599,12 @@ function keeperStatus(k){
   const c = crew.find(x => x.id === k.id); if(!c) return "Clocking in";
   const e = c.plan && state.exhibits.find(x => x.id === c.plan.exhibitId);
   const carry = c.carry ? ` with ${Math.ceil(c.carry.amount)} ${c.carry.type}` : "";
-  return {toStation:(c.plan && c.plan.type === "paleoflora" ? "Heading to CERES" : "Heading to a station") + (e ? ` for ${e.name}` : ""), toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`,
+  const hb = c.haul && buildingById(c.haul.dst), hs = c.haul && c.haul.src && buildingById(c.haul.src);
+  const hv = c.carry && c.carry.dst ? buildingById(c.carry.dst) : hb;
+  const src = c.plan && c.plan.src && buildingById(c.plan.src);
+  return {toStation:`Heading to ${c.plan && c.plan.type === "paleoflora" ? "CERES" : src ? "the " + BUILDINGS[src.type].label.toLowerCase() : "a store"}` + (e ? ` for ${e.name}` : ""),
+          toHaulSrc:`Heading to the ${hs ? BUILDINGS[hs.type].label.toLowerCase() : "store"} to restock the ${hb ? BUILDINGS[hb.type].label.toLowerCase() : "store"}`,
+          toHaulDst:`Restocking the ${hv ? BUILDINGS[hv.type].label.toLowerCase() : "store"}${carry}`, toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`,
           toClean:`Heading to muck out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`, mucking:`Mucking out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`,
           toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
