@@ -64,7 +64,7 @@ function researchTech(id){
 
 function escapesTick(dtMin){
   const sf = state.safety;
-  if(state.day < sf.escapesFrom || !kGraph || !kGraph.nodes.size) return;
+  if(state.day < sf.escapesFrom || !kGraph) return;
   for(const e of state.exhibits){
     if(e.viv || !e.animals.length) continue;
     // the animal most likely to get out decides how risky this exhibit is
@@ -94,7 +94,7 @@ function breakOut(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
   const n = nearestNode(cx, cy);
-  state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, from:e.id, at:n.k, next:null, t:0, status:"loose"});
+  state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
   state.rating = Math.max(0, state.rating - .05);
   events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} Keepers with dart guns are on the way.`, "bad");
   events.changed();
@@ -104,7 +104,8 @@ function breakOut(e, a){
 function moveLoose(dtMin){
   for(const l of state.safety.loose){
     if(l.status !== "loose") continue;
-    let at = kGraph.nodes.get(l.at); if(!at){ at = nearestNode(0, 0); l.at = at.k; }
+    // with no paths at all it stays where it got out; it starts wandering once there are paths again
+    let at = kGraph.nodes.get(l.at); if(!at){ at = nearestNode(l.x ?? 0, l.y ?? 0); if(!at) continue; l.at = at.k; }
     let left = ESCAPE.looseSpeed * dtMin;
     for(let i = 0; i < 20 && left > 0; i++){
       let nx = l.next && kGraph.nodes.get(l.next);
@@ -117,7 +118,7 @@ function moveLoose(dtMin){
 }
 function loosePos(l){
   const a = kGraph && kGraph.nodes.get(l.at), b = l.next && kGraph.nodes.get(l.next);
-  if(!a) return null;
+  if(!a) return l.x !== undefined ? [l.x, l.y] : null;
   return b ? [a.x + (b.x - a.x) * l.t, a.y + (b.y - a.y) * l.t] : [a.x, a.y];
 }
 

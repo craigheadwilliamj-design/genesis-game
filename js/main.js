@@ -105,7 +105,7 @@ function loadLocal(){
 
 function startWith(s, fresh){
   state = upgradeSave(s);
-  inPark = []; arrivalCarry = 0;
+  inPark = []; arrivalCarry = 0; powerShortNotified = -1; repairsHaltedDay = -1;
   herd.forEach(h => h.el.remove()); herd.clear();
   sel = null; if(draw) endDraw(); setTool("select");
   crew = []; mcrew = []; keeperEls.forEach(el => el.remove()); keeperEls.clear();

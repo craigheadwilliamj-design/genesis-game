@@ -41,9 +41,14 @@ function freshStaff(){ return {keepers:[], mechanics:[], transfers:[], upgrades:
 /* ---------- what each exhibit needs ---------- */
 
 // Food each type the exhibit eats per day
+// Cached per exhibit and keyed on its herd, since keepers ask this many times a frame
+const needCache = new WeakMap();
 function dailyNeed(e){
+  const key = e.animals.map(a => a.sp).join(","), hit = needCache.get(e);
+  if(hit && hit.key === key) return hit.need;
   const need = {};
   for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp], t = foodType(s); need[t] = (need[t] || 0) + unitsPerDay(s); }
+  needCache.set(e, {key, need});
   return need;
 }
 function storeMax(e, t){ return Math.ceil((dailyNeed(e)[t] || 0) * STORE_DAYS); }
@@ -123,11 +128,20 @@ function buildKeeperGraph(){
 // Shortest walk from one stop to every other (distances and the way back)
 // Quickest way from one stop to every other. With an ATV, service roads count as faster.
 function walkFrom(start, fast){
-  const dist = new Map([[start, 0]]), prev = new Map(), open = [start], done = new Set();
-  while(open.length){
-    open.sort((a, b) => dist.get(a) - dist.get(b));
-    const n = open.shift(); if(done.has(n)) continue; done.add(n);
-    for(const [m, d] of n.adj){ const nd = dist.get(n) + (fast && n.svc.has(m) ? d / VEHICLES.speedMult : d); if(nd < (dist.has(m) ? dist.get(m) : Infinity)){ dist.set(m, nd); prev.set(m, n); open.push(m); } }
+  const dist = new Map([[start, 0]]), prev = new Map(), done = new Set();
+  // binary min-heap of [distance, node]
+  const heap = [[0, start]];
+  const push = item => { heap.push(item); let i = heap.length - 1; while(i > 0){ const p = (i - 1) >> 1; if(heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if(heap.length){ heap[0] = last; let i = 0; for(;;){ const l = 2*i + 1, r = l + 1; let m = i;
+      if(l < heap.length && heap[l][0] < heap[m][0]) m = l; if(r < heap.length && heap[r][0] < heap[m][0]) m = r;
+      if(m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } }
+    return top;
+  };
+  while(heap.length){
+    const [, n] = pop(); if(done.has(n)) continue; done.add(n);
+    for(const [m, d] of n.adj){ const nd = dist.get(n) + (fast && n.svc.has(m) ? d / VEHICLES.speedMult : d); if(nd < (dist.has(m) ? dist.get(m) : Infinity)){ dist.set(m, nd); prev.set(m, n); push([nd, m]); } }
   }
   return {dist, prev};
 }
@@ -146,7 +160,14 @@ function restSpots(){ const r = state.buildings.filter(b => b.type === "breakroo
 function syncCrew(){
   const ids = new Set(state.staff.keepers.map(k => k.id));
   crew = crew.filter(c => ids.has(c.id));
-  for(const k of state.staff.keepers) if(!crew.some(c => c.id === k.id)) crew.push({id:k.id, at:null, route:[], t:0, job:"idle", carry:null, wait:0, plan:null});
+  // carry lives on the saved keeper too, so food in hand survives a reload
+  for(const k of state.staff.keepers) if(!crew.some(c => c.id === k.id)) crew.push({id:k.id, at:null, route:[], t:0, job:"idle", carry:k.carry || null, wait:0, plan:null});
+}
+function setCarry(c, v){ c.carry = v; const k = state.staff.keepers.find(x => x.id === c.id); if(k) k.carry = v; }
+// Hand back anything a keeper is holding: Paleoflora returns to CERES, station food is unlimited
+function returnCarry(c){
+  if(c.carry && c.carry.type === "paleoflora" && c.carry.amount > 0) state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + c.carry.amount);
+  setCarry(c, null);
 }
 
 // How much of each food each exhibit is short, minus what keepers are already bringing
@@ -258,6 +279,8 @@ function cleanJob(c){
 function decide(c, k){
   const l = huntJob(c);
   if(l && chase(c, l)) return;
+  // can't chase it from here (no dart gun to fetch, no route): let another keeper try
+  if(l && l.status === "loose" && l.keeper === c.id) l.keeper = null;
   const mv = moveJob(c);
   if(mv && mv.cargo && !c.cargo) c.cargo = mv.cargo;   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
@@ -312,15 +335,14 @@ function arrive(c, k){
   }
   if(c.job === "toStation"){
     // drop off whatever's left, pick up a full load of the food that's needed most
+    returnCarry(c);
     const t = c.plan && c.plan.type || (shortages()[0] || {}).t;
-    if(!t){ c.carry = null; c.job = "idle"; c.wait = 10; return; }
+    if(!t){ c.job = "idle"; c.wait = 10; return; }
     const want = shortages().filter(j => j.t === t).reduce((s, j) => s + j.short, 0);
     let amount = Math.min(carryMax(), Math.max(1, Math.ceil(want)));
     // CERES can only hand out what it has grown
-    if(t === "paleoflora"){ amount = Math.min(amount, Math.floor(state.ceres.stock)); if(amount < 1){ c.carry = null; c.job = "idle"; c.wait = 10; return; } state.ceres.stock -= amount; }
-    // leftover Paleoflora goes back to CERES instead of vanishing
-    if(c.carry && c.carry.type === "paleoflora" && c.carry.amount > 0) state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + c.carry.amount);
-    c.carry = {type:t, amount};
+    if(t === "paleoflora"){ amount = Math.min(amount, Math.floor(state.ceres.stock)); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } state.ceres.stock -= amount; }
+    setCarry(c, {type:t, amount});
     k.stamina -= KEEPER.tirePerDelivery;
     const j = shortages().find(j => j.t === t);
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); } else c.job = "idle";
@@ -336,7 +358,7 @@ function arrive(c, k){
       const give = Math.min(room, c.carry.amount);
       e.stock[c.carry.type] = (e.stock[c.carry.type] || 0) + give; c.carry.amount -= give;
       k.stamina -= KEEPER.tirePerDelivery;
-      if(c.carry.amount <= 0.01) c.carry = null;
+      if(c.carry.amount <= 0.01) setCarry(c, null);
     }
     c.plan = null; c.job = "idle"; c.wait = 0;
     return;
@@ -416,7 +438,7 @@ function keepersNight(){
   for(const t of [...state.staff.transfers]) if(t.cargo) dropOff(t, t.cargo);
   for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
-  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ c.at = null; c.route = []; c.carry = null; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; } }
+  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ returnCarry(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; } }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(){

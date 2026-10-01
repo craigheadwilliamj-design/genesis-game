@@ -6,6 +6,7 @@
    ===================================================================== */
 
 let mcrew = [];   // mechanics walking around right now (positions aren't saved)
+let repairsHaltedDay = -1;   // the day we last warned that repairs stopped for lack of money
 
 const isAttacker = s => !!s.predator || SMART.includes(s.id);
 function condOf(e){ return e.cond ?? 100; }
@@ -120,6 +121,12 @@ function mechanicsTick(dtMin){
       }
       if(c.job === "repairing"){
         if(!e){ c.job = "idle"; c.target = null; continue; }
+        // no repairs on credit: a broke park can't buy parts
+        if(state.money <= 0){
+          c.job = "idle"; c.target = null; c.wait = 60;
+          if(repairsHaltedDay !== state.day){ repairsHaltedDay = state.day; events.toast("Mechanics stopped repairs. The park can't pay for parts until it's back in the black.", "bad"); }
+          continue;
+        }
         const need = 100 - condOf(e), mins = Math.min(left, need / MAINT.repairPerMinute);
         const gain = mins * MAINT.repairPerMinute;
         spend(repairCost(e, gain), "repairs");
