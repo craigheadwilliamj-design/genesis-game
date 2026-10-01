@@ -408,7 +408,7 @@ function stationHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>`;
   const ks = state.staff.keepers;
   h += `<section><h3>Keepers (${ks.length})</h3>`;
-  if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).atv ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span><button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
+  if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span><button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
   else h += `<div class="meta">No keepers yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hire"${canAfford(KEEPER.hireCost) ? "" : " disabled"}>Hire a keeper, ${money(KEEPER.hireCost)}</button><span class="meta">${money(KEEPER.wage)} a day each</span></div></section>`;
   h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Exhibits need a gate on a service road. Vivariums don't.</div>`;
@@ -438,7 +438,7 @@ function workshopHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.workshop.blurb)} They check every fence every ${MAINT.inspectEvery} days and fix anything under ${MAINT.repairBelow}%, broken fences first.</div>`;
   const ms = state.staff.mechanics;
   h += `<section><h3>Mechanics (${ms.length})</h3>`;
-  h += ms.length ? `<ul class="herd">${ms.map(m => `<li><span class="dot" style="background:#C8642A"></span><span><b>${esc(m.name)}</b>${(mcrew.find(c => c.id === m.id) || {}).atv ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(mechanicStatus(m))}</span></span><button class="btn sell" data-action="fireMech" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No mechanics yet.</div>`;
+  h += ms.length ? `<ul class="herd">${ms.map(m => `<li><span class="dot" style="background:#C8642A"></span><span><b>${esc(m.name)}</b>${(mcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(mechanicStatus(m))}</span></span><button class="btn sell" data-action="fireMech" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No mechanics yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireMech"${canAfford(MAINT.hireCost) ? "" : " disabled"}>Hire a mechanic, ${money(MAINT.hireCost)}</button><span class="meta">${money(MAINT.wage)} a day each</span></div></section>`;
   // every fence, worst first, as of its last inspection
   const fences = state.exhibits.filter(e => !e.viv).sort((a, b) => knownCond(a) - knownCond(b));
@@ -491,7 +491,7 @@ function pmcHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.pmc.blurb)}</div>`;
   const vs = state.staff.vets, ward = state.health.ward;
   h += `<section><h3>Vets (${vs.length})</h3>`;
-  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).atv ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span><button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
+  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span><button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} PMC patients a night.</span></div></section>`;
   h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
   h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
@@ -515,13 +515,14 @@ function greenhouseHtml(b){
 function depotHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.depot.blurb)}</div>`;
   const working = depotWorking(b), k = knownCond(b);
-  h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs ready` : "ATVs grounded"}</span></div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs on site` : "ATVs grounded"}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   h += `<div class="meta">Grounds its ATVs below ${VEHICLES.offlineBelow}%. Wears about ${VEHICLES.wear}% a day.</div>`;
-  const staff = allStaff(), slots = vehicleSlots();
-  h += `<section><h3>Who drives</h3><div class="meta">${slots} ATV${slots === 1 ? "" : "s"} across ${depots().filter(depotWorking).length} working depot${depots().filter(depotWorking).length === 1 ? "" : "s"} for ${staff.length} staff. Keepers get them first, then mechanics, then vets.${staff.length > slots ? ` ${staff.length - slots} still walk everywhere. Build more depots to put them on wheels.` : ""}</div>`;
-  if(staff.length) h += `<ul class="issues" style="margin-top:6px">${staff.map((s, i) => `<li class="${i < slots ? "" : "bad"}">${esc(s.name)}: ${i < slots ? "has an ATV" : "walking"}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">ATVs never go on guest paths. Staff park where the service road ends and walk, and the ATV stays there until they come back for it. Connected service roads keep them on wheels.</div></section>`;
+  const mine = atvs().filter(a => a.depot === b.id), nameOf = id => (allStaffList().find(x => x.id === id) || {}).name || "someone";
+  h += `<section><h3>ATVs</h3><div class="meta">${VEHICLES.perDepot} ATVs come with each depot. Any keeper, mechanic or vet can take a free one. It stays wherever they get off until somebody walks back to it, and they all return here overnight.</div>`;
+  if(mine.length) h += `<ul class="issues" style="margin-top:6px">${mine.map((a, i) => { const c = [...crew, ...mcrew, ...vcrew].find(x => x.atvId === a.id);
+    return `<li class="${working ? "" : "bad"}">ATV ${i + 1}: ${!working ? "grounded" : a.by ? `${esc(nameOf(a.by))} ${c && c.riding ? "is driving it" : "is on the way to it"}` : a.at ? "parked out on the roads" : "in the depot"}</li>`; }).join("")}</ul>`;
+  h += `<div class="meta" style="margin-top:6px">ATVs never go on guest paths. Staff park where the service road ends and walk, so connected service roads keep them on wheels.</div></section>`;
   return h;
 }
 

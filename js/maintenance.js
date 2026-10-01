@@ -104,7 +104,7 @@ function mechanicArrive(c){
 function mechanicsTick(dtMin){
   if(!kGraph) return;
   syncMechanics();
-  assignVehicles();
+  syncAtvs();
   for(const c of mcrew){
     if(!c.at){ const w = workshops()[0]; if(!w) continue; c.at = kGraph.anchors[w.id]; }
     let left = dtMin, steps = 0;

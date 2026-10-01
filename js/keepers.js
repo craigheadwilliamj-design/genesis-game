@@ -36,7 +36,7 @@ const unitsPerDay = s => Math.max(1, Math.round(s.food / FOOD_UNIT_COST));
 let kGraph = null;     // {nodes: Map(key -> node), anchors: {id -> node}}
 let crew = [];         // keepers walking around right now (positions aren't saved)
 
-function freshStaff(){ return {keepers:[], mechanics:[], transfers:[], upgrades:[], feedFrom:5}; }
+function freshStaff(){ return {keepers:[], mechanics:[], transfers:[], atvs:[], upgrades:[], feedFrom:5}; }
 
 /* ---------- what each exhibit needs ---------- */
 
@@ -121,23 +121,20 @@ function buildKeeperGraph(){
     for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), isService(c.p)); link(n, node(c.pts[i]), isService(c.p)); } }
   kGraph = {nodes, anchors};
   // point everyone at the new map (the old one is thrown away)
-  for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; rebaseAtv(k, nodes); if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
-  for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; rebaseAtv(m, nodes); if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
-  for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; rebaseAtv(v, nodes); if(!["darting", "treating", "checking"].includes(v.job)){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; v.check = null; } }
+  for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; rebaseAtv(k); if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
+  for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; rebaseAtv(m); if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
+  for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; rebaseAtv(v); if(!["darting", "treating", "checking"].includes(v.job)){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; v.check = null; } }
 }
 
-// Quickest way from one stop to every other. An ATV is a real object: it sits where its owner last got off.
-// Staff can only ride service roads, and only an ATV they are standing next to, so a gap in the service
-// roads means walking it and leaving the ATV parked until they come back. One ride per trip.
-// Layers: 0 = on foot with the ATV still parked at c.atvAt, 1 = riding, 2 = on foot with the ATV left behind.
-// Pass a crew member as `c`, or nothing to plan a plain walk.
-function walkFrom(start, c){
+// Quickest way from one stop to every other. ATVs are shared and sit where the last driver left them.
+// Staff can only ride service roads, and only an ATV they have walked to, so a gap in the service roads
+// means walking it and leaving the ATV parked there for whoever needs it next. One ride per trip.
+// Layers: 0 = on foot, an ATV is free at one of `mounts`, 1 = riding, 2 = on foot with no ATV left to use.
+// Pass a crew member as `c` (or nothing to plan a plain walk); `mounts` overrides which stops have a free ATV.
+function walkFrom(start, c, mounts){
   const speed = typeof VEHICLES !== "undefined" ? VEHICLES.speedMult : 5;
-  let park = null, l0 = 2;
-  if(c && c.atv){
-    if(!c.riding && !c.atvAt) c.atvAt = start;   // a new ATV starts with its owner
-    park = c.riding ? start : c.atvAt; l0 = c.riding ? 1 : 0;
-  }
+  if(!mounts) mounts = c ? freeAtvNodes(c) : new Set();
+  const l0 = c && c.riding ? 1 : mounts.size ? 0 : 2;
   const dist = [new Map(), new Map(), new Map()], prev = [new Map(), new Map(), new Map()], done = [new Set(), new Set(), new Set()];
   dist[l0].set(start, 0);
   // binary min-heap of [distance, node, layer]
@@ -154,7 +151,7 @@ function walkFrom(start, c){
   while(heap.length){
     const [, n, l] = pop(); if(done[l].has(n)) continue; done[l].add(n);
     const d0 = dist[l].get(n);
-    if(l === 0 && n === park) relax(d0, n, 1, [n, 0]);   // climb on at the parked ATV
+    if(l === 0 && mounts.has(n)) relax(d0, n, 1, [n, 0]);   // climb on at a parked ATV
     if(l === 1) relax(d0, n, 2, [n, 1]);                  // get off anywhere; it stays here
     for(const [m, d] of n.adj){
       if(l === 1){ if(n.svc.has(m)) relax(d0 + d / speed, m, 1, [n, 1]); }
@@ -183,17 +180,30 @@ function routeTo(w, target){
 // Follow a planned route: climb on or get off the ATV when we reach the stop where that happens
 function atNode(c){
   if(c.mountAt && c.mountAt === c.at){ c.riding = true; c.mountAt = null; }
-  if(c.parkAt && c.parkAt === c.at){ c.riding = false; c.atvAt = c.at; c.parkAt = null; }
+  if(c.parkAt && c.parkAt === c.at){ dismount(c, c.at); c.parkAt = null; }
 }
-function setRoute(c, w, n){ const r = routeTo(w, n); c.route = r.slice(1); c.mountAt = r.mount; c.parkAt = r.park; atNode(c); }
-// The map was rebuilt: park the ATV where its owner stands, and re-point it at the new stops
-function rebaseAtv(c, nodes){
-  c.mountAt = c.parkAt = null;
-  if(c.riding){ c.riding = false; c.atvAt = c.at; }
-  else c.atvAt = c.atvAt ? nodes.get(c.atvAt.k) || null : null;
+// Plan a trip. If it starts with a walk to an ATV, set that ATV aside so nobody else takes it.
+function setRoute(c, w, n){
+  const r = routeTo(w, n);
+  if(r.mount){ const a = usableAtvs().find(a => !a.by && atvNode(a) === r.mount); if(a){ a.by = c.id; c.atvId = a.id; } else r.mount = null; }
+  c.route = r.slice(1); c.mountAt = r.mount; c.parkAt = r.park; atNode(c);
 }
-// A new day: the ATV is back with its owner
-function resetAtv(c){ c.riding = false; c.atvAt = null; c.mountAt = c.parkAt = null; }
+// Get off: the ATV stays at this stop until someone else (or this person) walks back to it
+function dismount(c, node){
+  const a = atvs().find(x => x.id === c.atvId);
+  if(a){ a.at = node ? node.k : null; a.by = null; }
+  c.atvId = null; c.riding = false;
+}
+// An ATV set aside for a walk that never finished goes back to being free
+function releaseAtv(c){
+  if(c.riding || !c.atvId) return;
+  const a = atvs().find(x => x.id === c.atvId); if(a) a.by = null;
+  c.atvId = null;
+}
+// The map was rebuilt: a rider parks where they stand, and everyone re-plans on the new stops
+function rebaseAtv(c){ c.mountAt = c.parkAt = null; if(c.riding) dismount(c, c.at); else releaseAtv(c); }
+// A new day: nobody is mid-ride
+function resetAtv(c){ c.riding = false; c.atvId = null; c.mountAt = c.parkAt = null; }
 
 /* ---------- running the crew ---------- */
 
@@ -444,7 +454,7 @@ function arrive(c, k){
 function keepersTick(dtMin){
   if(!kGraph) return;
   syncCrew();
-  assignVehicles();
+  syncAtvs();
   for(const c of crew){
     const k = state.staff.keepers.find(x => x.id === c.id);
     if(!c.at){ const s = stations()[0]; if(!s) continue; c.at = kGraph.anchors[s.id]; c.job = "idle"; }
@@ -514,6 +524,7 @@ function keepersNight(){
   for(const t of [...state.staff.transfers]) if(t.cargo) dropOff(t, t.cargo);
   for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
+  for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
   for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; } }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
@@ -541,14 +552,37 @@ function keeperStatus(k){
 
 /* ---------- staff vehicles ---------- */
 
+// Every depot comes with its own set of ATVs. They are shared: anyone can take a free one, and it stays
+// wherever the last driver got off. state.staff.atvs: {id, depot, at: stop key or null (in its depot), by: staff id or null}
 const depots = () => state.buildings.filter(b => b.type === "depot");
 const depotWorking = b => isReachable(b) && condOf(b) >= VEHICLES.offlineBelow;
-function vehicleSlots(){ return hasTech("vehicles") ? depots().filter(depotWorking).length * VEHICLES.perDepot : 0; }
-// Hand out ATVs: keepers first, then mechanics, then vets, as many as the working depots hold
-const allStaff = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets);
-function assignVehicles(){
-  const lucky = new Set(allStaff().slice(0, vehicleSlots()).map(s => s.id));
-  for(const c of [...crew, ...mcrew, ...vcrew]){ c.atv = lucky.has(c.id); if(!c.atv) resetAtv(c); }
+const atvs = () => state.staff.atvs;
+const allStaffList = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets);
+// A broken depot grounds its own ATVs wherever they are parked
+function usableAtvs(){
+  if(!hasTech("vehicles")) return [];
+  const ok = new Set(depots().filter(depotWorking).map(b => b.id));
+  return atvs().filter(a => ok.has(a.depot));
 }
-// Is this person driving right now? Only while riding their ATV, and only on a service road.
-function onAtv(c){ const nx = c.route && c.route[0]; return !!(c.atv && c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }
+function atvNode(a){ return (a.at && kGraph.nodes.get(a.at)) || kGraph.anchors[a.depot] || null; }
+// Stops where an ATV is free to take (the person's own set-aside one is released first)
+function freeAtvNodes(c){
+  releaseAtv(c);
+  const out = new Set();
+  for(const a of usableAtvs()) if(!a.by){ const n = atvNode(a); if(n) out.add(n); }
+  return out;
+}
+// Each depot holds its set of ATVs; demolishing one takes them with it
+function syncAtvs(){
+  const list = atvs(), ids = new Set(depots().map(b => b.id));
+  for(let i = list.length - 1; i >= 0; i--) if(!ids.has(list[i].depot)) list.splice(i, 1);
+  for(const b of depots()){ let n = list.filter(a => a.depot === b.id).length; while(n++ < VEHICLES.perDepot) list.push({id:uid("a-"), depot:b.id, at:null, by:null}); }
+  const have = new Set(list.map(a => a.id)), held = new Set();
+  for(const c of [...crew, ...mcrew, ...vcrew]){
+    if(c.atvId && !have.has(c.atvId)){ c.atvId = null; c.riding = false; c.mountAt = c.parkAt = null; }
+    if(c.atvId) held.add(c.atvId);
+  }
+  for(const a of list) if(a.by && !held.has(a.id)) a.by = null;
+}
+// Is this person driving right now? Only while on an ATV, and only on a service road.
+function onAtv(c){ const nx = c.route && c.route[0]; return !!(c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }
