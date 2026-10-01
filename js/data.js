@@ -7,7 +7,7 @@
 
 // How the park starts
 const START = {
-  money: 60000,
+  money: 100000,
   ticket: 25,          // ticket price in dollars
   rating: 1,           // starting star rating (0 to 5)
 };
@@ -230,11 +230,11 @@ const GATE_REACH = 4;        // a gate counts as on a road within this many mete
 const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
 
 // Staff buildings. They go beside a path or service road.
-BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:12000, upkeep:100, w:14, d:10, dept:true,
+BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:8000, upkeep:80, w:14, d:10, dept:true,
                        full:"Food storage and keeper lockers", blurb:"Keepers start here, load food here, and swap food types here."};
-BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:8000, upkeep:60, w:10, d:8, dept:true,
+BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:5000, upkeep:40, w:10, d:8, dept:true,
                        full:"Break room and locker room", blurb:"Tired keepers rest here four times faster than at a station."};
-BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:6000, upkeep:40, w:10, d:8, dept:true, unique:true,
+BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:4000, upkeep:30, w:10, d:8, dept:true, unique:true,
                        full:"Equipment for keepers", blurb:"Buy upgrades that make keepers' work easier."};
 for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
 
@@ -299,7 +299,7 @@ const MAINT = {
   hireCost:2000,
   wage:150,
 };
-BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:10000, upkeep:60, w:12, d:10, dept:true,
+BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:7000, upkeep:50, w:12, d:10, dept:true,
                       full:"Maintenance workshop", blurb:"Mechanics are based here. They inspect and repair exhibit barriers."};
 
 /* ---------------------------------------------------------------------
@@ -403,7 +403,7 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:16000, upkeep:120, w:14, d:10, dept:true,
                        store:{cap:400, holds:["meat", "fish", "meds"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, and medicine from rotting, as long as it has power from a generator."};
-BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:10000, upkeep:80, w:16, d:10, dept:true, serviceOnly:true,
+BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:6000, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
                   store:{cap:300, holds:FEED_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food overnight from suppliers. Trucks need a service road to the entrance. Keepers carry it from here."};
 // Production. Needs the food production research. Output goes into the building's own store.
