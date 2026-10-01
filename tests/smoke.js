@@ -261,6 +261,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.idleKeeperTidies = run(600, () => viv.dirt < 5);
     keepersNight();
 
+    // reshaping a zone: cancel puts it back, Done keeps it and pulls in what's now inside
+    state.zones.push({id:"z-e", name:"Edit", color:"#fff", points:[[100,100],[140,100],[140,140],[100,140]]});
+    const lone = {id:"e-lone", name:"Lone", viv:"S", points:rectPts(180, 120, 6, 4, 0), animals:[], happy:70}; state.exhibits.push(lone);
+    startZoneEdit("z-e"); zoneById("z-e").points = [[100,100],[200,100],[200,140],[100,140]]; setTool("select");
+    out.zoneEditCancel = JSON.stringify(zoneById("z-e").points) === JSON.stringify([[100,100],[140,100],[140,140],[100,140]]) && !lone.zone;
+    startZoneEdit("z-e"); zoneById("z-e").points = [[100,100],[200,100],[200,140],[100,140]]; finishZoneEdit();
+    out.zoneEditDone = zoneById("z-e").points[1][0] === 200 && lone.zone === "z-e" && tool === "select";
+    state.exhibits = state.exhibits.filter(e => e !== lone); dropZone("z-e"); state.zones = state.zones.filter(z => z.id !== "z-e");
+
     // production fills its own store through the day, and stops when full
     const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();

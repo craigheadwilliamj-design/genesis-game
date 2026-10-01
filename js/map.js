@@ -26,7 +26,8 @@ try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
 const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone";
 // Exhibits and zones are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone";
-let supplyOn = false;               // show supply lines on the map
+let supplyOn = false;
+let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
 /* ---------- looking things up ---------- */
@@ -202,6 +203,17 @@ function renderOverlay(){
   if(gateGhost){
     const gr = Math.max(1.6, 5*inv);
     s += `<rect x="${gateGhost.x-gr}" y="${gateGhost.y-gr}" width="${gr*2}" height="${gr*2}" fill="${gateGhost.ok ? "#D8B04A" : "var(--bad)"}" fill-opacity=".8" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  }
+  if(tool === "zoneedit" && zedit){
+    const z = zoneById(zedit.id);
+    if(z){
+      z.points.forEach((p, i) => {
+        const q = z.points[(i + 1) % z.points.length];
+        s += `<circle cx="${(p[0] + q[0]) / 2}" cy="${(p[1] + q[1]) / 2}" r="${5*inv}" fill="${z.color}" fill-opacity=".9" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+        s += `<path d="M${(p[0] + q[0]) / 2 - 2.5*inv} ${(p[1] + q[1]) / 2}h${5*inv}M${(p[0] + q[0]) / 2} ${(p[1] + q[1]) / 2 - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+      });
+      z.points.forEach((p, i) => { s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(zedit.sel === i ? 8 : 6.5)*inv}" fill="${zedit.sel === i ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`; });
+    }
   }
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   overlay.innerHTML = s;
@@ -434,6 +446,7 @@ const DRAW_TEXT = {
 const drawType = () => draw && draw.kind === "service" ? "service" : undefined;
 
 function setTool(t){
+  if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
   ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null;
   tool = t;
@@ -452,6 +465,10 @@ function setTool(t){
       : "Point beside a path and tap. It turns to face the path by itself.",
       `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:false, finish:false, cancel:"Done"});
   }
+  else if(t === "zoneedit" && zedit){
+    showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
+    updateZoneEditBar();
+  }
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a service road meets it. Keepers won't use a gate that opens onto a guest path. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
@@ -460,6 +477,7 @@ function setTool(t){
 
 function showBar(title, hint, stat, o){
   $("#dTitle").textContent = title; $("#dHint").textContent = hint; setStat(stat);
+  $("#dUndo").textContent = o.undoText || "Undo point"; $("#dFinish").textContent = o.finishText || "Build";
   $("#dUndo").hidden = !o.undo; $("#dFinish").hidden = !o.finish; $("#dCancel").textContent = o.cancel || "Cancel";
   $("#drawbar").classList.add("on");
 }
@@ -496,10 +514,44 @@ function updateDrawbar(){
 }
 
 function endDraw(){ draw = null; snapMark = null; hideBar(); }
+// Zone reshaping: corners are dragged, and a + on each edge adds a corner
+function zoneHandleAt(clientX, clientY){
+  const z = zedit && zoneById(zedit.id); if(!z) return null;
+  const p = toWorld(clientX, clientY), R = 14 / view.k;
+  for(let i = 0; i < z.points.length; i++) if(Math.hypot(p.x - z.points[i][0], p.y - z.points[i][1]) < R) return {type:"v", i};
+  for(let i = 0; i < z.points.length; i++){ const a = z.points[i], b = z.points[(i + 1) % z.points.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {type:"m", i}; }
+  return null;
+}
+function updateZoneEditBar(){
+  const z = zedit && zoneById(zedit.id); if(!z) return;
+  $("#dUndo").disabled = zedit.sel == null || z.points.length <= 3; $("#dFinish").disabled = false;
+  setStat(`${z.name}: ${fmtArea(area(z.points))}, ${z.points.length} corners`);
+  renderOverlay();
+}
+function deleteZoneCorner(){
+  const z = zedit && zoneById(zedit.id); if(!z || zedit.sel == null || z.points.length <= 3) return;
+  const keep = z.points.map(p => p.slice()); z.points.splice(zedit.sel, 1);
+  const why = zoneProblem(z.points);
+  if(why){ z.points = keep; setStat(why, true); return; }
+  zedit.sel = null; updateZoneEditBar(); render();
+}
+function finishZoneEdit(){
+  const z = zedit && zoneById(zedit.id); if(!z) return;
+  const why = zoneProblem(z.points); if(why){ setStat(why, true); return; }
+  // anything unassigned that now sits inside joins the zone
+  let joined = 0;
+  for(const e of state.exhibits) if(!e.zone && inPoly(...centroid(e.points), z.points)){ e.zone = z.id; joined++; }
+  for(const b of state.buildings) if(!b.zone && !b.exhibitId && inPoly(...centroid(b.points), z.points)){ b.zone = z.id; joined++; }
+  zedit.done = true; const id = z.id;
+  afterChange(); toolDone({kind:"zone", id});
+  ui.toast(joined ? `${z.name} reshaped. ${joined} more thing${joined === 1 ? "" : "s"} joined it.` : `${z.name} reshaped.`);
+}
+function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
+  if(tool === "zoneedit"){ finishZoneEdit(); return; }
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = (d.kind === "exhibit" ? closeAlong(d.pts) : d.pts).map(p => [p[0], p[1]]);
@@ -868,6 +920,16 @@ svg.addEventListener("pointerdown", e => {
     return;
   }
   if(pointers.size > 2) return;
+  if(tool === "zoneedit"){
+    const h = zoneHandleAt(e.clientX, e.clientY), z = h && zedit && zoneById(zedit.id);
+    if(h && z){
+      const start = z.points.map(p => p.slice());
+      let i = h.i;
+      if(h.type === "m"){ const a = z.points[i], b = z.points[(i + 1) % z.points.length]; z.points.splice(i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); i++; }
+      drag = {zv:i, sx:e.clientX, sy:e.clientY, moved:false, added:h.type === "m", start, hit:{kind:null, id:null}};
+      return;
+    }
+  }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
 
@@ -890,6 +952,16 @@ svg.addEventListener("pointermove", e => {
     const mx = (a.x+b.x)/2 - r.left, my = (a.y+b.y)/2 - r.top;
     view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender(); return;
   }
+  if(drag && drag.zv !== undefined){
+    const z = zedit && zoneById(zedit.id); if(!z) return;
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
+    z.points[drag.zv] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const why = zoneProblem(z.points);
+    setStat(why || `${fmtArea(area(z.points))}`, !!why);
+    queueRender(); return;
+  }
   if(!drag) return;
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if(!drag.moved && Math.hypot(dx, dy) < 6) return;
@@ -902,7 +974,17 @@ function endPointer(e){
   if(pinch){ if(pointers.size < 2) pinch = null; drag = null; render(); return; }
   if(!drag) return;
   const d = drag; drag = null;
+  if(d.zv !== undefined){
+    const z = zedit && zoneById(zedit.id);
+    if(z){
+      if(d.moved){ const why = zoneProblem(z.points); if(why){ z.points = d.start; setStat(why, true); } else zedit.sel = d.zv; }
+      else zedit.sel = zedit.sel === d.zv && !d.added ? null : d.zv;
+      updateZoneEditBar();
+    }
+    render(); return;
+  }
   if(d.moved){ render(); return; }
+  if(tool === "zoneedit") return;
   // a tap
   if(draw){ drawTap(e); return; }
   if(tool === "platform"){ platformTap(e); return; }

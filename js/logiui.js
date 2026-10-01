@@ -114,6 +114,7 @@ function zoneHtml(z){
   h += m.stores.length ? `<ul class="herd">${m.stores.map(b => row("building", b, BUILDINGS[b.type].label)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.buildings.filter(b => zb(b) && b.zone !== z.id).map(b => ["building", b.id, b.zone ? `${BUILDINGS[b.type].label} (${zoneName(b.zone)})` : BUILDINGS[b.type].label]), "Add a building…");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="claimZone">Claim everything inside</button></div></section>`;
+  h += `<div class="row"><button class="btn" data-action="zoneEdit">Reshape zone</button><span class="meta">Move corners, add more</span></div>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Remove zone</button></div>`;
   return h;
 }
@@ -154,6 +155,7 @@ panelEl.addEventListener("click", ev => {
   const a = b.dataset.action, it = selItem(), done = () => { afterChange(); render(); };
   if(a === "zoneTool"){ setTool("zone"); return; }
   if(a === "supplyToggle"){ $("#supplyBtn").click(); ui.panel(); return; }
+  if(a === "zoneEdit" && it && sel.kind === "zone"){ startZoneEdit(it.id); return; }
   if(a === "gotoZone"){ select("zone", b.dataset.id); return; }
   if(a === "claimZone" && it && sel.kind === "zone"){
     for(const e of state.exhibits) if(!e.zone && inPoly(...centroid(e.points), it.points)) e.zone = it.id;
