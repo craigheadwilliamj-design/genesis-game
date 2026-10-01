@@ -90,9 +90,9 @@ function pickFence(c){
 }
 
 function mechanicGo(c, n, job){
-  const w = walkFrom(c.at, c.atv);
+  const w = walkFrom(c.at, c);
   if(!w.dist.has(n)){ c.job = "idle"; c.wait = 15; c.target = null; return; }
-  c.route = routeTo(w, n).slice(1); c.job = job;
+  setRoute(c, w, n); c.job = job;
 }
 
 function mechanicArrive(c){
@@ -137,7 +137,7 @@ function mechanicsTick(dtMin){
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = MAINT.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
-        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; if(!c.route.length) mechanicArrive(c); }
+        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; atNode(c); if(!c.route.length) mechanicArrive(c); }
         continue;
       }
       if(c.job !== "idle"){ mechanicArrive(c); continue; }
@@ -149,7 +149,7 @@ function mechanicsTick(dtMin){
   }
 }
 
-function mechanicsNight(){ for(const c of mcrew){ c.at = null; c.route = []; c.job = "idle"; c.target = null; } }
+function mechanicsNight(){ for(const c of mcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.target = null; } }
 
 function hireMechanic(){
   if(!state.buildings.some(b => b.type === "workshop")) return "Build a Workshop first.";

@@ -345,7 +345,7 @@ const POWER = {
 BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:15000, upkeep:150, w:12, d:10, dept:true, power:600,
                        full:"Diesel generator", blurb:"Powers every electrified fence in the park. Mechanics keep it running."};
 
-// Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk.
+// Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk, and the ATV stays parked where they got off.
 const VEHICLES = {
   perDepot:3,             // ATVs each depot holds, so this many staff can drive at once
   speedMult:5,            // how much faster than walking an ATV goes

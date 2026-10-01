@@ -521,7 +521,7 @@ function depotHtml(b){
   const staff = allStaff(), slots = vehicleSlots();
   h += `<section><h3>Who drives</h3><div class="meta">${slots} ATV${slots === 1 ? "" : "s"} across ${depots().filter(depotWorking).length} working depot${depots().filter(depotWorking).length === 1 ? "" : "s"} for ${staff.length} staff. Keepers get them first, then mechanics, then vets.${staff.length > slots ? ` ${staff.length - slots} still walk everywhere. Build more depots to put them on wheels.` : ""}</div>`;
   if(staff.length) h += `<ul class="issues" style="margin-top:6px">${staff.map((s, i) => `<li class="${i < slots ? "" : "bad"}">${esc(s.name)}: ${i < slots ? "has an ATV" : "walking"}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">ATVs never go on guest paths. Staff park and walk those stretches, so a connected service road network makes them much faster.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">ATVs never go on guest paths. Staff park where the service road ends and walk, and the ATV stays there until they come back for it. Connected service roads keep them on wheels.</div></section>`;
   return h;
 }
 

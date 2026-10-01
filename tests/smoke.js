@@ -31,6 +31,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(let it = 0; it < 60; it++) for(const n of nodes) if(bf.has(n)) for(const [m, d] of n.adj){ const nd = bf.get(n) + d; if(!bf.has(m) || nd < bf.get(m) - 1e-9) bf.set(m, nd); }
     out.dijkstra = w.dist.size === bf.size && [...bf].every(([n, d]) => Math.abs(w.dist.get(n) - d) < 1e-6);
 
+    // ATVs stay parked: ride a service road, walk a gap, and the ATV is NOT there on the far side
+    const mk = (k, x) => ({k, x, y:0, adj:new Map(), svc:new Set()});
+    const [A, B, C, D, E] = [mk("A", 0), mk("B", 100), mk("C", 200), mk("D", 300), mk("E", 400)];
+    const ln = (a, b, svc) => { const d = Math.abs(a.x - b.x); a.adj.set(b, d); b.adj.set(a, d); if(svc){ a.svc.add(b); b.svc.add(a); } };
+    ln(A, B, true); ln(B, C, false); ln(C, D, true); ln(D, E, true);
+    const rider = {atv:true, riding:false, atvAt:A};
+    let wv = walkFrom(A, rider), rv = routeTo(wv, E);
+    out.atvPlan = rv.mount === A && rv.park === B && Math.abs(wv.dist.get(E) - (100/VEHICLES.speedMult + 100 + 200)) < 1e-6;   // ride A-B, walk B-E
+    // already on foot at C with the ATV parked at B: the C-D-E road is out of reach, so no riding
+    const foot = {atv:true, riding:false, atvAt:B};
+    wv = walkFrom(C, foot); out.atvLeftBehind = !routeTo(wv, E).mount && Math.abs(wv.dist.get(E) - 200) < 1e-6;
+    // back at B with the ATV, it is used again
+    wv = walkFrom(B, foot); out.atvRemount = routeTo(wv, A).mount === B && Math.abs(wv.dist.get(A) - 100/VEHICLES.speedMult) < 1e-6;
+
     // dailyNeed cache follows herd changes
     const e = {id:"x", animals:[{id:"a1", sp:sp.id}], points:[[0,0],[10,0],[10,10]]};
     const n1 = JSON.stringify(dailyNeed(e)); e.animals.push({id:"a2", sp:sp.id});
