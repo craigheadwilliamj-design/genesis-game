@@ -16,6 +16,16 @@ let arrivalCarry = 0; // fractions of a guest carried between frames
 // Hooks other files fill in, so the simulation can tell the screen what happened
 const events = { guestArrived(){}, guestLeft(){}, toast(){}, dayEnded(){}, changed(){}, gameOver(){} };
 
+// Starter species partner parks sell in this park: random picks from each pool
+function pickStarters(){
+  const out = [];
+  for(const {pick, ids} of Object.values(STARTER_POOLS)){
+    const pool = ids.slice();
+    for(let i = 0; i < pick && pool.length; i++) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  return out;
+}
+const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0}; }
 
 function freshScience(){
@@ -42,7 +52,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -95,6 +105,7 @@ function upgradeSave(s){
   if(s.ceres.meds === undefined) s.ceres.meds = 0;
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at CERES moves to the PMC
+  if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
   if(!s.logi){
     s.logi = freshLogi();
@@ -462,7 +473,7 @@ function tripReturns(t){
   let msg = r.gain ? `GHOST brought back ${s.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
                    : `GHOST brought back more ${s.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than what TAR already has."}`;
   // Sometimes the team finds something else along the way
-  const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && !x.shop);
+  const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && !isStarter(x));
   if(others.length && Math.random() < .3){
     const o = others[Math.floor(Math.random() * others.length)];
     const r2 = addSample(o.id, rand(5, 12), Math.round(rand(p.quality[0], p.quality[1])));

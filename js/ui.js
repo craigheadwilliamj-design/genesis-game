@@ -209,7 +209,7 @@ function exhibitHtml(e){
   h += `</section>`;
 
   // starter animals from partner parks
-  const forSale = SPECIES.filter(s => s.shop && fitsHabitat(s, e));
+  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
   h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
   return h;
@@ -340,7 +340,7 @@ function oracleHtml(b){
     return `<button role="tab" class="ptab" data-action="ptab" data-p="${id}" aria-selected="${id === oracleTab}" style="--pc:${PERIOD_COLOR[id]}">${open ? "" : `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="locked"><rect x="1" y="5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`}${id}</button>`;
   }).join("")}</div>`;
 
-  const p = PERIOD_BY_ID[oracleTab], open = sc.unlocked.includes(p.id), list = SPECIES.filter(s => s.period === p.id && !s.shop);
+  const p = PERIOD_BY_ID[oracleTab], open = sc.unlocked.includes(p.id), list = SPECIES.filter(s => s.period === p.id && !isStarter(s));
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips cost ${money(p.trip)}, take ${p.days} days, fail ${Math.round(p.risk*100)}% of the time, and bring back DNA of ${p.quality[0]}–${p.quality[1]}% quality.</div>`;
   if(!open){
     const why = unlockProblem(p.id);
@@ -685,7 +685,7 @@ let catFilter = "all";
 function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id], p = PERIOD_BY_ID[s.period];
   const lock = state.rating + 1e-9 < s.stars ? `Needs ${s.stars}★. You have ${state.rating.toFixed(1)}.` : "";
-  if(s.shop) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
+  if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
   if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete, quality ${d.quality}%. Send GHOST for more.`, lock};

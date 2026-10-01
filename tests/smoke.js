@@ -52,6 +52,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings = keepB; state.staff.atvs = keepA;
     out.atvPerDepot = two && one;
 
+    // every new park sells one species from pool A and two from pool B
+    let starterOk = true; const seenA = new Set();
+    for(let i = 0; i < 60; i++){
+      const st = pickStarters(), a = st.filter(id => STARTER_POOLS.a.ids.includes(id)), b = st.filter(id => STARTER_POOLS.b.ids.includes(id));
+      starterOk = starterOk && st.length === 3 && a.length === 1 && b.length === 2 && new Set(st).size === 3; seenA.add(a[0]);
+    }
+    out.starterPools = starterOk && seenA.size > 1;
+    const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
+    out.oldSaveStarters = upgradeSave(oldS).starters.join() === "arth,lyst,hyps";
+
     // dailyNeed cache follows herd changes
     const e = {id:"x", animals:[{id:"a1", sp:sp.id}], points:[[0,0],[10,0],[10,10]]};
     const n1 = JSON.stringify(dailyNeed(e)); e.animals.push({id:"a2", sp:sp.id});

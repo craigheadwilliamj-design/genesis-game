@@ -59,11 +59,11 @@ const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectiv
 
 const SPECIES = [
   // Carboniferous
-  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   shop:true, viv:"L"},
+  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
   {id:"pulm",  name:"Pulmonoscorpius",     period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
   {id:"mega",  name:"Meganeura",           period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
   // Permian
-  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   shop:true},
+  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
   {id:"dcau",  name:"Diplocaulus",         period:"Permian",       diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"dime",  name:"Dimetrodon",          period:"Permian",       diet:["carnivore"], predator:true, price:9000,  food:90,  space:400,  group:[1,4],  appeal:6,  stars:1},
   {id:"scut",  name:"Scutosaurus",         period:"Permian",       diet:["herbivore"], price:8000,  food:90,  space:500,  group:[2,6],  appeal:6,  stars:1},
@@ -86,7 +86,7 @@ const SPECIES = [
   {id:"torv",  name:"Torvosaurus",         period:"Jurassic",      diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
   {id:"dipl",  name:"Diplodocus",          period:"Jurassic",      diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
   // Cretaceous
-  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   shop:true},
+  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
   {id:"micr",  name:"Microraptor",         period:"Cretaceous",    diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
   {id:"psit",  name:"Psittacosaurus",      period:"Cretaceous",    diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
   {id:"prot",  name:"Protoceratops",       period:"Cretaceous",    diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
@@ -183,6 +183,12 @@ const CLONE_DAYS_PER_SPACE = 1000;
 const PERIOD_COLOR = {
   Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
   Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
+};
+
+// Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
+const STARTER_POOLS = {
+  a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
+  b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
