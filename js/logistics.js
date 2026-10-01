@@ -70,17 +70,19 @@ function zoneProblem(pts){
   if(area(pts) < ZONE_MIN_AREA) return "That zone is too small.";
   return null;
 }
+const STAFF_LISTS = {keeper:"keepers", mechanic:"mechanics", vet:"vets"};
 function zoneMembers(z){
-  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:state.staff.keepers.filter(k => k.zone === z.id)};
+  const mine = list => state.staff[list].filter(k => k.zone === z.id);
+  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:mine("keepers"), mechanics:mine("mechanics"), vets:mine("vets")};
 }
 // Zones go: everything in them goes back to working anywhere
 function dropZone(id){
   for(const e of state.exhibits) if(e.zone === id) delete e.zone;
   for(const b of state.buildings) if(b.zone === id) delete b.zone;
-  for(const k of state.staff.keepers) if(k.zone === id) delete k.zone;
+  for(const list of Object.values(STAFF_LISTS)) for(const k of state.staff[list]) if(k.zone === id) delete k.zone;
 }
 function setZone(kind, id, zid){
-  const it = kind === "keeper" ? state.staff.keepers.find(k => k.id === id) : findItem(kind, id);
+  const it = STAFF_LISTS[kind] ? state.staff[STAFF_LISTS[kind]].find(k => k.id === id) : findItem(kind, id);
   if(!it) return;
   if(zid && zoneById(zid)) it.zone = zid; else delete it.zone;
 }
@@ -257,5 +259,10 @@ function logiWarnings(){
     const m = zoneMembers(z);
     if(m.exhibits.some(e => e.animals.length) && !ks.some(k => k.zone === z.id) && ks.every(k => k.zone)) w.push(`${z.name} has animals but no keeper is assigned to it.`);
   }
+  // with every mechanic or vet in a zone, anything outside the zones gets nobody
+  const ms = state.staff.mechanics, vs = state.staff.vets;
+  if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (b.type === "generator" || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
+  if(vs.length && vs.every(v => v.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every vet is in a zone, so exhibits outside the zones get no check-ups.");
+  if(ks.length && ks.every(k => k.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every keeper is in a zone, so exhibits outside the zones aren't being fed.");
   return w;
 }

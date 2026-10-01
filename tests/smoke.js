@@ -240,6 +240,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.cleansBareHanded = run(900, () => viv.dirt < 60) && !hasUpgrade("shovels");
     keepersNight();
 
+    // mechanics and vets in a zone only work their own zone
+    const f1 = {id:"f1", name:"F1", points:[[0,0],[9,0],[9,9]], animals:[{id:"q1", sp:"arth"}], cond:60, zone:"z-9", inspected:{day:1, cond:60}};
+    const f2 = {id:"f2", name:"F2", points:[[50,0],[59,0],[59,9]], animals:[{id:"q2", sp:"arth"}], cond:5, inspected:{day:1, cond:5}};
+    state.exhibits.push(f1, f2); state.zones.push({id:"z-9", name:"Z", color:"#fff", points:[[0,0],[1,0],[1,1]]});
+    kGraph.anchors["fix:f1"] = kGraph.anchors["fix:f2"] = kGraph.anchors.f1 = kGraph.anchors.f2 = kGraph.anchors["b-st"];
+    state.staff.mechanics = [{id:"mz", name:"Z", zone:"z-9"}, {id:"mf", name:"F"}];
+    out.mechanicZone = pickFence({id:"mz"}) === f1 && pickFence({id:"mf"}).zone === undefined;
+    state.health.from = 0; vcrew = [];
+    state.staff.vets = [{id:"vz", name:"Z", zone:"z-9"}, {id:"vf", name:"F"}];
+    out.vetZone = pickCheck({id:"vz"}) === f1 && !!pickCheck({id:"vf"});
+    setZone("mechanic", "mf", "z-9"); setZone("vet", "vf", "z-9");
+    out.assignStaff = state.staff.mechanics[1].zone === "z-9" && zoneMembers(state.zones[0]).vets.length === 2;
+    dropZone("z-9");
+    out.dropClearsStaff = !state.staff.mechanics.some(m => m.zone) && !state.staff.vets.some(v => v.zone);
+    state.exhibits = state.exhibits.filter(e => e !== f1 && e !== f2); state.zones = []; state.staff.mechanics = []; state.staff.vets = [];
+
     // production fills its own store through the day, and stops when full
     const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();
