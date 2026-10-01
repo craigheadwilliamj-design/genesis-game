@@ -259,7 +259,8 @@ const UPGRADES = [
 const CLEAN = {
   messRate:.3,         // how fast animals make a mess (bigger animals make more)
   dietMess:{carnivore:1.3, piscivore:1.2, omnivore:1.1, herbivore:1, insectivore:.6},   // meat scraps are the worst
-  dirtyAt:35,          // keepers start cleaning an exhibit this dirty
+  dirtyAt:35,          // keepers go clean an exhibit this dirty before routine feeding
+  tidyAbove:2,         // a keeper with nothing else to do cleans any exhibit dirtier than this
   penaltyFrom:40,      // animals start getting unhappy above this much dirt
   penaltyPer:.6,       // happiness lost per point of dirt above that
   handRate:1.2,        // cleaning speed with shovels (slower in bigger exhibits)

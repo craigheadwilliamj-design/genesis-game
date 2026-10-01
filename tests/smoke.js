@@ -256,6 +256,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.dropClearsStaff = !state.staff.mechanics.some(m => m.zone) && !state.staff.vets.some(v => v.zone);
     state.exhibits = state.exhibits.filter(e => e !== f1 && e !== f2); state.zones = []; state.staff.mechanics = []; state.staff.vets = [];
 
+    // an idle keeper tidies an exhibit however clean it is
+    viv.dirt = 10; keepersNight(); crew.forEach(c => { c.job = "idle"; c.wait = 0; });
+    out.idleKeeperTidies = run(600, () => viv.dirt < 5);
+    keepersNight();
+
     // production fills its own store through the day, and stops when full
     const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();

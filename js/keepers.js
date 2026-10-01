@@ -361,9 +361,9 @@ function dirtTick(dtMin){
   for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / (CLOSE_MIN - OPEN_MIN));
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
-function cleanJob(c, k){
+function cleanJob(c, k, min = CLEAN.dirtyAt){
   const taken = new Set(crew.filter(x => x !== c && x.cleanId).map(x => x.cleanId));
-  return state.exhibits.filter(e => (e.dirt || 0) >= CLEAN.dirtyAt && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
+  return state.exhibits.filter(e => (e.dirt || 0) >= min && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
 }
 
 function decide(c, k){
@@ -403,9 +403,12 @@ function decide(c, k){
   if(haul && haul.ratio < LOGI.urgentBelow){ restock(); if(c.haul) return; }
   // cleaning comes before routine feeding, but not before food that's running out
   const dirty = cleanJob(c, k);
-  if(dirty){ c.cleanId = dirty.id; if(goTo(c, kGraph.anchors[dirty.id], "toClean")) return; c.cleanId = null; }
+  if(dirty){ c.cleanId = dirty.id; c.cleanLow = false; if(goTo(c, kGraph.anchors[dirty.id], "toClean")) return; c.cleanId = null; }
   if(job){ feed(); return; }
   if(haul){ restock(); if(c.haul) return; }
+  // nothing else to do: tidy up whatever is dirtiest, however little muck there is
+  const tidy = cleanJob(c, k, CLEAN.tidyAbove + .01);
+  if(tidy){ c.cleanId = tidy.id; c.cleanLow = true; if(goTo(c, kGraph.anchors[tidy.id], "toClean")) return; c.cleanId = null; }
   c.job = "idle"; c.wait = 15; c.plan = null;
   const home = near(stations()); if(home && home.d > 1) goTo(c, home.n, "home");
 }
@@ -519,7 +522,9 @@ function keepersTick(dtMin){
         // stop when it's clean, when the keeper is worn out, or when an escape needs everyone
         const need = Math.max(0, (e.dirt || 0) - 2) / cleanRate(e), w = Math.min(left, need);
         e.dirt = Math.max(0, (e.dirt || 0) - cleanRate(e) * w); k.stamina -= CLEAN.tirePerMin * w; left -= w;
-        if(e.dirt <= 2 || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
+        // light tidying gives way to real work: food that a store can supply
+        const busy = c.cleanLow && shortages(k).some(j => sourcesFor(j.t, k).length);
+        if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
       if(c.job === "sedating"){
