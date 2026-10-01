@@ -233,7 +233,7 @@ function returnCarry(c){
   if(h && h.amount > 0){
     if(h.type === "paleoflora") state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + h.amount);
     else if(h.type === "meds" && !stashGood("meds", h.amount, null) && cereses().length) state.ceres.meds = Math.min(medCap(), (state.ceres.meds || 0) + h.amount);
-    else if(h.type !== "meds") stashGood(h.type, h.amount, c.haul ? buildingById(c.haul.src) : null);
+    else if(h.type !== "meds") stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : c.plan && c.plan.src));
   }
   c.haul = null;
   setCarry(c, null);

@@ -408,16 +408,16 @@ BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyp
                   full:"Supplier deliveries", blurb:"Order animal food overnight from suppliers. Trucks need a service road to the entrance. Keepers carry it from here."};
 // Production. Needs the food production research. Output goes into the building's own store.
 //   makes   units a day
-BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:150, w:20, d:14, dept:true, tech:"foodprod",
+BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:260, w:20, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["plants"], spoil:1, source:true}, makes:{plants:60},
                        full:"Hay and forage farm", blurb:"Grows 60 units of hay a day."};
-BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:22000, upkeep:200, w:20, d:14, dept:true, tech:"foodprod",
+BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:22000, upkeep:380, w:20, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["meat"], spoil:1, source:true}, makes:{meat:40},
                        full:"Feed livestock ranch", blurb:"Raises 40 units of meat a day. Meat spoils fast, so keep a cold store nearby."};
-BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:22000, upkeep:200, w:18, d:14, dept:true, tech:"foodprod",
+BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:22000, upkeep:380, w:18, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["fish"], spoil:1, source:true}, makes:{fish:40},
                        full:"Fish hatchery", blurb:"Breeds 40 units of fish a day. It spoils fastest of all."};
-BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:16000, upkeep:120, w:14, d:10, dept:true, tech:"foodprod",
+BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:16000, upkeep:220, w:14, d:10, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
                        full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
 
