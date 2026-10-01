@@ -49,6 +49,8 @@ function newPark(){
 
 // Bring older saves up to date with anything added since
 function upgradeSave(s){
+  // parks from before keepers existed get 3 days of free feeding to build backstage
+  if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
   // before science staff existed: one free specialist for each department already built, one trip slot
   if(!s.science.crew){
@@ -86,8 +88,6 @@ function upgradeSave(s){
   }
   // parks from before escapes existed get 3 days to upgrade their barriers
   if(!s.safety){ s.safety = freshSafety(); s.safety.escapesFrom = s.day + 3; }
-  // parks from before keepers existed get 3 days of free feeding to build backstage
-  if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   return s;
@@ -198,7 +198,7 @@ function exhibitReport(e){
   // Barriers: say which animals could get out
   if(!e.viv && state.safety){
     for(const sp of counts.keys()){ const r = escapeRisk(e, SPECIES_BY_ID[sp]); if(r) issues.push({bad:true, text:`Escape risk. ${r}`}); }
-    if(isBreached(e)) issues.push({bad:true, text:"The barrier is broken. It will repair itself shortly."});
+    if(isBreached(e)) issues.push({bad:true, text:"The barrier is broken. A mechanic from a Workshop needs to repair it."});
   }
   // Food: an empty store for any food type means hungry animals
   if(e.animals.length && state.staff && !freeFeeding()){

@@ -55,7 +55,17 @@ events.gameOver = () => {
 
 /* ---------- the clock ---------- */
 let lastT = performance.now(), sinceDraw = 0, sincePanel = 0;
+let frameErrors = 0;
 function frame(now){
+  // schedule the next frame first so one exception can't freeze the game for good
+  requestAnimationFrame(frame);
+  try{ step(now); }
+  catch(err){
+    console.error(err);
+    if(frameErrors++ === 0) ui.toast("Something went wrong in the park simulation. Check the console if it keeps happening.", "bad");
+  }
+}
+function step(now){
   const dt = Math.min(.1, (now - lastT) / 1000); lastT = now;
   if(speed && !state.over){
     tick(dt * speed * MINUTES_PER_SECOND);
@@ -70,7 +80,6 @@ function frame(now){
   if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }
   // refresh the side panel now and then, but not while the mouse is over it (so buttons don't jump)
   if(sincePanel > 1.5 && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
-  requestAnimationFrame(frame);
 }
 
 /* ---------- saving ---------- */

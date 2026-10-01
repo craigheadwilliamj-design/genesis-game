@@ -189,7 +189,7 @@ function keeperPos(c){ const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at
 
 function chase(c, l){
   if(!c.gun){ const st = nearestOf(c, stations()); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
-  if(l.status === "loose"){ const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; goTo(c, n, "hunting"); if(!c.route.length) arrive(c, null); return true; } }
+  if(l.status === "loose"){ const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; if(!goTo(c, n, "hunting")){ l.keeper = null; return false; } if(!c.route.length) arrive(c, null); return true; } }
   if(l.status === "carried"){
     const e = state.exhibits.find(x => x.id === l.from), n = e && kGraph.anchors[e.id];
     if(n && goTo(c, n, "returning")){ c.hunt = l; return true; }
@@ -259,6 +259,7 @@ function decide(c, k){
   const l = huntJob(c);
   if(l && chase(c, l)) return;
   const mv = moveJob(c);
+  if(mv && mv.cargo && !c.cargo) c.cargo = mv.cargo;   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
   if(mv && !c.cargo){ mv.keeper = null; }
   if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots()); if(r){ goTo(c, r.n, "toRest"); return; } }
@@ -284,7 +285,7 @@ function arrive(c, k){
   if(c.job === "toPickup"){
     const t = c.move, e = t && state.exhibits.find(x => x.id === t.from), a = e && e.animals.find(x => x.id === t.animalId);
     if(!t || !a){ if(t) state.staff.transfers = state.staff.transfers.filter(x => x !== t); c.move = null; c.job = "idle"; return; }
-    e.animals.splice(e.animals.indexOf(a), 1); c.cargo = a;
+    e.animals.splice(e.animals.indexOf(a), 1); c.cargo = a; t.cargo = a;   // kept on the transfer too, so a save mid-move doesn't lose the animal
     k.stamina -= KEEPER.tirePerDelivery; events.changed();
     if(!goTo(c, kGraph.anchors[t.to] || c.at, "toDropoff")) c.job = "toDropoff";
     return;
@@ -317,6 +318,8 @@ function arrive(c, k){
     let amount = Math.min(carryMax(), Math.max(1, Math.ceil(want)));
     // CERES can only hand out what it has grown
     if(t === "paleoflora"){ amount = Math.min(amount, Math.floor(state.ceres.stock)); if(amount < 1){ c.carry = null; c.job = "idle"; c.wait = 10; return; } state.ceres.stock -= amount; }
+    // leftover Paleoflora goes back to CERES instead of vanishing
+    if(c.carry && c.carry.type === "paleoflora" && c.carry.amount > 0) state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + c.carry.amount);
     c.carry = {type:t, amount};
     k.stamina -= KEEPER.tirePerDelivery;
     const j = shortages().find(j => j.t === t);
@@ -410,7 +413,8 @@ function eatTick(dtMin){
 // Each night keepers go home and come back rested
 function keepersNight(){
   // anything being carried is finished off before the keepers go home
-  for(const c of crew) if(c.cargo && c.move){ dropOff(c.move, c.cargo); c.cargo = null; c.move = null; }
+  for(const t of [...state.staff.transfers]) if(t.cargo) dropOff(t, t.cargo);
+  for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
   for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ c.at = null; c.route = []; c.carry = null; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; } }
 
