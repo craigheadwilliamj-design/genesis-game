@@ -47,7 +47,7 @@ const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_
 // Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
 // so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
 function wideJoin(p){
-  const pts = p.points.map(q => q.slice()), clips = [];
+  const pts = p.points.map(q => q.slice()), clips = [], tapers = [];
   for(const end of [0, 1]){
     const i = end ? pts.length - 1 : 0, prev = pts[end ? i - 1 : 1], E = pts[i];
     let best = null;
@@ -63,14 +63,23 @@ function wideJoin(p){
     let mx = -ty, my = tx;                                          // normal pointing to the wide path's side
     if((prev[0] - best.x)*mx + (prev[1] - best.y)*my < 0){ mx = -mx; my = -my; }
     const dx = E[0] - prev[0], dy = E[1] - prev[1], dl = Math.hypot(dx, dy) || 1, dn = (dx*mx + dy*my) / dl;
-    if(Math.abs(dn) < .2) continue;                                 // running along it, not into it
+    if(Math.abs(dn) < .2){                                          // running along it, not into it: a narrower path carrying on in line gets a taper
+      const lat = Math.abs((E[0] - best.x)*mx + (E[1] - best.y)*my), ox = dx/dl, oy = dy/dl;
+      const ahead = Math.max((best.a[0] - E[0])*ox + (best.a[1] - E[1])*oy, (best.b[0] - E[0])*ox + (best.b[1] - E[1])*oy);
+      if(best.hw < WIDE_PATH.halfWidth && lat <= 1.5 && ahead > 1){
+        const T = Math.min(2*(WIDE_PATH.halfWidth - best.hw), ahead), W = WIDE_PATH.halfWidth, nx = -oy, ny = ox;
+        const cx = E[0] + ox*T + nx*((best.x - E[0])*nx + (best.y - E[1])*ny), cy = E[1] + oy*T + ny*((best.x - E[0])*nx + (best.y - E[1])*ny);
+        tapers.push([[E[0] + nx*W, E[1] + ny*W], [cx + nx*best.hw, cy + ny*best.hw], [cx - nx*best.hw, cy - ny*best.hw], [E[0] - nx*W, E[1] - ny*W]]);
+      }
+      continue;
+    }
     // how far past the end to run it to reach the far edge
     const gap = (E[0] - best.x)*mx + (E[1] - best.y)*my + best.hw;
     const t = -gap / dn;
     if(t > 0) pts[i] = [E[0] + dx/dl*Math.min(t, 40), E[1] + dy/dl*Math.min(t, 40)];
     clips.push({bx:best.x - mx*best.hw, by:best.y - my*best.hw, tx, ty, mx, my});
   }
-  return {pts, clips};
+  return {pts, clips, tapers};
 }
 
 /* ---------- looking things up ---------- */
@@ -173,7 +182,13 @@ function render(){
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
     if(!live) body += `<polyline points="${pts}" stroke="#8F7B52" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
-    over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}</g>`;
+    // a taper where the path steps down to a narrower one: edge below, surface above
+    let tp = "";
+    for(const t of wj ? wj.tapers : []){
+      under += `<polygon points="${polyStr(t)}" fill="#8F7B52" stroke="#8F7B52" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
+      tp += `<polygon points="${polyStr(t)}" fill="${live ? "#EADFC4" : "#C9BFA6"}"/>`;
+    }
+    over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
   }
   s += clipDefs + under + over;
 
