@@ -282,8 +282,8 @@ function openMoveDialog(e, sp){
   const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
   $("#moveTitle").textContent = `Move ${s.name}`;
   if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
-  const fromWhy = moveProblem(e);
-  $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = moveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
+  const fromWhy = keeperMoveProblem(e);
+  $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
     <label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>
     <p style="margin-top:10px">A keeper collects each one through this exhibit's gate and carries it to the new one. Both need a working keeper gate, or be a vivarium.</p>
     ${fromWhy ? `<p style="color:var(--bad)">Keepers can't get into ${esc(e.name)} yet: ${esc(fromWhy)}</p>` : ""}`;
@@ -353,7 +353,7 @@ function stationHtml(b){
   if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span>${zoneSelect("keeper", k.id, k.zone)}<button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
   else h += `<div class="meta">No keepers yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hire"${canAfford(KEEPER.hireCost) ? "" : " disabled"}>Hire a keeper, ${money(KEEPER.hireCost)}</button><span class="meta">${money(KEEPER.wage)} a day each</span></div></section>`;
-  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
+  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a path or service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
   h += `</section>`;

@@ -508,7 +508,7 @@ function setTool(t){
     showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
     updateZoneEditBar();
   }
-  else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a service road meets it. Keepers won't use a gate that opens onto a guest path. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
     showBar("Move", "Drag a building, exhibit or path to a new spot. Drag an exhibit's corner to reshape it, or a + on its fence to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
