@@ -24,7 +24,7 @@ const BUILD_MENU = [
   ]},
   {id:"land", label:"Landscaping", items:[
     ...Object.entries(LAND).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price) + (t.stock ? " + stock" : ""),
-      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need a pond. Groves from an animal's own era feed and shelter it. Cycads and lycopods use planting stock from CERES. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
+      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need a pond. Groves from an animal's own era feed and shelter it. Ferns, cycads, horsetails and lycopods use planting stock from CERES. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
   ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
@@ -76,7 +76,7 @@ const ICON_LINES = {
   "land-rock":'<circle cx="12" cy="13" r="6" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/><circle cx="10" cy="11" r="2.4" fill="#B7BBB2" opacity=".7"/>',
   "land-boulder":'<circle cx="9" cy="14" r="5" fill="#767A74" stroke="#4E524C" stroke-width="1.4"/><circle cx="16" cy="11" r="4" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/>',
   ...Object.fromEntries(Object.entries(LAND).filter(([, t]) => t.flora).map(([k, t]) => ["land-" + k,
-    `<circle cx="8" cy="11" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="16" cy="10" r="4.5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="12" cy="16" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>`])),
+    t.r < 4 ? `<circle cx="9" cy="13" r="3.4" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="15" cy="11" r="3" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>` : `<circle cx="8" cy="11" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="16" cy="10" r="4.5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="12" cy="16" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>`])),
   "land-shelter":'<rect x="6" y="6" width="12" height="12" rx="1.5" fill="#9A7B55" stroke="#3B3226" stroke-width="1.4"/><path d="M6 12h12" stroke="#3B3226" stroke-width="1"/>',
   "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',

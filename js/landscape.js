@@ -107,7 +107,7 @@ function habitatScore(e){
 function landProblem(e, key, x, y){
   const t = LAND[key];
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
-  if(t.stock && (state.ceres.plants[t.flora] || 0) < t.stock) return `Needs a batch of ${FLORA[t.flora].label} planting stock from CERES, which has ${state.ceres.plants[t.flora] || 0}.`;
+  if(t.stock && (state.ceres.plants[t.flora] || 0) < t.stock) return `Needs a batch of ${FLORA[t.flora].label} planting stock from CERES, which has ${+(state.ceres.plants[t.flora] || 0).toFixed(2)}.`;
   if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
   if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < t.r + LAND[f.type].r)) return "It overlaps something already there.";
   const pts = circlePts(x, y, t.r);
