@@ -686,7 +686,9 @@ function placeGhost(clientX, clientY){
     let fx = p.x, fy = p.y;
     if(tool === "sign"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
-    const off = t.onPath ? Math.max(0, best.hw - t.d/2 - .1) : t.d/2 + best.hw + .5;   // benches, bins and signs sit on the path, hugging the edge on the side you point at
+    let off = t.onPath ? Math.max(0, best.hw - t.d/2 - .1) : t.d/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
+    // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
+    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx)), e.points))) off = Math.max(0, off - .1);
     x = best.x + nx*side*off; y = best.y + ny*side*off;
     angle = Math.atan2(dy, dx);
   } else why = why || (t.serviceOnly ? "Move it next to a service road. ATVs can't use guest paths." : t.dept ? "Move it next to a path or service road." : "Move it next to a path.");
