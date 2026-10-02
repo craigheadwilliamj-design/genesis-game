@@ -8,6 +8,10 @@
 const SPECIES_BY_ID = Object.fromEntries(SPECIES.map(s => [s.id, s]));
 const uid = p => p + Math.random().toString(36).slice(2, 9);
 
+// The park plot: a 420 × 305 m rectangle, every corner on the 5 m grid
+const PARK_PLOT = [[0,0],[420,0],[420,305],[0,305]];
+const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
+
 let state = null;     // the saved game
 let derived = null;   // numbers worked out from the saved game, rebuilt when it changes
 let arrivalCarry = 0; // fractions of a guest carried between frames
@@ -46,10 +50,10 @@ function newPark(){
     version:1, name:"Genesis Park",
     money:START.money, ticket:START.ticket, rating:START.rating,
     day:1, minute:OPEN_MIN,
-    boundary:[[0,18],[150,0],[410,8],[420,300],[-6,306]],
-    gate:[205,303],
+    boundary:PARK_PLOT.map(p => p.slice()),
+    gate:[205,305],
     exhibits:[],
-    paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
+    paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{},
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -58,6 +62,8 @@ function newPark(){
 
 // Bring older saves up to date with anything added since
 function upgradeSave(s){
+  // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
+  if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
@@ -72,6 +78,7 @@ function upgradeSave(s){
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.vets) s.staff.vets = [];
+  if(!s.staff.custodians) s.staff.custodians = [];
   if(!s.staff.atvs) s.staff.atvs = [];
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
@@ -120,6 +127,8 @@ function upgradeSave(s){
     const pmc = s.buildings.find(b => b.type === "pmc");
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
+  // stock for stands and shops became physical: older parks get a few more days of direct deliveries
+  if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
@@ -366,6 +375,7 @@ function tick(dtMin){
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
   vetsTick(m1 - m0);
+  custodiansTick(m1 - m0);
   escapesTick(m1 - m0);
   if(state.over) return;
 
@@ -392,7 +402,7 @@ function dailyCosts(){
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
-  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage;
+  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage;
   // science staff are paid as research costs
   let research = 0;
   for(const [k, n] of Object.entries(state.science.crew)) research += n * SCIENTISTS[k].wage;
@@ -555,10 +565,12 @@ function endDay(){
   logiNight();
   escapesNight();
   mechanicsNight();
+  custodiansNight();
   healthNight();
   vetsNight();
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
   if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
+  if(state.day + 1 === state.logi.guestFrom) events.toast("From tomorrow, food stands and gift shops sell from their own stock. The dock orders it, and custodians carry it out. Build a Custodial Closet and hire one.", "bad");
 
   const before = state.rating;
   // Move a third of the way to the target each night, but at least 0.1 stars, so it actually gets there

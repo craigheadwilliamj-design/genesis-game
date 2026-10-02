@@ -364,7 +364,10 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <button data-tool="pmc" aria-pressed="false" title="Paleo-Medicine Center: hire vets to dart and treat sick and escaped animals">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#B0384F"/><path d="M12 8v8M8 12h8" stroke="#fff" stroke-width="2.4"/></svg>
             <span class="tl"><b>Paleo-Medicine</b><span class="price">$30,000, vets</span></span></button>
-          <button data-tool="toolshed" aria-pressed="false" title="Tool Shed: upgrades for keepers">
+          <button data-tool="closet" aria-pressed="false" title="Custodial Closet: hire custodians to restock shops and keep the park clean">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#2E8B8B"/><text x="12" y="12" class="glyph" font-size="10">J</text></svg>
+            <span class="tl"><b>Custodial Closet</b><span class="price">$4,000, custodians</span></span></button>
+          <button data-tool="toolshed" aria-pressed="false" title="Tool Shed: upgrades for keepers and custodians">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2" fill="#5B6470"/><text x="12" y="12" class="glyph" font-size="10">S</text></svg>
             <span class="tl"><b>Tool Shed</b><span class="price">$4,000, upgrades</span></span></button>
           <button data-tool="gate" aria-pressed="false" title="Put a keeper gate on an exhibit fence">
@@ -421,7 +424,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
             <span class="tl"><b>TAR</b><span class="price">$40,000, cloning</span></span></button>
         </div>
         <div class="tgroup">
-          <button id="gridBtn" aria-pressed="false" title="Snap corners and buildings to a 5 m grid (G). Hold Alt to place freely.">
+          <button id="gridBtn" aria-pressed="false" title="Snap corners and buildings to a 1 m grid (G). Hold Alt to place freely.">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/></svg>
             <span class="tl"><b>Grid snap</b><span class="price">Off. Press G</span></span></button>
         </div>
@@ -455,7 +458,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 
 <dialog id="dlgIntro">
   <h2>Welcome to Genesis Park</h2>
-  <p>You have $100,000 and an empty plot. Turn it into a park people will pay to see.</p>
+  <p>You have $150,000 and an empty plot. Turn it into a park people will pay to see.</p>
   <ol>
     <li><b>Draw an exhibit</b> with the Exhibit tool. Tap corners on the map, then tap the first corner to close it.</li>
     <li><b>Connect it with a path</b> that starts from the entrance at the bottom. Guests only see exhibits beside a path.</li>
@@ -521,6 +524,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/logistics.js"></script>
 <script src="js/guests.js"></script>
 <script src="js/services.js"></script>
+<script src="js/custodians.js"></script>
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/logiui.js"></script>

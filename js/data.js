@@ -7,7 +7,7 @@
 
 // How the park starts
 const START = {
-  money: 100000,
+  money: 150000,
   ticket: 25,          // ticket price in dollars
   rating: 1,           // starting star rating (0 to 5)
 };
@@ -258,24 +258,25 @@ const NEEDS = {
   bladder:{rate:.22, seek:60, start:25},
   energy: {rate:.24, seek:60, start:20},   // tiredness: a sit-down fixes it
 };
-// What food stands and gift shops can sell. price is the usual price; cost is what each one costs you to stock.
+// What food stands and gift shops can sell. price is the usual price; cost is what each one costs you to stock,
+// and it uses that many units of its good (a $2 burger uses 2 units of snacks).
 //   fills   how much each need drops (food)        joy     mood a souvenir adds (merch)
 //   litter  leaves a wrapper or cup to throw away
 const MENU = {
-  burger:  {label:"Burgers",     kind:"food",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
-  hotdog:  {label:"Hot dogs",    kind:"food",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
-  pizza:   {label:"Pizza",       kind:"food",  price:9,  cost:2.2, fills:{hunger:65},             litter:true},
-  fries:   {label:"Fries",       kind:"food",  price:4,  cost:.8,  fills:{hunger:35},             litter:true},
-  popcorn: {label:"Popcorn",     kind:"food",  price:3,  cost:.5,  fills:{hunger:25},             litter:true},
-  icecream:{label:"Ice cream",   kind:"food",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3},
-  soda:    {label:"Soda",        kind:"food",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
-  water:   {label:"Water",       kind:"food",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
-  coffee:  {label:"Coffee",      kind:"food",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
-  plush:   {label:"Dino plushes",  kind:"merch", price:14, cost:4,  joy:8},
-  tshirt:  {label:"T-shirts",      kind:"merch", price:20, cost:6,  joy:6},
-  toy:     {label:"Toy dinosaurs", kind:"merch", price:10, cost:3,  joy:7},
-  map:     {label:"Park maps",     kind:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
-  guide:   {label:"Field guides",  kind:"merch", price:12, cost:3.5, joy:5},
+  burger:  {label:"Burgers",     kind:"food", good:"snacks",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
+  hotdog:  {label:"Hot dogs",    kind:"food", good:"snacks",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
+  pizza:   {label:"Pizza",       kind:"food", good:"snacks",  price:9,  cost:2.2, fills:{hunger:65},             litter:true},
+  fries:   {label:"Fries",       kind:"food", good:"snacks",  price:4,  cost:.8,  fills:{hunger:35},             litter:true},
+  popcorn: {label:"Popcorn",     kind:"food", good:"snacks",  price:3,  cost:.5,  fills:{hunger:25},             litter:true},
+  icecream:{label:"Ice cream",   kind:"food", good:"snacks",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3},
+  soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
+  water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
+  coffee:  {label:"Coffee",      kind:"food", good:"drinks",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
+  plush:   {label:"Dino plushes",  kind:"merch", good:"merch", price:14, cost:4,  joy:8},
+  tshirt:  {label:"T-shirts",      kind:"merch", good:"merch", price:20, cost:6,  joy:6},
+  toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
+  map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
+  guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
 };
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
@@ -318,6 +319,7 @@ const THOUGHTS = {
   priceyFood: {text:"The food here costs too much."},
   priceyGift: {text:"The souvenirs are overpriced."},
   rested:     {text:"It was nice to sit down for a bit.", good:true},
+  soldOut:    {text:"They'd sold out of what I wanted."},
   wow:        {text:"The animals were amazing!", good:true},
   fed:        {text:"That hit the spot.", good:true},
 };
@@ -352,7 +354,7 @@ BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper stat
 BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:5000, upkeep:40, w:10, d:8, dept:true,
                        full:"Break room and locker room", blurb:"Tired keepers rest here four times faster than at a station."};
 BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:4000, upkeep:30, w:10, d:8, dept:true, unique:true,
-                       full:"Equipment for keepers", blurb:"Buy upgrades that make keepers' work easier."};
+                       full:"Equipment for staff", blurb:"Buy upgrades that make keepers' and custodians' work easier."};
 for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
 
 // Upgrades bought at the Tool Shed
@@ -364,7 +366,27 @@ const UPGRADES = [
   {id:"crates",      label:"Stacking crates", price:4000, text:"Every store holds 30% more."},
   {id:"coolers",     label:"Cooler boxes",    price:7000, text:"Food spoils 40% more slowly in every store."},
   {id:"forklift",    label:"Pallet forklift", price:10000, text:"Keepers restocking stores carry 3 times as much per trip.", needs:"wheelbarrow"},
+  {id:"picker",      label:"Litter pickers",  price:2000, text:"Custodians sweep litter twice as fast."},
+  {id:"jcart",       label:"Janitor carts",   price:4000, text:"Custodians carry twice as much stock per trip."},
+  {id:"washer",      label:"Pressure washers", price:3000, text:"Custodians scrub restrooms twice as fast."},
 ];
+
+// Custodians restock food stands and gift shops, scrub restrooms, empty bins, and sweep litter
+const CUSTODIAN = {
+  hireCost:1500,
+  wage:100,
+  speed:WALK_PER_MIN,  // custodians walk at the same pace as guests
+  carry:100,           // units of stock they carry per trip
+  scrubPerMin:4,       // restroom dirt cleaned each minute
+  sweepPerMin:2,       // pieces of litter picked up each minute
+  emptyMin:3,          // minutes to empty a bin
+  restroomAt:25,       // they scrub a restroom this dirty
+  binAt:.6,            // they empty a bin this full
+  litterAt:3,          // they sweep a square with this much litter
+  reach:30,            // they sweep litter this close to where they stand
+};
+BUILDINGS.closet = {label:"Custodial Closet", tag:"JANITOR", one:"a custodial closet", glyph:"J", color:"#2E8B8B", price:4000, upkeep:30, w:10, d:8, dept:true,
+                    full:"Custodians' base", blurb:"Custodians start here. They restock food stands and gift shops, scrub restrooms, empty bins, and sweep litter."};
 
 // Dirty exhibits
 const CLEAN = {
@@ -493,9 +515,18 @@ const GOODS = {
   fish:   {label:"Fish",     spoil:.20},
   insects:{label:"Insects",  spoil:.10},
   meds:   {label:"Medicine", spoil:.02},
+  // what food stands and gift shops sell from: a unit is $1 of wholesale stock
+  snacks: {label:"Snacks",      spoil:.08},
+  drinks: {label:"Drinks",      spoil:.01},
+  merch:  {label:"Merchandise", spoil:0},
 };
 const FEED_GOODS = ["plants", "meat", "fish", "insects"];
-const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F"};
+const GUEST_GOODS = ["snacks", "drinks", "merch"];
+const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS);   // what the dock buys
+const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
+// Units of guest goods a day each guest gets through, for ordering before there's a day of sales to go on
+const GUEST_USE = {snacks:2.5, drinks:.8, merch:2};
+const GUEST_GOODS_FROM = 7;   // new parks: suppliers deliver straight to stands and shops until this day
 const LOGI = {
   hubDays:1.5,         // a station keeps this many days of its zone's food on hand
   bulkDays:2.5,        // warehouses and cold stores keep this many days of the whole park's food
@@ -512,19 +543,23 @@ const LOGI = {
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
 };
 const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1};   // multiplied by the markup and FOOD_UNIT_COST
+const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, before the dock's markup
 
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
 BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
 BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: keepers restock them from bigger stores.";
 BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:9000, upkeep:50, w:16, d:12, dept:true,
-                       store:{cap:600, holds:["plants", "insects"], spoil:.7, bulk:true},
-                       full:"Dry goods warehouse", blurb:"Stores a lot of hay and insect feed, and keeps it better than a station does. Keepers restock stations from here."};
+                       store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
+                       full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Keepers restock stations and custodians restock shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:16000, upkeep:120, w:14, d:10, dept:true,
-                       store:{cap:400, holds:["meat", "fish", "meds"], spoil:1, cold:true, bulk:true},
-                       full:"Refrigerated store", blurb:"Keeps meat, fish, and medicine from rotting, as long as it has power from a generator."};
+                       store:{cap:400, holds:["meat", "fish", "meds", "snacks"], spoil:1, cold:true, bulk:true},
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:6000, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
-                  store:{cap:300, holds:FEED_GOODS, spoil:1, bulk:true, dock:true},
-                  full:"Supplier deliveries", blurb:"Order animal food overnight from suppliers. Trucks need a service road to the entrance. Keepers carry it from here."};
+                  store:{cap:600, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
+                  full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops overnight. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
+// Food stands and gift shops keep their own stock
+for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:200, megastore:500}))
+  BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
 // Production. Needs the food production research. Output goes into the building's own store.
 //   makes   units a day
 BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:260, w:20, d:14, dept:true, tech:"foodprod",
@@ -656,6 +691,7 @@ const GOALS = [
   {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
+  {id:"custodian",text:"Hire a custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3000, check:g=>(g.state.staff.custodians || []).length>0},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
@@ -668,6 +704,6 @@ const GOALS = [
   {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:8000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
   {id:"sp4",      text:"Show 4 different species",           hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
-  {id:"cash150",  text:"Have $150,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=150000},
+  {id:"cash150",  text:"Have $250,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=250000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Cretaceous, collect a full T. rex genome, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
 ];

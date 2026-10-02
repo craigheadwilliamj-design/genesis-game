@@ -59,6 +59,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       starterOk = starterOk && st.length === 3 && a.length === 1 && b.length === 2 && new Set(st).size === 3; seenA.add(a[0]);
     }
     out.starterPools = starterOk && seenA.size > 1;
+    // the old slanted plot becomes the grid-aligned rectangle; new parks start with it
+    const oldPlot = JSON.parse(JSON.stringify(state)); oldPlot.boundary = OLD_PLOT.map(p => p.slice());
+    out.plotRectangle = JSON.stringify(upgradeSave(oldPlot).boundary) === JSON.stringify(PARK_PLOT) && JSON.stringify(newPark().boundary) === JSON.stringify(PARK_PLOT) &&
+      PARK_PLOT.every(([x, y]) => x % 5 === 0 && y % 5 === 0);
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
     out.oldSaveStarters = upgradeSave(oldS).starters.join() === "arth,lyst,hyps";
 
@@ -456,6 +460,32 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.priceSense = willPay("burger", 8) === 1 && Math.abs(willPay("burger", 12) - .5) < 1e-9 && willPay("burger", 16) === 0;
     resetParties();
 
+    // stock goes physical: a stand with nothing on its shelves serves nobody, and a custodian carries stock out to it
+    state.logi.guestFrom = 0;
+    const kio = {id:"b-kio", type:"kiosk", points:rectPts(305, 200, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, Math.PI / 2)};
+    const wh = {id:"b-wh", type:"warehouse", points:rectPts(250, 111.5, BUILDINGS.warehouse.w, BUILDINGS.warehouse.d, 0)};
+    const cl = {id:"b-cl", type:"closet", points:rectPts(160, 115, BUILDINGS.closet.w, BUILDINGS.closet.d, 0)};
+    state.buildings.push(kio, wh, cl); afterChange();
+    addToMenu(kio, "soda");
+    out.noStockNoSale = !servesOf(kio).length && !!kGraph.anchors["b-kio"] && !!kGraph.anchors["b-wh"] && !!kGraph.anchors["b-cl"];
+    wh.store = {drinks:100};
+    hireCustodian(); syncCustodians();
+    const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
+    out.custodianRestocks = work(600, () => stockOf(kio, "drinks") > 0) && stockOf(wh, "drinks") < 100 && servesOf(kio).includes("thirst");
+    // a sale takes as many units as the item costs to stock
+    const sb = stockOf(kio, "drinks"), sp2 = newParty(2); sp2.needs = {hunger:0, thirst:80, bladder:0, energy:0}; sp2.cash = 100;
+    serveAt(sp2, kio, "thirst");
+    out.saleUsesStock = Math.abs(sb - stockOf(kio, "drinks") - MENU.soda.cost * 2) < 1e-9 && state.logi.used.drinks >= MENU.soda.cost * 2;
+    // custodians scrub dirty restrooms and sweep litter
+    for(const c of ccrew){ c.haul = null; setCustCarry(c, null); c.route = []; c.job = "idle"; c.wait = 0; }
+    wh.store = {}; rest.dirt = 60;
+    out.custodianScrubs = work(600, () => !rest.dirt);
+    const lk = litterKey(100, 200); state.litter = {[lk]:10};
+    out.custodianSweeps = work(900, () => !state.litter[lk]);
+    // the dock orders stock for stands and shops too
+    out.dockOrdersStock = dockOrders({type:"dock"}).drinks > 0;
+    state.staff.custodians = []; syncCustodians();
+
     // lots of guests stay quick to simulate
     state.minute = OPEN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
@@ -469,6 +499,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const b of old.buildings) if(b.type === "food" || b.type === "shop") delete b.menu;
     const up = upgradeSave(old);
     out.oldSaveGuests = !!up.guestLog && up.guestLog.mood === null && up.today.moodSum === 0;
+    const old2 = JSON.parse(JSON.stringify(state)); delete old2.logi.guestFrom; delete old2.staff.custodians; old2.day = 20;
+    const up2 = upgradeSave(old2);
+    out.oldSaveGuestGoods = up2.logi.guestFrom === 23 && Array.isArray(up2.staff.custodians) && up2.logi.guestNotice === true;
     out.oldSaveMenus = up.buildings.find(b => b.type === "food").menu.map(m => m.id).join() === "burger,soda" &&
       up.buildings.find(b => b.type === "shop").menu.map(m => m.id).join() === "plush,tshirt,map" && !!up.litter && up.guestLog.notice === true;
     resetParties();

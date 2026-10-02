@@ -538,7 +538,8 @@ function depotHtml(b){
 
 function buildingHtml(b){
   if(b.type === "dock") return dockHtml(b) + demolishRow(b);
-  if(storeOf(b) && !["station", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
+  if(b.type === "closet") return closetHtml(b) + demolishRow(b);
+  if(storeOf(b) && !isVendor(b) && !["station", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
   if(b.type === "depot") return depotHtml(b) + demolishRow(b);
   if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);

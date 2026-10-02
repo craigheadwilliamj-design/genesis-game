@@ -12,13 +12,18 @@ const isVendor = b => !!BUILDINGS[b.type].kind;
 const menuOf = b => b.menu || [];
 const menuItem = (b, id) => menuOf(b).find(m => m.id === id) || null;
 
-// The needs a building takes care of. A stand's come from its menu; a gift shop with anything to sell serves shoppers.
+// Is there stock for n of this item? Before stock is physical, suppliers keep every shelf full.
+
+const inStock = (b, id, n = 1) => guestGoodsFree() || stockOf(b, MENU[id].good) >= MENU[id].cost * n;
+const onSale = b => menuOf(b).filter(m => inStock(b, m.id));
+
+// The needs a building takes care of. A stand's come from what it has in stock; a gift shop with anything to sell serves shoppers.
 function servesOf(b){
   const t = BUILDINGS[b.type];
   if(!t.kind) return t.serves || [];
   const out = new Set();
-  if(t.kind === "merch"){ if(menuOf(b).length) out.add("shop"); }
-  else for(const m of menuOf(b)) for(const k of Object.keys(MENU[m.id].fills || {})) out.add(k);
+  if(t.kind === "merch"){ if(onSale(b).length) out.add("shop"); }
+  else for(const m of onSale(b)) for(const k of Object.keys(MENU[m.id].fills || {})) out.add(k);
   if(t.seats) out.add("energy");
   return [...out];
 }
@@ -45,29 +50,33 @@ const willPay = (id, price) => clamp(1 - PRICE_SENSE * (price - MENU[id].price) 
 // A party gets to the front of the line. Returns what it spent.
 function serveAt(p, b, why){
   const t = BUILDINGS[b.type], n = p.n;
-  let bill = 0, served = n;
+  let bill = 0, served = n, short = false;
   if(t.kind === "food"){
     // each need that's bad enough gets the best thing on the menu for it, if the price is right
     for(const need of ["hunger", "thirst", "energy"]){
       if(p.needs[need] < 25 && need !== why) continue;
-      let best = null;
+      let best = null, gone = false;
       for(const m of menuOf(b)){
         const f = (MENU[m.id].fills || {})[need]; if(!f) continue;
+        if(!inStock(b, m.id, n)){ gone = true; continue; }
         const score = f * willPay(m.id, m.price);
         if(!best || score > best.score) best = {m, f, score, will:willPay(m.id, m.price)};
       }
-      if(!best) continue;
+      if(!best){ if(gone && need === why) thinks(p, "soldOut"); continue; }
       if(best.will < .6) thinks(p, "priceyFood");
-      if(Math.random() > best.will || p.cash - bill < best.m.price * n) continue;
+      if(Math.random() > best.will) continue;
+      if(p.cash - bill < best.m.price * n){ short = true; continue; }
       buy(p, b, best.m, n); bill += best.m.price * n;
     }
     if(bill && !p.needs.hunger) thinks(p, "fed");
+    if(!bill && short){ thinks(p, "broke"); p.mood -= 6; p.cool.hunger = p.cool.thirst = state.minute + 120; }
     served = bill ? n : 0;
   } else if(t.kind === "merch"){
     // each guest might pick something: happier guests buy more
     served = 0;
-    const keen = clamp((p.mood - 30) / 60, .15, .9), menu = menuOf(b);
-    for(let i = 0; i < n && menu.length; i++){
+    const keen = clamp((p.mood - 30) / 60, .15, .9);
+    for(let i = 0; i < n; i++){
+      const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price);
       if(will < .6) thinks(p, "priceyGift");
       if(Math.random() < keen * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
@@ -78,17 +87,19 @@ function serveAt(p, b, why){
     b.dirt = Math.min(100, (b.dirt || 0) + RESTROOM.dirtPerGuest * n);
   }
   if(t.seats && (why === "energy" || t.kind)){ p.needs.energy = 0; if(why === "energy") thinks(p, "rested"); }
-  if(t.kind && !bill && why !== "shop" && why !== "energy"){ thinks(p, "broke"); p.mood -= 6; p.cool.hunger = p.cool.thirst = state.minute + 120; }
+
   if(!b.served || b.served.day !== state.day) b.served = {day:state.day, n:0, money:0, items:{}};
   b.served.n += served;
   return bill;
 }
-// Hand over one item to each of n guests: they pay, you pay for the stock, and they may be left holding a wrapper
+// Hand over one item to each of n guests: they pay, it comes off the shelf, and they may be left holding a wrapper.
+// While suppliers still deliver straight to the stand, an empty shelf just costs the item's price to stock.
 function buy(p, b, m, n){
-  const it = MENU[m.id];
+  const it = MENU[m.id], units = it.cost * n;
   p.cash -= m.price * n;
   earn(m.price * n, it.kind === "food" ? "food" : "shop");
-  spend(it.cost * n, "supplies");
+  if(stockOf(b, it.good) >= units) takeGood(b, it.good, units); else spend(units, "supplies");
+  state.logi.used[it.good] = (state.logi.used[it.good] || 0) + units;
   for(const [k, v] of Object.entries(it.fills || {})) p.needs[k] = Math.max(0, p.needs[k] - v);
   if(it.joy) p.mood += it.joy;
   if(m.id === "map") p.map = true;
