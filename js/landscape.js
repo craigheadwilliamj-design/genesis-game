@@ -130,6 +130,20 @@ function placeLand(e, key, x, y){
   (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
 }
 
+// Rocks and plants are drawn as lumpy blobs, shaped from the feature's id so each keeps its look. They stay inside their radius.
+const seedOf = f => { let h = 2166136261; for(const c of String(f.id || f.x + "," + f.y)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+function rngOf(seed){ return () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+// Closed outline around (x, y) within radius r. Sharp = straight edges (rock), otherwise smoothed (leaves).
+function blobPath(x, y, r, seed, sharp){
+  const rnd = rngOf(seed), n = sharp ? 6 + Math.floor(rnd() * 3) : 7 + Math.floor(rnd() * 3), a0 = rnd() * 6.283;
+  const p = Array.from({length:n}, (_, i) => { const a = a0 + i * 6.283 / n + (rnd() - .5) * .5, k = r * (sharp ? .62 + rnd() * .38 : .68 + rnd() * .32); return [x + k * Math.cos(a), y + k * Math.sin(a)]; });
+  if(sharp) return "M" + p.map(q => q[0].toFixed(2) + " " + q[1].toFixed(2)).join("L") + "Z";
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], m0 = mid(p[n - 1], p[0]);
+  let d = `M${m0[0].toFixed(2)} ${m0[1].toFixed(2)}`;
+  for(let i = 0; i < n; i++){ const m = mid(p[i], p[(i + 1) % n]); d += `Q${p[i][0].toFixed(2)} ${p[i][1].toFixed(2)} ${m[0].toFixed(2)} ${m[1].toFixed(2)}`; }
+  return d + "Z";
+}
+
 // SVG for one exhibit's ponds and rocks. When bulldozing they can be picked out one by one.
 function landSvg(e, pick, isDead){
   let s = "";
@@ -144,13 +158,19 @@ function landSvg(e, pick, isDead){
       s += `<rect x="${f.x - h}" y="${f.y - h}" width="${h * 2}" height="${h * 2}" rx="${h * .12}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
       s += `<path d="M${f.x - h} ${f.y}H${f.x + h}" stroke="#3B3226" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     } else if(t.flora){
-      // a clump of canopies
-      for(const [dx, dy, k] of [[-.35, -.2, .6], [.35, -.25, .55], [0, .3, .6]]) s += `<circle cx="${f.x + dx * t.r}" cy="${f.y + dy * t.r}" r="${t.r * k}" fill="${t.color}" fill-opacity=".9" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
-      s += `<circle cx="${f.x - t.r * .15}" cy="${f.y - t.r * .1}" r="${t.r * .2}" fill="#fff" fill-opacity=".18"/>`;
+      // a clump of lumpy canopies
+      const rnd = rngOf(seedOf(f) ^ 0x9E37), sd = seedOf(f), clump = [[-.35, -.2, .6], [.35, -.25, .55], [0, .3, .6]];
+      if(t.r > 3) clump.push([(rnd() - .5) * .9, (rnd() - .5) * .9, .4]);
+      clump.forEach(([dx, dy, k], i) => s += `<path d="${blobPath(f.x + (dx + (rnd() - .5) * .2) * t.r, f.y + (dy + (rnd() - .5) * .2) * t.r, t.r * k, sd + i * 101)}" fill="${t.color}" fill-opacity=".9" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`);
+      s += `<path d="${blobPath(f.x - t.r * .15, f.y - t.r * .1, t.r * .2, sd + 7)}" fill="#fff" fill-opacity=".18"/>`;
+    } else if(!t.water){
+      // a lumpy rock with a light and a dark face
+      const sd = seedOf(f);
+      s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" fill-opacity=".95" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="${blobPath(f.x - t.r * .3, f.y - t.r * .25, t.r * .45, sd + 3, true)}" fill="#B7BBB2" fill-opacity=".6"/><path d="${blobPath(f.x + t.r * .35, f.y + t.r * .3, t.r * .35, sd + 5, true)}" fill="#5F635D" fill-opacity=".6"/>`;
     } else {
-      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="${t.water ? "#4C93C9" : t.color}" fill-opacity="${t.water ? .8 : .95}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
-      s += t.water ? `<circle cx="${f.x - t.r * .2}" cy="${f.y - t.r * .2}" r="${t.r * .5}" fill="#7DB6DD" fill-opacity=".5"/>`
-        : `<circle cx="${f.x - t.r * .3}" cy="${f.y - t.r * .25}" r="${t.r * .45}" fill="#B7BBB2" fill-opacity=".6"/><circle cx="${f.x + t.r * .35}" cy="${f.y + t.r * .3}" r="${t.r * .35}" fill="#5F635D" fill-opacity=".6"/>`;
+      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="#4C93C9" fill-opacity=".8" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<circle cx="${f.x - t.r * .2}" cy="${f.y - t.r * .2}" r="${t.r * .5}" fill="#7DB6DD" fill-opacity=".5"/>`;
     }
     s += `</g>`;
   }
