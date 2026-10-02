@@ -59,76 +59,139 @@ const UPKEEP = {
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
 
 const SPECIES = [
+  // Devonian
+  {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
+  {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
   // Carboniferous
-  {id:"arth",  name:"Arthropleura",        period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
-  {id:"pulm",  name:"Pulmonoscorpius",     period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
-  {id:"mega",  name:"Meganeura",           period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
+  {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
+  {id:"hylo", name:"Hylonomus",      period:"Carboniferous", diet:["insectivore"], price:2800, food:4, space:5, group:[2,8], appeal:3, stars:0, viv:"S"},
+  {id:"arth", name:"Arthropleura",   period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
+  {id:"pulm", name:"Pulmonoscorpius", period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
+  {id:"mega", name:"Meganeura",      period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
+  {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
+  {id:"dipl", name:"Diplodocus",     period:"Carboniferous", diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
   // Permian
-  {id:"lyst",  name:"Lystrosaurus",        period:"Permian",       diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
-  {id:"dcau",  name:"Diplocaulus",         period:"Permian",       diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
-  {id:"dime",  name:"Dimetrodon",          period:"Permian",       diet:["carnivore"], predator:true, price:9000,  food:90,  space:400,  group:[1,4],  appeal:6,  stars:1},
-  {id:"scut",  name:"Scutosaurus",         period:"Permian",       diet:["herbivore"], price:8000,  food:90,  space:500,  group:[2,6],  appeal:6,  stars:1},
-  {id:"inos",  name:"Inostrancevia",       period:"Permian",       diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
-  {id:"prio",  name:"Prionosuchus",        period:"Permian",       diet:["piscivore"], price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
+  {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
+  {id:"lyst", name:"Lystrosaurus",   period:"Permian", diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
+  {id:"dcau", name:"Diplocaulus",    period:"Permian", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
+  {id:"seym", name:"Seymouria",      period:"Permian", diet:["insectivore","carnivore"], price:4000, food:8, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
+  {id:"plhy", name:"Platyhystrix",   period:"Permian", diet:["carnivore"], price:4500, food:10, space:10, group:[2,5], appeal:5, stars:0.5, viv:"M"},
+  {id:"mosc", name:"Moschops",       period:"Permian", diet:["herbivore"], price:8000, food:90, space:450, group:[2,6], appeal:6, stars:1},
+  {id:"dime", name:"Dimetrodon",     period:"Permian", diet:["carnivore"], predator:true, price:9000,  food:90,  space:400,  group:[1,4],  appeal:6,  stars:1},
+  {id:"scut", name:"Scutosaurus",    period:"Permian", diet:["herbivore"], price:8000,  food:90,  space:500,  group:[2,6],  appeal:6,  stars:1},
+  {id:"este", name:"Estemmenosuchus", period:"Permian", diet:["herbivore"], price:9000, food:100, space:450, group:[2,5], appeal:7, stars:1},
+  {id:"coty", name:"Cotylorhynchus", period:"Permian", diet:["herbivore"], price:13000, food:180, space:900, group:[2,5], appeal:8, stars:1.5},
+  {id:"ante", name:"Anteosaurus",    period:"Permian", diet:["carnivore"], predator:true, price:15000, food:150, space:800, group:[1,3], appeal:9, stars:2},
+  {id:"inos", name:"Inostrancevia",  period:"Permian", diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
+  {id:"prio", name:"Prionosuchus",   period:"Permian", diet:["piscivore"], price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
   // Triassic
-  {id:"coel",  name:"Coelophysis",         period:"Triassic",      diet:["carnivore"], predator:true, price:6000,  food:60,  space:200,  group:[3,8],  appeal:4,  stars:0.5},
-  {id:"plat",  name:"Plateosaurus",        period:"Triassic",      diet:["herbivore"], price:12000, food:160, space:900,  group:[3,8],  appeal:8,  stars:1.5},
-  {id:"post",  name:"Postosuchus",         period:"Triassic",      diet:["carnivore"], predator:true, price:14000, food:130, space:700,  group:[1,3],  appeal:9,  stars:2},
+  {id:"sile", name:"Silesaurus",     period:"Triassic", diet:["omnivore"], price:3500, food:25, space:100, group:[3,10], appeal:3, stars:0},
+  {id:"shar", name:"Sharovipteryx",  period:"Triassic", diet:["insectivore"], price:3800, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
+  {id:"long", name:"Longisquama",    period:"Triassic", diet:["insectivore"], price:4000, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
+  {id:"gigt", name:"Gigatitan",      period:"Triassic", diet:["insectivore"], bug:true, price:4500, food:6, space:14, group:[3,8], appeal:5, stars:0.5, viv:"M"},
+  {id:"coel", name:"Coelophysis",    period:"Triassic", diet:["carnivore"], predator:true, price:6000,  food:60,  space:200,  group:[3,8],  appeal:4,  stars:0.5},
+  {id:"herr", name:"Herrerasaurus",  period:"Triassic", diet:["carnivore"], predator:true, price:8000, food:70, space:300, group:[2,5], appeal:6, stars:1},
+  {id:"desm", name:"Desmatosuchus",  period:"Triassic", diet:["herbivore"], price:9000, food:110, space:500, group:[2,6], appeal:6, stars:1},
+  {id:"plat", name:"Plateosaurus",   period:"Triassic", diet:["herbivore"], price:12000, food:160, space:900,  group:[3,8],  appeal:8,  stars:1.5},
+  {id:"post", name:"Postosuchus",    period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:130, space:700,  group:[1,3],  appeal:9,  stars:2},
+  {id:"eryt", name:"Erythrosuchus",  period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:140, space:800, group:[1,3], appeal:9, stars:2},
+  {id:"liso", name:"Lisowicia",      period:"Triassic", diet:["herbivore"], price:16000, food:220, space:1300, group:[1,4], appeal:10, stars:2},
   // Jurassic
-  {id:"comp",  name:"Compsognathus",       period:"Jurassic",      diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
-  {id:"yiqi",  name:"Yi qi",               period:"Jurassic",      diet:["insectivore"], price:5500,  food:8,   space:10,   group:[2,6],  appeal:5,  stars:1,   viv:"M"},
-  {id:"arch",  name:"Archaeopteryx",       period:"Jurassic",      diet:["insectivore","carnivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
-  {id:"dryo",  name:"Dryosaurus",          period:"Jurassic",      diet:["herbivore"], price:9000,  food:90,  space:400,  group:[3,10], appeal:6,  stars:1},
-  {id:"dimo",  name:"Dimorphodon",         period:"Jurassic",      diet:["insectivore","carnivore"], price:7000,  food:50,  space:200,  group:[3,10], appeal:6,  stars:1},
-  {id:"dilo",  name:"Dilophosaurus",       period:"Jurassic",      diet:["carnivore"], predator:true, price:16000, food:140, space:700,  group:[2,4],  appeal:12, stars:2.5},
-  {id:"steg",  name:"Stegosaurus",         period:"Jurassic",      diet:["herbivore"], price:22000, food:260, space:1500, group:[2,6],  appeal:12, stars:2.5},
-  {id:"allo",  name:"Allosaurus",          period:"Jurassic",      diet:["carnivore"], predator:true, price:40000, food:500, space:3000, group:[1,3],  appeal:17, stars:3.5},
-  {id:"cama",  name:"Camarasaurus",        period:"Jurassic",      diet:["herbivore"], price:45000, food:600, space:4500, group:[2,6],  appeal:17, stars:3.5},
-  {id:"torv",  name:"Torvosaurus",         period:"Jurassic",      diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
-  {id:"dipl",  name:"Diplodocus",          period:"Jurassic",      diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
+  {id:"hete", name:"Heterodontosaurus", period:"Jurassic", diet:["herbivore"], price:3500, food:25, space:80, group:[3,10], appeal:3, stars:0},
+  {id:"anch", name:"Anchiornis",     period:"Jurassic", diet:["insectivore","carnivore"], price:4500, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
+  {id:"comp", name:"Compsognathus",  period:"Jurassic", diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
+  {id:"orni", name:"Ornitholestes",  period:"Jurassic", diet:["carnivore"], price:5000, food:40, space:100, group:[2,6], appeal:4, stars:0},
+  {id:"yiqi", name:"Yi qi",          period:"Jurassic", diet:["insectivore"], price:5500,  food:8,   space:10,   group:[2,6],  appeal:5,  stars:1,   viv:"M"},
+  {id:"arch", name:"Archaeopteryx",  period:"Jurassic", diet:["insectivore","carnivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
+  {id:"dryo", name:"Dryosaurus",     period:"Jurassic", diet:["herbivore"], price:9000,  food:90,  space:400,  group:[3,10], appeal:6,  stars:1},
+  {id:"dimo", name:"Dimorphodon",    period:"Jurassic", diet:["insectivore","carnivore"], price:7000,  food:50,  space:200,  group:[3,10], appeal:6,  stars:1},
+  {id:"scel", name:"Scelidosaurus",  period:"Jurassic", diet:["herbivore"], price:9000, food:90, space:450, group:[2,8], appeal:6, stars:1},
+  {id:"dilo", name:"Dilophosaurus",  period:"Jurassic", diet:["carnivore"], predator:true, price:16000, food:140, space:700,  group:[2,4],  appeal:12, stars:2.5},
+  {id:"kent", name:"Kentrosaurus",   period:"Jurassic", diet:["herbivore"], price:16000, food:190, space:1000, group:[2,6], appeal:10, stars:2},
+  {id:"steg", name:"Stegosaurus",    period:"Jurassic", diet:["herbivore"], price:22000, food:260, space:1500, group:[2,6],  appeal:12, stars:2.5},
+  {id:"cryo", name:"Cryolophosaurus", period:"Jurassic", diet:["carnivore"], predator:true, price:22000, food:220, space:1300, group:[1,3], appeal:13, stars:3},
+  {id:"cera", name:"Ceratosaurus",   period:"Jurassic", diet:["carnivore"], predator:true, price:30000, food:350, space:2000, group:[1,3], appeal:14, stars:3},
+  {id:"mgal", name:"Megalosaurus",   period:"Jurassic", diet:["carnivore"], predator:true, price:33000, food:380, space:2500, group:[1,2], appeal:15, stars:3.5},
+  {id:"allo", name:"Allosaurus",     period:"Jurassic", diet:["carnivore"], predator:true, price:40000, food:500, space:3000, group:[1,3],  appeal:17, stars:3.5},
+  {id:"cama", name:"Camarasaurus",   period:"Jurassic", diet:["herbivore"], price:45000, food:600, space:4500, group:[2,6],  appeal:17, stars:3.5},
+  {id:"torv", name:"Torvosaurus",    period:"Jurassic", diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
+  {id:"apat", name:"Apatosaurus",    period:"Jurassic", diet:["herbivore"], price:47000, food:620, space:4700, group:[2,6], appeal:18, stars:4},
+  {id:"brac", name:"Brachiosaurus",  period:"Jurassic", diet:["herbivore"], price:52000, food:680, space:5200, group:[2,5], appeal:20, stars:4},
   // Cretaceous
-  {id:"hyps",  name:"Hypsilophodon",       period:"Cretaceous",    diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
-  {id:"micr",  name:"Microraptor",         period:"Cretaceous",    diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
-  {id:"psit",  name:"Psittacosaurus",      period:"Cretaceous",    diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
-  {id:"prot",  name:"Protoceratops",       period:"Cretaceous",    diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
-  {id:"ovir",  name:"Oviraptor",           period:"Cretaceous",    diet:["omnivore"], price:8000,  food:60,  space:250,  group:[2,8],  appeal:5,  stars:1},
-  {id:"para",  name:"Parasaurolophus",     period:"Cretaceous",    diet:["herbivore"], price:14000, food:180, space:900,  group:[3,10], appeal:8,  stars:2},
-  {id:"igua",  name:"Iguanodon",           period:"Cretaceous",    diet:["herbivore"], price:18000, food:240, space:1200, group:[3,10], appeal:10, stars:2},
-  {id:"velo",  name:"Velociraptor",        period:"Cretaceous",    diet:["carnivore"], predator:true, price:15000, food:120, space:500,  group:[3,6],  appeal:11, stars:2.5},
-  {id:"pter",  name:"Pteranodon",          period:"Cretaceous",    diet:["piscivore"], price:16000, food:120, space:800,  group:[3,10], appeal:11, stars:2.5},
-  {id:"nige",  name:"Nigersaurus",         period:"Cretaceous",    diet:["herbivore"], price:20000, food:260, space:1500, group:[3,8],  appeal:10, stars:2.5},
-  {id:"utah",  name:"Utahraptor",          period:"Cretaceous",    diet:["carnivore"], predator:true, price:24000, food:220, space:1200, group:[2,5],  appeal:14, stars:3},
-  {id:"styr",  name:"Styracosaurus",       period:"Cretaceous",    diet:["herbivore"], price:26000, food:300, space:1800, group:[2,6],  appeal:13, stars:3},
-  {id:"bary",  name:"Baryonyx",            period:"Cretaceous",    diet:["piscivore","carnivore"], price:30000, food:300, space:1800, group:[1,3],  appeal:14, stars:3},
-  {id:"dsuc",  name:"Deinosuchus",         period:"Cretaceous",    diet:["carnivore","piscivore"], predator:true, price:32000, food:350, space:2000, group:[1,3],  appeal:15, stars:3.5},
-  {id:"anky",  name:"Ankylosaurus",        period:"Cretaceous",    diet:["herbivore"], price:34000, food:380, space:2200, group:[1,4],  appeal:15, stars:3.5},
-  {id:"tric",  name:"Triceratops",         period:"Cretaceous",    diet:["herbivore"], price:35000, food:400, space:2500, group:[1,5],  appeal:16, stars:3.5},
-  {id:"cnot",  name:"Carnotaurus",         period:"Cretaceous",    diet:["carnivore"], predator:true, price:36000, food:380, space:2200, group:[1,2],  appeal:16, stars:3.5},
-  {id:"dche",  name:"Deinocheirus",        period:"Cretaceous",    diet:["omnivore","piscivore"], price:38000, food:420, space:2500, group:[1,3],  appeal:16, stars:3.5},
-  {id:"quet",  name:"Quetzalcoatlus",      period:"Cretaceous",    diet:["carnivore"], price:45000, food:400, space:3000, group:[1,4],  appeal:19, stars:4},
-  {id:"spin",  name:"Spinosaurus",         period:"Cretaceous",    diet:["piscivore","carnivore"], price:55000, food:600, space:3500, group:[1,2],  appeal:20, stars:4},
-  {id:"carc",  name:"Carcharodontosaurus", period:"Cretaceous",    diet:["carnivore"], predator:true, price:70000, food:750, space:4000, group:[1,2],  appeal:22, stars:4.5},
-  {id:"trex",  name:"Tyrannosaurus rex",   period:"Cretaceous",    diet:["carnivore"], predator:true, price:80000, food:800, space:4000, group:[1,2],  appeal:25, stars:4.5},
+  {id:"hyps", name:"Hypsilophodon",  period:"Cretaceous", diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
+  {id:"beel", name:"Beelzebufo",     period:"Cretaceous", diet:["carnivore"], price:4000, food:8, space:8, group:[1,4], appeal:5, stars:0.5, viv:"M"},
+  {id:"mono", name:"Mononykus",      period:"Cretaceous", diet:["insectivore"], price:4500, food:5, space:6, group:[2,8], appeal:4, stars:0.5, viv:"S"},
+  {id:"mcer", name:"Microceratus",   period:"Cretaceous", diet:["herbivore"], price:4500, food:6, space:8, group:[3,10], appeal:4, stars:0.5, viv:"S"},
+  {id:"scan", name:"Scansoriopteryx", period:"Cretaceous", diet:["insectivore"], price:4500, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
+  {id:"micr", name:"Microraptor",    period:"Cretaceous", diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
+  {id:"psit", name:"Psittacosaurus", period:"Cretaceous", diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
+  {id:"prot", name:"Protoceratops",  period:"Cretaceous", diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
+  {id:"ornm", name:"Ornithomimus",   period:"Cretaceous", diet:["herbivore","insectivore"], price:7000, food:60, space:250, group:[3,10], appeal:5, stars:1},
+  {id:"kool", name:"Koolasuchus",    period:"Cretaceous", diet:["piscivore"], price:7000, food:30, space:30, group:[1,3], appeal:6, stars:1, viv:"L"},
+  {id:"ovir", name:"Oviraptor",      period:"Cretaceous", diet:["omnivore"], price:8000,  food:60,  space:250,  group:[2,8],  appeal:5,  stars:1},
+  {id:"minm", name:"Minmi",          period:"Cretaceous", diet:["herbivore"], price:8000, food:70, space:300, group:[2,8], appeal:5, stars:1},
+  {id:"gall", name:"Gallimimus",     period:"Cretaceous", diet:["omnivore"], price:9000, food:90, space:400, group:[3,10], appeal:6, stars:1.5},
+  {id:"para", name:"Parasaurolophus", period:"Cretaceous", diet:["herbivore"], price:14000, food:180, space:900,  group:[3,10], appeal:8,  stars:2},
+  {id:"igua", name:"Iguanodon",      period:"Cretaceous", diet:["herbivore"], price:18000, food:240, space:1200, group:[3,10], appeal:10, stars:2},
+  {id:"velo", name:"Velociraptor",   period:"Cretaceous", diet:["carnivore"], predator:true, price:15000, food:120, space:500,  group:[3,6],  appeal:11, stars:2.5},
+  {id:"pter", name:"Pteranodon",     period:"Cretaceous", diet:["piscivore"], price:16000, food:120, space:800,  group:[3,10], appeal:11, stars:2.5},
+  {id:"conc", name:"Concavenator",   period:"Cretaceous", diet:["carnivore"], predator:true, price:18000, food:170, space:900, group:[1,3], appeal:11, stars:2.5},
+  {id:"nige", name:"Nigersaurus",    period:"Cretaceous", diet:["herbivore"], price:20000, food:260, space:1500, group:[3,8],  appeal:10, stars:2.5},
+  {id:"utah", name:"Utahraptor",     period:"Cretaceous", diet:["carnivore"], predator:true, price:24000, food:220, space:1200, group:[2,5],  appeal:14, stars:3},
+  {id:"styr", name:"Styracosaurus",  period:"Cretaceous", diet:["herbivore"], price:26000, food:300, space:1800, group:[2,6],  appeal:13, stars:3},
+  {id:"bary", name:"Baryonyx",       period:"Cretaceous", diet:["piscivore","carnivore"], price:30000, food:300, space:1800, group:[1,3],  appeal:14, stars:3},
+  {id:"ther", name:"Therizinosaurus", period:"Cretaceous", diet:["herbivore"], price:30000, food:330, space:2000, group:[1,3], appeal:17, stars:3.5},
+  {id:"dsuc", name:"Deinosuchus",    period:"Cretaceous", diet:["carnivore","piscivore"], predator:true, price:32000, food:350, space:2000, group:[1,3],  appeal:15, stars:3.5},
+  {id:"yutt", name:"Yutyrannus",     period:"Cretaceous", diet:["carnivore"], predator:true, price:33000, food:350, space:2200, group:[1,3], appeal:16, stars:3.5},
+  {id:"anky", name:"Ankylosaurus",   period:"Cretaceous", diet:["herbivore"], price:34000, food:380, space:2200, group:[1,4],  appeal:15, stars:3.5},
+  {id:"tric", name:"Triceratops",    period:"Cretaceous", diet:["herbivore"], price:35000, food:400, space:2500, group:[1,5],  appeal:16, stars:3.5},
+  {id:"cnot", name:"Carnotaurus",    period:"Cretaceous", diet:["carnivore"], predator:true, price:36000, food:380, space:2200, group:[1,2],  appeal:16, stars:3.5},
+  {id:"dche", name:"Deinocheirus",   period:"Cretaceous", diet:["omnivore","piscivore"], price:38000, food:420, space:2500, group:[1,3],  appeal:16, stars:3.5},
+  {id:"quet", name:"Quetzalcoatlus", period:"Cretaceous", diet:["carnivore"], price:45000, food:400, space:3000, group:[1,4],  appeal:19, stars:4},
+  {id:"spin", name:"Spinosaurus",    period:"Cretaceous", diet:["piscivore","carnivore"], price:55000, food:600, space:3500, group:[1,2],  appeal:20, stars:4},
+  {id:"pata", name:"Patagotitan",    period:"Cretaceous", diet:["herbivore"], price:60000, food:800, space:5500, group:[2,5], appeal:21, stars:4.5},
+  {id:"carc", name:"Carcharodontosaurus", period:"Cretaceous", diet:["carnivore"], predator:true, price:70000, food:750, space:4000, group:[1,2],  appeal:22, stars:4.5},
+  {id:"trex", name:"Tyrannosaurus rex", period:"Cretaceous", diet:["carnivore"], predator:true, price:80000, food:800, space:4000, group:[1,2],  appeal:25, stars:4.5},
   // Paleogene
-  {id:"hyae",  name:"Hyaenodon",           period:"Paleogene",     diet:["carnivore"], predator:true, price:9000,  food:80,  space:500,  group:[3,8],  appeal:7,  stars:1.5},
-  {id:"ambu",  name:"Ambulocetus",         period:"Paleogene",     diet:["piscivore","carnivore"], price:12000, food:110, space:700,  group:[1,3],  appeal:8,  stars:2},
-  {id:"andr",  name:"Andrewsarchus",       period:"Paleogene",     diet:["carnivore","omnivore"], predator:true, price:20000, food:200, space:1200, group:[1,2],  appeal:11, stars:2.5},
-  {id:"bari",  name:"Barinasuchus",        period:"Paleogene",     diet:["carnivore"], predator:true, price:20000, food:180, space:1100, group:[1,2],  appeal:10, stars:2.5},
-  {id:"tita",  name:"Titanoboa",           period:"Paleogene",     diet:["carnivore","piscivore"], predator:true, price:30000, food:250, space:1500, group:[1,2],  appeal:16, stars:3},
-  {id:"pcer",  name:"Paraceratherium",     period:"Paleogene",     diet:["herbivore"], price:40000, food:550, space:4000, group:[1,4],  appeal:17, stars:3.5},
+  {id:"ples", name:"Plesiadapis",    period:"Paleogene", diet:["herbivore"], price:3500, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
+  {id:"paki", name:"Pakicetus",      period:"Paleogene", diet:["piscivore"], price:5000, food:15, space:12, group:[2,6], appeal:5, stars:0.5, viv:"M"},
+  {id:"proc", name:"Proconsul",      period:"Paleogene", diet:["herbivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
+  {id:"hyae", name:"Hyaenodon",      period:"Paleogene", diet:["carnivore"], predator:true, price:9000,  food:80,  space:500,  group:[3,8],  appeal:7,  stars:1.5},
+  {id:"ambu", name:"Ambulocetus",    period:"Paleogene", diet:["piscivore","carnivore"], price:12000, food:110, space:700,  group:[1,3],  appeal:8,  stars:2},
+  {id:"uint", name:"Uintatherium",   period:"Paleogene", diet:["herbivore"], price:17000, food:200, space:1100, group:[2,5], appeal:10, stars:2},
+  {id:"andr", name:"Andrewsarchus",  period:"Paleogene", diet:["carnivore","omnivore"], predator:true, price:20000, food:200, space:1200, group:[1,2],  appeal:11, stars:2.5},
+  {id:"bari", name:"Barinasuchus",   period:"Paleogene", diet:["carnivore"], predator:true, price:20000, food:180, space:1100, group:[1,2],  appeal:10, stars:2.5},
+  {id:"arge", name:"Argentavis",     period:"Paleogene", diet:["carnivore"], price:22000, food:150, space:800, group:[1,3], appeal:13, stars:3},
+  {id:"arsi", name:"Arsinoitherium", period:"Paleogene", diet:["herbivore"], price:24000, food:280, space:1800, group:[1,4], appeal:12, stars:3},
+  {id:"tita", name:"Titanoboa",      period:"Paleogene", diet:["carnivore","piscivore"], predator:true, price:30000, food:250, space:1500, group:[1,2],  appeal:16, stars:3},
   // Neogene
-  {id:"daeo",  name:"Daeodon",             period:"Neogene",       diet:["omnivore"], predator:true, price:11000, food:120, space:700,  group:[2,5],  appeal:8,  stars:1.5},
-  {id:"kele",  name:"Kelenken",            period:"Neogene",       diet:["carnivore"], predator:true, price:14000, food:100, space:700,  group:[1,3],  appeal:10, stars:2},
-  {id:"plty",  name:"Platybelodon",        period:"Neogene",       diet:["herbivore"], price:20000, food:250, space:1500, group:[2,6],  appeal:10, stars:2.5},
+  {id:"dino", name:"Dinopithecus",   period:"Neogene", diet:["omnivore"], price:7000, food:70, space:250, group:[4,12], appeal:6, stars:1},
+  {id:"daeo", name:"Daeodon",        period:"Neogene", diet:["omnivore"], predator:true, price:11000, food:120, space:700,  group:[2,5],  appeal:8,  stars:1.5},
+  {id:"aepy", name:"Aepycamelus",    period:"Neogene", diet:["herbivore"], price:12000, food:130, space:800, group:[2,6], appeal:7, stars:1.5},
+  {id:"kele", name:"Kelenken",       period:"Neogene", diet:["carnivore"], predator:true, price:14000, food:100, space:700,  group:[1,3],  appeal:10, stars:2},
+  {id:"thyl", name:"Thylacoleo",     period:"Neogene", diet:["carnivore"], predator:true, price:14000, food:110, space:500, group:[1,3], appeal:10, stars:2},
+  {id:"mchl", name:"Megalochelys",   period:"Neogene", diet:["herbivore"], price:14000, food:120, space:900, group:[1,4], appeal:9, stars:2},
+  {id:"chal", name:"Chalicotherium", period:"Neogene", diet:["herbivore"], price:15000, food:180, space:1000, group:[2,5], appeal:8, stars:2},
+  {id:"aind", name:"Archaeoindris",  period:"Neogene", diet:["herbivore"], price:16000, food:180, space:900, group:[1,4], appeal:9, stars:2},
+  {id:"drom", name:"Dromornis",      period:"Neogene", diet:["carnivore"], predator:true, price:18000, food:150, space:1000, group:[1,3], appeal:10, stars:2.5},
+  {id:"plty", name:"Platybelodon",   period:"Neogene", diet:["herbivore"], price:20000, food:250, space:1500, group:[2,6],  appeal:10, stars:2.5},
+  {id:"amph", name:"Amphicyon",      period:"Neogene", diet:["carnivore"], predator:true, price:20000, food:200, space:1100, group:[1,3], appeal:12, stars:2.5},
+  {id:"gpit", name:"Gigantopithecus", period:"Neogene", diet:["herbivore"], price:22000, food:260, space:1400, group:[1,4], appeal:12, stars:2.5},
+  {id:"siva", name:"Sivatherium",    period:"Neogene", diet:["herbivore"], price:25000, food:300, space:2000, group:[1,4], appeal:12, stars:3},
+  {id:"pcer", name:"Paraceratherium", period:"Neogene", diet:["herbivore"], price:40000, food:550, space:4000, group:[1,4],  appeal:17, stars:3.5},
   // Quaternary
-  {id:"dire",  name:"Dire wolf",           period:"Quaternary",    diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
-  {id:"arct",  name:"Arctodus",            period:"Quaternary",    diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
-  {id:"mgth",  name:"Megatherium",         period:"Quaternary",    diet:["herbivore"], price:20000, food:260, space:1500, group:[1,4],  appeal:11, stars:2.5},
-  {id:"mlan",  name:"Megalania",           period:"Quaternary",    diet:["carnivore"], predator:true, price:22000, food:180, space:1200, group:[1,2],  appeal:12, stars:2.5},
-  {id:"smil",  name:"Smilodon",            period:"Quaternary",    diet:["carnivore"], predator:true, price:18000, food:150, space:900,  group:[2,5],  appeal:11, stars:3},
-  {id:"mast",  name:"American mastodon",   period:"Quaternary",    diet:["herbivore"], price:24000, food:300, space:1900, group:[2,8],  appeal:12, stars:3},
-  {id:"elas",  name:"Elasmotherium",       period:"Quaternary",    diet:["herbivore"], price:22000, food:280, space:1800, group:[1,4],  appeal:12, stars:3},
-  {id:"mamm",  name:"Woolly mammoth",      period:"Quaternary",    diet:["herbivore"], price:26000, food:320, space:2000, group:[2,8],  appeal:13, stars:3},
+  {id:"ornw", name:"Ornimegalonyx",  period:"Quaternary", diet:["carnivore"], price:6000, food:25, space:14, group:[1,3], appeal:7, stars:1, viv:"M"},
+  {id:"dire", name:"Dire wolf",      period:"Quaternary", diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
+  {id:"macr", name:"Macrauchenia",   period:"Quaternary", diet:["herbivore"], price:13000, food:150, space:900, group:[2,6], appeal:8, stars:2},
+  {id:"arct", name:"Arctodus",       period:"Quaternary", diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
+  {id:"doed", name:"Doedicurus",     period:"Quaternary", diet:["herbivore"], price:18000, food:200, space:1100, group:[1,4], appeal:10, stars:2.5},
+  {id:"mgth", name:"Megatherium",    period:"Quaternary", diet:["herbivore"], price:20000, food:260, space:1500, group:[1,4],  appeal:11, stars:2.5},
+  {id:"mlan", name:"Megalania",      period:"Quaternary", diet:["carnivore"], predator:true, price:22000, food:180, space:1200, group:[1,2],  appeal:12, stars:2.5},
+  {id:"smil", name:"Smilodon",       period:"Quaternary", diet:["carnivore"], predator:true, price:18000, food:150, space:900,  group:[2,5],  appeal:11, stars:3},
+  {id:"mast", name:"American mastodon", period:"Quaternary", diet:["herbivore"], price:24000, food:300, space:1900, group:[2,8],  appeal:12, stars:3},
+  {id:"elas", name:"Elasmotherium",  period:"Quaternary", diet:["herbivore"], price:22000, food:280, space:1800, group:[1,4],  appeal:12, stars:3},
+  {id:"mamm", name:"Woolly mammoth", period:"Quaternary", diet:["herbivore"], price:26000, food:320, space:2000, group:[2,8],  appeal:13, stars:3},
+  {id:"colm", name:"Columbian mammoth", period:"Quaternary", diet:["herbivore"], price:30000, food:380, space:2400, group:[2,6], appeal:14, stars:3.5},
 ];
 
 // Vivariums: ready-made glass enclosures for small animals. Placed like buildings.
@@ -158,6 +221,7 @@ const TIME_PERIODS = [
   {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,88]},
   {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,85]},
   {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,80]},
+  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10, quality:[30,75]},
 ];
 
 // Science staff, hired at their department's building
@@ -195,7 +259,7 @@ const TRIP_SIZE = [10, 5000];
 //   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
 const PLANT_DNA = {
   mesozoic:  {id:"flora-mesozoic",  era:"mesozoic",  name:"Mesozoic flora",  space:300,  periods:["Triassic", "Jurassic", "Cretaceous"]},
-  paleozoic: {id:"flora-paleozoic", era:"paleozoic", name:"Paleozoic flora", space:900,  periods:["Carboniferous", "Permian"]},
+  paleozoic: {id:"flora-paleozoic", era:"paleozoic", name:"Paleozoic flora", space:900,  periods:["Devonian", "Carboniferous", "Permian"]},
 };
 const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.id, p]));
 
@@ -216,14 +280,14 @@ const FLORA_BATCH_M2 = 1200;   // one batch of planting stock covers this many m
 
 // Period colors, the same ones the planning map uses
 const PERIOD_COLOR = {
-  Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
+  Devonian:"#C28A4D", Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
   Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
 };
 
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
-  b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel"]},
+  b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
@@ -562,7 +626,7 @@ BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W",
    --------------------------------------------------------------------- */
 
 // Which era each period belongs to
-const ERA_OF = {Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
+const ERA_OF = {Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
                 Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
 
 // What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
@@ -581,7 +645,7 @@ const PALEOFLORA = {
 };
 const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
 // Herbivores from these periods never evolved to eat grass, and get sick on it
-const GRASS_INTOLERANT = ["Carboniferous", "Permian", "Triassic", "Jurassic"];
+const GRASS_INTOLERANT = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
@@ -728,7 +792,7 @@ const TECH = [
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:25, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
   {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:35, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:40, text:"CERES grows medicine for Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:40, text:"CERES grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
 const REFINE_POINTS = {cenozoic:6, mesozoic:9, paleozoic:12};
@@ -736,7 +800,7 @@ const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 
 // Flying animals. Outside an aviary or vivarium they escape almost at once.
-const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi"];
+const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi", "arge"];
 
 const ESCAPE = {
   lawsuit:75000,       // cost of each guest killed

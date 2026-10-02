@@ -582,7 +582,7 @@ function speciesStatus(s){
 function catalogHtml(){
   const owned = new Map();
   for(const e of state.exhibits) for(const a of e.animals) owned.set(a.sp, (owned.get(a.sp) || 0) + 1);
-  const order = ["Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
+  const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
   let h = "", shown = 0;
   for(const per of order){
     const list = SPECIES.filter(s => s.period === per).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
