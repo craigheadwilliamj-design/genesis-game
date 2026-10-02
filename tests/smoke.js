@@ -1013,7 +1013,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.themeNoBonusGenesis = !zMixed.ok && themeFitShare(e0) === 0;
     checkThemes();
     out.themeLocked = !themeHave("volcanic") && !themeHave("gilded") && !!themeProblem("exhibit", e0, "volcanic");
-    state.rating = 4; checkThemes();
+    state.rating = 4.6; recompute();   // no explicit check: recompute alone unlocks it
     out.themeVolcanicUnlock = themeHave("volcanic") && !themeHave("gilded");
     state.science.tech.push("gilded"); checkThemes();
     out.themeGildedUnlock = themeHave("gilded");
