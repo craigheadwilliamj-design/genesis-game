@@ -50,8 +50,8 @@ const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
 /* ---------- who gets sick ---------- */
 
-// Old plant-eaters eating grass, from a Cenozoic planting or grass hay
-function grassSick(e, s){ return foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ((e.flora || "cenozoic") === "cenozoic" || e.grassFed); }
+// Old plant-eaters eating grass, from a Cenozoic planting (without older groves to browse instead) or grass hay
+function grassSick(e, s){ return foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && (grassyFloor(e) || e.grassFed); }
 const hungerShare = e => clamp((e.hungryMin || 0) / (CLOSE_MIN - OPEN_MIN), 0, 1);
 const medicated = (e, s) => !!e.medFedOk && canTreat(s);
 

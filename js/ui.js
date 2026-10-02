@@ -227,8 +227,14 @@ function landHtml(e){
   const hb = habitatOf(e), n = {};
   for(const f of landOf(e)) n[f.type] = (n[f.type] || 0) + 1;
   const have = Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`).join(", ");
+  const need = dailyNeed(e), fed = ["paleoflora", "plants"].filter(t => need[t] && browseRate(e, t))
+    .map(t => `${Math.round(browseShare(e, t, need[t]) * 100)}% of their ${t}`);
+  const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
+  const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
+  const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : t.stock && (state.ceres.plants[t.flora] || 0) < t.stock ? `Needs ${FLORA[t.flora].label} planting stock from CERES.` : "";
   return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Ponds cover ${(hb.pondShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without a pond.</div>
-    <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px">${esc(t.label)}, ${money(t.price)}</button>`).join("")}</div></section>`;
+    <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Cycad and lycopod groves keep old plant-eaters off the grass, and each uses a batch of planting stock from CERES (no refund).</div>
+    <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.stock ? " + stock" : ""}</button>`).join("")}</div></section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit

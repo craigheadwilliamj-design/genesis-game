@@ -267,11 +267,11 @@ function exhibitReport(e){
     const away = kinds.filter(s => ERA_OF[s.period] !== flora);
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${FLORA[flora].plants}.`}); }
     else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. ${[...new Set(away.map(s => FLORA[ERA_OF[s.period]].label))].join(" or ")} plants would suit ${away.length === 1 ? "it" : "them"}.`}); }
-    // grass comes from a Cenozoic planting, or from plain plant food standing in for Paleoflora
-    const grassy = flora === "cenozoic" || e.grassFed;
+    // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora
+    const grassy = grassyFloor(e) || e.grassFed;
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
     const sick = grazers.filter(s => GRASS_INTOLERANT.includes(s.period)), picky = grazers.filter(s => s.period === "Cretaceous");
-    if(grassy && sick.length){ target += GRASS_HIT.intolerant; issues.push({bad:true, text:`Sick from eating grass. ${sick.map(s => s.name).join(", ")} never evolved to digest it. ${flora === "cenozoic" ? "Replant with older flora from CERES" : "Feed them Paleoflora from CERES"}.`}); }
+    if(grassy && sick.length){ target += GRASS_HIT.intolerant; issues.push({bad:true, text:`Sick from eating grass. ${sick.map(s => s.name).join(", ")} never evolved to digest it. ${grassyFloor(e) ? "Replant with older flora from CERES, or plant cycad or lycopod groves" : "Feed them Paleoflora from CERES"}.`}); }
     else if(grassy && picky.length){ target += GRASS_HIT.cretaceous; issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. Older flora or Paleoflora suits them better.`}); }
   }
   // Dirt: a filthy exhibit makes animals miserable fast

@@ -842,6 +842,33 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     oldL.exhibits.push({id:"e-old", name:"Old", points:[[1,1],[2,1],[2,2]], animals:[], happy:70}, {id:"e-oldv", name:"OldV", points:[[1,1],[2,1],[2,2]], animals:[], happy:70, viv:"S"});
     const upl = upgradeSave(oldL);
     out.oldGetsLand = upl.exhibits.find(e => e.id === "e-old").land.length === 0 && upl.exhibits.find(e => e.id === "e-oldv").land === undefined;
+
+    // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
+    const keepTech = [...sc.tech], keepPlants = {...state.ceres.plants}, keepFeed = state.staff.feedFrom;
+    state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
+    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], flora:"cenozoic"};
+    state.exhibits = [gx];
+    const grazer = SPECIES.find(s => !s.viv && foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ERA_OF[s.period] === "mesozoic");
+    gx.animals = [1, 2, 3].map(i => ({id:"a-g" + i, sp:grazer.id, q:90}));
+    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.plants.mesozoic = 0;
+    out.groveNeedsTech = /Research/.test(landSpot(115, 115, "cycads").why || "");
+    sc.tech.push("mesoplant");
+    out.groveNeedsStock = /planting stock/.test(landSpot(115, 115, "cycads").why || "");
+    out.treesNeedNoStock = landSpot(115, 115, "trees").ok;
+    const grassyBefore = grassyFloor(gx) && grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
+    state.ceres.plants.mesozoic = 3;
+    for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "cycads", x, y);
+    out.groveUsesStock = state.ceres.plants.mesozoic === 0 && gx.land.length === 3;
+    out.grovesStopGrass = grassyBefore && !grassyFloor(gx) && !grassSick(gx, grazer);
+    out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
+    // browsing: the stock drains slower, but keepers are still needed
+    const pn = dailyNeed(gx).paleoflora, share = browseShare(gx, "paleoflora", pn);
+    gx.stock = {paleoflora:100}; eatTick(60); const withGroves = 100 - gx.stock.paleoflora;
+    const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
+    out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
+    out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
+    sc.tech = keepTech; state.ceres.plants = keepPlants; state.staff.feedFrom = keepFeed;
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
     return out;
   }));
 

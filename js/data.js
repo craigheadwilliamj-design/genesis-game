@@ -879,10 +879,17 @@ BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platf
 //   r      radius in meters
 //   water  counts toward the exhibit's water
 //   cover  rock cover it adds (see HAB.rockEvery)
+//   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
+//   tech   research needed first
+//   stock  batches of CERES planting stock it uses up
+//   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic trees)
 const LAND = {
   pond:   {label:"Pond",          one:"a pond",          price:3000, r:6, color:"#3A7FB2", water:true},
   rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
+  trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
+  cycads: {label:"Cycad grove",   one:"a cycad grove",   price:1500, r:5, color:"#3F7D3A", flora:"mesozoic",  tech:"mesoplant",  stock:1, browse:4},
+  lycopods:{label:"Lycopod stand", one:"a lycopod stand", price:1800, r:5, color:"#2E6B55", flora:"paleozoic", tech:"paleoplant", stock:1, browse:4},
 };
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor in ponds that fully satisfies water lovers
@@ -891,6 +898,9 @@ const HAB = {
   wantsWater:.8,   // a species this keen on water is unhappy and sickly without a pond
   dry:8,           // happiness lost when water lovers have no pond
   dryIll:1.5,      // illness chance multiplier for them
+  groveFull:.06,   // share of the floor in groves from an animal's own era that fully satisfies it
+  groveBonus:6,    // happiness for animals with plenty of groves from their era
+  browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
 };
 // How much each species likes water and rocks (0 to 1). Fish eaters want water. Anything not listed likes both a little.
 const LIKES_ROCK = {water:.2, rock:.9};

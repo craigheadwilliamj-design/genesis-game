@@ -200,7 +200,8 @@ function ceresHtml(b){
   if(c.beds.length) h += `<div style="margin-top:8px">${[...c.beds].sort((a, d) => a.end - d.end).map(j => progressCard(j.kind === "flora" ? `${ERA_LABEL[j.era]} planting stock` : `${ERA_LABEL[j.era]} medicine`, beds() > 1 ? `bed ${(j.lane || 0) + 1}` : "", j)).join("")}</div>`;
   h += `</section>`;
 
-  h += `<section><h3>Planting stock</h3><div class="meta">Replanting an exhibit uses up stock. Tap the exhibit and change its flora.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => growRow("flora", era)).join("")}</ul>`;
+  const planted = era => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora === era).length, 0);
+  h += `<section><h3>Planting stock</h3><div class="meta">Replanting a whole exhibit uses up stock: tap the exhibit and change its flora. Each cycad grove or lycopod stand (Landscaping) uses one batch. Groves planted so far: ${planted("mesozoic")} Mesozoic, ${planted("paleozoic")} Paleozoic.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => growRow("flora", era)).join("")}</ul>`;
   for(const era of ["mesozoic", "paleozoic"]){
     const d = sc.dna[PLANT_DNA[era].id];
     if(hasTech(FLORA[era].tech) && !(d && d.genome >= 100)) h += `<div class="meta" style="margin-top:4px">${ERA_LABEL[era]} plant DNA: ${d ? d.genome : 0}%. GHOST is still collecting it.</div>`;
