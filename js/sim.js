@@ -177,7 +177,7 @@ function upgradeSave(s){
 
 /* ---------- things the rest of the game asks about ---------- */
 
-const PATH_HALF_WIDTH = 2;   // footpaths are 4 m wide
+const PATH_HALF_WIDTH = 2.5;   // footpaths are 5 m wide
 const REACH = 6;             // an exhibit or building within this many meters of a path counts as "on the path"
 
 function speciesCounts(e){

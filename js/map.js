@@ -456,7 +456,7 @@ function pathProblem(pts, type){
   if(lineLength(pts) < 2) return "Too short.";
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
-  if(state.buildings.some(b => lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
   const cost = pathCost(pts, type);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -492,6 +492,7 @@ function setTool(t){
     showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and tap.`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Tap beside a path. Fits ${fits.join(", ")}.`
       : b.kind ? `Point beside a path and tap, then tap it to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.`
+      : b.onPath ? "Point at a path and tap. It sits on the edge you point at."
       : b.prop ? "Point beside a path and tap."
       : "Point beside a path and tap. It turns to face the path by itself.",
       `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:false, finish:false, cancel:"Done"});
@@ -681,7 +682,7 @@ function placeGhost(clientX, clientY){
     const dx = best.b[0] - best.a[0], dy = best.b[1] - best.a[1], L = Math.hypot(dx, dy) || 1;
     const nx = -dy/L, ny = dx/L;
     const side = ((p.x - best.x)*nx + (p.y - best.y)*ny) >= 0 ? 1 : -1;
-    const off = t.d/2 + best.hw + .5;
+    const off = t.onPath ? Math.max(0, best.hw - t.d/2 - .1) : t.d/2 + best.hw + .5;   // benches, bins and signs sit on the path, hugging the edge on the side you point at
     x = best.x + nx*side*off; y = best.y + ny*side*off;
     angle = Math.atan2(dy, dx);
   } else why = why || (t.serviceOnly ? "Move it next to a service road. ATVs can't use guest paths." : t.dept ? "Move it next to a path or service road." : "Move it next to a path.");
@@ -689,7 +690,7 @@ function placeGhost(clientX, clientY){
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
-  if(!why && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
+  if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
   setStat(why || `${money(t.price)}. Tap to build.`, !!why);
@@ -965,10 +966,11 @@ function moveProblem(kind, it){
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
-    if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+    if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
+    else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
   } else {
     if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
-    if(state.buildings.some(b => lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+    if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
   }
   return null;
 }
