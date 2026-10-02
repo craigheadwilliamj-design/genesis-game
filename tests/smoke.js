@@ -870,6 +870,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech = keepTech; state.ceres.plants = keepPlants; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
+    // biomes: every open-exhibit animal has one, home ground makes them happier, the wrong one is flagged, wetland counts as some water
+    out.biomesCover = SPECIES.every(s => s.viv ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
+    const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
+    bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
+    state.exhibits = [bx];
+    const away = biomesOf(desertSp).includes(DEFAULT_BIOME) ? "wetland" : DEFAULT_BIOME;
+    bx.biome = away; const awayT = exhibitReport(bx).target, awayFlag = exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text));
+    bx.biome = "desert"; const homeT = exhibitReport(bx).target;
+    out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeT - awayT === BIOME_HAPPY.home - BIOME_HAPPY.away && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
+    const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], points:bx.points}, s));
+    bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
+    out.wetlandWaters = dryNow && !thirsty(bx, fishy);
+    state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivNo = !!regradeProblem({viv:"S"}, "desert");
+    state.money = 0; out.regradeNeedsMoney = /Costs/.test(regradeProblem(bx, "desert") || "") && regradeCost(bx, "desert") === Math.round(3600 * BIOMES.desert.perSqM);
+    render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
+    state.exhibits = keepEx; state.money = keepMoney; render();
+
     // weather: tomorrow's forecast comes true, animals without cover suffer, shelters and groves help
     const keepW = {...state.weather}, rnd = Math.random;
     const nw = newPark().weather;
