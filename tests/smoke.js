@@ -999,6 +999,39 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // the path preview band is as wide as the path it will become
     const bandW = kind => { setTool(kind); draw.pts = [[300,300]]; draw.hover = [340,300]; renderOverlay(); const m = $("#overlay").innerHTML.match(/stroke-opacity="\.35" stroke-width="([\d.]+)"/); setTool("select"); return m && +m[1]; };
     out.pathBandWidth = bandW("path") === 2*PATH_HALF_WIDTH && bandW("wide") === 2*WIDE_PATH.halfWidth && bandW("service") === 2*SERVICE_ROAD.halfWidth;
+
+    // themes: old saves get defaults, themes unlock by play, a matched area draws more, animals that suit a theme are happier
+    const old = JSON.parse(JSON.stringify(state)); delete old.themes; upgradeSave(old);
+    out.themesDefault = old.themes.brush === "genesis" && old.themes.have.length === 1;
+    const tSaved = {paths:state.paths, buildings:state.buildings, exhibits:state.exhibits, themes:state.themes, rating:state.rating, tech:state.science.tech.slice(), money:state.money};
+    state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded");
+    state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100, flora:"cenozoic"}];
+    state.paths = [{id:"p-gate", points:[[200,300],[200,240]], fixed:true}, {id:"p-t", points:[[200,240],[260,240]]}, {id:"p-t2", points:[[260,240],[260,300]]}];
+    state.buildings = [{id:"b-t", type:"restroom", points:[[245,243],[253,243],[253,249],[245,249]]}];
+    recompute();
+    const e0 = state.exhibits[0], zMixed = derived.themes["e-t"];
+    out.themeNoBonusGenesis = !zMixed.ok && themeFitShare(e0) === 0;
+    checkThemes();
+    out.themeLocked = !themeHave("volcanic") && !themeHave("gilded") && !!themeProblem("exhibit", e0, "volcanic");
+    state.rating = 4; checkThemes();
+    out.themeVolcanicUnlock = themeHave("volcanic") && !themeHave("gilded");
+    state.science.tech.push("gilded"); checkThemes();
+    out.themeGildedUnlock = themeHave("gilded");
+    e0.theme = "volcanic"; recompute();
+    out.themeMixedNothing = !derived.themes["e-t"].ok && derived.themes["e-t"].same === 0;
+    const appealMixed = derived.appeal;
+    for(const it of [...state.paths, ...state.buildings]) it.theme = "volcanic";
+    recompute();
+    out.themeMatchedBonus = derived.themes["e-t"].ok && derived.appeal > appealMixed && themeFitShare(e0) === 1;
+    out.themeFitHappier = exhibitReport(e0).target > (e0.theme = "genesis", exhibitReport(e0).target);
+    e0.theme = "volcanic"; render();
+    out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live) && world.innerHTML.includes(THEMES.volcanic.accent);
+    state.themes.brush = "volcanic"; state.money = 1e6;
+    const bp = {id:"p-n", points:[[260,300],[300,300]]}; themeNew("path", bp);
+    out.themeBrush = bp.theme === "volcanic" && state.money < 1e6;
+    state.themes.brush = "bayou"; const bq = {id:"p-q", points:[[260,300],[300,300]]}; state.themes.have = ["genesis", "gilded"]; themeNew("path", bq);
+    out.themeBrushLocked = bq.theme === undefined;
+    Object.assign(state, {paths:tSaved.paths, buildings:tSaved.buildings, exhibits:tSaved.exhibits, themes:tSaved.themes, rating:tSaved.rating, money:tSaved.money}); state.science.tech = tSaved.tech; recompute(); render();
     return out;
   }));
 

@@ -798,6 +798,7 @@ const TECH = [
   {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"gilded", group:"build", label:"Gilded Age design", points:30, text:"Unlocks the Gilded Age theme: Victorian brick and brass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
   {id:"security", group:"build", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
@@ -1033,6 +1034,31 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   gtod:"tropical temperate",  rmlo:"grassland scrubland",  sdel:"scrubland temperate",
 }).map(([id, b]) => [id, b.split(" ")]));
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
+
+// Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
+//   path     live and dead surface colors and the edge line
+//   bld      color a building's own color is blended toward (by `mix`), and its outline
+//   accent   the trim line drawn inside an exhibit's fence
+//   fee      share of an item's price to build it in this theme, or to change an existing one to it
+//   fits     species that look right here
+//   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
+const THEMES = {
+  genesis: {label:"Genesis", blurb:"Clean white, dark green and gold. The baseline everything else is compared to.",
+    path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
+    unlock:{hint:"Where you start.", check:() => true}},
+  gilded: {label:"Gilded Age", blurb:"Victorian brick and brass, 1800s paleontology, retro paleoart.",
+    path:{live:"#D9C9A3", dead:"#B8A97F", edge:"#6B3A2E"}, bld:"#7A3B3B", mix:.55, edge:"#3E2A22", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
+    unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
+  bayou: {label:"Bayou", blurb:"Weathered boardwalks, cypress green and still water.",
+    path:{live:"#A68A5B", dead:"#8C7650", edge:"#3F5B3A"}, bld:"#4F6B4A", mix:.5, edge:"#2E4A3B", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
+    unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
+  volcanic: {label:"Volcanic", blurb:"Black rock and glowing lava.",
+    path:{live:"#4A4A4F", dead:"#3A3A3E", edge:"#17171A"}, bld:"#2B2B30", mix:.65, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
+    unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
+};
+// A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
+// An animal that suits its exhibit's theme is happier and draws a little more too.
+const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};

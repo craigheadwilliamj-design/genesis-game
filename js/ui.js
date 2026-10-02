@@ -122,9 +122,49 @@ function overviewHtml(){
     h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Day</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.day}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
   }
 
+  h += themesOverview();
   h += `<section><h3>Goals</h3><ul class="checklist">${GOALS.map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${money(g.reward)}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
+
+/* ---------- themes ---------- */
+function themeOptions(kind, it){
+  const cur = it ? themeKey(it) : state.themes.brush;
+  return Object.entries(THEMES).map(([k, T]) => {
+    const locked = !themeHave(k), fee = it && k !== cur ? themeFee(kind, it, k) : 0;
+    return `<option value="${k}"${k === cur ? " selected" : ""}${locked ? " disabled" : ""}>${T.label}${locked ? ` (${T.unlock.hint})` : k === cur ? " (current)" : it ? (fee ? `, ${money(fee)}` : ", free") : T.fee ? `, +${Math.round(T.fee * 100)}% to build` : ""}</option>`;
+  }).join("");
+}
+function themeHtml(kind, it){
+  const T = themeOf(it);
+  let h = `<section><h3>Theme</h3><label class="field"><span>Style</span><select id="themeSel">${themeOptions(kind, it)}</select></label>`;
+  h += `<div class="meta" style="margin-top:4px">${esc(T.blurb)} Changing it has no refund.</div>`;
+  const z = kind === "exhibit" && derived.themes && derived.themes[it.id];
+  if(z){
+    h += `<div class="meta" style="margin-top:4px">${z.key === "genesis" ? "Pick a theme and match the paths, shops and restrooms beside this exhibit for an appeal bonus."
+      : z.ok ? `Matched area: all ${z.total} paths and buildings nearby are ${esc(T.label)}. Guests find this exhibit ${Math.round(THEME.appeal * 100)}% more appealing.`
+      : z.total < THEME.minNear ? `Needs at least ${THEME.minNear} paths or buildings within ${THEME.radius} m to count as a themed area (${z.total} now).`
+      : `Mixed area: ${z.same} of ${z.total} paths and buildings within ${THEME.radius} m are ${esc(T.label)}. Match them all for an appeal bonus.`}</div>`;
+    if(T.fits.length) h += `<div class="meta" style="margin-top:4px">Suits ${T.fits.map(id => esc(SPECIES_BY_ID[id].name)).join(", ")}.</div>`;
+  }
+  return h + `</section>`;
+}
+function themesOverview(){
+  let h = `<section><h3>Themes</h3><label class="field"><span>Build new things as</span><select id="brushSel">${themeOptions("", null)}</select></label>`;
+  h += `<ul class="issues" style="margin-top:6px">${Object.entries(THEMES).map(([k, T]) => `<li class="${themeHave(k) ? "" : "bad"}">${esc(T.label)}: ${themeHave(k) ? "unlocked." : esc(T.unlock.hint)}${T.fits.length ? ` Suits ${T.fits.map(id => esc(SPECIES_BY_ID[id].name)).join(", ")}.` : ""}</li>`).join("")}</ul>`;
+  return h + `<div class="meta" style="margin-top:4px">Match an exhibit with the paths, shops and restrooms near it for an appeal bonus. Animals that suit a theme are happier. Tap any path, building or exhibit to change its theme.</div></section>`;
+}
+panelEl.addEventListener("change", ev => {
+  if(ev.target.id === "brushSel"){ if(themeHave(ev.target.value)){ state.themes.brush = ev.target.value; saveSoon(); } ui.panel(); return; }
+  if(ev.target.id !== "themeSel") return;
+  const it = selItem(), key = ev.target.value; if(!it) return;
+  const kind = sel.kind, why = themeProblem(kind, it, key);
+  if(why){ ui.toast(why, "bad"); ui.panel(); return; }
+  const fee = themeFee(kind, it, key);
+  spend(fee, "built"); if(key === "genesis") delete it.theme; else it.theme = key;
+  ui.toast(`Now ${THEMES[key].label}${fee ? ` (${money(fee)})` : ""}.`, "good");
+  afterChange(); render();
+});
 
 /* ---------- an exhibit ---------- */
 function exhibitHtml(e){
@@ -179,6 +219,8 @@ function exhibitHtml(e){
     }).join("")}</select></label>`;
     h += `<div class="meta" style="margin-top:4px">${kinds.length ? kinds.map(s => `${esc(s.name)}: ${biomesOf(s).map((x, i) => i ? `gets by in ${BIOMES[x].label.toLowerCase()}` : `home is ${BIOMES[x].label.toLowerCase()}`).join(", ")}`).join(". ") + ". " : ""}Animals are happiest in their home biome. Regrading has no refund.${BIOMES[b].wet && !e.viv ? " Wetland gives water lovers half the water they want." : ""}</div></section>`;
   }
+
+  h += themeHtml("exhibit", e);
 
   // what the exhibit is planted with
   {
@@ -463,7 +505,12 @@ function depotHtml(b){
   return h;
 }
 
+// every building panel gets a theme picker just above its bulldoze button
 function buildingHtml(b){
+  const h = buildingBody(b), mark = `<div class="row"><button class="btn danger" data-action="demolish"`, i = h.lastIndexOf(mark);
+  return i < 0 ? h : h.slice(0, i) + themeHtml("building", b) + h.slice(i);
+}
+function buildingBody(b){
   if(b.type === "dock") return dockHtml(b) + demolishRow(b);
   if(b.type === "closet") return closetHtml(b) + demolishRow(b);
   if(b.type === "security") return securityHtml(b) + demolishRow(b);
@@ -496,6 +543,7 @@ function pathHtml(p){
   if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like ORACLE, GHOST, and TAR can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
+  if(!svc) h += themeHtml("path", p);
   if(!p.fixed) h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   else h += `<div class="meta">This is where guests come in. It can't be removed.</div>`;
   return h;

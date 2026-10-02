@@ -49,6 +49,9 @@ function freshScience(){
 // CERES: Paleoflora fodder (stock), medicine on hand, planting stock by era, growing beds, and which medicines it keeps stocked
 function freshCeres(){ return {stock:0, meds:0, plants:{mesozoic:0, paleozoic:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
+// Themes: the one new builds use, and which are unlocked
+function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
+
 function newPark(){
   return {
     version:1, name:"Genesis Park",
@@ -59,7 +62,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -106,6 +109,7 @@ function upgradeSave(s){
     for(const f of e.land.filter(f => f.type === "pond")) e.water.push({id:f.id, points:circlePts(f.x, f.y, WATER.oldPondR, 12)});
     e.land = e.land.filter(f => f.type !== "pond");
   }
+  if(!s.themes) s.themes = freshThemes();
   // parks from before weather get 3 fair days to build shelters
   if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
@@ -311,6 +315,11 @@ function exhibitReport(e){
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
   // Water, rocks, groves and shelter: animals feel at home among what they like, and water lovers need water
   const hab = habitatScore(e); target += hab.delta; issues.push(...hab.issues);
+  // Theme: animals that look right in the exhibit's theme are happier
+  if(e.animals.length && themeOf(e).fits.length){
+    const sh = themeFitShare(e);
+    if(sh > 0){ target += THEME.fitHappy * sh; issues.push({bad:false, text:`${themeOf(e).label} suits ${sh === 1 ? "these animals" : "some of these animals"}.`}); }
+  }
   // Sick and hurt animals drag the whole herd down
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
   // (a chronic case, eased by contemporary medicine, counts for less)
@@ -329,9 +338,9 @@ function recompute(){
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);
   const guestPaths = state.paths.filter(p => joined.has(p.id)), anyPaths = state.paths.filter(p => joinedAll.has(p.id));
   const near = (shape, list) => list.some(p => lineShapeDist(p.points, shape) <= REACH);
-  const reach = {}, reports = {};
+  const reach = {}, reports = {}, themes = {};
   // Guests reach exhibits and shops by footpath. Staff reach backstage buildings by footpath or service road.
-  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths); reports[e.id] = exhibitReport(e); }
+  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
   for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths);
 
   // How much guests want to visit
@@ -342,7 +351,7 @@ function recompute(){
     animals += n; happySum += e.happy * n;
     if(!reach[e.id]) continue;
     for(const [sp, c] of reports[e.id].counts){
-      appeal += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach);
+      appeal += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id]));
       shown.add(sp);
     }
   }
@@ -385,7 +394,7 @@ function recompute(){
   const pricey = state.ticket > fair * 1.3;
   if(pricey) ratingTarget -= 0.3;
 
-  derived = {joined, joinedAll, reach, reports, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
+  derived = {joined, joinedAll, reach, reports, themes, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
              comfort, mood, wom, learnt, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
   return derived;
 }
@@ -541,6 +550,7 @@ function endDay(){
 function currentGoal(){ return GOALS.find(g => !state.goalsDone.includes(g.id)) || null; }
 function checkGoals(){
   if(!derived) recompute();
+  checkThemes();
   for(const g of GOALS){
     if(state.goalsDone.includes(g.id)) continue;
     if(g.check(goalApi)){
