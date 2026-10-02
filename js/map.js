@@ -656,8 +656,16 @@ function drawTap(e){
 
 /* ---------- placing guest buildings ---------- */
 function placeGhost(clientX, clientY){
-  const t = BUILDINGS[tool], p = toWorld(clientX, clientY);
-  let best = null;
+  const t = BUILDINGS[tool];
+  let p = toWorld(clientX, clientY), best = null, snapped = false;
+  if(tool === "sign"){
+    // info signs snap to the closest spot on a nearby exhibit's fence, then sit on the path edge facing it
+    let sd = EDU.signReach;
+    for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){
+      const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]);
+      if(r.d < sd){ sd = r.d; p = {x:r.x, y:r.y}; snapped = true; }
+    }
+  }
   // guest buildings face footpaths; backstage departments can face service roads too
   for(const q of state.paths){
     if(isService(q) && !t.dept) continue;
@@ -673,7 +681,7 @@ function placeGhost(clientX, clientY){
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
-  if(best && gridSnap){
+  if(best && gridSnap && !snapped){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
     const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
     best.x = r.x; best.y = r.y;
