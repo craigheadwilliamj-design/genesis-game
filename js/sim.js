@@ -29,7 +29,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, supplies:0, cleaning:0, medicine:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
   return {
@@ -55,7 +55,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{},
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -120,6 +120,7 @@ function upgradeSave(s){
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
   if(s.guestLog.edu === undefined) s.guestLog.edu = null;
+  if(!s.lodging) s.lodging = freshLodging();
   // parks from before litter and seats get told what changed
   if(!s.litter){ s.litter = {}; if(s.buildings.some(b => OLD_MENUS[b.type] || b.type === "restroom")) s.guestLog.notice = true; }
   // food stands and gift shops from before menus keep selling what they used to
@@ -571,6 +572,7 @@ function endDay(){
   servicesNight();
   scienceNight();
   keepersNight();
+  lodgingNight();
   logiNight();
   escapesNight();
   mechanicsNight();
@@ -589,7 +591,7 @@ function endDay(){
   state.rating = clamp(state.rating + step, 0, 5);
 
   const t = state.today;
-  const income = t.tickets + t.food + t.shop + t.sold + t.rewards + t.donations + t.edfees;
+  const income = t.tickets + t.food + t.shop + t.sold + t.rewards + t.donations + t.edfees + t.rooms;
   const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning + t.medicine;
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});

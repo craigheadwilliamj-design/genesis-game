@@ -15,6 +15,7 @@ function guestsOverviewHtml(){
     ${L.mood != null ? `<dt>Left happy yesterday</dt><dd>${Math.round(L.mood)}%</dd>` : ""}
     ${litterTotal() >= 1 ? `<dt>Litter on the paths</dt><dd>${Math.round(litterTotal())} pieces</dd>` : ""}
     ${t.eduN ? `<dt>Learned today</dt><dd>${Math.round(t.eduSum / t.eduN)} on average</dd>` : L.edu != null ? `<dt>Learned yesterday</dt><dd>${Math.round(L.edu)} on average</dd>` : ""}
+    ${hotels().length ? `<dt>Hotel guests today</dt><dd>${parties.filter(p => p.hotel).reduce((s, p) => s + p.n, 0)} in the park, ${state.lodging.last.guests} stayed last night</dd>` : ""}
     ${t.donations + t.edfees >= 1 ? `<dt>Donations and Education Center</dt><dd>${money(Math.round(t.donations + t.edfees))}</dd>` : ""}
     ${vandalLog().acts ? `<dt>Vandalism today</dt><dd>${vandalLog().acts} act${vandalLog().acts === 1 ? "" : "s"}, ${vandalLog().caught} caught</dd>` : ""}
   </dl>`;
@@ -32,6 +33,7 @@ function guestBuildingHtml(b){
   const served = b.served && b.served.day === state.day ? b.served : {n:0, money:0, items:{}};
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
+  if(t.rooms) return h + hotelHtml(b);
   if(t.kind) h += menuHtml(b, served) + vendorStockHtml(b);
   if(t.prop){
     const c = propCond(b), broke = isBroken(b);
@@ -74,6 +76,18 @@ function guestBuildingHtml(b){
   return h;
 }
 
+// A hotel: tonight's room rate, last night's bookings, how clean it is, and its toiletries
+function hotelHtml(b){
+  const t = BUILDINGS[b.type], rate = roomRate(b), will = roomWill(b), dirt = b.dirt || 0, bk = b.booked;
+  let h = `<section><h3>Room rate</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="roomRate" data-d="-10" aria-label="Lower the rate" style="padding:2px 9px">−</button><b class="num" style="min-width:56px;text-align:center">${money(rate)}</b><button class="btn" data-action="roomRate" data-d="10" aria-label="Raise the rate" style="padding:2px 9px">+</button><span class="meta">a night</span></div>`;
+  h += `<div class="meta" style="margin-top:4px">${will >= 1 ? "Everyone who wants a room will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual rate is ${money(t.roomPrice)}.</div></section>`;
+  h += `<dl class="kv"><dt>Rooms</dt><dd>${t.rooms}, for ${LODGING.perRoom} guests each</dd><dt>Booked last night</dt><dd>${bk ? `${bk.rooms} room${bk.rooms === 1 ? "" : "s"}, ${money(bk.money || 0)}` : "Not open a night yet"}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+  h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= 50 ? "var(--bad)" : dirt >= LODGING.cleanAt ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
+  h += `<div class="meta" style="margin-top:4px">Rooms get dirty every night they're used, and a dirty hotel books fewer rooms. ${state.staff.custodians.length ? "Custodians clean it during the day." : "Hire a custodian to clean it."}</div></section>`;
+  h += `<section><h3>Toiletries</h3>${stockRows(b)}<div class="meta" style="margin-top:6px">Each booked room uses ${LODGING.toiletries} units of merchandise. ${guestGoodsFree() ? `Suppliers bring them until day ${state.logi.guestFrom}.` : roomsStocked(b) < t.rooms ? "Running low: custodians restock it from the dock or a warehouse." : "Custodians keep it stocked."}</div></section>`;
+  h += `<div class="meta">Each night, some of the day's guests book a room, more at a higher-rated park. Next morning they start the day here, with no ticket to buy and more to spend.</div>`;
+  return h;
+}
 // The Education Center: its entry fee, and what guests get from it
 function eduCenterHtml(b){
   const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
@@ -150,6 +164,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "fireGuard"){ state.staff.guards = state.staff.guards.filter(m => m.id !== b.dataset.id); syncGuards(); afterChange(); return; }
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
+  if(a === "roomRate" && it && isHotel(it)){ it.rate = clamp(roomRate(it) + (+b.dataset.d), 10, BUILDINGS[it.type].roomPrice * 3); ui.panel(); saveSoon(); return; }
   if(a === "eduFee" && it && it.type === "edcenter"){ it.fee = clamp((it.fee || 0) + (+b.dataset.d), 0, EDU.centerFee * 4); ui.panel(); saveSoon(); return; }
   if(!it || sel.kind !== "building" || !isVendor(it)) return;
   if(a === "menuAdd"){ const why = addToMenu(it, b.dataset.id); if(why) ui.toast(why, "bad"); }
