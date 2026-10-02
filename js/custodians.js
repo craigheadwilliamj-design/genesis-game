@@ -49,6 +49,7 @@ function pickChore(c, r, w){
     const n = kGraph.anchors[b.id]; if(!n || !custZoneOk(r, b)) continue;
     if(b.type === "restroom" && (b.dirt || 0) >= CUSTODIAN.restroomAt) consider("toScrub", b.id, n, 50 + b.dirt);
     if((b.graffiti || 0) >= VANDAL.grossAt) consider("toGraffiti", "G" + b.id, n, 35 + b.graffiti / 2);
+    if(isHotel(b) && (b.dirt || 0) >= LODGING.cleanAt) consider("toScrub", b.id, n, 45 + b.dirt / 2);
     if(b.type === "bin" && (b.fill || 0) >= LITTER.binCap * CUSTODIAN.binAt) consider("toBin", b.id, n, 40 + b.fill);
   }
   for(const [k, v] of Object.entries(state.litter)){

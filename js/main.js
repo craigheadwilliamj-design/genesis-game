@@ -26,6 +26,7 @@ events.dayEnded = r => {
     ${row("Tickets", money(L.tickets))}
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
     ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
+    ${L.rooms ? row("Hotel rooms", money(L.rooms)) : ""}
     ${L.rewards ? row("Goal rewards", money(L.rewards)) : ""}
     ${L.sold ? row("Sold and refunds", money(L.sold)) : ""}
     ${row("Animal food", "−" + money(L.feed))}

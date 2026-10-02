@@ -25,10 +25,11 @@ const FAMILIES = {
   viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
+  lodging:{tools:["lodge", "resort"], labels:["Safari Lodge", "Resort Hotel"]},
   props:{tools:["bin", "bench", "picnic", "lamp", "sign"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
-const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin"};
+const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin", lodging:"lodge"};
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
@@ -641,6 +642,7 @@ function placeGhost(clientX, clientY){
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
+  if(!why && t.rooms) why = hotelLocked(tool);
   if(best && gridSnap){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
     const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);

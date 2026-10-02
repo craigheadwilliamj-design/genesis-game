@@ -212,6 +212,9 @@ const BUILDINGS = {
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true},
+  // hotels: guests stay the night and spend the next day in the park
+  lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
+  resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
   // guests learn about prehistoric life here
   edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:16, d:12, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education"},
 
@@ -431,6 +434,17 @@ const EDU = {
   learned:40,          // guests who learned this much say so
   noInfo:3,            // exhibits seen without a sign before guests complain
 };
+// Hotels fill overnight from the day's guests. Next morning their guests start the day at the hotel, with no ticket to buy.
+const LODGING = {
+  stayShare:.15,       // share of the day's guests who'd stay the night at a 5-star park (fewer at fewer stars)
+  perRoom:2,           // guests in each room
+  toiletries:2,        // units of merchandise each booked room uses (soap, towels, little shampoos)
+  dirtPerNight:60,     // a hotel this full gets this dirty overnight (0 to 100), and custodians clean it in the day
+  dirtyCut:.6,         // a filthy hotel books this much less
+  cleanAt:20,          // custodians clean a hotel this dirty
+  cashBoost:1.3,       // hotel guests bring more money
+  stayBoost:120,       // and stay this many minutes longer
+};
 // Security guards patrol the paths, put vandals off, and throw out the ones they catch
 const SECURITY = {
   hireCost:2000,
@@ -617,6 +631,8 @@ BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:6000, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
                   store:{cap:600, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops overnight. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
+// Hotels keep toiletries, which custodians bring from the dock or a warehouse
+for(const t of ["lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
 // Food stands and gift shops keep their own stock
 for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:200, megastore:500}))
   BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
@@ -769,4 +785,5 @@ const GOALS = [
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
   {id:"cash150",  text:"Have $250,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=250000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Cretaceous, collect a full T. rex genome, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+  {id:"hotel",    text:"Build a hotel",                      hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].rooms)},
 ];

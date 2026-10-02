@@ -384,7 +384,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.minute = OPEN_MIN + 60; const t0 = state.today.tickets;
     guestsArrive(2); const p = parties[0];
     out.ticketPaid = state.today.tickets - t0 === state.ticket * 2;
-    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = CLOSE_MIN;
+    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = CLOSE_MIN; p.spd = 1.15;   // a quick walker, so one soda is enough when it gets there
     // only the parties set up here: nobody new comes in
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); state.minute++; if(until()) return true; } return false; };
     // (it may grab a meal too if it got hungry on the way)
@@ -537,7 +537,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("education");
     const ed = {id:"b-ed", type:"edcenter", points:rectPts(200, 111.5, BUILDINGS.edcenter.w, BUILDINGS.edcenter.d, 0), fee:4};
     state.buildings.push(ed); afterChange();
-    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100;
+    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100; e4.until = CLOSE_MIN;
     out.centerIsSight = !!gGraph.anchors["b-ed"] && pickSight(e4) === ed;
     const fee0 = state.today.edfees; serveAt(e4, ed, "see");
     out.centerTeaches = e4.edu === EDU.center && state.today.edfees - fee0 === 8 && ed.served.n === 2;
@@ -556,6 +556,39 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const edPart = derived.parts.find(x => x.label === "Education");
     out.educationRating = !!edPart && Math.abs(edPart.score - 30 / EDU.full) < 1e-9 && Math.abs(derived.parts.reduce((s, x) => s + x.max, 0) - 5) < 1e-9;
     state.buildings = state.buildings.filter(b => b !== ed && b !== sign); afterChange(); resetParties();
+
+    // lodging: hotels need stars and a busy park first
+    const r0 = state.rating, h0 = state.history; state.rating = 2;
+    const lock1 = hotelLocked("lodge"); state.rating = 3; state.history = [{guests:100}];
+    const lock2 = hotelLocked("lodge"); state.history = [{guests:400}];
+    out.hotelUnlock = /3 stars/.test(lock1) && /300 guests/.test(lock2) && !hotelLocked("lodge") && /4 stars/.test(hotelLocked("resort"));
+    const lodge = {id:"b-lodge", type:"lodge", points:rectPts(150, 245.5, BUILDINGS.lodge.w, BUILDINGS.lodge.d, 0)};
+    state.buildings.push(lodge); afterChange();
+    const gf0 = state.logi.guestFrom; state.logi.guestFrom = 999;   // suppliers bring toiletries for now
+    // guests book rooms overnight and pay for them, and the rooms get dirty
+    const book = (guests, stars) => { state.today.guests = guests; state.rating = stars; lodgingNight(); return lodge.booked.rooms; };
+    const rm0 = state.today.rooms;
+    out.hotelBooks = book(1000, 5) === BUILDINGS.lodge.rooms && state.today.rooms - rm0 === BUILDINGS.lodge.rooms * BUILDINGS.lodge.roomPrice
+      && state.lodging.stays[0].n === BUILDINGS.lodge.rooms * LODGING.perRoom && lodge.dirt === LODGING.dirtPerNight;
+    lodge.dirt = 0; const clean = book(200, 5); lodge.dirt = 100; const dirty = book(200, 5); lodge.dirt = 0;
+    lodge.rate = BUILDINGS.lodge.roomPrice * 1.5; const dear = book(200, 5); lodge.rate = BUILDINGS.lodge.roomPrice * 2; const tooDear = book(200, 5); delete lodge.rate;
+    out.hotelDirtyAndDear = clean > dirty && dirty > 0 && clean > dear && tooDear === 0;
+    // once stock is physical, each room needs toiletries
+    state.logi.guestFrom = 0; lodge.store = {merch:LODGING.toiletries * 5};
+    out.hotelToiletries = book(1000, 5) === 5 && stockOf(lodge, "merch") < 1e-9;
+    state.logi.guestFrom = 999; lodge.dirt = 0;
+    // next morning the hotel guests start at the hotel, without buying a ticket
+    book(1000, 5); resetParties();
+    const tk0 = state.today.tickets, gs0 = state.today.guests;
+    hotelGuestsArrive();
+    out.hotelGuestsMorning = parties.length === BUILDINGS.lodge.rooms && parties.every(x => x.at === gGraph.anchors["b-lodge"] && x.hotel === "b-lodge")
+      && state.today.tickets === tk0 && state.today.guests - gs0 === BUILDINGS.lodge.rooms * LODGING.perRoom && !state.lodging.stays.length;
+    resetParties();
+    // a custodian cleans the rooms
+    lodge.dirt = 70; hireCustodian(); syncCustodians();
+    out.custodianCleansHotel = work(900, () => !lodge.dirt);
+    state.staff.custodians = []; syncCustodians();
+    state.buildings = state.buildings.filter(b => b !== lodge); afterChange(); state.rating = r0; state.history = h0; state.logi.guestFrom = gf0;
 
     // lots of guests stay quick to simulate
     state.minute = OPEN_MIN + 120;
@@ -576,6 +609,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const up3 = upgradeSave(old3);
     const old4 = JSON.parse(JSON.stringify(state)); delete old4.guestLog.edu; delete old4.today.eduSum; delete old4.today.donations;
     const up4 = upgradeSave(old4);
+    const old5 = JSON.parse(JSON.stringify(state)); delete old5.lodging; delete old5.today.rooms;
+    const up5 = upgradeSave(old5);
+    out.oldSaveLodging = Array.isArray(up5.lodging.stays) && up5.today.rooms === 0;
     out.oldSaveEducation = up4.guestLog.edu === null && up4.today.eduSum === 0 && up4.today.donations === 0;
     out.oldSaveSecurity = Array.isArray(up3.staff.guards) && up3.guestLog.vandal && up3.guestLog.vandal.acts === 0;
     out.oldSaveGuestGoods = up2.logi.guestFrom === 23 && Array.isArray(up2.staff.custodians) && up2.logi.guestNotice === true;

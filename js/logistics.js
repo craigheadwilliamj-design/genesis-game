@@ -119,6 +119,7 @@ function storeTarget(b, t){
   const cap = storeCap(b);
   if(b.type === "pmc") return Math.ceil(cap * .8);
   if(t === "meds") return d.bulk && cereses().length ? Math.min(Math.round(cap * .05), 20) : 0;
+  if(BUILDINGS[b.type].rooms) return t === "merch" ? Math.round(cap * .8) : 0;
   // a stand or shop keeps most of its shelves full of what its menu uses, split between its goods
   if(d.vendor){
     const uses = menuOf(b).map(m => MENU[m.id].good), mine = uses.filter(g => g === t).length;
@@ -212,11 +213,14 @@ function dockDelivery(){
   let spent = 0, units = 0;
   for(const b of state.buildings){
     if(b.type !== "dock" || !isReachable(b)) continue;
-    const orders = dockOrders(b);
+    const orders = dockOrders(b), short = {};
+    for(const t of ORDER_GOODS) short[t] = Math.max(0, orders[t] - stockOf(b, t));
+    // when it won't all fit, each good gets its share of the room, so the last on the list isn't left out
+    const total = Object.values(short).reduce((s, n) => s + n, 0), fit = total > 0 ? Math.min(1, storeRoom(b, ORDER_GOODS[0]) / total) : 1;
     for(const t of ORDER_GOODS){
       // partner parks only pay for animal food; stock for stands and shops goes on the supplies bill
       const price = freeFeeding() && !isGuestGood(t) ? 0 : unitPrice(t);
-      let n = Math.min(Math.floor(orders[t] - stockOf(b, t)), Math.floor(storeRoom(b, t)));
+      let n = Math.min(Math.floor(short[t] * fit), Math.floor(storeRoom(b, t)));
       if(price) n = Math.min(n, Math.floor(Math.max(0, state.money) / price));
       if(n < 1) continue;
       addGood(b, t, n); units += n;
