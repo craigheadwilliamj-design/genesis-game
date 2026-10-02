@@ -657,15 +657,8 @@ function drawTap(e){
 /* ---------- placing guest buildings ---------- */
 function placeGhost(clientX, clientY){
   const t = BUILDINGS[tool];
-  let p = toWorld(clientX, clientY), best = null, snapped = false;
-  if(tool === "sign"){
-    // info signs snap to the closest spot on a nearby exhibit's fence, then sit on the path edge facing it
-    let sd = EDU.signReach;
-    for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){
-      const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]);
-      if(r.d < sd){ sd = r.d; p = {x:r.x, y:r.y}; snapped = true; }
-    }
-  }
+  const p = toWorld(clientX, clientY);
+  let best = null;
   // guest buildings face footpaths; backstage departments can face service roads too
   for(const q of state.paths){
     if(isService(q) && !t.dept) continue;
@@ -681,7 +674,7 @@ function placeGhost(clientX, clientY){
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
-  if(best && gridSnap && !snapped){
+  if(best && gridSnap){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
     const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
     best.x = r.x; best.y = r.y;
@@ -689,7 +682,10 @@ function placeGhost(clientX, clientY){
   if(best){
     const dx = best.b[0] - best.a[0], dy = best.b[1] - best.a[1], L = Math.hypot(dx, dy) || 1;
     const nx = -dy/L, ny = dx/L;
-    const side = ((p.x - best.x)*nx + (p.y - best.y)*ny) >= 0 ? 1 : -1;
+    // a sign goes on the edge of the path that faces the closest exhibit fence; everything else on the side you point at
+    let fx = p.x, fy = p.y;
+    if(tool === "sign"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+    const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
     const off = t.onPath ? Math.max(0, best.hw - t.d/2 - .1) : t.d/2 + best.hw + .5;   // benches, bins and signs sit on the path, hugging the edge on the side you point at
     x = best.x + nx*side*off; y = best.y + ny*side*off;
     angle = Math.atan2(dy, dx);
