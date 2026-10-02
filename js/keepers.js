@@ -41,7 +41,7 @@ const unitsPerDay = s => Math.max(1, Math.round(s.food / FOOD_UNIT_COST));
 let kGraph = null;     // {nodes: Map(key -> node), anchors: {id -> node}}
 let crew = [];         // keepers walking around right now (positions aren't saved)
 
-function freshStaff(){ return {keepers:[], mechanics:[], vets:[], custodians:[], transfers:[], atvs:[], upgrades:[], feedFrom:7}; }
+function freshStaff(){ return {keepers:[], mechanics:[], vets:[], custodians:[], guards:[], transfers:[], atvs:[], upgrades:[], feedFrom:7}; }
 
 /* ---------- what each exhibit needs ---------- */
 
@@ -89,7 +89,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc", "closet", "restroom", "bin"].includes(b.type) || storeOf(b)) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc", "closet", "security"].includes(b.type) || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -128,6 +128,7 @@ function buildKeeperGraph(){
   // point everyone at the new map (the old one is thrown away)
   for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; rebaseAtv(k); if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
   for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; rebaseAtv(m); if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
+  for(const c of gcrew){ c.at = c.at ? (nodes.get(c.at.k) || null) : null; c.route = []; c.t = 0; rebaseAtv(c); c.job = "idle"; }
   for(const c of ccrew){ c.at = c.at ? (nodes.get(c.at.k) || null) : null; c.route = []; c.t = 0; rebaseAtv(c); if(c.job.startsWith("to") || c.job === "home"){ c.job = "idle"; c.target = null; if(!c.carry) c.haul = null; } }
   for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; rebaseAtv(v); if(!["darting", "treating", "checking"].includes(v.job)){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; v.check = null; } }
 }
@@ -623,7 +624,7 @@ function keeperStatus(k){
 const depots = () => state.buildings.filter(b => b.type === "depot");
 const depotWorking = b => isReachable(b) && condOf(b) >= VEHICLES.offlineBelow;
 const atvs = () => state.staff.atvs;
-const allStaffList = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets, state.staff.custodians || []);
+const allStaffList = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets, state.staff.custodians || [], state.staff.guards || []);
 // A broken depot grounds its own ATVs wherever they are parked
 function usableAtvs(){
   if(!hasTech("vehicles")) return [];

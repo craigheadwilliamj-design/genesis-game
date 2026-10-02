@@ -48,6 +48,7 @@ function pickChore(c, r, w){
   for(const b of state.buildings){
     const n = kGraph.anchors[b.id]; if(!n || !custZoneOk(r, b)) continue;
     if(b.type === "restroom" && (b.dirt || 0) >= CUSTODIAN.restroomAt) consider("toScrub", b.id, n, 50 + b.dirt);
+    if((b.graffiti || 0) >= VANDAL.grossAt) consider("toGraffiti", "G" + b.id, n, 35 + b.graffiti / 2);
     if(b.type === "bin" && (b.fill || 0) >= LITTER.binCap * CUSTODIAN.binAt) consider("toBin", b.id, n, 40 + b.fill);
   }
   for(const [k, v] of Object.entries(state.litter)){
@@ -103,6 +104,7 @@ function custArrive(c){
     return;
   }
   if(c.job === "toScrub"){ c.job = "scrubbing"; return; }
+  if(c.job === "toGraffiti"){ c.job = "degraffiti"; return; }
   if(c.job === "toBin"){ c.job = "emptying"; c.work = CUSTODIAN.emptyMin; return; }
   if(c.job === "toSweep"){ c.job = "sweeping"; return; }
   c.job = "idle"; c.target = null;
@@ -115,6 +117,14 @@ function custWork(c, left){
     const w = Math.min(left, Math.max(0, (b.dirt || 0) - 1) / scrubRate());
     b.dirt = Math.max(0, (b.dirt || 0) - scrubRate() * w);
     if(b.dirt <= 1){ b.dirt = 0; c.job = "idle"; c.target = null; }
+    return w;
+  }
+  if(c.job === "degraffiti"){
+    const b = buildingById(c.target && c.target.slice(1));
+    if(!b){ c.job = "idle"; c.target = null; return 0; }
+    const w = Math.min(left, Math.max(0, (b.graffiti || 0) - 1) / scrubRate());
+    b.graffiti = Math.max(0, (b.graffiti || 0) - scrubRate() * w);
+    if(b.graffiti <= 1){ b.graffiti = 0; c.job = "idle"; c.target = null; }
     return w;
   }
   if(c.job === "emptying"){
@@ -140,7 +150,7 @@ function custodiansTick(dtMin){
     if(!c.at){ const h = closets()[0]; if(!h) continue; c.at = kGraph.anchors[h.id]; c.job = "idle"; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
-      if(["scrubbing", "emptying", "sweeping"].includes(c.job)){ const used = custWork(c, left); left -= used; if(!used && c.job !== "idle") left = 0; continue; }
+      if(["scrubbing", "degraffiti", "emptying", "sweeping"].includes(c.job)){ const used = custWork(c, left); left -= used; if(!used && c.job !== "idle") left = 0; continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = CUSTODIAN.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
@@ -177,12 +187,12 @@ function hireCustodian(){
 }
 function custodianStatus(m){
   const c = ccrew.find(x => x.id === m.id); if(!c) return "Clocking in";
-  const tgt = c.target && !c.target.startsWith("L") ? buildingById(c.target) : null, n = tgt ? BUILDINGS[tgt.type].label.toLowerCase() : "";
+  const tgt = c.target && !/^[LG]/.test(c.target) ? buildingById(c.target) : null, n = tgt ? BUILDINGS[tgt.type].label.toLowerCase() : "";
   const dst = c.haul && buildingById(c.haul.dst), src = c.haul && buildingById(c.haul.src);
   return {
     toHaulSrc:`Fetching ${goodName(c.haul ? c.haul.t : "").toLowerCase()} from the ${src ? BUILDINGS[src.type].label.toLowerCase() : "store"}`,
     toHaulDst:`Restocking the ${dst ? BUILDINGS[dst.type].label.toLowerCase() : "stand"}${c.carry ? ` (${Math.round(c.carry.amount)} ${goodName(c.carry.type).toLowerCase()})` : ""}`,
-    toScrub:`Walking to the ${n}`, scrubbing:`Scrubbing the ${n}`, toBin:"Walking to a full bin", emptying:"Emptying a bin",
+    toScrub:`Walking to the ${n}`, scrubbing:`Scrubbing the ${n}`, toGraffiti:"Walking to some graffiti", degraffiti:"Scrubbing off graffiti", toBin:"Walking to a full bin", emptying:"Emptying a bin",
     toSweep:"Walking to some litter", sweeping:"Sweeping up litter", home:"Heading back to the closet",
   }[c.job] || "Waiting for work";
 }

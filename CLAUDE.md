@@ -15,6 +15,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `js/guests.js`: guest parties. Their needs (`NEEDS`), the guest path graph (`buildGuestGraph`, `guestField` per stop), deciding where to go (`planParty`), queues and service at food stands, shops and restrooms (`svcQ`, `serveParty`), mood, thoughts (`THOUGHTS`, `topThoughts`), and the nightly `guestsNight`.
 - `js/services.js`: guest services. Menus on food and gift shells (`b.menu`, `MENU`, `servesOf`, `serveAt`, `willPay`), benches and picnic areas, trash bins and litter (`state.litter` grid, `trashCheck`), restroom dirt, and the night cleaning crew (`servicesNight`, `cleaningBill`).
 - `js/custodians.js`: custodians (`ccrew`, `state.staff.custodians`) who restock food stands and gift shops with guest goods (`pickHaul` with `GUEST_GOODS`), scrub restrooms, empty bins, and sweep litter, working from a Custodial Closet.
+- `js/security.js`: vandalism by rowdy, unhappy guests (`vandalTick`, `vandalize`, `deterrence`, broken props via `propCond`/`isBroken`, `b.graffiti`) and security guards (`gcrew`, `state.staff.guards`) who patrol, deter, catch vandals, and answer cameras from a Security Office.
 - `js/map.js`: SVG rendering, camera, build tools, and drawing guests (`drawParties`). Also defines `$`, `esc` and `nodeKey`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
 - `js/logiui.js`: panels for stores, the dock, zones, and the park-office supply summary, plus their click/change handlers.
@@ -26,7 +27,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `derived`: computed from `state` by `recompute()` (reach, reports, demand, rating parts). Call `recompute()` after layout changes.
 - `state.zones` / `state.logi`: work zones and logistics bookkeeping. Food is physical: it lives in `b.store` of stations, docks, warehouses, cold stores, and farms, and the PMC holds medicine. Exhibits only get what keepers carry. Stands and shops sell from their own `b.store` of guest goods (snacks, drinks, merch) once `state.logi.guestFrom` has passed; custodians carry it to them.
 - `kGraph`: the staff walking graph. Rebuild it with `buildKeeperGraph()` after paths, buildings or gates change.
-- `crew` / `mcrew` / `vcrew` / `ccrew`: live keeper, mechanic, vet, and custodian walkers. These are NOT saved, so mirror anything persistent onto `state.staff.*` (see `setCarry`, `transfer.cargo`).
+- `crew` / `mcrew` / `vcrew` / `ccrew` / `gcrew`: live keeper, mechanic, vet, custodian, and guard walkers. These are NOT saved, so mirror anything persistent onto `state.staff.*` (see `setCarry`, `transfer.cargo`).
 - `parties` / `gGraph`: live guest parties and their footpath graph (rebuild with `buildGuestGraph()` alongside `buildKeeperGraph()`). Parties are NOT saved. Guests pay where they're served, and their mood when they leave goes into `state.today.moodSum`/`moodN` and `state.guestLog`, which set guest comfort and word of mouth.
 - `events`: hooks the sim calls (`toast`, `changed`, `dayEnded`, `gameOver`), wired in main.js.
 - Time: `state.minute` runs from `OPEN_MIN` to `CLOSE_MIN`, and `*Night()` functions run in `endDay()`.

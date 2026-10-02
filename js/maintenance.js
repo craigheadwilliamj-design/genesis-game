@@ -53,13 +53,15 @@ function wearTick(dtMin){
 // Things mechanics look after: exhibit fences, generators, and vehicle depots
 function findTarget(id){ return state.exhibits.find(x => x.id === id) || state.buildings.find(x => x.id === id); }
 const isMachine = o => o.type === "generator" || o.type === "depot";
-const anchorFor = o => kGraph.anchors[isMachine(o) ? o.id : "fix:" + o.id];
-const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? "a vehicle depot" : o.name;
+const isPropB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].prop);
+const anchorFor = o => kGraph.anchors[isMachine(o) || isPropB(o) ? o.id : "fix:" + o.id];
+const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? "a vehicle depot" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
 // broken = needs urgent work: a fence with a hole in it, or a generator that has cut out
 const isDown = o => o.type === "generator" ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : condOf(o) <= 0;
 function repairCost(o, gain){
   if(o.type === "generator") return POWER.repairPerPercent * gain;
   if(o.type === "depot") return VEHICLES.repairPerPercent * gain;
+  if(isPropB(o)) return BUILDINGS[o.type].price * VANDAL.repairShare * gain;
   return perimeter(o.points) * barrierOf(o).repair * gain / 100;
 }
 
@@ -86,6 +88,12 @@ function pickFence(c){
     else if(k < MAINT.repairBelow) score = 500 + (100 - k);
     else if(overdue) score = 100 + daysSinceInspect(e);
     if(score && (!best || score > best.score)) best = {e, score};
+  }
+  // vandalized benches, bins, picnic areas, and lamps: obvious, so no inspection round, and after fences
+  for(const b of state.buildings){
+    if(!isPropB(b) || propCond(b) >= 60 || taken.has(b.id) || !anchorFor(b) || (mz && b.zone !== mz)) continue;
+    const score = 300 + (100 - propCond(b));
+    if(!best || score > best.score) best = {e:b, score};
   }
   return best && best.e;
 }

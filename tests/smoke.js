@@ -486,6 +486,40 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.dockOrdersStock = dockOrders({type:"dock"}).drinks > 0;
     state.staff.custodians = []; syncCustodians();
 
+    // vandalism: a rowdy, unhappy party breaks the bench beside it, and a broken bench seats nobody
+    const rr4 = Math.random;
+    const sec = {id:"b-sec", type:"security", points:rectPts(130, 114.5, BUILDINGS.security.w, BUILDINGS.security.d, 0)};
+    const ws = {id:"b-ws", type:"workshop", points:rectPts(93, 130, BUILDINGS.workshop.w, BUILDINGS.workshop.d, Math.PI / 2)};
+    state.buildings.push(sec, ws); bench.cond = 100; afterChange();
+    resetParties(); guestsArrive(2); const vp = parties[0];
+    vp.at = nearestGuestNode(100, 200); vp.rowdy = true; vp.mood = 10;
+    Math.random = () => 0; const hit = vandalize(vp); Math.random = rr4;
+    out.vandalBreaksBench = !!hit && hit.b === bench && propCond(bench) === 100 - VANDAL.propHit && vp.vandal && vandalLog().acts === 1;
+    bench.cond = 10;
+    out.brokenBenchUseless = isBroken(bench) && !servesOf(bench).length;
+    // a guard nearby puts vandals off, and throws this one out
+    const d0 = deterrence(100, 200);
+    hireGuard(); syncGuards(); gcrew[0].at = nearestNode(100, 200); gcrew[0].route = [];
+    out.guardDeters = deterrence(100, 200) <= d0 * SECURITY.deterCut + 1e-9;
+    guardWatch();
+    out.guardCatches = vp.gone && vp.ejected && vandalLog().caught === 1;
+    // with cameras, vandalism near the office sends the nearest guard
+    state.science.tech.push("cameras");
+    resetParties(); guestsArrive(2); const cp = parties[0]; cp.at = nearestGuestNode(130, 120); cp.rowdy = true;
+    gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null;
+    Math.random = () => 0; vandalize(cp); Math.random = rr4;
+    out.cameraSendsGuard = cp.wanted && gcrew[0].chase === cp;
+    state.science.tech = state.science.tech.filter(t => t !== "cameras");
+    state.staff.guards = []; syncGuards(); resetParties();
+    // a mechanic fixes the broken bench, and a custodian scrubs off graffiti
+    hireMechanic();
+    const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };
+    out.mechanicFixesProp = fix(900, () => propCond(bench) >= 99.9);
+    state.staff.mechanics = [];
+    const fs4 = buildingById("b-f"); fs4.graffiti = 80; hireCustodian(); syncCustodians();
+    out.custodianScrubsGraffiti = work(900, () => !fs4.graffiti);
+    state.staff.custodians = []; syncCustodians();
+
     // lots of guests stay quick to simulate
     state.minute = OPEN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
@@ -501,6 +535,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldSaveGuests = !!up.guestLog && up.guestLog.mood === null && up.today.moodSum === 0;
     const old2 = JSON.parse(JSON.stringify(state)); delete old2.logi.guestFrom; delete old2.staff.custodians; old2.day = 20;
     const up2 = upgradeSave(old2);
+    const old3 = JSON.parse(JSON.stringify(state)); delete old3.staff.guards; delete old3.guestLog.vandal;
+    const up3 = upgradeSave(old3);
+    out.oldSaveSecurity = Array.isArray(up3.staff.guards) && up3.guestLog.vandal && up3.guestLog.vandal.acts === 0;
     out.oldSaveGuestGoods = up2.logi.guestFrom === 23 && Array.isArray(up2.staff.custodians) && up2.logi.guestNotice === true;
     out.oldSaveMenus = up.buildings.find(b => b.type === "food").menu.map(m => m.id).join() === "burger,soda" &&
       up.buildings.find(b => b.type === "shop").menu.map(m => m.id).join() === "plush,tshirt,map" && !!up.litter && up.guestLog.notice === true;

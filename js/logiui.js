@@ -69,7 +69,7 @@ function warehouseHtml(b){
 function zoneHtml(z){
   const m = zoneMembers(z);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><label class="field"><span>Zone name</span><input id="zName" data-field="name" value="${esc(z.name)}" maxlength="40"></label>`;
-  h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
+  h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
   h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed, clean, and restock only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
 
   const issues = [];
@@ -94,7 +94,7 @@ function zoneHtml(z){
     let t = `<section><h3>${title}</h3>`;
     t += inZone.length ? `<ul class="herd">${inZone.map(k => row(kind, k, k.name, esc(statusFn(k)))).join("")}</ul>` : `<div class="meta">None assigned.</div>`;
     const free = list.filter(k => !k.zone), other = list.filter(k => k.zone && k.zone !== z.id);
-    t += addRow(z, [...free.map(k => [kind, k.id, k.name]), ...other.map(k => [kind, k.id, `${k.name} (${zoneName(k.zone)})`])], `Add ${kind === "vet" ? "a vet" : kind === "custodian" ? "a custodian" : "a mechanic"}…`);
+    t += addRow(z, [...free.map(k => [kind, k.id, k.name]), ...other.map(k => [kind, k.id, `${k.name} (${zoneName(k.zone)})`])], `Add ${kind === "vet" ? "a vet" : kind === "custodian" ? "a custodian" : kind === "guard" ? "a guard" : "a mechanic"}…`);
     return t + `</section>`;
   };
   h += `<section><h3>Keepers</h3>`;
@@ -106,6 +106,7 @@ function zoneHtml(z){
   if(state.staff.mechanics.length || m.mechanics.length) h += staffSection("Mechanics", "mechanic", state.staff.mechanics, m.mechanics, mechanicStatus);
   if(state.staff.vets.length || m.vets.length) h += staffSection("Vets", "vet", state.staff.vets, m.vets, vetStatus);
   if(state.staff.custodians.length || m.custodians.length) h += staffSection("Custodians", "custodian", state.staff.custodians, m.custodians, custodianStatus);
+  if(state.staff.guards.length || m.guards.length) h += staffSection("Security guards", "guard", state.staff.guards, m.guards, guardStatus);
 
   h += `<section><h3>Exhibits</h3>`;
   h += m.exhibits.length ? `<ul class="herd">${m.exhibits.map(e => row("exhibit", e, e.name, `${e.animals.length} animal${e.animals.length === 1 ? "" : "s"}`)).join("")}</ul>` : `<div class="meta">None.</div>`;
@@ -143,7 +144,7 @@ function logiOverviewHtml(){
   const L = state.logi;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;
   h += `<h3 style="margin-top:12px">Work zones</h3>`;
-  if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
+  if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
   else h += `<div class="meta">Zones group keepers with the exhibits and stores around them. Draw one to split the park into work areas.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="zoneTool">Draw a zone</button><button class="btn" data-action="supplyToggle">${supplyOn ? "Hide" : "Show"} supply lines</button></div></section>`;
   return h;

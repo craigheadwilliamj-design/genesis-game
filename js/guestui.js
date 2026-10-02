@@ -14,6 +14,7 @@ function guestsOverviewHtml(){
     ${left != null ? `<dt>Left happy today</dt><dd>${Math.round(left)}%</dd>` : ""}
     ${L.mood != null ? `<dt>Left happy yesterday</dt><dd>${Math.round(L.mood)}%</dd>` : ""}
     ${litterTotal() >= 1 ? `<dt>Litter on the paths</dt><dd>${Math.round(litterTotal())} pieces</dd>` : ""}
+    ${vandalLog().acts ? `<dt>Vandalism today</dt><dd>${vandalLog().acts} act${vandalLog().acts === 1 ? "" : "s"}, ${vandalLog().caught} caught</dd>` : ""}
   </dl>`;
   if(derived.wom !== 1) h += `<div class="meta" style="margin-top:4px">Word of mouth is ${derived.wom > 1 ? "bringing in" : "costing you"} about ${Math.round(Math.abs(derived.wom - 1) * 100)}% ${derived.wom > 1 ? "more" : "of your"} guests.</div>`;
   const th = topThoughts(5);
@@ -30,6 +31,12 @@ function guestBuildingHtml(b){
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   if(t.kind) h += menuHtml(b, served) + vendorStockHtml(b);
+  if(t.prop){
+    const c = propCond(b), broke = isBroken(b);
+    h += `<section><h3>Condition</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(c, broke ? "var(--bad)" : c < 60 ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(c)}%</span></div>`;
+    h += `<div class="meta" style="margin-top:4px">${broke ? "Broken by vandals. It doesn't work until a mechanic repairs it." : c < 60 ? "Damaged by vandals. A mechanic will fix it." : "In good shape."}${b.type === "lamp" ? ` Lamps make vandalism within ${VANDAL.lampReach} m half as likely.` : ""}</div></section>`;
+  }
+  if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
   if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
@@ -64,6 +71,19 @@ function vendorStockHtml(b){
   else h += `<div class="meta" style="margin-top:6px">${state.staff.custodians.length ? "Custodians restock it from the dock, a warehouse, or a cold store." : "Nobody is restocking it. Build a Custodial Closet and hire a custodian."} Each item uses as many units as it costs you in dollars.</div>`;
   return h + `</section>`;
 }
+// The Security Office: its guards, and today's trouble
+function securityHtml(b){
+  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.security.blurb)}</div>` + zoneRow("building", b);
+  const gs = state.staff.guards, L = vandalLog(), Y = state.guestLog.last.vandal;
+  h += `<section><h3>Guards (${gs.length})</h3>`;
+  h += gs.length ? `<ul class="herd">${gs.map(m => `<li><span class="dot" style="background:#2B3F6B"></span><span><b>${esc(m.name)}</b>${(gcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(guardStatus(m))}</span></span>${zoneSelect("guard", m.id, m.zone)}<button class="btn sell" data-action="fireGuard" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No guards yet.</div>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireGuard"${canAfford(SECURITY.hireCost) ? "" : " disabled"}>Hire a guard, ${money(SECURITY.hireCost)}</button><span class="meta">${money(SECURITY.wage)} a day each.</span></div></section>`;
+  const broken = state.buildings.filter(isBroken).length, tagged = state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length;
+  h += `<section><h3>Vandalism</h3><dl class="kv"><dt>Today</dt><dd>${L.acts} act${L.acts === 1 ? "" : "s"}, ${L.caught} caught</dd>${Y ? `<dt>Yesterday</dt><dd>${Y.acts} act${Y.acts === 1 ? "" : "s"}, ${Y.caught} caught</dd>` : ""}<dt>Broken props</dt><dd>${broken}</dd><dt>Buildings with graffiti</dt><dd>${tagged}</dd></dl>`;
+  h += `<div class="meta" style="margin-top:6px">About 1 party in ${Math.round(1 / VANDAL.rowdyShare)} is rowdy, and unhappy rowdy guests break things. Vandalism near a guard is ${Math.round((1 - SECURITY.deterCut) * 100)}% rarer, and a guard throws out any vandal within ${SECURITY.catchRadius} m. Lamp posts help, and heavy litter makes it worse. Mechanics fix broken props and custodians scrub off graffiti.</div>`;
+  h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? `Cameras watch ${SECURITY.cameraRadius} m around each office, and send the nearest guard straight to any vandal they see.` : "Research security cameras at ORACLE so each office watches the paths around it."}</div></section>`;
+  return h;
+}
 // The Custodial Closet: its staff, and what they've been up to
 function closetHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.closet.blurb)}</div>` + zoneRow("building", b);
@@ -78,7 +98,8 @@ function closetHtml(b){
     <li class="${low ? "bad" : ""}">${low ? `${low} stand${low === 1 ? "" : "s"} or shop${low === 1 ? "" : "s"} running low` : "Stands and shops are stocked"}</li>
     <li class="${dirty ? "bad" : ""}">${dirty ? `${dirty} restroom${dirty === 1 ? "" : "s"} need scrubbing` : "Restrooms are clean"}</li>
     <li class="${full ? "bad" : ""}">${full ? `${full} bin${full === 1 ? "" : "s"} need emptying` : "Bins have room"}</li>
-    <li class="${litterTotal() >= 10 ? "bad" : ""}">${Math.round(litterTotal())} pieces of litter on the paths</li></ul>`;
+    <li class="${litterTotal() >= 10 ? "bad" : ""}">${Math.round(litterTotal())} pieces of litter on the paths</li>
+    ${state.buildings.some(x => (x.graffiti || 0) >= VANDAL.grossAt) ? `<li class="bad">${state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length} buildings with graffiti</li>` : ""}</ul>`;
   h += `<div class="meta" style="margin-top:6px">They restock anything about to run out first, then clean, then top up the rest. Whatever they miss, the night crew cleans up for a fee. The Tool Shed sells litter pickers, janitor carts, and pressure washers for them.</div></section>`;
   return h;
 }
@@ -106,6 +127,8 @@ panelEl.addEventListener("click", ev => {
   const b = ev.target.closest("[data-action]"); if(!b) return;
   const a = b.dataset.action, it = selItem();
   if(a === "moodColors"){ moodColors = !moodColors; drawParties(); ui.panel(); return; }
+  if(a === "hireGuard"){ const why = hireGuard(); if(why) ui.toast(why, "bad"); afterChange(); return; }
+  if(a === "fireGuard"){ state.staff.guards = state.staff.guards.filter(m => m.id !== b.dataset.id); syncGuards(); afterChange(); return; }
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
   if(!it || sel.kind !== "building" || !isVendor(it)) return;
