@@ -62,7 +62,7 @@ function freeFeeding(){ return state.day < state.staff.feedFrom; }
 // Where keepers get into an exhibit: its gate, or for a vivarium the path beside it
 function gateCheck(e){
   if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
-  if(!e.gate) return {ok:false, text:"No gate. Use the Gate tool on a fence that touches a service road."};
+  if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
   const near = (p, list) => list.some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
   const guest = state.paths.filter(p => !isService(p)), svc = state.paths.filter(isService);
   if(near(e.gate, guest)) return {ok:false, text:"The gate opens onto a guest path. Keepers won't use it. Move it to a service road."};
@@ -500,6 +500,7 @@ function arrive(c, k){
       const room = roomFor(e, c.carry.type);
       const give = Math.min(room, c.carry.amount);
       e.stock[c.carry.type] = (e.stock[c.carry.type] || 0) + give; c.carry.amount -= give;
+      noteFlow(c.plan && c.plan.src, e.id, give);
       k.stamina -= KEEPER.tirePerDelivery;
       if(c.carry.amount <= 0.01) setCarry(c, null);
     }

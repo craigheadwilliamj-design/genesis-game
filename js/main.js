@@ -111,7 +111,7 @@ function startWith(s, fresh){
   sel = null; if(draw) endDraw(); setTool("select");
   crew = []; mcrew = []; vcrew = []; keeperEls.forEach(el => el.remove()); keeperEls.clear();
   recompute(); buildGuestGraph(); buildKeeperGraph();
-  fit(); ui.panel(); ui.hud(true);
+  fit(); ui.panel(); ui.hud(true); refreshMenu();
   setSpeed(state.over ? 0 : 1);
   if(fresh){ setSpeed(0); $("#dlgIntro").showModal(); }
 }

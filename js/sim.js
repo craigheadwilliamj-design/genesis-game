@@ -352,10 +352,10 @@ function canAfford(cost){ return state.money >= cost; }
 function spend(cost, kind){ state.money -= cost; state.today[kind] += cost; }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
 
-function exhibitCost(pts){ return Math.round(perimeter(pts) * COST.fencePerMeter + area(pts) * COST.landPerSqM); }
+function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
 function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : COST.pathPerMeter)); }
 function refundFor(kind, item){
-  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points)) * COST.refundShare);
+  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;

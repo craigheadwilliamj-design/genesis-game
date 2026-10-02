@@ -173,13 +173,13 @@ function noteFlow(srcId, dstId, n){
   const f = state.logi.flow, key = srcId + ">" + dstId;
   f[key] = (f[key] || 0) + n;
 }
-// Lines on the map: what keepers hauled today and yesterday, from one building to another
+// Lines on the map: what keepers hauled today and yesterday, from a store to a building or an exhibit
 function supplyLines(){
   const out = [], seen = {};
   for(const f of [state.logi.last, state.logi.flow]) for(const [key, n] of Object.entries(f)) seen[key] = (seen[key] || 0) + n;
   for(const [key, n] of Object.entries(seen)){
-    const [a, b] = key.split(">").map(buildingById); if(!a || !b) continue;
-    out.push({a:centroid(a.points), b:centroid(b.points), n});
+    const [from, to] = key.split(">"), a = buildingById(from), b = buildingById(to) || state.exhibits.find(e => e.id === to); if(!a || !b) continue;
+    out.push({a:centroid(a.points), b:centroid(b.points), n, exhibit:!!b.animals});
   }
   return out;
 }

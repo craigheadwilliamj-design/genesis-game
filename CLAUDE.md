@@ -2,7 +2,7 @@
 
 Browser park-builder game (Jurassic Park style). Plain JS, no build step, no modules: every file is a classic `<script>` sharing one global scope. Published as a claude.ai Artifact.
 
-## Files (script load order, from index.html)
+## Files (script load order, from index.html; menu.js sits just before map.js)
 - `js/data.js`: all tuning constants and content (`SPECIES`, `BUILDINGS`, `BARRIERS`, `TECH`, `GOALS`, `KEEPER`, `MAINT`, `POWER`, `ESCAPE`, `HEALTH`, `MEDICINE`, `VET`, ...). Balance changes go here.
 - `js/geometry.js`: pure shape math (`area`, `perimeter`, `inPoly`, `segProj`, `shapesOverlap`, ...).
 - `js/sim.js`: the core loop `tick(dtMin)` → `endDay()`, plus guest demand, money (`spend`/`earn`/`canAfford`), happiness (`exhibitReport`), rating, science (ORACLE/GHOST/TAR), goals, and save migration (`newPark`, `upgradeSave`).
@@ -17,7 +17,8 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `js/custodians.js`: custodians (`ccrew`, `state.staff.custodians`) who restock food stands and gift shops with guest goods (`pickHaul` with `GUEST_GOODS`), scrub restrooms, empty bins, and sweep litter, working from a Custodial Closet.
 - `js/security.js`: vandalism by rowdy, unhappy guests (`vandalTick`, `vandalize`, `deterrence`, broken props via `propCond`/`isBroken`, `b.graffiti`) and security guards (`gcrew`, `state.staff.guards`) who patrol, deter, catch vandals, and answer cameras from a Security Office.
 - `js/lodging.js`: hotels (`lodge`, `resort`, `isHotel`, `LODGING`). Guests book rooms overnight (`lodgingNight`, `state.lodging.stays`), and next morning they start at the hotel with no ticket (`hotelGuestsArrive`). Rooms use toiletries (merch in `b.store`, which custodians restock) and get dirty (`b.dirt`, which custodians clean). Unlocking is checked in `hotelLocked`.
-- `js/map.js`: SVG rendering, camera, build tools, and drawing guests (`drawParties`). Also defines `$`, `esc` and `nodeKey`.
+- `js/menu.js`: the build sidebar (`BUILD_MENU`, `buildMenu`, `refreshMenu`). Groups and dropdowns are generated from the data, so prices follow `BUILDINGS`, `BARRIERS` and `fenceRate`. Loads before map.js.
+- `js/map.js`: SVG rendering, camera, build tools (including the Move tool: `moveTarget`, `moveBy`, `moveProblem`, `dropMove`; and `fenceSel`, the fence an exhibit is built with), and drawing guests (`drawParties`). Also defines `$`, `esc` and `nodeKey`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
 - `js/logiui.js`: panels for stores, the dock, zones, and the park-office supply summary, plus their click/change handlers.
 - `js/guestui.js`: the park office's Guests section and the panels for food and gift shells (menu picker and prices), restrooms, bins, and seats.

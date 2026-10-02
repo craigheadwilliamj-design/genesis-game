@@ -339,7 +339,7 @@ function arrivalShare(m0, m1){
 
 function guestsTick(m0, m1){
   const dt = m1 - m0;
-  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path props). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
+  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path Tools). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
   hotelGuestsArrive();
   arrivalCarry += derived.demand * arrivalShare(m0, m1);
   while(arrivalCarry >= nextSize){ arrivalCarry -= nextSize; guestsArrive(nextSize); nextSize = GUEST.sizes[Math.floor(Math.random() * GUEST.sizes.length)]; }
