@@ -890,7 +890,11 @@ const LAND = {
   trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
   cycads: {label:"Cycad grove",   one:"a cycad grove",   price:1500, r:5, color:"#3F7D3A", flora:"mesozoic",  tech:"mesoplant",  stock:1, browse:4},
   lycopods:{label:"Lycopod stand", one:"a lycopod stand", price:1800, r:5, color:"#2E6B55", flora:"paleozoic", tech:"paleoplant", stock:1, browse:4},
+  shelter:{label:"Shelter",       one:"a shelter",       price:2500, r:4, color:"#9A7B55", slots:10},
+  barn:   {label:"Large shelter", one:"a large shelter", price:7000, r:7, color:"#7E6142", slots:36},
 };
+// Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
+for(const t of Object.values(LAND)) if(t.flora) t.shade = 8;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor in ponds that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after
@@ -902,6 +906,29 @@ const HAB = {
   groveBonus:6,    // happiness for animals with plenty of groves from their era
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
 };
+// Weather. Each night rolls the day after tomorrow, so the top bar always has tomorrow's forecast.
+// Animals with no cover in bad weather are unhappy, fall ill more, and in storms get hurt.
+//   odds    chance of this weather on any day
+//   happy   happiness an exhibit loses if none of its animals have cover
+//   ill     extra illness for animals without cover (1 means twice as likely)
+//   hurt    chance a day an animal without cover is hurt
+//   wear    fence wear multiplier
+//   guests  share of the usual guests who come
+//   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
+const WEATHER = {
+  startDay:4,       // new parks get fair weather until this day
+  kinds:{
+    fair: {label:"Fair",      odds:.55, happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
+    hot:  {label:"Heat wave", odds:.17, happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
+    cold: {label:"Cold snap", odds:.15, happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
+    storm:{label:"Storm",     odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+  },
+};
+// Ice age animals shrug off the cold
+const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast"];
+// Shelter slots one animal takes: bigger animals need more room
+const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
+
 // How much each species likes water and rocks (0 to 1). Fish eaters want water. Anything not listed likes both a little.
 const LIKES_ROCK = {water:.2, rock:.9};
 const HABITAT_LIKES = {diic:LIKES_ROCK, lyst:LIKES_ROCK, seym:LIKES_ROCK, dime:LIKES_ROCK, plhy:LIKES_ROCK, mlan:LIKES_ROCK, mono:LIKES_ROCK, beel:{water:.6, rock:.6}};

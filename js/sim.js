@@ -59,7 +59,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -99,6 +99,8 @@ function upgradeSave(s){
   for(const e of s.exhibits) if(!e.viv && e.cond === undefined){ e.cond = 100; e.inspected = {day:s.day, cond:100}; }
   // landscaping: ponds and rocks inside open exhibits
   for(const e of s.exhibits) if(!e.viv && e.land === undefined) e.land = [];
+  // parks from before weather get 3 fair days to build shelters
+  if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
   for(const b of s.buildings){
     if(b.type !== "platform" || b.inward) continue;
@@ -339,7 +341,7 @@ function recompute(){
   // word of mouth: yesterday's guests tell their friends how it went
   const told = state.guestLog.mood;
   const wom = told == null ? 1 : clamp(1 + GUEST.wordOfMouth * (told - 60) / 40, 1 - GUEST.wordOfMouth, 1 + GUEST.wordOfMouth);
-  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor() * wom;
+  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor() * wom * weatherNow().guests;
 
   // How well the park looks after its guests: how happy they are when they leave.
   // Before anyone has left, guess from how many food stands and restrooms there are.
@@ -488,6 +490,9 @@ function endDay(){
   guardsNight();
   healthNight();
   vetsNight();
+  // today's weather has done its harm; tomorrow's forecast comes true
+  rollWeather();
+  if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer${weatherNow().guests < .9 ? ", and fewer guests will come" : ""}.`, "bad");
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
   if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
   if(state.day + 1 === state.logi.guestFrom) events.toast("From tomorrow, food stands and gift shops sell from their own stock. The dock orders it, and custodians carry it out. Build a Custodial Closet and hire one.", "bad");

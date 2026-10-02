@@ -28,7 +28,8 @@ function wearPerDay(e){
     const s = SPECIES_BY_ID[a.sp];
     if(isAttacker(s) && !isFlyer(s)) w += MAINT.attackWear * Math.min(2, escapeStrength(s) / b.strength);
   }
-  return w;
+  // storms batter fences
+  return w * weatherNow().wear;
 }
 
 function wearTick(dtMin){

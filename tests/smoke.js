@@ -869,6 +869,41 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
     sc.tech = keepTech; state.ceres.plants = keepPlants; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+
+    // weather: tomorrow's forecast comes true, animals without cover suffer, shelters and groves help
+    const keepW = {...state.weather}, rnd = Math.random;
+    const nw = newPark().weather;
+    out.weatherStartsFair = nw.today === "fair" && nw.next === "fair" && nw.from === WEATHER.startDay;
+    state.weather = {today:"fair", next:"storm", from:0};
+    Math.random = () => .999; rollWeather();
+    out.forecastComesTrue = state.weather.today === "storm" && state.weather.next === "storm";
+    state.weather.from = state.day + 10; rollWeather(); Math.random = rnd;
+    out.fairBeforeStart = state.weather.next === "fair";
+    state.money = 1e6; state.buildings = [];
+    const wxSp = SPECIES.find(s => !s.viv && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
+    const wx = {id:"e-wx", name:"Weather test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[1, 2, 3].map(i => ({id:"a-w" + i, sp:wxSp.id, q:90})), happy:70, cond:100, land:[]};
+    state.exhibits = [wx];
+    const at = (k, f) => { state.weather.today = k; return f(); };
+    out.stormExposes = at("storm", () => exposure(wx) === 1 && exhibitReport(wx).issues.some(i => i.bad && /Storm/.test(i.text)));
+    out.stormHurts = at("storm", () => exhibitReport(wx).target) < at("fair", () => exhibitReport(wx).target)
+      && at("storm", () => illChance(wx, wx.animals[0]).p) > at("fair", () => illChance(wx, wx.animals[0]).p)
+      && at("storm", () => injuryChance(wx, wx.animals[0]).p) > at("fair", () => injuryChance(wx, wx.animals[0]).p)
+      && Math.abs(at("storm", () => wearPerDay(wx)) - at("fair", () => wearPerDay(wx)) * WEATHER.kinds.storm.wear) < 1e-9;
+    placeLand(wx, "trees", 115, 145);
+    out.grovesShadeOnlyWhenHot = at("hot", () => exposure(wx)) < 1 && at("cold", () => exposure(wx)) === 1;
+    placeLand(wx, "shelter", 130, 120);
+    out.shelterCovers = coverOf(wx).shelter >= at("cold", () => coverOf(wx).need) && at("cold", () => exposure(wx)) === 0 && at("storm", () => exhibitReport(wx).issues.some(i => /Sheltered/.test(i.text)));
+    const hardy = SPECIES_BY_ID[COLD_HARDY.find(id => SPECIES_BY_ID[id] && !SPECIES_BY_ID[id].viv)];
+    const hx = {...wx, id:"e-hx", land:[], animals:[{id:"a-h", sp:hardy.id, q:90}]};
+    out.coldHardy = at("cold", () => exposure(hx)) === 0 && at("storm", () => exposure(hx)) === 1;
+    // an exhibit beside the entrance walk, so guests want to come
+    state.exhibits = [{...wx, id:"e-wx2", points:[[206.5,240],[246,240],[246,280],[206.5,280]], land:[]}];
+    const d1 = at("fair", () => (recompute(), derived.demand)), d2 = at("storm", () => (recompute(), derived.demand));
+    out.stormFewerGuests = d1 > 0 && Math.abs(d2 - d1 * WEATHER.kinds.storm.guests) < 1e-6;
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+    state.weather = keepW; recompute();
+    const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
+    out.oldGetsWeather = upgradeSave(oldW).weather.from === 23 && oldW.weather.today === "fair";
     return out;
   }));
 

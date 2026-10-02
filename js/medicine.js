@@ -64,6 +64,8 @@ function illChance(e, a){
   const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
   if(grassSick(e, s)){ p *= HEALTH.grassSick; why.push("eating grass"); }
   if(thirsty(e, s)){ p *= HAB.dryIll; why.push("no water"); }
+  const wx = weatherNow(), x = exposure(e);
+  if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))){ p *= 1 + wx.ill * x; why.push("weather"); }
   if(medicated(e, s)) p *= MEDICINE.feedCut;
   return {p, why};
 }
@@ -77,6 +79,9 @@ function injuryChance(e, a){
     p += HEALTH.territorial * (n - 1) * (ratio < 1 ? 3 : ratio < 1.5 ? 1.5 : 1); why.push("rivals");
   }
   for(const sp of counts.keys()) if(sp !== s.id && attackReason(SPECIES_BY_ID[sp], s)){ p += HEALTH.attacked; why.push("attacks"); break; }
+  // storms hurt animals caught out in them
+  const wx = weatherNow(), x = wx.hurt ? exposure(e) : 0;
+  if(x > 0){ p += wx.hurt * x; why.push("weather"); }
   return {p, why};
 }
 

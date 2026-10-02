@@ -4,7 +4,8 @@
    some of each, and water lovers get unhappy and sickly without a pond.
    Groves from an animal's own era make it happier and feed part of its
    diet, and older groves (grown from CERES planting stock) keep old
-   plant-eaters off the grass.
+   plant-eaters off the grass. Shelters (and groves, for shade) cover
+   animals from the weather, which is rolled here each night.
    Placing and drawing them lives in map.js, next to the other tools.
    ===================================================================== */
 
@@ -39,6 +40,37 @@ const browseShare = (e, t, need) => need > 0 ? Math.min(HAB.browseMax, browseRat
 // A water lover with no pond to drink from or wade in
 const thirsty = (e, s) => !e.viv && likesOf(s).water >= HAB.wantsWater && habitatOf(e).wet === 0;
 
+/* ---------- weather and shelter ---------- */
+function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
+const weatherNow = () => WEATHER.kinds[state.weather ? state.weather.today : "fair"];
+const weatherNext = () => WEATHER.kinds[state.weather ? state.weather.next : "fair"];
+function pickWeather(){
+  let r = Math.random();
+  for(const [k, w] of Object.entries(WEATHER.kinds)){ r -= w.odds; if(r < 0) return k; }
+  return "fair";
+}
+// At night: tomorrow's forecast comes true, and a new one is made for the day after
+function rollWeather(){
+  const w = state.weather;
+  w.today = w.next;
+  w.next = state.day + 2 >= w.from ? pickWeather() : "fair";
+}
+// Shelter slots an exhibit's animals need today, and what it has. Ice age animals don't need cover from the cold.
+function coverOf(e){
+  const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
+  let need = 0, shelter = 0, shade = 0;
+  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))) need += coverSlots(s); }
+  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; shelter += L.slots || 0; shade += (L.shade || 0) * w.grove; }
+  return {need, shelter, shade, have:shelter + shade};
+}
+// Share of the herd out in today's weather with no cover: 0 to 1
+function exposure(e){
+  if(e.viv || !e.animals.length || !weatherNow().happy) return 0;
+  const c = coverOf(e);
+  return c.need ? clamp(1 - c.have / c.need, 0, 1) : 0;
+}
+const WEATHER_TEXT = {hot:"no shade. Shelters and groves give shade", cold:"nowhere warm. Shelters keep them warm", storm:"nowhere to shelter. Shelters help most, and groves a little"};
+
 // What the landscaping does to an exhibit's happiness, for exhibitReport
 function habitatScore(e){
   const out = {delta:0, issues:[]};
@@ -64,6 +96,10 @@ function habitatScore(e){
     out.delta += HAB.groveBonus * home;
     out.issues.push({bad:false, text:home >= .6 ? "Groves from their own era to browse and shelter in." : "A few groves from their era. More would suit them."});
   }
+  // today's weather
+  const w = weatherNow(), x = exposure(e);
+  if(w.happy && x > 0){ out.delta -= w.happy * x; out.issues.push({bad:true, text:`${w.label}. ${x >= .99 ? "The animals have" : `${Math.round(x * 100)}% of the herd has`} ${WEATHER_TEXT[state.weather.today]}.`}); }
+  else if(w.happy && coverOf(e).need) out.issues.push({bad:false, text:`Sheltered from the ${w.label.toLowerCase()}.`});
   return out;
 }
 
@@ -100,9 +136,14 @@ function landSvg(e, pick, isDead){
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
     const dead = pick && isDead(f.id), at = pick ? ` data-kind="land" data-id="${esc(f.id)}" style="cursor:pointer"` : ` pointer-events="none"`;
-    const edge = dead ? "var(--bad)" : t.water ? "#2F6F9F" : t.flora ? "#1F3A2B" : "#4E524C";
+    const edge = dead ? "var(--bad)" : t.water ? "#2F6F9F" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
     s += `<g${at}>`;
-    if(t.flora){
+    if(t.slots){
+      // a square roof with a ridge
+      const h = t.r * .78;
+      s += `<rect x="${f.x - h}" y="${f.y - h}" width="${h * 2}" height="${h * 2}" rx="${h * .12}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="M${f.x - h} ${f.y}H${f.x + h}" stroke="#3B3226" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    } else if(t.flora){
       // a clump of canopies
       for(const [dx, dy, k] of [[-.35, -.2, .6], [.35, -.25, .55], [0, .3, .6]]) s += `<circle cx="${f.x + dx * t.r}" cy="${f.y + dy * t.r}" r="${t.r * k}" fill="${t.color}" fill-opacity=".9" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
       s += `<circle cx="${f.x - t.r * .15}" cy="${f.y - t.r * .1}" r="${t.r * .2}" fill="#fff" fill-opacity=".18"/>`;

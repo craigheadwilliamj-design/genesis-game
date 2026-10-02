@@ -16,8 +16,10 @@ const ui = {
     set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
     set("clock", fmtClock(state.minute));
-    set("dayLabel", `Day ${state.day}`);
+    set("dayLabel", `Day ${state.day} · ${weatherNow().label}`);
     set("parkName", state.name);
+    const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
+    if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
     $("#dayFill").style.width = ((state.minute - OPEN_MIN) / (CLOSE_MIN - OPEN_MIN) * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
     if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 16); $("#rating").setAttribute("aria-label", `${r} stars`); }
@@ -234,6 +236,8 @@ function landHtml(e){
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : t.stock && (state.ceres.plants[t.flora] || 0) < t.stock ? `Needs ${FLORA[t.flora].label} planting stock from CERES.` : "";
   return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Ponds cover ${(hb.pondShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without a pond.</div>
     <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Cycad and lycopod groves keep old plant-eaters off the grass, and each uses a batch of planting stock from CERES (no refund).</div>
+    ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
+      return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
     <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.stock ? " + stock" : ""}</button>`).join("")}</div></section>`;
 }
 
@@ -250,7 +254,7 @@ function healthHtml(e){
   if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
   if(e.animals.length > hr.sick.length){
     h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
-    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", rivals:"territorial rivals", attacks:"species that attack each other"};
+    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
     if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
     h += `</div>`;
   }
