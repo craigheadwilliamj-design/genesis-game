@@ -128,6 +128,7 @@ const SPECIES = [
   {id:"prot", name:"Protoceratops",  period:"Cretaceous", diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
   {id:"ornm", name:"Ornithomimus",   period:"Cretaceous", diet:["herbivore","insectivore"], price:7000, food:60, space:250, group:[3,10], appeal:5, stars:1},
   {id:"kool", name:"Koolasuchus",    period:"Cretaceous", diet:["piscivore"], price:7000, food:30, space:30, group:[1,3], appeal:6, stars:1, viv:"L"},
+  {id:"simo", name:"Simosuchus",     period:"Cretaceous", diet:["herbivore"], price:5500, food:14, space:14, group:[2,5], appeal:3, stars:0.5, viv:"M"},
   {id:"ovir", name:"Oviraptor",      period:"Cretaceous", diet:["omnivore"], price:8000,  food:60,  space:250,  group:[2,8],  appeal:5,  stars:1},
   {id:"minm", name:"Minmi",          period:"Cretaceous", diet:["herbivore"], price:8000, food:70, space:300, group:[2,8], appeal:5, stars:1},
   {id:"gall", name:"Gallimimus",     period:"Cretaceous", diet:["omnivore"], price:9000, food:90, space:400, group:[3,10], appeal:6, stars:1.5},
@@ -155,6 +156,12 @@ const SPECIES = [
   // Paleogene
   {id:"ples", name:"Plesiadapis",    period:"Paleogene", diet:["herbivore"], price:3500, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
   {id:"paki", name:"Pakicetus",      period:"Paleogene", diet:["piscivore"], price:5000, food:15, space:12, group:[2,6], appeal:5, stars:0.5, viv:"M"},
+  {id:"lept", name:"Leptictidium",   period:"Paleogene", diet:["omnivore"], price:3200, food:5, space:5, group:[2,8], appeal:3, stars:0, viv:"S"},
+  {id:"sifr", name:"Sifrhippus",     period:"Paleogene", diet:["herbivore"], price:4500, food:8, space:9, group:[3,8], appeal:4, stars:0.5, viv:"M"},
+  {id:"ptil", name:"Ptilodus",       period:"Paleogene", diet:["omnivore"], price:3800, food:6, space:8, group:[3,8], appeal:3, stars:0.5, viv:"M"},
+  {id:"miac", name:"Miacis",         period:"Paleogene", diet:["carnivore"], price:5500, food:10, space:12, group:[2,5], appeal:4, stars:0.5, viv:"M"},
+  {id:"waim", name:"Waimanu",        period:"Paleogene", diet:["piscivore"], price:9000, food:20, space:22, group:[2,6], appeal:5, stars:1, viv:"L"},
+  {id:"tmyr", name:"Titanomyrma",    period:"Paleogene", diet:["insectivore"], bug:true, price:2200, food:4, space:6, group:[1,4], appeal:1, stars:0, viv:"S"},
   {id:"proc", name:"Proconsul",      period:"Paleogene", diet:["herbivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
   {id:"hyae", name:"Hyaenodon",      period:"Paleogene", diet:["carnivore"], predator:true, price:9000,  food:80,  space:500,  group:[3,8],  appeal:7,  stars:1.5},
   {id:"ambu", name:"Ambulocetus",    period:"Paleogene", diet:["piscivore","carnivore"], price:12000, food:110, space:700,  group:[1,3],  appeal:8,  stars:2},
@@ -179,8 +186,17 @@ const SPECIES = [
   {id:"gpit", name:"Gigantopithecus", period:"Neogene", diet:["herbivore"], price:22000, food:260, space:1400, group:[1,4], appeal:12, stars:2.5},
   {id:"siva", name:"Sivatherium",    period:"Neogene", diet:["herbivore"], price:25000, food:300, space:2000, group:[1,4], appeal:12, stars:3},
   {id:"pcer", name:"Paraceratherium", period:"Neogene", diet:["herbivore"], price:40000, food:550, space:4000, group:[1,4],  appeal:17, stars:3.5},
+  {id:"dgal", name:"Deinogalerix",   period:"Neogene", diet:["insectivore","carnivore"], price:5500, food:10, space:12, group:[1,4], appeal:3, stars:0.5, viv:"M"},
+  {id:"nura", name:"Nuralagus rex",  period:"Neogene", diet:["herbivore"], price:9000, food:16, space:20, group:[2,6], appeal:4, stars:1, viv:"L"},
+  {id:"hopl", name:"Hoplitomeryx",   period:"Neogene", diet:["herbivore"], price:11000, food:22, space:26, group:[2,5], appeal:5, stars:1, viv:"L"},
+  {id:"psil", name:"Psilopterus",    period:"Neogene", diet:["carnivore"], price:10000, food:20, space:26, group:[1,3], appeal:4, stars:1, viv:"L"},
   // Quaternary
   {id:"ornw", name:"Ornimegalonyx",  period:"Quaternary", diet:["carnivore"], price:6000, food:25, space:14, group:[1,3], appeal:7, stars:1, viv:"M"},
+  {id:"dodo", name:"Dodo",           period:"Quaternary", diet:["herbivore"], price:14000, food:24, space:30, group:[2,5], appeal:6, stars:1.5, viv:"L"},
+  {id:"ppig", name:"Passenger Pigeon", period:"Quaternary", diet:["herbivore"], price:2600, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
+  {id:"gtod", name:"Golden Toad",    period:"Quaternary", diet:["insectivore"], price:2800, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
+  {id:"rmlo", name:"Rocky Mountain Locust", period:"Quaternary", diet:["herbivore"], bug:true, price:2400, food:3, space:4, group:[4,12], appeal:2, stars:0, viv:"S"},
+  {id:"sdel", name:"Sicilian Dwarf Elephant", period:"Quaternary", diet:["herbivore"], price:15000, food:28, space:40, group:[1,3], appeal:6, stars:1.5, viv:"L"},
   {id:"dire", name:"Dire wolf",      period:"Quaternary", diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
   {id:"macr", name:"Macrauchenia",   period:"Quaternary", diet:["herbivore"], price:13000, food:150, space:900, group:[2,6], appeal:8, stars:2},
   {id:"arct", name:"Arctodus",       period:"Quaternary", diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
@@ -800,7 +816,7 @@ const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 
 // Flying animals. Outside an aviary or vivarium they escape almost at once.
-const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi", "arge"];
+const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi", "arge", "ppig", "rmlo"];
 
 const ESCAPE = {
   lawsuit:75000,       // cost of each guest killed
