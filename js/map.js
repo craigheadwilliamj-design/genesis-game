@@ -34,13 +34,13 @@ let fenceSel = "wood";             // fence type the next exhibit is built with
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone" || t === "water";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
-const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
+const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH;
 
 /* ---------- looking things up ---------- */
 function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : kind === "water" ? state.exhibits.flatMap(waterOf) : null; }
@@ -478,10 +478,11 @@ const DRAW_TEXT = {
   exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it, or start and end on a neighbor's fence and tap the last corner again to share its wall."],
   path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
+  wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
   water:["New water", "Tap to drop shore corners inside an open exhibit. Tap the first corner again to fill it. Animals like water, and fish eaters need some."]
 };
-const drawType = () => draw && draw.kind === "service" ? "service" : undefined;
+const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide") ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
@@ -651,15 +652,15 @@ function finishDraw(){
     d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
     const cost = pathCost(pts, type);
     spend(cost, "built");
-    const p = {id:uid("p-"), name:type ? "Service road" : "Path", points:pts};
+    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : "Path", points:pts};
     if(type) p.type = type;
     state.paths.push(p);
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw(d.kind);
     render();
-    const joinedNow = (type ? derived.joinedAll : derived.joined).has(p.id);
-    const what = type ? "service road" : "path";
+    const joinedNow = (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
+    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : "path";
     ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
   }
 }

@@ -1023,6 +1023,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
+const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:5, crowdMult:2};   // a 10 m promenade: twice the walkers before it feels packed
 
 // Goals give new players something to aim for, and pay a reward.
 // Each check() looks at the park and returns true when the goal is met.

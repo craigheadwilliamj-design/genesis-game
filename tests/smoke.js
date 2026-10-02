@@ -942,6 +942,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     catch { out.moveDialogOpens = false; }
     if($("#dlgMove").open) $("#dlgMove").close();
     state.exhibits = keepEx; recompute();
+
+    // a wide path holds twice the crowd before guests feel packed
+    const wPaths = state.paths;
+    const crowdedOn = type => {
+      state.paths = [{id:"p-w", points:[[200,300],[260,300]], ...(type ? {type} : {})}, {id:"p-gate", points:[[200,300],[200,300.5]]}];
+      state.gate = [200,300]; recompute(); buildGuestGraph();
+      const a = gGraph.anchors.gate, b = [...a.adj.keys()].find(n => n.x > 250);
+      if(!b) return null;
+      const L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.ceil(GUEST.crowd * L / 10 * 1.5);
+      return {n, mult:(a.room && a.room.get(b)) || 1, crowd:GUEST.crowd};
+    };
+    const plain = crowdedOn(), wide = crowdedOn("wide");
+    out.widePathRoom = !!plain && !!wide && plain.mult === 1 && wide.mult === WIDE_PATH.crowdMult && pathCost([[0,0],[10,0]], "wide") === 10 * WIDE_PATH.perMeter;
+    state.paths = wPaths; recompute(); buildGuestGraph();
     return out;
   }));
 

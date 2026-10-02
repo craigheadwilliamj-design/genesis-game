@@ -24,7 +24,7 @@ function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, edu:null, va
 // Footpaths joined to the entrance, with stops spliced in where an exhibit or guest building meets a path
 function buildGuestGraph(){
   const live = state.paths.filter(p => derived.joined.has(p.id));
-  const copies = live.map(p => ({pts:p.points, adds:[]}));
+  const copies = live.map(p => ({pts:p.points, adds:[], mult:isWide(p) ? WIDE_PATH.crowdMult : 1}));
   const nearest = (x, y, maxD) => {
     let best = null;
     for(const c of copies) for(let i = 1; i < c.pts.length; i++){
@@ -54,19 +54,19 @@ function buildGuestGraph(){
   }
   const nodes = new Map(), anchors = {};
   const node = p => { const k = nodeKey(p); if(!nodes.has(k)) nodes.set(k, {k, x:p[0], y:p[1], adj:new Map()}); return nodes.get(k); };
-  const link = (a, b) => { if(a === b) return; const d = Math.hypot(a.x-b.x, a.y-b.y); a.adj.set(b, d); b.adj.set(a, d); };
+  const link = (a, b, mult = 1) => { if(a === b) return; const d = Math.hypot(a.x-b.x, a.y-b.y); a.adj.set(b, d); b.adj.set(a, d); if(mult > 1){ (a.room = a.room || new Map()).set(b, mult); (b.room = b.room || new Map()).set(a, mult); } };
   for(const c of copies){
     const seq = [];
     c.pts.forEach((v, i) => {
       if(i > 0) c.adds.filter(a => a.i === i).sort((a, b) => a.t - b.t).forEach(a => { const n = node(a.pt); anchors[a.id] = n; seq.push(n); });
       seq.push(node(v));
     });
-    for(let i = 1; i < seq.length; i++) link(seq[i-1], seq[i]);
+    for(let i = 1; i < seq.length; i++) link(seq[i-1], seq[i], c.mult);
   }
   // a corner of one path sitting on the middle of another joins them
   const all = [...nodes.values()];
   for(const c of copies) for(let i = 1; i < c.pts.length; i++)
-    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1])); link(n, node(c.pts[i])); } }
+    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), c.mult); link(n, node(c.pts[i]), c.mult); } }
   let gate = null, gd = 3;
   for(const n of nodes.values()){ const d = Math.hypot(n.x - state.gate[0], n.y - state.gate[1]); if(d < gd){ gd = d; gate = n; } }
   if(gate) anchors.gate = gate;
@@ -355,7 +355,7 @@ function guestsTick(m0, m1){
     for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * o / (100 - d.seek); }
     if(p.at && p.to){
       const L = Math.hypot(p.to.x - p.at.x, p.to.y - p.at.y) || 1;
-      if(busy.get(edge(p)) * 10 / L > GUEST.crowd){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
+      if(busy.get(edge(p)) * 10 / L > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
     }
     // walking through litter
     const mess = p.at ? litterAt(p.at.x, p.at.y) : 0;
