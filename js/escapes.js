@@ -82,7 +82,7 @@ function breakOut(e, a){
   const s = SPECIES_BY_ID[a.sp], [cx, cy] = centroid(e.points);
   e.animals.splice(e.animals.indexOf(a), 1);
   e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
-  const n = nearestNode(cx, cy);
+  const n = kGraph.anchors[e.id] || nearestNode(cx, cy);   // the gate stop is on the staff network; the nearest stop might be on a path nobody can walk to
   state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
   state.rating = Math.max(0, state.rating - .05);
   events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} ${vetsOnDuty() ? "Vets with dart guns are on the way." : "Keepers with dart guns are on the way."}`, "bad");

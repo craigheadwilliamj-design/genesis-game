@@ -174,6 +174,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.escapeReturned = run(600, () => { if(state.safety.loose[0] && state.safety.loose[0].byVet) vetDarted = true; return !state.safety.loose.length; }) && viv.animals.some(a => a.id === "a-x");
     out.vetDartedEscape = vetDarted;
 
+    // an animal on a path nobody can walk to is left to keepers, and a breakout starts at the exhibit's gate stop
+    vetsNight(); keepersNight(); state.safety.loose = [];
+    const iso = {k:"iso", x:50, y:50, adj:new Map(), svc:new Set()}, iso2 = {k:"iso2", x:80, y:50, adj:new Map(), svc:new Set()};
+    iso.adj.set(iso2, 30); iso2.adj.set(iso, 30); kGraph.nodes.set("iso", iso); kGraph.nodes.set("iso2", iso2);
+    state.safety.loose.push({id:"a-y", sp:"arth", from:"e-v", at:"iso", x:50, y:50, next:null, t:0, status:"loose"});
+    run(30, () => false);
+    out.vetFlagsUnreachable = state.safety.loose[0].noVet === true && needsKeeper(state.safety.loose[0]);
+    kGraph.nodes.delete("iso"); kGraph.nodes.delete("iso2"); state.safety.loose = [];
+    viv.animals.push({id:"a-z", sp:"arth"}); breakOut(viv, viv.animals[viv.animals.length - 1]);
+    out.breakoutAtGate = state.safety.loose[0].at === kGraph.anchors["e-v"].k;
+    state.safety.loose = []; viv.animals = viv.animals.filter(a => a.id !== "a-z");
+
     // hungry, dirty animals fall ill more than well-kept ones
     const a = viv.animals[1], base = illChance(viv, a).p;
     viv.hungryMin = CLOSE_MIN - OPEN_MIN; viv.dirt = 90;
