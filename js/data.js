@@ -21,6 +21,7 @@ const WALK_SPEED = 40;
 // The same speed in meters per park minute, which is what the simulation counts in
 const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
+const DAY_MIN = CLOSE_MIN - OPEN_MIN;   // park minutes in one open day. Research, trips, and growing are counted in these.
 
 // Building costs
 const COST = {
@@ -143,20 +144,20 @@ const VIVARIUMS = {
    --------------------------------------------------------------------- */
 
 // Time periods GHOST can travel to.
-//   research   ORACLE research points needed to unlock trips there
-//   trip       what one expedition costs
-//   days       how long an expedition takes
-//   risk       chance an expedition comes back with nothing
+//   research   base ORACLE research points to unlock an animal from here (bigger and pricier animals cost more)
+//   trip       what one expedition costs for a mid-size animal
+//   days       how long an expedition takes, in open days
+//   risk       extra chance an expedition comes back with nothing. Big animals add more (see TRIP).
 //   quality    [worst, best] DNA quality a sample can have. Deeper time gives worse DNA.
 const TIME_PERIODS = [
-  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:6000,  days:2, risk:.05, quality:[70,100]},
-  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:7000,  days:2, risk:.07, quality:[65,98]},
-  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:9000,  days:2, risk:.10, quality:[60,96]},
-  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:15000, days:3, risk:.15, quality:[55,95]},
-  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:14000, days:3, risk:.15, quality:[50,90]},
-  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:10000, days:3, risk:.12, quality:[45,88]},
-  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:9000,  days:2, risk:.12, quality:[40,85]},
-  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:8000,  days:2, risk:.10, quality:[35,80]},
+  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05, quality:[70,100]},
+  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07, quality:[65,98]},
+  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10, quality:[60,96]},
+  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15, quality:[55,95]},
+  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15, quality:[50,90]},
+  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,88]},
+  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,85]},
+  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,80]},
 ];
 
 // Science staff, hired at their department's building
@@ -165,19 +166,53 @@ const TIME_PERIODS = [
 //   wage       pay per day
 const SCIENTISTS = {
   paleo:    {label:"Paleontologist",     plural:"Paleontologists",     dept:"oracle", hireCost:3000, wage:250,
-             text:"Each one earns 5 research points every night."},
+             text:"Each one earns 5 research points a day and runs one research project at a time."},
   temporal: {label:"Temporal Researcher", plural:"Temporal Researchers", dept:"ghost",  hireCost:4000, wage:400,
              text:"Each one runs an expedition team. More researchers means more trips at the same time."},
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
              text:"Each one runs an incubator, so TAR can grow that many clones at the same time."},
+  botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
+             text:"Each one tends a growing bed, so CERES can grow that many batches at the same time."},
 };
-const RESEARCH_PER_PALEO = 5;   // research points each paleontologist earns per night
+const RESEARCH_PER_PALEO = 5;   // research points each paleontologist earns per open day
+// How long research takes, in park minutes per point. A 60-point project is 3 open days.
+const RESEARCH_MIN_PER_POINT = DAY_MIN / 20;
+// What unlocking one animal's genome costs at ORACLE: its period's base plus this much for every $ of its price
+const UNLOCK_PER_PRICE = 1 / 2000;
 
-// What one expedition sample adds to a species' genome, in percent
-const SAMPLE_GAIN = [25, 45];
+// Expeditions. A trip either finds something or comes back empty-handed, and a find fills part of a genome.
+// Bigger animals are harder to find, and a genome takes about 3 trips for the smallest and 8 for the largest.
+//   fail     chance of nothing, before the period's own risk: [smallest animal, largest animal]
+//   trips    trips a genome takes on average: [smallest, largest]
+//   spread   a find is worth between this share less and this share more than average
+//   costMul  trip price multiplier: [smallest, largest]
+//   bonus    chance a trip also turns up traces of another unlocked animal from that period, and what they add
+const TRIP = {fail:[.2, .35], trips:[3, 8], spread:.35, costMul:[.7, 1.3], bonus:{chance:.12, gain:[4, 8]}};
+// Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
+const TRIP_SIZE = [10, 5000];
 
-// How long a clone takes at TAR, in days: 1 day plus 1 more for every this many m² the species needs
+// Paleoflora genomes. GHOST collects plant DNA from any period of the era; CERES needs it complete before it grows anything.
+//   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
+const PLANT_DNA = {
+  mesozoic:  {id:"flora-mesozoic",  era:"mesozoic",  name:"Mesozoic flora",  space:300,  periods:["Triassic", "Jurassic", "Cretaceous"]},
+  paleozoic: {id:"flora-paleozoic", era:"paleozoic", name:"Paleozoic flora", space:900,  periods:["Carboniferous", "Permian"]},
+};
+const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.id, p]));
+
+// What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
+// TAR upgrades, researched at ORACLE: each level of incubators adds one more per geneticist, each level of speed cuts clone time
+const TAR_UPGRADE = {incubators:1, speed:.75};
+
+// What CERES grows in its beds. Works like TAR's incubators, but with plants.
+//   days    how long one batch takes, in open days
+//   cost    what one batch costs
+//   doses   (medicine) doses one batch makes
+const CERES_GROW = {
+  flora:    {mesozoic:{days:1.5, cost:1500}, paleozoic:{days:2, cost:2200}},
+  medicine: {cenozoic:{days:.75, cost:900, doses:20}, mesozoic:{days:1.25, cost:1500, doses:20}, paleozoic:{days:1.75, cost:2200, doses:20}},
+};
+const FLORA_BATCH_M2 = 1200;   // one batch of planting stock covers this many m² of an exhibit
 
 // Period colors, the same ones the planning map uses
 const PERIOD_COLOR = {
@@ -222,10 +257,10 @@ const BUILDINGS = {
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:11250, upkeep:150, w:24, d:16, dept:true,
              full:"Operational Requests for Ancestral & Chronological Life Evidence",
-             blurb:"The GHOST hub. Researches time periods and sends expedition requests."},
+             blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and TAR upgrades. Research takes time."},
   ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:18750, upkeep:250, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
-             blurb:"The time travel unit. Brings back DNA samples from unlocked periods."},
+             blurb:"The time travel unit. Sends teams to the periods of animals ORACLE has unlocked, and fills their genomes with DNA."},
   tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:15000, upkeep:200, w:26, d:18, dept:true,
              full:"Terrestrial Animal Reconstruction",
              blurb:"The cloning lab. Turns complete genomes into living animals."},
@@ -550,7 +585,7 @@ const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:13125, upkeep:150, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
-                   blurb:"Grows Paleoflora food for prehistoric plant-eaters, Mesozoic and Paleozoic plants for exhibits, and medicine for the PMC, once ORACLE has researched them. Keepers collect Paleoflora here."};
+                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, planting stock for exhibits, and medicine for the PMC, once ORACLE has unlocked them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -659,31 +694,43 @@ BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:
 const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
 const ZONE_MIN_AREA = 200;
 
-// Things ORACLE can research besides time periods
+// Things ORACLE can research besides animals. Each one takes time (see RESEARCH_MIN_PER_POINT).
+//   group   which ORACLE tab it sits on: "barrier" and "build" under Park Management, "tar" for TAR upgrades,
+//           "flora" and "med" under Paleo-Flora
+//   needs   another project that has to finish first
+//   era     (flora, med) the era it belongs to
 const TECH = [
-  {id:"bars",     label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
-  {id:"electric", label:"Electrified fence", points:30, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
-  {id:"concrete", label:"Concrete walls",    points:35, text:"Strength 140. Holds anything, but guests can barely see in."},
-  {id:"acrylic",  label:"Acrylic walls",     points:50, text:"Strength 85. Clear walls that guests love looking through."},
-  {id:"aviary",   label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
-  {id:"moat",     label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
-  {id:"platform", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
-  {id:"education", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
-  {id:"hotels",  label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
-  {id:"coldstore", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
-  {id:"security", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
-  {id:"generator", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
-  {id:"cameras",  label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
-  {id:"vehicles",   label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
-  {id:"paleoflora", label:"Paleoflora",       points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass."},
-  {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
-  {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
-  {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
-  {id:"foodprod",  label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
-  {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"CERES makes medicine that fully cures Paleogene, Neogene, and Quaternary animals."},
-  {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"CERES makes medicine that fully cures Triassic, Jurassic, and Cretaceous animals."},
-  {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"CERES makes medicine that fully cures Carboniferous and Permian animals."},
+  {id:"bars",     group:"barrier", label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
+  {id:"electric", group:"barrier", label:"Electrified fence", points:30, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
+  {id:"concrete", group:"barrier", label:"Concrete walls",    points:35, text:"Strength 140. Holds anything, but guests can barely see in."},
+  {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:50, text:"Strength 85. Clear walls that guests love looking through."},
+  {id:"aviary",   group:"barrier", label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
+  {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
+  {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
+  {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
+  {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
+  {id:"security", group:"build", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
+  {id:"generator", group:"build", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
+  {id:"cameras",  group:"build", label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
+  {id:"vehicles",   group:"build", label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
+  {id:"foodprod",  group:"build", label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
+  // TAR upgrades
+  {id:"incub1",   group:"tar", label:"More incubators",     points:30, text:"Every geneticist runs 2 incubators instead of 1."},
+  {id:"incub2",   group:"tar", label:"Even more incubators", points:50, needs:"incub1", text:"Every geneticist runs 3 incubators."},
+  {id:"fast1",    group:"tar", label:"Faster incubators",   points:30, text:"Clones finish in three quarters of the time."},
+  {id:"fast2",    group:"tar", label:"Much faster incubators", points:50, needs:"fast1", text:"Clones finish in about half the time."},
+  // Paleo-Flora: plants and medicine, grown at CERES
+  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
+  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. GHOST collects their DNA, then CERES grows planting stock for exhibits."},
+  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:45, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. GHOST collects their DNA, then CERES grows planting stock for exhibits."},
+  {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
+  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:25, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
+  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:35, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:40, text:"CERES grows medicine for Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
+// Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
+const REFINE_POINTS = {cenozoic:10, mesozoic:15, paleozoic:20};
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 
@@ -730,10 +777,9 @@ const HEALTH = {
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
                      "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
-// CERES makes medicine once ORACLE has researched any of it
+// CERES grows medicine in batches (see CERES_GROW) once ORACLE has unlocked its type
 const MEDICINE = {
-  perDay:8,            // doses CERES makes each day
-  storeDays:3,         // CERES holds this many days of medicine
+  capacity:60,         // doses CERES holds
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
   feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
@@ -785,13 +831,13 @@ const GOALS = [
   {id:"zone",     text:"Draw a work zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",    text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"period",   text:"Unlock a time period",               hint:"Tap ORACLE and hire a paleontologist. They earn research points each night. Then open a period's tab and unlock it.", reward:4000, check:g=>g.state.science.unlocked.length>0},
-  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to unlocked periods. Hire a Temporal Researcher at GHOST, then request a trip from the period's tab in ORACLE.", reward:6000, check:g=>Object.keys(g.state.science.dna).length>0},
+  {id:"period",   text:"Unlock an animal's genome",           hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open a period's tab and start unlocking an animal. It takes a while.", reward:4000, check:g=>g.state.science.unlocked.length>0},
+  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to the periods of animals you've unlocked. Hire a Temporal Researcher at GHOST, then pick the animal under its period's tab and send GHOST.", reward:6000, check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:6000, check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
   {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:8000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
   {id:"sp4",      text:"Show 4 different species",           hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
   {id:"cash150",  text:"Have $250,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=250000},
-  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Cretaceous, collect a full T. rex genome, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"hotel",    text:"Build a hotel",                      hint:"Research Hotels at ORACLE. Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].rooms)},
 ];

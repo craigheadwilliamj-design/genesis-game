@@ -16,11 +16,11 @@ const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph &
 
 /* ---------- CERES growing Paleoflora ---------- */
 const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b));
-function ceresRate(){ return dept("ceres") && hasTech("paleoflora") ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
+function ceresRate(){ return dept("ceres") && hasTech("paleoflora") && anyPlantDna() ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
 function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLORA.storeDays; }
 function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / (CLOSE_MIN - OPEN_MIN)); }
 // Keepers only go for Paleoflora when CERES has some to give
-const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && state.ceres.stock >= 1;
+const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && anyPlantDna() && state.ceres.stock >= 1;
 // Where keepers pick up a food: Paleoflora at CERES, everything else from a store that has some.
 // A keeper in a zone uses that zone's stores first.
 function sourcesFor(t, k){

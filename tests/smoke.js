@@ -117,7 +117,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pmcOnGraph = !!kGraph.anchors["b-pmc"] && !!kGraph.anchors["e-v"];
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
-    state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
     viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
@@ -160,7 +160,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
     // science buildings got cheaper
@@ -652,6 +652,143 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       [state.exhibits, state.buildings, state.paths] = keep;
     }
     out.campgroundIsHotel = isHotel({type:"campground"});
+    return out;
+  }));
+
+  // Science: research, trips, clones, and growing all run on park minutes, not days
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    events.toast = () => {};
+    state.money = 1e7; state.day = 3; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
+    const H = Math.PI / 2;
+    state.buildings.push({id:"b-or", type:"oracle", points:rectPts(230, 262, 24, 16, H)});
+    state.buildings.push({id:"b-gh", type:"ghost",  points:rectPts(180, 262, 28, 20, H)});
+    state.buildings.push({id:"b-ta", type:"tar",    points:rectPts(230, 290, 26, 18, H)});
+    state.buildings.push({id:"b-ce", type:"ceres",  points:rectPts(180, 290, 26, 18, H)});
+    state.paths.push({id:"p-t", name:"t", points:[[205,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[205,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[205,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[205,290],[193,290]]});
+    recompute(); buildKeeperGraph();
+    out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
+    const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= CLOSE_MIN - 2){ state.day++; state.minute = OPEN_MIN; } tick(1); if(fn && fn()) return true; } return false; };
+    state.minute = OPEN_MIN + 60;
+
+    // research: needs a paleontologist, takes time proportional to cost, and finishes mid-day
+    out.needsPaleo = !!startProject("tech", "bars");
+    hireScientist("paleo");
+    sc.points = 100;
+    out.startResearch = startProject("tech", "bars") === null && sc.points === 85 && !hasTech("bars");
+    const t15 = sc.projects[0].end - sc.projects[0].start;
+    out.oneAtATime = !!startProject("tech", "moat") && sc.projects.length === 1;
+    out.researchTakesTime = adv(60) === false && !hasTech("bars");
+    const day0 = state.day;
+    out.researchFinishesMidDay = adv(600, () => hasTech("bars")) && state.day === day0;
+    sc.points = 100; startProject("tech", "moat");
+    out.pricierIsSlower = sc.projects[0].end - sc.projects[0].start === t15 * 4;
+    sc.projects = [];
+    // points accrue with time, not at night
+    const pts0 = sc.points; state.minute = OPEN_MIN + 60; tick(60);
+    out.pointsTrickle = Math.abs(sc.points - pts0 - RESEARCH_PER_PALEO * 60 / DAY_MIN) < 1e-6;
+
+    // animals are unlocked one by one under their period
+    const small = SPECIES.filter(x => !x.viv).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
+    out.tripLockedFirst = !!tripProblem(small.id, small.period);
+    sc.points = 500; state.minute = OPEN_MIN + 60;
+    out.unlockAnimal = startProject("species", small.id) === null && !isUnlocked(small.id);
+    out.unlockCostScales = unlockPoints(big) > unlockPoints(small);
+    adv(projectMinutes(unlockPoints(small)) + 5, () => isUnlocked(small.id));
+    out.animalUnlocked = isUnlocked(small.id) && !sc.unlocked.includes(small.period);
+
+    // trips: need a team, take minutes, and come back mid-day
+    out.needsTeam = !!tripProblem(small.id, small.period);
+    hireScientist("temporal");
+    out.tripOk = !tripProblem(small.id, small.period);
+    const mny = state.money; state.minute = OPEN_MIN + 60;
+    out.launch = launchTrip(small.id, small.period) && state.money === mny - tripOdds(small.id, small.period).cost && sc.trips.length === 1;
+    out.oneTeamOneTrip = !!tripProblem(small.id, small.period);
+    const trip = sc.trips[0];
+    out.tripLength = trip.end - trip.start === Math.round(PERIOD_BY_ID[small.period].days * DAY_MIN);
+    const realRandom = Math.random;
+    Math.random = () => .99;   // never empty-handed bonus-free good find
+    out.tripReturns = adv(trip.end - nowMin() + 2, () => !sc.trips.length) && !!sc.dna[small.id];
+    Math.random = realRandom;
+
+    // a genome takes about 3 trips for the smallest animal and 8 for the largest
+    const avgTrips = id => {
+      const p = SPECIES_BY_ID[id].period; let total = 0; const N = 600;
+      for(let n = 0; n < N; n++){ delete sc.dna[id]; let k = 0; while(!genomeDone(id) && k < 60){ tripReturns({sp:id, period:p}); k++; } total += k; }
+      return total / N;
+    };
+    const tiny = SPECIES.slice().sort((a, c) => a.space - c.space)[0];
+    sc.unlocked.push(big.id);
+    const aSmall = avgTrips(tiny.id), aBig = avgTrips(big.id);
+    out.smallGenome3 = aSmall > 2.6 && aSmall < 4.2;
+    out.bigGenome8 = aBig > 6.8 && aBig < 9.2;
+    out.bigTakesMoreTrips = aBig > aSmall + 3 && tripOdds(big.id, big.period).trips > tripOdds(tiny.id, tiny.period).trips + 4;
+    out.genomeVaries = (() => { const ns = []; for(let n = 0; n < 40; n++){ delete sc.dna[big.id]; let k = 0; while(!genomeDone(big.id) && k < 60){ tripReturns({sp:big.id, period:big.period}); k++; } ns.push(k); } return Math.min(...ns) < Math.max(...ns); })();
+
+    // cloning: time depends on size and the upgrades, and runs on minutes
+    sc.dna[small.id] = {genome:100, quality:90}; hireScientist("gene");
+    const base = cloneMinutes(small.id);
+    out.cloneTimed = base === Math.round((1 + small.space / CLONE_DAYS_PER_SPACE) * DAY_MIN);
+    state.rating = 5; state.minute = OPEN_MIN + 60;
+    out.cloneOrder = orderClone(small.id, null) && sc.clones.length === 1;
+    out.incubatorCount = incubators() === 1;
+    sc.tech.push("incub1", "fast1");
+    out.upgradesApply = incubators() === 2 && cloneMinutes(small.id) === Math.round(base * TAR_UPGRADE.speed);
+    out.secondLane = (() => { const before = nowMin(); orderClone(small.id, null); return sc.clones[1].lane === 1 && sc.clones[1].start <= before + 1; })();
+    out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
+    sc.tar = null;
+
+    // CERES: needs a botanist, flora unlocked, and complete plant DNA from GHOST; then it grows planting stock in its beds
+    out.noBotanist = growProblem("flora", "mesozoic") === "Hire a botanist at CERES to tend a growing bed.";
+    hireScientist("botanist");
+    out.floraLocked = /ORACLE/.test(growProblem("flora", "mesozoic"));
+    sc.tech.push("paleoflora", "mesoplant", "medmeso");
+    out.floraNeedsDna = /plant DNA/.test(growProblem("flora", "mesozoic")) && !ceresRate();
+    sc.dna[PLANT_DNA.mesozoic.id] = {genome:50, quality:80};
+    out.halfDnaNotEnough = !!growProblem("flora", "mesozoic");
+    sc.dna[PLANT_DNA.mesozoic.id] = {genome:100, quality:80};
+    out.floraGrows = growProblem("flora", "mesozoic") === null && ceresRate() > 0;
+    const ex = {id:"e-fl", name:"Fl", points:[[300,200],[340,200],[340,240],[300,240]], animals:[], happy:70, cond:100};
+    out.replantNeedsStock = /planting stock/.test(replantProblem(ex, "mesozoic"));
+    state.minute = OPEN_MIN + 60;
+    growBatch("flora", "mesozoic");
+    out.bedBusy = state.ceres.beds.length === 1 && !state.ceres.plants.mesozoic;
+    out.batchTakesTime = adv(60) === false && !state.ceres.plants.mesozoic;
+    out.batchDone = adv(growMinutes("flora", "mesozoic"), () => state.ceres.plants.mesozoic === 1);
+    out.replantNeedsTwoBatches = batchesFor(ex) === 2 && /planting stock/.test(replantProblem(ex, "mesozoic"));
+    state.ceres.plants.mesozoic = 2;
+    out.replantWithStock = replantProblem(ex, "mesozoic") === null;
+    state.ceres.plants.mesozoic = 0;
+    // medicine comes from batches, not a steady trickle
+    state.ceres.meds = 0; state.minute = OPEN_MIN + 60;
+    out.medNoTrickle = (adv(30), state.ceres.meds === 0);
+    out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => state.ceres.meds >= 20);
+    state.ceres.auto.mesozoic = true; state.ceres.meds = 0;
+    out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => state.ceres.meds >= 20);
+    state.ceres.auto.mesozoic = false;
+
+    // medicine only cures a period's animals once refined for it
+    sc.tech.push("medceno");
+    const jur = SPECIES.find(x => x.period === "Jurassic");
+    out.unrefinedCantTreat = !canTreat(jur);
+    sc.tech.push("ref-Jurassic");
+    out.refinedTreats = canTreat(jur) && !canTreat(SPECIES.find(x => x.period === "Triassic"));
+    sc.points = 100;
+    out.refineNeedsEra = projectProblem("refine", "Permian") === "Research Paleozoic medicine first.";
+    out.refineOk = projectProblem("refine", "Cretaceous") === null;
+
+    // saves from before timed science keep their unlocked periods, trips, and clones
+    const oldS = JSON.parse(JSON.stringify(newPark()));
+    oldS.day = 6; oldS.starters = ["arth"]; oldS.science.unlocked = ["Cretaceous"]; delete oldS.science.projects;
+    oldS.science.trips = [{period:"Jurassic", sp:"dryo", back:7}]; oldS.science.clones = [{id:"c1", sp:"lyst", exhibitId:null, q:90, lane:0, done:8}];
+    oldS.science.tech = ["paleoflora", "mesoplant", "medmeso"]; delete oldS.science.crew.botanist; delete oldS.ceres;
+    oldS.buildings.push({id:"b-c", type:"ceres", points:rectPts(180, 290, 26, 18, H)});
+    const up = upgradeSave(oldS);
+    out.oldUnlocksAnimals = up.science.unlocked.includes("trex") && up.science.unlocked.every(id => SPECIES_BY_ID[id]) && !up.science.unlocked.includes("arth");
+    out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
+    out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
+    out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
     return out;
   }));
 

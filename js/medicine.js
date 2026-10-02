@@ -14,7 +14,8 @@ let vcrew = [];   // vets walking around right now (positions aren't saved)
 function freshHealth(){ return {from:HEALTH.startDay, ward:[], cmeds:0}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
-const canTreat = s => hasTech(medTechFor(s));
+// An era's medicine only cures a period's animals once it has been refined for that period
+const canTreat = s => hasTech(medTechFor(s)) && hasTech("ref-" + s.period);
 const anyMedTech = () => Object.values(MED_TECH).some(hasTech);
 const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
@@ -43,9 +44,8 @@ const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
 const vetsOnDuty = () => state.staff.vets.length > 0 && pmcs().length > 0;
 
 /* ---------- CERES medicine ---------- */
-function medRate(){ return dept("ceres") && anyMedTech() ? MEDICINE.perDay : 0; }
-function medCap(){ return MEDICINE.perDay * MEDICINE.storeDays; }
-function medTick(dtMin){ const c = state.ceres; c.meds = Math.min(medCap(), (c.meds || 0) + medRate() * dtMin / (CLOSE_MIN - OPEN_MIN)); }
+// CERES grows medicine in batches (see growBatch in science.js)
+function medCap(){ return MEDICINE.capacity; }
 const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
 /* ---------- who gets sick ---------- */
