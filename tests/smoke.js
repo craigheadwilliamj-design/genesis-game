@@ -890,6 +890,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
     state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivNo = !!regradeProblem({viv:"S"}, "desert");
     state.money = 0; out.regradeNeedsMoney = /Costs/.test(regradeProblem(bx, "desert") || "") && regradeCost(bx, "desert") === Math.round(3600 * BIOMES.desert.perSqM);
+    { const sp = SPECIES.find(s => !s.viv && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
+      const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
+      out.wantsBySize = wantsOf({points:pts.map(([x,y]) => [x*2,y*2]), biome:"tropical"}, sp).plants > tW.plants;
+      out.wantsByBiome = dW.rock > tW.rock && tW.plants > dW.plants && wantsOf(mk("desert"), fish).water > wantsOf(mk("desert"), sp).water;
+      const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
+      out.waterTooMuchHurts = waterFit(wp, wp) === 1 && waterFit(0, wp) === 0 && waterFit(wp * 5, wp) < 1 && waterFit(wp * 5, wp) < waterFit(wp * 1.1, wp); }
+    try { const h = landHtml(bx); out.landPanelRenders = /What they want in/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
     state.exhibits = keepEx; state.money = keepMoney; render();
 

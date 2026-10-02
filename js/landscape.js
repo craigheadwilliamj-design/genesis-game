@@ -49,6 +49,31 @@ function habitatOf(e){
   return {waterM2:wet, waterShare:wet / a, wet:clamp(wet / a / HAB.waterFull + (BIOMES[biomeOf(e)].wet || 0), 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
 }
 // Grass underfoot: a Cenozoic planting, unless enough older groves give the grazers something else to eat
+// What one species wants from an exhibit, given its size and biome: water as a share of the floor, rock cover points, and square meters of plants
+function wantsOf(e, s){
+  const a = area(e.points) || 1, l = likesOf(s), B = BIOMES[biomeOf(e)];
+  const meat = !s.diet.some(d => d === "herbivore" || d === "omnivore");
+  return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
+}
+// What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters from any era
+function haveOf(e){
+  const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
+  return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
+    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora ? landM2(f) : 0), 0))};
+}
+// How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
+function waterFit(have, want){
+  if(want <= 0) return 1;
+  const d = have - want, band = want * HAB.waterBand;
+  if(Math.abs(d) <= band) return 1;
+  return d < 0 ? clamp(have / (want - band), 0, 1) : clamp(1 - (d - band) / (want * 2), 0, 1);
+}
+const fitOf = (have, want) => want > 0 ? clamp(have / want, 0, 1) : 1;
+function speciesFit(e, s){
+  const w = wantsOf(e, s), h = haveOf(e), l = likesOf(s), pw = HAB.plantWeight;
+  const water = waterFit(h.water, w.water), rock = fitOf(h.rock, w.rock), plants = fitOf(h.plants, w.plants);
+  return {w, h, water, rock, plants, sat:(l.water * water + l.rock * rock + pw * plants) / (l.water + l.rock + pw)};
+}
 const grassyFloor = e => (e.flora || "cenozoic") === "cenozoic" && habitatOf(e).old < 1;
 // Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic trees give plants.
 function browseRate(e, t){
@@ -95,19 +120,22 @@ const WEATHER_TEXT = {hot:"no shade. Shelters and groves give shade", cold:"nowh
 function habitatScore(e){
   const out = {delta:0, issues:[]};
   if(e.viv || !e.animals.length) return out;
-  const h = habitatOf(e), dry = [];
+  const h = habitatOf(e), dry = [], lack = {water:[], rock:[], plants:[]};
   let sat = 0, n = 0;
   for(const [sp, c] of speciesCounts(e)){
-    const s = SPECIES_BY_ID[sp], l = likesOf(s);
-    sat += c * (l.water * h.wet + l.rock * h.rock) / (l.water + l.rock); n += c;
+    const s = SPECIES_BY_ID[sp], f = speciesFit(e, s);
+    sat += c * f.sat; n += c;
     if(thirsty(e, s)) dry.push(s.name);
+    else for(const k of ["water", "rock", "plants"]) if(f[k] < .6) lack[k].push(s.name);
   }
   sat /= n || 1;
   if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.join(", ")} ${dry.length === 1 ? "needs" : "need"} water. Draw some in the exhibit.`}); }
   if(sat > 0){
     out.delta += HAB.bonus * sat;
-    out.issues.push({bad:false, text:sat >= .6 ? "Water and rocks make it feel like home." : "Some water and rocks. More would make them feel more at home."});
+    out.issues.push({bad:false, text:sat >= .6 ? "Water, rocks and plants make it feel like home." : "Some water, rocks and plants. More of what they want would make them feel more at home."});
   }
+  const what = {water:"the right amount of water", rock:"enough rocks", plants:"enough plants"}, uniq = l => [...new Set(l)].join(", ");
+  for(const k of ["water", "rock", "plants"]) if(lack[k].length) out.issues.push({bad:false, text:`${uniq(lack[k])} ${lack[k].length === 1 ? "wants" : "want"} ${what[k]}. See Landscaping.`});
   // the biome: each animal's home ground, the one it gets by in, or neither
   const b = biomeOf(e), fit = {home:[], near:[], away:[]};
   for(const [sp, c] of speciesCounts(e)){ const s = SPECIES_BY_ID[sp], f = biomeFit(s, b); if(f){ out.delta += BIOME_HAPPY[f] * c / n; fit[f].push(s); } }

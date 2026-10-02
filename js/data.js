@@ -939,6 +939,11 @@ const HAB = {
   dryIll:1.5,      // illness chance multiplier for them
   groveFull:.06,   // share of the floor in groves from an animal's own era that fully satisfies it
   groveBonus:6,    // happiness for animals with plenty of groves from their era
+  waterMax:.1,     // share of the floor an animal that loves water (likes 1) wants under water; less keen animals want proportionally less
+  waterBand:.2,    // no penalty within this share either side of what an animal wants
+  rockBase:1,      // rocks a 500 m² exhibit of grassland wants for an animal with middling taste (likes .4); scaled by biome and by how much it likes rocks
+  plantWeight:.4,  // how much plants weigh against water and rocks when an animal is satisfied
+  meatPlants:.5,   // meat eaters want this share of the plants that plant eaters do
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
 };
 // Weather. Each night rolls the day after tomorrow, so the top bar always has tomorrow's forecast.
@@ -973,14 +978,16 @@ const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {wat
 //   color    floor color on the map (the pattern id is "b-" + the key)
 //   perSqM   cost to regrade an exhibit to this biome
 //   wet      counts as this share of the water that fully satisfies water lovers
+//   rock     how many rocks animals want here, next to grassland's 1 (see HAB.rockEvery)
+//   plants   share of the floor animals want planted here (see HAB.plantMax)
 const BIOMES = {
-  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", perSqM:.5},
-  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", perSqM:1},
-  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", perSqM:.3},
-  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", perSqM:.4},
-  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", perSqM:1.2, wet:.5},
-  temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", perSqM:.6},
-  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", perSqM:.8},
+  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", perSqM:.5, rock:1.6, plants:0.01},
+  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", perSqM:1, rock:0.6, plants:0.12},
+  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", perSqM:.3, rock:0.6, plants:0.03},
+  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", perSqM:.4, rock:1.3, plants:0.03},
+  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
+  temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", perSqM:.6, rock:0.8, plants:0.08},
+  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", perSqM:.8, rock:1, plants:0.08},
 };
 const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
