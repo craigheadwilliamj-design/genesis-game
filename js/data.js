@@ -17,7 +17,7 @@ const START = {
 const MINUTES_PER_SECOND = 12;
 
 // How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
-const WALK_SPEED = 8;
+const WALK_SPEED = 40;
 // The same speed in meters per park minute, which is what the simulation counts in
 const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
@@ -221,8 +221,7 @@ const GUEST = {
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home
   cash:[20, 45],       // money each guest brings to spend inside
-  walk:5,              // guests stroll this many times faster than staff walk with a load
-  speed:[.85, 1.15],   // each party's own pace, times that
+  speed:[.85, 1.15],   // each party's own pace, times WALK_PER_MIN
   startMood:62,        // mood on arrival, plus 4 for each star
   quitBelow:20,        // a party this unhappy heads home early
   tire:.03,            // mood lost each minute just from being on their feet
@@ -277,7 +276,7 @@ const KEEPER = {
   wage:120,            // each keeper's pay per day
   carry:40,            // food units a keeper can carry by hand
   speed:WALK_PER_MIN,  // keepers walk at the same pace as guests
-  tirePerMeter:.15,    // stamina lost per meter walked
+  tirePerMeter:.03,    // stamina lost per meter walked
   tirePerDelivery:2,   // stamina lost loading or unloading
   restBelow:25,        // keepers take a break when stamina drops under this
   restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)

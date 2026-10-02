@@ -265,7 +265,7 @@ function seeExhibit(p, e){
 // Minutes this party needs to walk to a stop from where it is
 function walkMins(p, id){
   const f = p.at && guestField(id), d = f && f.dist.get(p.at);
-  return d === undefined || !f ? 0 : d / (WALK_PER_MIN * GUEST.walk * p.spd);
+  return d === undefined || !f ? 0 : d / (WALK_PER_MIN * p.spd);
 }
 function walkParty(p, left){
   for(let i = 0; i < 40 && left > 0 && !p.gone && !p.in; i++){
@@ -357,7 +357,7 @@ function guestsTick(m0, m1){
     // set off for the gate in time to be out by the time they planned to leave
     if(!p.home && (m1 + walkMins(p, "gate") >= p.until || p.mood < GUEST.quitBelow)) goHome(p);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
-    walkParty(p, WALK_PER_MIN * GUEST.walk * p.spd * dt);
+    walkParty(p, WALK_PER_MIN * p.spd * dt);
   }
   serviceTick(dt, m1);
   parties = parties.filter(p => !p.gone);

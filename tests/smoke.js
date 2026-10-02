@@ -289,6 +289,53 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // A keeper fetches food from a dock far out on a service road, with a break room near the station
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    const realRandom = Math.random; Math.random = () => .99;
+    state.money = 1e6; state.staff.feedFrom = 0; state.safety.escapesFrom = 999; state.health.from = 999;
+    state.paths.push({id:"p-k1", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    state.paths.push({id:"s-k1", type:"service", points:[[205,235],[205,140]]});
+    state.paths.push({id:"s-k2", type:"service", points:[[205,140],[205,60],[380,60]]});
+    const ex = (id, pts, sp, n, gate) => state.exhibits.push({id, name:id, points:pts, gate, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100, stock:{}});
+    ex("e-k1", [[104,124],[204,124],[204,231],[104,231]], "lyst", 4, [204,180]);
+    ex("e-k2", [[206,124],[296,124],[296,231],[206,231]], "dime", 2, [206,180]);
+    const B = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, 0)});
+    B("b-kst", "station", 214, 265); B("b-kdock", "dock", 380, 67); B("b-kbr", "breakroom", 197, 265);
+    afterChange();
+    const dock = buildingById("b-kdock"), st = buildingById("b-kst");
+    out.dockLayout = ["b-kst", "b-kdock", "b-kbr", "e-k1", "e-k2"].every(id => !!kGraph.anchors[id]);
+    dock.store = {plants:100, meat:100};
+    state.staff.keepers.push({id:"k-d", name:"D", stamina:100}); syncCrew();
+    const day = state.day;
+    while(state.day === day && !(state.exhibits[1].stock.meat > 0)) tick(1);
+    out.dockToExhibit = state.day === day && state.exhibits[1].stock.meat > 0 && stockOf(dock, "meat") < 100 && state.staff.keepers[0].stamina > 50;
+
+    // a worn-out keeper holding food delivers it before taking a break
+    const c = crew.find(x => x.id === "k-d"), k = state.staff.keepers.find(x => x.id === "k-d");
+    state.exhibits[1].stock = {}; c.route = []; c.job = "idle"; c.wait = 0; c.plan = null; c.haul = null; c.at = kGraph.anchors["b-kdock"];
+    setCarry(c, {type:"meat", amount:10}); k.stamina = 10;
+    decide(c, k);
+    out.deliverBeforeRest = c.job === "toExhibit";
+
+    // food still in hand at closing stays with the keeper overnight, and gets delivered the next day
+    keepersNight();
+    out.carryOvernight = !!c.carry && c.carry.amount === 10 && k.carry && k.carry.amount === 10;
+    state.minute = OPEN_MIN; let fed = false;
+    for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
+    out.carryDeliveredNextDay = fed;
+
+    // a station full of one food doesn't send keepers to fetch another it has no room for
+    for(const x of crew){ x.haul = null; setCarry(x, null); }
+    st.store = {plants:storeCap(st)};
+    const near = list => list.length ? {b:list[0]} : null;
+    const h = pickHaul(null, near);
+    out.fullStoreNoHaul = !h || h.d !== st;
+    Math.random = realRandom;
+    return out;
+  }));
+
   // Guests: parties walk to food and restrooms, pay where they're served, and their mood sets guest comfort
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
