@@ -67,6 +67,13 @@ function buildGuestGraph(){
   const all = [...nodes.values()];
   for(const c of copies) for(let i = 1; i < c.pts.length; i++)
     for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), c.mult); link(n, node(c.pts[i]), c.mult); } }
+  // a plain stretch that runs inside a wide path's body (one drawn over another) has the wide path's room too
+  const wides = copies.filter(c => c.mult > 1), onWide = (x, y) => wides.find(c => c.pts.some((v, i) => i > 0 && segProj(x, y, c.pts[i-1], v).d <= WIDE_PATH.halfWidth));
+  if(wides.length) for(const n of nodes.values()) for(const m of n.adj.keys()){
+    if(m.k < n.k || (n.room && n.room.get(m))) continue;
+    const c = onWide(n.x, n.y); if(!c || onWide(m.x, m.y) !== c || !onWide((n.x + m.x) / 2, (n.y + m.y) / 2)) continue;
+    (n.room = n.room || new Map()).set(m, c.mult); (m.room = m.room || new Map()).set(n, c.mult);
+  }
   let gate = null, gd = 3;
   for(const n of nodes.values()){ const d = Math.hypot(n.x - state.gate[0], n.y - state.gate[1]); if(d < gd){ gd = d; gate = n; } }
   if(gate) anchors.gate = gate;
@@ -345,17 +352,20 @@ function guestsTick(m0, m1){
   while(arrivalCarry >= nextSize){ arrivalCarry -= nextSize; guestsArrive(nextSize); nextSize = GUEST.sizes[Math.floor(Math.random() * GUEST.sizes.length)]; }
   // guests near a dangerous animal on the loose run for the gate
   const danger = state.safety.loose.filter(l => l.status === "loose" && isDangerous(SPECIES_BY_ID[l.sp])).map(loosePos).filter(Boolean);
-  // how packed each stretch of path is
-  const busy = new Map(), edge = p => p.at.k < p.to.k ? p.at.k + "|" + p.to.k : p.to.k + "|" + p.at.k;
-  for(const p of parties) if(p.at && p.to){ const k = edge(p); busy.set(k, (busy.get(k) || 0) + 1); }
+  // how packed the path is around each walker: parties within 5 m either way, so short stretches at joins don't read as packed
+  const busy = new Map(), cell = (x, y) => Math.floor(x / 10) + ":" + Math.floor(y / 10), pos = new Map();
+  for(const p of parties) if(p.at && p.to){
+    const x = p.at.x + (p.to.x - p.at.x) * p.t, y = p.at.y + (p.to.y - p.at.y) * p.t, k = cell(x, y);
+    pos.set(p, [x, y]); if(!busy.has(k)) busy.set(k, []); busy.get(k).push([x, y]);
+  }
+  const near = ([x, y]) => { let n = 0; for(let i = -1; i <= 1; i++) for(let j = -1; j <= 1; j++) for(const [a, b] of busy.get(cell(x + i*10, y + j*10)) || []) if((a-x)*(a-x) + (b-y)*(b-y) <= 25) n++; return n; };
 
   for(const p of parties){
     for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + NEEDS[k].rate * dt);
     let hurt = GUEST.tire;
     for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * o / (100 - d.seek); }
     if(p.at && p.to){
-      const L = Math.hypot(p.to.x - p.at.x, p.to.y - p.at.y) || 1;
-      if(busy.get(edge(p)) * 10 / L > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
+      if(near(pos.get(p)) > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
     }
     // walking through litter
     const mess = p.at ? litterAt(p.at.x, p.at.y) : 0;
