@@ -502,6 +502,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.custodianSweeps = work(900, () => !state.litter[lk]);
     // the dock orders stock for stands and shops too
     out.dockOrdersStock = dockOrders({type:"dock"}).drinks > 0;
+    // a day of empty shelves sells little, but the order still covers the crowd
+    const ul = state.logi.usedLast; state.logi.usedLast = {drinks:1};
+    out.demandNotStarved = guestDemand("drinks") >= Math.ceil(derived.demand * GUEST_USE.drinks) && guestDemand("drinks") > 1;
+    state.logi.usedLast = ul;
+    // supply trucks top up the dock while the park is open
+    const tdk = {id:"b-tdk", type:"dock", points:rectPts(196, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
+    const tm = state.minute; state.minute = OPEN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
+    out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
+    state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
     state.staff.custodians = []; syncCustodians();
 
     // vandalism: a rowdy, unhappy party breaks the bench beside it, and a broken bench seats nobody
@@ -957,6 +966,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     };
     const plain = crowdedOn(), wide = crowdedOn("wide");
     out.widePathRoom = !!plain && !!wide && plain.mult === 1 && wide.mult === WIDE_PATH.crowdMult && pathCost([[0,0],[10,0]], "wide") === 10 * WIDE_PATH.perMeter;
+    // a wide path drawn over a plain one gives the plain stretch under it the room too, and a lone party on a short stretch isn't packed
+    state.paths = [{id:"p-n", points:[[200,300],[260,300]]}, {id:"p-gate", points:[[200,300],[200,300.5]]}, {id:"p-o", type:"wide", points:[[200.5,300],[259,300]]}];
+    recompute(); buildGuestGraph();
+    const gA = gGraph.anchors.gate, under = [...gGraph.nodes.values()].flatMap(n => [...n.adj.keys()].filter(m => n.y === 300 && m.y === 300).map(m => (n.room && n.room.get(m)) || 1));
+    const keepParties = parties, shortHop = [...gA.adj.keys()].find(m => Math.hypot(m.x - gA.x, m.y - gA.y) < 1);
+    parties = [{...newParty(2), at:gA, to:shortHop, t:.5, mood:80}]; parties[0].until = 9e9;
+    guestsTick(state.minute, state.minute + .01);
+    out.wideOverlayRoom = under.length > 0 && under.every(r => r === WIDE_PATH.crowdMult) && !!shortHop && !parties[0].thought.has("crowded");
+    parties = keepParties;
     state.paths = wPaths; recompute(); buildGuestGraph();
 
     // a building can go far from any path (but doesn't work there), and Rotate turns it a quarter
