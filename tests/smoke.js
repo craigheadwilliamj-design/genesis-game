@@ -962,6 +962,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     setTool("food"); rot = 0; placeGhost(0, 0); const g0 = ghost; const w0 = Math.hypot(g0.pts[1][0] - g0.pts[0][0], g0.pts[1][1] - g0.pts[0][1]);
     rotateTool(); const w1 = Math.hypot(ghost.pts[1][0] - ghost.pts[0][0], ghost.pts[1][1] - ghost.pts[0][1]);
     out.offPathRotate = typeof g0.ok === "boolean" && !(g0.why || "").includes("next to a path") && Math.abs(w0 - w1) < 1e-6 && Math.abs(ghost.angle - g0.angle - Math.PI/2) < 1e-6;
+    // drawing a path onto the edge of another snaps to its centerline, so they join
+    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}]; recompute();
+    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*view.k];
+    const sn = snapAt(...cl(250, 297.5));   // on the edge of the 5 m path, 2.5 m off its centerline
+    out.pathEdgeSnaps = Math.abs(sn.y - 300) < .01 && sn.info && sn.info.type === "seg";
+    const farSn = snapAt(...cl(250, 290));  // well clear of it
+    out.pathFarNoSnap = Math.abs(farSn.y - 290) < .5 || !!farSn.info === false;
+    setTool("select");
+    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}, {id:"p-w", type:"wide", points:[[250,240],[250,297.5]]}]; recompute();
+    out.wideShortNotJoined = !derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 0;
+    state.paths[2].points[1] = [250, 300]; recompute();
+    out.wideOnCenterJoined = derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 1;
     setTool("select"); state.paths = savedPaths; recompute();
 
     // the path preview band is as wide as the path it will become
