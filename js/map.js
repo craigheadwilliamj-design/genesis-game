@@ -44,6 +44,34 @@ let mvSel = null;                   // building picked with the Move tool, the o
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH;
+// Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
+// so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
+function wideJoin(p){
+  const pts = p.points.map(q => q.slice()), clips = [];
+  for(const end of [0, 1]){
+    const i = end ? pts.length - 1 : 0, prev = pts[end ? i - 1 : 1], E = pts[i];
+    let best = null;
+    for(const o of state.paths){
+      if(o === p || isService(o)) continue;
+      for(let j = 1; j < o.points.length; j++){
+        const r = segProj(E[0], E[1], o.points[j-1], o.points[j]), hw = halfWidth(o);
+        if(r.d <= hw + .5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};
+      }
+    }
+    if(!best) continue;
+    const ux = best.b[0] - best.a[0], uy = best.b[1] - best.a[1], L = Math.hypot(ux, uy) || 1, tx = ux/L, ty = uy/L;
+    let mx = -ty, my = tx;                                          // normal pointing to the wide path's side
+    if((prev[0] - best.x)*mx + (prev[1] - best.y)*my < 0){ mx = -mx; my = -my; }
+    const dx = E[0] - prev[0], dy = E[1] - prev[1], dl = Math.hypot(dx, dy) || 1, dn = (dx*mx + dy*my) / dl;
+    if(Math.abs(dn) < .2) continue;                                 // running along it, not into it
+    // how far past the end to run it to reach the far edge
+    const gap = (E[0] - best.x)*mx + (E[1] - best.y)*my + best.hw;
+    const t = -gap / dn;
+    if(t > 0) pts[i] = [E[0] + dx/dl*Math.min(t, 40), E[1] + dy/dl*Math.min(t, 40)];
+    clips.push({bx:best.x - mx*best.hw, by:best.y - my*best.hw, tx, ty, mx, my});
+  }
+  return {pts, clips};
+}
 
 /* ---------- looking things up ---------- */
 function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : kind === "water" ? state.exhibits.flatMap(waterOf) : null; }
@@ -131,21 +159,23 @@ function render(){
 
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
-  let under = "", over = "";
+  let under = "", over = "", clipDefs = "", wjN = 0;
   // staff roads go first, so a guest path always lays over them where they meet
   for(const p of [...state.paths].sort((a, b) => isService(b) - isService(a))){
     const svc = isService(p);
-    const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const wj = isWide(p) ? wideJoin(p) : null, pts = polyStr(wj ? wj.pts : p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
     const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
-    if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
-    under += `<polyline points="${pts}" stroke="${svc ? "#4B4F55" : "#8F7B52"}" stroke-width="${w + 1.6*inv}" ${lj}/>`;
-    over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer"><polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? "#EADFC4" : "#C9BFA6"}" stroke-width="${w}" ${lj}/>`;
-    if(svc) over += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
-    if(!live) over += `<polyline points="${pts}" stroke="#8F7B52" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
-    over += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/></g>`;
+    if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
+    under += cut(`<polyline points="${pts}" stroke="${svc ? "#4B4F55" : "#8F7B52"}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
+    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? "#EADFC4" : "#C9BFA6"}" stroke-width="${w}" ${lj}/>`;
+    if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
+    if(!live) body += `<polyline points="${pts}" stroke="#8F7B52" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
+    body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+    over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}</g>`;
   }
-  s += under + over;
+  s += clipDefs + under + over;
 
   // entrance gate
   const [gx, gy] = state.gate;
