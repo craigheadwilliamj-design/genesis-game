@@ -1,9 +1,9 @@
 /* =====================================================================
    KEEPERS
    Staff who carry food from Keeper Stations to exhibits.
-   Keepers walk any path or service road. They only go into an exhibit
-   through a gate on a service road (never one that opens onto a guest
-   path). Vivariums need no gate.
+   Keepers walk any path or service road, but ATVs only drive on service
+   roads. They go into an exhibit through its gate, which can open onto
+   either kind of path. Vivariums need no gate.
    ===================================================================== */
 
 const FOOD_OF_DIET = {herbivore:"plants", omnivore:"plants", carnivore:"meat", piscivore:"fish", insectivore:"insects"};
@@ -64,10 +64,8 @@ function gateCheck(e){
   if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
   if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
   const near = (p, list) => list.some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
-  const guest = state.paths.filter(p => !isService(p)), svc = state.paths.filter(isService);
-  if(near(e.gate, guest)) return {ok:false, text:"The gate opens onto a guest path. Keepers won't use it. Move it to a service road."};
-  if(!near(e.gate, svc)) return {ok:false, text:"The gate doesn't touch a service road."};
-  return {ok:true, text:"Gate opens onto a service road."};
+  if(!near(e.gate, state.paths)) return {ok:false, text:"The gate doesn't touch a path or service road."};
+  return {ok:true, text:"Gate opens onto a path."};
 }
 
 /* ---------- the keepers' map of paths ---------- */
@@ -105,7 +103,7 @@ function buildKeeperGraph(){
   }
   for(const e of state.exhibits){
     if(e.viv){ const [cx, cy] = centroid(e.points); attach(e.id, cx, cy, VIVARIUMS[e.viv].d/2 + 6, false); }
-    else if(e.gate && gateCheck(e).ok) attach(e.id, e.gate[0], e.gate[1], GATE_REACH, true);
+    else if(e.gate && gateCheck(e).ok) attach(e.id, e.gate[0], e.gate[1], GATE_REACH, false);
   }
   // splice the stops into each path, then link everything up
   const nodes = new Map();
@@ -312,7 +310,7 @@ function requestMove(from, sp, to, count){
   }
   return n;
 }
-function moveProblem(e){ return kGraph && kGraph.anchors[e.id] ? null : gateCheck(e).text; }
+function keeperMoveProblem(e){ return kGraph && kGraph.anchors[e.id] ? null : gateCheck(e).text; }
 
 // A move nobody has picked up yet, where keepers can reach both ends
 function moveJob(c){
