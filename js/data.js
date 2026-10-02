@@ -993,7 +993,7 @@ const BIOMES = {
 };
 const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
-// Each open-exhibit animal's home biome, then the one it gets by in. Vivarium animals don't mind.
+// Each animal's home biome, then the one it gets by in. Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.
 const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   eryo:"wetland tropical",    lyst:"scrubland desert",     mosc:"scrubland desert",     dime:"scrubland wetland",
   scut:"desert scrubland",    este:"temperate wetland",    coty:"scrubland desert",     ante:"wetland temperate",
@@ -1020,6 +1020,17 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
   smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"boreal grassland",
   colm:"grassland temperate",
+  icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
+  dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
+  diic:"scrubland desert",    seym:"scrubland wetland",    plhy:"scrubland desert",     shar:"temperate wetland",
+  long:"temperate wetland",   gigt:"scrubland tropical",   anch:"temperate tropical",   comp:"scrubland temperate",
+  yiqi:"temperate boreal",    arch:"scrubland temperate",  beel:"scrubland tropical",   mono:"desert scrubland",
+  mcer:"temperate grassland", scan:"temperate boreal",     micr:"temperate wetland",     kool:"boreal wetland",
+  simo:"tropical wetland",    ples:"temperate tropical",   paki:"wetland tropical",     lept:"temperate tropical",
+  sifr:"temperate grassland", ptil:"temperate grassland",  miac:"temperate tropical",    waim:"temperate wetland",
+  tmyr:"tropical temperate",  dgal:"scrubland temperate",  nura:"scrubland temperate",  hopl:"scrubland temperate",
+  psil:"grassland scrubland", ornw:"scrubland temperate",  dodo:"tropical scrubland",    ppig:"temperate grassland",
+  gtod:"tropical temperate",  rmlo:"grassland scrubland",  sdel:"scrubland temperate",
 }).map(([id, b]) => [id, b.split(" ")]));
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 

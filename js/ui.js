@@ -171,13 +171,13 @@ function exhibitHtml(e){
   }
 
   // the biome the exhibit is laid out as
-  if(!e.viv){
+  {
     const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
     h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
       const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
       return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
     }).join("")}</select></label>`;
-    h += `<div class="meta" style="margin-top:4px">${kinds.length ? kinds.map(s => `${esc(s.name)}: ${biomesOf(s).map((x, i) => i ? `gets by in ${BIOMES[x].label.toLowerCase()}` : `home is ${BIOMES[x].label.toLowerCase()}`).join(", ")}`).join(". ") + ". " : ""}Animals are happiest in their home biome. Regrading has no refund.${BIOMES[b].wet ? " Wetland gives water lovers half the water they want." : ""}</div></section>`;
+    h += `<div class="meta" style="margin-top:4px">${kinds.length ? kinds.map(s => `${esc(s.name)}: ${biomesOf(s).map((x, i) => i ? `gets by in ${BIOMES[x].label.toLowerCase()}` : `home is ${BIOMES[x].label.toLowerCase()}`).join(", ")}`).join(". ") + ". " : ""}Animals are happiest in their home biome. Regrading has no refund.${BIOMES[b].wet && !e.viv ? " Wetland gives water lovers half the water they want." : ""}</div></section>`;
   }
 
   // what the exhibit is planted with
@@ -318,7 +318,7 @@ $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
-const habitatText = s => s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : biomesOf(s) ? `Home biome ${BIOMES[biomesOf(s)[0]].label.toLowerCase()}, gets by in ${BIOMES[biomesOf(s)[1]].label.toLowerCase()}. ` : "";
+const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `Home biome ${BIOMES[biomesOf(s)[0]].label.toLowerCase()}, gets by in ${BIOMES[biomesOf(s)[1]].label.toLowerCase()}. ` : "");
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){

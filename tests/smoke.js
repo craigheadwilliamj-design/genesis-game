@@ -886,8 +886,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech = keepTech; state.ceres.pots = keepPots; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
-    // biomes: every open-exhibit animal has one, home ground makes them happier, the wrong one is flagged, wetland counts as some water
-    out.biomesCover = SPECIES.every(s => s.viv ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
+    // biomes: every animal has one, vivarium animals too, home ground makes them happier, the wrong one is flagged, wetland counts as some water
+    out.biomesCover = SPECIES.every(s => biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
     const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
@@ -899,7 +899,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
-    state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivNo = !!regradeProblem({viv:"S"}, "desert");
+    state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivOk = !regradeProblem({viv:"S", points:bx.points, animals:[]}, "desert") && regradeProblem({viv:"S", points:bx.points, animals:[]}, DEFAULT_BIOME) !== null;
     state.money = 0; out.regradeNeedsMoney = /Costs/.test(regradeProblem(bx, "desert") || "") && regradeCost(bx, "desert") === Math.round(3600 * BIOMES.desert.perSqM);
     { const sp = SPECIES.find(s => !s.viv && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
       const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
