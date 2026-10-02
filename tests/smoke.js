@@ -806,59 +806,64 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
     out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
 
-    // landscaping: ponds and rocks inside open exhibits
+    // landscaping: water drawn inside open exhibits, and rocks placed in them
     const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
-    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     state.exhibits = [lx];
     const fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
     lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
-    out.landMenu = !!document.querySelector('[data-tool="land-pond"]');
-    setTool("land-pond"); out.landTool = tool === "land-pond" && $("#drawbar").classList.contains("on"); setTool("select");
-    out.landRejectsOutside = !landSpot(10, 10, "pond").ok && !landSpot(103, 130, "pond").ok;
+    out.landMenu = !!document.querySelector('[data-tool="water"]') && !!document.querySelector('[data-tool="land-rock"]');
+    setTool("water"); out.landTool = tool === "water" && $("#drawbar").classList.contains("on"); setTool("select");
+    const sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
+    out.landRejectsOutside = waterHost(sq(10, 10, 4)) === null && !!waterProblem(sq(102, 130, 4), lx, null, 0) && !landSpot(10, 10, "rock").ok;
     const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
     out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
-    const spot = landSpot(130, 130, "pond");
-    out.landAcceptsInside = spot.ok && spot.e === lx;
-    placeLand(lx, "pond", 130, 130);
-    out.landOverlapRejected = !landSpot(133, 130, "pond").ok;
+    const pool = sq(130, 130, 6);
+    out.landAcceptsInside = waterHost(pool) === lx && waterProblem(pool, lx, null, waterCost(pool)) === null;
+    addWater(lx, pool);
+    out.landOverlapRejected = !!waterProblem(sq(133, 130, 4), lx, null, 0) && !landSpot(132, 130, "rock").ok;
     out.landPondHelps = !thirsty(lx, fish) && exhibitReport(lx).target > dryTarget && illChance(lx, lx.animals[0]).p < dryIll;
-    state.money = 100; out.landNeedsMoney = /Costs/.test(landSpot(140, 110, "boulder").why || ""); state.money = 1e6;
+    state.money = 100; out.landNeedsMoney = /Costs/.test(landSpot(150, 110, "boulder").why || ""); state.money = 1e6;
     placeLand(lx, "rock", 110, 150);
-    // ponds and rocks ride along when the exhibit moves
+    // water and rocks ride along when the exhibit moves
     const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
-    out.landMoves = lx.land[0].x === 140 && lx.land[0].y === 135 && lx.points[0][0] === 110;
+    out.landMoves = lx.water[0].points[0][0] === 134 && lx.water[0].points[0][1] === 129 && lx.land[0].x === 120 && lx.points[0][0] === 110;
     moveBy(mv, 0, 0);
-    // an outline that would leave one outside the fence is refused
+    // an outline that would leave something outside the fence is refused
     const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
     out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
-    // bulldozing one refunds part of its price
-    const f0 = lx.land[1], n0 = lx.land.length;
-    out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && landRefund(lx) > 0;
-    removeItem("land", f0);
-    out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0);
+    // bulldozing refunds part of the price
+    const f0 = lx.land[0], n0 = lx.land.length;
+    out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && refundFor("water", lx.water[0]) === Math.round(waterCost(pool) * COST.refundShare) && landRefund(lx) > 0;
+    removeItem("land", f0); removeItem("water", lx.water[0]);
+    out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0) && lx.water.length === 0;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
     // old saves get an empty list for open exhibits only
     const oldL = JSON.parse(JSON.stringify(newPark()));
     oldL.exhibits.push({id:"e-old", name:"Old", points:[[1,1],[2,1],[2,2]], animals:[], happy:70}, {id:"e-oldv", name:"OldV", points:[[1,1],[2,1],[2,2]], animals:[], happy:70, viv:"S"});
     const upl = upgradeSave(oldL);
     out.oldGetsLand = upl.exhibits.find(e => e.id === "e-old").land.length === 0 && upl.exhibits.find(e => e.id === "e-oldv").land === undefined;
+    const oldP = JSON.parse(JSON.stringify(newPark()));
+    oldP.exhibits.push({id:"e-oldp", name:"OldP", points:[[0,0],[40,0],[40,40],[0,40]], animals:[], happy:70, land:[{id:"l-p", type:"pond", x:20, y:20}, {id:"l-r", type:"rock", x:5, y:5}]});
+    const upp = upgradeSave(oldP).exhibits.find(e => e.id === "e-oldp");
+    out.oldPondsBecomeWater = upp.water.length === 1 && upp.land.length === 1 && upp.land[0].type === "rock" && Math.abs(area(upp.water[0].points) - Math.PI * WATER.oldPondR ** 2) < Math.PI * WATER.oldPondR ** 2 * .1;
 
     // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
-    const keepTech = [...sc.tech], keepPlants = {...state.ceres.plants}, keepFeed = state.staff.feedFrom;
+    const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;
     state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
     const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], flora:"cenozoic"};
     state.exhibits = [gx];
     const grazer = SPECIES.find(s => !s.viv && foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ERA_OF[s.period] === "mesozoic");
     gx.animals = [1, 2, 3].map(i => ({id:"a-g" + i, sp:grazer.id, q:90}));
-    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.plants.mesozoic = 0;
+    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.pots["mesozoic-large"] = 0;
     out.groveNeedsTech = /Research/.test(landSpot(115, 115, "cycads").why || "");
     sc.tech.push("mesoplant");
-    out.groveNeedsStock = /planting stock/.test(landSpot(115, 115, "cycads").why || "");
+    out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "cycads").why || "");
     out.treesNeedNoStock = landSpot(115, 115, "trees").ok;
     const grassyBefore = grassyFloor(gx) && grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
-    state.ceres.plants.mesozoic = 3;
+    state.ceres.pots["mesozoic-large"] = 3;
     for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "cycads", x, y);
-    out.groveUsesStock = state.ceres.plants.mesozoic === 0 && gx.land.length === 3;
+    out.groveUsesStock = state.ceres.pots["mesozoic-large"] === 0 && gx.land.length === 3;
     out.grovesStopGrass = grassyBefore && !grassyFloor(gx) && !grassSick(gx, grazer);
     out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
     // browsing: the stock drains slower, but keepers are still needed
@@ -867,12 +872,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
-    sc.tech = keepTech; state.ceres.plants = keepPlants; state.staff.feedFrom = keepFeed;
+    sc.tech = keepTech; state.ceres.pots = keepPots; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
     // biomes: every open-exhibit animal has one, home ground makes them happier, the wrong one is flagged, wetland counts as some water
     out.biomesCover = SPECIES.every(s => s.viv ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
-    const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
     state.exhibits = [bx];
@@ -880,7 +885,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     bx.biome = away; const awayT = exhibitReport(bx).target, awayFlag = exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text));
     bx.biome = "desert"; const homeT = exhibitReport(bx).target;
     out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeT - awayT === BIOME_HAPPY.home - BIOME_HAPPY.away && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
-    const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], points:bx.points}, s));
+    const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
     state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivNo = !!regradeProblem({viv:"S"}, "desert");
@@ -922,6 +927,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.weather = keepW; recompute();
     const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
     out.oldGetsWeather = upgradeSave(oldW).weather.from === 23 && oldW.weather.today === "fair";
+
+    // the animal move dialog opens and lists where they can go (it once called map.js's moveProblem and threw)
+    const mvA = {...wx, id:"e-mvA", land:[]}, mvB = {...wx, id:"e-mvB", name:"Move test B", animals:[], land:[]};
+    state.exhibits = [mvA, mvB];
+    try { openMoveDialog(mvA, wxSp.id); out.moveDialogOpens = $("#dlgMove").open && !!$("#moveTo") && $("#moveTo").options.length === 1; }
+    catch { out.moveDialogOpens = false; }
+    if($("#dlgMove").open) $("#dlgMove").close();
+    state.exhibits = keepEx; recompute();
     return out;
   }));
 

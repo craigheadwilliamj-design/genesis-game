@@ -220,34 +220,37 @@ function finishClone(c){
 /* ---------- CERES: growing plants and medicine ---------- */
 
 const beds = () => dept("ceres") ? Math.max(0, state.science.crew.botanist) : 0;
-const growing = (kind, era) => state.ceres.beds.filter(b => b.kind === kind && b.era === era).length;
+const growing = (kind, era, size) => state.ceres.beds.filter(b => b.kind === kind && b.era === era && (b.size || null) === (size || null)).length;
 const batchesFor = e => Math.max(1, Math.ceil(area(e.points) / FLORA_BATCH_M2));
-const growInfo = (kind, era) => CERES_GROW[kind === "flora" ? "flora" : "medicine"][era];
-const growMinutes = (kind, era) => Math.round(growInfo(kind, era).days * DAY_MIN);
+const growInfo = (kind, era, size) => kind === "plant" ? (CERES_GROW.plant[era] || {})[size] : CERES_GROW[kind === "flora" ? "flora" : "medicine"][era];
+const growMinutes = (kind, era, size) => Math.round(growInfo(kind, era, size).days * DAY_MIN);
+// What a batch is called, for toasts and bed cards
+const growName = (kind, era, size) => kind === "plant" ? `${ERA_LABEL[era]} ${size} plants` : kind === "flora" ? `${ERA_LABEL[era]} planting stock` : `${ERA_LABEL[era]} medicine`;
 
-function growProblem(kind, era){
+function growProblem(kind, era, size){
   const sc = state.science, c = state.ceres;
-  if(!growInfo(kind, era)) return "CERES can't grow that.";
+  if(!growInfo(kind, era, size)) return "CERES can't grow that.";
   const blocker = deptProblem("ceres"); if(blocker) return blocker;
   if(!sc.crew.botanist) return "Hire a botanist at CERES to tend a growing bed.";
-  if(kind === "flora" && !hasTech(FLORA[era].tech)) return `Research ${FLORA[era].label} flora at ORACLE first.`;
+  if(kind !== "med" && !hasTech(FLORA[era].tech)) return `Research ${FLORA[era].label} flora at ORACLE first.`;
   if(kind === "med" && !hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
   if(era !== "cenozoic" && !plantDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
   if(c.beds.length >= sc.crew.botanist * 3) return "Every bed has a full queue. Hire more botanists.";
-  if(!canAfford(growInfo(kind, era).cost)) return `A batch costs ${money(growInfo(kind, era).cost)}. You have ${money(state.money)}.`;
+  if(!canAfford(growInfo(kind, era, size).cost)) return `A batch costs ${money(growInfo(kind, era, size).cost)}. You have ${money(state.money)}.`;
   return null;
 }
-function growBatch(kind, era){
-  if(growProblem(kind, era)) return false;
-  const gi = growInfo(kind, era), {lane, start} = freeLane(state.ceres.beds, Math.max(1, state.science.crew.botanist));
+function growBatch(kind, era, size){
+  if(growProblem(kind, era, size)) return false;
+  const gi = growInfo(kind, era, size), {lane, start} = freeLane(state.ceres.beds, Math.max(1, state.science.crew.botanist));
   spend(gi.cost, "science");
-  state.ceres.beds.push({id:uid("g-"), kind, era, lane, start, end:start + growMinutes(kind, era)});
-  events.toast(`CERES started a batch of ${kind === "flora" ? `${ERA_LABEL[era]} planting stock` : `${ERA_LABEL[era]} medicine`}. Ready ${whenText(start + growMinutes(kind, era))}.`);
+  state.ceres.beds.push({id:uid("g-"), kind, era, ...(size ? {size} : {}), lane, start, end:start + growMinutes(kind, era, size)});
+  events.toast(`CERES started a batch of ${growName(kind, era, size)}. Ready ${whenText(start + growMinutes(kind, era, size))}.`);
   return true;
 }
 function finishBatch(b){
   const c = state.ceres;
-  if(b.kind === "flora"){ c.plants[b.era] = (c.plants[b.era] || 0) + 1; events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} planting stock.`, "good"); }
+  if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
+  else if(b.kind === "flora"){ c.plants[b.era] = (c.plants[b.era] || 0) + 1; events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} planting stock.`, "good"); }
   else { c.meds = Math.min(medCap(), (c.meds || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store

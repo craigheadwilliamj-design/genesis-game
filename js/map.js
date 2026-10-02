@@ -15,7 +15,7 @@ let tool = "select";
 let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
-let landGhost = null;               // pond or rock being placed: {key, x, y, ok, why}
+let landGhost = null;               // rock, grove or shelter being placed: {key, x, y, ok, why}
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
@@ -34,16 +34,16 @@ let fenceSel = "wood";             // fence type the next exhibit is built with
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone";
-// Exhibits and zones are closed shapes. Paths are open lines.
-const isPoly = k => k === "exhibit" || k === "zone";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone" || t === "water";
+// Exhibits, zones and water are closed shapes. Paths are open lines.
+const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
-let mvCorner = null;                // exhibit corner picked with the Move tool: {id, i}
+let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : null; }
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : kind === "water" ? state.exhibits.flatMap(waterOf) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
 function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
 
@@ -115,7 +115,7 @@ function render(){
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
-    if(!e.viv) s += landSvg(e, tool === "bulldoze", id => isDoomed("land", id));
+    if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if((e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
@@ -279,13 +279,14 @@ function renderOverlay(){
     }
   }
   if(tool === "move"){
-    for(const e of state.exhibits){
-      if(e.viv) continue;
-      e.points.forEach((p, i) => {
-        const q = e.points[(i + 1) % e.points.length], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
-        s += `<circle cx="${mx}" cy="${my}" r="${5*inv}" fill="var(--sel)" fill-opacity=".85" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/><path d="M${mx - 2.5*inv} ${my}h${5*inv}M${mx} ${my - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    // fence corners in gold, water corners in blue
+    for(const {t, w} of reshapeables()){
+      const col = w ? "#2F6F9F" : "var(--sel)";
+      t.points.forEach((p, i) => {
+        const q = t.points[(i + 1) % t.points.length], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+        s += `<circle cx="${mx}" cy="${my}" r="${5*inv}" fill="${col}" fill-opacity=".85" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/><path d="M${mx - 2.5*inv} ${my}h${5*inv}M${mx} ${my - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       });
-      e.points.forEach((p, i) => { const on = mvCorner && mvCorner.id === e.id && mvCorner.i === i; s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(on ? 8 : 6.5)*inv}" fill="${on ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
+      t.points.forEach((p, i) => { const on = mvCorner && mvCorner.id === t.id && mvCorner.i === i; s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(on ? 8 : 6.5)*inv}" fill="${on ? col : "#fff"}" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
     }
   }
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
@@ -382,6 +383,8 @@ function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx -
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
   if(ev && ev.altKey) return {x:p.x, y:p.y, info:null};
+  // water stays clear of fences and paths, so it only snaps to the grid
+  if(draw && draw.kind === "water") return gridSnap ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}} : {x:p.x, y:p.y, info:null};
   const R = 12 / view.k;
   let best = null, bd = R;
   const tryV = (v, kind, id) => { const d = Math.hypot(p.x - v[0], p.y - v[1]); if(d < bd){ bd = d; best = {x:v[0], y:v[1], info:{type:"vertex", kind, id}}; } };
@@ -475,7 +478,8 @@ const DRAW_TEXT = {
   exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it, or start and end on a neighbor's fence and tap the last corner again to share its wall."],
   path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
-  service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."]
+  service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
+  water:["New water", "Tap to drop shore corners inside an open exhibit. Tap the first corner again to fill it. Animals like water, and fish eaters need some."]
 };
 const drawType = () => draw && draw.kind === "service" ? "service" : undefined;
 
@@ -494,7 +498,7 @@ function setTool(t){
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(landKey(t)) showBar(`Place ${LAND[landKey(t)].one}`, "Tap inside an open exhibit. Animals feel at home among ponds and rocks, and some can't do without water.", `${money(LAND[landKey(t)].price)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(landKey(t)) showBar(`Place ${LAND[landKey(t)].one}`, "Tap inside an open exhibit, clear of any water. Animals feel at home among water and rocks, groves from their era, and shelter from bad weather.", `${money(LAND[landKey(t)].price)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
@@ -513,7 +517,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit or path to a new spot. Drag an exhibit's corner to reshape it, or a + on its fence to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
+    showBar("Move", "Drag a building, exhibit or path to a new spot. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -551,13 +555,16 @@ function updateDrawbar(){
     if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${BARRIERS[fenceSel].label.toLowerCase()}. ${money(exhibitCost(shape, fenceSel))}`; err = exhibitProblem(shape); }
   } else if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
+  } else if(draw.kind === "water"){
+    if(all.length >= 3){ stat = `${fmtArea(area(all))} of water. ${money(waterCost(all))}`; err = waterProblem(all, waterHost(all), null, waterCost(all)); }
+    else if(all.length && !waterHost(all)) err = "Start it inside an open exhibit.";
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
   draw.error = err;
   setStat(err || stat, !!err);
   $("#dUndo").disabled = !draw.pts.length;
-  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "exhibit" ? closeAlong(draw.pts).length >= 3 && !exhibitProblem(closeAlong(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
+  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "water" ? !waterProblem(draw.pts, waterHost(draw.pts), null, waterCost(draw.pts)) : draw.kind === "exhibit" ? closeAlong(draw.pts).length >= 3 && !exhibitProblem(closeAlong(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
   $("#dFinish").disabled = !ready;
 }
 
@@ -603,8 +610,18 @@ function finishDraw(){
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = (d.kind === "exhibit" ? closeAlong(d.pts) : d.pts).map(p => [p[0], p[1]]);
-  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "exhibit" ? exhibitProblem(pts) : pathProblem(pts, type);
+  const host = d.kind === "water" ? waterHost(pts) : null;
+  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "water" ? waterProblem(pts, host, null, waterCost(pts)) : d.kind === "exhibit" ? exhibitProblem(pts) : pathProblem(pts, type);
   if(problem){ setStat(problem, true); return; }
+  if(d.kind === "water"){
+    const cost = waterCost(pts);
+    addWater(host, pts);
+    afterChange();
+    // keep the tool going so you can draw the next one
+    startDraw("water"); render();
+    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host.name} for ${money(cost)}.`, "good");
+    return;
+  }
   if(d.kind === "zone"){
     const used = new Set(state.zones.map(x => x.name));
     let n = 1; while(used.has(`Zone ${n}`)) n++;
@@ -928,7 +945,7 @@ function platformTap(ev){
   ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
 }
 
-/* ---------- ponds and rocks ---------- */
+/* ---------- rocks, groves and shelters ---------- */
 function landPoint(ev){
   const p = toWorld(ev.clientX, ev.clientY);
   return gridSnap && !ev.altKey ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP} : p;
@@ -969,6 +986,7 @@ function removeItem(kind, it){
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)); if(o) o.land.splice(o.land.indexOf(it), 1); }
+  else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)); if(o) o.water.splice(o.water.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   if(kind === "zone") dropZone(it.id);
@@ -1016,13 +1034,15 @@ function moveBy(m, dx, dy){
   if(m.gate) it.gate = [m.gate[0] + dx, m.gate[1] + dy];
   for(const pl of m.plats) pl.b.points = shiftPts(pl.pts, dx, dy);
   for(const l of m.land){ l.f.x = l.x + dx; l.f.y = l.y + dy; }
+  for(const w of m.water) w.w.points = shiftPts(w.pts, dx, dy);
   m.dx = dx; m.dy = dy;
 }
 function startMove(it, kind, e){
   const w = toWorld(e.clientX, e.clientY);
   return {it, kind, wx:w.x, wy:w.y, dx:0, dy:0, orig:it.points.map(p => p.slice()), gate:it.gate ? it.gate.slice() : null,
     plats:kind === "exhibit" ? state.buildings.filter(b => b.exhibitId === it.id).map(b => ({b, pts:b.points.map(p => p.slice())})) : [],
-    land:kind === "exhibit" ? landOf(it).map(f => ({f, x:f.x, y:f.y})) : []};
+    land:kind === "exhibit" ? landOf(it).map(f => ({f, x:f.x, y:f.y})) : [],
+    water:kind === "exhibit" ? waterOf(it).map(w => ({w, pts:w.points.map(p => p.slice())})) : []};
 }
 function dragMove(m, e){
   const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
@@ -1045,18 +1065,38 @@ function dropMove(m){
   setStat("");
 }
 
-// Reshaping an exhibit: drag a corner, drag a + to add one, tap a corner and delete it
+// Reshaping an exhibit or its water: drag a corner, drag a + to add one, tap a corner and delete it
+// Every shape that can be reshaped: each open exhibit's fence, and each body of water inside it
+function reshapeables(){
+  const out = [];
+  for(const e of state.exhibits){ if(e.viv) continue; out.push({e, t:e}); for(const w of waterOf(e)) out.push({e, t:w, w}); }
+  return out;
+}
+// Corners first (fences before water), then the + in the middle of each edge
 function cornerAt(clientX, clientY){
-  const p = toWorld(clientX, clientY), R = 14 / view.k;
-  for(const e of state.exhibits){
-    if(e.viv) continue;
-    for(let i = 0; i < e.points.length; i++) if(Math.hypot(p.x - e.points[i][0], p.y - e.points[i][1]) < R) return {e, i, type:"v"};
-  }
-  for(const e of state.exhibits){
-    if(e.viv) continue;
-    for(let i = 0; i < e.points.length; i++){ const a = e.points[i], b = e.points[(i + 1) % e.points.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {e, i, type:"m"}; }
+  const p = toWorld(clientX, clientY), R = 14 / view.k, all = reshapeables();
+  for(const s of all) for(let i = 0; i < s.t.points.length; i++) if(Math.hypot(p.x - s.t.points[i][0], p.y - s.t.points[i][1]) < R) return {...s, i, type:"v"};
+  for(const s of all){
+    const P = s.t.points;
+    for(let i = 0; i < P.length; i++){ const a = P[i], b = P[(i + 1) % P.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {...s, i, type:"m"}; }
   }
   return null;
+}
+// Water is priced by area: growing it costs the difference, shrinking it refunds part
+const waterReshapeCost = (w, orig) => waterCost(w.points) - waterCost(orig);
+// A reshape in progress (r.t is the shape being changed: an exhibit, or water inside r.e)
+const rvProblem = r => r.w ? waterProblem(r.w.points, r.e, r.w, waterReshapeCost(r.w, r.orig)) : reshapeProblem(r.e, r.orig);
+function rvStat(r){
+  if(r.w){ const diff = waterReshapeCost(r.w, r.orig); return `${fmtArea(area(r.w.points))} of water. ${diff > 0 ? "Costs " + money(diff) : diff < 0 ? "Refund " + money(Math.round(-diff * COST.refundShare)) : "No change"}`; }
+  const diff = reshapeCost(r.e, r.orig);
+  return `${fmtArea(area(r.e.points))}. ${diff > 0 ? "Extra fence " + money(diff) : diff < 0 ? "Fence refund " + money(Math.round(-diff * COST.refundShare)) : "No change in fence"}`;
+}
+const rvCommit = r => r.w ? commitWaterReshape(r.e, r.w, r.orig) : commitReshape(r.e, r.orig);
+function commitWaterReshape(e, w, orig){
+  const diff = waterReshapeCost(w, orig);
+  if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
+  afterChange(); render();
+  ui.toast(diff > 0 ? `Reshaped the water in ${e.name} for ${money(diff)}.` : diff < 0 ? `Reshaped the water in ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped the water in ${e.name}.`);
 }
 const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
 // Why this exhibit's new outline won't work, or null
@@ -1069,7 +1109,8 @@ function reshapeProblem(e, orig){
   if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A pond or rock would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
   return null;
@@ -1088,12 +1129,12 @@ function commitReshape(e, orig){
   ui.toast(diff > 0 ? `Reshaped ${e.name}. The extra fence cost ${money(diff)}.` : diff < 0 ? `Reshaped ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${e.name}.`);
 }
 function deleteMoveCorner(){
-  const e = mvCorner && findItem("exhibit", mvCorner.id); if(!e) return;
-  if(e.points.length <= 3){ setStat("An exhibit needs at least 3 corners.", true); return; }
-  const orig = e.points.map(p => p.slice()); e.points.splice(mvCorner.i, 1);
-  const why = reshapeProblem(e, orig);
-  if(why){ e.points = orig; setStat(why, true); return; }
-  mvCorner = null; updateMoveBar(); commitReshape(e, orig);
+  const s = mvCorner && reshapeables().find(x => x.t.id === mvCorner.id); if(!s) return;
+  if(s.t.points.length <= 3){ setStat(s.w ? "Water needs at least 3 corners." : "An exhibit needs at least 3 corners.", true); return; }
+  const r = {...s, orig:s.t.points.map(p => p.slice())}; s.t.points.splice(mvCorner.i, 1);
+  const why = rvProblem(r);
+  if(why){ s.t.points = r.orig; setStat(why, true); return; }
+  mvCorner = null; updateMoveBar(); rvCommit(r);
 }
 
 /* ---------- moving the view ---------- */
@@ -1156,9 +1197,9 @@ svg.addEventListener("pointerdown", e => {
   if(tool === "move"){
     const c = cornerAt(e.clientX, e.clientY);
     if(c){
-      const orig = c.e.points.map(p => p.slice());
-      if(c.type === "m"){ const a = orig[c.i], b = orig[(c.i + 1) % orig.length]; c.e.points.splice(c.i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); c.i++; }
-      drag = {rv:{e:c.e, i:c.i, orig, added:c.type === "m"}, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}};
+      const orig = c.t.points.map(p => p.slice());
+      if(c.type === "m"){ const a = orig[c.i], b = orig[(c.i + 1) % orig.length]; c.t.points.splice(c.i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); c.i++; }
+      drag = {rv:{e:c.e, t:c.t, w:c.w, i:c.i, orig, added:c.type === "m"}, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}};
       return;
     }
     const hit = itemAt(e.target), it = moveTarget(hit);
@@ -1202,9 +1243,9 @@ svg.addEventListener("pointermove", e => {
     if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
     drag.moved = true;
     const r = drag.rv, w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
-    r.e.points[r.i] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
-    const why = reshapeProblem(r.e, r.orig), diff = reshapeCost(r.e, r.orig);
-    setStat(why || `${fmtArea(area(r.e.points))}. ${diff > 0 ? "Extra fence " + money(diff) : diff < 0 ? "Fence refund " + money(Math.round(-diff * COST.refundShare)) : "No change in fence"}`, !!why);
+    r.t.points[r.i] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const why = rvProblem(r);
+    setStat(why || rvStat(r), !!why);
     queueRender(); return;
   }
   if(drag.mv){
@@ -1227,12 +1268,12 @@ function endPointer(e){
     const r = d.rv;
     if(!d.moved){
       // a tap on a corner picks it; a tap on a + that just added a corner undoes the addition
-      if(r.added) r.e.points = r.orig; else mvCorner = mvCorner && mvCorner.id === r.e.id && mvCorner.i === r.i ? null : {id:r.e.id, i:r.i};
+      if(r.added) r.t.points = r.orig; else mvCorner = mvCorner && mvCorner.id === r.t.id && mvCorner.i === r.i ? null : {id:r.t.id, i:r.i};
       updateMoveBar(); render(); return;
     }
-    const why = reshapeProblem(r.e, r.orig);
-    if(why){ r.e.points = r.orig; ui.toast(`Couldn't reshape it. ${why}`, "bad"); setStat(""); render(); return; }
-    mvCorner = {id:r.e.id, i:r.i}; updateMoveBar(); setStat(""); commitReshape(r.e, r.orig); return;
+    const why = rvProblem(r);
+    if(why){ r.t.points = r.orig; ui.toast(`Couldn't reshape it. ${why}`, "bad"); setStat(""); render(); return; }
+    mvCorner = {id:r.t.id, i:r.i}; updateMoveBar(); setStat(""); rvCommit(r); return;
   }
   if(d.zv !== undefined){
     const z = zedit && zoneById(zedit.id);
