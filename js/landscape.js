@@ -1,24 +1,34 @@
 /* =====================================================================
    LANDSCAPE
-   Ponds, rocks and groves inside open exhibits (e.land). Animals like
-   some of each, and water lovers get unhappy and sickly without a pond.
+   Water, rocks, groves and shelters inside open exhibits. Water is
+   drawn corner by corner like an exhibit (e.water); the rest are placed
+   with a tap (e.land). Animals like some of each, and water lovers get
+   unhappy and sickly without any water.
    Groves from an animal's own era make it happier and feed part of its
-   diet, and older groves (grown from CERES planting stock) keep old
+   diet, and older groves (plants grown at CERES) keep old
    plant-eaters off the grass. Shelters (and groves, for shade) cover
    animals from the weather, which is rolled here each night.
-   Placing and drawing them lives in map.js, next to the other tools.
+   Placing, drawing and reshaping them lives in map.js, next to the other tools.
    ===================================================================== */
 
 const landKey = t => typeof t === "string" && t.startsWith("land-") ? t.slice(5) : null;
 const landOf = e => e.land || [];
+const waterOf = e => e.water || [];
 const circlePts = (x, y, r, n = 14) => Array.from({length:n}, (_, i) => [x + r * Math.cos(i * 2 * Math.PI / n), y + r * Math.sin(i * 2 * Math.PI / n)]);
-const landRefund = e => Math.round(landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) * COST.refundShare);
+const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
+// What bulldozing gets back for everything inside an exhibit
+const landRefund = e => Math.round((landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) + waterOf(e).reduce((n, w) => n + waterCost(w.points), 0)) * COST.refundShare);
+
+// Mesozoic and Paleozoic plants each use up one plant of their era and size from CERES
+const potKey = t => t.tech && t.size ? t.flora + "-" + t.size : null;
+const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
+const potName = t => `${ERA_LABEL[t.flora]} ${t.size} plants`;
 
 const landM2 = f => Math.PI * LAND[f.type].r ** 2;
 // How much of the exhibit is water, rock, and groves from each era: 0 to 1 each, where 1 satisfies the animals that like it
 function habitatOf(e){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
-  const pond = land.reduce((n, f) => n + (LAND[f.type].water ? landM2(f) : 0), 0);
+  const wet = waterOf(e).reduce((n, w) => n + area(w.points), 0);
   const cover = land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0);
   const grove = {}, groveM2 = {};
   for(const era of Object.keys(FLORA)){
@@ -26,7 +36,7 @@ function habitatOf(e){
     grove[era] = clamp(groveM2[era] / a / HAB.groveFull, 0, 1);
   }
   const old = clamp((groveM2.mesozoic + groveM2.paleozoic) / a / HAB.groveFull, 0, 1);
-  return {pond, pondShare:pond / a, wet:clamp(pond / a / HAB.waterFull, 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
+  return {waterM2:wet, waterShare:wet / a, wet:clamp(wet / a / HAB.waterFull, 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
 }
 // Grass underfoot: a Cenozoic planting, unless enough older groves give the grazers something else to eat
 const grassyFloor = e => (e.flora || "cenozoic") === "cenozoic" && habitatOf(e).old < 1;
@@ -37,7 +47,7 @@ function browseRate(e, t){
 }
 // How much of today's eating the groves cover, capped so keepers still bring the rest
 const browseShare = (e, t, need) => need > 0 ? Math.min(HAB.browseMax, browseRate(e, t) / need) : 0;
-// A water lover with no pond to drink from or wade in
+// A water lover with no water to drink from or wade in
 const thirsty = (e, s) => !e.viv && likesOf(s).water >= HAB.wantsWater && habitatOf(e).wet === 0;
 
 /* ---------- weather and shelter ---------- */
@@ -83,10 +93,10 @@ function habitatScore(e){
     if(thirsty(e, s)) dry.push(s.name);
   }
   sat /= n || 1;
-  if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.join(", ")} ${dry.length === 1 ? "needs" : "need"} water. Add a pond.`}); }
+  if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.join(", ")} ${dry.length === 1 ? "needs" : "need"} water. Draw some in the exhibit.`}); }
   if(sat > 0){
     out.delta += HAB.bonus * sat;
-    out.issues.push({bad:false, text:sat >= .6 ? "Ponds and rocks make it feel like home." : "Some ponds and rocks. More would make them feel more at home."});
+    out.issues.push({bad:false, text:sat >= .6 ? "Water and rocks make it feel like home." : "Some water and rocks. More would make them feel more at home."});
   }
   // groves from the animals' own era
   let home = 0;
@@ -103,14 +113,47 @@ function habitatScore(e){
   return out;
 }
 
-// Why a pond or rock can't go at (x, y) in this exhibit, or null
+/* ---------- water ---------- */
+// Every corner, and points along every shore, sit inside the fence with room to spare, and no fence corner pokes into the water
+function insideFence(pts, fence, m){
+  for(let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!deepInside(x, y, fence, m)) return false; }
+  }
+  return !fence.some(p => inPoly(p[0], p[1], pts));
+}
+// The open exhibit a new body of water starts in
+const waterHost = pts => pts.length ? state.exhibits.find(e => !e.viv && inPoly(pts[0][0], pts[0][1], e.points)) || null : null;
+// Why this water shape won't work in exhibit e, or null. skip is the water being reshaped; cost is what it would cost now.
+function waterProblem(pts, e, skip, cost){
+  if(pts.length < 3) return "Needs at least 3 corners.";
+  if(!e) return "Start it inside an open exhibit.";
+  if(selfCrosses(pts)) return "The shore crosses itself.";
+  if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";
+  if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
+  if(waterOf(e).some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
+  if(landOf(e).some(f => LAND[f.type] && shapesOverlap(circlePts(f.x, f.y, LAND[f.type].r), pts))) return "It overlaps a rock, grove or shelter.";
+  if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
+  if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
+  if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
+  return null;
+}
+function addWater(e, pts){
+  spend(waterCost(pts), "built");
+  (e.water = e.water || []).push({id:uid("w-"), points:pts});
+}
+const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(e)) if(w.id === id) return {e, w}; return null; };
+
+/* ---------- rocks, groves and shelters ---------- */
+// Why a rock, grove or shelter can't go at (x, y) in this exhibit, or null
 function landProblem(e, key, x, y){
   const t = LAND[key];
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
-  if(t.stock && (state.ceres.plants[t.flora] || 0) < t.stock) return `Needs a batch of ${FLORA[t.flora].label} planting stock from CERES, which has ${+(state.ceres.plants[t.flora] || 0).toFixed(2)}.`;
+  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
   if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < t.r + LAND[f.type].r)) return "It overlaps something already there.";
   const pts = circlePts(x, y, t.r);
+  if(waterOf(e).some(w => shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts))) return "It's in the water.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && Math.hypot(e.gate[0] - x, e.gate[1] - y) < t.r + 3) return "Keep clear of the gate.";
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
@@ -126,7 +169,7 @@ function landSpot(x, y, key){
 function placeLand(e, key, x, y){
   const t = LAND[key];
   spend(t.price, "built");
-  if(t.stock) state.ceres.plants[t.flora] -= t.stock;
+  if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
   (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
 }
 
@@ -144,14 +187,20 @@ function blobPath(x, y, r, seed, sharp){
   return d + "Z";
 }
 
-// SVG for one exhibit's ponds and rocks. When bulldozing they can be picked out one by one.
+// SVG for one exhibit's water, rocks, groves and shelters. When bulldozing they can be picked out one by one.
 function landSvg(e, pick, isDead){
   let s = "";
+  const at = (kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(id)}" style="cursor:pointer"` : ` pointer-events="none"`;
+  for(const w of waterOf(e)){
+    const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+    s += `<g${at("water", w.id)}><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="${dead ? "var(--bad)" : "#2F6F9F"}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    s += `<polygon points="${pts}" fill="none" stroke="#7DB6DD" stroke-opacity=".7" stroke-width="2.5" stroke-linejoin="round" transform="translate(${centroid(w.points).map(c => c * .12).join(" ")}) scale(.88)"/></g>`;
+  }
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
-    const dead = pick && isDead(f.id), at = pick ? ` data-kind="land" data-id="${esc(f.id)}" style="cursor:pointer"` : ` pointer-events="none"`;
-    const edge = dead ? "var(--bad)" : t.water ? "#2F6F9F" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
-    s += `<g${at}>`;
+    const dead = pick && isDead("land", f.id);
+    const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
+    s += `<g${at("land", f.id)}>`;
     if(t.slots){
       // a square roof with a ridge
       const h = t.r * .78;
@@ -163,14 +212,11 @@ function landSvg(e, pick, isDead){
       if(t.r > 3) clump.push([(rnd() - .5) * .9, (rnd() - .5) * .9, .4]);
       clump.forEach(([dx, dy, k], i) => s += `<path d="${blobPath(f.x + (dx + (rnd() - .5) * .2) * t.r, f.y + (dy + (rnd() - .5) * .2) * t.r, t.r * k, sd + i * 101)}" fill="${t.color}" fill-opacity=".9" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`);
       s += `<path d="${blobPath(f.x - t.r * .15, f.y - t.r * .1, t.r * .2, sd + 7)}" fill="#fff" fill-opacity=".18"/>`;
-    } else if(!t.water){
+    } else {
       // a lumpy rock with a light and a dark face
       const sd = seedOf(f);
       s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" fill-opacity=".95" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       s += `<path d="${blobPath(f.x - t.r * .3, f.y - t.r * .25, t.r * .45, sd + 3, true)}" fill="#B7BBB2" fill-opacity=".6"/><path d="${blobPath(f.x + t.r * .35, f.y + t.r * .3, t.r * .35, sd + 5, true)}" fill="#5F635D" fill-opacity=".6"/>`;
-    } else {
-      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="#4C93C9" fill-opacity=".8" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
-      s += `<circle cx="${f.x - t.r * .2}" cy="${f.y - t.r * .2}" r="${t.r * .5}" fill="#7DB6DD" fill-opacity=".5"/>`;
     }
     s += `</g>`;
   }
