@@ -725,8 +725,9 @@ const FEED_GOODS = ["plants", "meat", "fish", "insects"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
 const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS);   // what the dock buys
 const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
-// Units of guest goods a day each guest gets through, for ordering before there's a day of sales to go on
-const GUEST_USE = {snacks:2.5, drinks:.8, merch:2};
+// Units of guest goods a day each guest gets through when the shelves stay full. Ordering never plans for less,
+// because a day of empty shelves sells little and would otherwise shrink the next order.
+const GUEST_USE = {snacks:1, drinks:.7, merch:1.5};
 const GUEST_GOODS_FROM = 7;   // new parks: suppliers deliver straight to stands and shops until this day
 const LOGI = {
   hubDays:1.5,         // a station keeps this many days of its zone's food on hand
@@ -740,6 +741,7 @@ const LOGI = {
   rushMarkup:1.75,     // a rush order costs this much
   rushLot:50,          // units in a rush order
   autoDays:2,          // auto-ordering keeps the dock stocked with this many days of the park's food
+  truckMin:120,        // while the park is open, a supply truck tops up each dock this often
   coldPower:25,        // kW a cold store draws
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
 };
@@ -756,8 +758,8 @@ BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph
                        store:{cap:400, holds:["meat", "fish", "meds", "snacks"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
-                  store:{cap:600, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
-                  full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops overnight. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
+                  store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
+                  full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops. Trucks come overnight and every two hours while the park is open. They need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
 for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
 // Food stands and gift shops keep their own stock

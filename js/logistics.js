@@ -6,7 +6,7 @@
    Nobody draws supply lines. They appear from what keepers actually haul.
    ===================================================================== */
 
-function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, guestFrom:GUEST_GOODS_FROM}; }
+function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, guestFrom:GUEST_GOODS_FROM, trucks:0}; }
 // Keepers carry food from stations to exhibits; custodians stock every store (animal food, medicine, stand and shop goods)
 const KEEPER_GOODS = FEED_GOODS.concat(["meds"]);
 const isGuestGood = t => GUEST_GOODS.includes(t);
@@ -100,12 +100,12 @@ function foodDemand(e, t){
 }
 const zoneDemand = (zid, t) => state.exhibits.reduce((s, e) => s + ((e.zone || null) === zid ? foodDemand(e, t) : 0), 0);
 const parkDemand = t => state.exhibits.reduce((s, e) => s + foodDemand(e, t), 0);
-// Guest goods the park gets through in a day: yesterday's sales, or a guess from the crowd before there are any
+// Guest goods the park gets through in a day: yesterday's sales, but never less than the crowd would buy.
+// Sales alone undercount: shelves that ran dry sold less, and ordering only that much kept them dry.
 function guestDemand(t){
   const last = (state.logi.usedLast || {})[t] || 0;
-  if(last) return last;
   const sold = state.buildings.some(b => isVendor(b) && menuOf(b).some(m => MENU[m.id].good === t));
-  return sold ? Math.ceil((derived ? derived.demand : 0) * GUEST_USE[t]) : 0;
+  return Math.max(last, sold ? Math.ceil((derived ? derived.demand : 0) * GUEST_USE[t]) : 0);
 }
 const demandOf = t => isGuestGood(t) ? guestDemand(t) : parkDemand(t);
 const parkProduction = t => state.buildings.reduce((s, b) => s + (isReachable(b) && BUILDINGS[b.type].makes ? BUILDINGS[b.type].makes[t] || 0 : 0), 0);
@@ -186,7 +186,10 @@ function supplyLines(){
 /* ---------- through the day and night ---------- */
 
 // Farms and ranches fill their own stores through the day. A full store stops production.
+// Supply trucks also top up the docks every couple of hours while the park is open.
 function logiTick(dtMin){
+  const due = Math.floor((state.minute - OPEN_MIN) / LOGI.truckMin);
+  if(due > (state.logi.trucks || 0)){ state.logi.trucks = due; if(state.minute < CLOSE_MIN) dockDelivery(true); }
   if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until day ${state.logi.guestFrom}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
   const share = dtMin / (CLOSE_MIN - OPEN_MIN);
@@ -207,8 +210,8 @@ function dockOrders(b){
   return out;
 }
 function dockTotals(){ const o = {}; for(const b of state.buildings) if(b.type === "dock") for(const [t, n] of Object.entries(dockOrders(b))) o[t] = (o[t] || 0) + n; return o; }
-// Overnight delivery: top up each dock to its order. Partner parks pay while they're still feeding.
-function dockDelivery(){
+// A delivery: top up each dock to its order. Partner parks pay while they're still feeding. Daytime trucks don't announce themselves.
+function dockDelivery(quiet){
   let spent = 0, units = 0;
   for(const b of state.buildings){
     if(b.type !== "dock" || !isReachable(b)) continue;
@@ -226,7 +229,7 @@ function dockDelivery(){
       if(price){ spend(Math.round(n * price), isGuestGood(t) ? "supplies" : "feed"); spent += n * price; }
     }
   }
-  if(units) events.toast(`The dock took in ${units} units of food and stock${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
+  if(units && !quiet) events.toast(`The dock took in ${units} units of food and stock${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
 }
 function rushOrder(b, t){
   const price = Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup);
@@ -264,7 +267,7 @@ const MED_UNIT_VALUE = 60;
 function logiNight(){
   spoilNight();
   dockDelivery();
-  state.logi.last = state.logi.flow; state.logi.flow = {};
+  state.logi.last = state.logi.flow; state.logi.flow = {}; state.logi.trucks = 0;
   state.logi.usedLast = state.logi.used || {}; state.logi.used = {};
 }
 

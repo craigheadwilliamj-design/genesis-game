@@ -500,6 +500,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.custodianSweeps = work(900, () => !state.litter[lk]);
     // the dock orders stock for stands and shops too
     out.dockOrdersStock = dockOrders({type:"dock"}).drinks > 0;
+    // a day of empty shelves sells little, but the order still covers the crowd
+    const ul = state.logi.usedLast; state.logi.usedLast = {drinks:1};
+    out.demandNotStarved = guestDemand("drinks") >= Math.ceil(derived.demand * GUEST_USE.drinks) && guestDemand("drinks") > 1;
+    state.logi.usedLast = ul;
+    // supply trucks top up the dock while the park is open
+    const tdk = {id:"b-tdk", type:"dock", points:rectPts(196, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
+    const tm = state.minute; state.minute = OPEN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
+    out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
+    state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
     state.staff.custodians = []; syncCustodians();
 
     // vandalism: a rowdy, unhappy party breaks the bench beside it, and a broken bench seats nobody
