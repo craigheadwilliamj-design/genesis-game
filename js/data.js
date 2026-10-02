@@ -388,6 +388,7 @@ const KEEPER = {
   tirePerMeter:.03,    // stamina lost per meter walked
   tirePerDelivery:2,   // stamina lost loading or unloading
   restBelow:25,        // keepers take a break when stamina drops under this
+  topUpBelow:.6,       // keepers only set out to feed an exhibit once its food drops under this share of a full store
   restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)
 };
 const FOOD_UNIT_COST = 20;   // one food unit per $20 of an animal's daily food cost
@@ -503,7 +504,7 @@ const CLEAN = {
   messRate:.3,         // how fast animals make a mess (bigger animals make more)
   dietMess:{carnivore:1.3, piscivore:1.2, omnivore:1.1, herbivore:1, insectivore:.6},   // meat scraps are the worst
   dirtyAt:35,          // keepers go clean an exhibit this dirty before routine feeding
-  tidyAbove:2,         // a keeper with nothing else to do cleans any exhibit dirtier than this
+  tidyAbove:15,        // a keeper with nothing else to do cleans any exhibit dirtier than this (a smaller mess is not worth the walk)
   penaltyFrom:40,      // animals start getting unhappy above this much dirt
   penaltyPer:.6,       // happiness lost per point of dirt above that
   handRate:1.2,        // cleaning speed with shovels (slower in bigger exhibits)
