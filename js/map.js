@@ -347,7 +347,7 @@ function renderOverlay(){
 function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k})`); }
 
 /* ---------- animals wandering in their exhibits ---------- */
-const herd = new Map();   // animal id -> {el, x, y, tx, ty, wait, spd, exhibitId}
+const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
@@ -362,7 +362,7 @@ function syncAnimals(){
         const [x, y] = randomInside(e.points);
         const el = document.createElementNS("http://www.w3.org/2000/svg", "g");
         el.setAttribute("pointer-events", "none");
-        h = {el, x, y, tx:x, ty:y, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp};
+        h = {el, x, y, path:null, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp};
         herd.set(a.id, h);
         animalLayer.appendChild(el);
       }
@@ -379,12 +379,78 @@ function syncAnimals(){
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
 }
 
+// Can an animal walk straight from a to b without touching the fence? Samples the line, since L and U shaped exhibits cut corners.
+function walkClear(a, b, pts){
+  for(let i = 0; i < pts.length; i++) if(segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
+  const n = Math.max(2, Math.ceil(dist(a, b) / 1.5));
+  for(let i = 0; i <= n; i++){ const t = i/n; if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false; }
+  return true;
+}
+
+// Every corner nudged a little way inward, so a route can bend around the inside corners of an irregular exhibit
+const walkNodeCache = new Map();
+function walkNodes(pts){
+  const key = JSON.stringify(pts); let nodes = walkNodeCache.get(key);
+  if(nodes) return nodes;
+  nodes = [];
+  const n = pts.length, c = centroid(pts);
+  for(let i = 0; i < n; i++){
+    const p = pts[i], a = pts[(i+n-1) % n], b = pts[(i+1) % n];
+    const u = [(a[0]-p[0])/(dist(a,p)||1), (a[1]-p[1])/(dist(a,p)||1)], v = [(b[0]-p[0])/(dist(b,p)||1), (b[1]-p[1])/(dist(b,p)||1)];
+    let bx = u[0] + v[0], by = u[1] + v[1], L = Math.hypot(bx, by);
+    if(L < 1e-6){ bx = -u[1]; by = u[0]; L = 1; }
+    bx /= L; by /= L;
+    for(const m of [1, 2.5]){   // bisector of the two edges, flipped if it points outside
+      let q = [p[0] + bx*m, p[1] + by*m];
+      if(!inPoly(q[0], q[1], pts)) q = [p[0] - bx*m, p[1] - by*m];
+      if(inPoly(q[0], q[1], pts) && distToEdge(q[0], q[1], pts) > .3){ nodes.push(q); break; }
+    }
+  }
+  if(walkNodeCache.size > 60) walkNodeCache.clear();
+  walkNodeCache.set(key, nodes);
+  return nodes;
+}
+
+// Waypoints from a to b that stay inside the exhibit, or null if there's no way
+function walkRoute(a, b, pts){
+  if(walkClear(a, b, pts)) return [b];
+  const nodes = walkNodes(pts), pos = [a, ...nodes, b], N = pos.length, d = new Array(N).fill(Infinity), prev = new Array(N).fill(-1), done = new Array(N).fill(false);
+  d[0] = 0;
+  for(;;){
+    let u = -1; for(let i = 0; i < N; i++) if(!done[i] && d[i] < Infinity && (u < 0 || d[i] < d[u])) u = i;
+    if(u < 0) return null;
+    if(u === N-1) break;
+    done[u] = true;
+    for(let v = 1; v < N; v++){
+      if(done[v]) continue;
+      const w = dist(pos[u], pos[v]); if(d[u] + w >= d[v] || !walkClear(pos[u], pos[v], pts)) continue;
+      d[v] = d[u] + w; prev[v] = u;
+    }
+  }
+  const out = []; for(let i = N-1; i > 0; i = prev[i]) out.unshift(pos[i]);
+  return out;
+}
+
+// Pick a new spot to walk to and the route there; an animal that finds none just stays put
+function animalWander(h, e){
+  h.key = JSON.stringify(e.points); h.path = [];
+  if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
+  for(let i = 0; i < 6; i++){
+    const [x, y] = randomInside(e.points);
+    if(distToEdge(x, y, e.points) < .5) continue;
+    const r = walkRoute([h.x, h.y], [x, y], e.points);
+    if(r){ h.path = r; return; }
+  }
+}
+
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
     if(h.wait > 0){ h.wait -= dt; continue; }
-    const dx = h.tx - h.x, dy = h.ty - h.y, d = Math.hypot(dx, dy);
-    if(d < .3){ h.wait = 1 + Math.random()*4; [h.tx, h.ty] = randomInside(e.points); continue; }
+    if(!h.path || h.key !== JSON.stringify(e.points)) animalWander(h, e);   // new animal, or the exhibit was reshaped
+    if(!h.path.length){ h.wait = 1 + Math.random()*3; h.path = null; continue; }
+    const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
+    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = 1 + Math.random()*4; h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * dt);
     h.x += dx/d * step; h.y += dy/d * step;
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
@@ -1143,7 +1209,7 @@ function dropMove(m){
   const why = moveProblem(m.kind, m.it);
   if(why || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(why) ui.toast(`Couldn't move it. ${why}`, "bad"); setStat(""); render(); return; }
   if(m.kind === "exhibit"){
-    for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.tx += m.dx; h.ty += m.dy; }
+    for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.path = null; }
   }
   afterChange(); render();
   const it = m.it, reach = m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it);
