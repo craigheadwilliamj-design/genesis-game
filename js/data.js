@@ -211,6 +211,9 @@ const BUILDINGS = {
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true},
+  sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true},
+  // guests learn about prehistoric life here
+  edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:16, d:12, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:15000, upkeep:150, w:24, d:16, dept:true,
@@ -324,6 +327,9 @@ const THOUGHTS = {
   graffiti:   {text:"Someone has spray-painted everything."},
   broken:     {text:"The benches here are all broken."},
   safe:       {text:"Seeing guards around made me feel safe.", good:true},
+  noInfo:     {text:"I wish there were signs telling us about the animals."},
+  priceyEdu:  {text:"The Education Center costs too much to get in."},
+  learned:    {text:"I learned so much about prehistoric life!", good:true},
   wow:        {text:"The animals were amazing!", good:true},
   fed:        {text:"That hit the spot.", good:true},
 };
@@ -404,6 +410,26 @@ const VANDAL = {
   lampCut:.5,          // a working lamp nearby multiplies it by this
   lampReach:15,
   repairShare:.005,    // mechanics' parts cost this share of a prop's price for each point repaired
+};
+// Guests learn about the animals from info signs, field guides, and the Education Center
+const EDU = {
+  see:2,               // learning from seeing an exhibit (0 to 100 per guest)
+  sign:8,              // more if an info sign stands by its fence, plus a quarter more for each species inside
+  signReach:20,        // a sign this close to an exhibit's fence tells guests about it
+  guide:10,            // learning from buying a field guide
+  guideBoost:1.5,      // and guests with one learn this much more at every exhibit after
+  center:35,           // learning from a visit to the Education Center
+  centerJoy:12,        // and the mood it adds
+  centerAppeal:25,     // how keen guests are to visit it, next to an exhibit's appeal
+  centerFee:5,         // usual entry price: everyone pays this, nobody pays double
+  joy:.08,             // mood gained for each point learned
+  litterCut:.4,        // at 100 learning, guests drop litter this much less
+  vandalCut:.6,        // and vandalize this much less
+  shopBoost:.3,        // and are this much keener in gift shops (double for plushes and field guides)
+  donate:4,            // a guest who learned everything drops this in the donation box on the way out
+  full:40,             // average learning that gets full marks in the rating
+  learned:40,          // guests who learned this much say so
+  noInfo:3,            // exhibits seen without a sign before guests complain
 };
 // Security guards patrol the paths, put vandals off, and throw out the ones they catch
 const SECURITY = {
@@ -622,6 +648,7 @@ const TECH = [
   {id:"aviary",   label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
   {id:"moat",     label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
+  {id:"education", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
   {id:"cameras",  label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"paleoflora", label:"Paleoflora",       points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass."},

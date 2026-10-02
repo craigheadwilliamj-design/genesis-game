@@ -35,7 +35,9 @@ function onCamera(x, y){
 function vandalTick(p, dt){
   if(!p.rowdy || p.home || p.in || !p.at || p.mood >= VANDAL.moodBelow) return;
   const grumpy = Math.min(2.5, (VANDAL.moodBelow - p.mood) / 30);
-  const chance = 1 - Math.pow(1 - Math.min(.5, VANDAL.rate * grumpy * deterrence(p.at.x, p.at.y)), dt);
+  // guests who've learned about the place are less likely to wreck it
+  const calm = 1 - EDU.vandalCut * (p.edu || 0) / 100;
+  const chance = 1 - Math.pow(1 - Math.min(.5, VANDAL.rate * grumpy * calm * deterrence(p.at.x, p.at.y)), dt);
   if(Math.random() < chance) vandalize(p);
 }
 // Pick something nearby and damage it. Returns what was hit, or null if there's nothing to hit.

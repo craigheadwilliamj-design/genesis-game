@@ -17,7 +17,7 @@ let nextSize = 1;          // how many are in the next party through the gate
 const guestCount = () => parties.reduce((s, p) => s + p.n, 0);
 const guestBuilding = b => !!(BUILDINGS[b.type].serves || BUILDINGS[b.type].kind);
 const NO_THOUGHT = {hunger:"noFood", thirst:"noDrink", bladder:"noRestroom", energy:"noSeat"};
-function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, vandal:freshVandalLog(), last:{thoughts:{}, guests:0}}; }
+function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, edu:null, vandal:freshVandalLog(), last:{thoughts:{}, guests:0}}; }
 
 /* ---------- the guests' map of footpaths ---------- */
 
@@ -124,6 +124,8 @@ function guestsArrive(n){
   p.n += n; p.cash += n * rand(...GUEST.cash);
 }
 function thinks(p, k){ p.thought.add(k); }
+// A party learns something. Learning is per guest, 0 to 100, and cheers them up as it comes.
+function learn(p, n){ const g = clamp(n, 0, 100 - (p.edu || 0)); p.edu = (p.edu || 0) + g; p.mood += g * EDU.joy; }
 // A party walks out of the gate. How it feels now counts toward the day's guest comfort.
 function partyLeaves(p){
   if(p.gone) return;
@@ -131,8 +133,12 @@ function partyLeaves(p){
   leaveQueue(p);
   // going home still hungry, thirsty, or needing the restroom spoils the day
   for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) p.mood -= GUEST.leftWanting * o / (100 - d.seek); }
-  const t = state.today, L = state.guestLog;
+  const t = state.today, L = state.guestLog, edu = p.edu || 0;
   t.moodSum += clamp(p.mood, 0, 100) * p.n; t.moodN += p.n;
+  t.eduSum += edu * p.n; t.eduN += p.n;
+  if(edu >= EDU.learned) thinks(p, "learned");
+  // guests who learned something drop a little in the donation box
+  if(edu > 0) earn(p.n * EDU.donate * edu / 100, "donations");
   L.guests += p.n;
   for(const k of p.thought) L.thoughts[k] = (L.thoughts[k] || 0) + p.n;
 }
@@ -179,17 +185,24 @@ function exhibitAppeal(e){
   for(const [sp, c] of speciesCounts(e)) a += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100);
   return a * viewFactor(e, derived.reach);
 }
-// Pick an exhibit not seen yet: popular ones, and close ones, are likelier
+// Pick an exhibit not seen yet, or the Education Center if it hasn't been: popular ones, and close ones, are likelier
 function pickSight(p){
   let tot = 0;
   const opts = [];
-  for(const e of state.exhibits){
-    if(p.seen.has(e.id) || !e.animals.length || !gGraph.anchors[e.id]) continue;
-    const f = guestField(e.id), d = f && f.dist.get(p.at);
-    if(d === undefined) continue;
-    const w = (exhibitAppeal(e) + 1) / (1 + d / 60);
-    opts.push([e, w]); tot += w;
-  }
+  const add = (x, appeal) => {
+    const f = guestField(x.id), d = f && f.dist.get(p.at);
+    if(d === undefined) return;
+    const w = (appeal + 1) / (1 + d / 60);
+    opts.push([x, w]); tot += w;
+  };
+  for(const e of state.exhibits) if(!p.seen.has(e.id) && e.animals.length && gGraph.anchors[e.id]) add(e, exhibitAppeal(e));
+  // the Education Center, once, if there's time left for the walk and the visit (and they didn't just give up on its line)
+  if(!p.learnt && (p.cool.see || 0) <= state.minute)
+    for(const b of state.buildings){
+      if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
+      const home = (guestField("gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
+      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal);
+    }
   let r = Math.random() * tot;
   for(const [e, w] of opts){ r -= w; if(r <= 0) return e; }
   return null;
@@ -262,7 +275,13 @@ function seeExhibit(p, e){
   p.mood += GUEST.seeGain * a / (a + 15);
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
   if(a >= 30) thinks(p, "wow");
+  // what they learn: a little from looking, a lot more with an info sign to read, and more again with a field guide
+  const sign = hasSign(e);
+  learn(p, (EDU.see + (sign ? EDU.sign * (1 + speciesCounts(e).size * .25) : 0)) * (p.guide ? EDU.guideBoost : 1));
+  if(!sign && (p.noSign = (p.noSign || 0) + 1) >= EDU.noInfo) thinks(p, "noInfo");
 }
+// Is there a working info sign by this exhibit's fence?
+const hasSign = e => state.buildings.some(b => b.type === "sign" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= EDU.signReach);
 // Minutes this party needs to walk to a stop from where it is
 function walkMins(p, id){
   const f = p.at && guestField(id), d = f && f.dist.get(p.at);
@@ -289,13 +308,13 @@ function serviceTick(dt, now){
     if(!b || !gGraph.anchors[id]){ for(const p of q.queue.concat(q.busy)){ p.in = null; p.dest = null; p.why = null; } svcQ.delete(id); continue; }
     const t = BUILDINGS[b.type];
     // finish whoever's done, and start the next in line in the free spot
-    q.busy.sort((a, c) => a.done - c.done);
-    while(q.busy.length && q.busy[0].done <= now){
-      const p = q.busy.shift(), at = p.done;
+    q.busy.sort((a, c) => a.readyAt - c.readyAt);
+    while(q.busy.length && q.busy[0].readyAt <= now){
+      const p = q.busy.shift(), at = p.readyAt;
       serveParty(p, b);
-      if(q.queue.length){ const n = q.queue.shift(); n.done = at + t.serveMin; q.busy.push(n); q.busy.sort((a, c) => a.done - c.done); }
+      if(q.queue.length){ const n = q.queue.shift(); n.readyAt = at + t.serveMin; q.busy.push(n); q.busy.sort((a, c) => a.readyAt - c.readyAt); }
     }
-    while(q.busy.length < t.slots && q.queue.length){ const n = q.queue.shift(); n.done = now + t.serveMin; q.busy.push(n); }
+    while(q.busy.length < t.slots && q.queue.length){ const n = q.queue.shift(); n.readyAt = now + t.serveMin; q.busy.push(n); }
     for(const p of [...q.queue]){
       p.waited += dt;
       if(p.waited > (t.patience ?? GUEST.patience)){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }
@@ -362,6 +381,7 @@ function flushParties(){
 function guestsNight(){
   const t = state.today, L = state.guestLog;
   if(t.moodN) L.mood = t.moodSum / t.moodN;
+  if(t.eduN) L.edu = t.eduSum / t.eduN;
   L.last = {thoughts:L.thoughts, guests:L.guests, vandal:L.vandal};
   L.thoughts = {}; L.guests = 0; L.vandal = freshVandalLog();
 }

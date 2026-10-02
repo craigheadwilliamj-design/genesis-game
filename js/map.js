@@ -25,7 +25,7 @@ const FAMILIES = {
   viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
-  props:{tools:["bin", "bench", "picnic", "lamp"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "sign"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin"};
@@ -164,6 +164,7 @@ function render(){
       if(bl.type === "bin" || bl.type === "lamp") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
+      if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       s += `</g>`;
       continue;

@@ -29,7 +29,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, supplies:0, cleaning:0, medicine:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
   return {
@@ -119,6 +119,7 @@ function upgradeSave(s){
   if(!s.zones) s.zones = [];
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
+  if(s.guestLog.edu === undefined) s.guestLog.edu = null;
   // parks from before litter and seats get told what changed
   if(!s.litter){ s.litter = {}; if(s.buildings.some(b => OLD_MENUS[b.type] || b.type === "restroom")) s.guestLog.notice = true; }
   // food stands and gift shops from before menus keep selling what they used to
@@ -315,22 +316,27 @@ function recompute(){
   const comfortNote = mood == null ? `Food ${Math.round(foodCover*100)}%, restrooms ${Math.round(restCover*100)}% of what your guests need.`
     : `Guests leave ${Math.round(mood)}% happy. ${GUEST.goodMood}% gets full marks.${gripe ? ` ${Math.round(gripe.share * 100)}% say "${gripe.text}"` : ""}`;
   const avgHappy = animals ? happySum / animals : 0;
-  // Stars come from four things: happy animals, looked-after guests, variety, and how much there is to see.
+  // Stars come from five things: happy animals, looked-after guests, variety, how much there is to see, and what guests learn.
   // Each part is scored 0 to 1. Animals count as fully happy at 90% or more.
   const welfare = clamp((avgHappy - 30) / 60, 0, 1);
   const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / 150);
+  // what guests learned: today's leavers once enough have gone home, otherwise yesterday's
+  const learnt = t.eduN >= 20 ? t.eduSum / t.eduN : state.guestLog.edu, education = learnt == null ? 0 : Math.min(1, learnt / EDU.full);
+  const eduNote = learnt == null ? "Nobody has left yet. Info signs by exhibits, field guides, and an Education Center teach guests."
+    : `Guests leave having learned ${Math.round(learnt)} on average. ${EDU.full} gets full marks.${learnt < EDU.full ? " Put info signs by your exhibits, sell field guides, or build an Education Center." : ""}`;
   const parts = animals ? [
     {label:"Animal happiness", score:welfare,              max:1.25, note:`${Math.round(avgHappy)}% average. 90% counts as full marks.`},
     {label:"Guest comfort",    score:comfort,              max:.75,  note:comfortNote},
-    {label:"Variety",          score:variety,              max:1.5,  note:shown.size >= 10 ? `${shown.size} species on show. Full marks.` : `${shown.size} species on show. 10 gets full marks.`},
-    {label:"Things to see",    score:size,                 max:1.5,  note:"Bigger, happier groups of popular animals."},
+    {label:"Variety",          score:variety,              max:1.25,  note:shown.size >= 10 ? `${shown.size} species on show. Full marks.` : `${shown.size} species on show. 10 gets full marks.`},
+    {label:"Things to see",    score:size,                 max:1.25, note:"Bigger, happier groups of popular animals."},
+    {label:"Education",        score:education,            max:.5,   note:eduNote},
   ] : [];
   let ratingTarget = parts.reduce((s, p) => s + p.score * p.max, 0);
   const pricey = state.ticket > fair * 1.3;
   if(pricey) ratingTarget -= 0.3;
 
   derived = {joined, joinedAll, reach, reports, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
-             comfort, mood, wom, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
+             comfort, mood, wom, learnt, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
   return derived;
 }
 
@@ -583,7 +589,7 @@ function endDay(){
   state.rating = clamp(state.rating + step, 0, 5);
 
   const t = state.today;
-  const income = t.tickets + t.food + t.shop + t.sold + t.rewards;
+  const income = t.tickets + t.food + t.shop + t.sold + t.rewards + t.donations + t.edfees;
   const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning + t.medicine;
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});

@@ -405,7 +405,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // a desperate party gives up on a long queue
     guestsArrive(1); const q = parties[parties.length - 1];
-    svcQ.set("b-r", {queue:[q], busy:[{done:1e9}, {done:1e9}, {done:1e9}, {done:1e9}]}); q.in = "b-r"; q.waited = 0; q.why = "bladder"; q.dest = "b-r";
+    svcQ.set("b-r", {queue:[q], busy:[{readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}]}); q.in = "b-r"; q.waited = 0; q.why = "bladder"; q.dest = "b-r";
     run(GUEST.patience + 2, () => false);
     out.queueGivesUp = !q.in && q.thought.has("queue") && !svcQ.get("b-r").queue.includes(q);
     svcQ.clear();
@@ -520,6 +520,43 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.custodianScrubsGraffiti = work(900, () => !fs4.graffiti);
     state.staff.custodians = []; syncCustodians();
 
+    // education: an info sign by an exhibit teaches far more than looking, unless it's broken
+    resetParties(); state.minute = OPEN_MIN + 60;
+    const g1 = state.exhibits.find(e => e.id === "e-g1"), kid = () => { guestsArrive(2); return parties[parties.length - 1]; };
+    const e0 = kid(); seeExhibit(e0, g1);
+    const sign = {id:"b-sign", type:"sign", points:rectPts(96.9, 170, BUILDINGS.sign.w, BUILDINGS.sign.d, Math.PI / 2)};
+    state.buildings.push(sign); afterChange();
+    const e1 = kid(); seeExhibit(e1, g1);
+    out.signTeaches = e0.edu === EDU.see && Math.abs(e1.edu - (EDU.see + EDU.sign * 1.25)) < 1e-9 && e1.mood > e0.mood;
+    sign.cond = 10; const e2 = kid(); seeExhibit(e2, g1); sign.cond = 100;
+    out.brokenSignTeachesNothing = e2.edu === EDU.see;
+    // a field guide teaches a little, and makes every exhibit after teach more
+    const e3 = kid(); buy(e3, buildingById("b-s"), {id:"guide", price:12}, 1); seeExhibit(e3, g1);
+    out.guideBoosts = e3.guide && Math.abs(e3.edu - (EDU.guide + (EDU.see + EDU.sign * 1.25) * EDU.guideBoost)) < 1e-9;
+    // the Education Center: a sight once everything else is seen, and a fee at the door
+    state.science.tech.push("education");
+    const ed = {id:"b-ed", type:"edcenter", points:rectPts(200, 111.5, BUILDINGS.edcenter.w, BUILDINGS.edcenter.d, 0), fee:4};
+    state.buildings.push(ed); afterChange();
+    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100;
+    out.centerIsSight = !!gGraph.anchors["b-ed"] && pickSight(e4) === ed;
+    const fee0 = state.today.edfees; serveAt(e4, ed, "see");
+    out.centerTeaches = e4.edu === EDU.center && state.today.edfees - fee0 === 8 && ed.served.n === 2;
+    ed.fee = EDU.centerFee * 2; const e5 = kid(); e5.cash = 100; serveAt(e5, ed, "see");
+    out.centerTooDear = !e5.edu && e5.thought.has("priceyEdu");
+    // learned guests litter less
+    const rr5 = Math.random; Math.random = () => LITTER.drop * .8; state.litter = {};
+    const lit = edu => { const x = kid(); x.edu = edu; x.at = nearestGuestNode(300, 200); x.trash = 1; x.trashAt = -999; trashCheck(x); return !x.trash; };
+    out.learnedLitterLess = lit(0) && !lit(100);
+    Math.random = rr5; state.litter = {};
+    // leaving guests donate for what they learned, and it goes into the Education rating
+    const e6 = kid(); e6.edu = 50; const don0 = state.today.donations, n0e = state.today.eduN;
+    partyLeaves(e6);
+    out.donations = Math.abs(state.today.donations - don0 - 2 * EDU.donate * .5) < 1e-9 && state.today.eduN === n0e + 2;
+    state.today.eduSum = 30 * 20; state.today.eduN = 20; recompute();
+    const edPart = derived.parts.find(x => x.label === "Education");
+    out.educationRating = !!edPart && Math.abs(edPart.score - 30 / EDU.full) < 1e-9 && Math.abs(derived.parts.reduce((s, x) => s + x.max, 0) - 5) < 1e-9;
+    state.buildings = state.buildings.filter(b => b !== ed && b !== sign); afterChange(); resetParties();
+
     // lots of guests stay quick to simulate
     state.minute = OPEN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
@@ -537,6 +574,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const up2 = upgradeSave(old2);
     const old3 = JSON.parse(JSON.stringify(state)); delete old3.staff.guards; delete old3.guestLog.vandal;
     const up3 = upgradeSave(old3);
+    const old4 = JSON.parse(JSON.stringify(state)); delete old4.guestLog.edu; delete old4.today.eduSum; delete old4.today.donations;
+    const up4 = upgradeSave(old4);
+    out.oldSaveEducation = up4.guestLog.edu === null && up4.today.eduSum === 0 && up4.today.donations === 0;
     out.oldSaveSecurity = Array.isArray(up3.staff.guards) && up3.guestLog.vandal && up3.guestLog.vandal.acts === 0;
     out.oldSaveGuestGoods = up2.logi.guestFrom === 23 && Array.isArray(up2.staff.custodians) && up2.logi.guestNotice === true;
     out.oldSaveMenus = up.buildings.find(b => b.type === "food").menu.map(m => m.id).join() === "burger,soda" &&

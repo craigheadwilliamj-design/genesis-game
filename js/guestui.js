@@ -14,6 +14,8 @@ function guestsOverviewHtml(){
     ${left != null ? `<dt>Left happy today</dt><dd>${Math.round(left)}%</dd>` : ""}
     ${L.mood != null ? `<dt>Left happy yesterday</dt><dd>${Math.round(L.mood)}%</dd>` : ""}
     ${litterTotal() >= 1 ? `<dt>Litter on the paths</dt><dd>${Math.round(litterTotal())} pieces</dd>` : ""}
+    ${t.eduN ? `<dt>Learned today</dt><dd>${Math.round(t.eduSum / t.eduN)} on average</dd>` : L.edu != null ? `<dt>Learned yesterday</dt><dd>${Math.round(L.edu)} on average</dd>` : ""}
+    ${t.donations + t.edfees >= 1 ? `<dt>Donations and Education Center</dt><dd>${money(Math.round(t.donations + t.edfees))}</dd>` : ""}
     ${vandalLog().acts ? `<dt>Vandalism today</dt><dd>${vandalLog().acts} act${vandalLog().acts === 1 ? "" : "s"}, ${vandalLog().caught} caught</dd>` : ""}
   </dl>`;
   if(derived.wom !== 1) h += `<div class="meta" style="margin-top:4px">Word of mouth is ${derived.wom > 1 ? "bringing in" : "costing you"} about ${Math.round(Math.abs(derived.wom - 1) * 100)}% ${derived.wom > 1 ? "more" : "of your"} guests.</div>`;
@@ -24,7 +26,7 @@ function guestsOverviewHtml(){
   return h;
 }
 
-// A food stand, gift shop, restroom, bin, bench, or picnic area
+// A food stand, gift shop, restroom, Education Center, or anything beside the path
 function guestBuildingHtml(b){
   const t = BUILDINGS[b.type], reach = isReachable(b), q = queueAt(b);
   const served = b.served && b.served.day === state.day ? b.served : {n:0, money:0, items:{}};
@@ -36,16 +38,25 @@ function guestBuildingHtml(b){
     h += `<section><h3>Condition</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(c, broke ? "var(--bad)" : c < 60 ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(c)}%</span></div>`;
     h += `<div class="meta" style="margin-top:4px">${broke ? "Broken by vandals. It doesn't work until a mechanic repairs it." : c < 60 ? "Damaged by vandals. A mechanic will fix it." : "In good shape."}${b.type === "lamp" ? ` Lamps make vandalism within ${VANDAL.lampReach} m half as likely.` : ""}</div></section>`;
   }
+  if(b.type === "sign"){
+    h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+    const [x, y] = centroid(b.points), near = state.exhibits.filter(e => distToEdge(x, y, e.points) <= EDU.signReach);
+    h += `<section><h3>Tells guests about</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}${e.animals.length ? "" : ' <span class="meta">empty</span>'}</li>`).join("")}</ul>` : `<div class="meta">No exhibit within ${EDU.signReach} m. Move it closer to a fence.</div>`}`;
+    h += `<div class="meta" style="margin-top:6px">Guests who stop at an exhibit with a sign learn about its animals, more so with several species inside. Learning makes guests happier, tidier, and more generous.</div></section>`;
+    return h;
+  }
+  if(b.type === "edcenter") h += eduCenterHtml(b, served);
   if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
   if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
     h += `<div class="meta" style="margin-top:4px">Guests with a wrapper or cup throw it in a bin within ${LITTER.binReach} m. ${full ? "This one is full, so trash spills onto the path. " : ""}The night crew empties bins after closing.</div></section>`;
-  } else {
+  } else if(!t.slots) h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+  else {
     h += `<dl class="kv"><dt>${t.seats && !t.kind ? "Sitting here now" : "Serving now"}</dt><dd>${q.busy} of ${t.slots} parties</dd>`;
     if(!t.prop) h += `<dt>Waiting in line</dt><dd>${q.waiting} part${q.waiting === 1 ? "y" : "ies"}</dd>`;
-    h += `<dt>${t.kind === "merch" ? "Bought something today" : t.seats && !t.kind ? "Sat down today" : "Served today"}</dt><dd>${served.n.toLocaleString()} guest${served.n === 1 ? "" : "s"}</dd>`;
-    if(t.kind) h += `<dt>Takings today</dt><dd>${money(served.money)}</dd>`;
+    h += `<dt>${t.kind === "merch" ? "Bought something today" : b.type === "edcenter" ? "Visited today" : t.seats && !t.kind ? "Sat down today" : "Served today"}</dt><dd>${served.n.toLocaleString()} guest${served.n === 1 ? "" : "s"}</dd>`;
+    if(t.kind || b.type === "edcenter") h += `<dt>Takings today</dt><dd>${money(served.money)}</dd>`;
     h += `<dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   }
   if(b.type === "restroom"){
@@ -63,6 +74,14 @@ function guestBuildingHtml(b){
   return h;
 }
 
+// The Education Center: its entry fee, and what guests get from it
+function eduCenterHtml(b){
+  const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
+  let h = `<section><h3>Entry fee</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="eduFee" data-d="-1" aria-label="Lower the fee" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${fee ? money(fee) : "Free"}</b><button class="btn" data-action="eduFee" data-d="1" aria-label="Raise the fee" style="padding:2px 9px">+</button></div>`;
+  h += `<div class="meta" style="margin-top:4px">${fee <= EDU.centerFee ? "Everyone will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual price is ${money(EDU.centerFee)}.</div></section>`;
+  h += `<div class="meta">Guests spend ${BUILDINGS.edcenter.serveMin} minutes here, sitting through a talk and using the restrooms, and come out knowing far more about prehistoric life. Learning makes them happier, tidier, and more generous, and counts toward your rating.</div>`;
+  return h;
+}
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
 // What's on the shelves, and who fills them
 function vendorStockHtml(b){
@@ -131,6 +150,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "fireGuard"){ state.staff.guards = state.staff.guards.filter(m => m.id !== b.dataset.id); syncGuards(); afterChange(); return; }
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
+  if(a === "eduFee" && it && it.type === "edcenter"){ it.fee = clamp((it.fee || 0) + (+b.dataset.d), 0, EDU.centerFee * 4); ui.panel(); saveSoon(); return; }
   if(!it || sel.kind !== "building" || !isVendor(it)) return;
   if(a === "menuAdd"){ const why = addToMenu(it, b.dataset.id); if(why) ui.toast(why, "bad"); }
   else if(a === "menuDrop") dropFromMenu(it, b.dataset.id);
