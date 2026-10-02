@@ -618,6 +618,40 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldSaveMenus = up.buildings.find(b => b.type === "food").menu.map(m => m.id).join() === "burger,soda" &&
       up.buildings.find(b => b.type === "shop").menu.map(m => m.id).join() === "plush,tshirt,map" && !!up.litter && up.guestLog.notice === true;
     resetParties();
+
+    // build sidebar and the Move tool
+    out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="campground"]') && !!document.querySelector('[data-fence="concrete"]');
+    out.fencePrice = exhibitCost([[0,0],[40,0],[40,40],[0,40]], "bars") - exhibitCost([[0,0],[40,0],[40,40],[0,40]]) === Math.round(160 * BARRIERS.bars.perMeter);
+    {
+      const ex = {id:"e-mv", name:"Mv", points:[[200,200],[240,200],[240,240],[200,240]], animals:[], happy:70, cond:100, gate:[220,200]};
+      const keep = [state.exhibits, state.buildings, state.paths];
+      state.exhibits = [ex]; state.buildings = []; state.paths = [];
+      const m = startMove(ex, "exhibit", {clientX:0, clientY:0});
+      moveBy(m, 10, 20);
+      out.moveShifts = ex.points[0][0] === 210 && ex.points[0][1] === 220 && ex.gate[0] === 230 && ex.gate[1] === 220 && !moveProblem("exhibit", ex);
+      moveBy(m, 5000, 0);
+      out.moveBlocked = !!moveProblem("exhibit", ex);
+      moveBy(m, 0, 0);
+      out.moveRestores = ex.points[0][0] === 200 && ex.gate[1] === 200;
+      [state.exhibits, state.buildings, state.paths] = keep;
+    }
+    {
+      const ex = {id:"e-rs", name:"Rs", points:[[200,200],[240,200],[240,240],[200,240]], animals:[], happy:70, cond:100, gate:[220,200]};
+      const keep = [state.exhibits, state.buildings, state.paths], money0 = state.money;
+      state.exhibits = [ex]; state.buildings = []; state.paths = [];
+      const orig = ex.points.map(p => p.slice());
+      ex.points[2] = [260, 260];
+      out.reshapeOk = !reshapeProblem(ex, orig) && reshapeCost(ex, orig) > 0;
+      commitReshape(ex, orig);
+      out.reshapePaid = state.money < money0;
+      const o2 = ex.points.map(p => p.slice()); ex.points[2] = [200, 200];
+      out.reshapeCrossBlocked = !!reshapeProblem(ex, o2);
+      ex.points = o2;
+      mvCorner = {id:"e-rs", i:3}; state.exhibits = [ex]; deleteMoveCorner();
+      out.cornerDeleted = ex.points.length === 3;
+      [state.exhibits, state.buildings, state.paths] = keep;
+    }
+    out.campgroundIsHotel = isHotel({type:"campground"});
     return out;
   }));
 

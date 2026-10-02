@@ -215,6 +215,7 @@ const BUILDINGS = {
   // hotels: guests stay the night and spend the next day in the park
   lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
   resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
+  campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, w:16, d:12, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100},
   // guests learn about prehistoric life here
   edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:16, d:12, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education"},
 
@@ -492,6 +493,9 @@ const BARRIERS = {
   concrete: {label:"Concrete wall",     strength:140, perMeter:90,  view:.45,  tech:"concrete", color:"#9A958C"},
 };
 
+// What a new fence costs to build, per meter: the base fence plus the barrier's own cost
+const fenceRate = key => COST.fencePerMeter + BARRIERS[key].perMeter;
+
 // How each barrier wears.
 //   wear     condition lost per day from weather and age (percent)
 //   repair   materials to fix a whole fence, per meter, from broken to 100%
@@ -632,7 +636,7 @@ BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyp
                   store:{cap:600, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops overnight. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
-for(const t of ["lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
+for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
 // Food stands and gift shops keep their own stock
 for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:200, megastore:500}))
   BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
@@ -762,8 +766,8 @@ const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
 // Goals give new players something to aim for, and pay a reward.
 // Each check() looks at the park and returns true when the goal is met.
 const GOALS = [
-  {id:"exhibit",  text:"Draw your first exhibit",            hint:"Pick Exhibit in the build tools, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
-  {id:"connect",  text:"Connect an exhibit to the path",     hint:"Guests only see exhibits that touch a path from the entrance. Use the Path tool to reach it.", reward:2000,  check:g=>g.state.exhibits.some(e=>g.isReachable(e))},
+  {id:"exhibit",  text:"Draw your first exhibit",            hint:"Open Build, then Exhibit Tools, pick a fence type, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
+  {id:"connect",  text:"Connect an exhibit to the path",     hint:"Guests only see exhibits that touch a path from the entrance. Use Guest Paths under Path Tools to reach it.", reward:2000,  check:g=>g.state.exhibits.some(e=>g.isReachable(e))},
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:3000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
   {id:"food",     text:"Build a food stand",                 hint:"Pick Food and tap next to a path, then tap the stand and choose what it sells. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].kind==="food" && (b.menu||[]).length)},
   {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
@@ -771,7 +775,7 @@ const GOALS = [
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3000, check:g=>(g.state.staff.custodians || []).length>0},
   {id:"guard",    text:"Hire a security guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Build a Security Office beside a path and hire a guard to patrol. Lamp posts help too.", reward:3000, check:g=>(g.state.staff.guards || []).length>0},
-  {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
+  {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use Gates under Exhibit Tools on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
   {id:"zone",     text:"Draw a work zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},

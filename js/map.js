@@ -20,16 +20,16 @@ let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
 
 const isBuildTool = t => !!BUILDINGS[t];
-// Toolbar buttons that open a choice of buildings, picked in the build bar
+// Menu groups whose tools share a choice bar above the map (vivarium sizes, food stalls, hotels...)
 const FAMILIES = {
   viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
-  lodging:{tools:["lodge", "resort"], labels:["Safari Lodge", "Resort Hotel"]},
+  lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
   props:{tools:["bin", "bench", "picnic", "lamp", "sign"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
-const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin", lodging:"lodge"};
+let fenceSel = "wood";             // fence type the next exhibit is built with
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
@@ -37,6 +37,7 @@ const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t 
 // Exhibits and zones are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone";
 let supplyOn = false;
+let mvCorner = null;                // exhibit corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
@@ -124,7 +125,8 @@ function render(){
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "";
-  for(const p of state.paths){
+  // staff roads go first, so a guest path always lays over them where they meet
+  for(const p of [...state.paths].sort((a, b) => isService(b) - isService(a))){
     const svc = isService(p);
     const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
@@ -209,6 +211,13 @@ function render(){
     s += `<g pointer-events="none"><line x1="${l.a[0]}" y1="${l.a[1]}" x2="${l.b[0]}" y2="${l.b[1]}" stroke="#E0A030" stroke-opacity=".85" stroke-width="${w}" stroke-dasharray="${7*inv} ${5*inv}" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`
       + `<circle cx="${l.b[0]}" cy="${l.b[1]}" r="${4*inv}" fill="#E0A030"/></g>`;
   }
+  // with supply lines on: ring the stores and farms, and the exhibits keepers have been feeding
+  if(supplyOn){
+    const ring = (it, col) => { const [x, y] = centroid(it.points), bb = bbox(it.points), r = Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0) / 2 + 3; return `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r}" fill="none" stroke="${col}" stroke-width="2.5" stroke-dasharray="${6*inv} ${4*inv}" vector-effect="non-scaling-stroke" pointer-events="none"/>`; };
+    for(const b of state.buildings){ const t = BUILDINGS[b.type]; if(t.makes) s += ring(b, "#5BAA3C"); else if(storeOf(b) && !t.kind && !t.rooms) s += ring(b, "#4A8FC4"); }
+    const fed = new Set(supplyLines().filter(l => l.exhibit).map(l => l.b.join()));
+    for(const e of state.exhibits) if(fed.has(centroid(e.points).join())) s += ring(e, "#E0A030");
+  }
   for(const z of state.zones){
     const [zx, zy] = centroid(z.points), on = isSel("zone", z.id), fs = 11*inv;
     s += `<g data-kind="zone" data-id="${esc(z.id)}" style="cursor:pointer"><rect x="${zx - 34*inv}" y="${zy - 9*inv}" width="${68*inv}" height="${18*inv}" rx="${4*inv}" fill="${z.color}" fill-opacity="${on ? 1 : .85}" stroke="${on ? "var(--sel)" : "none"}" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" x="${zx}" y="${zy}" font-size="${fs}" style="fill:#fff">${esc(z.name.slice(0, 12))}</text></g>`;
@@ -259,6 +268,16 @@ function renderOverlay(){
         s += `<path d="M${(p[0] + q[0]) / 2 - 2.5*inv} ${(p[1] + q[1]) / 2}h${5*inv}M${(p[0] + q[0]) / 2} ${(p[1] + q[1]) / 2 - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
       });
       z.points.forEach((p, i) => { s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(zedit.sel === i ? 8 : 6.5)*inv}" fill="${zedit.sel === i ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`; });
+    }
+  }
+  if(tool === "move"){
+    for(const e of state.exhibits){
+      if(e.viv) continue;
+      e.points.forEach((p, i) => {
+        const q = e.points[(i + 1) % e.points.length], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+        s += `<circle cx="${mx}" cy="${my}" r="${5*inv}" fill="var(--sel)" fill-opacity=".85" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/><path d="M${mx - 2.5*inv} ${my}h${5*inv}M${mx} ${my - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      });
+      e.points.forEach((p, i) => { const on = mvCorner && mvCorner.id === e.id && mvCorner.i === i; s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(on ? 8 : 6.5)*inv}" fill="${on ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
     }
   }
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
@@ -425,7 +444,9 @@ function exhibitProblem(pts){
   if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
-  const cost = exhibitCost(pts);
+  const fence = BARRIERS[fenceSel];
+  if(fence.tech && !hasTech(fence.tech)) return `Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`;
+  const cost = exhibitCost(pts, fenceSel);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
 }
@@ -457,9 +478,9 @@ function setTool(t){
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
+  document.querySelectorAll("[data-fence]").forEach(b => b.setAttribute("aria-pressed", t === "exhibit" && b.dataset.fence === fenceSel));
   $("#dSizes").hidden = !fam;
   if(fam){
-    lastPick[fam] = t;
     $("#dSizes").innerHTML = FAMILIES[fam].tools.map((x, i) => `<button data-pick="${x}" aria-pressed="${x === t}">${FAMILIES[fam].labels[i]}</button>`).join("");
   }
   mapwrap.className = "mapwrap tool-" + t;
@@ -480,6 +501,11 @@ function setTool(t){
     updateZoneEditBar();
   }
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a service road meets it. Keepers won't use a gate that opens onto a guest path. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "move"){
+    mvCorner = null;
+    showBar("Move", "Drag a building, exhibit or path to a new spot. Drag an exhibit's corner to reshape it, or a + on its fence to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
+    updateMoveBar();
+  }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
@@ -498,8 +524,10 @@ function startDraw(kind){
   draw = {kind, pts:[], snaps:[], hover:null, error:null};
   sel = null; ui.panel();
   const [t, hint] = DRAW_TEXT[kind];
-  showBar(t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
+  showBar(kind === "exhibit" ? `New exhibit: ${BARRIERS[fenceSel].label.toLowerCase()}` : t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
   updateDrawbar();
+  const fence = BARRIERS[fenceSel];
+  if(kind === "exhibit" && fence.tech && !hasTech(fence.tech)) setStat(`Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -510,7 +538,7 @@ function updateDrawbar(){
   let stat = "", err = null;
   if(draw.kind === "exhibit"){
     const shape = closeAlong(all);
-    if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of fence. ${money(exhibitCost(shape))}`; err = exhibitProblem(shape); }
+    if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${BARRIERS[fenceSel].label.toLowerCase()}. ${money(exhibitCost(shape, fenceSel))}`; err = exhibitProblem(shape); }
   } else if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
   } else if(all.length >= 2){
@@ -558,7 +586,7 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
   if(tool === "zoneedit"){ finishZoneEdit(); return; }
@@ -581,11 +609,12 @@ function finishDraw(){
     return;
   }
   if(d.kind === "exhibit"){
-    const cost = exhibitCost(pts);
+    const cost = exhibitCost(pts, fenceSel);
     spend(cost, "built");
     const used = new Set(state.exhibits.map(x => x.name));
     let n = 1; while(used.has(`Exhibit ${n}`)) n++;
     const e = {id:uid("e-"), name:`Exhibit ${n}`, points:pts, animals:[], happy:70, cond:100, inspected:{day:state.day, cond:100}};
+    if(fenceSel !== "wood") e.barrier = fenceSel;
     autoZone(e);
     state.exhibits.push(e);
     afterChange();
@@ -914,6 +943,119 @@ function removeItem(kind, it){
   render(); ui.panel();
 }
 
+/* ---------- moving things ---------- */
+// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, and paths (not the entrance walk)
+function moveTarget(hit){
+  if(!hit.kind) return null;
+  const it = findItem(hit.kind, hit.id);
+  if(!it || !["exhibit", "path", "building"].includes(hit.kind)) return null;
+  if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
+  if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
+  return it;
+}
+const shiftPts = (pts, dx, dy) => pts.map(p => [p[0] + dx, p[1] + dy]);
+// Why this item can't sit at its new spot, or null. Mirrors the checks for building it fresh.
+function moveProblem(kind, it){
+  const pts = it.points;
+  if(!insidePlot(pts)) return "Keep it inside the park boundary.";
+  if(kind === "exhibit"){
+    if(state.exhibits.some(e => e !== it && shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
+    if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
+    if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  } else if(kind === "building"){
+    if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
+    if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
+    if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+  } else {
+    if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
+    if(state.buildings.some(b => lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  }
+  return null;
+}
+// Everything that moves with the item: its own points, an exhibit's gate and platforms, and the animals wandering inside
+function moveBy(m, dx, dy){
+  const it = m.it;
+  it.points = shiftPts(m.orig, dx, dy);
+  if(m.gate) it.gate = [m.gate[0] + dx, m.gate[1] + dy];
+  for(const pl of m.plats) pl.b.points = shiftPts(pl.pts, dx, dy);
+  m.dx = dx; m.dy = dy;
+}
+function startMove(it, kind, e){
+  const w = toWorld(e.clientX, e.clientY);
+  return {it, kind, wx:w.x, wy:w.y, dx:0, dy:0, orig:it.points.map(p => p.slice()), gate:it.gate ? it.gate.slice() : null,
+    plats:kind === "exhibit" ? state.buildings.filter(b => b.exhibitId === it.id).map(b => ({b, pts:b.points.map(p => p.slice())})) : []};
+}
+function dragMove(m, e){
+  const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
+  let dx = w.x - m.wx, dy = w.y - m.wy;
+  if(g){ dx = Math.round(dx / g) * g; dy = Math.round(dy / g) * g; }
+  moveBy(m, dx, dy);
+  const why = moveProblem(m.kind, m.it);
+  m.why = why; setStat(why || "Let go to drop it here.", !!why);
+  queueRender();
+}
+function dropMove(m){
+  const why = moveProblem(m.kind, m.it);
+  if(why || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(why) ui.toast(`Couldn't move it. ${why}`, "bad"); setStat(""); render(); return; }
+  if(m.kind === "exhibit"){
+    for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.tx += m.dx; h.ty += m.dy; }
+  }
+  afterChange(); render();
+  const it = m.it, reach = m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it);
+  ui.toast(reach ? "Moved." : "Moved, but it doesn't reach the entrance from there.", reach ? "" : "bad");
+  setStat("");
+}
+
+// Reshaping an exhibit: drag a corner, drag a + to add one, tap a corner and delete it
+function cornerAt(clientX, clientY){
+  const p = toWorld(clientX, clientY), R = 14 / view.k;
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    for(let i = 0; i < e.points.length; i++) if(Math.hypot(p.x - e.points[i][0], p.y - e.points[i][1]) < R) return {e, i, type:"v"};
+  }
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    for(let i = 0; i < e.points.length; i++){ const a = e.points[i], b = e.points[(i + 1) % e.points.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {e, i, type:"m"}; }
+  }
+  return null;
+}
+const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
+// Why this exhibit's new outline won't work, or null
+function reshapeProblem(e, orig){
+  const pts = e.points;
+  if(selfCrosses(pts)) return "The fence crosses itself.";
+  if(!insidePlot(pts)) return "Keep it inside the park boundary.";
+  if(area(pts) < 60) return "Too small. Exhibits need at least 60 m².";
+  if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
+  if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
+  if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
+  const diff = reshapeCost(e, orig);
+  if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
+  return null;
+}
+function updateMoveBar(){ if(tool === "move") $("#dUndo").disabled = !mvCorner; }
+// Pay or refund for the new fence, keep the gate on the wall, and rebuild the routes
+function commitReshape(e, orig){
+  const diff = reshapeCost(e, orig);
+  if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
+  if(e.gate){
+    let best = null;
+    for(let i = 0; i < e.points.length; i++){ const r = segProj(e.gate[0], e.gate[1], e.points[i], e.points[(i + 1) % e.points.length]); if(!best || r.d < best.d) best = r; }
+    e.gate = [best.x, best.y];
+  }
+  afterChange(); render();
+  ui.toast(diff > 0 ? `Reshaped ${e.name}. The extra fence cost ${money(diff)}.` : diff < 0 ? `Reshaped ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${e.name}.`);
+}
+function deleteMoveCorner(){
+  const e = mvCorner && findItem("exhibit", mvCorner.id); if(!e) return;
+  if(e.points.length <= 3){ setStat("An exhibit needs at least 3 corners.", true); return; }
+  const orig = e.points.map(p => p.slice()); e.points.splice(mvCorner.i, 1);
+  const why = reshapeProblem(e, orig);
+  if(why){ e.points = orig; setStat(why, true); return; }
+  mvCorner = null; updateMoveBar(); commitReshape(e, orig);
+}
+
 /* ---------- moving the view ---------- */
 function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:r.height}; }
 function fit(){
@@ -971,6 +1113,17 @@ svg.addEventListener("pointerdown", e => {
       return;
     }
   }
+  if(tool === "move"){
+    const c = cornerAt(e.clientX, e.clientY);
+    if(c){
+      const orig = c.e.points.map(p => p.slice());
+      if(c.type === "m"){ const a = orig[c.i], b = orig[(c.i + 1) % orig.length]; c.e.points.splice(c.i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); c.i++; }
+      drag = {rv:{e:c.e, i:c.i, orig, added:c.type === "m"}, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}};
+      return;
+    }
+    const hit = itemAt(e.target), it = moveTarget(hit);
+    if(it){ drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; return; }
+  }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
 
@@ -1004,6 +1157,19 @@ svg.addEventListener("pointermove", e => {
     queueRender(); return;
   }
   if(!drag) return;
+  if(drag.rv){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    const r = drag.rv, w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
+    r.e.points[r.i] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const why = reshapeProblem(r.e, r.orig), diff = reshapeCost(r.e, r.orig);
+    setStat(why || `${fmtArea(area(r.e.points))}. ${diff > 0 ? "Extra fence " + money(diff) : diff < 0 ? "Fence refund " + money(Math.round(-diff * COST.refundShare)) : "No change in fence"}`, !!why);
+    queueRender(); return;
+  }
+  if(drag.mv){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
+    drag.moved = true; dragMove(drag.mv, e); return;
+  }
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if(!drag.moved && Math.hypot(dx, dy) < 6) return;
   drag.moved = true;
@@ -1015,6 +1181,18 @@ function endPointer(e){
   if(pinch){ if(pointers.size < 2) pinch = null; drag = null; render(); return; }
   if(!drag) return;
   const d = drag; drag = null;
+  if(d.mv){ if(d.moved) dropMove(d.mv); return; }
+  if(d.rv){
+    const r = d.rv;
+    if(!d.moved){
+      // a tap on a corner picks it; a tap on a + that just added a corner undoes the addition
+      if(r.added) r.e.points = r.orig; else mvCorner = mvCorner && mvCorner.id === r.e.id && mvCorner.i === r.i ? null : {id:r.e.id, i:r.i};
+      updateMoveBar(); render(); return;
+    }
+    const why = reshapeProblem(r.e, r.orig);
+    if(why){ r.e.points = r.orig; ui.toast(`Couldn't reshape it. ${why}`, "bad"); setStat(""); render(); return; }
+    mvCorner = {id:r.e.id, i:r.i}; updateMoveBar(); setStat(""); commitReshape(r.e, r.orig); return;
+  }
   if(d.zv !== undefined){
     const z = zedit && zoneById(zedit.id);
     if(z){
@@ -1047,11 +1225,33 @@ svg.addEventListener("wheel", e => {
 }, {passive:false});
 
 /* ---------- toolbar and keys ---------- */
+buildMenu();
+const sideOpen = on => {
+  $("#sideTab").setAttribute("aria-expanded", on); $("#sideBody").hidden = !on; mapwrap.classList.toggle("side-open", on);
+  try{ localStorage.setItem("genesis-side-open", on ? "1" : "0"); }catch{}
+};
+// Tapping a tool picks it and tucks the menu away so the map is clear. Tapping it again goes back to Select.
 document.querySelectorAll("[data-tool]").forEach(b => b.addEventListener("click", () => {
-  const f = FAMILIES[b.dataset.tool], t = f ? lastPick[b.dataset.tool] : b.dataset.tool;
-  const active = t === tool || (f && familyOf(tool) === b.dataset.tool);
-  setTool(active && tool !== "select" ? "select" : t);
+  const t = b.dataset.tool, active = t === tool || (familyOf(tool) && familyOf(tool) === familyOf(t));
+  const off = active && tool !== "select" && !familyOf(t);
+  setTool(off ? "select" : t);
+  if(!off && t !== "select") sideOpen(false);
 }));
+document.querySelectorAll("[data-fence]").forEach(b => b.addEventListener("click", () => {
+  fenceSel = b.dataset.fence; setTool("exhibit"); sideOpen(false);
+}));
+// One group open at a time; dropdowns inside a group open on their own
+$("#sideTab").onclick = () => sideOpen($("#sideBody").hidden);
+document.querySelectorAll(".shead").forEach(h => h.addEventListener("click", () => {
+  const g = h.parentElement, was = g.classList.contains("open");
+  document.querySelectorAll(".sgroup.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
+  g.classList.toggle("open", !was); h.setAttribute("aria-expanded", !was);
+}));
+document.querySelectorAll(".srow.head").forEach(h => h.addEventListener("click", () => {
+  const it = h.parentElement, was = it.classList.contains("open");
+  it.classList.toggle("open", !was); h.setAttribute("aria-expanded", !was);
+}));
+try{ if(localStorage.getItem("genesis-side-open") === "1") sideOpen(true); }catch{}
 $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick); });
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
@@ -1063,7 +1263,7 @@ function setGridSnap(on){
   if(state) render();
 }
 $("#gridBtn").onclick = () => setGridSnap(!gridSnap);
-$("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Shows hauls" : "Off"; render(); };
+$("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Green farms, blue stores, gold exhibits" : "Off"; render(); };
 setGridSnap(gridSnap);
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;
@@ -1086,6 +1286,7 @@ document.addEventListener("keydown", e => {
 
 // Call after anything in the park changes shape: rework the numbers, the walkers' routes, goals, and save
 function afterChange(){
+  refreshMenu();
   recompute();
   buildGuestGraph();
   buildKeeperGraph();
