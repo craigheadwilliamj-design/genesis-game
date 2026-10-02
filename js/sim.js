@@ -59,7 +59,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -97,6 +97,10 @@ function upgradeSave(s){
     if(s.exhibits.some(e => e.flora === "paleozoic")){ give("paleoflora"); give("paleoplant"); }
   }
   for(const e of s.exhibits) if(!e.viv && e.cond === undefined){ e.cond = 100; e.inspected = {day:s.day, cond:100}; }
+  // landscaping: ponds and rocks inside open exhibits
+  for(const e of s.exhibits) if(!e.viv && e.land === undefined) e.land = [];
+  // parks from before weather get 3 fair days to build shelters
+  if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
   for(const b of s.buildings){
     if(b.type !== "platform" || b.inward) continue;
@@ -265,11 +269,11 @@ function exhibitReport(e){
     const away = kinds.filter(s => ERA_OF[s.period] !== flora);
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${FLORA[flora].plants}.`}); }
     else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. ${[...new Set(away.map(s => FLORA[ERA_OF[s.period]].label))].join(" or ")} plants would suit ${away.length === 1 ? "it" : "them"}.`}); }
-    // grass comes from a Cenozoic planting, or from plain plant food standing in for Paleoflora
-    const grassy = flora === "cenozoic" || e.grassFed;
+    // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora
+    const grassy = grassyFloor(e) || e.grassFed;
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
     const sick = grazers.filter(s => GRASS_INTOLERANT.includes(s.period)), picky = grazers.filter(s => s.period === "Cretaceous");
-    if(grassy && sick.length){ target += GRASS_HIT.intolerant; issues.push({bad:true, text:`Sick from eating grass. ${sick.map(s => s.name).join(", ")} never evolved to digest it. ${flora === "cenozoic" ? "Replant with older flora from CERES" : "Feed them Paleoflora from CERES"}.`}); }
+    if(grassy && sick.length){ target += GRASS_HIT.intolerant; issues.push({bad:true, text:`Sick from eating grass. ${sick.map(s => s.name).join(", ")} never evolved to digest it. ${grassyFloor(e) ? "Replant with older flora from CERES, or plant cycad or lycopod groves" : "Feed them Paleoflora from CERES"}.`}); }
     else if(grassy && picky.length){ target += GRASS_HIT.cretaceous; issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. Older flora or Paleoflora suits them better.`}); }
   }
   // Dirt: a filthy exhibit makes animals miserable fast
@@ -295,6 +299,8 @@ function exhibitReport(e){
   let fight = null;
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = conflict(kinds[i], kinds[j]);
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
+  // Ponds and rocks: animals feel at home among what they like, and water lovers need a pond
+  const hab = habitatScore(e); target += hab.delta; issues.push(...hab.issues);
   // Sick and hurt animals drag the whole herd down
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
   // (a chronic case, eased by contemporary medicine, counts for less)
@@ -335,7 +341,7 @@ function recompute(){
   // word of mouth: yesterday's guests tell their friends how it went
   const told = state.guestLog.mood;
   const wom = told == null ? 1 : clamp(1 + GUEST.wordOfMouth * (told - 60) / 40, 1 - GUEST.wordOfMouth, 1 + GUEST.wordOfMouth);
-  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor() * wom;
+  const demand = appeal * (1 + 0.06 * shown.size) * 9 * (0.6 + 0.16 * state.rating) * priceF * fearFactor() * wom * weatherNow().guests;
 
   // How well the park looks after its guests: how happy they are when they leave.
   // Before anyone has left, guess from how many food stands and restrooms there are.
@@ -388,7 +394,8 @@ function earn(amount, kind){ state.money += amount; state.today[kind] += amount;
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
 function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : COST.pathPerMeter)); }
 function refundFor(kind, item){
-  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare);
+  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
+  if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;
@@ -483,6 +490,9 @@ function endDay(){
   guardsNight();
   healthNight();
   vetsNight();
+  // today's weather has done its harm; tomorrow's forecast comes true
+  rollWeather();
+  if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer${weatherNow().guests < .9 ? ", and fewer guests will come" : ""}.`, "bad");
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
   if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
   if(state.day + 1 === state.logi.guestFrom) events.toast("From tomorrow, food stands and gift shops sell from their own stock. The dock orders it, and custodians carry it out. Build a Custodial Closet and hire one.", "bad");

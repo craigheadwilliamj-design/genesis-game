@@ -16,8 +16,10 @@ const ui = {
     set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
     set("clock", fmtClock(state.minute));
-    set("dayLabel", `Day ${state.day}`);
+    set("dayLabel", `Day ${state.day} · ${weatherNow().label}`);
     set("parkName", state.name);
+    const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
+    if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
     $("#dayFill").style.width = ((state.minute - OPEN_MIN) / (CLOSE_MIN - OPEN_MIN) * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
     if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 16); $("#rating").setAttribute("aria-label", `${r} stars`); }
@@ -179,6 +181,8 @@ function exhibitHtml(e){
     h += `<div class="meta" style="margin-top:4px">${eras.length ? `Animals here come from the ${eras.map(x => FLORA[x].label).join(" and ")}. ` : ""}${hasCeres ? `Replanting uses ${batchesFor(e)} batch${batchesFor(e) === 1 ? "" : "es"} of planting stock grown at CERES (it has ${state.ceres.plants.mesozoic || 0} Mesozoic and ${state.ceres.plants.paleozoic || 0} Paleozoic). It has no refund.` : "Build CERES, research the flora at ORACLE, and grow planting stock to plant Mesozoic or Paleozoic flora."}</div></section>`;
   }
 
+  if(!e.viv) h += landHtml(e);
+
   // food and keeper access
   const g = gateCheck(e), need = dailyNeed(e);
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>`;
@@ -220,6 +224,23 @@ function exhibitHtml(e){
   return h;
 }
 
+// Ponds and rocks in one exhibit, and buttons to add more
+function landHtml(e){
+  const hb = habitatOf(e), n = {};
+  for(const f of landOf(e)) n[f.type] = (n[f.type] || 0) + 1;
+  const have = Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`).join(", ");
+  const need = dailyNeed(e), fed = ["paleoflora", "plants"].filter(t => need[t] && browseRate(e, t))
+    .map(t => `${Math.round(browseShare(e, t, need[t]) * 100)}% of their ${t}`);
+  const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
+  const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
+  const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : t.stock && (state.ceres.plants[t.flora] || 0) < t.stock ? `Needs ${FLORA[t.flora].label} planting stock from CERES.` : "";
+  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Ponds cover ${(hb.pondShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without a pond.</div>
+    <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Cycad and lycopod groves keep old plant-eaters off the grass, and each uses a batch of planting stock from CERES (no refund).</div>
+    ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
+      return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
+    <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.stock ? " + stock" : ""}</button>`).join("")}</div></section>`;
+}
+
 // Sick animals, illness risk, and medicated feed for one exhibit
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
@@ -233,7 +254,7 @@ function healthHtml(e){
   if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
   if(e.animals.length > hr.sick.length){
     h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
-    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", rivals:"territorial rivals", attacks:"species that attack each other"};
+    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
     if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
     h += `</div>`;
   }
@@ -484,6 +505,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
+  if(a === "landTool"){ setTool("land-" + b.dataset.key); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireSci"){ if(sc.crew[b.dataset.k] > 0) sc.crew[b.dataset.k]--; done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }

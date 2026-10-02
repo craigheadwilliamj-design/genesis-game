@@ -564,7 +564,8 @@ function eatTick(dtMin){
     if(!free && Object.keys(need).some(t => stockFor(e, t) <= 0.01)) e.hungryMin = (e.hungryMin || 0) + dtMin;
     for(const t of Object.keys(need)){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
-      let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN);
+      // groves in the exhibit feed part of it; keepers bring the rest
+      let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN) * (1 - browseShare(e, t, need[t]));
       const has = e.stock[t] || 0;
       e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat);
       // out of Paleoflora: they eat the grass hay instead

@@ -22,6 +22,10 @@ const BUILD_MENU = [
     {label:"Viewing Platforms", tool:"platform"},
     {label:"Fence Types", fences:true, note:"Pick a fence before you build. Then draw the exhibit the same way."},
   ]},
+  {id:"land", label:"Landscaping", items:[
+    ...Object.entries(LAND).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price) + (t.stock ? " + stock" : ""),
+      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need a pond. Groves from an animal's own era feed and shelter it. Cycads and lycopods use planting stock from CERES. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
+  ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
     {label:"Food Stall", sub:["kiosk", "food", "restaurant"]},
@@ -68,6 +72,13 @@ const ICON_LINES = {
   service:'<path d="M4 20L20 4" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".4"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 3"/>',
   gate:'<path d="M3 12h5M16 12h5" stroke="currentColor" stroke-width="2.5"/><rect x="8" y="8" width="8" height="8" rx="1" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.4"/>',
   platform:'<rect x="3" y="9" width="18" height="7" rx="1" fill="#B08654" stroke="#1D2B22" stroke-width="1.2"/><path d="M5 16v4M19 16v4" stroke="currentColor" stroke-width="1.4"/>',
+  "land-pond":'<ellipse cx="12" cy="13" rx="9" ry="6" fill="#4C93C9" stroke="#2F6F9F" stroke-width="1.4"/><ellipse cx="9.5" cy="11.5" rx="3.5" ry="2" fill="#7DB6DD" opacity=".6"/>',
+  "land-rock":'<circle cx="12" cy="13" r="6" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/><circle cx="10" cy="11" r="2.4" fill="#B7BBB2" opacity=".7"/>',
+  "land-boulder":'<circle cx="9" cy="14" r="5" fill="#767A74" stroke="#4E524C" stroke-width="1.4"/><circle cx="16" cy="11" r="4" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/>',
+  ...Object.fromEntries(Object.entries(LAND).filter(([, t]) => t.flora).map(([k, t]) => ["land-" + k,
+    `<circle cx="8" cy="11" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="16" cy="10" r="4.5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="12" cy="16" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>`])),
+  "land-shelter":'<rect x="6" y="6" width="12" height="12" rx="1.5" fill="#9A7B55" stroke="#3B3226" stroke-width="1.4"/><path d="M6 12h12" stroke="#3B3226" stroke-width="1"/>',
+  "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
   grid:'<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/>',
@@ -100,7 +111,7 @@ function menuRow(it){
     return `<div class="sitem" data-open="${it.sub[0]}"><button class="srow head" aria-expanded="false">${menuIcon(it.sub[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange(it.sub)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   const b = BUILDINGS[it.tool], price = it.price ? it.price() : money(b.price);
-  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${b ? b.tech || "" : ""}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
+  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
 }
 
 function buildMenu(){

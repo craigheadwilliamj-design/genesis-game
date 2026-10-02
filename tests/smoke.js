@@ -805,6 +805,105 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
     out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
+
+    // landscaping: ponds and rocks inside open exhibits
+    const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
+    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    state.exhibits = [lx];
+    const fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
+    lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
+    out.landMenu = !!document.querySelector('[data-tool="land-pond"]');
+    setTool("land-pond"); out.landTool = tool === "land-pond" && $("#drawbar").classList.contains("on"); setTool("select");
+    out.landRejectsOutside = !landSpot(10, 10, "pond").ok && !landSpot(103, 130, "pond").ok;
+    const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
+    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
+    const spot = landSpot(130, 130, "pond");
+    out.landAcceptsInside = spot.ok && spot.e === lx;
+    placeLand(lx, "pond", 130, 130);
+    out.landOverlapRejected = !landSpot(133, 130, "pond").ok;
+    out.landPondHelps = !thirsty(lx, fish) && exhibitReport(lx).target > dryTarget && illChance(lx, lx.animals[0]).p < dryIll;
+    state.money = 100; out.landNeedsMoney = /Costs/.test(landSpot(140, 110, "boulder").why || ""); state.money = 1e6;
+    placeLand(lx, "rock", 110, 150);
+    // ponds and rocks ride along when the exhibit moves
+    const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
+    out.landMoves = lx.land[0].x === 140 && lx.land[0].y === 135 && lx.points[0][0] === 110;
+    moveBy(mv, 0, 0);
+    // an outline that would leave one outside the fence is refused
+    const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
+    out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
+    // bulldozing one refunds part of its price
+    const f0 = lx.land[1], n0 = lx.land.length;
+    out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && landRefund(lx) > 0;
+    removeItem("land", f0);
+    out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0);
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+    // old saves get an empty list for open exhibits only
+    const oldL = JSON.parse(JSON.stringify(newPark()));
+    oldL.exhibits.push({id:"e-old", name:"Old", points:[[1,1],[2,1],[2,2]], animals:[], happy:70}, {id:"e-oldv", name:"OldV", points:[[1,1],[2,1],[2,2]], animals:[], happy:70, viv:"S"});
+    const upl = upgradeSave(oldL);
+    out.oldGetsLand = upl.exhibits.find(e => e.id === "e-old").land.length === 0 && upl.exhibits.find(e => e.id === "e-oldv").land === undefined;
+
+    // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
+    const keepTech = [...sc.tech], keepPlants = {...state.ceres.plants}, keepFeed = state.staff.feedFrom;
+    state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
+    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], flora:"cenozoic"};
+    state.exhibits = [gx];
+    const grazer = SPECIES.find(s => !s.viv && foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ERA_OF[s.period] === "mesozoic");
+    gx.animals = [1, 2, 3].map(i => ({id:"a-g" + i, sp:grazer.id, q:90}));
+    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.plants.mesozoic = 0;
+    out.groveNeedsTech = /Research/.test(landSpot(115, 115, "cycads").why || "");
+    sc.tech.push("mesoplant");
+    out.groveNeedsStock = /planting stock/.test(landSpot(115, 115, "cycads").why || "");
+    out.treesNeedNoStock = landSpot(115, 115, "trees").ok;
+    const grassyBefore = grassyFloor(gx) && grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
+    state.ceres.plants.mesozoic = 3;
+    for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "cycads", x, y);
+    out.groveUsesStock = state.ceres.plants.mesozoic === 0 && gx.land.length === 3;
+    out.grovesStopGrass = grassyBefore && !grassyFloor(gx) && !grassSick(gx, grazer);
+    out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
+    // browsing: the stock drains slower, but keepers are still needed
+    const pn = dailyNeed(gx).paleoflora, share = browseShare(gx, "paleoflora", pn);
+    gx.stock = {paleoflora:100}; eatTick(60); const withGroves = 100 - gx.stock.paleoflora;
+    const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
+    out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
+    out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
+    sc.tech = keepTech; state.ceres.plants = keepPlants; state.staff.feedFrom = keepFeed;
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+
+    // weather: tomorrow's forecast comes true, animals without cover suffer, shelters and groves help
+    const keepW = {...state.weather}, rnd = Math.random;
+    const nw = newPark().weather;
+    out.weatherStartsFair = nw.today === "fair" && nw.next === "fair" && nw.from === WEATHER.startDay;
+    state.weather = {today:"fair", next:"storm", from:0};
+    Math.random = () => .999; rollWeather();
+    out.forecastComesTrue = state.weather.today === "storm" && state.weather.next === "storm";
+    state.weather.from = state.day + 10; rollWeather(); Math.random = rnd;
+    out.fairBeforeStart = state.weather.next === "fair";
+    state.money = 1e6; state.buildings = [];
+    const wxSp = SPECIES.find(s => !s.viv && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
+    const wx = {id:"e-wx", name:"Weather test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[1, 2, 3].map(i => ({id:"a-w" + i, sp:wxSp.id, q:90})), happy:70, cond:100, land:[]};
+    state.exhibits = [wx];
+    const at = (k, f) => { state.weather.today = k; return f(); };
+    out.stormExposes = at("storm", () => exposure(wx) === 1 && exhibitReport(wx).issues.some(i => i.bad && /Storm/.test(i.text)));
+    out.stormHurts = at("storm", () => exhibitReport(wx).target) < at("fair", () => exhibitReport(wx).target)
+      && at("storm", () => illChance(wx, wx.animals[0]).p) > at("fair", () => illChance(wx, wx.animals[0]).p)
+      && at("storm", () => injuryChance(wx, wx.animals[0]).p) > at("fair", () => injuryChance(wx, wx.animals[0]).p)
+      && Math.abs(at("storm", () => wearPerDay(wx)) - at("fair", () => wearPerDay(wx)) * WEATHER.kinds.storm.wear) < 1e-9;
+    placeLand(wx, "trees", 115, 145);
+    out.grovesShadeOnlyWhenHot = at("hot", () => exposure(wx)) < 1 && at("cold", () => exposure(wx)) === 1;
+    placeLand(wx, "shelter", 130, 120);
+    out.shelterCovers = coverOf(wx).shelter >= at("cold", () => coverOf(wx).need) && at("cold", () => exposure(wx)) === 0 && at("storm", () => exhibitReport(wx).issues.some(i => /Sheltered/.test(i.text)));
+    const hardy = SPECIES_BY_ID[COLD_HARDY.find(id => SPECIES_BY_ID[id] && !SPECIES_BY_ID[id].viv)];
+    const hx = {...wx, id:"e-hx", land:[], animals:[{id:"a-h", sp:hardy.id, q:90}]};
+    out.coldHardy = at("cold", () => exposure(hx)) === 0 && at("storm", () => exposure(hx)) === 1;
+    // an exhibit beside the entrance walk, so guests want to come
+    state.exhibits = [{...wx, id:"e-wx2", points:[[206.5,240],[246,240],[246,280],[206.5,280]], land:[]}];
+    const d1 = at("fair", () => (recompute(), derived.demand)), d2 = at("storm", () => (recompute(), derived.demand));
+    out.stormFewerGuests = d1 > 0 && Math.abs(d2 - d1 * WEATHER.kinds.storm.guests) < 1e-6;
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+    state.weather = keepW; recompute();
+    const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
+    out.oldGetsWeather = upgradeSave(oldW).weather.from === 23 && oldW.weather.today === "fair";
     return out;
   }));
 
