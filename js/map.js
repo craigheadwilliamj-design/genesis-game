@@ -55,7 +55,7 @@ function wideJoin(p){
       if(o === p || isService(o)) continue;
       for(let j = 1; j < o.points.length; j++){
         const r = segProj(E[0], E[1], o.points[j-1], o.points[j]), hw = halfWidth(o);
-        if(r.d <= hw + .5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};
+        if(r.d < 1.5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};   // joined, by the same 1.5 m rule the game uses
       }
     }
     if(!best) continue;
@@ -64,9 +64,9 @@ function wideJoin(p){
     if((prev[0] - best.x)*mx + (prev[1] - best.y)*my < 0){ mx = -mx; my = -my; }
     const dx = E[0] - prev[0], dy = E[1] - prev[1], dl = Math.hypot(dx, dy) || 1, dn = (dx*mx + dy*my) / dl;
     if(Math.abs(dn) < .2){                                          // running along it, not into it: a narrower path carrying on in line gets a taper
-      const lat = Math.abs((E[0] - best.x)*mx + (E[1] - best.y)*my), ox = dx/dl, oy = dy/dl;
+      const ox = dx/dl, oy = dy/dl;
       const ahead = Math.max((best.a[0] - E[0])*ox + (best.a[1] - E[1])*oy, (best.b[0] - E[0])*ox + (best.b[1] - E[1])*oy);
-      if(best.hw < WIDE_PATH.halfWidth && lat <= 1.5 && ahead > 1){
+      if(best.hw < WIDE_PATH.halfWidth && ahead > 1){
         const T = Math.min(2*(WIDE_PATH.halfWidth - best.hw), ahead), W = WIDE_PATH.halfWidth, nx = -oy, ny = ox;
         const cx = E[0] + ox*T + nx*((best.x - E[0])*nx + (best.y - E[1])*ny), cy = E[1] + oy*T + ny*((best.x - E[0])*nx + (best.y - E[1])*ny);
         tapers.push([[E[0] + nx*W, E[1] + ny*W], [cx + nx*best.hw, cy + ny*best.hw], [cx - nx*best.hw, cy - ny*best.hw], [E[0] - nx*W, E[1] - ny*W]]);
@@ -437,6 +437,15 @@ function snapAt(clientX, clientY, ev){
   // water stays clear of fences and paths, so it only snaps to the grid
   if(draw && draw.kind === "water") return gridSnap ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}} : {x:p.x, y:p.y, info:null};
   const R = 12 / view.k;
+  // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
+  if(draw && ["path", "wide", "service"].includes(draw.kind)){
+    let hit = null;
+    for(const q of state.paths) for(let i = 1; i < q.points.length; i++){
+      const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
+      if(r.d <= Math.max(halfWidth(q), R * .8) && !state.paths.some(o => o.points.some(v => Math.hypot(p.x - v[0], p.y - v[1]) < R)) && (!hit || r.d < hit.d)) hit = {x:r.x, y:r.y, d:r.d, id:q.id};
+    }
+    if(hit) return {x:hit.x, y:hit.y, info:{type:"seg", kind:"path", id:hit.id}};
+  }
   let best = null, bd = R;
   const tryV = (v, kind, id) => { const d = Math.hypot(p.x - v[0], p.y - v[1]); if(d < bd){ bd = d; best = {x:v[0], y:v[1], info:{type:"vertex", kind, id}}; } };
   tryV(state.gate, "gate", "gate");
