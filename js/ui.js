@@ -183,7 +183,10 @@ function exhibitHtml(e){
   // what the exhibit is planted with
   {
     const fl = e.flora || "cenozoic", hasCeres = hasDept("ceres");
-    const eras = [...new Set(e.animals.map(x => ERA_OF[SPECIES_BY_ID[x.sp].period]))];
+    const hv = haveOf(e), pc = x => Math.round(x * 1000) / 10;
+  const wants = e.animals.length ? [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s);
+    return `<li>${esc(s.name)}: water ${pc(f.w.water)}% (has ${pc(hv.water)}%), rocks ${f.w.rock} (has ${hv.rock}), plants ${f.w.plants} m² (has ${hv.plants} m²)</li>`; }).join("") : "";
+  const eras = [...new Set(e.animals.map(x => ERA_OF[SPECIES_BY_ID[x.sp].period]))];
     h += `<section><h3>Plants</h3><label class="field"><span>Flora</span><select id="floraSel">${Object.entries(FLORA).map(([k, f]) => {
       const why = k === fl ? null : replantProblem(e, k), cost = k === fl ? 0 : Math.round(area(e.points) * f.perSqM), noTech = f.tech && !hasTech(f.tech);
       return `<option value="${k}"${k === fl ? " selected" : ""}${why ? " disabled" : ""}>${f.label}: ${f.plants}${k === fl ? " (current)" : noTech ? " (research at ORACLE)" : why ? (!hasCeres ? " (needs CERES)" : " (needs planting stock)") : cost ? `, ${money(cost)}` : ", free"}</option>`;
@@ -245,7 +248,8 @@ function landHtml(e){
   const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
   const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";
-  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without water. Reshape water with the Move tool, like a fence.</div>
+  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Each animal wants its own share of water, a number of rocks (a boulder field counts as 3) and some plants, set by the size and biome of the exhibit. Too much water is as bad as too little, and fish eaters can't do without any. Reshape water with the Move tool, like a fence.</div>
+    ${wants ? `<div class="meta" style="margin-top:4px">What they want in ${esc(BIOMES[biomeOf(e)].label.toLowerCase())}:<ul style="margin:2px 0 0 16px;padding:0">${wants}</ul></div>` : ""}
     <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Mesozoic and Paleozoic plantings keep old plant-eaters off the grass. Each one uses a plant of its size grown at CERES (no refund).</div>
     ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
