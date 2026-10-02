@@ -162,16 +162,17 @@ function tarHtml(b){
 
 /* ---------- CERES ---------- */
 
-function growRow(kind, era){
-  const gi = growInfo(kind, era), unlocked = kind === "flora" ? hasTech(FLORA[era].tech) : hasTech(MED_TECH[era]);
-  const why = unlocked ? growProblem(kind, era) : "locked", q = growing(kind, era), c = state.ceres;
-  const name = kind === "flora" ? `${ERA_LABEL[era]} planting stock` : `${ERA_LABEL[era]} medicine`;
+function growRow(kind, era, size){
+  const gi = growInfo(kind, era, size), unlocked = kind !== "med" ? hasTech(FLORA[era].tech) : hasTech(MED_TECH[era]);
+  const why = unlocked ? growProblem(kind, era, size) : "locked", q = growing(kind, era, size), c = state.ceres;
+  const name = growName(kind, era, size), sz = size ? ` data-size="${size}"` : "";
   let h = `<li class="${unlocked ? "" : "locked"}"><span class="nm">${name}</span>`;
-  h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${why ? " disabled" : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
+  h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${sz}${why ? " disabled" : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need">`;
-  if(!unlocked) h += `Research ${kind === "flora" ? `${FLORA[era].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
+  if(!unlocked) h += `Research ${kind !== "med" ? `${FLORA[era].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
   else {
-    h += `A batch takes ${spanText(growMinutes(kind, era))}. ${kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${+(c.plants[era] || 0).toFixed(2)} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
+    const have = size ? c.pots[era + "-" + size] || 0 : +(c.plants[era] || 0).toFixed(2), grove = size && Object.values(LAND).find(t => t.flora === era && t.size === size);
+    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for ${grove ? grove.label.toLowerCase() + "s" : "the landscape"}. ${have} ready.` : kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
     if(why && era !== "cenozoic" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
   }
   h += `</span>`;
@@ -197,11 +198,12 @@ function ceresHtml(b){
 
   h += `<section><h3>Growing beds (${c.beds.length} batch${c.beds.length === 1 ? "" : "es"}, ${beds()} bed${beds() === 1 ? "" : "s"})</h3>`;
   h += `<div class="meta">Like TAR's incubators, but with plants. Each botanist tends a bed and can have up to 3 batches lined up.</div>`;
-  if(c.beds.length) h += `<div style="margin-top:8px">${[...c.beds].sort((a, d) => a.end - d.end).map(j => progressCard(j.kind === "flora" ? `${ERA_LABEL[j.era]} planting stock` : `${ERA_LABEL[j.era]} medicine`, beds() > 1 ? `bed ${(j.lane || 0) + 1}` : "", j)).join("")}</div>`;
+  if(c.beds.length) h += `<div style="margin-top:8px">${[...c.beds].sort((a, d) => a.end - d.end).map(j => progressCard(growName(j.kind, j.era, j.size), beds() > 1 ? `bed ${(j.lane || 0) + 1}` : "", j)).join("")}</div>`;
   h += `</section>`;
 
   const planted = era => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora === era).length, 0);
-  h += `<section><h3>Planting stock</h3><div class="meta">Replanting a whole exhibit uses up stock: tap the exhibit and change its flora. Each cycad grove or lycopod stand (Landscaping) uses one batch. Groves planted so far: ${planted("mesozoic")} Mesozoic, ${planted("paleozoic")} Paleozoic.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => growRow("flora", era)).join("")}</ul>`;
+  h += `<section><h3>Planting stock</h3><div class="meta">Replanting a whole exhibit uses up stock: tap the exhibit and change its flora.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => growRow("flora", era)).join("")}</ul></section>`;
+  h += `<section><h3>Plants for exhibits</h3><div class="meta">Small, medium and large plants for Landscaping. Each one placed in an exhibit uses up one plant. Planted so far: ${planted("mesozoic")} Mesozoic, ${planted("paleozoic")} Paleozoic.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => PLANT_SIZES.map(sz => growRow("plant", era, sz)).join("")).join("")}</ul>`;
   for(const era of ["mesozoic", "paleozoic"]){
     const d = sc.dna[PLANT_DNA[era].id];
     if(hasTech(FLORA[era].tech) && !(d && d.genome >= 100)) h += `<div class="meta" style="margin-top:4px">${ERA_LABEL[era]} plant DNA: ${d ? d.genome : 0}%. GHOST is still collecting it.</div>`;
@@ -232,6 +234,6 @@ panelEl.addEventListener("click", ev => {
   if(a === "gtab"){ ghostTab = b.dataset.k; ui.panel(); return; }
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "trip"){ if(launchTrip(b.dataset.sp, b.dataset.p)) done(); return; }
-  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era) || "CERES can't grow that.", "bad"); return; }
+  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "CERES can't grow that.", "bad"); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }
 });
