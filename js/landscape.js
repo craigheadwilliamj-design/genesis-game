@@ -25,6 +25,16 @@ const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
 const potName = t => `${ERA_LABEL[t.flora]} ${t.size} plants`;
 
 const landM2 = f => Math.PI * LAND[f.type].r ** 2;
+// The exhibit's biome, and how well it suits one species: "home", "near", "away", or null for animals that don't mind
+const biomeOf = e => BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
+function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l[0] === b ? "home" : l.includes(b) ? "near" : "away"; }
+const regradeCost = (e, b) => Math.round(area(e.points) * BIOMES[b].perSqM);
+function regradeProblem(e, b){
+  if(e.viv) return "Vivariums have no biome.";
+  if(!BIOMES[b]) return "Unknown biome.";
+  if(biomeOf(e) === b) return `${e.name} is already ${BIOMES[b].label.toLowerCase()}.`;
+  return canAfford(regradeCost(e, b)) ? null : `Costs ${money(regradeCost(e, b))}.`;
+}
 // How much of the exhibit is water, rock, and groves from each era: 0 to 1 each, where 1 satisfies the animals that like it
 function habitatOf(e){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
@@ -36,7 +46,7 @@ function habitatOf(e){
     grove[era] = clamp(groveM2[era] / a / HAB.groveFull, 0, 1);
   }
   const old = clamp((groveM2.mesozoic + groveM2.paleozoic) / a / HAB.groveFull, 0, 1);
-  return {waterM2:wet, waterShare:wet / a, wet:clamp(wet / a / HAB.waterFull, 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
+  return {waterM2:wet, waterShare:wet / a, wet:clamp(wet / a / HAB.waterFull + (BIOMES[biomeOf(e)].wet || 0), 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
 }
 // Grass underfoot: a Cenozoic planting, unless enough older groves give the grazers something else to eat
 const grassyFloor = e => (e.flora || "cenozoic") === "cenozoic" && habitatOf(e).old < 1;
@@ -98,6 +108,13 @@ function habitatScore(e){
     out.delta += HAB.bonus * sat;
     out.issues.push({bad:false, text:sat >= .6 ? "Water and rocks make it feel like home." : "Some water and rocks. More would make them feel more at home."});
   }
+  // the biome: each animal's home ground, the one it gets by in, or neither
+  const b = biomeOf(e), fit = {home:[], near:[], away:[]};
+  for(const [sp, c] of speciesCounts(e)){ const s = SPECIES_BY_ID[sp], f = biomeFit(s, b); if(f){ out.delta += BIOME_HAPPY[f] * c / n; fit[f].push(s); } }
+  const names = l => l.map(s => s.name).join(", "), homes = l => [...new Set(l.map(s => BIOMES[biomesOf(s)[0]].label.toLowerCase()))].join(" or ");
+  if(fit.away.length) out.issues.push({bad:true, text:`Wrong biome. ${names(fit.away)} ${fit.away.length === 1 ? "doesn't" : "don't"} belong in ${BIOMES[b].label.toLowerCase()}. ${[...new Set(fit.away.map(s => BIOMES[biomesOf(s)[0]].label))].join(" or ")} would suit ${fit.away.length === 1 ? "it" : "them"}.`});
+  if(fit.near.length) out.issues.push({bad:false, text:`${names(fit.near)} ${fit.near.length === 1 ? "gets" : "get"} by in ${BIOMES[b].label.toLowerCase()}, but would rather live in ${homes(fit.near)}.`});
+  if(fit.home.length && !fit.away.length && !fit.near.length) out.issues.push({bad:false, text:`At home in the ${BIOMES[b].ground}.`});
   // groves from the animals' own era
   let home = 0;
   for(const [sp, c] of speciesCounts(e)) home += c * h.grove[ERA_OF[SPECIES_BY_ID[sp].period]];
