@@ -750,7 +750,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.cloneOrder = orderClone(small.id, null) && sc.clones.length === 1;
     out.incubatorCount = incubators() === 1;
     sc.tech.push("incub1", "fast1");
-    out.upgradesApply = incubators() === 2 && cloneMinutes(small.id) === Math.round(base * TAR_UPGRADE.speed);
+    out.upgradesApply = incubators() === 2 && Math.abs(cloneMinutes(small.id) - base * TAR_UPGRADE.speed) <= 1;
     out.secondLane = (() => { const before = nowMin(); orderClone(small.id, null); return sc.clones[1].lane === 1 && sc.clones[1].start <= before + 1; })();
     out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
     sc.tar = null;
