@@ -97,6 +97,8 @@ function upgradeSave(s){
     if(s.exhibits.some(e => e.flora === "paleozoic")){ give("paleoflora"); give("paleoplant"); }
   }
   for(const e of s.exhibits) if(!e.viv && e.cond === undefined){ e.cond = 100; e.inspected = {day:s.day, cond:100}; }
+  // landscaping: ponds and rocks inside open exhibits
+  for(const e of s.exhibits) if(!e.viv && e.land === undefined) e.land = [];
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
   for(const b of s.buildings){
     if(b.type !== "platform" || b.inward) continue;
@@ -295,6 +297,8 @@ function exhibitReport(e){
   let fight = null;
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = conflict(kinds[i], kinds[j]);
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
+  // Ponds and rocks: animals feel at home among what they like, and water lovers need a pond
+  const hab = habitatScore(e); target += hab.delta; issues.push(...hab.issues);
   // Sick and hurt animals drag the whole herd down
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
   // (a chronic case, eased by contemporary medicine, counts for less)
@@ -388,7 +392,8 @@ function earn(amount, kind){ state.money += amount; state.today[kind] += amount;
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
 function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : COST.pathPerMeter)); }
 function refundFor(kind, item){
-  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare);
+  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
+  if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;

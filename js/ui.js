@@ -179,6 +179,8 @@ function exhibitHtml(e){
     h += `<div class="meta" style="margin-top:4px">${eras.length ? `Animals here come from the ${eras.map(x => FLORA[x].label).join(" and ")}. ` : ""}${hasCeres ? `Replanting uses ${batchesFor(e)} batch${batchesFor(e) === 1 ? "" : "es"} of planting stock grown at CERES (it has ${state.ceres.plants.mesozoic || 0} Mesozoic and ${state.ceres.plants.paleozoic || 0} Paleozoic). It has no refund.` : "Build CERES, research the flora at ORACLE, and grow planting stock to plant Mesozoic or Paleozoic flora."}</div></section>`;
   }
 
+  if(!e.viv) h += landHtml(e);
+
   // food and keeper access
   const g = gateCheck(e), need = dailyNeed(e);
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>`;
@@ -220,6 +222,15 @@ function exhibitHtml(e){
   return h;
 }
 
+// Ponds and rocks in one exhibit, and buttons to add more
+function landHtml(e){
+  const hb = habitatOf(e), n = {};
+  for(const f of landOf(e)) n[f.type] = (n[f.type] || 0) + 1;
+  const have = Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`).join(", ");
+  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Ponds cover ${(hb.pondShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without a pond.</div>
+    <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px">${esc(t.label)}, ${money(t.price)}</button>`).join("")}</div></section>`;
+}
+
 // Sick animals, illness risk, and medicated feed for one exhibit
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
@@ -233,7 +244,7 @@ function healthHtml(e){
   if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
   if(e.animals.length > hr.sick.length){
     h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
-    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", rivals:"territorial rivals", attacks:"species that attack each other"};
+    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", rivals:"territorial rivals", attacks:"species that attack each other"};
     if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
     h += `</div>`;
   }
@@ -484,6 +495,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
+  if(a === "landTool"){ setTool("land-" + b.dataset.key); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireSci"){ if(sc.crew[b.dataset.k] > 0) sc.crew[b.dataset.k]--; done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }

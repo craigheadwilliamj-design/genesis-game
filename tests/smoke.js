@@ -805,6 +805,43 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
     out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
+
+    // landscaping: ponds and rocks inside open exhibits
+    const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
+    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    state.exhibits = [lx];
+    const fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
+    lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
+    out.landMenu = !!document.querySelector('[data-tool="land-pond"]');
+    setTool("land-pond"); out.landTool = tool === "land-pond" && $("#drawbar").classList.contains("on"); setTool("select");
+    out.landRejectsOutside = !landSpot(10, 10, "pond").ok && !landSpot(103, 130, "pond").ok;
+    const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
+    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
+    const spot = landSpot(130, 130, "pond");
+    out.landAcceptsInside = spot.ok && spot.e === lx;
+    placeLand(lx, "pond", 130, 130);
+    out.landOverlapRejected = !landSpot(133, 130, "pond").ok;
+    out.landPondHelps = !thirsty(lx, fish) && exhibitReport(lx).target > dryTarget && illChance(lx, lx.animals[0]).p < dryIll;
+    state.money = 100; out.landNeedsMoney = /Costs/.test(landSpot(140, 110, "boulder").why || ""); state.money = 1e6;
+    placeLand(lx, "rock", 110, 150);
+    // ponds and rocks ride along when the exhibit moves
+    const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
+    out.landMoves = lx.land[0].x === 140 && lx.land[0].y === 135 && lx.points[0][0] === 110;
+    moveBy(mv, 0, 0);
+    // an outline that would leave one outside the fence is refused
+    const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
+    out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
+    // bulldozing one refunds part of its price
+    const f0 = lx.land[1], n0 = lx.land.length;
+    out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && landRefund(lx) > 0;
+    removeItem("land", f0);
+    out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0);
+    state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+    // old saves get an empty list for open exhibits only
+    const oldL = JSON.parse(JSON.stringify(newPark()));
+    oldL.exhibits.push({id:"e-old", name:"Old", points:[[1,1],[2,1],[2,2]], animals:[], happy:70}, {id:"e-oldv", name:"OldV", points:[[1,1],[2,1],[2,2]], animals:[], happy:70, viv:"S"});
+    const upl = upgradeSave(oldL);
+    out.oldGetsLand = upl.exhibits.find(e => e.id === "e-old").land.length === 0 && upl.exhibits.find(e => e.id === "e-oldv").land === undefined;
     return out;
   }));
 

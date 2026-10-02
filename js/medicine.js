@@ -63,6 +63,7 @@ function illChance(e, a){
   const d = e.dirt || 0; if(d > CLEAN.penaltyFrom){ p *= 1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer; why.push("dirt"); }
   const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
   if(grassSick(e, s)){ p *= HEALTH.grassSick; why.push("eating grass"); }
+  if(thirsty(e, s)){ p *= HAB.dryIll; why.push("no water"); }
   if(medicated(e, s)) p *= MEDICINE.feedCut;
   return {p, why};
 }

@@ -15,6 +15,7 @@ let tool = "select";
 let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
+let landGhost = null;               // pond or rock being placed: {key, x, y, ok, why}
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
@@ -42,7 +43,7 @@ let zedit = null;                   // zone being reshaped: {id, orig, sel, done
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : null; }
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
 function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
 
@@ -112,6 +113,7 @@ function render(){
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
+    if(!e.viv) s += landSvg(e, tool === "bulldoze", id => isDoomed("land", id));
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if((e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
@@ -249,6 +251,10 @@ function renderOverlay(){
       const first = poly && i === 0 && draw.pts.length >= 3;
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(first ? 7 : 4.5)*inv}" fill="${first ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     });
+  }
+  if(landGhost && landKey(tool)){
+    const t = LAND[landGhost.key];
+    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${t.color}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
   if(ghost){
     const col = ghost.ok ? "var(--sel)" : "var(--bad)", t = BUILDINGS[tool];
@@ -474,7 +480,7 @@ const drawType = () => draw && draw.kind === "service" ? "service" : undefined;
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null; landGhost = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -486,6 +492,7 @@ function setTool(t){
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
+  else if(landKey(t)) showBar(`Place ${LAND[landKey(t)].one}`, "Tap inside an open exhibit. Animals feel at home among ponds and rocks, and some can't do without water.", `${money(LAND[landKey(t)].price)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
@@ -913,6 +920,25 @@ function platformTap(ev){
   ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
 }
 
+/* ---------- ponds and rocks ---------- */
+function landPoint(ev){
+  const p = toWorld(ev.clientX, ev.clientY);
+  return gridSnap && !ev.altKey ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP} : p;
+}
+function landHover(ev){
+  const key = landKey(tool), p = landPoint(ev);
+  landGhost = {...landSpot(p.x, p.y, key), key};
+  setStat(landGhost.why || `${money(LAND[key].price)}. It goes in ${landGhost.e.name}.`, !landGhost.ok);
+  renderOverlay();
+}
+function landTap(ev){
+  const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
+  if(!g.ok){ setStat(g.why, true); return; }
+  placeLand(g.e, key, g.x, g.y);
+  afterChange(); render();
+  ui.toast(`Added ${LAND[key].one} to ${g.e.name}.`, "good");
+}
+
 /* ---------- bulldozing ---------- */
 function bulldozeTap(kind, id){
   if(!kind){ doomed = null; setStat(""); render(); return; }
@@ -934,7 +960,8 @@ function removeItem(kind, it){
   const refund = refundFor(kind, it);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
-  const l = listFor(kind); l.splice(l.indexOf(it), 1);
+  if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)); if(o) o.land.splice(o.land.indexOf(it), 1); }
+  else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   if(kind === "zone") dropZone(it.id);
   // viewing platforms go with their exhibit
@@ -980,12 +1007,14 @@ function moveBy(m, dx, dy){
   it.points = shiftPts(m.orig, dx, dy);
   if(m.gate) it.gate = [m.gate[0] + dx, m.gate[1] + dy];
   for(const pl of m.plats) pl.b.points = shiftPts(pl.pts, dx, dy);
+  for(const l of m.land){ l.f.x = l.x + dx; l.f.y = l.y + dy; }
   m.dx = dx; m.dy = dy;
 }
 function startMove(it, kind, e){
   const w = toWorld(e.clientX, e.clientY);
   return {it, kind, wx:w.x, wy:w.y, dx:0, dy:0, orig:it.points.map(p => p.slice()), gate:it.gate ? it.gate.slice() : null,
-    plats:kind === "exhibit" ? state.buildings.filter(b => b.exhibitId === it.id).map(b => ({b, pts:b.points.map(p => p.slice())})) : []};
+    plats:kind === "exhibit" ? state.buildings.filter(b => b.exhibitId === it.id).map(b => ({b, pts:b.points.map(p => p.slice())})) : [],
+    land:kind === "exhibit" ? landOf(it).map(f => ({f, x:f.x, y:f.y})) : []};
 }
 function dragMove(m, e){
   const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
@@ -1032,6 +1061,7 @@ function reshapeProblem(e, orig){
   if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
+  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A pond or rock would end up outside the fence. Bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
   return null;
@@ -1135,6 +1165,7 @@ svg.addEventListener("pointermove", e => {
     if(e.pointerType !== "mouse") return;
     if(draw){ const sn = snapAt(e.clientX, e.clientY, e); draw.hover = [sn.x, sn.y]; snapMark = sn.info ? [sn.x, sn.y] : null; updateDrawbar(); renderOverlay(); }
     else if(tool === "platform") platformHover(e);
+    else if(landKey(tool)) landHover(e);
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
     else if(tool === "bulldoze"){ const h = itemAt(e.target); const nh = h.kind ? h : null; if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); } }
@@ -1209,6 +1240,7 @@ function endPointer(e){
   // a tap
   if(draw){ drawTap(e); return; }
   if(tool === "platform"){ platformTap(e); return; }
+  if(landKey(tool)){ landTap(e); return; }
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
@@ -1218,7 +1250,7 @@ svg.addEventListener("pointerup", endPointer);
 svg.addEventListener("pointercancel", endPointer);
 svg.addEventListener("pointerleave", () => {
   if(draw && draw.hover){ draw.hover = null; snapMark = null; updateDrawbar(); renderOverlay(); }
-  if(ghost){ ghost = null; renderOverlay(); }
+  if(ghost || landGhost){ ghost = null; landGhost = null; renderOverlay(); }
   if(hoverItem){ hoverItem = null; queueRender(); }
 });
 svg.addEventListener("wheel", e => {

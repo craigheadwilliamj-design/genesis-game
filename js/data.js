@@ -875,6 +875,28 @@ BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};
 
+// Landscaping: ponds and rocks placed inside an open exhibit (e.land). Animals feel at home among what they like.
+//   r      radius in meters
+//   water  counts toward the exhibit's water
+//   cover  rock cover it adds (see HAB.rockEvery)
+const LAND = {
+  pond:   {label:"Pond",          one:"a pond",          price:3000, r:6, color:"#3A7FB2", water:true},
+  rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
+  boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
+};
+const HAB = {
+  waterFull:.03,   // share of the exhibit's floor in ponds that fully satisfies water lovers
+  rockEvery:500,   // square meters of exhibit that one point of rock cover looks after
+  bonus:8,         // happiness an exhibit with everything its animals like gains
+  wantsWater:.8,   // a species this keen on water is unhappy and sickly without a pond
+  dry:8,           // happiness lost when water lovers have no pond
+  dryIll:1.5,      // illness chance multiplier for them
+};
+// How much each species likes water and rocks (0 to 1). Fish eaters want water. Anything not listed likes both a little.
+const LIKES_ROCK = {water:.2, rock:.9};
+const HABITAT_LIKES = {diic:LIKES_ROCK, lyst:LIKES_ROCK, seym:LIKES_ROCK, dime:LIKES_ROCK, plhy:LIKES_ROCK, mlan:LIKES_ROCK, mono:LIKES_ROCK, beel:{water:.6, rock:.6}};
+const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {water:.9, rock:.1} : {water:.4, rock:.4});
+
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
 
