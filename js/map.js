@@ -38,6 +38,9 @@ const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t 
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
+let rot = 0;                        // quarter turns a building is rotated by while placing it
+let lastPtr = null;                 // where the pointer last was while placing, so Rotate can redraw the ghost
+let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH;
@@ -258,6 +261,8 @@ function renderOverlay(){
     const t = LAND[landGhost.key];
     s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${t.color}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
+  const mb = tool === "move" && mvSel && findItem("building", mvSel);
+  if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   if(ghost){
     const col = ghost.ok ? "var(--sel)" : "var(--bad)", t = BUILDINGS[tool];
     s += `<polygon points="${polyStr(ghost.pts)}" fill="${t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
@@ -487,7 +492,7 @@ const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide")
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null; landGhost = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null; landGhost = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -503,13 +508,14 @@ function setTool(t){
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
-    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and tap.`
-      : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Tap beside a path. Fits ${fits.join(", ")}.`
-      : b.kind ? `Point beside a path and tap, then tap it to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.`
-      : b.onPath ? "Point at a path and tap. It sits on the edge you point at."
-      : b.prop ? "Point beside a path and tap."
-      : "Point beside a path and tap. It turns to face the path by itself.",
-      `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:false, finish:false, cancel:"Done"});
+    const free = " Place it anywhere, but it only works once a path reaches it.", spin = " Rotate turns it a quarter (R).";
+    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and it snaps on.${free}${spin}`
+      : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
+      : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
+      : b.onPath ? `Point at a path and tap. It sits on the edge you point at.${spin}`
+      : b.prop ? `Point beside a path and it snaps on.${free}${spin}`
+      : `Point beside a path and it turns to face it.${free}${spin}`,
+      `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:true, finish:false, cancel:"Done", undoText:"Rotate"});
   }
   else if(t === "zoneedit" && zedit){
     showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
@@ -518,7 +524,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit or path to a new spot. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
+    showBar("Move", "Drag a building, exhibit or path to a new spot. Tap a building, then Rotate (R) to turn it a quarter. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -604,10 +610,11 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
   if(tool === "zoneedit"){ finishZoneEdit(); return; }
+  if(tool === "move"){ rotateMoved(); return; }
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = (d.kind === "exhibit" ? closeAlong(d.pts) : d.pts).map(p => [p[0], p[1]]);
@@ -683,6 +690,7 @@ function drawTap(e){
 
 /* ---------- placing guest buildings ---------- */
 function placeGhost(clientX, clientY){
+  lastPtr = {x:clientX, y:clientY};
   const t = BUILDINGS[tool];
   const p = toWorld(clientX, clientY);
   let best = null;
@@ -713,12 +721,15 @@ function placeGhost(clientX, clientY){
     let fx = p.x, fy = p.y;
     if(tool === "sign"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
-    let off = t.onPath ? Math.max(0, best.hw - t.d/2 - .1) : t.d/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
+    const dn = rot % 2 ? t.w : t.d;   // how deep it is across the path once turned
+    let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
     // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
-    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx)), e.points))) off = Math.max(0, off - .1);
+    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + rot*Math.PI/2), e.points))) off = Math.max(0, off - .1);
     x = best.x + nx*side*off; y = best.y + ny*side*off;
     angle = Math.atan2(dy, dx);
-  } else why = why || (t.serviceOnly ? "Move it next to a service road. ATVs can't use guest paths." : t.dept ? "Move it next to a path or service road." : "Move it next to a path.");
+  } else if(t.onPath) why = why || "Move it next to a path.";
+  angle += rot * Math.PI/2;
+  if(!best && gridSnap){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
   const pts = rectPts(x, y, t.w, t.d, angle);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
@@ -726,7 +737,26 @@ function placeGhost(clientX, clientY){
   if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
-  setStat(why || `${money(t.price)}. Tap to build.`, !!why);
+  setStat(why || `${money(t.price)}. Tap to build.${best ? "" : " No path nearby, so it won't work until one reaches it."}`, !!why);
+}
+
+// Turn the building being placed a quarter, and redraw the ghost where the pointer is
+function rotateTool(){
+  rot = (rot + 1) % 4;
+  if(lastPtr){ placeGhost(lastPtr.x, lastPtr.y); renderOverlay(); }
+  else setStat(`Turned a quarter. Tap to place it.`);
+}
+// Turn the building picked with the Move tool a quarter about its middle, if it fits there
+function rotateMoved(){
+  const it = mvSel && findItem("building", mvSel);
+  if(!it){ setStat("Tap a building first, then Rotate.", true); return; }
+  const orig = it.points, [cx, cy] = centroid(orig);
+  it.points = orig.map(([x, y]) => [cx - (y - cy), cy + (x - cx)]);
+  const why = moveProblem("building", it);
+  if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
+  afterChange(); render(); updateMoveBar();
+  const reach = isReachable(it);
+  setStat(reach ? "Turned." : "Turned, but it has no path to the entrance, so it won't work.", !reach);
 }
 
 function placeBuilding(e){
@@ -742,7 +772,7 @@ function placeBuilding(e){
     autoZone(e);
     state.exhibits.push(e);
     afterChange(); render();
-    ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but its path doesn't reach the entrance yet.`, isReachable(e) ? "" : "bad");
+    ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(e) ? "" : "bad");
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts};
@@ -750,7 +780,7 @@ function placeBuilding(e){
   state.buildings.push(b);
   afterChange();
   render();
-  ui.toast(isReachable(b) ? `Built ${t.one} for ${money(t.price)}.` : `Built ${t.one}, but its path doesn't reach the entrance yet.`, isReachable(b) ? "" : "bad");
+  ui.toast(isReachable(b) ? `Built ${t.one} for ${money(t.price)}.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(b) ? "" : "bad");
   if(t.dept || t.kind){ toolDone({kind:"building", id:b.id}); }
 }
 
@@ -1116,7 +1146,7 @@ function reshapeProblem(e, orig){
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
   return null;
 }
-function updateMoveBar(){ if(tool === "move") $("#dUndo").disabled = !mvCorner; }
+function updateMoveBar(){ if(tool === "move"){ $("#dUndo").disabled = !mvCorner; $("#dFinish").disabled = !(mvSel && findItem("building", mvSel)); } }
 // Pay or refund for the new fence, keep the gate on the wall, and rebuild the routes
 function commitReshape(e, orig){
   const diff = reshapeCost(e, orig);
@@ -1204,8 +1234,9 @@ svg.addEventListener("pointerdown", e => {
       return;
     }
     const hit = itemAt(e.target), it = moveTarget(hit);
-    if(it){ drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; return; }
+    if(it){ mvSel = hit.kind === "building" ? it.id : null; updateMoveBar(); drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; render(); return; }
   }
+  if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
 
@@ -1363,6 +1394,7 @@ document.addEventListener("keydown", e => {
   if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sel) select(null); }
   if(e.key === " "){ e.preventDefault(); setSpeed(speed ? 0 : (lastSpeed || 1)); }
   if(e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey){ setGridSnap(!gridSnap); if(draw){ updateDrawbar(); renderOverlay(); } }
+  if(e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey){ if(isBuildTool(tool)) rotateTool(); else if(tool === "move" && mvSel) rotateMoved(); }
   if(e.key === "1") setSpeed(1);
   if(e.key === "2") setSpeed(2);
   if(e.key === "3" || e.key === "4") setSpeed(4);

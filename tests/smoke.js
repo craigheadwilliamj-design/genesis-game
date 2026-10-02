@@ -956,6 +956,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const plain = crowdedOn(), wide = crowdedOn("wide");
     out.widePathRoom = !!plain && !!wide && plain.mult === 1 && wide.mult === WIDE_PATH.crowdMult && pathCost([[0,0],[10,0]], "wide") === 10 * WIDE_PATH.perMeter;
     state.paths = wPaths; recompute(); buildGuestGraph();
+
+    // a building can go far from any path (but doesn't work there), and Rotate turns it a quarter
+    const savedPaths = state.paths; state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]]}]; state.gate = [200,300]; recompute();
+    setTool("food"); rot = 0; placeGhost(0, 0); const g0 = ghost; const w0 = Math.hypot(g0.pts[1][0] - g0.pts[0][0], g0.pts[1][1] - g0.pts[0][1]);
+    rotateTool(); const w1 = Math.hypot(ghost.pts[1][0] - ghost.pts[0][0], ghost.pts[1][1] - ghost.pts[0][1]);
+    out.offPathRotate = typeof g0.ok === "boolean" && !(g0.why || "").includes("next to a path") && Math.abs(w0 - w1) < 1e-6 && Math.abs(ghost.angle - g0.angle - Math.PI/2) < 1e-6;
+    setTool("select"); state.paths = savedPaths; recompute();
     return out;
   }));
 
