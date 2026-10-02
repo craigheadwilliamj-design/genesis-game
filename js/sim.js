@@ -177,6 +177,7 @@ function upgradeSave(s){
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
   // stock for stands and shops became physical: older parks get a few more days of direct deliveries
+  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor((s.minute - OPEN_MIN) / LOGI.truckMin));
   if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
