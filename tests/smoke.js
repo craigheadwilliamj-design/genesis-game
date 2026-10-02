@@ -449,14 +449,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = CLOSE_MIN;
     out.benchRests = !!gGraph.anchors["b-bench"] && run(400, () => tp1.needs.energy < 5) && bench.served && bench.served.n === 2;
 
-    // trash goes in a bin nearby; a full bin spills onto the path; the night crew clears it all, for a fee
+    // trash goes in a bin nearby; a nearly full bin spills the rest; a full one gets walked past; the night crew clears it all, for a fee
     const bin = {id:"b-bin", type:"bin", points:rectPts(96.7, 180, BUILDINGS.bin.w, BUILDINGS.bin.d, Math.PI / 2)};
     state.buildings.push(bin); afterChange();
     state.litter = {};
     tp1.at = nearestGuestNode(100, 180); tp1.trash = 3; tp1.trashAt = state.minute; trashCheck(tp1);
     out.binCatchesTrash = bin.fill === 3 && !tp1.trash && litterTotal() === 0;
-    bin.fill = LITTER.binCap; tp1.trash = 2; trashCheck(tp1);
-    out.fullBinSpills = litterTotal() === 2;
+    bin.fill = LITTER.binCap - 1; tp1.trash = 3; trashCheck(tp1);
+    out.fullBinSpills = litterTotal() === 2 && bin.fill === LITTER.binCap && !tp1.trash;
+    tp1.trash = 2; tp1.trashAt = state.minute; trashCheck(tp1);
+    out.fullBinSkipped = tp1.trash === 2 && litterTotal() === 2 && bin.fill === LITTER.binCap;
     // with no bin in reach, trash held long enough ends up on the ground
     const far = nearestGuestNode(300, 125); tp1.at = far; tp1.trash = 1; tp1.trashAt = state.minute - LITTER.holdMin;
     const rr2 = Math.random; Math.random = () => 0; trashCheck(tp1); Math.random = rr2;
