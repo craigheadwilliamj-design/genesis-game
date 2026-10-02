@@ -5,12 +5,13 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 ## Files (script load order, from index.html; menu.js sits just before map.js)
 - `js/data.js`: all tuning constants and content (`SPECIES`, `BUILDINGS`, `BARRIERS`, `TECH`, `GOALS`, `KEEPER`, `MAINT`, `POWER`, `ESCAPE`, `HEALTH`, `MEDICINE`, `VET`, ...). Balance changes go here.
 - `js/geometry.js`: pure shape math (`area`, `perimeter`, `inPoly`, `segProj`, `shapesOverlap`, ...).
-- `js/sim.js`: the core loop `tick(dtMin)` → `endDay()`, plus guest demand, money (`spend`/`earn`/`canAfford`), happiness (`exhibitReport`), rating, science (ORACLE/GHOST/TAR), goals, and save migration (`newPark`, `upgradeSave`).
+- `js/sim.js`: the core loop `tick(dtMin)` → `endDay()`, plus guest demand, money (`spend`/`earn`/`canAfford`), happiness (`exhibitReport`), rating, goals, and save migration (`newPark`, `upgradeSave`).
+- `js/science.js`: ORACLE/GHOST/TAR/CERES logic, loaded right after sim.js. Everything is timed in park minutes (`nowMin()`, jobs carry `start`/`end`) and finishes mid-day in `scienceTick(dtMin)`, not at night. ORACLE projects (`startProject`, kinds `tech`/`refine`/`species`, one per paleontologist), GHOST trips (`tripOdds`, `launchTrip`, `tripReturns`; a genome takes 3 to 8 trips by size), TAR clones (`orderClone`, `freeLane`, upgrades `incub1/2`, `fast1/2`), and CERES growing beds (`growBatch`, planting stock for `replantProblem`, medicine batches).
 - `js/keepers.js`: keepers, food (`dailyNeed`, `shortages`), cleaning, animal transfers, ATVs, and the staff path graph (`buildKeeperGraph`, `walkFrom` Dijkstra).
 - `js/escapes.js`: barrier strength, breakouts, loose animals, guest deaths, viewing platforms, `researchTech`.
 - `js/power.js`: generators and electric-fence power allocation (`updatePower`).
 - `js/maintenance.js`: fence/generator/depot wear, plus mechanics who inspect and repair.
-- `js/medicine.js`: sickness and injuries (`illChance`, `injuryChance`, `healthNight`), the PMC ward (`admit`, `discharge`, `pmcRemoved`), vets who dart sick and escaped animals (`vetsTick`), and CERES medicine (`medTick`).
+- `js/medicine.js`: sickness and injuries (`illChance`, `injuryChance`, `healthNight`), the PMC ward (`admit`, `discharge`, `pmcRemoved`), vets who dart sick and escaped animals (`vetsTick`), and which medicine cures what (`canTreat`: the era's medicine plus a `ref-<Period>` refinement from ORACLE). CERES makes the doses in batches (science.js).
 - `js/logistics.js`: food and medicine as goods. Stores (`b.store`, `storeOf`, `addGood`/`takeGood`), spoilage, dock orders, farms, work zones (`state.zones`, `e.zone`/`b.zone`/`k.zone`), and restock hauls (`pickHaul`, `supplyLines`).
 - `js/guests.js`: guest parties. Their needs (`NEEDS`), the guest path graph (`buildGuestGraph`, `guestField` per stop), deciding where to go (`planParty`), queues and service at food stands, shops and restrooms (`svcQ`, `serveParty`), mood, thoughts (`THOUGHTS`, `topThoughts`), and the nightly `guestsNight`. Also learning (`p.edu`, `learn`, `hasSign`): info signs, field guides and the Education Center teach guests, which lifts mood, cuts litter and vandalism, brings donations, and feeds the Education rating part (`EDU`).
 - `js/services.js`: guest services. Menus on food and gift shells (`b.menu`, `MENU`, `servesOf`, `serveAt`, `willPay`), benches and picnic areas, trash bins and litter (`state.litter` grid, `trashCheck`), restroom dirt, and the night cleaning crew (`servicesNight`, `cleaningBill`).
@@ -20,11 +21,13 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `js/menu.js`: the build sidebar (`BUILD_MENU`, `buildMenu`, `refreshMenu`). Groups and dropdowns are generated from the data, so prices follow `BUILDINGS`, `BARRIERS` and `fenceRate`. Loads before map.js.
 - `js/map.js`: SVG rendering, camera, build tools (including the Move tool: `moveTarget`, `moveBy`, `moveProblem`, `dropMove`; and `fenceSel`, the fence an exhibit is built with), and drawing guests (`drawParties`). Also defines `$`, `esc` and `nodeKey`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
+- `js/scienceui.js`: the ORACLE (Park management / Animals / Paleo-Flora tabs), GHOST (period tabs with genome bars), TAR and CERES panels and their clicks.
 - `js/logiui.js`: panels for stores, the dock, zones, and the park-office supply summary, plus their click/change handlers.
 - `js/guestui.js`: the park office's Guests section and the panels for food and gift shells (menu picker and prices), restrooms, bins, and seats.
 - `js/main.js`: the rAF loop (`frame` → `step`), saving (localStorage plus the claude.ai `db` capability), and `startWith`.
 
 ## Key globals
+- `state.science`: `points`, `crew`, `tech` (TECH ids, plus `ref-<Period>`), `projects`, `unlocked` (animal ids), `dna` (animal and plant genomes, `PLANT_DNA`), `trips`, `clones`. `state.ceres`: Paleoflora `stock`, `meds`, planting stock `plants`, `beds`, `auto`.
 - `state`: the whole saved game (JSON-serialized). **Anything that must survive a reload lives in `state`.**
 - `derived`: computed from `state` by `recompute()` (reach, reports, demand, rating parts). Call `recompute()` after layout changes.
 - `state.zones` / `state.logi`: work zones and logistics bookkeeping. Food is physical: it lives in `b.store` of stations, docks, warehouses, cold stores, and farms, and the PMC holds medicine. Exhibits only get what keepers carry. Stands and shops sell from their own `b.store` of guest goods (snacks, drinks, merch) once `state.logi.guestFrom` has passed; custodians carry it to them.

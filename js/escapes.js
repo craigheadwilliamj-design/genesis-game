@@ -49,17 +49,6 @@ function upgradeCost(e, key){ return Math.round(perimeter(e.points) * BARRIERS[k
 function moatCost(e){ return Math.round(perimeter(e.points) * MOAT_PER_METER); }
 function aviaryCost(e){ return Math.round(area(e.points) * AVIARY_PER_SQM); }
 
-function researchTech(id){
-  const t = TECH.find(x => x.id === id), sc = state.science;
-  if(!t || hasTech(id)) return "Already researched.";
-  if(t.needs && !hasTech(t.needs)) return `Research ${TECH.find(x => x.id === t.needs).label} first.`;
-  const blocker = deptProblem("oracle"); if(blocker) return blocker;
-  if(sc.points < t.points) return `Needs ${t.points} research points. You have ${sc.points}.`;
-  sc.points -= t.points; sc.tech.push(id);
-  events.toast(`ORACLE researched ${t.label.toLowerCase()}.`, "good");
-  return null;
-}
-
 /* ---------- breakouts ---------- */
 
 function escapesTick(dtMin){
