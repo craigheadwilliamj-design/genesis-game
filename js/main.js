@@ -39,7 +39,7 @@ events.dayEnded = r => {
     ${L.repairs ? row("Fence repairs", "−" + money(L.repairs)) : ""}
     ${L.built + L.animals ? row("Building and animals", "−" + money(L.built + L.animals)) : ""}
     <tr class="tot"><td>Profit</td><td>${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>
-  </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${r.rating.toFixed(1)} stars.</div>` : ""}`);
+  </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${starTxt(r.rating)} stars.</div>` : ""}`);
   render(); ui.panel(); ui.hud(true);
   saveNow();
 };

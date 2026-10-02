@@ -169,7 +169,7 @@ function cloneProblem(sp){
   return deptProblem("tar") ||
     (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
     (!d || d.genome < 100 ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. It needs 100%.` : null) ||
-    (state.rating + 1e-9 < s.stars ? `Needs a ${s.stars}-star park. You have ${state.rating.toFixed(1)}.` : null) ||
+    (state.rating + 1e-9 < s.stars ? `Needs a ${s.stars}-star park. You have ${starTxt(state.rating)}.` : null) ||
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 // A job queue per lane (incubator, growing bed): the next job starts when the lane's last one ends. Picks the lane that frees up first.
