@@ -59,7 +59,7 @@ function warehouseHtml(b){
     const full = storeTotal(b) >= storeCap(b) - .5;
     h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Keepers carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
   } else {
-    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park eats ${Math.round(parkDemand(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Keepers fill it from docks and farms and take from it to restock stations.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Keepers and custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
   }
   return h + `</section>`;
 }
