@@ -213,20 +213,20 @@ const BUILDINGS = {
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true},
   // hotels: guests stay the night and spend the next day in the park
-  lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
-  resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
-  campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, w:16, d:12, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100},
+  lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
+  resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
+  campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, tech:"hotels", w:16, d:12, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100},
   // guests learn about prehistoric life here
   edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:16, d:12, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
-  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:15000, upkeep:150, w:24, d:16, dept:true,
+  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:11250, upkeep:150, w:24, d:16, dept:true,
              full:"Operational Requests for Ancestral & Chronological Life Evidence",
              blurb:"The GHOST hub. Researches time periods and sends expedition requests."},
-  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:25000, upkeep:250, w:28, d:20, dept:true,
+  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:18750, upkeep:250, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
              blurb:"The time travel unit. Brings back DNA samples from unlocked periods."},
-  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:20000, upkeep:200, w:26, d:18, dept:true,
+  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:15000, upkeep:200, w:26, d:18, dept:true,
              full:"Terrestrial Animal Reconstruction",
              blurb:"The cloning lab. Turns complete genomes into living animals."},
 };
@@ -363,11 +363,11 @@ const GATE_REACH = 4;        // a gate counts as on a road within this many mete
 const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
 
 // Staff buildings. They go beside a path or service road.
-BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:8000, upkeep:80, w:14, d:10, dept:true,
+BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:4000, upkeep:80, w:14, d:10, dept:true,
                        full:"Food storage and keeper lockers", blurb:"Keepers start here, load food here, and swap food types here."};
-BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:5000, upkeep:40, w:10, d:8, dept:true,
+BUILDINGS.breakroom = {label:"Break Room", tag:"BREAK", one:"a break room", glyph:"B", color:"#7A5A2E", price:2500, upkeep:40, w:10, d:8, dept:true,
                        full:"Break room and locker room", blurb:"Tired keepers rest here four times faster than at a station."};
-BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:4000, upkeep:30, w:10, d:8, dept:true, unique:true,
+BUILDINGS.toolshed  = {label:"Tool Shed", tag:"SHED", one:"a tool shed", glyph:"S", color:"#5B6470", price:2000, upkeep:30, w:10, d:8, dept:true, unique:true,
                        full:"Equipment for staff", blurb:"Buy upgrades that make keepers' and custodians' work easier."};
 for(const t of ["oracle", "ghost", "tar"]) BUILDINGS[t].unique = true;
 
@@ -458,9 +458,9 @@ const SECURITY = {
   evacRadius:50,       // during an escape, guards send guests this close toward the gate
   patrolWait:8,        // minutes a guard stands at each stop
 };
-BUILDINGS.security = {label:"Security Office", tag:"SECURITY", one:"a security office", glyph:"P", color:"#2B3F6B", price:8000, upkeep:60, w:12, d:9, dept:true,
+BUILDINGS.security = {label:"Security Office", tag:"SECURITY", one:"a security office", glyph:"P", color:"#2B3F6B", price:4000, upkeep:60, tech:"security", w:12, d:9, dept:true,
                       full:"Park security", blurb:"Guards start here. They patrol the paths, put rowdy guests off, throw out vandals, and steer guests to the gate during escapes."};
-BUILDINGS.closet = {label:"Custodial Closet", tag:"JANITOR", one:"a custodial closet", glyph:"J", color:"#2E8B8B", price:4000, upkeep:30, w:10, d:8, dept:true,
+BUILDINGS.closet = {label:"Custodial Closet", tag:"JANITOR", one:"a custodial closet", glyph:"J", color:"#2E8B8B", price:2000, upkeep:30, w:10, d:8, dept:true,
                     full:"Custodians' base", blurb:"Custodians start here. They restock food stands and gift shops, scrub restrooms, empty bins, and sweep litter."};
 
 // Dirty exhibits
@@ -518,7 +518,7 @@ const MAINT = {
   hireCost:2000,
   wage:150,
 };
-BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:7000, upkeep:50, w:12, d:10, dept:true,
+BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W", color:"#B8642A", price:3500, upkeep:50, w:12, d:10, dept:true,
                       full:"Maintenance workshop", blurb:"Mechanics are based here. They inspect and repair exhibit barriers."};
 
 /* ---------------------------------------------------------------------
@@ -548,11 +548,11 @@ const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants 
 const GRASS_INTOLERANT = ["Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
-BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:17500, upkeep:150, w:26, d:18, dept:true, unique:true,
+BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:13125, upkeep:150, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
                    blurb:"Grows Paleoflora food for prehistoric plant-eaters, Mesozoic and Paleozoic plants for exhibits, and medicine for the PMC, once ORACLE has researched them. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
-BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:8000, upkeep:60, w:12, d:8, dept:true,
+BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
                         full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to CERES."};
 
@@ -564,7 +564,7 @@ const POWER = {
   offlineBelow:25,        // generators cut out below this condition
   repairPerPercent:60,    // materials to restore 1% of a generator's condition
 };
-BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:15000, upkeep:150, w:12, d:10, dept:true, power:600,
+BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:7500, upkeep:150, tech:"generator", w:12, d:10, dept:true, power:600,
                        full:"Diesel generator", blurb:"Powers every electrified fence in the park. Mechanics keep it running."};
 
 // Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk, and the ATV stays parked where they got off for the next person.
@@ -575,7 +575,7 @@ const VEHICLES = {
   offlineBelow:25,        // a depot this worn grounds its ATVs
   repairPerPercent:50,    // materials to restore 1% of a depot's condition
 };
-BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyph:"A", color:"#4F6273", price:25000, upkeep:300, w:16, d:12, dept:true,
+BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyph:"A", color:"#4F6273", price:12500, upkeep:300, w:16, d:12, dept:true,
                    tech:"vehicles", serviceOnly:true,
                    full:"Staff vehicle depot", blurb:"Adds 3 ATVs for staff to share. They drive five times faster than walking, but only on service roads, and an ATV stays where it was left. Mechanics keep it running."};
 
@@ -626,13 +626,13 @@ const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, befor
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
 BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
 BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: keepers restock them from bigger stores.";
-BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:9000, upkeep:50, w:16, d:12, dept:true,
+BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:6750, upkeep:50, w:16, d:12, dept:true,
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Keepers restock stations and custodians restock shops from here."};
-BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:16000, upkeep:120, w:14, d:10, dept:true,
+BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:14, d:10, dept:true,
                        store:{cap:400, holds:["meat", "fish", "meds", "snacks"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
-BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:6000, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
+BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
                   store:{cap:600, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops overnight. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
@@ -642,16 +642,16 @@ for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:6
   BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
 // Production. Needs the food production research. Output goes into the building's own store.
 //   makes   units a day
-BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:18000, upkeep:260, w:20, d:14, dept:true, tech:"foodprod",
+BUILDINGS.farm      = {label:"Hay Farm",   tag:"FARM", one:"a hay farm",   glyph:"F", color:"#7A9A36", price:13500, upkeep:260, w:20, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["plants"], spoil:1, source:true}, makes:{plants:60},
                        full:"Hay and forage farm", blurb:"Grows 60 units of hay a day."};
-BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:22000, upkeep:380, w:20, d:14, dept:true, tech:"foodprod",
+BUILDINGS.ranch     = {label:"Livestock Ranch", tag:"RANCH", one:"a livestock ranch", glyph:"L", color:"#9A4A3A", price:16500, upkeep:380, w:20, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["meat"], spoil:1, source:true}, makes:{meat:40},
                        full:"Feed livestock ranch", blurb:"Raises 40 units of meat a day. Meat spoils fast, so keep a cold store nearby."};
-BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:22000, upkeep:380, w:18, d:14, dept:true, tech:"foodprod",
+BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery", glyph:"H", color:"#3A7FA8", price:16500, upkeep:380, w:18, d:14, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["fish"], spoil:1, source:true}, makes:{fish:40},
                        full:"Fish hatchery", blurb:"Breeds 40 units of fish a day. It spoils fastest of all."};
-BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:16000, upkeep:220, w:14, d:10, dept:true, tech:"foodprod",
+BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:12000, upkeep:220, w:14, d:10, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
                        full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
 
@@ -669,6 +669,10 @@ const TECH = [
   {id:"moat",     label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"hotels",  label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
+  {id:"coldstore", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
+  {id:"security", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
+  {id:"generator", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
   {id:"cameras",  label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"paleoflora", label:"Paleoflora",       points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass."},
@@ -752,13 +756,13 @@ const VET = {
   speed:WALK_PER_MIN,  // vets walk at the same pace as guests
   patients:3,          // patients each vet can treat each night
 };
-BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:15000, upkeep:125, w:20, d:14, dept:true, unique:true,
+BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:7500, upkeep:125, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
 BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
 
 // Viewing platforms snap onto an exhibit's fence
-BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, w:14, d:7};
+BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
@@ -774,7 +778,7 @@ const GOALS = [
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3000, check:g=>(g.state.staff.custodians || []).length>0},
-  {id:"guard",    text:"Hire a security guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Build a Security Office beside a path and hire a guard to patrol. Lamp posts help too.", reward:3000, check:g=>(g.state.staff.guards || []).length>0},
+  {id:"guard",    text:"Hire a security guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at ORACLE, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:3000, check:g=>(g.state.staff.guards || []).length>0},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use Gates under Exhibit Tools on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
@@ -789,5 +793,5 @@ const GOALS = [
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
   {id:"cash150",  text:"Have $250,000 in the bank",          hint:"Earn more than you spend. Check the day report after closing.", reward:10000, check:g=>g.state.money>=250000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Cretaceous, collect a full T. rex genome, and reach 4.5 stars. It needs a lot of room.", reward:25000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
-  {id:"hotel",    text:"Build a hotel",                      hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].rooms)},
+  {id:"hotel",    text:"Build a hotel",                      hint:"Research Hotels at ORACLE. Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].rooms)},
 ];

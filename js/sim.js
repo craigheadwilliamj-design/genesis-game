@@ -75,6 +75,9 @@ function upgradeSave(s){
   if(s.science.trip !== undefined){ s.science.trips = s.science.trip ? [s.science.trip] : []; delete s.science.trip; }
   delete s.science.budget;
   if(!s.science.tech) s.science.tech = [];
+  // hotels, cold stores, security, generators and viewing platforms became research: parks already using them keep them
+  for(const [type, id] of [["campground","hotels"], ["lodge","hotels"], ["resort","hotels"], ["coldstore","coldstore"], ["security","security"], ["generator","generator"], ["platform","platform"]])
+    if(s.buildings.some(b => b.type === type) && !s.science.tech.includes(id)) s.science.tech.push(id);
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.vets) s.staff.vets = [];
