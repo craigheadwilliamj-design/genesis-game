@@ -224,8 +224,8 @@ function vetDecide(c){
   const l = vetHuntJob(c);
   if(l){
     l.vet = c.id; c.loose = l;
-    if(vetGo(c, kGraph.nodes.get(l.next || l.at), "hunting")) return;
-    l.vet = null; c.loose = null;
+    if(vetGo(c, kGraph.nodes.get(l.next || l.at), "hunting")){ delete l.noVet; return; }
+    l.vet = null; c.loose = null; l.noVet = true;   // keepers can try it with a dart gun
   }
   const p = pickPatient(c);
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
@@ -242,7 +242,7 @@ function vetArrive(c){
     if(!l || l.status !== "loose" || !state.safety.loose.includes(l)){ c.loose = null; c.job = "idle"; return; }
     const [x, y] = keeperPos(c);
     if(lp && Math.hypot(lp[0] - x, lp[1] - y) < 10){ l.status = "darting"; c.job = "darting"; c.work = ESCAPE.sedateMinutes; return; }
-    c.job = "idle"; c.wait = 0; return;   // it moved; chase it again
+    c.job = "idle"; c.wait = 1; return;   // it moved; chase it again (the wait keeps a vet already at the stop from re-planning forever)
   }
   if(c.job === "toPatient"){
     const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a);

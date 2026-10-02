@@ -272,7 +272,7 @@ function goTo(c, n, job){ const w = walkFrom(c.at, c); if(!w.dist.has(n)){ c.job
 
 // An escape nobody is chasing yet gets this keeper. Escapes come before feeding and breaks.
 // With vets on duty, vets do the darting and keepers only carry darted animals home.
-const needsKeeper = l => !l.keeper && (vetsOnDuty() ? l.status === "sedated" : l.status === "loose");
+const needsKeeper = l => !l.keeper && (vetsOnDuty() && !l.noVet ? l.status === "sedated" : l.status === "loose");   // noVet: no vet could get to it
 function huntJob(c){
   if(!state.safety) return null;
   const mine = state.safety.loose.find(l => l.keeper === c.id);
@@ -287,7 +287,7 @@ function chase(c, l){
   // a vet already darted it: walk over and pick it up
   if(l.status === "sedated" && l.byVet){ const n = kGraph.nodes.get(l.at); if(n && goTo(c, n, "toSedated")){ c.hunt = l; return true; } return false; }
   if(l.status === "loose"){
-    if(vetsOnDuty()){ l.keeper = null; return false; }
+    if(vetsOnDuty() && !l.noVet){ l.keeper = null; return false; }
     if(!c.gun){ const st = nearestOf(c, stations()); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
     const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; if(!goTo(c, n, "hunting")){ l.keeper = null; return false; } if(!c.route.length) arrive(c, null); return true; }
   }
@@ -384,6 +384,7 @@ function decide(c, k){
     if(n && goTo(c, n, "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCarry(c);
   }
+  if(c.carry && c.carry.amount > 0 && c.carry.amount < 1) returnCarry(c);   // a scrap isn't worth another trip
   if(c.carry && c.carry.amount > 0){
     const jobs = shortages(k, c).filter(j => j.t === c.carry.type);
     const w = walkFrom(c.at, c); const j = jobs.filter(j => w.dist.has(kGraph.anchors[j.e.id])).sort((a, b) => w.dist.get(kGraph.anchors[a.e.id]) - w.dist.get(kGraph.anchors[b.e.id]))[0];
@@ -395,7 +396,7 @@ function decide(c, k){
   const near = list => { let best = null; for(const b of list){ const n = kGraph.anchors[b.id]; if(n && w.dist.has(n) && (!best || w.dist.get(n) < best.d)) best = {b, n, d:w.dist.get(n)}; } return best; };
   // the neediest exhibit that a store can actually supply
   let job = null, st = null;
-  for(const j of shortages(k)){ const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
+  for(const j of shortages(k)){ if(j.ratio >= KEEPER.topUpBelow) continue; const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
   const feed = () => { c.plan = {exhibitId:job.e.id, type:job.t, src:st.b.id}; goTo(c, st.n, "toStation"); };
   if(job && job.ratio < .3){ feed(); return; }
   // cleaning comes before routine feeding, but not before food that's running out
@@ -437,7 +438,7 @@ function arrive(c, k){
     if(!l || l.status !== "loose"){ c.job = "idle"; return; }
     const [kx, ky] = keeperPos(c);
     if(lp && Math.hypot(lp[0] - kx, lp[1] - ky) < 10){ c.job = "sedating"; c.sedate = ESCAPE.sedateMinutes; l.status = "sedated"; return; }
-    c.job = "idle"; c.wait = 0; return;   // it moved; decide() chases it again
+    c.job = "idle"; c.wait = 1; return;   // it moved; decide() chases it again (the wait stops a keeper at the stop re-planning forever)
   }
   if(c.job === "returning"){
     const l = c.hunt, e = l && state.exhibits.find(x => x.id === l.from);
@@ -520,7 +521,7 @@ function keepersTick(dtMin){
         const need = Math.max(0, (e.dirt || 0) - 2) / cleanRate(e), w = Math.min(left, need);
         e.dirt = Math.max(0, (e.dirt || 0) - cleanRate(e) * w); k.stamina -= CLEAN.tirePerMin * w; left -= w;
         // light tidying gives way to real work: food that a store can supply
-        const busy = c.cleanLow && shortages(k).some(j => sourcesFor(j.t, k).length);
+        const busy = c.cleanLow && shortages(k).some(j => j.ratio < KEEPER.topUpBelow && sourcesFor(j.t, k).length);   // same bar as decide(), or a tidy-up is dropped the moment it starts
         if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
