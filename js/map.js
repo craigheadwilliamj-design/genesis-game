@@ -157,6 +157,8 @@ function render(){
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
+    // a themed exhibit gets a trim line just inside its fence
+    if(themeKey(e) !== "genesis") s += `<polygon points="${polyStr(insetRect(e.points, .96))}" fill="none" stroke="${themeOf(e).accent}" stroke-width="2" stroke-dasharray="${7*inv} ${4*inv}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
@@ -173,22 +175,22 @@ function render(){
   let under = "", over = "", clipDefs = "", wjN = 0;
   // staff roads go first, so a guest path always lays over them where they meet
   for(const p of [...state.paths].sort((a, b) => isService(b) - isService(a))){
-    const svc = isService(p);
+    const svc = isService(p), PT = themeOf(p).path;
     const wj = isWide(p) ? wideJoin(p) : null, pts = polyStr(wj ? wj.pts : p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
     const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
     const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
-    under += cut(`<polyline points="${pts}" stroke="${svc ? "#4B4F55" : "#8F7B52"}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
-    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? "#EADFC4" : "#C9BFA6"}" stroke-width="${w}" ${lj}/>`;
+    under += cut(`<polyline points="${pts}" stroke="${svc ? "#4B4F55" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
+    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
-    if(!live) body += `<polyline points="${pts}" stroke="#8F7B52" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
+    if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
     // a taper where the path steps down to a narrower one: edge below, surface above
     let tp = "";
     for(const t of wj ? wj.tapers : []){
-      under += `<polygon points="${polyStr(t)}" fill="#8F7B52" stroke="#8F7B52" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
-      tp += `<polygon points="${polyStr(t)}" fill="${live ? "#EADFC4" : "#C9BFA6"}"/>`;
+      under += `<polygon points="${polyStr(t)}" fill="${PT.edge}" stroke="${PT.edge}" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
+      tp += `<polygon points="${polyStr(t)}" fill="${live ? PT.live : PT.dead}"/>`;
     }
     over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
   }
@@ -217,7 +219,7 @@ function render(){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : "#1D2B22", full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
-      const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : t.color, sw = on || dead ? 2.5 : 1.2;
+      const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
       if(bl.type === "bin" || bl.type === "lamp") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
@@ -227,7 +229,7 @@ function render(){
       continue;
     }
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
-    s += `<polygon points="${polyStr(bl.points)}" fill="${t.color}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? "#1D2B22" : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    s += `<polygon points="${polyStr(bl.points)}" fill="${themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
     else s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${fs}">${t.glyph}</text>`;
@@ -774,6 +776,7 @@ function finishDraw(){
     const e = {id:uid("e-"), name:`Exhibit ${n}`, points:pts, animals:[], happy:70, cond:100, inspected:{day:state.day, cond:100}};
     if(fenceSel !== "wood") e.barrier = fenceSel;
     autoZone(e);
+    themeNew("exhibit", e);
     state.exhibits.push(e);
     afterChange();
     toolDone({kind:"exhibit", id:e.id});
@@ -784,6 +787,7 @@ function finishDraw(){
     spend(cost, "built");
     const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : "Path", points:pts};
     if(type) p.type = type;
+    if(type !== "service") themeNew("path", p);
     state.paths.push(p);
     afterChange();
     // keep the tool going so you can draw the next one
@@ -893,6 +897,7 @@ function placeBuilding(e){
     let n = 1; while(used.has(`${t.label} ${n}`)) n++;
     const e = {id:uid("e-"), name:`${t.label} ${n}`, points:ghost.pts, animals:[], happy:70, viv:t.viv};
     autoZone(e);
+    themeNew("exhibit", e);
     state.exhibits.push(e);
     afterChange(); render();
     ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(e) ? "" : "bad");
@@ -900,6 +905,7 @@ function placeBuilding(e){
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts};
   autoZone(b);
+  themeNew("building", b);
   state.buildings.push(b);
   afterChange();
   render();
