@@ -10,7 +10,8 @@ let ccrew = [];   // custodians walking around right now (positions aren't saved
 
 const closets = () => state.buildings.filter(b => b.type === "closet" && kGraph && kGraph.anchors[b.id]);
 const custRec = c => state.staff.custodians.find(x => x.id === c.id) || null;
-const custCarry = () => CUSTODIAN.carry * (hasUpgrade("jcart") ? 2 : 1);
+const CUSTODIAN_GOODS = KEEPER_GOODS.concat(GUEST_GOODS);   // custodians stock every store: animal food and medicine too
+const custCarry = () => CUSTODIAN.carry * (hasUpgrade("jcart") ? 2 : 1) * (hasUpgrade("forklift") ? LOGI.forklift : 1);
 const sweepRate = () => CUSTODIAN.sweepPerMin * (hasUpgrade("picker") ? 2 : 1);
 const scrubRate = () => CUSTODIAN.scrubPerMin * (hasUpgrade("washer") ? 2 : 1);
 
@@ -73,7 +74,7 @@ function custDecide(c, r){
     if(d && custGo(c, w, kGraph.anchors[d.id], "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCustCarry(c);
   }
-  const haul = pickHaul(r, near, GUEST_GOODS, custCarry());
+  const haul = pickHaul(r, near, CUSTODIAN_GOODS, custCarry());
   const restock = () => { c.haul = {t:haul.t, src:haul.src.id, dst:haul.d.id, amount:haul.amount}; if(!custGo(c, w, kGraph.anchors[haul.src.id], "toHaulSrc")) c.haul = null; };
   // a stand or shop about to run dry comes first, then cleaning, then routine restocking.
   // After a delivery, one waiting chore gets done before the next haul, so the cleaning never stops completely.

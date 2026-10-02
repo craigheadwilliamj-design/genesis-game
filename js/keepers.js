@@ -396,19 +396,12 @@ function decide(c, k){
   // the neediest exhibit that a store can actually supply
   let job = null, st = null;
   for(const j of shortages(k)){ const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
-  const haul = pickHaul(k, near);
   const feed = () => { c.plan = {exhibitId:job.e.id, type:job.t, src:st.b.id}; goTo(c, st.n, "toStation"); };
-  const restock = () => {
-    c.haul = {t:haul.t, src:haul.src.id, dst:haul.d.id, amount:haul.amount};
-    if(!goTo(c, kGraph.anchors[haul.src.id], "toHaulSrc")) c.haul = null;
-  };
   if(job && job.ratio < .3){ feed(); return; }
-  if(haul && haul.ratio < LOGI.urgentBelow){ restock(); if(c.haul) return; }
   // cleaning comes before routine feeding, but not before food that's running out
   const dirty = cleanJob(c, k);
   if(dirty){ c.cleanId = dirty.id; c.cleanLow = false; if(goTo(c, kGraph.anchors[dirty.id], "toClean")) return; c.cleanId = null; }
   if(job){ feed(); return; }
-  if(haul){ restock(); if(c.haul) return; }
   // nothing else to do: tidy up whatever is dirtiest, however little muck there is
   const tidy = cleanJob(c, k, CLEAN.tidyAbove + .01);
   if(tidy){ c.cleanId = tidy.id; c.cleanLow = true; if(goTo(c, kGraph.anchors[tidy.id], "toClean")) return; c.cleanId = null; }

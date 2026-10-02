@@ -215,7 +215,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     dock.store = {}; const m2 = state.money; out.rushOrder = !rushOrder(dock, "meat") && stockOf(dock, "meat") === LOGI.rushLot && state.money < m2;
     dock.store = {plants:12};
 
-    // a keeper feeds the exhibit from the dock's stock, then restocks the station when nothing else needs doing
+    // a keeper feeds the exhibit from the dock's stock, then a custodian restocks the station
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
     viv.stock = {};
@@ -223,6 +223,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.foodLeftDock = stockOf(dock, "plants") < 12;
     dock.store = {plants:60};
     viv.stock = {plants:storeMax(viv, "paleoflora"), paleoflora:storeMax(viv, "paleoflora")};
+    // keepers leave restocking to custodians: nothing moves to the station until one is hired
+    out.keeperNoRestock = !run(300, () => stockOf(st, "plants") >= 5);
+    state.buildings.push({id:"b-cl2", type:"closet", points:rectPts(210, 250, BUILDINGS.closet.w, BUILDINGS.closet.d, H)});
+    state.staff.custodians.push({id:"c-r", name:"R"}); recompute(); buildKeeperGraph(); buildGuestGraph();
     out.keeperRestocks = run(1500, () => stockOf(st, "plants") >= 5);
     out.supplyLine = supplyLines().length > 0;
     keepersNight();
@@ -353,7 +357,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const x of crew){ x.haul = null; setCarry(x, null); }
     st.store = {plants:storeCap(st)};
     const near = list => list.length ? {b:list[0]} : null;
-    const h = pickHaul(null, near);
+    const h = pickHaul(null, near, CUSTODIAN_GOODS, custCarry());
     out.fullStoreNoHaul = !h || h.d !== st;
     Math.random = realRandom;
     return out;
