@@ -730,7 +730,7 @@ const TECH = [
   {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:40, text:"CERES grows medicine for Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
-const REFINE_POINTS = {cenozoic:10, mesozoic:15, paleozoic:20};
+const REFINE_POINTS = {cenozoic:6, mesozoic:9, paleozoic:12};
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 
@@ -752,8 +752,8 @@ const ESCAPE = {
 // Animals fall ill or get hurt. Vets from the Paleo-Medicine Center (PMC) dart them,
 // keepers carry them in, and the PMC treats them with medicine from CERES.
 const HEALTH = {
-  startDay:10,         // new parks: nobody gets sick before this day
-  illChance:.008,      // chance a well-kept animal falls ill each day
+  startDay:18,         // new parks: nobody gets sick before this day
+  illChance:.005,      // chance a well-kept animal falls ill each day
   hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
   dirtPer:25,          // every this many points of dirt above the unhappy line adds 1× more risk
   frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
@@ -761,8 +761,8 @@ const HEALTH = {
   territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
   attacked:.15,        // chance a day an animal is hurt by a species that preys on it
   illStart:20, injuryStart:25,       // how bad a new case starts (0 to 100)
-  illWorsen:12, injuryWorsen:8,      // how much worse it gets each day untreated; 100 kills
-  sickHappy:12,        // happiness lost per sick animal, as a share of the herd
+  illWorsen:8, injuryWorsen:6,       // how much worse it gets each day untreated; 100 kills
+  sickHappy:8,         // happiness lost per sick animal, as a share of the herd
   dartMinutes:8,       // how long a vet takes to dart a sick animal
   obviousAt:40,        // an illness this bad shows; milder ones stay hidden until a vet checks the exhibit (0 shows everything)
   checkEvery:3,        // days between vet check-ups before an exhibit is overdue
@@ -789,11 +789,11 @@ const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
 // Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
 // but can't cure prehistoric illness for good: the animal goes home with a chronic case.
 const MODERN = {
-  stock:20,            // doses the PMC keeps on hand
-  cost:40,             // price of each dose
-  heal:{cenozoic:.8, mesozoic:.5, paleozoic:.3},     // how well it works, as a share of the era's own medicine
-  floor:{cenozoic:10, mesozoic:20, paleozoic:30},    // how sick it leaves an animal, at best
-  chronicHappy:.5,     // a chronic case counts as this much of a sick animal for happiness
+  stock:30,            // doses the PMC keeps on hand
+  cost:25,             // price of each dose
+  heal:{cenozoic:.9, mesozoic:.7, paleozoic:.5},     // how well it works, as a share of the era's own medicine
+  floor:{cenozoic:5, mesozoic:10, paleozoic:15},    // how sick it leaves an animal, at best
+  chronicHappy:.25,     // a chronic case counts as this much of a sick animal for happiness
 };
 const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoic"};
 const VET = {
@@ -827,11 +827,11 @@ const GOALS = [
   {id:"guard",    text:"Hire a security guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at ORACLE, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:3000, check:g=>(g.state.staff.guards || []).length>0},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use Gates under Exhibit Tools on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
-  {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},
+  {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:9000, check:g=>(g.state.staff.vets || []).length>0},
   {id:"zone",     text:"Draw a work zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",    text:"Get 100 guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
-  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:5000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"period",   text:"Unlock an animal's genome",           hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open a period's tab and start unlocking an animal. It takes a while.", reward:4000, check:g=>g.state.science.unlocked.length>0},
+  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:12000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"period",   text:"Unlock an animal's genome",           hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open a period's tab and start unlocking an animal. It takes a while.", reward:8000, check:g=>g.state.science.unlocked.length>0},
   {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to the periods of animals you've unlocked. Hire a Temporal Researcher at GHOST, then pick the animal under its period's tab and send GHOST.", reward:6000, check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:6000, check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
   {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:8000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
