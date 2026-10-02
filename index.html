@@ -326,15 +326,18 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <button data-tool="service" aria-pressed="false" title="Draw a staff-only service road">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20L20 4" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".4"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 3"/></svg>
             <span class="tl"><b>Service road</b><span class="price">$10/m, staff only</span></span></button>
-          <button data-tool="food" aria-pressed="false" title="Place a food stand">
+          <button data-tool="eat" aria-pressed="false" title="Place a food kiosk, stand, or restaurant, then pick what it sells">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" fill="#2F6E8F"/><text x="12" y="13" class="glyph" font-size="10">D</text></svg>
-            <span class="tl"><b>Food stand</b><span class="price">$6,000</span></span></button>
-          <button data-tool="shop" aria-pressed="false" title="Place a gift shop">
+            <span class="tl"><b>Food and drink</b><span class="price">$3,000–$20,000</span></span></button>
+          <button data-tool="gifts" aria-pressed="false" title="Place a gift cart, shop, or megastore, then pick what it sells">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" fill="#8C4F7D"/><text x="12" y="13" class="glyph" font-size="10">S</text></svg>
-            <span class="tl"><b>Gift shop</b><span class="price">$8,000</span></span></button>
+            <span class="tl"><b>Gift shops</b><span class="price">$3,000–$25,000</span></span></button>
           <button data-tool="restroom" aria-pressed="false" title="Place restrooms">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" fill="#56708A"/><text x="12" y="13" class="glyph" font-size="10">R</text></svg>
             <span class="tl"><b>Restrooms</b><span class="price">$4,000</span></span></button>
+          <button data-tool="props" aria-pressed="false" title="Trash bins, benches, and picnic areas beside the path">
+            <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="12" height="3" rx="1" fill="#8A6238"/><path d="M4.5 15v4M13.5 15v4" stroke="#8A6238" stroke-width="1.6"/><rect x="16.5" y="9" width="5" height="10" rx="1" fill="#3C4A3F"/></svg>
+            <span class="tl"><b>Bins and seats</b><span class="price">$150–$1,500</span></span></button>
           <button data-tool="viv" aria-pressed="false" title="Place a ready-made vivarium for small animals">
             <svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/><path d="M6 9l3-2M12 9l3-2" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>
             <span class="tl"><b>Vivarium</b><span class="price">$3,000–$15,000</span></span></button>
@@ -432,9 +435,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
       <div class="drawbar" id="drawbar" role="status">
         <div class="dtext"><b id="dTitle"></b><span class="dh" id="dHint"></span><span class="ds" id="dStat"></span></div>
         <div class="dbtns">
-          <span id="dSizes" class="sizes" role="group" aria-label="Vivarium size" hidden>
-            <button data-size="S" aria-pressed="false">Small</button><button data-size="M" aria-pressed="false">Medium</button><button data-size="L" aria-pressed="false">Large</button>
-          </span>
+          <span id="dSizes" class="sizes" role="group" aria-label="Which one" hidden></span>
           <button id="dUndo">Undo point</button>
           <button id="dFinish" class="primary">Build</button>
           <button id="dCancel">Cancel</button>
@@ -519,6 +520,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/medicine.js"></script>
 <script src="js/logistics.js"></script>
 <script src="js/guests.js"></script>
+<script src="js/services.js"></script>
 <script src="js/map.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/logiui.js"></script>

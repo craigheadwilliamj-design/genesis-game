@@ -347,7 +347,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     ex("e-g2", [[220,124],[296,124],[296,231],[220,231]], "dryo", 4);
     const B = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, 0)});
     B("b-f", "food", 92, 150); B("b-r", "restroom", 305, 150); B("b-s", "shop", 240, 242);
+    // a new stand is an empty shell until it has a menu
     afterChange();
+    out.emptyShellServesNothing = !servesOf(buildingById("b-f")).length;
+    addToMenu(buildingById("b-f"), "burger"); addToMenu(buildingById("b-f"), "soda"); addToMenu(buildingById("b-s"), "plush");
+    out.menuSlotsLimit = !!addToMenu(buildingById("b-f"), "pizza");
     out.guestStops = ["b-f", "b-r", "b-s", "e-g1", "e-g2", "gate"].every(id => !!gGraph.anchors[id]);
     // a party's route to a stop matches a plain walk there
     const f = guestField("b-f"), w = walkFrom(gGraph.anchors.gate, null, new Set());
@@ -357,18 +361,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.minute = OPEN_MIN + 60; const t0 = state.today.tickets;
     guestsArrive(2); const p = parties[0];
     out.ticketPaid = state.today.tickets - t0 === state.ticket * 2;
-    p.needs = {hunger:10, thirst:70, bladder:0}; p.until = CLOSE_MIN;
+    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = CLOSE_MIN;
     // only the parties set up here: nobody new comes in
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); state.minute++; if(until()) return true; } return false; };
     // (it may grab a meal too if it got hungry on the way)
-    out.partyDrinks = run(400, () => p.needs.thirst < 5) && state.today.food >= BUILDINGS.food.drink * 2 && state.buildings.find(b => b.id === "b-f").served.money === state.today.food;
+    out.partyDrinks = run(400, () => p.needs.thirst < 20) && state.today.food >= MENU.soda.price * 2 && state.buildings.find(b => b.id === "b-f").served.money === state.today.food;
     // and then the restroom
     p.needs.bladder = 75;
     out.partyRestroom = run(400, () => p.needs.bladder < 5);
     // nowhere to eat: they say so
     const fs = state.buildings.find(b => b.id === "b-f"); state.buildings = state.buildings.filter(b => b !== fs); afterChange();
-    p.needs.hunger = 80;
-    out.noFoodThought = run(5, () => p.thought.has("noFood"));
+    p.needs.hunger = 80; p.needs.energy = 0; p.dest = null; p.why = null;
+    p.home = false; p.mood = 70; p.until = CLOSE_MIN; planParty(p);
+    out.noFoodThought = p.thought.has("noFood");
     state.buildings.push(fs); afterChange();
     // going home: the party walks out the gate and its mood counts
     const before = state.today.moodN; goHome(p);
@@ -397,6 +402,40 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.dayOfGuests = h.guests > 20 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
+    // a tired party sits on a bench, and gets up rested
+    const bench = {id:"b-bench", type:"bench", points:rectPts(96.8, 200, BUILDINGS.bench.w, BUILDINGS.bench.d, Math.PI / 2)};
+    state.buildings.push(bench); afterChange();
+    resetParties(); state.minute = OPEN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
+    tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = CLOSE_MIN;
+    out.benchRests = !!gGraph.anchors["b-bench"] && run(400, () => tp1.needs.energy < 5) && bench.served && bench.served.n === 2;
+
+    // trash goes in a bin nearby; a full bin spills onto the path; the night crew clears it all, for a fee
+    const bin = {id:"b-bin", type:"bin", points:rectPts(96.7, 180, BUILDINGS.bin.w, BUILDINGS.bin.d, Math.PI / 2)};
+    state.buildings.push(bin); afterChange();
+    state.litter = {};
+    tp1.at = nearestGuestNode(100, 180); tp1.trash = 3; tp1.trashAt = state.minute; trashCheck(tp1);
+    out.binCatchesTrash = bin.fill === 3 && !tp1.trash && litterTotal() === 0;
+    bin.fill = LITTER.binCap; tp1.trash = 2; trashCheck(tp1);
+    out.fullBinSpills = litterTotal() === 2;
+    // with no bin in reach, trash held long enough ends up on the ground
+    const far = nearestGuestNode(300, 125); tp1.at = far; tp1.trash = 1; tp1.trashAt = state.minute - LITTER.holdMin;
+    const rr2 = Math.random; Math.random = () => 0; trashCheck(tp1); Math.random = rr2;
+    out.dropsLitter = litterAt(far.x, far.y) === 1;
+    const rest = buildingById("b-r"); rest.dirt = 40;
+    const bill = cleaningBill(), c0 = state.today.cleaning;
+    servicesNight();
+    out.nightCleaning = bill === Math.round(3 * LITTER.nightCost + LITTER.binCap * LITTER.binNightCost + 40 * RESTROOM.nightCost) &&
+      state.today.cleaning - c0 === bill && litterTotal() === 0 && bin.fill === 0 && rest.dirt === 0;
+    // a filthy restroom only gets the desperate
+    rest.dirt = RESTROOM.avoid + 5; tp1.at = gGraph.gate; tp1.needs.bladder = 70;
+    out.filthyRestroomAvoided = !bestStop(tp1, "bladder");
+    tp1.needs.bladder = GUEST.desperate + 1;
+    out.desperateUseIt = !!bestStop(tp1, "bladder");
+    rest.dirt = 0;
+    // prices: everyone pays the usual price, half pay 50% more, nobody pays double
+    out.priceSense = willPay("burger", 8) === 1 && Math.abs(willPay("burger", 12) - .5) < 1e-9 && willPay("burger", 16) === 0;
+    resetParties();
+
     // lots of guests stay quick to simulate
     state.minute = OPEN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
@@ -405,10 +444,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const tp = performance.now(); for(let i = 0; i < 50; i++) tick(.8);
     out.guestPerf = (performance.now() - tp) / 50 < 15;
 
-    // old saves get a guest log
-    const old = JSON.parse(JSON.stringify(state)); delete old.guestLog; delete old.today.moodSum;
+    // old saves get a guest log, and stands and shops from before menus keep what they sold
+    const old = JSON.parse(JSON.stringify(state)); delete old.guestLog; delete old.today.moodSum; delete old.litter;
+    for(const b of old.buildings) if(b.type === "food" || b.type === "shop") delete b.menu;
     const up = upgradeSave(old);
     out.oldSaveGuests = !!up.guestLog && up.guestLog.mood === null && up.today.moodSum === 0;
+    out.oldSaveMenus = up.buildings.find(b => b.type === "food").menu.map(m => m.id).join() === "burger,soda" &&
+      up.buildings.find(b => b.type === "shop").menu.map(m => m.id).join() === "plush,tshirt,map" && !!up.litter && up.guestLog.notice === true;
     resetParties();
     return out;
   }));

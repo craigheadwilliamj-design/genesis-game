@@ -13,10 +13,11 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `js/medicine.js`: sickness and injuries (`illChance`, `injuryChance`, `healthNight`), the PMC ward (`admit`, `discharge`, `pmcRemoved`), vets who dart sick and escaped animals (`vetsTick`), and CERES medicine (`medTick`).
 - `js/logistics.js`: food and medicine as goods. Stores (`b.store`, `storeOf`, `addGood`/`takeGood`), spoilage, dock orders, farms, work zones (`state.zones`, `e.zone`/`b.zone`/`k.zone`), and restock hauls (`pickHaul`, `supplyLines`).
 - `js/guests.js`: guest parties. Their needs (`NEEDS`), the guest path graph (`buildGuestGraph`, `guestField` per stop), deciding where to go (`planParty`), queues and service at food stands, shops and restrooms (`svcQ`, `serveParty`), mood, thoughts (`THOUGHTS`, `topThoughts`), and the nightly `guestsNight`.
+- `js/services.js`: guest services. Menus on food and gift shells (`b.menu`, `MENU`, `servesOf`, `serveAt`, `willPay`), benches and picnic areas, trash bins and litter (`state.litter` grid, `trashCheck`), restroom dirt, and the night cleaning crew (`servicesNight`, `cleaningBill`).
 - `js/map.js`: SVG rendering, camera, build tools, and drawing guests (`drawParties`). Also defines `$`, `esc` and `nodeKey`.
 - `js/ui.js`: HUD, side panel (`ui.panel()`), toasts, catalog and dialogs, and panel click actions.
 - `js/logiui.js`: panels for stores, the dock, zones, and the park-office supply summary, plus their click/change handlers.
-- `js/guestui.js`: the park office's Guests section and the food stand, gift shop and restroom panels.
+- `js/guestui.js`: the park office's Guests section and the panels for food and gift shells (menu picker and prices), restrooms, bins, and seats.
 - `js/main.js`: the rAF loop (`frame` → `step`), saving (localStorage plus the claude.ai `db` capability), and `startWith`.
 
 ## Key globals

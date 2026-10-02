@@ -82,8 +82,9 @@ function overviewHtml(){
     <dt>Food and gifts</dt><dd>${money(t.food + t.shop)}</dd>
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
-    <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research)}</dd>
-  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}.</div></section>`;
+    ${t.supplies ? `<dt>Food and gift stock</dt><dd>−${money(t.supplies)}</dd>` : ""}
+    <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
+  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
   // science at a glance
   const sc = state.science;

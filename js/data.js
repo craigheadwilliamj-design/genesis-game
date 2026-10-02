@@ -192,13 +192,24 @@ const STARTER_POOLS = {
 };
 
 // Guest buildings. w and d are width and depth in meters.
-//   serves     the guest needs it takes care of
-//   perGuest   what each guest pays for a meal or a souvenir (drink is the price of a drink)
+//   kind       "food" or "merch": an empty shell that sells whatever you put on its menu (up to menuSlots items)
+//   serves     the guest needs it takes care of, for buildings without a menu
+//   seats      guests can sit down and rest here
 //   slots      parties served at once, each taking serveMin minutes
+//   patience   minutes a party will wait for a free spot (default GUEST.patience)
+//   minRating  stars the park needs before you can build it
 const BUILDINGS = {
-  food:     {label:"Food stand", one:"a food stand", glyph:"D", color:"#2F6E8F", price:6000, upkeep:60, w:10, d:8,  serves:["hunger", "thirst"], perGuest:7, drink:3, slots:4, serveMin:4},
-  shop:     {label:"Gift shop",  one:"a gift shop",  glyph:"S", color:"#8C4F7D", price:8000, upkeep:80, w:12, d:10, serves:["shop"], perGuest:12, slots:3, serveMin:5},
-  restroom: {label:"Restrooms",  one:"restrooms",    glyph:"R", color:"#56708A", price:4000, upkeep:40, w:8,  d:6,  serves:["bladder"], perGuest:0, slots:4, serveMin:3},
+  kiosk:     {label:"Food kiosk",  one:"a food kiosk",  glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:6,  d:5,  kind:"food",  menuSlots:1, slots:2,  serveMin:3},
+  food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:8,  kind:"food",  menuSlots:2, slots:4,  serveMin:4},
+  restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:4, slots:10, serveMin:12, seats:true, minRating:2},
+  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:25,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
+  shop:      {label:"Gift shop",   one:"a gift shop",   glyph:"S", color:"#8C4F7D", price:8000,  upkeep:80,  w:12, d:10, kind:"merch", menuSlots:3, slots:3,  serveMin:5},
+  megastore: {label:"Megastore",   one:"a megastore",   glyph:"M", color:"#6E3661", price:25000, upkeep:250, w:20, d:14, kind:"merch", menuSlots:5, slots:8,  serveMin:6, minRating:3},
+  restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:8,  d:6,  serves:["bladder"], slots:4, serveMin:3},
+  // small things beside the path
+  bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true},
+  bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
+  picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:30000, upkeep:300, w:24, d:16, dept:true,
@@ -245,6 +256,47 @@ const NEEDS = {
   hunger: {rate:.2,  seek:55, start:30},
   thirst: {rate:.25, seek:55, start:30},
   bladder:{rate:.22, seek:60, start:25},
+  energy: {rate:.24, seek:60, start:20},   // tiredness: a sit-down fixes it
+};
+// What food stands and gift shops can sell. price is the usual price; cost is what each one costs you to stock.
+//   fills   how much each need drops (food)        joy     mood a souvenir adds (merch)
+//   litter  leaves a wrapper or cup to throw away
+const MENU = {
+  burger:  {label:"Burgers",     kind:"food",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
+  hotdog:  {label:"Hot dogs",    kind:"food",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
+  pizza:   {label:"Pizza",       kind:"food",  price:9,  cost:2.2, fills:{hunger:65},             litter:true},
+  fries:   {label:"Fries",       kind:"food",  price:4,  cost:.8,  fills:{hunger:35},             litter:true},
+  popcorn: {label:"Popcorn",     kind:"food",  price:3,  cost:.5,  fills:{hunger:25},             litter:true},
+  icecream:{label:"Ice cream",   kind:"food",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3},
+  soda:    {label:"Soda",        kind:"food",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
+  water:   {label:"Water",       kind:"food",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
+  coffee:  {label:"Coffee",      kind:"food",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
+  plush:   {label:"Dino plushes",  kind:"merch", price:14, cost:4,  joy:8},
+  tshirt:  {label:"T-shirts",      kind:"merch", price:20, cost:6,  joy:6},
+  toy:     {label:"Toy dinosaurs", kind:"merch", price:10, cost:3,  joy:7},
+  map:     {label:"Park maps",     kind:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
+  guide:   {label:"Field guides",  kind:"merch", price:12, cost:3.5, joy:5},
+};
+// How guests take prices: at the usual price everyone buys, at double nobody does
+const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
+// Litter lies on the paths in squares this many meters across
+const LITTER = {
+  cell:8,              // size of a litter square
+  binReach:12,         // guests use a bin this close
+  binCap:40,           // pieces a bin holds
+  holdMin:12,          // minutes a guest carries trash looking for a bin
+  drop:.5,             // chance they drop it then, rather than keep looking
+  dirtyDrop:.04,       // extra chance for each piece already lying there
+  heavy:12,            // pieces in one square that make guests really unhappy
+  hurt:.12,            // mood lost each minute among heavy litter
+  nightCost:2,         // the night cleaning crew charges this per piece picked up
+  binNightCost:.5,     // and this per piece emptied from bins
+};
+const RESTROOM = {
+  dirtPerGuest:.35,    // dirt each visitor adds (0 to 100)
+  gross:45,            // dirtier than this and guests complain
+  avoid:80,            // dirtier than this and only desperate guests use it
+  nightCost:1.5,       // the night cleaning crew charges this per point of dirt
 };
 // What guests think. good ones are compliments.
 const THOUGHTS = {
@@ -260,6 +312,12 @@ const THOUGHTS = {
   sadAnimals: {text:"The animals looked miserable."},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
+  noSeat:     {text:"My feet hurt and there's nowhere to sit."},
+  litter:     {text:"There's trash all over the paths."},
+  grossLoo:   {text:"The restrooms were disgusting."},
+  priceyFood: {text:"The food here costs too much."},
+  priceyGift: {text:"The souvenirs are overpriced."},
+  rested:     {text:"It was nice to sit down for a bit.", good:true},
   wow:        {text:"The animals were amazing!", good:true},
   fed:        {text:"That hit the spot.", good:true},
 };
@@ -584,7 +642,7 @@ const GOALS = [
   {id:"exhibit",  text:"Draw your first exhibit",            hint:"Pick Exhibit in the build tools, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
   {id:"connect",  text:"Connect an exhibit to the path",     hint:"Guests only see exhibits that touch a path from the entrance. Use the Path tool to reach it.", reward:2000,  check:g=>g.state.exhibits.some(e=>g.isReachable(e))},
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:3000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
-  {id:"food",     text:"Build a food stand",                 hint:"Pick Food stand and tap next to a path. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="food")},
+  {id:"food",     text:"Build a food stand",                 hint:"Pick Food and tap next to a path, then tap the stand and choose what it sells. Hungry guests rate the park lower.", reward:2000,  check:g=>g.state.buildings.some(b=>BUILDINGS[b.type].kind==="food" && (b.menu||[]).length)},
   {id:"restroom", text:"Build restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:2000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},

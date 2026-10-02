@@ -20,6 +20,15 @@ let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
 
 const isBuildTool = t => !!BUILDINGS[t];
+// Toolbar buttons that open a choice of buildings, picked in the build bar
+const FAMILIES = {
+  viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
+  eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
+  gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
+  props:{tools:["bin", "bench", "picnic"], labels:["Trash bin", "Bench", "Picnic area"]},
+};
+const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
+const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin"};
 const GRID_STEP = 5;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
@@ -131,10 +140,28 @@ function render(){
   s += `<g pointer-events="none"><rect x="${gx-9}" y="${gy-3}" width="18" height="6" rx="1" fill="#1F3A2B"/><rect x="${gx-9}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/><rect x="${gx+6}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/>`;
   s += `<text class="lbl" x="${gx}" y="${gy + 3 + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}">Entrance</text></g>`;
 
+  // litter on the paths
+  const specks = litterSpecks();
+  if(specks.length){
+    // small square flecks in dull paper and cardboard colors, so they don't look like guests
+    const cols = ["#FFFFFF", "#6F6A5C", "#7A5A2E"], d = cols.map(() => []), w = Math.max(.6, 3.2*inv);
+    for(const [x, y, c] of specks) d[c].push(`M${x.toFixed(2)} ${y.toFixed(2)}h${w.toFixed(2)}`);
+    s += `<g pointer-events="none">${cols.map((c, i) => d[i].length ? `<path d="${d[i].join("")}" stroke="${c}" stroke-width="${w}" stroke-linecap="square" fill="none"/>` : "").join("")}</g>`;
+  }
+
   // guest buildings
   for(const bl of state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    // bins, benches and picnic areas: small, but always big enough to see and tap
+    if(t.prop){
+      const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : "#1D2B22", full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
+      s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
+      if(bl.type === "bin") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${full ? "var(--bad)" : t.color}" stroke="${edge}" stroke-width="${on || dead ? 2.5 : 1.2}" vector-effect="non-scaling-stroke"/>`;
+      else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${t.color}" stroke="${edge}" stroke-width="${on || dead ? 2.5 : 1.2}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `</g>`;
+      continue;
+    }
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
     s += `<polygon points="${polyStr(bl.points)}" fill="${t.color}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? "#1D2B22" : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
     // departments show their name once there's room for it; smaller buildings show a letter
@@ -409,10 +436,13 @@ function setTool(t){
   if(draw) endDraw();
   ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null;
   tool = t;
-  document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || (b.dataset.tool === "viv" && t.startsWith("viv"))));
-  $("#dSizes").hidden = !t.startsWith("viv");
-  document.querySelectorAll("[data-size]").forEach(b => b.setAttribute("aria-pressed", t === "viv" + b.dataset.size));
-  if(t.startsWith("viv")) lastViv = t;
+  const fam = familyOf(t);
+  document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
+  $("#dSizes").hidden = !fam;
+  if(fam){
+    lastPick[fam] = t;
+    $("#dSizes").innerHTML = FAMILIES[fam].tools.map((x, i) => `<button data-pick="${x}" aria-pressed="${x === t}">${FAMILIES[fam].labels[i]}</button>`).join("");
+  }
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
@@ -421,6 +451,8 @@ function setTool(t){
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
     showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and tap.`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Tap beside a path. Fits ${fits.join(", ")}.`
+      : b.kind ? `Point beside a path and tap, then tap it to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.`
+      : b.prop ? "Point beside a path and tap."
       : "Point beside a path and tap. It turns to face the path by itself.",
       `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:false, finish:false, cancel:"Done"});
   }
@@ -590,6 +622,7 @@ function placeGhost(clientX, clientY){
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
+  if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(best && gridSnap){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
     const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
@@ -635,7 +668,7 @@ function placeBuilding(e){
   afterChange();
   render();
   ui.toast(isReachable(b) ? `Built ${t.one} for ${money(t.price)}.` : `Built ${t.one}, but its path doesn't reach the entrance yet.`, isReachable(b) ? "" : "bad");
-  if(t.dept){ toolDone({kind:"building", id:b.id}); }
+  if(t.dept || t.kind){ toolDone({kind:"building", id:b.id}); }
 }
 
 /* ---------- keeper gates ---------- */
@@ -965,13 +998,12 @@ svg.addEventListener("wheel", e => {
 }, {passive:false});
 
 /* ---------- toolbar and keys ---------- */
-let lastViv = "vivM";
 document.querySelectorAll("[data-tool]").forEach(b => b.addEventListener("click", () => {
-  const t = b.dataset.tool === "viv" ? lastViv : b.dataset.tool;
-  const active = t === tool || (b.dataset.tool === "viv" && tool.startsWith("viv"));
+  const f = FAMILIES[b.dataset.tool], t = f ? lastPick[b.dataset.tool] : b.dataset.tool;
+  const active = t === tool || (f && familyOf(tool) === b.dataset.tool);
   setTool(active && tool !== "select" ? "select" : t);
 }));
-document.querySelectorAll("[data-size]").forEach(b => b.addEventListener("click", () => setTool("viv" + b.dataset.size)));
+$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick); });
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;

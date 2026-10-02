@@ -25,7 +25,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, supplies:0, cleaning:0}; }
 
 function freshScience(){
   return {
@@ -51,7 +51,7 @@ function newPark(){
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{},
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -107,6 +107,10 @@ function upgradeSave(s){
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
   if(!s.guestLog) s.guestLog = freshGuestLog();
+  // parks from before litter and seats get told what changed
+  if(!s.litter){ s.litter = {}; if(s.buildings.some(b => OLD_MENUS[b.type] || b.type === "restroom")) s.guestLog.notice = true; }
+  // food stands and gift shops from before menus keep selling what they used to
+  for(const b of s.buildings) if(OLD_MENUS[b.type] && !b.menu) b.menu = OLD_MENUS[b.type].map(id => ({id, price:MENU[id].price}));
   if(!s.logi){
     s.logi = freshLogi();
     if(s.staff.keepers.length || s.buildings.some(b => b.type === "station")){ s.staff.feedFrom = Math.max(s.staff.feedFrom, s.day + 2); s.logi.notice = true; }
@@ -283,11 +287,11 @@ function recompute(){
 
   // How well the park looks after its guests: how happy they are when they leave.
   // Before anyone has left, guess from how many food stands and restrooms there are.
-  const cap = t => state.buildings.filter(b => b.type === t && reach[b.id]).length * BUILDINGS[t].slots * (CLOSE_MIN - OPEN_MIN) / BUILDINGS[t].serveMin * 2.5;
+  const cap = need => state.buildings.filter(b => reach[b.id] && servesOf(b).includes(need)).reduce((s, b) => s + BUILDINGS[b.type].slots * (CLOSE_MIN - OPEN_MIN) / BUILDINGS[b.type].serveMin * 2.5, 0);
   const last = state.history.length ? state.history[state.history.length-1].guests : 0;
   const ref = Math.max(last, demand);
   const cover = c => ref > 0 ? Math.min(1, c / ref) : (c > 0 ? 1 : 0);
-  const foodCover = cover(cap("food")), restCover = cover(cap("restroom"));
+  const foodCover = cover(cap("hunger")), restCover = cover(cap("bladder"));
   const t = state.today, mood = t.moodN >= 20 ? t.moodSum / t.moodN : told;
   const comfort = mood == null ? (0.35 * foodCover + 0.35 * restCover) / .7 : clamp((mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
   const gripe = topThoughts(3).find(x => !x.good && x.share >= .1);
@@ -539,6 +543,7 @@ function endDay(){
 
   const c = dailyCosts();
   spend(c.feed, "feed"); spend(c.wages, "wages"); spend(c.upkeep, "upkeep"); spend(c.research, "science");
+  servicesNight();
   scienceNight();
   keepersNight();
   logiNight();
@@ -557,7 +562,7 @@ function endDay(){
 
   const t = state.today;
   const income = t.tickets + t.food + t.shop + t.sold + t.rewards;
-  const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs;
+  const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning;
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});
   if(state.history.length > 60) state.history.shift();

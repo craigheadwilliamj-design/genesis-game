@@ -15,8 +15,8 @@ let moodColors = false;    // color guests on the map by how happy they are
 let nextSize = 1;          // how many are in the next party through the gate
 
 const guestCount = () => parties.reduce((s, p) => s + p.n, 0);
-const guestBuilding = b => !!BUILDINGS[b.type].serves;
-const NO_THOUGHT = {hunger:"noFood", thirst:"noDrink", bladder:"noRestroom"};
+const guestBuilding = b => !!(BUILDINGS[b.type].serves || BUILDINGS[b.type].kind);
+const NO_THOUGHT = {hunger:"noFood", thirst:"noDrink", bladder:"noRestroom", energy:"noSeat"};
 function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, last:{thoughts:{}, guests:0}}; }
 
 /* ---------- the guests' map of footpaths ---------- */
@@ -80,6 +80,7 @@ function buildGuestGraph(){
   }
   gGraph = {nodes, anchors, gate};
   gFields = new Map();
+  indexLitterSpots(nodes);
   // everyone carries on from the same spot on the new map
   for(const p of parties){
     const x = p.at ? p.at.x : null, y = p.at ? p.at.y : null;
@@ -158,12 +159,12 @@ function urgentNeed(p){
   }
   return worst;
 }
-// The best place to fix a need: close, and without a long queue
+// The best place to fix a need: close, and without a long queue. A filthy restroom only gets the desperate.
 function bestStop(p, need){
   let best = null;
   for(const b of state.buildings){
-    const t = BUILDINGS[b.type];
-    if(!t.serves || !t.serves.includes(need) || !gGraph.anchors[b.id]) continue;
+    if(!gGraph.anchors[b.id] || !servesOf(b).includes(need)) continue;
+    if(b.type === "restroom" && (b.dirt || 0) >= RESTROOM.avoid && p.needs.bladder < GUEST.desperate) continue;
     const f = guestField(b.id), d = f && f.dist.get(p.at);
     if(d === undefined) continue;
     const q = svcQ.get(b.id), score = d + (q ? q.queue.length : 0) * GUEST.queueMeters;
@@ -202,7 +203,7 @@ function planParty(p){
     if(s && s.d < GUEST.lastStop){ p.lastStop = true; p.dest = s.b.id; p.why = need; return; }
     if(!p.shopped){
       p.shopped = true;
-      const s = p.mood >= 50 && p.cash >= BUILDINGS.shop.perGuest && Math.random() < GUEST.shopChance && bestStop(p, "shop");
+      const s = p.mood >= 50 && p.cash >= 5 && Math.random() < GUEST.shopChance && bestStop(p, "shop");
       if(s && s.d < GUEST.farWalk){ p.dest = s.b.id; p.why = "shop"; return; }
     }
     p.dest = "gate"; p.why = "home";
@@ -213,7 +214,7 @@ function planParty(p){
   if(need && p.why !== need && (!onTrip || (p.needs[need] >= GUEST.desperate && p.needs[p.why] < GUEST.desperate))){
     const s = bestStop(p, need);
     if(!s){ thinks(p, NO_THOUGHT[need]); p.cool[need] = state.minute + 60; }
-    else if(s.b.id !== p.dest){ p.dest = s.b.id; p.why = need; if(s.d > GUEST.farWalk) thinks(p, "far"); return; }
+    else if(s.b.id !== p.dest){ p.dest = s.b.id; p.why = need; if(s.d > GUEST.farWalk && !p.map) thinks(p, "far"); return; }
   }
   if(p.dest) return;
   const e = pickSight(p);
@@ -276,6 +277,7 @@ function walkParty(p, left){
     const ids = p.at.sees && p.at.sees.get(p.to);
     if(ids) for(const id of ids){ const e = state.exhibits.find(x => x.id === id); if(e) seeExhibit(p, e); }
     p.prev = p.at; p.at = p.to; p.to = null; p.t = 0;
+    trashCheck(p);
   }
 }
 
@@ -296,32 +298,15 @@ function serviceTick(dt, now){
     while(q.busy.length < t.slots && q.queue.length){ const n = q.queue.shift(); n.done = now + t.serveMin; q.busy.push(n); }
     for(const p of [...q.queue]){
       p.waited += dt;
-      if(p.waited > GUEST.patience){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }
+      if(p.waited > (t.patience ?? GUEST.patience)){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }
     }
   }
 }
 function serveParty(p, b){
-  const t = BUILDINGS[b.type], n = p.n, why = p.why;
+  const why = p.why;
   p.in = null; p.dest = null; p.why = null;
-  let bill = 0, served = n;
-  if(b.type === "food"){
-    const meal = p.needs.hunger >= 25, drink = p.needs.thirst >= 25 || !meal;
-    if(meal && p.cash >= t.perGuest * n){ bill += t.perGuest * n; p.needs.hunger = 0; }
-    if(drink && p.cash - bill >= t.drink * n){ bill += t.drink * n; p.needs.thirst = 0; }
-    if(bill){ earn(bill, "food"); state.today.servedFood += n; if(meal && !p.needs.hunger) thinks(p, "fed"); }
-  } else if(b.type === "shop"){
-    let buyers = 0;
-    const chance = clamp((p.mood - 30) / 60, .15, .9);
-    for(let i = 0; i < n; i++) if(Math.random() < chance && p.cash - bill >= t.perGuest){ bill += t.perGuest; buyers++; }
-    if(bill){ earn(bill, "shop"); state.today.servedShop += buyers; }
-    served = buyers;
-  } else {
-    for(const k of t.serves) if(p.needs[k] !== undefined) p.needs[k] = 0;
-  }
-  if(t.perGuest && !bill && why !== "shop"){ thinks(p, "broke"); p.mood -= 6; p.cool.hunger = p.cool.thirst = state.minute + 120; }
-  p.cash -= bill;
-  if(!b.served || b.served.day !== state.day) b.served = {day:state.day, n:0, money:0};
-  b.served.n += served; b.served.money += bill;
+  serveAt(p, b, why);
+  trashCheck(p);
 }
 
 /* ---------- through the day ---------- */
@@ -335,6 +320,7 @@ function arrivalShare(m0, m1){
 
 function guestsTick(m0, m1){
   const dt = m1 - m0;
+  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Bins and seats). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
   arrivalCarry += derived.demand * arrivalShare(m0, m1);
   while(arrivalCarry >= nextSize){ arrivalCarry -= nextSize; guestsArrive(nextSize); nextSize = GUEST.sizes[Math.floor(Math.random() * GUEST.sizes.length)]; }
   // guests near a dangerous animal on the loose run for the gate
@@ -351,6 +337,9 @@ function guestsTick(m0, m1){
       const L = Math.hypot(p.to.x - p.at.x, p.to.y - p.at.y) || 1;
       if(busy.get(edge(p)) * 10 / L > GUEST.crowd){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
     }
+    // walking through litter
+    const mess = p.at ? litterAt(p.at.x, p.at.y) : 0;
+    if(mess >= 3){ hurt += LITTER.hurt * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
     p.mood = clamp(p.mood - hurt * dt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }
     if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange)){ p.fled = true; thinks(p, "scared"); p.mood -= 15; goHome(p); }
@@ -383,7 +372,7 @@ function topThoughts(n){
   let tot = L.guests;
   for(const p of parties){ tot += p.n; for(const k of p.thought) c[k] = (c[k] || 0) + p.n; }
   const use = tot ? {c, tot} : {c:L.last.thoughts, tot:L.last.guests};
-  return Object.entries(use.c).filter(([k]) => THOUGHTS[k]).map(([k, v]) => ({k, share:v / Math.max(1, use.tot), ...THOUGHTS[k]}))
+  return Object.entries(use.c).filter(([k]) => THOUGHTS[k]).map(([k, v]) => ({k, share:v / Math.max(1, use.tot), ...THOUGHTS[k]})).filter(x => x.share >= .005)
     .sort((a, b) => b.share - a.share).slice(0, n);
 }
 // Average mood of everyone in the park right now
