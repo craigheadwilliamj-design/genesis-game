@@ -806,37 +806,57 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
     out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
 
-    // landscaping: ponds and rocks inside open exhibits
+    // landscaping: water drawn inside open exhibits like a fence, and rocks placed with a tap
     const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
-    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     state.exhibits = [lx];
     const fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
     lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
-    out.landMenu = !!document.querySelector('[data-tool="land-pond"]');
-    setTool("land-pond"); out.landTool = tool === "land-pond" && $("#drawbar").classList.contains("on"); setTool("select");
-    out.landRejectsOutside = !landSpot(10, 10, "pond").ok && !landSpot(103, 130, "pond").ok;
+    const sq = (x0, y0, s) => [[x0, y0], [x0 + s, y0], [x0 + s, y0 + s], [x0, y0 + s]];
+    out.landMenu = !!document.querySelector('[data-tool="water"]') && !!document.querySelector('[data-tool="land-rock"]') && !document.querySelector('[data-tool="land-pond"]');
+    out.waterRejects = /open exhibit/.test(waterProblem(sq(10, 10, 10), waterHost(sq(10, 10, 10)), null, 0) || "")
+      && /inside the fence/.test(waterProblem(sq(150, 120, 20), waterHost(sq(150, 120, 20)), null, 0) || "")
+      && /Too small/.test(waterProblem(sq(120, 120, 2), lx, null, 0) || "")
+      && /Costs/.test((state.money = 100, waterProblem(sq(120, 120, 16), lx, null, waterCost(sq(120, 120, 16))) || "")); state.money = 1e6;
     const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
     out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
-    const spot = landSpot(130, 130, "pond");
-    out.landAcceptsInside = spot.ok && spot.e === lx;
-    placeLand(lx, "pond", 130, 130);
-    out.landOverlapRejected = !landSpot(133, 130, "pond").ok;
-    out.landPondHelps = !thirsty(lx, fish) && exhibitReport(lx).target > dryTarget && illChance(lx, lx.animals[0]).p < dryIll;
+    // draw it the way a player does: pick the tool, drop corners, finish
+    setTool("water"); const drawing = !!draw && draw.kind === "water" && $("#drawbar").classList.contains("on");
+    const b0 = state.today.built; draw.pts = sq(122, 122, 16); finishDraw();
+    out.waterDraws = drawing && lx.water.length === 1 && Math.abs(area(lx.water[0].points) - 256) < 1e-6 && state.today.built - b0 === 256 * WATER.perSqM;
+    setTool("select");
+    out.waterOverlapRejected = /other water/.test(waterProblem(sq(126, 126, 16), lx, null, 0) || "") && /in the water/.test(landSpot(130, 130, "rock").why || "");
+    out.waterHelps = !thirsty(lx, fish) && exhibitReport(lx).target > dryTarget && illChance(lx, lx.animals[0]).p < dryIll && habitatOf(lx).wet === 1;
     state.money = 100; out.landNeedsMoney = /Costs/.test(landSpot(140, 110, "boulder").why || ""); state.money = 1e6;
     placeLand(lx, "rock", 110, 150);
-    // ponds and rocks ride along when the exhibit moves
+    // water and rocks ride along when the exhibit moves
     const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
-    out.landMoves = lx.land[0].x === 140 && lx.land[0].y === 135 && lx.points[0][0] === 110;
+    out.landMoves = lx.land[0].x === 120 && lx.land[0].y === 155 && lx.water[0].points[0][0] === 132 && lx.points[0][0] === 110;
     moveBy(mv, 0, 0);
-    // an outline that would leave one outside the fence is refused
+    out.landMovesBack = lx.water[0].points[0][0] === 122 && lx.land[0].x === 110;
+    // a fence that would leave water outside is refused
     const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
-    out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
-    // bulldozing one refunds part of its price
-    const f0 = lx.land[1], n0 = lx.land.length;
-    out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && landRefund(lx) > 0;
-    removeItem("land", f0);
-    out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0);
+    out.landReshapeGuard = /water would end up outside/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
+    // the shore reshapes like a fence: drag a corner (pay for the extra area), or drag it out past the fence (refused)
+    const wat = lx.water[0], r = {e:lx, t:wat, w:wat, orig:wat.points.map(p => p.slice())};
+    wat.points[2] = [150, 150]; const growOk = !rvProblem(r) && /Costs/.test(rvStat(r)), m1 = state.today.built, grow = waterReshapeCost(wat, r.orig);
+    rvCommit(r); const paid = grow > 0 && state.today.built === m1 + grow;
+    const r2 = {e:lx, t:wat, w:wat, orig:wat.points.map(p => p.slice())}; wat.points[2] = [170, 170];
+    out.waterReshapes = growOk && paid && /inside the fence/.test(rvProblem(r2) || ""); wat.points = r2.orig;
+    // a water corner can be picked and deleted
+    mvCorner = {id:wat.id, i:2}; deleteMoveCorner();
+    out.waterCornerDelete = wat.points.length === 3 && !mvCorner;
+    out.waterCornerFound = reshapeables().some(s => s.w === wat);
+    // bulldozing refunds part of the price
+    out.landRefund = refundFor("water", wat) === Math.round(waterCost(wat.points) * COST.refundShare) && refundFor("land", lx.land[0]) === Math.round(LAND.rock.price * COST.refundShare) && landRefund(lx) > 0;
+    removeItem("water", wat); const f0 = lx.land[0]; removeItem("land", f0);
+    out.landBulldoze = lx.water.length === 0 && lx.land.length === 0;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
+    // old round ponds turn into drawn water of the same size
+    const oldP = JSON.parse(JSON.stringify(newPark()));
+    oldP.exhibits.push({id:"e-pond", name:"Pond", points:sq(0, 0, 50), animals:[], happy:70, land:[{id:"l-p", type:"pond", x:25, y:25}, {id:"l-r", type:"rock", x:10, y:10}]});
+    const upP = upgradeSave(oldP).exhibits.find(e => e.id === "e-pond");
+    out.oldPondsBecomeWater = upP.water.length === 1 && upP.water[0].id === "l-p" && Math.abs(area(upP.water[0].points) - 108) < .01 && upP.land.length === 1 && upP.land[0].type === "rock";
     // old saves get an empty list for open exhibits only
     const oldL = JSON.parse(JSON.stringify(newPark()));
     oldL.exhibits.push({id:"e-old", name:"Old", points:[[1,1],[2,1],[2,2]], animals:[], happy:70}, {id:"e-oldv", name:"OldV", points:[[1,1],[2,1],[2,2]], animals:[], happy:70, viv:"S"});

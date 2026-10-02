@@ -875,16 +875,22 @@ BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};
 
-// Landscaping: ponds and rocks placed inside an open exhibit (e.land). Animals feel at home among what they like.
+// Water is drawn inside an open exhibit like the exhibit itself (e.water: shapes with corners), and priced by area
+const WATER = {
+  perSqM:20,       // cost per square meter
+  minArea:12,      // smallest body of water, in square meters
+  margin:.5,       // gap kept between the water and the fence, in meters
+  oldPondR:6,      // radius of the round ponds older saves had; they become drawn water
+};
+
+// Landscaping: rocks, groves and shelters placed inside an open exhibit (e.land). Animals feel at home among what they like.
 //   r      radius in meters
-//   water  counts toward the exhibit's water
 //   cover  rock cover it adds (see HAB.rockEvery)
 //   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
 //   tech   research needed first
 //   stock  batches of CERES planting stock it uses up
 //   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic trees)
 const LAND = {
-  pond:   {label:"Pond",          one:"a pond",          price:3000, r:6, color:"#3A7FB2", water:true},
   rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
   trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
@@ -896,11 +902,11 @@ const LAND = {
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora) t.shade = 8;
 const HAB = {
-  waterFull:.03,   // share of the exhibit's floor in ponds that fully satisfies water lovers
+  waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after
   bonus:8,         // happiness an exhibit with everything its animals like gains
-  wantsWater:.8,   // a species this keen on water is unhappy and sickly without a pond
-  dry:8,           // happiness lost when water lovers have no pond
+  wantsWater:.8,   // a species this keen on water is unhappy and sickly without any
+  dry:8,           // happiness lost when water lovers have no water
   dryIll:1.5,      // illness chance multiplier for them
   groveFull:.06,   // share of the floor in groves from an animal's own era that fully satisfies it
   groveBonus:6,    // happiness for animals with plenty of groves from their era

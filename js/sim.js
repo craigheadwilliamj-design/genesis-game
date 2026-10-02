@@ -97,8 +97,15 @@ function upgradeSave(s){
     if(s.exhibits.some(e => e.flora === "paleozoic")){ give("paleoflora"); give("paleoplant"); }
   }
   for(const e of s.exhibits) if(!e.viv && e.cond === undefined){ e.cond = 100; e.inspected = {day:s.day, cond:100}; }
-  // landscaping: ponds and rocks inside open exhibits
-  for(const e of s.exhibits) if(!e.viv && e.land === undefined) e.land = [];
+  // landscaping: rocks, groves and shelters (e.land) and drawn water (e.water) inside open exhibits.
+  // Round ponds became drawn water: each one turns into a shape of the same size where it was.
+  for(const e of s.exhibits){
+    if(e.viv) continue;
+    if(e.land === undefined) e.land = [];
+    if(e.water === undefined) e.water = [];
+    for(const f of e.land.filter(f => f.type === "pond")) e.water.push({id:f.id, points:circlePts(f.x, f.y, WATER.oldPondR, 12)});
+    e.land = e.land.filter(f => f.type !== "pond");
+  }
   // parks from before weather get 3 fair days to build shelters
   if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
@@ -299,7 +306,7 @@ function exhibitReport(e){
   let fight = null;
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = conflict(kinds[i], kinds[j]);
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
-  // Ponds and rocks: animals feel at home among what they like, and water lovers need a pond
+  // Water, rocks, groves and shelter: animals feel at home among what they like, and water lovers need water
   const hab = habitatScore(e); target += hab.delta; issues.push(...hab.issues);
   // Sick and hurt animals drag the whole herd down
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
@@ -396,6 +403,7 @@ function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "ser
 function refundFor(kind, item){
   if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
+  if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;
