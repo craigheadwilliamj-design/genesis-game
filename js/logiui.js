@@ -57,9 +57,9 @@ function warehouseHtml(b){
   h += `<section><h3>${made ? "Output" : "Stock"}</h3>${stockRows(b)}${spoilLine(b)}`;
   if(made){
     const full = storeTotal(b) >= storeCap(b) - .5;
-    h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Keepers carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Custodians carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
   } else {
-    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Keepers and custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
   }
   return h + `</section>`;
 }
@@ -70,7 +70,7 @@ function zoneHtml(z){
   const m = zoneMembers(z);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><label class="field"><span>Zone name</span><input id="zName" data-field="name" value="${esc(z.name)}" maxlength="40"></label>`;
   h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
-  h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed, clean, and restock only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
+  h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed and clean only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
 
   const issues = [];
   if(m.exhibits.some(e => e.animals.length) && !m.keepers.length) issues.push(state.staff.keepers.some(k => !k.zone) ? "No keeper is assigned here. Unassigned keepers will cover it." : "No keeper is assigned here, so nobody feeds these animals.");

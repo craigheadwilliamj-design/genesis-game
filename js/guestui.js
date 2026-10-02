@@ -133,7 +133,7 @@ function closetHtml(b){
     <li class="${full ? "bad" : ""}">${full ? `${full} bin${full === 1 ? "" : "s"} need emptying` : "Bins have room"}</li>
     <li class="${litterTotal() >= 10 ? "bad" : ""}">${Math.round(litterTotal())} pieces of litter on the paths</li>
     ${state.buildings.some(x => (x.graffiti || 0) >= VANDAL.grossAt) ? `<li class="bad">${state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length} buildings with graffiti</li>` : ""}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">They restock anything about to run out first, then clean, then top up the rest. Whatever they miss, the night crew cleans up for a fee. The Tool Shed sells litter pickers, janitor carts, and pressure washers for them.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">They restock stations, stands, and shops, anything about to run out first, then clean, then top up the rest. Whatever they miss, the night crew cleans up for a fee. The Tool Shed sells litter pickers, janitor carts, and pressure washers for them.</div></section>`;
   return h;
 }
 // What a stand or shop sells, at what price, and what else it could sell

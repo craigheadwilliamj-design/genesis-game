@@ -7,7 +7,7 @@
    ===================================================================== */
 
 function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, guestFrom:GUEST_GOODS_FROM}; }
-// Keepers carry animal food and medicine; custodians carry stock for stands and shops
+// Keepers carry food from stations to exhibits; custodians stock every store (animal food, medicine, stand and shop goods)
 const KEEPER_GOODS = FEED_GOODS.concat(["meds"]);
 const isGuestGood = t => GUEST_GOODS.includes(t);
 // Until this day, suppliers deliver straight to stands and shops, so they never run out
@@ -51,7 +51,6 @@ function stashGood(t, n, first){
   for(const b of order){ if(left <= 0.01) break; left -= addGood(b, t, left); }
   return n - Math.max(0, left);
 }
-const haulMax = () => carryMax() * (hasUpgrade("forklift") ? LOGI.forklift : 1);
 const pmcStock = () => { const p = pmcBuilding(); return p ? stockOf(p, "meds") : 0; };
 const medOnHand = pmcStock;
 function useMeds(n){ const p = pmcBuilding(); if(p) takeGood(p, "meds", n); }
@@ -145,8 +144,8 @@ function haulSources(j){
   return out;
 }
 // The most run-down store this worker can restock, with the nearest place to get what it needs. `near` finds the closest of a list.
-// Keepers haul animal food and medicine; custodians pass GUEST_GOODS and a carry limit of their own.
-function pickHaul(k, near, goods = KEEPER_GOODS, most = haulMax()){
+// Only custodians restock stores: they pass the goods and a carry limit of their own.
+function pickHaul(k, near, goods, most){
   const kz = k && k.zone, cands = [];
   for(const d of stores()){
     const dd = storeOf(d); if(dd.source || dd.dock) continue;
@@ -188,7 +187,7 @@ function supplyLines(){
 
 // Farms and ranches fill their own stores through the day. A full store stops production.
 function logiTick(dtMin){
-  if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station, and keepers will carry it to the animals.", "bad"); }
+  if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until day ${state.logi.guestFrom}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
   const share = dtMin / (CLOSE_MIN - OPEN_MIN);
   for(const b of state.buildings){
