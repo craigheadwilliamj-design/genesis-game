@@ -134,7 +134,7 @@ function render(){
     const svc = isService(p);
     const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
-    const lj = `stroke-linejoin="round" stroke-linecap="round" fill="none"`;
+    const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
     under += `<polyline points="${pts}" stroke="${svc ? "#4B4F55" : "#8F7B52"}" stroke-width="${w + 1.6*inv}" ${lj}/>`;
     over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer"><polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? "#EADFC4" : "#C9BFA6"}" stroke-width="${w}" ${lj}/>`;
