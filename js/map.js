@@ -29,7 +29,7 @@ const FAMILIES = {
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin"};
-const GRID_STEP = 5;               // meters between grid-snap points
+const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
 const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "zone";
@@ -66,10 +66,12 @@ function render(){
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
-    const st = gridSnap && k > 3 ? GRID_STEP : 10;
+    const st = gridSnap && k > 7 ? GRID_STEP : gridSnap && k > 2.5 ? 5 : 10;
     let dMin = "", dMaj = "";
-    for(let x = Math.floor(b.x0/st)*st; x <= b.x1; x += st){ const d = `M${x} ${b.y0}V${b.y1}`; if(x % 50 === 0) dMaj += d; else dMin += d; }
-    for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % 50 === 0) dMaj += d; else dMin += d; }
+    // zoomed in on the 1 m grid, every 5 m line is the darker one
+    const maj = st === 1 ? 5 : 50;
+    for(let x = Math.floor(b.x0/st)*st; x <= b.x1; x += st){ const d = `M${x} ${b.y0}V${b.y1}`; if(x % maj === 0) dMaj += d; else dMin += d; }
+    for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
     s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   }
   s += `<polygon points="${polyStr(state.boundary)}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -1025,7 +1027,7 @@ $("#zfit").onclick = fit;
 function setGridSnap(on){
   gridSnap = on;
   try{ localStorage.setItem("genesis-grid-snap", on ? "1" : "0"); }catch{}
-  const b = $("#gridBtn"); b.setAttribute("aria-pressed", on); b.querySelector(".price").textContent = on ? "On, 5 m. Press G" : "Off. Press G";
+  const b = $("#gridBtn"); b.setAttribute("aria-pressed", on); b.querySelector(".price").textContent = on ? "On, 1 m. Press G" : "Off. Press G";
   if(state) render();
 }
 $("#gridBtn").onclick = () => setGridSnap(!gridSnap);

@@ -59,6 +59,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       starterOk = starterOk && st.length === 3 && a.length === 1 && b.length === 2 && new Set(st).size === 3; seenA.add(a[0]);
     }
     out.starterPools = starterOk && seenA.size > 1;
+    // the old slanted plot becomes the grid-aligned rectangle; new parks start with it
+    const oldPlot = JSON.parse(JSON.stringify(state)); oldPlot.boundary = OLD_PLOT.map(p => p.slice());
+    out.plotRectangle = JSON.stringify(upgradeSave(oldPlot).boundary) === JSON.stringify(PARK_PLOT) && JSON.stringify(newPark().boundary) === JSON.stringify(PARK_PLOT) &&
+      PARK_PLOT.every(([x, y]) => x % 5 === 0 && y % 5 === 0);
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
     out.oldSaveStarters = upgradeSave(oldS).starters.join() === "arth,lyst,hyps";
 

@@ -8,6 +8,10 @@
 const SPECIES_BY_ID = Object.fromEntries(SPECIES.map(s => [s.id, s]));
 const uid = p => p + Math.random().toString(36).slice(2, 9);
 
+// The park plot: a 420 × 305 m rectangle, every corner on the 5 m grid
+const PARK_PLOT = [[0,0],[420,0],[420,305],[0,305]];
+const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
+
 let state = null;     // the saved game
 let derived = null;   // numbers worked out from the saved game, rebuilt when it changes
 let arrivalCarry = 0; // fractions of a guest carried between frames
@@ -46,10 +50,10 @@ function newPark(){
     version:1, name:"Genesis Park",
     money:START.money, ticket:START.ticket, rating:START.rating,
     day:1, minute:OPEN_MIN,
-    boundary:[[0,18],[150,0],[410,8],[420,300],[-6,306]],
-    gate:[205,303],
+    boundary:PARK_PLOT.map(p => p.slice()),
+    gate:[205,305],
     exhibits:[],
-    paths:[{id:"p-main", name:"Main walk", points:[[205,303],[205,235]], fixed:true}],
+    paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:{stock:0, meds:0}, health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{},
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -58,6 +62,8 @@ function newPark(){
 
 // Bring older saves up to date with anything added since
 function upgradeSave(s){
+  // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
+  if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
