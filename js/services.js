@@ -76,12 +76,25 @@ function serveAt(p, b, why){
   } else if(t.kind === "merch"){
     // each guest might pick something: happier guests buy more
     served = 0;
-    const keen = clamp((p.mood - 30) / 60, .15, .9);
+    // and guests who've learned about the animals want something to remember them by
+    const keen = clamp((p.mood - 30) / 60, .15, .9), edu = (p.edu || 0) / 100;
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price);
+      const boost = 1 + EDU.shopBoost * edu * (m.id === "guide" || m.id === "plush" ? 2 : 1);
       if(will < .6) thinks(p, "priceyGift");
-      if(Math.random() < keen * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
+      if(Math.random() < Math.min(.95, keen * boost) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
+    }
+  } else if(b.type === "edcenter"){
+    // the entry fee, if there is one: too steep and they turn around
+    const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
+    served = 0; p.learnt = true;
+    if(fee && Math.random() > will){ thinks(p, "priceyEdu"); p.mood -= 3; }
+    else if(p.cash < fee * n) thinks(p, "broke");
+    else {
+      if(fee){ p.cash -= fee * n; earn(fee * n, "edfees"); bill = fee * n; }
+      // they sit through a talk and use the restrooms while they're in there
+      learn(p, EDU.center); p.mood += EDU.centerJoy; p.needs.energy = 0; p.needs.bladder = 0; served = n;
     }
   } else if(b.type === "restroom"){
     p.needs.bladder = 0;
@@ -91,7 +104,7 @@ function serveAt(p, b, why){
   if(t.seats && (why === "energy" || t.kind)){ p.needs.energy = 0; if(why === "energy") thinks(p, "rested"); }
 
   if(!b.served || b.served.day !== state.day) b.served = {day:state.day, n:0, money:0, items:{}};
-  b.served.n += served;
+  b.served.n += served; if(b.type === "edcenter") b.served.money += bill;
   return bill;
 }
 // Hand over one item to each of n guests: they pay, it comes off the shelf, and they may be left holding a wrapper.
@@ -105,6 +118,7 @@ function buy(p, b, m, n){
   for(const [k, v] of Object.entries(it.fills || {})) p.needs[k] = Math.max(0, p.needs[k] - v);
   if(it.joy) p.mood += it.joy;
   if(m.id === "map") p.map = true;
+  if(m.id === "guide"){ if(!p.guide) learn(p, EDU.guide); p.guide = true; }
   if(it.litter){ p.trash = (p.trash || 0) + n; p.trashAt = state.minute; }
   if(it.kind === "food") state.today.servedFood += n; else state.today.servedShop += n;
   if(!b.served || b.served.day !== state.day) b.served = {day:state.day, n:0, money:0, items:{}};
@@ -134,7 +148,7 @@ function trashCheck(p){
     p.trash = 0; return;
   }
   if(state.minute - p.trashAt < LITTER.holdMin) return;
-  if(Math.random() < LITTER.drop + LITTER.dirtyDrop * litterAt(p.at.x, p.at.y)){ addLitter(p.at.x, p.at.y, p.trash); p.trash = 0; }
+  if(Math.random() < (LITTER.drop + LITTER.dirtyDrop * litterAt(p.at.x, p.at.y)) * (1 - EDU.litterCut * (p.edu || 0) / 100)){ addLitter(p.at.x, p.at.y, p.trash); p.trash = 0; }
   else p.trashAt = state.minute;
 }
 // Where along the footpaths each litter square's specks go. Called when the guest map is rebuilt.

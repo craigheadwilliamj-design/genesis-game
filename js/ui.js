@@ -140,7 +140,8 @@ function exhibitHtml(e){
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
       ${movesHtml(e)}
-      <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
+      <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
+      <div class="meta" style="margin-top:4px">${hasSign(e) ? "An info sign by the fence teaches guests about these animals." : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
   h += healthHtml(e);
 
@@ -553,7 +554,7 @@ function buildingHtml(b){
   if(b.type === "oracle") return oracleHtml(b) + demolishRow(b);
   if(b.type === "ghost") return ghostHtml(b) + demolishRow(b);
   if(b.type === "tar") return tarHtml(b) + demolishRow(b);
-  if(guestBuilding(b)) return guestBuildingHtml(b) + demolishRow(b);
+  if(guestBuilding(b) || BUILDINGS[b.type].prop) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;

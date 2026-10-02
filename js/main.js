@@ -25,6 +25,7 @@ events.dayEnded = r => {
   ui.toast("", "day", `<h4>Day ${r.day} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
     ${row("Tickets", money(L.tickets))}
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
+    ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
     ${L.rewards ? row("Goal rewards", money(L.rewards)) : ""}
     ${L.sold ? row("Sold and refunds", money(L.sold)) : ""}
     ${row("Animal food", "−" + money(L.feed))}
