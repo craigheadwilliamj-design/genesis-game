@@ -892,7 +892,7 @@ BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};
 
 // Landscaping: ponds and rocks placed inside an open exhibit (e.land). Animals feel at home among what they like.
-//   r      radius in meters
+//   r      radius in meters. Groves come small (r 2), medium (r 3.5) and large (r 5).
 //   water  counts toward the exhibit's water
 //   cover  rock cover it adds (see HAB.rockEvery)
 //   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
@@ -903,14 +903,20 @@ const LAND = {
   pond:   {label:"Pond",          one:"a pond",          price:3000, r:6, color:"#3A7FB2", water:true},
   rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
+  flowers:{label:"Flower bed",    one:"a flower bed",    price:300,  r:2,   color:"#C98AB0", flora:"cenozoic", browse:1,   shade:2},
+  shrubs: {label:"Shrubs",        one:"a patch of shrubs",  price:600,  r:3.5, color:"#79B05A", flora:"cenozoic", browse:2,   shade:4},
   trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
+  ginkgos:{label:"Ginkgo saplings", one:"ginkgo saplings", price:380, r:2,   color:"#8DB04A", flora:"mesozoic",  tech:"mesoplant",  stock:.25, browse:1,   shade:2},
+  ferns:  {label:"Fern patch",    one:"a fern patch",    price:750,  r:3.5, color:"#52934A", flora:"mesozoic",  tech:"mesoplant",  stock:.5,  browse:2,   shade:4},
   cycads: {label:"Cycad grove",   one:"a cycad grove",   price:1500, r:5, color:"#3F7D3A", flora:"mesozoic",  tech:"mesoplant",  stock:1, browse:4},
+  mosses: {label:"Club moss",     one:"a club moss bed", price:450,  r:2,   color:"#5E9E7A", flora:"paleozoic", tech:"paleoplant", stock:.25, browse:1,   shade:2},
+  horsetails:{label:"Horsetail patch", one:"a horsetail patch", price:900, r:3.5, color:"#3F8268", flora:"paleozoic", tech:"paleoplant", stock:.5, browse:2, shade:4},
   lycopods:{label:"Lycopod stand", one:"a lycopod stand", price:1800, r:5, color:"#2E6B55", flora:"paleozoic", tech:"paleoplant", stock:1, browse:4},
   shelter:{label:"Shelter",       one:"a shelter",       price:2500, r:4, color:"#9A7B55", slots:10},
   barn:   {label:"Large shelter", one:"a large shelter", price:7000, r:7, color:"#7E6142", slots:36},
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
-for(const t of Object.values(LAND)) if(t.flora) t.shade = 8;
+for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor in ponds that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after

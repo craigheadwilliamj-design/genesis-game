@@ -171,7 +171,7 @@ function growRow(kind, era){
   h += `<span class="need">`;
   if(!unlocked) h += `Research ${kind === "flora" ? `${FLORA[era].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
   else {
-    h += `A batch takes ${spanText(growMinutes(kind, era))}. ${kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${c.plants[era] || 0} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
+    h += `A batch takes ${spanText(growMinutes(kind, era))}. ${kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${+(c.plants[era] || 0).toFixed(2)} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
     if(why && era !== "cenozoic" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
   }
   h += `</span>`;
