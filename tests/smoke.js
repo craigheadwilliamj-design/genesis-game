@@ -164,7 +164,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
     // science buildings got cheaper
-    out.cheaperScience = BUILDINGS.oracle.price === 11250 && BUILDINGS.ghost.price === 18750 && BUILDINGS.tar.price === 15000 && BUILDINGS.ceres.price === 13125 && BUILDINGS.pmc.price === 7500;
+    out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
     // vets dart escaped animals and keepers carry them home
     vetsNight(); keepersNight();
