@@ -136,12 +136,31 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.injuryGoesToWard = run(600, () => state.health.ward.length === 1);
     state.health.ward = []; viv.animals.push({id:"a-t", sp:"arth"}); vetsNight(); keepersNight();
 
-    // without the era's medicine, a patient only stabilizes
+    // without the era's medicine, contemporary medicine eases a patient down to its era's floor, and it goes home chronic
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
-    state.health.ward.push({a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", dosed:false});
+    state.buildings.find(b => b.id === "b-pmc").store = {meds:0};
+    const m0 = state.today.medicine; state.health.cmeds = 0;
+    const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
+    state.health.ward.push(pal);
     healthNight();
-    out.stableWithoutMedicine = state.health.ward.find(p => p.a.id === "a-w").a.sick.sev === 50;
-    state.health.ward = [];
+    out.modernRestock = state.today.medicine - m0 === MODERN.stock * MODERN.cost && state.health.cmeds === MODERN.stock - HEALTH.dose;
+    out.modernEases = pal.med === "modern" && Math.abs(pal.a.sick.sev - (50 - HEALTH.healPerNight * MODERN.heal.paleozoic)) < 1e-9 && !pal.cured;
+    for(let i = 0; i < 5 && !pal.cured; i++) healthNight();
+    out.modernLeavesChronic = pal.cured && pal.a.sick && pal.a.sick.chronic && pal.a.sick.sev === MODERN.floor.paleozoic;
+    // Cenozoic animals respond better and are left less ill
+    out.modernByEra = MODERN.heal.cenozoic > MODERN.heal.mesozoic && MODERN.heal.mesozoic > MODERN.heal.paleozoic && MODERN.floor.cenozoic < MODERN.floor.paleozoic;
+    // a chronic case holds steady overnight instead of getting worse
+    state.health.ward = []; state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== "a-w");
+    viv.animals[1].sick = {kind:"illness", sev:MODERN.floor.paleozoic, chronic:true};
+    healthNight();
+    out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
+    // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
+    out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
+    state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
+    delete viv.animals[1].sick;
+    // science buildings got cheaper
+    out.cheaperScience = BUILDINGS.oracle.price === 15000 && BUILDINGS.ghost.price === 25000 && BUILDINGS.tar.price === 20000 && BUILDINGS.ceres.price === 17500 && BUILDINGS.pmc.price === 15000;
 
     // vets dart escaped animals and keepers carry them home
     vetsNight(); keepersNight();
@@ -367,7 +386,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // (it may grab a meal too if it got hungry on the way)
     out.partyDrinks = run(400, () => p.needs.thirst < 20) && state.today.food >= MENU.soda.price * 2 && state.buildings.find(b => b.id === "b-f").served.money === state.today.food;
     // and then the restroom
-    p.needs.bladder = 75;
+    p.needs.bladder = 75; p.needs.energy = 0; p.mood = 70;
     out.partyRestroom = run(400, () => p.needs.bladder < 5);
     // nowhere to eat: they say so
     const fs = state.buildings.find(b => b.id === "b-f"); state.buildings = state.buildings.filter(b => b !== fs); afterChange();
@@ -376,6 +395,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.noFoodThought = p.thought.has("noFood");
     state.buildings.push(fs); afterChange();
     // going home: the party walks out the gate and its mood counts
+    p.needs.energy = 0; p.mood = 70;
     const before = state.today.moodN; goHome(p);
     out.partyLeaves = run(600, () => p.gone) && !parties.includes(p) && state.today.moodN === before + 2;
 

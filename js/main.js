@@ -31,6 +31,7 @@ events.dayEnded = r => {
     ${row("Keepers and upkeep", "−" + money(L.wages + L.upkeep))}
     ${L.supplies ? row("Food and gift stock", "−" + money(L.supplies)) : ""}
     ${L.cleaning ? row("Night cleaning", "−" + money(L.cleaning)) : ""}
+    ${L.medicine ? row("Medicine", "−" + money(L.medicine)) : ""}
     ${L.science ? row("Research and expeditions", "−" + money(L.science)) : ""}
     ${L.fines ? row("Lawsuits", "−" + money(L.fines)) : ""}
     ${L.repairs ? row("Fence repairs", "−" + money(L.repairs)) : ""}
