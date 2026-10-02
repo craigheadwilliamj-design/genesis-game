@@ -224,21 +224,22 @@ function exhibitHtml(e){
   return h;
 }
 
-// Ponds and rocks in one exhibit, and buttons to add more
+// Water, rocks, groves and shelters in one exhibit, and buttons to add more
 function landHtml(e){
   const hb = habitatOf(e), n = {};
-  for(const f of landOf(e)) n[f.type] = (n[f.type] || 0) + 1;
-  const have = Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`).join(", ");
+  for(const f of landOf(e)) if(LAND[f.type]) n[f.type] = (n[f.type] || 0) + 1;
+  const wn = waterOf(e).length;
+  const have = (wn ? [`${fmtArea(hb.waterM2)} of water in ${wn} part${wn === 1 ? "" : "s"}`] : []).concat(Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`)).join(", ");
   const need = dailyNeed(e), fed = ["paleoflora", "plants"].filter(t => need[t] && browseRate(e, t))
     .map(t => `${Math.round(browseShare(e, t, need[t]) * 100)}% of their ${t}`);
   const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
   const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : t.stock && (state.ceres.plants[t.flora] || 0) < t.stock ? `Needs ${FLORA[t.flora].label} planting stock from CERES.` : "";
-  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Ponds cover ${(hb.pondShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without a pond.</div>
+  return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Animals feel at home among water and rocks they like, and fish eaters can't do without water. Reshape water with the Move tool, like a fence.</div>
     <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Cycad and lycopod groves keep old plant-eaters off the grass, and each uses a batch of planting stock from CERES (no refund).</div>
     ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
-    <div class="row" style="margin-top:6px">${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.stock ? " + stock" : ""}</button>`).join("")}</div></section>`;
+    <div class="row" style="margin-top:6px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button>${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.stock ? " + stock" : ""}</button>`).join("")}</div></section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
@@ -506,6 +507,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); return; }
+  if(a === "waterTool"){ setTool("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireSci"){ if(sc.crew[b.dataset.k] > 0) sc.crew[b.dataset.k]--; done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }
