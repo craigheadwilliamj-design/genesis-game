@@ -956,6 +956,51 @@ const LIKES_ROCK = {water:.2, rock:.9};
 const HABITAT_LIKES = {diic:LIKES_ROCK, lyst:LIKES_ROCK, seym:LIKES_ROCK, dime:LIKES_ROCK, plhy:LIKES_ROCK, mlan:LIKES_ROCK, mono:LIKES_ROCK, beel:{water:.6, rock:.6}};
 const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {water:.9, rock:.1} : {water:.4, rock:.4});
 
+// Biomes: the ground an open exhibit is laid out as. Each animal has a home biome and one it gets by in.
+//   color    floor color on the map (the pattern id is "b-" + the key)
+//   perSqM   cost to regrade an exhibit to this biome
+//   wet      counts as this share of a full pond for water lovers
+const BIOMES = {
+  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", perSqM:.5},
+  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", perSqM:1},
+  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", perSqM:.3},
+  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", perSqM:.4},
+  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", perSqM:1.2, wet:.5},
+  temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", perSqM:.6},
+  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", perSqM:.8},
+};
+const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
+const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
+// Each open-exhibit animal's home biome, then the one it gets by in. Vivarium animals don't mind.
+const SPECIES_BIOMES = Object.fromEntries(Object.entries({
+  eryo:"wetland tropical",    lyst:"scrubland desert",     mosc:"scrubland desert",     dime:"scrubland wetland",
+  scut:"desert scrubland",    este:"temperate wetland",    coty:"scrubland desert",     ante:"wetland temperate",
+  inos:"scrubland temperate", prio:"wetland tropical",     sile:"scrubland desert",     coel:"desert scrubland",
+  herr:"scrubland temperate", desm:"scrubland desert",     plat:"temperate scrubland",  post:"scrubland tropical",
+  eryt:"desert scrubland",    liso:"scrubland temperate",  hete:"desert scrubland",     orni:"temperate scrubland",
+  dryo:"grassland temperate", dimo:"tropical wetland",     scel:"temperate wetland",    dilo:"tropical scrubland",
+  kent:"scrubland tropical",  steg:"grassland scrubland",  cryo:"boreal temperate",     cera:"scrubland grassland",
+  mgal:"temperate wetland",   allo:"grassland scrubland",  cama:"grassland temperate",  torv:"scrubland grassland",
+  apat:"grassland wetland",   dipl:"grassland scrubland",  brac:"tropical grassland",   hyps:"temperate wetland",
+  psit:"temperate scrubland", prot:"desert scrubland",     ornm:"temperate grassland",  ovir:"desert scrubland",
+  minm:"temperate scrubland", gall:"desert grassland",     para:"wetland temperate",    igua:"temperate wetland",
+  velo:"desert scrubland",    pter:"wetland tropical",     conc:"wetland tropical",     nige:"tropical wetland",
+  utah:"temperate scrubland", styr:"grassland temperate",  bary:"wetland temperate",    ther:"wetland temperate",
+  dsuc:"wetland tropical",    yutt:"boreal temperate",     anky:"temperate grassland",  tric:"grassland temperate",
+  cnot:"grassland scrubland", dche:"wetland temperate",    quet:"grassland scrubland",  spin:"wetland tropical",
+  pata:"grassland temperate", carc:"desert scrubland",     trex:"temperate grassland",  proc:"tropical temperate",
+  hyae:"temperate scrubland", ambu:"wetland tropical",     uint:"temperate wetland",    andr:"scrubland grassland",
+  bari:"tropical wetland",    arge:"grassland scrubland",  arsi:"wetland tropical",     tita:"tropical wetland",
+  dino:"grassland scrubland", daeo:"grassland scrubland",  aepy:"grassland scrubland",  kele:"grassland scrubland",
+  thyl:"scrubland temperate", mchl:"scrubland tropical",   chal:"temperate tropical",   aind:"tropical temperate",
+  drom:"scrubland grassland", plty:"wetland grassland",    amph:"temperate grassland",  gpit:"tropical temperate",
+  siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland boreal",     macr:"grassland scrubland",
+  arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
+  smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"boreal grassland",
+  colm:"grassland temperate",
+}).map(([id, b]) => [id, b.split(" ")]));
+const biomesOf = s => SPECIES_BIOMES[s.id] || null;
+
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
 
