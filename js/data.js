@@ -65,15 +65,14 @@ const SPECIES = [
   // Carboniferous
   {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
   {id:"hylo", name:"Hylonomus",      period:"Carboniferous", diet:["insectivore"], price:2800, food:4, space:5, group:[2,8], appeal:3, stars:0, viv:"S"},
+  {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"arth", name:"Arthropleura",   period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
   {id:"pulm", name:"Pulmonoscorpius", period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
   {id:"mega", name:"Meganeura",      period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
   {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
-  {id:"dipl", name:"Diplodocus",     period:"Carboniferous", diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
   // Permian
   {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
   {id:"lyst", name:"Lystrosaurus",   period:"Permian", diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
-  {id:"dcau", name:"Diplocaulus",    period:"Permian", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"seym", name:"Seymouria",      period:"Permian", diet:["insectivore","carnivore"], price:4000, food:8, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
   {id:"plhy", name:"Platyhystrix",   period:"Permian", diet:["carnivore"], price:4500, food:10, space:10, group:[2,5], appeal:5, stars:0.5, viv:"M"},
   {id:"mosc", name:"Moschops",       period:"Permian", diet:["herbivore"], price:8000, food:90, space:450, group:[2,6], appeal:6, stars:1},
@@ -116,6 +115,7 @@ const SPECIES = [
   {id:"cama", name:"Camarasaurus",   period:"Jurassic", diet:["herbivore"], price:45000, food:600, space:4500, group:[2,6],  appeal:17, stars:3.5},
   {id:"torv", name:"Torvosaurus",    period:"Jurassic", diet:["carnivore"], predator:true, price:42000, food:450, space:3000, group:[1,2],  appeal:17, stars:4},
   {id:"apat", name:"Apatosaurus",    period:"Jurassic", diet:["herbivore"], price:47000, food:620, space:4700, group:[2,6], appeal:18, stars:4},
+  {id:"dipl", name:"Diplodocus",     period:"Jurassic", diet:["herbivore"], price:50000, food:650, space:5000, group:[2,6],  appeal:19, stars:4},
   {id:"brac", name:"Brachiosaurus",  period:"Jurassic", diet:["herbivore"], price:52000, food:680, space:5200, group:[2,5], appeal:20, stars:4},
   // Cretaceous
   {id:"hyps", name:"Hypsilophodon",  period:"Cretaceous", diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
