@@ -25,7 +25,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, supplies:0, cleaning:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
   return {
@@ -102,6 +102,9 @@ function upgradeSave(s){
   // parks from before medicine existed get 5 days before animals start falling ill
   if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
   if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
+  if(s.health.cmeds === undefined) s.health.cmeds = 0;
+  for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at CERES moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
@@ -248,9 +251,12 @@ function exhibitReport(e){
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
   // Sick and hurt animals drag the whole herd down
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
-  const sick = e.animals.filter(a => a.sick).length, known = e.animals.filter(noticed).length;
+  // (a chronic case, eased by contemporary medicine, counts for less)
+  const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : 1) : 0), 0);
+  const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt. ${known === 1 ? "It needs" : "They need"} a vet. See Health below.`});
+  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from CERES cures it fully.`});
   else if(sick) issues.push({bad:true, text:"Some of the animals seem off. A vet's check-up would find out why."});
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
@@ -562,7 +568,7 @@ function endDay(){
 
   const t = state.today;
   const income = t.tickets + t.food + t.shop + t.sold + t.rewards;
-  const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning;
+  const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning + t.medicine;
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});
   if(state.history.length > 60) state.history.shift();

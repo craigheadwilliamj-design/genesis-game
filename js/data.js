@@ -212,13 +212,13 @@ const BUILDINGS = {
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
-  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:30000, upkeep:300, w:24, d:16, dept:true,
+  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:15000, upkeep:150, w:24, d:16, dept:true,
              full:"Operational Requests for Ancestral & Chronological Life Evidence",
              blurb:"The GHOST hub. Researches time periods and sends expedition requests."},
-  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:50000, upkeep:500, w:28, d:20, dept:true,
+  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:25000, upkeep:250, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
              blurb:"The time travel unit. Brings back DNA samples from unlocked periods."},
-  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:40000, upkeep:400, w:26, d:18, dept:true,
+  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:20000, upkeep:200, w:26, d:18, dept:true,
              full:"Terrestrial Animal Reconstruction",
              blurb:"The cloning lab. Turns complete genomes into living animals."},
 };
@@ -448,11 +448,11 @@ const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants 
 const GRASS_INTOLERANT = ["Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
-BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:35000, upkeep:300, w:26, d:18, dept:true, unique:true,
+BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:17500, upkeep:150, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
                    blurb:"Grows Paleoflora food for prehistoric plant-eaters, Mesozoic and Paleozoic plants for exhibits, and medicine for the PMC, once ORACLE has researched them. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
-BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:12000, upkeep:80, w:12, d:8, dept:true,
+BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:8000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
                         full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to CERES."};
 
@@ -559,9 +559,9 @@ const TECH = [
   {id:"paleoplant", label:"Paleozoic planting", points:45, needs:"paleoflora", text:"Plant exhibits with lycopod trees, horsetails, and seed ferns."},
   {id:"greenhouse", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
   {id:"foodprod",  label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
-  {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"The PMC can treat Paleogene, Neogene, and Quaternary animals. CERES makes the medicine."},
-  {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"The PMC can treat Triassic, Jurassic, and Cretaceous animals. CERES makes the medicine."},
-  {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"The PMC can treat Carboniferous and Permian animals. CERES makes the medicine."},
+  {id:"medceno",    label:"Cenozoic medicine",  points:25, text:"CERES makes medicine that fully cures Paleogene, Neogene, and Quaternary animals."},
+  {id:"medmeso",    label:"Mesozoic medicine",  points:35, text:"CERES makes medicine that fully cures Triassic, Jurassic, and Cretaceous animals."},
+  {id:"medpaleo",   label:"Paleozoic medicine", points:40, text:"CERES makes medicine that fully cures Carboniferous and Permian animals."},
 ];
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
@@ -619,13 +619,23 @@ const MEDICINE = {
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
+// Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
+// but can't cure prehistoric illness for good: the animal goes home with a chronic case.
+const MODERN = {
+  stock:20,            // doses the PMC keeps on hand
+  cost:40,             // price of each dose
+  heal:{cenozoic:.8, mesozoic:.5, paleozoic:.3},     // how well it works, as a share of the era's own medicine
+  floor:{cenozoic:10, mesozoic:20, paleozoic:30},    // how sick it leaves an animal, at best
+  chronicHappy:.5,     // a chronic case counts as this much of a sick animal for happiness
+};
+const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoic"};
 const VET = {
   hireCost:3000,
   wage:200,
   speed:WALK_PER_MIN,  // vets walk at the same pace as guests
   patients:3,          // patients each vet can treat each night
 };
-BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:30000, upkeep:250, w:20, d:14, dept:true, unique:true,
+BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:15000, upkeep:125, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
 BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};

@@ -11,11 +11,32 @@
 
 let vcrew = [];   // vets walking around right now (positions aren't saved)
 
-function freshHealth(){ return {from:HEALTH.startDay, ward:[]}; }
+function freshHealth(){ return {from:HEALTH.startDay, ward:[], cmeds:0}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
 const canTreat = s => hasTech(medTechFor(s));
 const anyMedTech = () => Object.values(MED_TECH).some(hasTech);
+const eraOf = s => ERA_OF[s.period];
+const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
+// Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
+function pickMed(s, n){
+  if(canTreat(s) && medOnHand() >= n) return "era";
+  if(dept("pmc") && (state.health.cmeds || 0) >= n) return "modern";
+  return null;
+}
+function takeMed(kind, n){ if(kind === "era") useMeds(n); else state.health.cmeds -= n; }
+// Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
+function ease(a){
+  const fl = MODERN.floor[eraOf(SPECIES_BY_ID[a.sp])];
+  a.sick = {kind:a.sick.kind, sev:Math.min(a.sick.sev, fl), chronic:true};
+}
+// Overnight, suppliers top the PMC up with contemporary medicine
+function modernMedsNight(){
+  const h = state.health;
+  if(!dept("pmc")) return;
+  const n = Math.min(MODERN.stock - (h.cmeds || 0), Math.floor(Math.max(0, state.money) / MODERN.cost));
+  if(n > 0){ h.cmeds = (h.cmeds || 0) + n; spend(n * MODERN.cost, "medicine"); }
+}
 const pmcs = () => state.buildings.filter(b => b.type === "pmc" && kGraph && kGraph.anchors[b.id]);
 const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
 // Vets handle escapes whenever there's a vet and a connected PMC for them to work from
@@ -73,12 +94,17 @@ function healthReport(e){
 // Injuries are obvious at once; illness shows only once it's bad
 function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && sev < HEALTH.obviousAt) a.sick.hidden = true; }
 // Can a vet cure this one where it stands?
+// A chronic case only comes back for a real cure, with the era's own medicine.
 function fieldTreatable(a){
-  return noticed(a) && !a.darted && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && canTreat(SPECIES_BY_ID[a.sp]) && medOnHand() >= HEALTH.fieldDose;
+  if(!noticed(a) || a.darted || a.sick.kind !== "illness" || a.sick.sev >= HEALTH.minorBelow) return false;
+  const k = pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
+  return a.sick.chronic ? k === "era" : !!k;
 }
 
 // What's happening to one sick animal, in words
 function sickStatus(e, a){
+  const s = SPECIES_BY_ID[a.sp];
+  if(a.sick.chronic && !fieldTreatable(a)) return canTreat(s) ? `Chronic. A vet will cure it once CERES has ${eraMedName(s).toLowerCase()} on hand.` : `Chronic. Contemporary medicine eased it, but only ${eraMedName(s).toLowerCase()} from CERES can cure it fully.`;
   if(a.darted){ const t = state.staff.transfers.find(x => x.animalId === a.id); return t && t.keeper ? "Darted. A keeper is coming to carry it to the PMC." : "Darted. Waiting for a keeper to carry it to the PMC."; }
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center and hire a vet to treat it.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
@@ -86,18 +112,21 @@ function sickStatus(e, a){
   if(!kGraph || !kGraph.anchors[e.id]) return `Vets can't get in. ${gateCheck(e).text}`;
   const mine = vcrew.find(c => c.patient && c.patient.a === a.id);
   if(mine) return mine.patient.field ? (mine.job === "treating" ? "A vet is treating it here." : "A vet is on the way to treat it here.") : "A vet is on the way to dart it.";
-  if(a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !canTreat(SPECIES_BY_ID[a.sp]) && bedsFree() > 0) return "Minor, but ORACLE hasn't researched its medicine, so it goes to the PMC. Waiting for a free vet.";
+  if(a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !fieldTreatable(a) && bedsFree() > 0) return "Minor, but the PMC is out of medicine, so it goes to the PMC. Waiting for a free vet.";
   if(fieldTreatable(a)) return "Minor. A vet can treat it here. Waiting for a free vet.";
   if(bedsFree() <= 0) return "The PMC is full. It waits for a free bed.";
   return "Waiting for a free vet.";
 }
 function patientStatus(p){
   const s = SPECIES_BY_ID[p.a.sp];
-  if(p.cured){ const t = state.staff.transfers.find(x => x.animalId === p.a.id); return t && t.keeper ? "Recovered. A keeper is taking it home." : "Recovered. Waiting for a keeper to take it home."; }
-  if(!canTreat(s)) return `Stable. ORACLE needs to research ${TECH.find(t => t.id === medTechFor(s)).label.toLowerCase()} to treat it.`;
+  if(p.cured){
+    const t = state.staff.transfers.find(x => x.animalId === p.a.id), done = p.a.sick && p.a.sick.chronic ? "As well as contemporary medicine can make it." : "Recovered.";
+    return `${done} ${t && t.keeper ? "A keeper is taking it home." : "Waiting for a keeper to take it home."}`;
+  }
   if(!state.staff.vets.length) return "Stable. Hire a vet to treat it.";
-  if(!p.dosed) return hasDept("ceres") ? "Stable. Waiting for medicine from CERES." : "Stable. Build CERES to make medicine.";
-  return "Being treated.";
+  if(p.med === "modern") return `Being treated with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`;
+  if(p.med === "era") return "Being treated.";
+  return "Stable. Waiting for medicine. Suppliers restock the PMC every night.";
 }
 
 /* ---------- the ward ---------- */
@@ -111,7 +140,7 @@ function bedsFree(){
 // A keeper brings an animal in
 function admit(a, t){
   delete a.darted;
-  state.health.ward.push({a, home:t.from, dosed:false, since:state.day});
+  state.health.ward.push({a, home:t.from, med:null, since:state.day});
   events.toast(`A sick ${SPECIES_BY_ID[a.sp].name} was admitted to the PMC.`);
   events.changed();
 }
@@ -173,6 +202,7 @@ function pickPatient(c){
     for(const a of e.animals){
       if(!noticed(a) || a.darted || taken.has(a.id)) continue;
       const field = fieldTreatable(a);
+      if(a.sick.chronic && !field) continue;
       if((field || beds) && (!best || a.sick.sev > best.a.sick.sev)) best = {e, a, field};
     }
   }
@@ -247,10 +277,11 @@ function treatDone(c){
   const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a), v = state.staff.vets.find(x => x.id === c.id);
   c.patient = null; c.job = "idle"; c.wait = 0;
   if(!a || !a.sick) return;
-  if(medOnHand() < HEALTH.fieldDose){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`, "bad"); return; }
-  useMeds(HEALTH.fieldDose);
-  delete a.sick;
-  events.toast(`${v ? v.name : "A vet"} treated a ${SPECIES_BY_ID[a.sp].name} in ${e.name} on the spot.`, "good");
+  const s = SPECIES_BY_ID[a.sp], k = pickMed(s, HEALTH.fieldDose);
+  if(!k || (a.sick.chronic && k !== "era")){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${s.name} in ${e.name}.`, "bad"); return; }
+  takeMed(k, HEALTH.fieldDose);
+  if(k === "era"){ delete a.sick; events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} on the spot.`, "good"); }
+  else { ease(a); events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`); }
   events.changed();
 }
 
@@ -323,6 +354,7 @@ function vetStatus(v){
 
 function healthNight(){
   const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[]};
+  modernMedsNight();
   // medicated feed: CERES doses go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
@@ -336,6 +368,8 @@ function healthNight(){
       for(const a of [...e.animals]){
         const s = SPECIES_BY_ID[a.sp];
         if(a.sick){
+          // a chronic case holds steady, and medicated feed with the era's own medicine slowly clears it up
+          if(a.sick.chronic){ if(medicated(e, s)){ a.sick.sev -= MEDICINE.feedHeal; if(a.sick.sev <= 0){ delete a.sick; out.healed++; } } continue; }
           // mild cases clear up on medicated feed; everything else gets worse
           if(medicated(e, s) && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !a.darted){
             a.sick.sev -= MEDICINE.feedHeal;
@@ -358,16 +392,25 @@ function healthNight(){
   const pmc = dept("pmc");
   let cap = pmc ? state.staff.vets.length * VET.patients : 0;
   for(const p of [...h.ward].sort((x, y) => (y.a.sick ? y.a.sick.sev : 0) - (x.a.sick ? x.a.sick.sev : 0))){
-    if(p.cured || cap <= 0 || !canTreat(SPECIES_BY_ID[p.a.sp])) continue;
-    if(!p.dosed){ if(medOnHand() < HEALTH.dose) continue; useMeds(HEALTH.dose); p.dosed = true; }
+    if(p.cured || cap <= 0) continue;
+    const s = SPECIES_BY_ID[p.a.sp];
+    // start a course of medicine, or switch to the era's own once it's available
+    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose); p.med = k; } }
+    if(!p.med) continue;
     cap--;
-    p.a.sick.sev -= HEALTH.healPerNight;
-    if(p.a.sick.sev <= 0){
-      delete p.a.sick; p.cured = true;
+    const era = eraOf(s), fl = MODERN.floor[era];
+    if(p.med === "modern"){
+      if(p.a.sick.sev - HEALTH.healPerNight * MODERN.heal[era] > fl){ p.a.sick.sev -= HEALTH.healPerNight * MODERN.heal[era]; continue; }
+      ease(p.a);
+    } else p.a.sick.sev -= HEALTH.healPerNight;
+    if(p.a.sick.chronic || p.a.sick.sev <= 0){
+      const chronic = !!p.a.sick.chronic;
+      if(!chronic) delete p.a.sick;
+      p.cured = true;
       const home = state.exhibits.find(x => x.id === p.home);
       if(home) state.staff.transfers.push({id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmcBuilding().id, to:home.id, med:true});
       else { discharge(p.a.id); state.science.ready.push({id:p.a.id, sp:p.a.sp, q:p.a.q ?? 90}); }
-      events.toast(`The PMC cured a ${SPECIES_BY_ID[p.a.sp].name}.${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in holding."}`, "good");
+      events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in holding."}`, chronic ? "" : "good");
     }
   }
   for(const e of state.exhibits) e.hungryMin = 0;
