@@ -72,6 +72,7 @@ function upgradeSave(s){
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.vets) s.staff.vets = [];
+  if(!s.staff.custodians) s.staff.custodians = [];
   if(!s.staff.atvs) s.staff.atvs = [];
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
@@ -120,6 +121,8 @@ function upgradeSave(s){
     const pmc = s.buildings.find(b => b.type === "pmc");
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
+  // stock for stands and shops became physical: older parks get a few more days of direct deliveries
+  if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
@@ -366,6 +369,7 @@ function tick(dtMin){
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
   vetsTick(m1 - m0);
+  custodiansTick(m1 - m0);
   escapesTick(m1 - m0);
   if(state.over) return;
 
@@ -392,7 +396,7 @@ function dailyCosts(){
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
-  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage;
+  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage;
   // science staff are paid as research costs
   let research = 0;
   for(const [k, n] of Object.entries(state.science.crew)) research += n * SCIENTISTS[k].wage;
@@ -555,10 +559,12 @@ function endDay(){
   logiNight();
   escapesNight();
   mechanicsNight();
+  custodiansNight();
   healthNight();
   vetsNight();
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
   if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
+  if(state.day + 1 === state.logi.guestFrom) events.toast("From tomorrow, food stands and gift shops sell from their own stock. The dock orders it, and custodians carry it out. Build a Custodial Closet and hire one.", "bad");
 
   const before = state.rating;
   // Move a third of the way to the target each night, but at least 0.1 stars, so it actually gets there
