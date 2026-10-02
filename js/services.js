@@ -131,9 +131,10 @@ function buy(p, b, m, n){
 const litterKey = (x, y) => Math.floor(x / LITTER.cell) + ":" + Math.floor(y / LITTER.cell);
 const litterAt = (x, y) => state.litter[litterKey(x, y)] || 0;
 function addLitter(x, y, n){ const k = litterKey(x, y); state.litter[k] = (state.litter[k] || 0) + n; }
+// The nearest working bin with room left. Guests walk past a full one and keep looking.
 function nearBin(x, y){
   let best = null, bd = LITTER.binReach;
-  for(const s of binSpots){ if(isBroken(s.b)) continue; const d = Math.hypot(s.x - x, s.y - y); if(d < bd){ bd = d; best = s.b; } }
+  for(const s of binSpots){ if(isBroken(s.b) || (s.b.fill || 0) >= LITTER.binCap) continue; const d = Math.hypot(s.x - x, s.y - y); if(d < bd){ bd = d; best = s.b; } }
   return best;
 }
 // At each corner a party holding trash looks for a bin. After a while some give up and drop it.
@@ -143,7 +144,7 @@ function trashCheck(p){
   if(b){
     const room = Math.max(0, LITTER.binCap - (b.fill || 0)), put = Math.min(room, p.trash);
     b.fill = (b.fill || 0) + put;
-    // a full bin overflows onto the ground beside it
+    // whatever doesn't fit in a nearly full bin spills beside it
     if(p.trash > put){ const [bx, by] = centroid(b.points); addLitter(bx, by, p.trash - put); }
     p.trash = 0; return;
   }

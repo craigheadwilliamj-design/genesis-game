@@ -413,8 +413,8 @@ const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual 
 // Litter lies on the paths in squares this many meters across
 const LITTER = {
   cell:8,              // size of a litter square
-  binReach:12,         // guests use a bin this close
-  binCap:40,           // pieces a bin holds
+  binReach:20,         // guests use a bin this close
+  binCap:100,          // pieces a bin holds
   holdMin:12,          // minutes a guest carries trash looking for a bin
   drop:.5,             // chance they drop it then, rather than keep looking
   dirtyDrop:.04,       // extra chance for each piece already lying there
