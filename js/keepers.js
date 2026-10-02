@@ -239,8 +239,9 @@ function returnCarry(c){
   setCarry(c, null);
 }
 
-// How much of each food each exhibit is short, minus what keepers are already bringing
-function shortages(k){
+// How much of each food each exhibit is short, minus what other keepers are already bringing
+// (pass the asking keeper as `self` so its own load doesn't count as already on its way)
+function shortages(k, self){
   const out = [];
   for(const e of state.exhibits){
     if(!e.animals.length || !kGraph.anchors[e.id]) continue;
@@ -250,7 +251,7 @@ function shortages(k){
       // with no CERES, keepers bring plain plant food in place of Paleoflora
       const t = need_t === "paleoflora" && !paleofloraReady() ? "plants" : need_t;
       if(t === "plants" && need_t === "paleoflora" && need.plants) continue;   // the exhibit's own plant order covers it
-      const coming = crew.reduce((s, c) => s + (c.plan && c.plan.exhibitId === e.id && c.carry && c.carry.type === t ? c.carry.amount : 0), 0);
+      const coming = crew.reduce((s, c) => s + (c !== self && c.plan && c.plan.exhibitId === e.id && c.carry && c.carry.type === t ? c.carry.amount : 0), 0);
       const have = stockFor(e, need_t), short = storeMax(e, need_t) - have - coming;
       if(short > 0.5) out.push({e, t, short, ratio:have / Math.max(1, storeMax(e, need_t))});
     }
@@ -375,18 +376,18 @@ function decide(c, k){
   if(mv && mv.cargo && !c.cargo) c.cargo = mv.cargo;   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
   if(mv && !c.cargo){ mv.keeper = null; }
-  if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots()); if(r){ goTo(c, r.n, "toRest"); return; } }
-  // goods in hand for a store: finish the delivery
+  // goods in hand for a store: finish the delivery (before any break, so food doesn't ride along to the break room)
   if(c.carry && c.carry.amount > 0 && c.carry.dst){
     const d = buildingById(c.carry.dst), n = d && kGraph.anchors[d.id];
     if(n && goTo(c, n, "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCarry(c);
   }
   if(c.carry && c.carry.amount > 0){
-    const jobs = shortages(k).filter(j => j.t === c.carry.type);
+    const jobs = shortages(k, c).filter(j => j.t === c.carry.type);
     const w = walkFrom(c.at, c); const j = jobs.filter(j => w.dist.has(kGraph.anchors[j.e.id])).sort((a, b) => w.dist.get(kGraph.anchors[a.e.id]) - w.dist.get(kGraph.anchors[b.e.id]))[0];
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); return; }
   }
+  if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots()); if(r){ goTo(c, r.n, "toRest"); return; } }
   // one map of the walk from here serves every choice below
   const w = walkFrom(c.at, c);
   const near = list => { let best = null; for(const b of list){ const n = kGraph.anchors[b.id]; if(n && w.dist.has(n) && (!best || w.dist.get(n) < best.d)) best = {b, n, d:w.dist.get(n)}; } return best; };
@@ -461,7 +462,7 @@ function arrive(c, k){
     else { amount = Math.min(amount, src ? Math.floor(stockOf(src, t)) : 0); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } takeGood(src, t, amount); }
     setCarry(c, {type:t, amount});
     k.stamina -= KEEPER.tirePerDelivery;
-    const j = shortages(k).find(j => j.t === t);
+    const j = shortages(k, c).find(j => j.t === t);
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); } else c.job = "idle";
     return;
   }
@@ -583,7 +584,8 @@ function keepersNight(){
   for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
-  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; } }
+  // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to CERES
+  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; } }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(){

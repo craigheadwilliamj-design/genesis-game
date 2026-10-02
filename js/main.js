@@ -18,11 +18,8 @@ function setSpeed(s){
 document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => setSpeed(+b.dataset.speed));
 
 /* ---------- what the simulation tells the screen ---------- */
-events.guestArrived = addWalker;
-events.guestLeft = removeWalker;
 events.toast = (t, kind) => ui.toast(t, kind);
 events.dayEnded = r => {
-  clearWalkers();
   const L = r.ledger, row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
   const stars = r.rating - r.ratingBefore;
   ui.toast("", "day", `<h4>Day ${r.day} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
@@ -32,12 +29,14 @@ events.dayEnded = r => {
     ${L.sold ? row("Sold and refunds", money(L.sold)) : ""}
     ${row("Animal food", "−" + money(L.feed))}
     ${row("Keepers and upkeep", "−" + money(L.wages + L.upkeep))}
+    ${L.supplies ? row("Food and gift stock", "−" + money(L.supplies)) : ""}
+    ${L.cleaning ? row("Night cleaning", "−" + money(L.cleaning)) : ""}
     ${L.science ? row("Research and expeditions", "−" + money(L.science)) : ""}
     ${L.fines ? row("Lawsuits", "−" + money(L.fines)) : ""}
     ${L.repairs ? row("Fence repairs", "−" + money(L.repairs)) : ""}
     ${L.built + L.animals ? row("Building and animals", "−" + money(L.built + L.animals)) : ""}
     <tr class="tot"><td>Profit</td><td>${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>
-  </table>${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${r.rating.toFixed(1)} stars.</div>` : ""}`);
+  </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${r.rating.toFixed(1)} stars.</div>` : ""}`);
   render(); ui.panel(); ui.hud(true);
   saveNow();
 };
@@ -70,9 +69,8 @@ function step(now){
   if(speed && !state.over){
     tick(dt * speed * MINUTES_PER_SECOND);
     animateAnimals(dt * Math.min(speed, 2));
-    moveWalkers(dt * speed);
   }
-  drawWalkers();
+  drawParties();
   drawKeepers();
   drawLoose();
   ui.hud();
@@ -105,11 +103,11 @@ function loadLocal(){
 
 function startWith(s, fresh){
   state = upgradeSave(s);
-  inPark = []; arrivalCarry = 0; powerShortNotified = -1; repairsHaltedDay = -1;
+  resetParties(); powerShortNotified = -1; repairsHaltedDay = -1;
   herd.forEach(h => h.el.remove()); herd.clear();
   sel = null; if(draw) endDraw(); setTool("select");
   crew = []; mcrew = []; vcrew = []; keeperEls.forEach(el => el.remove()); keeperEls.clear();
-  recompute(); buildGraph(); buildKeeperGraph(); clearWalkers();
+  recompute(); buildGuestGraph(); buildKeeperGraph();
   fit(); ui.panel(); ui.hud(true);
   setSpeed(state.over ? 0 : 1);
   if(fresh){ setSpeed(0); $("#dlgIntro").showModal(); }

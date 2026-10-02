@@ -133,7 +133,9 @@ function pickHaul(k, near){
     if(kz && d.zone && d.zone !== kz) continue;
     for(const t of dd.holds){
       const tgt = storeTarget(d, t); if(tgt <= 0) continue;
-      const have = stockOf(d, t) + inbound(d.id, t), need = tgt - have;
+      // a store only takes what fits: every good shares its room
+      const have = stockOf(d, t) + inbound(d.id, t), room = storeRoom(d, t) - dd.holds.reduce((s, x) => s + inbound(d.id, x), 0);
+      const need = Math.min(tgt - have, room);
       if(have >= tgt * .6 || need < Math.min(5, tgt)) continue;
       cands.push({d, t, need, cls:dd.bulk ? 2 : 1, ratio:have / tgt});
     }
