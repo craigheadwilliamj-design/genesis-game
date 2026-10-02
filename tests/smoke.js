@@ -635,6 +635,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.moveRestores = ex.points[0][0] === 200 && ex.gate[1] === 200;
       [state.exhibits, state.buildings, state.paths] = keep;
     }
+    {
+      const ex = {id:"e-rs", name:"Rs", points:[[200,200],[240,200],[240,240],[200,240]], animals:[], happy:70, cond:100, gate:[220,200]};
+      const keep = [state.exhibits, state.buildings, state.paths], money0 = state.money;
+      state.exhibits = [ex]; state.buildings = []; state.paths = [];
+      const orig = ex.points.map(p => p.slice());
+      ex.points[2] = [260, 260];
+      out.reshapeOk = !reshapeProblem(ex, orig) && reshapeCost(ex, orig) > 0;
+      commitReshape(ex, orig);
+      out.reshapePaid = state.money < money0;
+      const o2 = ex.points.map(p => p.slice()); ex.points[2] = [200, 200];
+      out.reshapeCrossBlocked = !!reshapeProblem(ex, o2);
+      ex.points = o2;
+      mvCorner = {id:"e-rs", i:3}; state.exhibits = [ex]; deleteMoveCorner();
+      out.cornerDeleted = ex.points.length === 3;
+      [state.exhibits, state.buildings, state.paths] = keep;
+    }
     out.campgroundIsHotel = isHotel({type:"campground"});
     return out;
   }));

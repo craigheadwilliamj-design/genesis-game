@@ -37,6 +37,7 @@ const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t 
 // Exhibits and zones are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone";
 let supplyOn = false;
+let mvCorner = null;                // exhibit corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : PATH_HALF_WIDTH;
 
@@ -269,6 +270,16 @@ function renderOverlay(){
       z.points.forEach((p, i) => { s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(zedit.sel === i ? 8 : 6.5)*inv}" fill="${zedit.sel === i ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`; });
     }
   }
+  if(tool === "move"){
+    for(const e of state.exhibits){
+      if(e.viv) continue;
+      e.points.forEach((p, i) => {
+        const q = e.points[(i + 1) % e.points.length], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+        s += `<circle cx="${mx}" cy="${my}" r="${5*inv}" fill="var(--sel)" fill-opacity=".85" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/><path d="M${mx - 2.5*inv} ${my}h${5*inv}M${mx} ${my - 2.5*inv}v${5*inv}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      });
+      e.points.forEach((p, i) => { const on = mvCorner && mvCorner.id === e.id && mvCorner.i === i; s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(on ? 8 : 6.5)*inv}" fill="${on ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
+    }
+  }
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   overlay.innerHTML = s;
 }
@@ -490,7 +501,11 @@ function setTool(t){
     updateZoneEditBar();
   }
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a service road meets it. Keepers won't use a gate that opens onto a guest path. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
-  else if(t === "move") showBar("Move", "Drag a building, exhibit or path to a new spot. Platforms and gates go with their exhibit. It's free.", "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "move"){
+    mvCorner = null;
+    showBar("Move", "Drag a building, exhibit or path to a new spot. Drag an exhibit's corner to reshape it, or a + on its fence to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:false, cancel:"Done", undoText:"Delete corner"});
+    updateMoveBar();
+  }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
@@ -571,7 +586,7 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
   if(tool === "zoneedit"){ finishZoneEdit(); return; }
@@ -991,6 +1006,56 @@ function dropMove(m){
   setStat("");
 }
 
+// Reshaping an exhibit: drag a corner, drag a + to add one, tap a corner and delete it
+function cornerAt(clientX, clientY){
+  const p = toWorld(clientX, clientY), R = 14 / view.k;
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    for(let i = 0; i < e.points.length; i++) if(Math.hypot(p.x - e.points[i][0], p.y - e.points[i][1]) < R) return {e, i, type:"v"};
+  }
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    for(let i = 0; i < e.points.length; i++){ const a = e.points[i], b = e.points[(i + 1) % e.points.length]; if(Math.hypot(p.x - (a[0] + b[0]) / 2, p.y - (a[1] + b[1]) / 2) < R) return {e, i, type:"m"}; }
+  }
+  return null;
+}
+const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
+// Why this exhibit's new outline won't work, or null
+function reshapeProblem(e, orig){
+  const pts = e.points;
+  if(selfCrosses(pts)) return "The fence crosses itself.";
+  if(!insidePlot(pts)) return "Keep it inside the park boundary.";
+  if(area(pts) < 60) return "Too small. Exhibits need at least 60 m².";
+  if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
+  if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
+  if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
+  const diff = reshapeCost(e, orig);
+  if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
+  return null;
+}
+function updateMoveBar(){ if(tool === "move") $("#dUndo").disabled = !mvCorner; }
+// Pay or refund for the new fence, keep the gate on the wall, and rebuild the routes
+function commitReshape(e, orig){
+  const diff = reshapeCost(e, orig);
+  if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
+  if(e.gate){
+    let best = null;
+    for(let i = 0; i < e.points.length; i++){ const r = segProj(e.gate[0], e.gate[1], e.points[i], e.points[(i + 1) % e.points.length]); if(!best || r.d < best.d) best = r; }
+    e.gate = [best.x, best.y];
+  }
+  afterChange(); render();
+  ui.toast(diff > 0 ? `Reshaped ${e.name}. The extra fence cost ${money(diff)}.` : diff < 0 ? `Reshaped ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${e.name}.`);
+}
+function deleteMoveCorner(){
+  const e = mvCorner && findItem("exhibit", mvCorner.id); if(!e) return;
+  if(e.points.length <= 3){ setStat("An exhibit needs at least 3 corners.", true); return; }
+  const orig = e.points.map(p => p.slice()); e.points.splice(mvCorner.i, 1);
+  const why = reshapeProblem(e, orig);
+  if(why){ e.points = orig; setStat(why, true); return; }
+  mvCorner = null; updateMoveBar(); commitReshape(e, orig);
+}
+
 /* ---------- moving the view ---------- */
 function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:r.height}; }
 function fit(){
@@ -1049,6 +1114,13 @@ svg.addEventListener("pointerdown", e => {
     }
   }
   if(tool === "move"){
+    const c = cornerAt(e.clientX, e.clientY);
+    if(c){
+      const orig = c.e.points.map(p => p.slice());
+      if(c.type === "m"){ const a = orig[c.i], b = orig[(c.i + 1) % orig.length]; c.e.points.splice(c.i + 1, 0, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]); c.i++; }
+      drag = {rv:{e:c.e, i:c.i, orig, added:c.type === "m"}, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}};
+      return;
+    }
     const hit = itemAt(e.target), it = moveTarget(hit);
     if(it){ drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; return; }
   }
@@ -1085,6 +1157,15 @@ svg.addEventListener("pointermove", e => {
     queueRender(); return;
   }
   if(!drag) return;
+  if(drag.rv){
+    if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+    drag.moved = true;
+    const r = drag.rv, w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
+    r.e.points[r.i] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const why = reshapeProblem(r.e, r.orig), diff = reshapeCost(r.e, r.orig);
+    setStat(why || `${fmtArea(area(r.e.points))}. ${diff > 0 ? "Extra fence " + money(diff) : diff < 0 ? "Fence refund " + money(Math.round(-diff * COST.refundShare)) : "No change in fence"}`, !!why);
+    queueRender(); return;
+  }
   if(drag.mv){
     if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 5) return;
     drag.moved = true; dragMove(drag.mv, e); return;
@@ -1101,6 +1182,17 @@ function endPointer(e){
   if(!drag) return;
   const d = drag; drag = null;
   if(d.mv){ if(d.moved) dropMove(d.mv); return; }
+  if(d.rv){
+    const r = d.rv;
+    if(!d.moved){
+      // a tap on a corner picks it; a tap on a + that just added a corner undoes the addition
+      if(r.added) r.e.points = r.orig; else mvCorner = mvCorner && mvCorner.id === r.e.id && mvCorner.i === r.i ? null : {id:r.e.id, i:r.i};
+      updateMoveBar(); render(); return;
+    }
+    const why = reshapeProblem(r.e, r.orig);
+    if(why){ r.e.points = r.orig; ui.toast(`Couldn't reshape it. ${why}`, "bad"); setStat(""); render(); return; }
+    mvCorner = {id:r.e.id, i:r.i}; updateMoveBar(); setStat(""); commitReshape(r.e, r.orig); return;
+  }
   if(d.zv !== undefined){
     const z = zedit && zoneById(zedit.id);
     if(z){
