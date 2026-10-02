@@ -20,6 +20,7 @@ const onSale = b => menuOf(b).filter(m => inStock(b, m.id));
 // The needs a building takes care of. A stand's come from what it has in stock; a gift shop with anything to sell serves shoppers.
 function servesOf(b){
   const t = BUILDINGS[b.type];
+  if(isBroken(b)) return [];
   if(!t.kind) return t.serves || [];
   const out = new Set();
   if(t.kind === "merch"){ if(onSale(b).length) out.add("shop"); }
@@ -51,6 +52,7 @@ const willPay = (id, price) => clamp(1 - PRICE_SENSE * (price - MENU[id].price) 
 function serveAt(p, b, why){
   const t = BUILDINGS[b.type], n = p.n;
   let bill = 0, served = n, short = false;
+  if((b.graffiti || 0) >= VANDAL.grossAt){ thinks(p, "graffiti"); p.mood -= 4; }
   if(t.kind === "food"){
     // each need that's bad enough gets the best thing on the menu for it, if the price is right
     for(const need of ["hunger", "thirst", "energy"]){
@@ -117,7 +119,7 @@ const litterAt = (x, y) => state.litter[litterKey(x, y)] || 0;
 function addLitter(x, y, n){ const k = litterKey(x, y); state.litter[k] = (state.litter[k] || 0) + n; }
 function nearBin(x, y){
   let best = null, bd = LITTER.binReach;
-  for(const s of binSpots){ const d = Math.hypot(s.x - x, s.y - y); if(d < bd){ bd = d; best = s.b; } }
+  for(const s of binSpots){ if(isBroken(s.b)) continue; const d = Math.hypot(s.x - x, s.y - y); if(d < bd){ bd = d; best = s.b; } }
   return best;
 }
 // At each corner a party holding trash looks for a bin. After a while some give up and drop it.

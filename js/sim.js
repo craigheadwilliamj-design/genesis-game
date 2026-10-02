@@ -79,6 +79,7 @@ function upgradeSave(s){
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.vets) s.staff.vets = [];
   if(!s.staff.custodians) s.staff.custodians = [];
+  if(!s.staff.guards) s.staff.guards = [];
   if(!s.staff.atvs) s.staff.atvs = [];
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
@@ -117,6 +118,7 @@ function upgradeSave(s){
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
   if(!s.guestLog) s.guestLog = freshGuestLog();
+  if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
   // parks from before litter and seats get told what changed
   if(!s.litter){ s.litter = {}; if(s.buildings.some(b => OLD_MENUS[b.type] || b.type === "restroom")) s.guestLog.notice = true; }
   // food stands and gift shops from before menus keep selling what they used to
@@ -376,6 +378,7 @@ function tick(dtMin){
   mechanicsTick(m1 - m0);
   vetsTick(m1 - m0);
   custodiansTick(m1 - m0);
+  guardsTick(m1 - m0);
   escapesTick(m1 - m0);
   if(state.over) return;
 
@@ -402,7 +405,7 @@ function dailyCosts(){
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
-  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage;
+  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;
   // science staff are paid as research costs
   let research = 0;
   for(const [k, n] of Object.entries(state.science.crew)) research += n * SCIENTISTS[k].wage;
@@ -566,6 +569,7 @@ function endDay(){
   escapesNight();
   mechanicsNight();
   custodiansNight();
+  guardsNight();
   healthNight();
   vetsNight();
   if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");

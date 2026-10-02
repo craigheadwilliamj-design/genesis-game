@@ -17,7 +17,7 @@ let nextSize = 1;          // how many are in the next party through the gate
 const guestCount = () => parties.reduce((s, p) => s + p.n, 0);
 const guestBuilding = b => !!(BUILDINGS[b.type].serves || BUILDINGS[b.type].kind);
 const NO_THOUGHT = {hunger:"noFood", thirst:"noDrink", bladder:"noRestroom", energy:"noSeat"};
-function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, last:{thoughts:{}, guests:0}}; }
+function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, vandal:freshVandalLog(), last:{thoughts:{}, guests:0}}; }
 
 /* ---------- the guests' map of footpaths ---------- */
 
@@ -111,7 +111,7 @@ function newParty(n){
   for(const [k, d] of Object.entries(NEEDS)) needs[k] = Math.random() * d.start;
   const p = {id:uid("g"), n, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
              until:state.minute + rand(...GUEST.stay), at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
-             spd:rand(...GUEST.speed), off:(Math.random()*2-1) * 1.4, shirt:Math.floor(Math.random() * 4), in:null};
+             spd:rand(...GUEST.speed), off:(Math.random()*2-1) * 1.4, shirt:Math.floor(Math.random() * 4), in:null, rowdy:Math.random() < VANDAL.rowdyShare};
   if(state.ticket > fairTicket() * 1.3){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
 }
@@ -213,7 +213,7 @@ function planParty(p){
   const need = urgentNeed(p), onTrip = p.why in NEEDS;
   if(need && p.why !== need && (!onTrip || (p.needs[need] >= GUEST.desperate && p.needs[p.why] < GUEST.desperate))){
     const s = bestStop(p, need);
-    if(!s){ thinks(p, NO_THOUGHT[need]); p.cool[need] = state.minute + 60; }
+    if(!s){ thinks(p, NO_THOUGHT[need]); if(need === "energy" && state.buildings.some(b => BUILDINGS[b.type].seats && isBroken(b))) thinks(p, "broken"); p.cool[need] = state.minute + 60; }
     else if(s.b.id !== p.dest){ p.dest = s.b.id; p.why = need; if(s.d > GUEST.farWalk && !p.map) thinks(p, "far"); return; }
   }
   if(p.dest) return;
@@ -320,7 +320,7 @@ function arrivalShare(m0, m1){
 
 function guestsTick(m0, m1){
   const dt = m1 - m0;
-  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Bins and seats). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
+  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path props). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
   arrivalCarry += derived.demand * arrivalShare(m0, m1);
   while(arrivalCarry >= nextSize){ arrivalCarry -= nextSize; guestsArrive(nextSize); nextSize = GUEST.sizes[Math.floor(Math.random() * GUEST.sizes.length)]; }
   // guests near a dangerous animal on the loose run for the gate
@@ -345,6 +345,7 @@ function guestsTick(m0, m1){
     if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange)){ p.fled = true; thinks(p, "scared"); p.mood -= 15; goHome(p); }
     // set off for the gate in time to be out by the time they planned to leave
     if(!p.home && (m1 + walkMins(p, "gate") >= p.until || p.mood < GUEST.quitBelow)) goHome(p);
+    vandalTick(p, dt);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
     walkParty(p, WALK_PER_MIN * p.spd * dt);
   }
@@ -361,8 +362,8 @@ function flushParties(){
 function guestsNight(){
   const t = state.today, L = state.guestLog;
   if(t.moodN) L.mood = t.moodSum / t.moodN;
-  L.last = {thoughts:L.thoughts, guests:L.guests};
-  L.thoughts = {}; L.guests = 0;
+  L.last = {thoughts:L.thoughts, guests:L.guests, vandal:L.vandal};
+  L.thoughts = {}; L.guests = 0; L.vandal = freshVandalLog();
 }
 function resetParties(){ parties = []; svcQ = new Map(); arrivalCarry = 0; }
 

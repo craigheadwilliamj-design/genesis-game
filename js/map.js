@@ -25,7 +25,7 @@ const FAMILIES = {
   viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
-  props:{tools:["bin", "bench", "picnic"], labels:["Trash bin", "Bench", "Picnic area"]},
+  props:{tools:["bin", "bench", "picnic", "lamp"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 const lastPick = {viv:"vivM", eat:"food", gifts:"shop", props:"bin"};
@@ -159,8 +159,12 @@ function render(){
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : "#1D2B22", full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
-      if(bl.type === "bin") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${full ? "var(--bad)" : t.color}" stroke="${edge}" stroke-width="${on || dead ? 2.5 : 1.2}" vector-effect="non-scaling-stroke"/>`;
-      else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${t.color}" stroke="${edge}" stroke-width="${on || dead ? 2.5 : 1.2}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      // a vandalized prop goes dark red; a broken one gets a cross through it
+      const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : t.color, sw = on || dead ? 2.5 : 1.2;
+      if(bl.type === "bin" || bl.type === "lamp") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
+      else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
+      if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       s += `</g>`;
       continue;
     }
@@ -169,7 +173,18 @@ function render(){
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
     else s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${fs}">${t.glyph}</text>`;
+    // graffiti: a purple scribble across the front
+    if((bl.graffiti || 0) >= VANDAL.grossAt){
+      const w = Math.min(t.w, t.d) * .35;
+      s += `<path d="M${cx - w} ${cy + w*.4}q${w*.25} ${-w*.8} ${w*.5} 0t${w*.5} 0t${w*.5} 0t${w*.5} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`;
+    }
     s += `</g>`;
+  }
+  // with cameras researched, a selected Security Office shows what every office watches
+  const selB = sel && sel.kind === "building" && findItem("building", sel.id);
+  if(selB && selB.type === "security" && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security")){
+    const [ox, oy] = centroid(o.points);
+    s += `<circle cx="${ox}" cy="${oy}" r="${SECURITY.cameraRadius}" fill="#2B3F6B" fill-opacity=".08" stroke="#2B3F6B" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
   // exhibit names and happiness
@@ -769,6 +784,20 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2E8B8B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
         (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
+    }
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+  }
+  // security guards: navy, with a white badge; a dashed ring while chasing
+  for(const c of gcrew){
+    if(!c.at) continue;
+    seen.add(c.id);
+    let el = keeperEls.get(c.id);
+    if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), chasing = !!c.chase, drive = onAtv(c), key = `g${r.toFixed(3)}|${chasing}|${drive}`;
+    if(el.dataset.key !== key){
+      el.dataset.key = key;
+      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
+        (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
   }

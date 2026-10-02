@@ -210,6 +210,7 @@ const BUILDINGS = {
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true},
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
+  lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:15000, upkeep:150, w:24, d:16, dept:true,
@@ -320,6 +321,9 @@ const THOUGHTS = {
   priceyGift: {text:"The souvenirs are overpriced."},
   rested:     {text:"It was nice to sit down for a bit.", good:true},
   soldOut:    {text:"They'd sold out of what I wanted."},
+  graffiti:   {text:"Someone has spray-painted everything."},
+  broken:     {text:"The benches here are all broken."},
+  safe:       {text:"Seeing guards around made me feel safe.", good:true},
   wow:        {text:"The animals were amazing!", good:true},
   fed:        {text:"That hit the spot.", good:true},
 };
@@ -385,6 +389,36 @@ const CUSTODIAN = {
   litterAt:3,          // they sweep a square with this much litter
   reach:30,            // they sweep litter this close to where they stand
 };
+// Rowdy guests break things when they're unhappy
+const VANDAL = {
+  rowdyShare:.12,      // share of parties that are rowdy
+  moodBelow:80,        // a rowdy party under this mood might cause trouble
+  rate:.006,           // chance each minute that it does something, 30 points under that; more the unhappier it gets
+  reach:15,            // what it damages is this close
+  propHit:35,          // condition a bench, bin, picnic area, or lamp loses
+  brokenBelow:30,      // a prop in worse shape than this doesn't work
+  graffiti:40,         // graffiti added to a building
+  fenceHit:3,          // condition an exhibit fence loses to a kick
+  grossAt:30,          // graffiti this bad upsets guests
+  litterBoost:1.5,     // heavy litter around makes vandalism this much likelier
+  lampCut:.5,          // a working lamp nearby multiplies it by this
+  lampReach:15,
+  repairShare:.005,    // mechanics' parts cost this share of a prop's price for each point repaired
+};
+// Security guards patrol the paths, put vandals off, and throw out the ones they catch
+const SECURITY = {
+  hireCost:2000,
+  wage:140,
+  speed:WALK_PER_MIN,  // guards walk at the same pace as guests
+  deterRadius:25,      // vandalism near a guard is much rarer
+  deterCut:.3,
+  catchRadius:15,      // a guard catches a vandal this close
+  cameraRadius:60,     // with cameras, each Security Office watches this far
+  evacRadius:50,       // during an escape, guards send guests this close toward the gate
+  patrolWait:8,        // minutes a guard stands at each stop
+};
+BUILDINGS.security = {label:"Security Office", tag:"SECURITY", one:"a security office", glyph:"P", color:"#2B3F6B", price:8000, upkeep:60, w:12, d:9, dept:true,
+                      full:"Park security", blurb:"Guards start here. They patrol the paths, put rowdy guests off, throw out vandals, and steer guests to the gate during escapes."};
 BUILDINGS.closet = {label:"Custodial Closet", tag:"JANITOR", one:"a custodial closet", glyph:"J", color:"#2E8B8B", price:4000, upkeep:30, w:10, d:8, dept:true,
                     full:"Custodians' base", blurb:"Custodians start here. They restock food stands and gift shops, scrub restrooms, empty bins, and sweep litter."};
 
@@ -588,6 +622,7 @@ const TECH = [
   {id:"aviary",   label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
   {id:"moat",     label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
+  {id:"cameras",  label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"paleoflora", label:"Paleoflora",       points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass."},
   {id:"mesoplant",  label:"Mesozoic planting", points:35, needs:"paleoflora", text:"Plant exhibits with cycads, conifers, ginkgos, and ferns."},
@@ -692,6 +727,7 @@ const GOALS = [
   {id:"keeper",   text:"Hire a keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:3000, check:g=>g.state.staff.keepers.length>0},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, and keepers carry the food to a station and out to the exhibits. Partner parks cover the first deliveries.", reward:2500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3000, check:g=>(g.state.staff.custodians || []).length>0},
+  {id:"guard",    text:"Hire a security guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Build a Security Office beside a path and hire a guard to patrol. Lamp posts help too.", reward:3000, check:g=>(g.state.staff.guards || []).length>0},
   {id:"gate",     text:"Give an exhibit a keeper gate",      hint:"Run a service road to an exhibit's fence, then use the Gate tool on that fence. Keepers won't use a gate that opens onto a guest path.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:3000, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:3000, check:g=>(g.state.staff.vets || []).length>0},

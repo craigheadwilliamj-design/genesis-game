@@ -75,10 +75,10 @@ function zoneProblem(pts){
   if(area(pts) < ZONE_MIN_AREA) return "That zone is too small.";
   return null;
 }
-const STAFF_LISTS = {keeper:"keepers", mechanic:"mechanics", vet:"vets", custodian:"custodians"};
+const STAFF_LISTS = {keeper:"keepers", mechanic:"mechanics", vet:"vets", custodian:"custodians", guard:"guards"};
 function zoneMembers(z){
   const mine = list => state.staff[list].filter(k => k.zone === z.id);
-  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:mine("keepers"), mechanics:mine("mechanics"), vets:mine("vets"), custodians:mine("custodians")};
+  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:mine("keepers"), mechanics:mine("mechanics"), vets:mine("vets"), custodians:mine("custodians"), guards:mine("guards")};
 }
 // Zones go: everything in them goes back to working anywhere
 function dropZone(id){
