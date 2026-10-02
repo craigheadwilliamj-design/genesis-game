@@ -107,7 +107,7 @@ function overviewHtml(){
   h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
     <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
 
-  h += `<section><h3>Rating ${starsSvg(state.rating, 15)} <span class="num">${state.rating.toFixed(1)}</span></h3>`;
+  h += `<section><h3>Rating ${starsSvg(state.rating, 15)} <span class="num">${starTxt(state.rating)}</span></h3>`;
   if(!d.parts.length) h += `<div class="meta">Your park needs animals before it can earn stars.</div>`;
   for(const p of d.parts){
     const pct = p.score * 100, col = pct >= 95 ? "var(--good)" : pct >= 60 ? "var(--gold)" : "var(--warn)";
@@ -313,7 +313,7 @@ function animalCard(s, rep, mode){
   const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>`
     : have === 0 && s.group[0] > 1 ? `<span class="need">${fitText} Get at least ${s.group[0]} so they aren't lonely.</span>` : `<span class="fit">${fitText}</span>`;
   let h = `<li class="${locked ? "locked" : ""}"><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)} <span class="per">${s.period}</span></span>`;
-  if(locked) h += `<span class="meta">Needs ${s.stars}★ (you have ${state.rating.toFixed(1)})</span>`;
+  if(locked) h += `<span class="meta">Needs ${s.stars}★ (you have ${starTxt(state.rating)})</span>`;
   else if(mode === "clone"){
     const why = cloneProblem(s.id);
     h += `<button class="buy" data-action="clone" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone ${money(s.price)}</button>`;
@@ -591,7 +591,7 @@ let catFilter = "all";
 // Where a species stands: can you get it now, is it on its way, or not started yet?
 function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
-  const lock = state.rating + 1e-9 < s.stars ? `Needs ${s.stars}★. You have ${state.rating.toFixed(1)}.` : "";
+  const lock = state.rating + 1e-9 < s.stars ? `Needs ${s.stars}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};

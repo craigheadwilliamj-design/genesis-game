@@ -549,3 +549,6 @@ function fmtClock(min){
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
+
+// Rating text rounded down, so "4.5" is never shown while 4.46 fails a 4.5 star gate.
+function starTxt(r){ return (Math.floor(r * 10 + 1e-9) / 10).toFixed(1); }
