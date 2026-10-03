@@ -160,7 +160,7 @@ function render(){
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     // a themed exhibit gets a trim line just inside its fence
-    if(themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])));
+    if(themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.barrier);
     if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
@@ -187,6 +187,8 @@ function render(){
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
     if(!svc && texFill(p)) body += `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w}" ${lj}/>`;
+    // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
+    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w * .4}" ${lj}/>` : "");
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
     if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
@@ -309,7 +311,7 @@ function renderOverlay(){
     const pk = all.length >= 2 && !err && (draw.kind === "exhibit" ? all.length >= 3 : (draw.kind === "path" || draw.kind === "wide")) ? themeFor(draw.kind === "exhibit" ? "exhibit" : "path", {points:all, type:drawType(), barrier:fenceSel}) : null;
     if(pk){
       const pt = {theme:pk}, T = THEMES[pk];
-      if(poly) s += `<g opacity=".75">${themeRailSvg(polyStr(insetRect(all, .96)), T, inv)}</g>`;
+      if(poly) s += `<g opacity=".75">${themeRailSvg(polyStr(insetRect(all, .96)), T, inv, 4, false, draw.kind === "exhibit" ? fenceSel : null)}</g>`;
       else { const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), 3*inv), pl = polyStr(all), lj = `stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"`;
         s += `<g opacity=".8"><polyline points="${pl}" stroke="${T.path.edge}" stroke-width="${pw + 1.6*inv}" ${lj}/><polyline points="${pl}" stroke="${T.path.live}" stroke-width="${pw}" ${lj}/>${texFill(pt) ? `<polyline points="${pl}" stroke="${texFill(pt)}" stroke-width="${pw}" ${lj}/>` : ""}</g>`; }
     }
@@ -918,7 +920,7 @@ function placeBuilding(e){
     ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(e) ? "" : "bad");
     return;
   }
-  const b = {id:uid("b-"), type:tool, points:ghost.pts};
+  const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
   autoZone(b);
   themeNew("building", b);
   state.buildings.push(b);
@@ -1114,7 +1116,7 @@ function platformTap(ev){
   if(!g){ setStat("Tap an exhibit's fence.", true); return; }
   if(!g.ok){ setStat(g.why, true); return; }
   spend(BUILDINGS.platform.price, "built");
-  const b = {id:uid("b-"), type:"platform", exhibitId:g.e.id, points:g.pts, inward:true};
+  const b = {id:uid("b-"), type:"platform", exhibitId:g.e.id, points:g.pts, inward:true, day:state.day};
   state.buildings.push(b);
   afterChange(); render();
   ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");

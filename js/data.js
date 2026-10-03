@@ -1037,23 +1037,33 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
-//   path     live and dead surface colors, the edge line, and `kerb`: a dashed second color along the edge ({c, dash} in px)
+//   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity})
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
-//   rot      optional decay pattern laid over buildings, stronger on some than others
+//   rot      optional decay pattern laid over buildings, stronger on some than others (with `age`, it grows over that many days from when each was built)
+//   moss     optional {c: [colors], r}: moss patches in a building's corners, growing with its decay
+//   snow     optional {of(type def, type id) -> 0, 1 or 2, tex: [a pattern per level], at: scale}: snow laid over the roof, inset so the eaves still show
+//   sod.shade  optional list of gradients (`#g-<id>`) shading small roofs (each building keeps one)
+//   ridge    a line's `c` can be a list (each building keeps one)
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
-//   heat     optional {of(type def, type id) -> 0, 1 or 2, btex: [3 roof patterns], trim: [3 lists of trim lines]}: roof and trim by how hot a building runs, instead of btex/sod and bord.trim
+//   roofs    optional {of(type def, type id) -> class 0, 1, 2..., btex: [a roof pattern, or a list (each building keeps one), per class], trim: [a list of trim lines per class],
+//            brace: {of: [classes], min: square meters, lines: [...]}}: roof and trim by building class, instead of btex/sod and bord.trim. A brace is an X across big rectangular buildings.
+//            A trim line's `at` draws it on the outline scaled by that much (1 is the building's edge) instead of the usual inner trim
+//   tier     optional {min, next, at: [scales], light, shadow, drop}: rectangular buildings over `min` square meters get stepped upper stories (one per scale; each more needs `next` times the area)
 //   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
-//            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
+//            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px; none means no main line), c2/w2/dash2/cap2 (second line), glow (soft halo)
+//            more (extra lines on top, each {c, w, dash, cap, zig: [amp, step] px for a zigzag, knots: dots at the zigzag's corners instead of rails}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals), by ({barrier id: a whole other border} for that fence type)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
+// How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
+const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Genesis", blurb:"Clean white, dark green and gold. The baseline everything else is compared to.",
     path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
@@ -1066,9 +1076,14 @@ const THEMES = {
       more:[{c:"#1F1F24", w:6.5, dash:"0 36", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 36", cap:"round"}],
       trim:{c:"#C9A24B", w:1.2}, base:{c:"#9A9486", w:7, c2:"#6F6A5C", dash2:"3 5"}},
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
-  bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
+  bayou: {label:"Bayou", ground:"#3E4A2E", tex:"bayou", gtex:"bayou-ground", ptex:"bayou-walk", btex:"bayou-planks", rot:"bayou-rot", age:40, blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
     path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"},
+    // roofs: weathered gray-brown planks with gaps, or rust-streaked corrugated tin (each building keeps one); a dark water-stained edge with faded teal paint peeling off it
+    roofs:{of:() => 0, btex:[["bayou-planks", "bayou-tin"]],
+      trim:[[{c:"#2A2118", w:3.2}, {c:"#6FA39A", w:1.6, dash:"9 3 4 7 13 2 6 9"}, {c:"#C9C2AE", w:1.4, dash:"0 11 3 17 2 26"}]]},
+    // moss creeps in from the corners as buildings age (decay grows over `age` days, so new ones are clean)
+    moss:{c:["#3E5A28", "#5F7A3A", "#7A9448"], r:2.2},
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#2A2118", w:1.4},
       // rusted chain-link for dangerous animals: a rust mesh band on leaning weathered posts, with vines and leaves creeping over it
       strong:{band:"#3E4A2C", c:"#4A2E1A", w:5.4,
         more:[{c:"#A8683A", w:4.4, dash:"1 1.1 .7 1.4"}, {c:"#D08A50", w:1.2, dash:".6 1.9 1 2.6", cap:"round"},
@@ -1078,7 +1093,7 @@ const THEMES = {
   volcanic: {label:"Volcanic", ground:"#1E1B1D", tex:"volcanic-rock", gtex:"volcanic-ground", ptex:"volcanic-flow", btex:"volcanic-basalt-dim", blurb:"Black basalt, steel and ash, with heat glowing through the cracks.",
     path:{live:"#4A1E14", dead:"#3A3436", edge:"#141113"}, bld:"#1A1719", mix:.92, edge:"#8A8488", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     // roofs by how hot a building runs: 0 storage and shops (dark basalt), 1 kitchens, hotels and work buildings (basalt with glowing seams), 2 labs, medicine and generators (steel plating, ember strips and vents)
-    heat:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
         : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "toolshed"].includes(type) ? 1 : 0,
       btex:["volcanic-basalt-dim", "volcanic-basalt", "volcanic-plate"],
       trim:[[{c:"#5C7A8C", w:1}],
@@ -1095,22 +1110,33 @@ const THEMES = {
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
   stone: {label:"Stone Age", ground:"#857D71", tex:"stone", gtex:"stone-tundra", ptex:"stone-flag", btex:"stone-slab", blurb:"Frozen tundra, flagstones, stacked stone and lashed timber, thatch and hide. Cold and rough, with no paint anywhere.",
     path:{live:"#4E463D", dead:"#6E675E", edge:"#2B2D30"}, bld:"#4C5157", mix:.9, edge:"#2B2D30", accent:"#B8995A", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
-    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100},
+    // small buildings: thatch or stitched hide, shaped as a domed mound or a lean-to; bigger ones: heavy slab roofs with moss in the cracks
+    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100, shade:["dome", "lean"]},
+    // snow load: storage and sheds stay buried, heated buildings melt off to bare thatch or dark wet stone
+    snow:{of:SNOW_HEAT, tex:["snow-deep", "snow-patchy", "snow-melt"], at:.92},
     // stacked-stone wall: a thick bumpy gray band of dry-laid stones, two courses of uneven size
     bord:{band:"#3E4248", c:"#2B2D30", w:6,
       more:[{c:"#2B2D30", w:8.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"}, {c:"#7E838A", w:6.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"},
         {c:"#2B2D30", w:5, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"}, {c:"#9A9EA2", w:3.4, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"},
         {c:"#EEF1F1", w:1.6, dash:"0 17 0 23 0 11", cap:"round"}],
       // the building's base: a ring of stacked stones with the odd bone or antler
-      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"}],
+      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"},
+        // rough log ends poking out unevenly from the roof edge, with the odd antler tine
+        {c:"#2A2017", w:4.2, dash:"0 7 0 13 0 5 0 17", cap:"round", at:1}, {c:"#8A6E4E", w:2.6, dash:"0 7 0 13 0 5 0 17", cap:"round", at:1}, {c:"#E8E2D2", w:1.2, dash:"0 31 2.2 40", cap:"round", at:1}],
       // timber palisade for dangerous animals: a row of sharpened log tops, lashed with straw rope
       strong:{band:"#3E4248", c:"#2A2017", w:6.5,
         more:[{c:"#2A2017", w:7.6, dash:"0 5.2", cap:"round"}, {c:"#6B5440", w:5.8, dash:"0 5.2", cap:"round"}, {c:"#A88A62", w:2.2, dash:"0 5.2", cap:"round"},
           {c:"#B8995A", w:1, dash:"1.6 9.8"}]}},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
-  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-roof", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
+  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-shingle", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
     path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
-    eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:3.4}, {c:"#9E2A2B", w:1.6}], sod:{tex:"lodge-sod", max:80},
+    // dark wood shingles or metal panels under snow, dark eaves, and a steep gable ridge with a deep red or forest green stripe; grass sod on small buildings
+    roofs:{of:() => 0, btex:[["lodge-shingle", "lodge-shingle", "lodge-metal"]],
+      // thick round log ends in warm tan along the eaves
+      trim:[[{c:"#3A2A1E", w:5.6, dash:"0 7.5", cap:"round", at:.98}, {c:"#C9A36A", w:4.2, dash:"0 7.5", cap:"round", at:.98}, {c:"#8A6A44", w:1.3, dash:"0 7.5", cap:"round", at:.98}]]},
+    eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:4}, {c:["#9E2A2B", "#2F5A3A"], w:1.8}], sod:{tex:"lodge-sod", max:80},
+    // snow depth by how warm a building runs: sheds buried, labs and restrooms melted to wet dark shingles
+    snow:{of:SNOW_HEAT, tex:["snow-deep", "snow-patchy", "snow-melt"], at:.9},
     // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
     bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
       more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
@@ -1121,9 +1147,27 @@ const THEMES = {
         more:[{c:"#3A2A1E", w:7.4, dash:"0 5", cap:"round"}, {c:"#C9A36A", w:5.6, dash:"0 5", cap:"round"}, {c:"#8A6A44", w:1.4, dash:"0 5", cap:"round"},
           {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"}]}},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
-  western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
-    path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
-    bord:{band:"#D9B48A", c:"#8C6A4A", w:1.8, c2:"#4A2E1C", w2:5, dash2:"2 16"},
+  mesa: {label:"Mesa", ground:"#D6A26E", tex:"mesa", gtex:"mesa-sand", ptex:"mesa-flag", btex:"mesa-sand-roof", blurb:"Pueblo adobe, sandstone, cactus and turquoise in the Southwest desert.",
+    path:{live:"#E3CBA4", dead:"#C9AE88", edge:"#9A5A3A"}, bld:"#C4683F", mix:.85, edge:"#7A3E26", accent:"#3FA7A0", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+    // flat adobe roofs: 0 work buildings (terracotta or deep clay), 1 guest buildings (sand or cream), 2 labs (cream). Guest buildings and labs get a turquoise door.
+    // A pale parapet runs round the top, with dark viga log ends poking out along the edge
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 2
+        : t.kind === "food" || t.kind === "merch" || t.rooms || ["edcenter", "campground", "platform"].includes(type) ? 1 : 0,
+      btex:[["mesa-terra", "mesa-clay"], ["mesa-sand-roof", "mesa-cream"], "mesa-cream"],
+      trim:[[{c:"#E8A882", w:4, at:.97}, {c:"#7A3E26", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}],
+        [{c:"#F6E8CE", w:4, at:.97}, {c:"#A8784E", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}, {c:"#3FA7A0", w:2.4, dash:"8 9999", at:.97}],
+        [{c:"#FBF3E2", w:4, at:.97}, {c:"#A8784E", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}, {c:"#3FA7A0", w:2.4, dash:"8 9999", at:.97}]]},
+    // stepped pueblo blocks on big buildings: a lighter upper story with a shadow, and a third on the biggest
+    tier:{min:150, next:2.4, at:[.62, .34], light:"#FFF2DC", shadow:"#5A2E1C", drop:.4},
+    // low adobe wall: a thick terracotta band with a rounded, sunlit top
+    bord:{band:"#D6A26E", c:"#8A4A2E", w:8, trim:{c:"#5A3A26", w:1.6},
+      more:[{c:"#D08A5E", w:6.4}, {c:"#EDB98E", w:2.4}, {c:"#F6D8B6", w:.8, dash:"14 6 22 9"}],
+      // wooden fences become a latilla fence: rows of thin peeled sticks, lashed every so often
+      by:{wood:{band:"#D6A26E", c:"#4A3220", w:1.2,
+        more:[{c:"#4A3220", w:6.4, dash:"1.3 1"}, {c:"#C8A47A", w:5.6, dash:"1 1.3"}, {c:"#3E2A1C", w:1.4}, {c:"#6E4A2E", w:7, dash:"1.6 18"}]}},
+      // tall adobe wall on a wide footing, capped with a rusted steel rail on posts
+      strong:{band:"#D6A26E", base:{c:"#7A4028", w:14, c2:"#5A2E1C", dash2:"2 6"}, c:"#8A4A2E", w:9,
+        more:[{c:"#C97E52", w:7.4}, {c:"#E8B48A", w:3}, {c:"#5A2A14", w:4.4, dash:"0 22", cap:"round"}, {c:"#7A3A1C", w:1.8}, {c:"#B8643A", w:.7, dash:"5 4 9 3"}]}},
     unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
   modern: {label:"Modern", ground:"#BFC9CC", tex:"modern", blurb:"Polished concrete, steel and glass panels, with wood for warmth.",
     path:{live:"#DDE1E3", dead:"#B9BFC2", edge:"#37454D", kerb:{c:"#7FD0E0", dash:"14 4"}}, bld:"#5F8A9A", mix:.85, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
@@ -1141,9 +1185,25 @@ const THEMES = {
     path:{live:"#5B5E66", dead:"#45484F", edge:"#F2F2F2", kerb:{c:"#E8334A", dash:"9 9"}}, bld:"#C9D2D8", mix:.85, edge:"#E8334A", accent:"#2EE6D6", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
     bord:{band:"#2A2D33", glow:"#2EE6D6", c:"#2EE6D6", w:2.6, c2:"#E8334A", w2:1.6, dash2:"10 10"},
     unlock:{hint:"Get 250 guests in a day.", check:() => lastGuests() >= 250}},
-  range: {label:"Range", ground:"#D3C18F", tex:"range", blurb:"Wyoming: dry prairie, weathered planks, barbed wire and tall dry grass.",
-    path:{live:"#BF9F72", dead:"#9F8259", edge:"#6E5030", kerb:{c:"#8A6A42", dash:"3 5"}}, ptex:"range-road", bld:"#8A6D4B", mix:.85, edge:"#4A3420", btex:"range-bld", accent:"#D8C16A", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
-    bord:{band:"#D8C16A", c:"#6E6558", w:3, dash:"3 15", cap:"butt", c2:"#B9BCC0", w2:.9},
+  homestead: {label:"Homestead", ground:"#CDB06A", tex:"homestead", gtex:"homestead-prairie", ptex:"homestead-road", btex:"homestead-plank", blurb:"Wyoming ranch country: wind-combed prairie, dirt roads, rusty tin barns and split-rail fences.",
+    path:{live:"#C4A574", dead:"#A88E66", edge:"#7A5E3C", ruts:{c:"#8A6A42", o:.45}}, bld:"#8E8B84", mix:.85, edge:"#3E352C", accent:"#A9C8DA", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
+    // roofs: 0 barns and sheds (rusty corrugated tin in barn red, weathered gray or rust, each building keeps one), 1 guest buildings (ranch-house wood shake), 2 labs (newer, clean tin)
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 2
+        : t.kind === "food" || t.kind === "merch" || t.rooms || ["edcenter", "campground", "platform"].includes(type) ? 1 : 0,
+      btex:[["homestead-tin-red", "homestead-tin-gray", "homestead-tin-rust"], "homestead-shake", "homestead-tin-clean"],
+      trim:[[{c:"#3E352C", w:2.6}, {c:"#7A6A56", w:.8, dash:"9 2 5 2"}],
+        [{c:"#EDE6D6", w:1.8}],
+        [{c:"#F2F0EA", w:1.3}, {c:"#A9C8DA", w:.8, dash:"14 6"}]],
+      // a whitewashed barn X on big barns
+      brace:{of:[0], min:140, lines:[{c:"#3E352C", w:3.2}, {c:"#EDE6D6", w:1.6}]}},
+    // split-rail fence: weathered gray rails laid in a zigzag, stacked where they cross
+    bord:{band:"#C9AE6A", trim:{c:"#3E352C", w:2},
+      more:[{c:"#3E352C", w:5.4, zig:[6, 18]}, {c:"#9C9186", w:3.6, zig:[6, 18]}, {c:"#CFC7B8", w:1, dash:"9 6 14 5", zig:[6, 18]},
+        {c:"#3E352C", w:6.4, zig:[6, 18], knots:true}, {c:"#7A6E60", w:4.2, zig:[6, 18], knots:true}],
+      // heavy timber posts strung with taut barbed wire for dangerous animals
+      strong:{band:"#C9AE6A",
+        more:[{c:"#2E241A", w:8, dash:"0 26", cap:"square"}, {c:"#6E5A42", w:5.6, dash:"0 26", cap:"square"}, {c:"#8E7A5E", w:2, dash:"0 26", cap:"square"},
+          {c:"#3A3C40", w:1.8}, {c:"#3A3C40", w:4, dash:".8 5"}, {c:"#C9CCD0", w:.8}]}},
     unlock:{hint:"Keep an animal in a grassland exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "grassland")}},
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.

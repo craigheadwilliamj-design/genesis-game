@@ -110,6 +110,13 @@ function upgradeSave(s){
     e.land = e.land.filter(f => f.type !== "pond");
   }
   if(!s.themes) s.themes = freshThemes();
+  // the day each building went up (older themed buildings weather more); ones from before this count as old
+  for(const b of s.buildings) if(b.day === undefined) b.day = 0;
+  // renamed themes: Range is now Homestead, Western is now Mesa
+  const renamed = {range:"homestead", western:"mesa"}, rn = k => renamed[k] || k;
+  for(const it of [...s.paths, ...s.buildings, ...s.exhibits, ...(s.zones || [])]) if(renamed[it.theme]) it.theme = rn(it.theme);
+  s.themes.have = s.themes.have.map(rn);
+  s.themes.brush = rn(s.themes.brush);
   // parks from before weather get 3 fair days to build shelters
   if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
