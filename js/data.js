@@ -1061,7 +1061,7 @@ const THEMES = {
     bord:{band:"#51683A", c:"#D2BC85", w:3, dash:"1 5", cap:"round", c2:"#2F4A2E", w2:1.2},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
   volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
-    path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#241E21", mix:.86, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
+    path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     bord:{band:"#2B2326", glow:"#FF5A1F", c:"#FF7A2F", w:2.6, c2:"#1A1416", w2:1.2, dash2:"6 6"},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
   stone: {label:"Stone Age", ground:"#DDE6EA", tex:"stone", blurb:"Snow, ice, stacked boulders and dark grey stone.",
