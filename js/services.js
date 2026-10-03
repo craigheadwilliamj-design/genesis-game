@@ -157,7 +157,7 @@ function indexLitterSpots(nodes){
   binSpots = state.buildings.filter(b => b.type === "bin" && isReachable(b)).map(b => { const [x, y] = centroid(b.points); return {b, x, y}; });
   litterPts = new Map();
   for(const n of nodes.values()) for(const m of n.adj.keys()){
-    if(m.k < n.k) continue;
+    if(m.k < n.k || (n.ride && n.ride.has(m))) continue;   // no litter on the tram track
     const L = Math.hypot(m.x - n.x, m.y - n.y);
     for(let s = 1; s < L; s += 1.5){
       const x = n.x + (m.x - n.x) * s / L, y = n.y + (m.y - n.y) * s / L, k = litterKey(x, y);

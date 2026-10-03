@@ -88,7 +88,7 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, supplies:0, cleaning:0, medicine:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
   return {
@@ -114,7 +114,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 function newPark(){
   return {
     version:1, name:"Genesis Park",
-    money:START.money, ticket:START.ticket, rating:START.rating,
+    money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
@@ -131,6 +131,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
@@ -272,6 +273,11 @@ function speciesCounts(e){
 
 const isService = p => p.type === "service";
 const isWide = p => p.type === "wide";
+const isTram = p => p.type === "tram";   // track: nobody walks it, guests ride it between stations
+// What a ride costs a guest now, and the share of guests who'll pay it (everyone at the usual fare, nobody at double)
+const tramFare = () => state.tramFare ?? TRAM.fare;
+const tramWill = () => clamp(1 - PRICE_SENSE * (tramFare() - TRAM.fare) / TRAM.fare, 0, 1);
+const tramNear = pts => state.paths.some(p => isTram(p) && lineShapeDist(p.points, pts) <= TRAM.reach);
 const vivRank = size => ({S:1, M:2, L:3})[size] || 0;
 // A diet can be written as one word or a list; treat it as a list everywhere
 for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
@@ -296,7 +302,7 @@ function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
 function connectedPathIds(guestsOnly){
-  const usable = state.paths.filter(p => !(guestsOnly && isService(p)));
+  const usable = state.paths.filter(p => !isTram(p) && !(guestsOnly && isService(p)));
   const joined = new Set(), queue = [];
   for(const p of usable) if(p.points.some(v => dist(v, state.gate) < 2)){ joined.add(p.id); queue.push(p); }
   const touches = (p, q) => p.points.some(v => q.points.some((w,i) => i>0 && segProj(v[0], v[1], q.points[i-1], w).d < 1.5));
@@ -479,7 +485,7 @@ function spend(cost, kind){ state.money -= cost; state.today[kind] += cost; }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
-function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : COST.pathPerMeter)); }
+function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : type === "tram" ? TRAM.perMeter : COST.pathPerMeter)); }
 function refundFor(kind, item){
   if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
@@ -537,7 +543,7 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : UPKEEP.pathPerMeter);
+  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
@@ -593,7 +599,7 @@ function endDay(){
   state.rating = clamp(state.rating + step, 0, 5);
 
   const t = state.today;
-  const income = t.tickets + t.food + t.shop + t.sold + t.rewards + t.donations + t.edfees + t.rooms;
+  const income = t.tickets + t.food + t.shop + t.sold + t.rewards + t.donations + t.edfees + t.rooms + t.fares;
   const costs = t.feed + t.wages + t.upkeep + t.built + t.animals + t.science + t.fines + t.repairs + t.supplies + t.cleaning + t.medicine;
   const report = {day:state.day, guests:t.guests, income, costs, net:income - costs, rating:state.rating, ratingBefore:before, ledger:{...t}};
   state.history.push({day:state.day, guests:t.guests, income, costs, net:income - costs, rating:+state.rating.toFixed(2)});

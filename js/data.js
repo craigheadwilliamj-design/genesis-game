@@ -350,6 +350,8 @@ const BUILDINGS = {
   campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, tech:"hotels", w:16, d:12, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100},
   // guests learn about prehistoric life here
   edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:16, d:12, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education"},
+  // guests ride the tram between these; each sits beside a footpath and a tram track
+  tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
   oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
@@ -459,6 +461,8 @@ const THOUGHTS = {
   priceyFood: {text:"The food here costs too much."},
   priceyGift: {text:"The souvenirs are overpriced."},
   rested:     {text:"It was nice to sit down for a bit.", good:true},
+  tram:       {text:"The tram saved my feet.", good:true},
+  noTram:     {text:"I couldn't afford the tram."},
   soldOut:    {text:"They'd sold out of what I wanted."},
   graffiti:   {text:"Someone has spray-painted everything."},
   broken:     {text:"The benches here are all broken."},
@@ -816,6 +820,7 @@ const TECH = [
   {id:"generator", group:"build", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
   {id:"cameras",  group:"build", label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   group:"build", label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
+  {id:"transit",   group:"build", label:"Guest tram",       points:40, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
   {id:"foodprod",  group:"build", label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   // TAR upgrades
   {id:"incub1",   group:"tar", label:"More incubators",     points:30, text:"Every geneticist runs 2 incubators instead of 1."},
@@ -1335,6 +1340,21 @@ const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
 const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:5, crowdMult:2};   // a 10 m promenade: twice the walkers before it feels packed
+// Tram track is drawn like a path, but guests only get on and off at a tram station. The tram runs speedMult times faster than walking.
+const TRAM = {
+  perMeter:25, upkeepPerMeter:0.3, halfWidth:1.5,
+  reach:5,             // track this close to a station's edge counts as alongside it
+  speedMult:6,         // how much faster than walking a ride is
+  wait:30,             // each platform link feels this many meters longer, for the wait for the next tram
+  fare:3,              // the usual fare, paid by each guest when they board (the player can change it)
+  maxFare:9,           // the most you can charge; guests lose interest as it climbs past the usual fare
+  wear:3,              // condition a station loses each day
+  trackWear:.5,        // and this much more for each 100 m of track it sits on
+  offlineBelow:25,     // a station this worn stops taking riders until a mechanic repairs it
+  repairPerPercent:40, // cost of each percent of repair
+  room:3,              // a platform or tram holds this many times the crowd of a plain path before it feels packed
+  headway:6,           // minutes between trams, for drawing the cars
+};
 
 // Goals give new players something to aim for, and pay a reward.
 // Each check() looks at the park and returns true when the goal is met.

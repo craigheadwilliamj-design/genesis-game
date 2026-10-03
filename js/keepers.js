@@ -64,7 +64,7 @@ function gateCheck(e){
   if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
   if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
   const near = (p, list) => list.some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
-  if(!near(e.gate, state.paths)) return {ok:false, text:"The gate doesn't touch a path or service road."};
+  if(!near(e.gate, state.paths.filter(p => !isTram(p)))) return {ok:false, text:"The gate doesn't touch a path or service road."};
   return {ok:true, text:"Gate opens onto a path."};
 }
 
@@ -87,7 +87,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc", "closet", "security"].includes(b.type) || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -136,7 +136,7 @@ function buildKeeperGraph(){
 // means walking it and leaving the ATV parked there for whoever needs it next. One ride per trip.
 // Layers: 0 = on foot, an ATV is free at one of `mounts`, 1 = riding, 2 = on foot with no ATV left to use.
 // Pass a crew member as `c` (or nothing to plan a plain walk); `mounts` overrides which stops have a free ATV.
-function walkFrom(start, c, mounts){
+function walkFrom(start, c, mounts, skip){
   const speed = typeof VEHICLES !== "undefined" ? VEHICLES.speedMult : 5;
   if(!mounts) mounts = c ? freeAtvNodes(c) : new Set();
   const l0 = c && c.riding ? 1 : mounts.size ? 0 : 2;
@@ -159,6 +159,7 @@ function walkFrom(start, c, mounts){
     if(l === 0 && mounts.has(n)) relax(d0, n, 1, [n, 0]);   // climb on at a parked ATV
     if(l === 1) relax(d0, n, 2, [n, 1]);                  // get off anywhere; it stays here
     for(const [m, d] of n.adj){
+      if(skip && skip(n, m)) continue;   // guests who can't ride leave out the tram
       if(l === 1){ if(n.svc.has(m)) relax(d0 + d / speed, m, 1, [n, 1]); }
       else relax(d0 + d, m, l, [n, l]);
     }

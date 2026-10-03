@@ -17,6 +17,7 @@ function guestsOverviewHtml(){
     ${t.eduN ? `<dt>Learned today</dt><dd>${Math.round(t.eduSum / t.eduN)} on average</dd>` : L.edu != null ? `<dt>Learned yesterday</dt><dd>${Math.round(L.edu)} on average</dd>` : ""}
     ${hotels().length ? `<dt>Hotel guests today</dt><dd>${parties.filter(p => p.hotel).reduce((s, p) => s + p.n, 0)} in the park, ${state.lodging.last.guests} stayed last night</dd>` : ""}
     ${t.donations + t.edfees >= 1 ? `<dt>Donations and Education Center</dt><dd>${money(Math.round(t.donations + t.edfees))}</dd>` : ""}
+    ${t.fares >= 1 ? `<dt>Tram fares today</dt><dd>${money(Math.round(t.fares))}</dd>` : ""}
     ${vandalLog().acts ? `<dt>Vandalism today</dt><dd>${vandalLog().acts} act${vandalLog().acts === 1 ? "" : "s"}, ${vandalLog().caught} caught</dd>` : ""}
   </dl>`;
   if(derived.wom !== 1) h += `<div class="meta" style="margin-top:4px">Word of mouth is ${derived.wom > 1 ? "bringing in" : "costing you"} about ${Math.round(Math.abs(derived.wom - 1) * 100)}% ${derived.wom > 1 ? "more" : "of your"} guests.</div>`;

@@ -35,7 +35,7 @@ let fenceSel = "wood";             // fence type the next exhibit is built with
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "zone" || t === "water";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
@@ -44,7 +44,7 @@ let lastPtr = null;                 // where the pointer last was while placing,
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
-const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH;
+const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : PATH_HALF_WIDTH;
 // Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
 // so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
 function wideJoin(p){
@@ -53,7 +53,7 @@ function wideJoin(p){
     const i = end ? pts.length - 1 : 0, prev = pts[end ? i - 1 : 1], E = pts[i];
     let best = null;
     for(const o of state.paths){
-      if(o === p || isService(o)) continue;
+      if(o === p || isService(o) || isTram(o)) continue;
       for(let j = 1; j < o.points.length; j++){
         const r = segProj(E[0], E[1], o.points[j-1], o.points[j]), hw = halfWidth(o);
         if(r.d < 1.5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};   // joined, by the same 1.5 m rule the game uses
@@ -178,7 +178,21 @@ function render(){
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "", clipDefs = "", wjN = 0;
   // staff roads go first, so a guest path always lays over them where they meet
-  for(const p of [...state.paths].sort((a, b) => isService(b) - isService(a))){
+  // tram track goes under everything, then staff roads
+  const pathRank = p => isTram(p) ? 2 : isService(p) ? 1 : 0;
+  for(const p of [...state.paths].sort((a, b) => pathRank(b) - pathRank(a))){
+    if(isTram(p)){
+      const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id);
+      if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
+      // gravel bed, then the ties as short dashes across it, then two rails: a dark band with a bed-colored band laid back over it
+      under += `<polyline points="${pts}" stroke="#4A4742" stroke-width="${w + 1.2*inv}" ${lj}/>`;
+      let body = `<polyline points="${pts}" stroke="#8C877D" stroke-width="${w}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="#5E4B38" stroke-width="${w}" stroke-dasharray="${.7} ${1.6}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="#2E2C29" stroke-width="${w * .72}" ${lj}/><polyline points="${pts}" stroke="#8C877D" stroke-width="${w * .46}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+      over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
+      continue;
+    }
     const svc = isService(p), PT = themeOf(p).path;
     const wj = isWide(p) ? wideJoin(p) : null, pts = polyStr(wj ? wj.pts : p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
     const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
@@ -239,11 +253,13 @@ function render(){
       s += `</g>`;
       continue;
     }
+    const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
-    s += `<polygon points="${polyStr(bl.points)}" fill="${themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
+    s += `<polygon points="${polyStr(bl.points)}" fill="${down ? "#6E2A26" : themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
     else s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${fs}">${t.glyph}</text>`;
+    if(down){ const r = Math.min(t.w, t.d) * .3; s += `<path d="M${cx - r} ${cy - r}L${cx + r} ${cy + r}M${cx + r} ${cy - r}L${cx - r} ${cy + r}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
     // graffiti: a purple scribble across the front
     if((bl.graffiti || 0) >= VANDAL.grossAt){
       const w = Math.min(t.w, t.d) * .35;
@@ -531,6 +547,31 @@ function drawParties(){
   outline.setAttribute("d", all.join(""));
 }
 
+/* ---------- trams: one car shuttles between the end stations of each stretch of track ---------- */
+const tramEls = new Map();
+function drawTrams(){
+  const layer = $("#tramLayer"), seen = new Set();
+  for(const p of state.paths){
+    if(!isTram(p) || !gGraph) continue;
+    const {cum, stops} = tramStops(p);
+    if(stops.length < 2) continue;
+    const a = Math.min(...stops), z = Math.max(...stops), v = WALK_PER_MIN * TRAM.speedMult, run = (z - a) / v, dwell = 1.5, T = 2 * (run + dwell);
+    const ph = state.minute % T, s = ph < run ? a + v * ph : ph < run + dwell ? z : ph < 2 * run + dwell ? z - v * (ph - run - dwell) : a;
+    let i = 1; while(i < cum.length - 1 && cum[i] < s) i++;
+    const f = (s - cum[i-1]) / ((cum[i] - cum[i-1]) || 1), A = p.points[i-1], B = p.points[i];
+    const x = A[0] + (B[0] - A[0]) * f, y = A[1] + (B[1] - A[1]) * f, ang = Math.atan2(B[1] - A[1], B[0] - A[0]) * 180 / Math.PI;
+    let el = tramEls.get(p.id);
+    if(!el){
+      el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
+      el.innerHTML = `<rect x="-4" y="-1.3" width="8" height="2.6" rx=".8" fill="#B5533C" stroke="#1D2B22" stroke-width=".35"/><rect x="-3.2" y="-.8" width="6.4" height="1.6" rx=".4" fill="#F1E6C8"/><rect x="2.4" y="-1" width="1.2" height="2" rx=".3" fill="#2F4A5C"/>`;
+      layer.appendChild(el); tramEls.set(p.id, el);
+    }
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang.toFixed(1)})`);
+    seen.add(p.id);
+  }
+  for(const [id, el] of tramEls) if(!seen.has(id)){ el.remove(); tramEls.delete(id); }
+}
+
 /* ---------- snapping new corners to things nearby ---------- */
 function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/view.k}; }
 
@@ -541,11 +582,13 @@ function snapAt(clientX, clientY, ev){
   if(draw && draw.kind === "water") return gridSnap ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}} : {x:p.x, y:p.y, info:null};
   const R = 12 / view.k;
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
-  if(draw && ["path", "wide", "service"].includes(draw.kind)){
+  // tram track only ever joins other tram track, and nothing else snaps to it
+  const snapPaths = state.paths.filter(q => isTram(q) === !!(draw && draw.kind === "tram"));
+  if(draw && ["path", "wide", "service", "tram"].includes(draw.kind)){
     let hit = null;
-    for(const q of state.paths) for(let i = 1; i < q.points.length; i++){
+    for(const q of snapPaths) for(let i = 1; i < q.points.length; i++){
       const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
-      if(r.d <= Math.max(halfWidth(q), R * .8) && !state.paths.some(o => o.points.some(v => Math.hypot(p.x - v[0], p.y - v[1]) < R)) && (!hit || r.d < hit.d)) hit = {x:r.x, y:r.y, d:r.d, id:q.id};
+      if(r.d <= Math.max(halfWidth(q), R * .8) && !snapPaths.some(o => o.points.some(v => Math.hypot(p.x - v[0], p.y - v[1]) < R)) && (!hit || r.d < hit.d)) hit = {x:r.x, y:r.y, d:r.d, id:q.id};
     }
     if(hit) return {x:hit.x, y:hit.y, info:{type:"seg", kind:"path", id:hit.id}};
   }
@@ -554,14 +597,14 @@ function snapAt(clientX, clientY, ev){
   tryV(state.gate, "gate", "gate");
   const edges = ownedEdges();
   for(const [a, c] of edges){ tryV(a, "boundary", "boundary"); tryV(c, "boundary", "boundary"); }
-  for(const q of state.paths) q.points.forEach(v => tryV(v, "path", q.id));
+  for(const q of snapPaths) q.points.forEach(v => tryV(v, "path", q.id));
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
   if(best) return best;
   // with grid snap on, land on the nearest grid point (and still join a path if that point sits on one)
   if(gridSnap){
     const g = [Math.round(p.x / GRID_STEP) * GRID_STEP, Math.round(p.y / GRID_STEP) * GRID_STEP];
     let info = {type:"grid"};
-    for(const q of state.paths) for(let i = 1; i < q.points.length; i++)
+    for(const q of snapPaths) for(let i = 1; i < q.points.length; i++)
       if(segProj(g[0], g[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
     return {x:g[0], y:g[1], info};
   }
@@ -570,7 +613,7 @@ function snapAt(clientX, clientY, ev){
     const n = pts.length, segs = closed ? n : n-1;
     for(let i = 0; i < segs; i++){ const r = segProj(p.x, p.y, pts[i], pts[(i+1) % n]); if(r.d < bd){ bd = r.d; best = {x:r.x, y:r.y, info:{type:"seg", kind, id}}; } }
   };
-  for(const q of state.paths) tryS(q.points, false, "path", q.id);
+  for(const q of snapPaths) tryS(q.points, false, "path", q.id);
   for(const q of state.exhibits) tryS(q.points, true, "exhibit", q.id);
   for(const [a, c] of edges){ const r = segProj(p.x, p.y, a, c); if(r.d < bd){ bd = r.d; best = {x:r.x, y:r.y, info:{type:"seg", kind:"boundary", id:"boundary"}}; } }
   return best || {x:p.x, y:p.y, info:null};
@@ -636,6 +679,7 @@ function exhibitProblem(pts){
 }
 
 function pathProblem(pts, type){
+  if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`;
   if(pts.length < 2) return "Needs at least 2 points.";
   if(lineLength(pts) < 2) return "Too short.";
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
@@ -653,9 +697,10 @@ const DRAW_TEXT = {
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
+  tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
   water:["New water", "Tap to drop shore corners inside an open exhibit. Tap the first corner again to fill it. Animals like water, and fish eaters need some."]
 };
-const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide") ? draw.kind : undefined;
+const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram") ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
@@ -679,6 +724,7 @@ function setTool(t){
     const free = " Place it anywhere, but it only works once a path reaches it.", spin = " Rotate turns it a quarter (R).";
     showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and it snaps on.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
+      : b.tram ? `Point beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
       : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
       : b.onPath ? `Point at a path and tap. It sits on the edge you point at.${spin}`
       : b.prop ? `Point beside a path and it snaps on.${free}${spin}`
@@ -718,6 +764,7 @@ function startDraw(kind){
   updateDrawbar();
   const fence = BARRIERS[fenceSel];
   if(kind === "exhibit" && fence.tech && !hasTech(fence.tech)) setStat(`Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`, true);
+  if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -849,16 +896,16 @@ function finishDraw(){
     d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
     const cost = pathCost(pts, type);
     spend(cost, "built");
-    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : "Path", points:pts};
+    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : "Path", points:pts};
     if(type) p.type = type;
-    if(type !== "service") themeNew("path", p);
+    if(type !== "service" && type !== "tram") themeNew("path", p);
     state.paths.push(p);
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw(d.kind);
     render();
-    const joinedNow = (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
-    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : "path";
+    const joinedNow = type === "tram" || (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
+    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : "path";
     ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
   }
 }
@@ -887,6 +934,7 @@ function placeGhost(clientX, clientY){
   let best = null;
   // guest buildings face footpaths; backstage departments can face service roads too
   for(const q of state.paths){
+    if(isTram(q)) continue;   // buildings face footpaths, not the tram track
     if(isService(q) && !t.dept) continue;
     if(t.serviceOnly && !isService(q)) continue;   // depots go on service roads, where ATVs can drive
     for(let i = 1; i < q.points.length; i++){
@@ -928,7 +976,8 @@ function placeGhost(clientX, clientY){
   if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
-  setStat(why || `${money(t.price)}. Tap to build.${best ? "" : " No path nearby, so it won't work until one reaches it."}`, !!why);
+  const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
+  setStat(why || `${money(t.price)}. Tap to build.${best ? "" : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
 }
 
 // Turn the building being placed a quarter, and redraw the ghost where the pointer is
@@ -1243,7 +1292,7 @@ function moveProblem(kind, it){
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
-    if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
+    if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
     else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
   } else {
     if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";

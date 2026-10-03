@@ -49,19 +49,36 @@ function wearTick(dtMin){
     b.cond = Math.max(0, condOf(b) - VEHICLES.wear * dtMin / (CLOSE_MIN - OPEN_MIN));
     if(was && condOf(b) < VEHICLES.offlineBelow) events.toast("A vehicle depot has broken down. Its ATVs are grounded until a mechanic repairs it.", "bad");
   }
+  // tram stations wear too; one that gives out stops taking riders, and the guest map drops it
+  for(const b of tramStations()){
+    const was = tramWorking(b);
+    b.cond = Math.max(0, condOf(b) - tramWear(b) * dtMin / (CLOSE_MIN - OPEN_MIN));
+    if(was && !tramWorking(b)){ events.toast("A tram station has broken down. Nobody can ride from it until a mechanic repairs it.", "bad"); buildGuestGraph(); }
+  }
 }
 
-// Things mechanics look after: exhibit fences, generators, and vehicle depots
+// Tram stations wear with use of the track they sit on. A worn-out one stops taking riders.
+const tramStations = () => state.buildings.filter(b => BUILDINGS[b.type].tram);
+const tramWorking = b => condOf(b) >= TRAM.offlineBelow;
+function tramWear(b){
+  const rail = state.paths.filter(isTram).reduce((m, p) => Math.min(m, lineShapeDist(p.points, b.points)), Infinity);
+  const len = state.paths.filter(p => isTram(p) && lineShapeDist(p.points, b.points) <= rail + .5).reduce((s, p) => s + lineLength(p.points), 0);
+  return TRAM.wear + TRAM.trackWear * len / 100;
+}
+
+// Things mechanics look after: exhibit fences, generators, vehicle depots, and tram stations
 function findTarget(id){ return state.exhibits.find(x => x.id === id) || state.buildings.find(x => x.id === id); }
-const isMachine = o => o.type === "generator" || o.type === "depot";
+const isMachine = o => o.type === "generator" || o.type === "depot" || !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
+const isTramB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
 const isPropB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].prop);
 const anchorFor = o => kGraph.anchors[isMachine(o) || isPropB(o) ? o.id : "fix:" + o.id];
-const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? "a vehicle depot" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
+const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? "a vehicle depot" : isTramB(o) ? "a tram station" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
 // broken = needs urgent work: a fence with a hole in it, or a generator that has cut out
-const isDown = o => o.type === "generator" ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : condOf(o) <= 0;
+const isDown = o => o.type === "generator" ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : isTramB(o) ? !tramWorking(o) : condOf(o) <= 0;
 function repairCost(o, gain){
   if(o.type === "generator") return POWER.repairPerPercent * gain;
   if(o.type === "depot") return VEHICLES.repairPerPercent * gain;
+  if(isTramB(o)) return TRAM.repairPerPercent * gain;
   if(isPropB(o)) return BUILDINGS[o.type].price * VANDAL.repairShare * gain;
   return perimeter(o.points) * barrierOf(o).repair * gain / 100;
 }
@@ -81,7 +98,7 @@ function pickFence(c){
   const taken = new Set(mcrew.filter(x => x !== c && x.target).map(x => x.target));
   const mz = (state.staff.mechanics.find(m => m.id === c.id) || {}).zone;   // a mechanic in a zone only looks after that zone
   let best = null;
-  for(const e of state.exhibits.filter(x => !x.viv).concat(generators(), depots())){
+  for(const e of state.exhibits.filter(x => !x.viv).concat(generators(), depots(), tramStations())){
     if(taken.has(e.id) || !anchorFor(e) || (mz && e.zone !== mz)) continue;
     const k = knownCond(e), overdue = daysSinceInspect(e) >= MAINT.inspectEvery;
     let score = 0;
@@ -141,7 +158,7 @@ function mechanicsTick(dtMin){
         const gain = mins * MAINT.repairPerMinute;
         spend(repairCost(e, gain), "repairs");
         e.cond = Math.min(100, condOf(e) + gain); left -= mins;
-        if(condOf(e) >= 99.9){ e.cond = 100; e.inspected = {day:state.day, cond:100}; c.job = "idle"; c.target = null; if(e.type === "generator") updatePower(); events.changed(); }
+        if(condOf(e) >= 99.9){ e.cond = 100; e.inspected = {day:state.day, cond:100}; c.job = "idle"; c.target = null; if(e.type === "generator") updatePower(); if(isTramB(e)) buildGuestGraph(); events.changed(); }
         continue;
       }
       if(c.route.length){
