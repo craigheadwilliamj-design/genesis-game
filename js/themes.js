@@ -183,8 +183,8 @@ function themeBuildSvg(bl, pts, trimPts){
   if(G && bl.points && bl.points.length === 4 && area(bl.points) >= (G.min || 0)) s += glassSvg(bl.points, G, ns);
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   if(T.corners && !small && bl.points){ const r = Math.max(.7, Math.min(2, Math.sqrt(area(bl.points)) / 14)); for(const [x, y] of bl.points) s += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r.toFixed(2)}" fill="${T.corners.c}" stroke="${T.corners.c2}" stroke-width=".7" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
-  const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
-  if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
+  const RL = H >= 0 && T.roofs.ridge ? T.roofs.ridge[H] : T.ridge, rg = RL && !small && bl.points && ridgeLine(bl.points);
+  if(rg) for(const L of RL) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
   // carved ridge tips: a crossed pair of short strokes with a dot at each end of the ridge
   if(rg && T.tips && area(bl.points) >= T.tips.min){
     const r = Math.max(.5, Math.min(1.3, Math.sqrt(area(bl.points)) / 16)), [[ax, ay], [bx, by]] = rg, L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
@@ -193,8 +193,12 @@ function themeBuildSvg(bl, pts, trimPts){
       s += `<path d="${c(1) + c(-1)}" stroke="${T.tips.c}" stroke-width="3.2" stroke-linecap="round" ${ns}/><path d="${c(1) + c(-1)}" stroke="${T.tips.c2}" stroke-width="1.4" stroke-linecap="round" ${ns}/>`;
     }
   }
+
   const trims = H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord), along = (L, P) => strokeSvg("polygon", L.at || P !== bl.points ? polyStr(insetRect(P, L.at || .86)) : trimPts, L, ns);
   for(const L of trims) s += bl.points ? along(L, bl.points) : strokeSvg("polygon", trimPts, L, ns);
+  const UN = H >= 0 && T.roofs.units && T.roofs.units[H];
+  if(UN && bl.points && bl.points.length === 4 && area(bl.points) >= UN.min) s += unitsSvg(bl, UN, ns);
+  if(T.emblem && T.emblem.includes(bl.type) && bl.points && bl.points.length === 4) s += emblemOn(bl);
   const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");
   if(X && X.of.includes(H) && tp.length === 4 && area(bl.points) >= X.min) for(const L of X.lines) s += strokeSvg("polyline", `${tp[0]} ${tp[2]}`, L, ns) + strokeSvg("polyline", `${tp[1]} ${tp[3]}`, L, ns);
   // stepped blocks: big buildings get a smaller upper story pushed toward the back corner, with a shadow cast down and to the right, and its own trim
@@ -221,4 +225,61 @@ function themeProp(it, shape){
     return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(R.c, R.w)} pointer-events="none"/>`;
   }
   return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(R.c, R.w)} pointer-events="none"/>`;
+}
+
+// rooftop units on a flat roof: `n` small boxes (a fan in each) kept away from the middle, where the name goes
+function unitsSvg(bl, U, ns){
+  const R = insetRect(bl.points, .8), lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const along = dist(R[0], R[1]) >= dist(R[1], R[2]), [a, b, c, d] = along ? R : [R[1], R[2], R[3], R[0]];
+  const L = dist(a, b), W = dist(a, d), eu = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], ev = [(d[0] - a[0]) / W, (d[1] - a[1]) / W];
+  const h = Math.round(rotLevel(bl) * 996), spots = [[.84, .24], [.16, .8], [.8, .8]], sz = Math.max(.9, Math.min(2.2, W / 9));
+  let s = "";
+  for(let i = 0; i < U.n; i++){
+    const [u, v] = spots[(i + h) % spots.length], p = lerp(lerp(a, b, u), lerp(d, c, u), v), sw = sz * (1 + (i + h) % 2 * .5), sh = sz;
+    const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => [p[0] + eu[0] * sw * x + ev[0] * sh * y, p[1] + eu[1] * sw * x + ev[1] * sh * y]);
+    s += `<polygon points="${polyStr(q)}" fill="${U.c}" stroke="${U.c2}" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`
+      + `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="${(sh * .6).toFixed(2)}" fill="${U.c2}" fill-opacity=".55" stroke="${U.c2}" stroke-width=".7" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
+  return s;
+}
+// the campus mark: a gold helix with a leaf, drawn in a -1 to 1 box (lines and dots only)
+function emblemSvg(cx, cy, r){
+  const g = `fill="none" stroke="#C9A24B" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+  return `<g transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)}) scale(${r.toFixed(2)})" pointer-events="none">`
+    + `<circle r="1.08" stroke-width="1.3" stroke-opacity=".85" ${g.replace('fill="none"', 'fill="#10261A" fill-opacity=".45"')}/>`
+    + `<path d="M-.42 -.78C.5 -.5 .5 -.2 0 0C-.5 .2 -.5 .5 .42 .78M.42 -.78C-.5 -.5 -.5 -.2 0 0C.5 .2 .5 .5 -.42 .78" stroke-width="1.5" ${g}/>`
+    + `<path d="M-.3 -.5H.3M-.3 .5H.3" stroke-width="1" ${g}/>`
+    + `<path d="M.1 .1C.5 .05 .8 -.25 .78 -.62C.4 -.6 .1 -.35 .1 .1Z" stroke-width="1.1" ${g.replace('fill="none"', 'fill="#1F3D2B"')}/>`
+    + `<circle cx="-.42" cy="-.78" r=".02" stroke-width="3" ${g}/><circle cx="-.42" cy=".78" r=".02" stroke-width="3" ${g}/></g>`;
+}
+// the mark on a landmark roof, up in the back corner so the name still reads
+function emblemOn(bl){
+  const [cx, cy] = centroid(bl.points), bk = bl.points.reduce((a, p) => p[0] + p[1] < a[0] + a[1] ? p : a), r = Math.max(1.6, Math.sqrt(area(bl.points)) / 9.5);
+  return emblemSvg(cx + (bk[0] - cx) * .68, cy + (bk[1] - cy) * .66, r);
+}
+
+/* ---------- Genesis paths: timber boardwalk near exhibits, gold-inlaid plaza at the entrance ---------- */
+// Which stretches of a guest path get a variant: [boards, plaza], each a list of polylines (point lists). Worked out once per layout and kept.
+const pathVar = {sig:"", m:new Map()};
+function pathVariantSig(){
+  return state.exhibits.map(e => e.id + e.points.length + (e.points[0] || []).join(",")).join("|") + "#" + state.gate.join(",");
+}
+function pathVariants(p, sig){
+  if(pathVar.sig !== sig){ pathVar.sig = sig; pathVar.m.clear(); }
+  const key = p.id + "@" + p.points.map(q => q.join(",")).join(";");
+  let r = pathVar.m.get(key);
+  if(r) return r;
+  const PT = THEMES.genesis.path, boards = [], plaza = [], pts = p.points;
+  let cb = null, cp = null;
+  for(let i = 0; i + 1 < pts.length; i++){
+    const a = pts[i], b = pts[i + 1], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const nearEx = state.exhibits.some(e => !e.viv && lineShapeDist([a, b], e.points) <= PT.boards.near), nearGate = dist(m, state.gate) <= PT.plaza.near;
+    // the plaza wins over boards where they meet
+    const wantB = nearEx && !nearGate, wantP = nearGate;
+    if(wantB){ if(!cb){ cb = [a]; boards.push(cb); } cb.push(b); } else cb = null;
+    if(wantP){ if(!cp){ cp = [a]; plaza.push(cp); } cp.push(b); } else cp = null;
+  }
+  if(pathVar.m.size > 400) pathVar.m.clear();
+  pathVar.m.set(key, r = {boards, plaza});
+  return r;
 }
