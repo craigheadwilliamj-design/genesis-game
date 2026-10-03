@@ -98,14 +98,14 @@ const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `
 const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
-// `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail
+// `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail (over the band)
 // and a theme whose border has its own `strong` rail draws that instead
 function themeRailSvg(pts, T, inv, bw = 4, strong = false){
   const B = strong && T.bord && T.bord.strong || T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(!B) return "";
   let s = "";
-  if(strong && B.base) s += `<polygon points="${pts}" stroke="${B.base.c}" stroke-width="${B.base.w}" ${ns}/>` + (B.base.c2 ? `<polygon points="${pts}" stroke="${B.base.c2}" stroke-width="1" stroke-dasharray="${B.base.dash2 || "3 5"}" ${ns}/>` : "");
   if(T.tex && B.band) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
+  if(strong && B.base) s += `<polygon points="${pts}" stroke="${B.base.c}" stroke-width="${B.base.w}" ${ns}/>` + (B.base.c2 ? `<polygon points="${pts}" stroke="${B.base.c2}" stroke-width="1" stroke-dasharray="${B.base.dash2 || "3 5"}" ${ns}/>` : "");
   if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
   s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
   if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;

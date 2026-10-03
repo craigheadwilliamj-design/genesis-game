@@ -1099,7 +1099,12 @@ const THEMES = {
     // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
     bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
       more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
-      trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}]},
+      trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}],
+      // tall timber palisade for dangerous animals: evenly set peeled logs on a mortared stone footing, a dark steel band across them, and snow on top
+      strong:{band:"#DCE3E7", c:"#3A2A1E", w:6.5,
+        base:{c:"#8E9196", w:13, c2:"#5E6268", dash2:"4 2 6 2"},
+        more:[{c:"#3A2A1E", w:7.4, dash:"0 5", cap:"round"}, {c:"#C9A36A", w:5.6, dash:"0 5", cap:"round"}, {c:"#8A6A44", w:1.4, dash:"0 5", cap:"round"},
+          {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"}]}},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
   western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
     path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
