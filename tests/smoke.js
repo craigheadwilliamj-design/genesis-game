@@ -1029,6 +1029,44 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(let i = 0; i < 12 && trp.in !== loo.id; i++){ for(const k of Object.keys(trp.needs)) trp.needs[k] = 0; walkParty(trp, 60); }
     out.tramFare = trp.in === loo.id && Math.abs(state.today.fares - 2 * TRAM.fare) < 1e-6 && trp.thought.has("tram");
     parties = parties.filter(x => x !== trp); svcQ.clear();
+    // a party that can't afford the fare walks: no ride in its map, and nothing paid
+    const rideTrip = (cash, tramRoll) => {
+      const q = newParty(2); q.id = "tr-q"; q.cash = cash; q.tramRoll = tramRoll; q.dest = loo.id; q.why = "see"; q.until = 1e6; q.at = gGraph.gate;
+      for(const k of Object.keys(q.needs)) q.needs[k] = 0;
+      parties.push(q);
+      const f0 = state.today.fares, rode = canRide(q), dw = fieldFor(q, loo.id).dist.get(gGraph.gate);
+      for(let i = 0; i < 30 && q.in !== loo.id; i++){ for(const k of Object.keys(q.needs)) q.needs[k] = 0; walkParty(q, 60); }
+      parties = parties.filter(x => x !== q); svcQ.clear();
+      return {rode, dist:dw, arrived:q.in === loo.id, paid:state.today.fares - f0, thought:q.thought.has("noTram"), cash:q.cash};
+    };
+    const poor = rideTrip(1, 0);
+    out.tramBrokeWalks = !poor.rode && poor.dist > 280 && poor.arrived && poor.paid === 0 && poor.thought && poor.cash === 1;
+    // the fare is adjustable, charged per guest, and fewer guests pay it as it climbs
+    state.tramFare = 4; const dear = rideTrip(100, 0);
+    out.tramFareCharged = dear.rode && Math.abs(dear.paid - 2 * 4) < 1e-6 && Math.abs(tramWill() - (1 - 1/3)) < 1e-9;
+    state.tramFare = 2 * TRAM.fare;
+    const tooDear = rideTrip(100, 0);
+    out.tramFareTooDear = tramWill() === 0 && !tooDear.rode && tooDear.paid === 0 && tooDear.dist > 280;
+    state.tramFare = 99; state.tramFare = clamp(state.tramFare, 1, TRAM.maxFare);
+    out.tramFareCapped = state.tramFare === TRAM.maxFare;
+    state.tramFare = TRAM.fare;
+    // already aboard, a party keeps riding even when it's out of cash
+    out.tramRiderKeepsRiding = canRide({at:{rail:false}, onTram:true, cash:0, n:2, tramRoll:.99}) && canRide({at:{rail:true}, cash:0, n:2, tramRoll:.99});
+    // a worn-out station stops taking riders and shows as broken; a mechanic repairs it and the ride comes back
+    const trMin = state.minute, stA = state.buildings.find(b => b.id === "b-trA");
+    const workshop = {id:"b-tr-ws", type:"workshop", points:rectPts(215, 309, BUILDINGS.workshop.w, BUILDINGS.workshop.d, 0)};
+    state.buildings.push(workshop); stA.cond = 10; recompute(); buildGuestGraph(); buildKeeperGraph();
+    out.tramBrokenNoRide = !tramWorking(stA) && !gGraph.anchors["b-trA:foot"] && !gGraph.anchors["b-trA:rail"] && tramStops(state.paths[2]).stops.length === 1;
+    render(); out.tramBrokenDrawn = world.innerHTML.includes("#6E2A26");
+    state.science.tech.push("transit");
+    state.staff.mechanics = []; hireMechanic();
+    let fixed = false; for(let i = 0; i < 1500 && !fixed; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); fixed = condOf(stA) >= 99.9; }
+    out.tramMechanicRepairs = fixed && tramWorking(stA) && !!gGraph.anchors["b-trA:rail"] && tramStops(state.paths[2]).stops.length === 2;
+    state.staff.mechanics = []; syncMechanics(); state.minute = trMin;
+    // stations wear faster with more track beside them
+    const wearShort = tramWear(stA); state.paths[2].points = [[250,312],[480,312],[480,330],[250,330],[250,350]];
+    out.tramWearGrowsWithTrack = tramWear(stA) > wearShort; state.paths[2].points = [[250,312],[480,312]];
+    state.buildings = state.buildings.filter(b => b !== workshop); recompute(); buildGuestGraph();
     // drawn like a path, and a car runs on it
     render(); drawTrams();
     out.tramDrawn = world.innerHTML.includes("#5E4B38") && $("#tramLayer").children.length === 1 && tramStops(state.paths[2]).stops.length === 2;
@@ -1045,7 +1083,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.tramStationNeedsPath = ![...gGraph.nodes.values()].some(n => n.ride);
     // old saves get the fares line
     const trOld = JSON.parse(JSON.stringify(state)); delete trOld.today.fares; upgradeSave(trOld);
-    out.tramOldSave = trOld.today.fares === 0;
+    delete trOld.tramFare; upgradeSave(trOld);
+    out.tramOldSave = trOld.today.fares === 0 && trOld.tramFare === TRAM.fare;
     Object.assign(state, {paths:trSaved.paths, buildings:trSaved.buildings, money:trSaved.money}); state.science.tech = trSaved.tech; state.today.fares = trSaved.fares;
     recompute(); buildGuestGraph(); buildKeeperGraph(); render(); drawTrams();
 

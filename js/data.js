@@ -462,6 +462,7 @@ const THOUGHTS = {
   priceyGift: {text:"The souvenirs are overpriced."},
   rested:     {text:"It was nice to sit down for a bit.", good:true},
   tram:       {text:"The tram saved my feet.", good:true},
+  noTram:     {text:"I couldn't afford the tram."},
   soldOut:    {text:"They'd sold out of what I wanted."},
   graffiti:   {text:"Someone has spray-painted everything."},
   broken:     {text:"The benches here are all broken."},
@@ -1345,7 +1346,12 @@ const TRAM = {
   reach:5,             // track this close to a station's edge counts as alongside it
   speedMult:6,         // how much faster than walking a ride is
   wait:30,             // each platform link feels this many meters longer, for the wait for the next tram
-  fare:3,              // paid by each guest when they board
+  fare:3,              // the usual fare, paid by each guest when they board (the player can change it)
+  maxFare:9,           // the most you can charge; guests lose interest as it climbs past the usual fare
+  wear:3,              // condition a station loses each day
+  trackWear:.5,        // and this much more for each 100 m of track it sits on
+  offlineBelow:25,     // a station this worn stops taking riders until a mechanic repairs it
+  repairPerPercent:40, // cost of each percent of repair
   room:3,              // a platform or tram holds this many times the crowd of a plain path before it feels packed
   headway:6,           // minutes between trams, for drawing the cars
 };

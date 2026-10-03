@@ -537,14 +537,23 @@ function buildingBody(b){
 }
 function demolishRow(b){ return `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("building", b))}</button></div>`; }
 
-// Tram station: is it joined to a footpath and to track, and does a tram call here
+// The fare control, shared by the station and track panels
+function tramFareHtml(){
+  const f = tramFare();
+  return `<section><h3>Fare</h3><div class="ticket"><button data-action="tramFare" data-d="-1" aria-label="Lower the fare">−</button><output>${money(f)}</output><button data-action="tramFare" data-d="1" aria-label="Raise the fare">+</button></div>
+    <div class="meta" style="margin-top:6px">${f === TRAM.fare ? `Everyone pays the usual ${money(TRAM.fare)}.` : `About ${Math.round(tramWill() * 100)}% of guests will pay this much.`} Guests who can't afford it walk. One fare covers the whole tram.</div></section>`;
+}
+// Tram station: is it joined to a footpath and to track, does it still work, and what does a ride cost
 function tramStopHtml(b){
-  const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]);
-  const ok = foot && rail, why = !isReachable(b) ? "No path from the entrance." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
+  const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]), worn = !tramWorking(b), k = knownCond(b);
+  const ok = foot && rail && !worn, why = !isReachable(b) ? "No path from the entrance." : worn ? "Out of order." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Open to riders" : why}</span></div>`;
-  h += `<dl class="kv"><dt>Fare</dt><dd>${money(TRAM.fare)} a guest</dd><dt>Fares today</dt><dd>${money(Math.round(state.today.fares))}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
-  if(!ok) h += `<div class="meta">Guests walk to it from the footpath and board from the track. It needs both beside it, and another station on the same track to ride to.</div>`;
+  h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
+  h += `<div class="meta">Stops taking riders below ${TRAM.offlineBelow}%. Wears about ${Math.round(tramWear(b) * 10) / 10}% a day, more with more track. ${state.staff.mechanics.length ? "Mechanics repair it." : "Hire a mechanic at a Workshop to keep it running."}</div>`;
+  h += tramFareHtml();
+  h += `<dl class="kv"><dt>Fares today</dt><dd>${money(Math.round(state.today.fares))}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+  if(!ok && !worn) h += `<div class="meta">Guests walk to it from the footpath and board from the track. It needs both beside it, and another station on the same track to ride to.</div>`;
   return h;
 }
 // Tram track: how many working stations it serves, and what it costs
@@ -552,7 +561,8 @@ function tramTrackHtml(p){
   const stops = tramStops(p).stops.length;
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>Tram track</h2>`;
   h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
-  h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace and pay ${money(TRAM.fare)} each. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run.</div>`;
+  h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run, and stations wear faster with more track.</div>`;
+  h += tramFareHtml();
   h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   return h;
 }
@@ -575,6 +585,10 @@ panelEl.addEventListener("click", e => {
   const b = e.target.closest("[data-action]"); if(!b) return;
   const a = b.dataset.action, it = selItem();
   if(a === "deselect"){ select(null); return; }
+  if(a === "tramFare"){
+    state.tramFare = clamp(tramFare() + (+b.dataset.d), 1, TRAM.maxFare);
+    recompute(); ui.panel(); saveSoon(); return;
+  }
   if(a === "ticket"){
     state.ticket = clamp(state.ticket + (+b.dataset.d), 1, 150);
     recompute(); ui.panel(); saveSoon(); return;

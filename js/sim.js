@@ -114,7 +114,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 function newPark(){
   return {
     version:1, name:"Genesis Park",
-    money:START.money, ticket:START.ticket, rating:START.rating,
+    money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
@@ -131,6 +131,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
@@ -273,6 +274,9 @@ function speciesCounts(e){
 const isService = p => p.type === "service";
 const isWide = p => p.type === "wide";
 const isTram = p => p.type === "tram";   // track: nobody walks it, guests ride it between stations
+// What a ride costs a guest now, and the share of guests who'll pay it (everyone at the usual fare, nobody at double)
+const tramFare = () => state.tramFare ?? TRAM.fare;
+const tramWill = () => clamp(1 - PRICE_SENSE * (tramFare() - TRAM.fare) / TRAM.fare, 0, 1);
 const tramNear = pts => state.paths.some(p => isTram(p) && lineShapeDist(p.points, pts) <= TRAM.reach);
 const vivRank = size => ({S:1, M:2, L:3})[size] || 0;
 // A diet can be written as one word or a list; treat it as a list everywhere

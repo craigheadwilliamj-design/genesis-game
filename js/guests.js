@@ -9,6 +9,7 @@
 
 let parties = [];          // parties in the park right now
 let gGraph = null;         // the guests' walking map: {nodes, anchors:{id -> node}, gate}
+let gFieldsWalk = new Map();   // the same, for guests who can't ride the tram
 let gFields = new Map();   // stop id -> quickest way there from every node, worked out when first needed
 let svcQ = new Map();      // building id -> {queue:[party], busy:[party]}
 let moodColors = false;    // color guests on the map by how happy they are
@@ -55,7 +56,7 @@ function buildGuestGraph(){
   // tram stations: one stop on the footpath beside it, one on the track beside it
   const tc = state.paths.filter(isTram).map(p => ({pts:p.points, adds:[]})), stations = [];
   if(tc.length) for(const b of state.buildings){
-    const t = BUILDINGS[b.type]; if(!t.tram || !isReachable(b)) continue;
+    const t = BUILDINGS[b.type]; if(!t.tram || !isReachable(b) || condOf(b) < TRAM.offlineBelow) continue;
     const [cx, cy] = centroid(b.points), foot = nearest(cx, cy, Math.hypot(t.w, t.d) / 2 + REACH);
     let rail = null;
     for(const c of tc) for(let i = 1; i < c.pts.length; i++){
@@ -119,7 +120,7 @@ function buildGuestGraph(){
     if(ids.length){ (n.sees = n.sees || new Map()).set(m, ids); (m.sees = m.sees || new Map()).set(n, ids); }
   }
   gGraph = {nodes, anchors, gate};
-  gFields = new Map();
+  gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
   // everyone carries on from the same spot on the new map
   for(const p of parties){
@@ -146,13 +147,18 @@ function tramStops(p){
   return {cum, stops};
 }
 // The quickest way to a stop from everywhere: distance, and which node is the next step
-function guestField(id){
-  if(gFields.has(id)) return gFields.get(id);
+function guestField(id, walkOnly){
+  const cache = walkOnly ? gFieldsWalk : gFields;
+  if(cache.has(id)) return cache.get(id);
   const a = gGraph && gGraph.anchors[id];
-  const f = a ? (w => ({dist:w.dist, prev:w.layers.prev[2]}))(walkFrom(a, null, new Set())) : null;
-  gFields.set(id, f);
+  const f = a ? (w => ({dist:w.dist, prev:w.layers.prev[2]}))(walkFrom(a, null, new Set(), walkOnly ? (n, m) => n.rail || m.rail : null)) : null;
+  cache.set(id, f);
   return f;
 }
+// Can this party use the tram right now? It needs the fare, and to think the fare is fair. A rider already aboard keeps riding.
+const canRide = p => !!p.at && (!!p.at.rail || !!p.onTram || (p.cash >= tramFare() * p.n && p.tramRoll < tramWill()));
+// The quickest-way map this party plans with: the tram, if they can use it
+const fieldFor = (p, id) => guestField(id, !canRide(p));
 const nextHop = (f, n) => { const s = f.prev.get(n); return s ? s[0] : null; };
 
 /* ---------- arriving and leaving ---------- */
@@ -162,7 +168,7 @@ function newParty(n){
   for(const [k, d] of Object.entries(NEEDS)) needs[k] = Math.random() * d.start;
   const p = {id:uid("g"), n, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
              until:state.minute + rand(...GUEST.stay), at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
-             spd:rand(...GUEST.speed), off:(Math.random()*2-1) * 1.4, shirt:Math.floor(Math.random() * 4), in:null, rowdy:Math.random() < VANDAL.rowdyShare};
+             spd:rand(...GUEST.speed), off:(Math.random()*2-1) * 1.4, shirt:Math.floor(Math.random() * 4), tramRoll:Math.random(), in:null, rowdy:Math.random() < VANDAL.rowdyShare};
   if(state.ticket > fairTicket() * 1.3){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
 }
@@ -222,7 +228,7 @@ function bestStop(p, need){
   for(const b of state.buildings){
     if(!gGraph.anchors[b.id] || !servesOf(b).includes(need)) continue;
     if(b.type === "restroom" && (b.dirt || 0) >= RESTROOM.avoid && p.needs.bladder < GUEST.desperate) continue;
-    const f = guestField(b.id), d = f && f.dist.get(p.at);
+    const f = fieldFor(p, b.id), d = f && f.dist.get(p.at);
     if(d === undefined) continue;
     const q = svcQ.get(b.id), score = d + (q ? q.queue.length : 0) * GUEST.queueMeters;
     if(!best || score < best.score) best = {b, d, score};
@@ -241,7 +247,7 @@ function pickSight(p){
   let tot = 0;
   const opts = [];
   const add = (x, appeal) => {
-    const f = guestField(x.id), d = f && f.dist.get(p.at);
+    const f = fieldFor(p, x.id), d = f && f.dist.get(p.at);
     if(d === undefined) return;
     const w = (appeal + 1) / (1 + d / 60);
     opts.push([x, w]); tot += w;
@@ -251,7 +257,7 @@ function pickSight(p){
   if(!p.learnt && (p.cool.see || 0) <= state.minute)
     for(const b of state.buildings){
       if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
-      const home = (guestField("gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
+      const home = (fieldFor(p, "gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
       if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal);
     }
   let r = Math.random() * tot;
@@ -293,10 +299,15 @@ function planParty(p){
 // Pick the next node to walk to. False means the party isn't walking anywhere for now.
 function headOut(p){
   planParty(p);
+  // too broke to ride, and the tram would have saved them a good walk
+  if(p.dest && !p.noTram && p.cash < tramFare() * p.n && !canRide(p)){
+    const by = guestField(p.dest), on = guestField(p.dest, true), a = by && by.dist.get(p.at), w = on && on.dist.get(p.at);
+    if(a !== undefined && w !== undefined && a < w * .7){ p.noTram = true; thinks(p, "noTram"); }
+  }
   if(p.dest){
     const goal = gGraph.anchors[p.dest];
     if(goal === p.at){ reachDest(p); return false; }
-    const f = goal && guestField(p.dest), step = f && nextHop(f, p.at);
+    const f = goal && fieldFor(p, p.dest), step = f && nextHop(f, p.at);
     if(step){ p.to = step; return true; }
     p.dest = null; p.why = null;
     if(p.home){ partyLeaves(p); return false; }
@@ -335,7 +346,7 @@ function seeExhibit(p, e){
 const hasSign = e => state.buildings.some(b => b.type === "sign" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= EDU.signReach);
 // Minutes this party needs to walk to a stop from where it is
 function walkMins(p, id){
-  const f = p.at && guestField(id), d = f && f.dist.get(p.at);
+  const f = p.at && fieldFor(p, id), d = f && f.dist.get(p.at);
   return d === undefined || !f ? 0 : d / (WALK_PER_MIN * p.spd);
 }
 // Stepping onto the tram: each guest pays the fare once per ride, and it's remembered as a good thing
@@ -344,7 +355,7 @@ function board(p){
   if(!ride){ p.onTram = false; return; }
   if(p.onTram) return;
   p.onTram = true;
-  const fare = Math.min(TRAM.fare * p.n, p.cash);
+  const fare = tramFare() * p.n;
   p.cash -= fare; earn(fare, "fares"); thinks(p, "tram");
 }
 function walkParty(p, left){
