@@ -87,3 +87,24 @@ function themeZone(e){
 }
 // Extra appeal for an exhibit from its matched area and its animals' fit
 function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitAppeal * themeFitShare(e); }
+
+/* ---------- drawing: texture and borders (SVG strings used by map.js) ---------- */
+const texFill = it => { const T = themeOf(it); return T.tex ? `url(#t-${T.tex})` : null; };
+// a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
+function themeRailSvg(pts, T, inv){
+  const B = T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+  if(!B) return "";
+  let s = "";
+  if(T.tex) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(3, 4*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(3, 4*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
+  if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
+  s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
+  if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
+  return s;
+}
+// a themed building: its texture over the fill, and an inner trim line in the theme's second border color
+function themeBuildSvg(bl, pts, trimPts){
+  const T = themeOf(bl), B = T.bord; let s = "";
+  if(T.tex) s += `<polygon points="${pts}" fill="url(#t-${T.tex})" pointer-events="none"/>`;
+  if(B && B.c2) s += `<polygon points="${trimPts}" fill="none" stroke="${B.c2}" stroke-width="${Math.max(1, B.w2 * .45)}"${B.dash2 ? ` stroke-dasharray="${B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" ")}"` : ""} stroke-linecap="${B.cap2 || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  return s;
+}

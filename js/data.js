@@ -1037,36 +1037,47 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
-//   path     live and dead surface colors and the edge line
+//   path     live and dead surface colors, the edge line, and `kerb`: a dashed second color along the edge ({c, dash} in px)
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
-//   accent   the trim line drawn inside an exhibit's fence
+//   accent   the trim color
+//   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
+//   bord     the border drawn just inside an exhibit's fence and around buildings:
+//            band (the strip's color under the texture), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 const THEMES = {
   genesis: {label:"Genesis", blurb:"Clean white, dark green and gold. The baseline everything else is compared to.",
     path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
+    bord:{band:"#D8B04A", c:"#D8B04A", w:2, dash:"7 4", cap:"butt"},
     unlock:{hint:"Where you start.", check:() => true}},
-  gilded: {label:"Gilded Age", ground:"#C8B28A", blurb:"Victorian brick and brass, 1800s paleontology, retro paleoart.",
-    path:{live:"#D9C9A3", dead:"#B8A97F", edge:"#6B3A2E"}, bld:"#7A3B3B", mix:.55, edge:"#3E2A22", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
+  gilded: {label:"Gilded Age", ground:"#CDB791", tex:"gilded", blurb:"Red brick, wrought iron and brass studs. 1800s paleontology, retro paleoart.",
+    path:{live:"#B5684E", dead:"#8C5340", edge:"#2B1D18", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#8E3B34", mix:.82, edge:"#2B1D18", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
+    bord:{band:"#6B2F2A", c:"#2B1D18", w:3.2, cap:"butt", c2:"#C9A24B", w2:1.6, dash2:"1 6", cap2:"round"},
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
-  bayou: {label:"Bayou", ground:"#6F8F5E", blurb:"Weathered boardwalks, cypress green and still water.",
-    path:{live:"#A68A5B", dead:"#8C7650", edge:"#3F5B3A"}, bld:"#4F6B4A", mix:.5, edge:"#2E4A3B", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
+  bayou: {label:"Bayou", ground:"#6F8F5E", tex:"bayou", blurb:"Weathered boardwalks, rope rails, cypress and still water.",
+    path:{live:"#B08D57", dead:"#8A6B3E", edge:"#2F2418", kerb:{c:"#6E7F3E", dash:"9 6"}}, bld:"#6B5334", mix:.82, edge:"#2F2418", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
+    bord:{band:"#51683A", c:"#D2BC85", w:3, dash:"1 5", cap:"round", c2:"#2F4A2E", w2:1.2},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
-  volcanic: {label:"Volcanic", ground:"#3A3236", blurb:"Black rock and glowing lava.",
-    path:{live:"#4A4A4F", dead:"#3A3A3E", edge:"#17171A"}, bld:"#2B2B30", mix:.65, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
+  volcanic: {label:"Volcanic", ground:"#3A3236", tex:"volcanic", blurb:"Black basalt cut by glowing lava.",
+    path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#241E21", mix:.86, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
+    bord:{band:"#2B2326", glow:"#FF5A1F", c:"#FF7A2F", w:2.6, c2:"#1A1416", w2:1.2, dash2:"6 6"},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
-  stone: {label:"Stone Age", ground:"#DDE6EA", blurb:"Ice, dark grey stone, natural wood and snow.",
-    path:{live:"#E6EBEE", dead:"#C3CBD1", edge:"#4A4F55"}, bld:"#4B4F56", mix:.6, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
+  stone: {label:"Stone Age", ground:"#DDE6EA", tex:"stone", blurb:"Snow, ice, stacked boulders and dark grey stone.",
+    path:{live:"#EEF3F5", dead:"#CBD4D9", edge:"#5A6069", kerb:{c:"#8FB8CC", dash:"4 4"}}, bld:"#6A7078", mix:.85, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
+    bord:{band:"#A4ADB5", c:"#4A4F55", w:5, dash:"9 3", cap:"round", c2:"#E4EEF3", w2:2, dash2:"5 7", cap2:"round"},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
-  lodge: {label:"Lodge", ground:"#C9D2C0", blurb:"Scandinavian lodges, ski resorts and Alaskan cabins.",
-    path:{live:"#EDE6D6", dead:"#C9BDA2", edge:"#6B4A2F"}, bld:"#8A5A36", mix:.55, edge:"#4A2F1C", accent:"#B7432F", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
+  lodge: {label:"Lodge", ground:"#C9D2C0", tex:"lodge", blurb:"Log cabins, ski resorts and Alaskan lodges: timber and red trim.",
+    path:{live:"#D9C7A0", dead:"#BFAA80", edge:"#5A3A22", kerb:{c:"#B7432F", dash:"8 8"}}, bld:"#7A4B2A", mix:.85, edge:"#3A2312", accent:"#B7432F", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
+    bord:{band:"#8A5A36", c:"#5A3A22", w:4, dash:"10 2", cap:"butt", c2:"#B7432F", w2:1.6, dash2:"2 12", cap2:"round"},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
-  western: {label:"Western", ground:"#D9B48A", blurb:"Red rock, weathered wood, fence posts and Arizona desert.",
-    path:{live:"#D9A877", dead:"#B98557", edge:"#7A3E26"}, bld:"#B5502E", mix:.55, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+  western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
+    path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+    bord:{band:"#D9B48A", c:"#8C6A4A", w:1.8, c2:"#4A2E1C", w2:5, dash2:"2 16"},
     unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
-  modern: {label:"Modern", ground:"#BFC9CC", blurb:"Sleek and natural: polished stone, metal and glass alongside wood.",
-    path:{live:"#D8DCDD", dead:"#B4BABD", edge:"#3C4A52"}, bld:"#6F8791", mix:.5, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
+  modern: {label:"Modern", ground:"#BFC9CC", tex:"modern", blurb:"Polished concrete, steel and glass panels, with wood for warmth.",
+    path:{live:"#DDE1E3", dead:"#B9BFC2", edge:"#37454D", kerb:{c:"#7FD0E0", dash:"14 4"}}, bld:"#5F8A9A", mix:.85, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
+    bord:{band:"#C6D0D3", c:"#26343B", w:1.2, c2:"#7FD0E0", w2:3.4, dash2:"15 3"},
     unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
