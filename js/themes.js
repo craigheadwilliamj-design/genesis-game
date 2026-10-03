@@ -257,29 +257,3 @@ function emblemOn(bl){
   const [cx, cy] = centroid(bl.points), bk = bl.points.reduce((a, p) => p[0] + p[1] < a[0] + a[1] ? p : a), r = Math.max(1.6, Math.sqrt(area(bl.points)) / 9.5);
   return emblemSvg(cx + (bk[0] - cx) * .68, cy + (bk[1] - cy) * .66, r);
 }
-
-/* ---------- Genesis paths: timber boardwalk near exhibits, gold-inlaid plaza at the entrance ---------- */
-// Which stretches of a guest path get a variant: [boards, plaza], each a list of polylines (point lists). Worked out once per layout and kept.
-const pathVar = {sig:"", m:new Map()};
-function pathVariantSig(){
-  return state.exhibits.map(e => e.id + e.points.length + (e.points[0] || []).join(",")).join("|") + "#" + state.gate.join(",");
-}
-function pathVariants(p, sig){
-  if(pathVar.sig !== sig){ pathVar.sig = sig; pathVar.m.clear(); }
-  const key = p.id + "@" + p.points.map(q => q.join(",")).join(";");
-  let r = pathVar.m.get(key);
-  if(r) return r;
-  const PT = THEMES.genesis.path, boards = [], plaza = [], pts = p.points;
-  let cb = null, cp = null;
-  for(let i = 0; i + 1 < pts.length; i++){
-    const a = pts[i], b = pts[i + 1], m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    const nearEx = state.exhibits.some(e => !e.viv && lineShapeDist([a, b], e.points) <= PT.boards.near), nearGate = dist(m, state.gate) <= PT.plaza.near;
-    // the plaza wins over boards where they meet
-    const wantB = nearEx && !nearGate, wantP = nearGate;
-    if(wantB){ if(!cb){ cb = [a]; boards.push(cb); } cb.push(b); } else cb = null;
-    if(wantP){ if(!cp){ cp = [a]; plaza.push(cp); } cp.push(b); } else cp = null;
-  }
-  if(pathVar.m.size > 400) pathVar.m.clear();
-  pathVar.m.set(key, r = {boards, plaza});
-  return r;
-}

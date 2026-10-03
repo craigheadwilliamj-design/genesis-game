@@ -1082,10 +1082,10 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
-  genesis: {label:"Genesis", ground:"#6B9A5E", tex:"genesis", gtex:"genesis-lawn", ptex:"genesis-concrete", btex:"genesis-seam",
+  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
-    // warm gray concrete between dark green curbs; `boards` (timber walk) goes where a path runs near an exhibit (`near` m), `plaza` (gold inlay) near the entrance (`near` m)
-    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", boards:{near:8, live:"#8B6B48", dead:"#76604A"}, plaza:{near:30, c:"#C9A24B"}},
+    // warm gray concrete between dark green curbs
+    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B"},
     bld:"#1F3D2B", mix:0, edge:"#14281C", accent:"#C9A24B", fee:0, fits:[],
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
