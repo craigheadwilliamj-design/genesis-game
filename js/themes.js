@@ -182,6 +182,7 @@ function themeBuildSvg(bl, pts, trimPts){
   const G = H >= 0 && T.roofs.glass && T.roofs.glass[H];
   if(G && bl.points && bl.points.length === 4 && area(bl.points) >= (G.min || 0)) s += glassSvg(bl.points, G, ns);
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
+  if(T.corners && !small && bl.points){ const r = Math.max(.7, Math.min(2, Math.sqrt(area(bl.points)) / 14)); for(const [x, y] of bl.points) s += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r.toFixed(2)}" fill="${T.corners.c}" stroke="${T.corners.c2}" stroke-width=".7" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
   const trims = H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord), along = (L, P) => strokeSvg("polygon", L.at || P !== bl.points ? polyStr(insetRect(P, L.at || .86)) : trimPts, L, ns);

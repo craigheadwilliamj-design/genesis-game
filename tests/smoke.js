@@ -1007,6 +1007,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
     out.themeRangeRenamed = rg.paths[0].theme === "homestead" && rg.themes.brush === "homestead" && rg.themes.have.includes("homestead") && !THEMES.range;
     out.themeWesternRenamed = rg.paths[1].theme === "mesa" && rg.themes.have.includes("mesa") && !rg.themes.have.includes("western") && !THEMES.western;
+    // the Classic theme became Japanese Garden: old saves move over
+    const clc = JSON.parse(JSON.stringify(state)); clc.themes = {brush:"classic", have:["genesis", "classic"]}; clc.exhibits = [{id:"e-clc", theme:"classic", points:[[0, 0], [9, 0], [9, 9]], animals:[], land:[], water:[]}]; upgradeSave(clc);
+    out.themeClassicRenamed = clc.exhibits[0].theme === "japanese" && clc.themes.brush === "japanese" && clc.themes.have.includes("japanese") && !clc.themes.have.includes("classic") && !THEMES.classic;
     const tSaved = {paths:state.paths, buildings:state.buildings, exhibits:state.exhibits, themes:state.themes, rating:state.rating, tech:state.science.tech.slice(), money:state.money};
     state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded");
     state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100, flora:"cenozoic"}];

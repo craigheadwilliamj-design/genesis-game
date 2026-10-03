@@ -1041,6 +1041,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
 //   rot      optional decay pattern laid over buildings, stronger on some than others (with `age`, it grows over that many days from when each was built)
+//   corners  optional {c, c2}: a small round cap at each corner of a big rectangular roof (upturned eaves seen from above)
 //   moss     optional {c: [colors], r}: moss patches in a building's corners, growing with its decay
 //   snow     optional {of(type def, type id) -> 0, 1 or 2, tex: [a pattern per level], at: scale}: snow laid over the roof, inset so the eaves still show
 //   sod.shade  optional list of gradients (`#g-<id>`) shading small roofs (each building keeps one)
@@ -1206,9 +1207,42 @@ const THEMES = {
         more:[{c:"#A9D8D3", w:5.4}, {c:"#F2FFFD", w:1.2, dash:"11 7 3 9"}, {c:"#4B3121", w:1.8},
           {c:"#1E2226", w:11, dash:"0 30", cap:"square"}, {c:"#8E979D", w:5, dash:"0 30", cap:"square"}, {c:"#B5552D", w:2, dash:"0 120", cap:"square"}]}},
     unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
-  classic: {label:"Classic", ground:"#C9B79B", tex:"classic", blurb:"A classic European zoo: cobbles, verdigris copper roofs and wrought iron.",
-    path:{live:"#D8C3A5", dead:"#B6A283", edge:"#2E3A36", kerb:{c:"#4FA38A", dash:"12 3"}}, bld:"#3F8F7A", mix:.85, edge:"#262B2A", accent:"#4FA38A", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
-    bord:{band:"#CDB89A", c:"#262B2A", w:2.2, c2:"#262B2A", w2:5, dash2:"1 11", cap2:"round"},
+  japanese: {label:"Japanese Garden", ground:"#7FA68F", tex:"japanese", gtex:"japanese-moss", ptex:"japanese-plank", btex:"japanese-tile", blurb:"Calm and precise: curved tile roofs, golden thatch, dark timber walkways with pebble edges, bamboo lattice and plaster walls, clipped moss and raked gravel. Red is kept for lanterns.",
+    path:{live:"#6A5240", dead:"#54402F", edge:"#2E2118", kerb:{c:"#CFCBBE", dash:"2.4 1.6"}}, bld:"#3C4146", mix:.85, edge:"#1F1A16", accent:"#C8442E", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
+    // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
+    // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
+        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery"].includes(type) ? 1 : 2,
+      btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
+      trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
+        [{c:"#33281E", w:3.2, at:1}, {c:"#CFC9B4", w:1.6, at:.94}, {c:"#33281E", w:.6, at:.9}],
+        [{c:"#2A1E16", w:3.2, at:1}, {c:"#EDE7D4", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}, {c:"#C9A24B", w:.8, dash:"7 5", at:.86}]]},
+    eave:{c:"#1F1A16", w:2.2}, sod:{tex:["japanese-thatch"], max:70, shade:["dome"]},
+    ridge:[{c:"#15171A", w:5, cap:"round"}, {c:"#59606A", w:2.2, cap:"round"}, {c:"#C9A24B", w:.7, dash:"2 4"}],
+    // upturned corners, and moss creeping along the roof edges as buildings age
+    corners:{c:"#1F2226", c2:"#C9C5B4"}, moss:{c:["#4A6B3A", "#6A8A48", "#86A558"], r:1.4}, age:90,
+    // bamboo lattice: a thin pale pole with crossing poles in a neat grid, lashed at the crossings with dark cord
+    bord:{band:"#D4D1C4", c:"#6B5A3A", w:4.2, trim:[{c:"#2A1E16", w:2.4}, {c:"#C9A24B", w:.8}],
+      more:[{c:"#F0E2B6", w:2.8}, {c:"#7A6840", w:6.6, dash:"1.1 5.3"}, {c:"#DCCB98", w:5.2, dash:"1.1 5.3"}, {c:"#2B2118", w:2.6, dash:"0.05 6.35", cap:"round"}],
+      by:{
+        // metal bars: dark timber slats on a rail
+        bars:{band:"#D4D1C4", c:"#2A1E16", w:5,
+          more:[{c:"#5A4332", w:4, dash:"1 3.2"}, {c:"#C9A24B", w:.9}, {c:"#1A120C", w:7, dash:"0 36", cap:"square"}]},
+        // electric: the lattice with a thin wire, small white insulators and paper lanterns, the one place the red shows
+        electric:{band:"#D4D1C4", c:"#6B5A3A", w:4.2,
+          more:[{c:"#F0E2B6", w:2.8}, {c:"#7A6840", w:6.6, dash:"1.1 5.3"}, {c:"#DCCB98", w:5.2, dash:"1.1 5.3"}, {c:"#2B2118", w:2.6, dash:"0.05 6.35", cap:"round"},
+            {c:"#9AA3A9", w:.8}, {c:"#F4F4F0", w:2.6, dash:"0 6.4", cap:"round"},
+            {c:"#6E1F12", w:8.4, dash:"0 64", cap:"round"}, {c:"#D84A2E", w:6.4, dash:"0 64", cap:"round"}, {c:"#FFC98A", w:2.4, dash:"0 64", cap:"round"}]},
+        // acrylic: a shoji screen, pale paper panels in a dark lattice
+        acrylic:{band:"#D4D1C4", c:"#2A1E16", w:7,
+          more:[{c:"#F3EEDD", w:5}, {c:"#4A3626", w:5.4, dash:".9 9"}, {c:"#4A3626", w:.9}]},
+        // concrete: a low plaster wall under a charcoal tile cap, with a plaster edge showing either side
+        concrete:{band:"#D4D1C4", c:"#E6E0CE", w:9, trim:[{c:"#2A1E16", w:2.4}, {c:"#E6E0CE", w:1}],
+          more:[{c:"#A9A392", w:.8, dash:"9 5 14 4"}, {c:"#14161A", w:5.8}, {c:"#454B52", w:3.8, dash:"2.4 .6"}, {c:"#8E959C", w:.7}]}},
+      // tall dark timber posts with steel mesh behind a plaster wall, on a pebble footing
+      strong:{band:"#D4D1C4", base:{c:"#9A968A", w:15, c2:"#6F6B60", dash2:"3 5"}, c:"#E6E0CE", w:8,
+        more:[{c:"#A9A392", w:.8, dash:"9 5 14 4"}, {c:"#8E959C", w:3.4, dash:"1 1.1 .7 1.4"}, {c:"#C9D0D4", w:.8},
+          {c:"#15110D", w:9, dash:"0 24", cap:"round"}, {c:"#4A3626", w:6.4, dash:"0 24", cap:"round"}, {c:"#7A6244", w:1.8, dash:"0 24", cap:"round"}]}},
     unlock:{hint:"Build 3 exhibits.", check:() => state.exhibits.length >= 3}},
   tropical: {label:"Tropical", ground:"#3F9A4A", tex:"tropical", gtex:"tropical-ground", ptex:"tropical-stones", btex:"tropical-bamboo", rot:"tropical-bloom", blurb:"Lush and bright: thatch huts, bamboo and teak, pale stepping stones, big leaves and bursts of flowers. Tidy and cared for, unlike the Bayou.",
     path:{live:"#F4D6BE", dead:"#D6B49C", edge:"#256B35", kerb:{c:"#8BCB5A", dash:"7 4"}}, bld:"#A8742E", mix:.85, edge:"#4A2E14", accent:"#1FA7A0", fee:.15, fits:["arch", "micr", "dimo", "psit", "quet"],
