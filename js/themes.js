@@ -97,6 +97,11 @@ function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitApp
 const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `url(#t-${x})` : null; };
 const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
+// slow blinking lines and glowing pools stay still for players who ask for less motion
+const calmMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+if(calmMotion) document.querySelectorAll("#map defs animate").forEach(a => a.remove());
+// one stroked outline (polygon or polyline), blinking slowly if the line has `pulse`
+const strokeSvg = (tag, pts, L, ns) => `<${tag} points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}>` + (L.pulse && !calmMotion ? `<animate attributeName="stroke-opacity" values="1;.3;1" dur="${L.pulse}s" repeatCount="indefinite"/>` : "") + `</${tag}>`;
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
 // `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail (over the band)
 // and a theme whose border has its own `strong` rail draws that instead
@@ -109,7 +114,7 @@ function themeRailSvg(pts, T, inv, bw = 4, strong = false){
   if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
   s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
   if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
-  for(const m of B.more || []) s += `<polygon points="${pts}" stroke="${m.c}" stroke-width="${m.w}"${m.dash ? ` stroke-dasharray="${m.dash}"` : ""} stroke-linecap="${m.cap || "butt"}" ${ns}/>`;
+  for(const m of B.more || []) s += strokeSvg("polygon", pts, m, ns);
   return s;
 }
 // the inner trim lines on buildings (px): the border's own `trim` (one line or a list), else its second line, thinner
@@ -124,17 +129,18 @@ function ridgeLine(pts){
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], len = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   return len(pts[0], pts[1]) < len(pts[1], pts[2]) ? [mid(pts[0], pts[1]), mid(pts[2], pts[3])] : [mid(pts[1], pts[2]), mid(pts[3], pts[0])];
 }
-const lineSvg = (pts, L, ns) => `<polyline points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
-// a themed building: its roof texture (sod on small ones), any decay overlay, the eave band, the ridge, and inner trim lines
+// how hot a building runs under a theme with `heat` (0 to 2), or -1
+const heatOf = (T, bl) => T.heat && BUILDINGS[bl.type] ? T.heat.of(BUILDINGS[bl.type], bl.type) : -1;
+// a themed building: its roof texture (by heat, or sod on small ones), any decay overlay, the eave band, the ridge, and inner trim lines
 function themeBuildSvg(bl, pts, trimPts){
-  const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
-  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
+  const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = heatOf(T, bl);
+  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = H >= 0 ? T.heat.btex[H] : small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
   if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
   if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
-  if(rg) for(const L of T.ridge) s += lineSvg(polyStr(rg), L, ns);
-  for(const L of themeTrim(T.bord)) s += `<polygon points="${trimPts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
+  if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), L, ns);
+  for(const L of H >= 0 ? T.heat.trim[H] : themeTrim(T.bord)) s += strokeSvg("polygon", trimPts, L, ns);
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
