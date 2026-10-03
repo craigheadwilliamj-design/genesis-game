@@ -1033,6 +1033,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.themeBrush = bp.theme === "volcanic" && state.money < 1e6;
     state.themes.brush = "bayou"; const bq = {id:"p-q", points:[[260,300],[300,300]]}; state.themes.have = ["genesis", "gilded"]; themeNew("path", bq);
     out.themeBrushLocked = bq.theme === undefined;
+    state.themes.have = ["genesis", "gilded", "volcanic"]; state.money = 1e6; state.themes.brush = "genesis";
+    const zs = state.zones; state.zones = [{id:"z-t", name:"Z", color:"#c33", points:[[0,0],[2000,0],[2000,2000],[0,2000]], theme:"volcanic"}];
+    const zp = {id:"p-z", points:[[260,300],[300,300]]}; themeNew("path", zp);
+    for(const it of [...state.paths, ...state.buildings, ...state.exhibits]) delete it.theme;
+    const nz = zoneThemePlan(state.zones[0], "volcanic").length, rz = restyleZone(state.zones[0], "volcanic");
+    render();
+    out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
+    state.zones = zs;
     Object.assign(state, {paths:tSaved.paths, buildings:tSaved.buildings, exhibits:tSaved.exhibits, themes:tSaved.themes, rating:tSaved.rating, money:tSaved.money}); state.science.tech = tSaved.tech; recompute(); render();
     return out;
   }));

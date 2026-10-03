@@ -19,13 +19,42 @@ function themeProblem(kind, it, key){
   if(!canAfford(themeFee(kind, it, key))) return "Not enough money.";
   return null;
 }
-// New things are built in the theme picked in the park office, if it's unlocked and you can afford the extra
+// A themed zone (z.theme) styles what is built inside it: the zone's theme beats the brush
+const itemSpot = it => { const n = it.points.length; return [it.points.reduce((a, p) => a + p[0], 0) / n, it.points.reduce((a, p) => a + p[1], 0) / n]; };
+function themedZoneAt(it){
+  if(!it.points || !it.points.length) return null;
+  const [x, y] = itemSpot(it);
+  return zones().find(z => z.theme && THEMES[z.theme] && inPoly(x, y, z.points)) || null;
+}
+// New things are built in the theme of the zone they sit in, else the one picked in the park office, if it's unlocked and you can afford the extra
 function themeNew(kind, it){
-  const key = state.themes && state.themes.brush;
+  const z = themedZoneAt(it), key = z ? z.theme : state.themes && state.themes.brush;
   if(!key || key === "genesis" || !themeHave(key)) return;
   const fee = themeFee(kind, it, key);
   if(!canAfford(fee)) return;
   spend(fee, "built"); it.theme = key;
+}
+// Everything whose middle is inside the zone that isn't already in a theme: guest paths, buildings and exhibits
+function zoneThemePlan(z, key){
+  const out = [], inside = it => it.points && it.points.length && inPoly(...itemSpot(it), z.points);
+  for(const p of state.paths) if(!isService(p) && inside(p) && themeKey(p) !== key) out.push(["path", p]);
+  for(const b of state.buildings) if(inside(b) && themeKey(b) !== key) out.push(["building", b]);
+  for(const e of state.exhibits) if(inside(e) && themeKey(e) !== key) out.push(["exhibit", e]);
+  return out;
+}
+const zoneThemeFee = (z, key) => zoneThemePlan(z, key).reduce((s, [k, it]) => s + themeFee(k, it, key), 0);
+function zoneThemeProblem(z, key){
+  if(!THEMES[key]) return "Unknown theme.";
+  if(!themeHave(key)) return `${THEMES[key].label} is locked. ${THEMES[key].unlock.hint}`;
+  if(!zoneThemePlan(z, key).length) return "Everything inside already has that theme.";
+  if(!canAfford(zoneThemeFee(z, key))) return "Not enough money.";
+  return null;
+}
+function restyleZone(z, key){
+  const plan = zoneThemePlan(z, key), fee = zoneThemeFee(z, key);
+  spend(fee, "built");
+  for(const [, it] of plan) if(key === "genesis") delete it.theme; else it.theme = key;
+  return {n:plan.length, fee};
 }
 
 // Themes are earned: each unlocks once and stays unlocked

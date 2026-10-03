@@ -116,6 +116,7 @@ function zoneHtml(z){
   h += m.stores.length ? `<ul class="herd">${m.stores.map(b => row("building", b, BUILDINGS[b.type].label)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.buildings.filter(b => zb(b) && b.zone !== z.id).map(b => ["building", b.id, b.zone ? `${BUILDINGS[b.type].label} (${zoneName(b.zone)})` : BUILDINGS[b.type].label]), "Add a building…");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="claimZone">Claim everything inside</button></div></section>`;
+  h += zoneThemeHtml(z);
   h += `<div class="row"><button class="btn" data-action="zoneEdit">Reshape zone</button><span class="meta">Move corners, add more</span></div>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Remove zone</button></div>`;
   return h;
@@ -158,6 +159,12 @@ panelEl.addEventListener("click", ev => {
   if(a === "zoneTool"){ setTool("zone"); return; }
   if(a === "supplyToggle"){ $("#supplyBtn").click(); ui.panel(); return; }
   if(a === "zoneEdit" && it && sel.kind === "zone"){ startZoneEdit(it.id); return; }
+  if(a === "zoneRestyle" && it && sel.kind === "zone"){
+    const key = THEMES[it.theme] ? it.theme : "genesis", why = zoneThemeProblem(it, key);
+    if(why){ ui.toast(why, "bad"); return; }
+    const r = restyleZone(it, key); ui.toast(`Restyled ${r.n} thing${r.n === 1 ? "" : "s"} as ${THEMES[key].label}${r.fee ? ` (${money(r.fee)})` : ""}.`, "good");
+    done(); return;
+  }
   if(a === "gotoZone"){ select("zone", b.dataset.id); return; }
   if(a === "claimZone" && it && sel.kind === "zone"){
     for(const e of state.exhibits) if(!e.zone && inPoly(...centroid(e.points), it.points)) e.zone = it.id;
@@ -176,6 +183,12 @@ panelEl.addEventListener("click", ev => {
 
 panelEl.addEventListener("change", ev => {
   const t = ev.target;
+  if(t.id === "zoneThemeSel"){
+    const it = selItem(); if(!it || sel.kind !== "zone") return;
+    if(!themeHave(t.value)){ ui.toast("That theme is locked.", "bad"); ui.panel(); return; }
+    if(t.value === "genesis") delete it.theme; else it.theme = t.value;
+    afterChange(); render(); return;
+  }
   if(t.dataset.assign){
     const [kind, id] = t.dataset.assign.split(":");
     setZone(kind, id, t.value); afterChange(); render(); return;
@@ -185,3 +198,12 @@ panelEl.addEventListener("change", ev => {
     setZone(kind, id, t.dataset.addzone); afterChange(); render();
   }
 });
+
+// A zone's theme tints the ground and styles what gets built inside it; the button restyles what is already there
+function zoneThemeHtml(z){
+  const key = THEMES[z.theme] ? z.theme : "genesis", T = THEMES[key], plan = zoneThemePlan(z, key);
+  let h = `<section><h3>Theme</h3><label class="field"><span>Zone style</span><select id="zoneThemeSel">${Object.entries(THEMES).map(([k, X]) => `<option value="${k}"${k === key ? " selected" : ""}${themeHave(k) ? "" : " disabled"}>${esc(X.label)}${themeHave(k) ? "" : ` (${esc(X.unlock.hint)})`}</option>`).join("")}</select></label>`;
+  h += `<div class="meta" style="margin-top:4px">${key === "genesis" ? "Pick a theme to tint this part of the map and style new paths, buildings and exhibits built here." : `${esc(T.blurb)} New builds inside this zone use it.`}</div>`;
+  if(plan.length) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="zoneRestyle">Restyle ${plan.length} thing${plan.length === 1 ? "" : "s"} inside (${money(zoneThemeFee(z, key))})</button></div>`;
+  return h + `</section>`;
+}
