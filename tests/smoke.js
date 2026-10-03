@@ -63,6 +63,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const oldPlot = JSON.parse(JSON.stringify(state)); oldPlot.boundary = OLD_PLOT.map(p => p.slice());
     out.plotRectangle = JSON.stringify(upgradeSave(oldPlot).boundary) === JSON.stringify(PARK_PLOT) && JSON.stringify(newPark().boundary) === JSON.stringify(PARK_PLOT) &&
       PARK_PLOT.every(([x, y]) => x % 5 === 0 && y % 5 === 0);
+    // land for sale: only plots touching owned land sell, buying pays and extends where you can build
+    {
+      const m0 = state.money, keep = state.parcels.slice(); state.money = 1e6; state.parcels = [];
+      const far = [0, 0], east = PARCEL_CELLS.find(([i, j]) => parcelRect(i, j)[0] === 420 && parcelRect(i, j)[1] === 100), farE = PARCEL_CELLS.find(([i, j]) => parcelRect(i, j)[0] === 560 && parcelRect(i, j)[1] === 100);
+      const before = insidePlot([[430,150],[440,150]]), lockedWhy = parcelProblem(farE[0], farE[1]), p = parcelPrice(east[0], east[1]), mm = state.money;
+      const bought = buyParcel(east[0], east[1]);
+      out.landBuy = !before && !!lockedWhy && bought && state.money === mm - p && p > 0 && insidePlot([[430,150],[440,150]]) && insidePlot([[400,150],[450,150],[450,190]], true) && !insidePlot([[400,150],[600,150]]) && !parcelProblem(farE[0], farE[1]) === true &&
+        JSON.stringify(upgradeSave({...JSON.parse(JSON.stringify(state)), parcels:undefined}).parcels) === "[]";
+      state.parcels = keep; state.money = m0;
+    }
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
     out.oldSaveStarters = upgradeSave(oldS).starters.join() === "arth,lyst,hyps";
 

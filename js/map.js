@@ -19,6 +19,7 @@ let landGhost = null;               // rock, grove or shelter being placed: {key
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
+let parcelSel = null;               // plot picked with the Buy Land tool: [i, j]
 
 const isBuildTool = t => !!BUILDINGS[t];
 // Menu groups whose tools share a choice bar above the map (vivarium sizes, food stalls, hotels...)
@@ -102,10 +103,10 @@ function polyStr(pts){ return pts.map(p => p[0].toFixed(2) + "," + p[1].toFixed(
 
 function render(){
   const k = view.k, inv = 1/k;
-  const b = bbox(state.boundary);
-  let s = `<rect x="${b.x0-3000}" y="${b.y0-3000}" width="${b.x1-b.x0+6000}" height="${b.y1-b.y0+6000}" fill="url(#contours)"/>`;
-  $("#plotClipPoly").setAttribute("points", polyStr(state.boundary));
-  s += `<polygon points="${polyStr(state.boundary)}" fill="var(--grass)"/>`;
+  const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
+  let s = `<rect x="${PARCELS.xs[0]-3000}" y="${PARCELS.ys[0]-3000}" width="${PARCELS.xs[PARCELS.xs.length-1]-PARCELS.xs[0]+6000}" height="${PARCELS.ys[PARCELS.ys.length-1]-PARCELS.ys[0]+6000}" fill="url(#contours)"/>`;
+  $("#plotClipPoly").setAttribute("d", rd);
+  s += `<path d="${rd}" fill="var(--grass)"/>`;
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
@@ -117,7 +118,8 @@ function render(){
     for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
     s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   }
-  s += `<polygon points="${polyStr(state.boundary)}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  const bd = ownedEdges().map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
+  s += `<path d="${bd}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
 
   const isDoomed = (kind, id) => (doomed && doomed.kind === kind && doomed.id === id) || (tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id);
   const isSel = (kind, id) => sel && sel.kind === kind && sel.id === id;
@@ -297,9 +299,21 @@ function render(){
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
+function parcelOverlay(){
+  const inv = 1/view.k; let s = "";
+  for(const [i, j] of PARCEL_CELLS){
+    if(ownsParcel(i, j)) continue;
+    const [x0, y0, x1, y1] = parcelRect(i, j), open = parcelTouches(i, j), on = parcelSel && parcelSel[0] === i && parcelSel[1] === j;
+    s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="${on ? "var(--sel)" : open ? "var(--good)" : "var(--ink)"}" fill-opacity="${on ? .3 : open ? .16 : .1}" stroke="${on ? "var(--sel)" : "var(--boundary)"}" stroke-width="${on ? 3 : 1}" stroke-dasharray="${open ? "none" : "6 4"}" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    const fs = Math.min(15*inv, (x1-x0)/7), cx = (x0+x1)/2, cy = (y0+y1)/2;
+    s += `<text x="${cx}" y="${cy - (open ? fs*.2 : 0)}" font-size="${fs}" text-anchor="middle" font-weight="700" fill="var(--ink)" pointer-events="none">${open ? money(parcelPrice(i, j)) : "Locked"}</text>`;
+    if(open) s += `<text x="${cx}" y="${cy + fs*1.1}" font-size="${fs*.75}" text-anchor="middle" fill="var(--ink)" opacity=".75" pointer-events="none">${fmtArea(parcelArea(i, j))}</text>`;
+  }
+  return s;
+}
 function renderOverlay(){
   const inv = 1/view.k;
-  let s = "";
+  let s = tool === "parcels" ? parcelOverlay() : "";
   if(draw){
     const poly = isPoly(draw.kind);
     let all = draw.hover ? draw.pts.concat([draw.hover]) : draw.pts;
@@ -538,9 +552,10 @@ function snapAt(clientX, clientY, ev){
   let best = null, bd = R;
   const tryV = (v, kind, id) => { const d = Math.hypot(p.x - v[0], p.y - v[1]); if(d < bd){ bd = d; best = {x:v[0], y:v[1], info:{type:"vertex", kind, id}}; } };
   tryV(state.gate, "gate", "gate");
+  const edges = ownedEdges();
+  for(const [a, c] of edges){ tryV(a, "boundary", "boundary"); tryV(c, "boundary", "boundary"); }
   for(const q of state.paths) q.points.forEach(v => tryV(v, "path", q.id));
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
-  state.boundary.forEach(v => tryV(v, "boundary", "boundary"));
   if(best) return best;
   // with grid snap on, land on the nearest grid point (and still join a path if that point sits on one)
   if(gridSnap){
@@ -557,7 +572,7 @@ function snapAt(clientX, clientY, ev){
   };
   for(const q of state.paths) tryS(q.points, false, "path", q.id);
   for(const q of state.exhibits) tryS(q.points, true, "exhibit", q.id);
-  tryS(state.boundary, true, "boundary", "boundary");
+  for(const [a, c] of edges){ const r = segProj(p.x, p.y, a, c); if(r.d < bd){ bd = r.d; best = {x:r.x, y:r.y, info:{type:"seg", kind:"boundary", id:"boundary"}}; } }
   return best || {x:p.x, y:p.y, info:null};
 }
 
@@ -571,7 +586,16 @@ function insertJunction(pathId, x, y){
 }
 
 /* ---------- checking whether something can be built ---------- */
-function insidePlot(pts){ return pts.every(p => inPoly(p[0], p[1], state.boundary) || distToEdge(p[0], p[1], state.boundary) < .5); }
+// Everything must sit on land you own, edges included (a shape can't cut across a plot you haven't bought)
+function insidePlot(pts, closed){
+  if(!pts.every(p => inOwned(p[0], p[1]))) return false;
+  const n = pts.length;
+  for(let i = 0; i < (closed ? n : n - 1); i++){
+    const a = pts[i], c = pts[(i+1) % n], steps = Math.ceil(Math.hypot(c[0]-a[0], c[1]-a[1]) / 2);
+    for(let k = 1; k < steps; k++) if(!inOwned(a[0] + (c[0]-a[0])*k/steps, a[1] + (c[1]-a[1])*k/steps)) return false;
+  }
+  return true;
+}
 
 // An open shape whose two ends sit on another exhibit's fence gets closed by following that fence,
 // so neighbors can share a wall even around corners. Returns the closed shape (or the points unchanged).
@@ -599,7 +623,7 @@ function closeAlong(pts){
 function exhibitProblem(pts){
   if(pts.length < 3) return "Needs at least 3 corners.";
   if(selfCrosses(pts)) return "The fence crosses itself.";
-  if(!insidePlot(pts)) return "Keep it inside the park boundary.";
+  if(!insidePlot(pts, true)) return "Keep it inside the park boundary.";
   if(area(pts) < 60) return "Too small. Exhibits need at least 60 m².";
   if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points))) return "It overlaps a building.";
@@ -665,6 +689,7 @@ function setTool(t){
     showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
     updateZoneEditBar();
   }
+  else if(t === "parcels"){ parcelSel = null; fit(); updateParcelBar(); }
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
@@ -753,10 +778,30 @@ function finishZoneEdit(){
   ui.toast(joined ? `${z.name} reshaped. ${joined} more thing${joined === 1 ? "" : "s"} joined it.` : `${z.name} reshaped.`);
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
+function updateParcelBar(){
+  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${fmtArea(ownedBox() ? PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0) : 0)} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
+  const [i, j] = parcelSel, why = parcelProblem(i, j);
+  showBar("Buy this plot", `${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
+  $("#dFinish").disabled = !!why; setStat(why || "", !!why);
+}
+function parcelTap(e){
+  const p = toWorld(e.clientX, e.clientY);
+  const c = PARCEL_CELLS.find(([i, j]) => { const r = parcelRect(i, j); return p.x >= r[0] && p.x < r[2] && p.y >= r[1] && p.y < r[3]; });
+  parcelSel = c && !ownsParcel(c[0], c[1]) ? c : null;
+  updateParcelBar(); renderOverlay();
+}
+function buyLand(){
+  if(!parcelSel) return;
+  const [i, j] = parcelSel, price = parcelPrice(i, j);
+  if(!buyParcel(i, j)){ updateParcelBar(); return; }
+  parcelSel = null; recompute(); events.changed(); render(); updateParcelBar();
+  ui.toast(`Bought ${fmtArea(parcelArea(i, j))} of land for ${money(price)}.`, "good");
+}
 function cancelTool(){ setTool("select"); }
 function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
+  if(tool === "parcels"){ buyLand(); return; }
   if(tool === "zoneedit"){ finishZoneEdit(); return; }
   if(tool === "move"){ rotateMoved(); return; }
   if(!draw) return;
@@ -1320,7 +1365,7 @@ function deleteMoveCorner(){
 function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:r.height}; }
 function fit(){
   const {w, h} = svgSize(); if(!w || !h) return;
-  const b = bbox(state.boundary), pad = 40;
+  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:PARCELS.ys[PARCELS.ys.length-1]} : ownedBox(), pad = 40;
   view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/(b.y1 - b.y0)), KMIN, KMAX);
   view.tx = (w - (b.x1 - b.x0)*view.k)/2 - b.x0*view.k;
   view.ty = (h - (b.y1 - b.y0)*view.k)/2 - b.y0*view.k;
@@ -1468,6 +1513,7 @@ function endPointer(e){
   if(tool === "zoneedit") return;
   // a tap
   if(draw){ drawTap(e); return; }
+  if(tool === "parcels"){ parcelTap(e); return; }
   if(tool === "platform"){ platformTap(e); return; }
   if(landKey(tool)){ landTap(e); return; }
   if(isBuildTool(tool)){ placeBuilding(e); return; }

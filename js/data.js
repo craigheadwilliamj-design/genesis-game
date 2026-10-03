@@ -6,6 +6,15 @@
    ===================================================================== */
 
 // How the park starts
+// Land for sale: a grid of parcels around the home plot (0,0 to 420,305). Grid lines on the home plot's edges keep it whole.
+// A parcel costs its area times the rate for its ring, and can be bought once it touches land you own.
+const PARCELS = {
+  xs:[-280,-140,0,140,280,420,560,700],
+  ys:[-200,-100,0,100,200,305,405,505],
+  home:[0,0,420,305],
+  rates:[0, 0.8, 1.4],  // dollars per m² by ring (1 touches the home plot, 2 is the next one out)
+};
+
 const START = {
   money: 150000,
   ticket: 25,          // ticket price in dollars
@@ -34,6 +43,7 @@ const COST = {
 
 // Daily running costs, charged when the park closes each night
 const UPKEEP = {
+  landPerSqM: 0.005,    // property tax a day on each bought parcel
   exhibitPerSqM: 0.02,
   pathPerMeter: 0.2,
 };
