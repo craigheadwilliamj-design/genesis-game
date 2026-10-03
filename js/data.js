@@ -1054,7 +1054,7 @@ const THEMES = {
     path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
     bord:{band:"#D8B04A", c:"#D8B04A", w:2, dash:"7 4", cap:"butt"},
     unlock:{hint:"Where you start.", check:() => true}},
-  gilded: {label:"Gilded Age", ground:"#7FA36A", tex:"gilded", ptex:"gilded-brick", btex:"gilded-roof", gtex:"gilded-lawn", blurb:"Herringbone brick, slate roofs, wrought iron and brass. 1800s paleontology, retro paleoart.",
+  gilded: {label:"Gilded Age", ground:"#7FA36A", tex:"gilded", ptex:"gilded-cobble", btex:"gilded-roof", gtex:"gilded-lawn", blurb:"Cobblestones, slate roofs, wrought iron and brass. 1800s paleontology, retro paleoart.",
     path:{live:"#D2B98A", dead:"#B8A97F", edge:"#5E3226", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#6E2430", mix:.82, edge:"#2B2B30", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
     // wrought iron: a black rail with pointed finials, thicker posts with brass caps, and a stone footing for dangerous animals
     bord:{c:"#1F1F24", w:2.2, c2:"#1F1F24", w2:3.6, dash2:"0 4.5", cap2:"round",
