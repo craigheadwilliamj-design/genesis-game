@@ -396,6 +396,7 @@ function recompute(){
 
   derived = {joined, joinedAll, reach, reports, themes, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
              comfort, mood, wom, learnt, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
+  checkThemes();   // themes unlock as soon as the park qualifies, including on load
   return derived;
 }
 
