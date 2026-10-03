@@ -147,11 +147,12 @@ function ridgeLine(pts){
 }
 // a building's roof class under a theme with `roofs` (0, 1, 2...), or -1
 const roofOf = (T, bl) => T.roofs && BUILDINGS[bl.type] ? T.roofs.of(BUILDINGS[bl.type], bl.type) : -1;
-// a themed building: its roof texture (by roof class, or sod on small ones), any decay overlay, the eave band, the ridge, inner trim lines, and a cross brace on big ones
+// a themed building: its roof texture (sod on small ones, else by roof class), any decay overlay, the eave band, the ridge, inner trim lines, and a cross brace on big ones
 function themeBuildSvg(bl, pts, trimPts){
   const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = roofOf(T, bl);
-  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
+  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = small ? pickFor(bl, T.sod.tex) : H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T); let s = "";
   if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
+  if(small && T.sod.shade) s += `<polygon points="${pts}" fill="url(#g-${pickFor(bl, T.sod.shade)})" pointer-events="none"/>`;
   const rot = decayOf(T, bl);
   if(T.rot && rot > .01) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rot.toFixed(2)}" pointer-events="none"/>`;
   // moss in some of the corners, bigger as the building decays, kept inside the roof
@@ -161,9 +162,12 @@ function themeBuildSvg(bl, pts, trimPts){
       const reach = Math.hypot(cx - x, cy - y);
       for(let k = 0; k < 3; k++){ const f = .14 + k * .09 + (h >> (k + i) & 1) * .04, r = Math.min(big * (1 - k * .25), reach * f * .85), j = (k - 1) * r * .6; s += `<circle cx="${(x + (cx - x) * f + j * (cy - y) / reach).toFixed(2)}" cy="${(y + (cy - y) * f - j * (cx - x) / reach).toFixed(2)}" r="${r.toFixed(2)}" fill="${T.moss.c[k % T.moss.c.length]}" fill-opacity=".85" pointer-events="none"/>`; } });
   }
+  // snow load by how warm the building runs, inset so the dark eaves still show
+  const sn = T.snow && BUILDINGS[bl.type] && bl.points && T.snow.tex[T.snow.of(BUILDINGS[bl.type], bl.type)];
+  if(sn) s += `<polygon points="${polyStr(insetRect(bl.points, T.snow.at))}" fill="url(#t-${sn})" stroke-linejoin="round" pointer-events="none"/>`;
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
-  if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), L, ns);
+  if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
   const trims = H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord), along = (L, P) => strokeSvg("polygon", L.at || P !== bl.points ? polyStr(insetRect(P, L.at || .86)) : trimPts, L, ns);
   for(const L of trims) s += bl.points ? along(L, bl.points) : strokeSvg("polygon", trimPts, L, ns);
   const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");

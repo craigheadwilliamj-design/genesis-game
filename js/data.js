@@ -1042,6 +1042,9 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   accent   the trim color
 //   rot      optional decay pattern laid over buildings, stronger on some than others (with `age`, it grows over that many days from when each was built)
 //   moss     optional {c: [colors], r}: moss patches in a building's corners, growing with its decay
+//   snow     optional {of(type def, type id) -> 0, 1 or 2, tex: [a pattern per level], at: scale}: snow laid over the roof, inset so the eaves still show
+//   sod.shade  optional list of gradients (`#g-<id>`) shading small roofs (each building keeps one)
+//   ridge    a line's `c` can be a list (each building keeps one)
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
 //   roofs    optional {of(type def, type id) -> class 0, 1, 2..., btex: [a roof pattern, or a list (each building keeps one), per class], trim: [a list of trim lines per class],
@@ -1058,6 +1061,9 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
+// How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
+const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Genesis", blurb:"Clean white, dark green and gold. The baseline everything else is compared to.",
     path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
@@ -1104,22 +1110,33 @@ const THEMES = {
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
   stone: {label:"Stone Age", ground:"#857D71", tex:"stone", gtex:"stone-tundra", ptex:"stone-flag", btex:"stone-slab", blurb:"Frozen tundra, flagstones, stacked stone and lashed timber, thatch and hide. Cold and rough, with no paint anywhere.",
     path:{live:"#4E463D", dead:"#6E675E", edge:"#2B2D30"}, bld:"#4C5157", mix:.9, edge:"#2B2D30", accent:"#B8995A", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
-    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100},
+    // small buildings: thatch or stitched hide, shaped as a domed mound or a lean-to; bigger ones: heavy slab roofs with moss in the cracks
+    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100, shade:["dome", "lean"]},
+    // snow load: storage and sheds stay buried, heated buildings melt off to bare thatch or dark wet stone
+    snow:{of:SNOW_HEAT, tex:["snow-deep", "snow-patchy", "snow-melt"], at:.92},
     // stacked-stone wall: a thick bumpy gray band of dry-laid stones, two courses of uneven size
     bord:{band:"#3E4248", c:"#2B2D30", w:6,
       more:[{c:"#2B2D30", w:8.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"}, {c:"#7E838A", w:6.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"},
         {c:"#2B2D30", w:5, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"}, {c:"#9A9EA2", w:3.4, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"},
         {c:"#EEF1F1", w:1.6, dash:"0 17 0 23 0 11", cap:"round"}],
       // the building's base: a ring of stacked stones with the odd bone or antler
-      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"}],
+      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"},
+        // rough log ends poking out unevenly from the roof edge, with the odd antler tine
+        {c:"#2A2017", w:4.2, dash:"0 7 0 13 0 5 0 17", cap:"round", at:1}, {c:"#8A6E4E", w:2.6, dash:"0 7 0 13 0 5 0 17", cap:"round", at:1}, {c:"#E8E2D2", w:1.2, dash:"0 31 2.2 40", cap:"round", at:1}],
       // timber palisade for dangerous animals: a row of sharpened log tops, lashed with straw rope
       strong:{band:"#3E4248", c:"#2A2017", w:6.5,
         more:[{c:"#2A2017", w:7.6, dash:"0 5.2", cap:"round"}, {c:"#6B5440", w:5.8, dash:"0 5.2", cap:"round"}, {c:"#A88A62", w:2.2, dash:"0 5.2", cap:"round"},
           {c:"#B8995A", w:1, dash:"1.6 9.8"}]}},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
-  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-roof", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
+  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-shingle", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
     path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
-    eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:3.4}, {c:"#9E2A2B", w:1.6}], sod:{tex:"lodge-sod", max:80},
+    // dark wood shingles or metal panels under snow, dark eaves, and a steep gable ridge with a deep red or forest green stripe; grass sod on small buildings
+    roofs:{of:() => 0, btex:[["lodge-shingle", "lodge-shingle", "lodge-metal"]],
+      // thick round log ends in warm tan along the eaves
+      trim:[[{c:"#3A2A1E", w:5.6, dash:"0 7.5", cap:"round", at:.98}, {c:"#C9A36A", w:4.2, dash:"0 7.5", cap:"round", at:.98}, {c:"#8A6A44", w:1.3, dash:"0 7.5", cap:"round", at:.98}]]},
+    eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:4}, {c:["#9E2A2B", "#2F5A3A"], w:1.8}], sod:{tex:"lodge-sod", max:80},
+    // snow depth by how warm a building runs: sheds buried, labs and restrooms melted to wet dark shingles
+    snow:{of:SNOW_HEAT, tex:["snow-deep", "snow-patchy", "snow-melt"], at:.9},
     // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
     bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
       more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
