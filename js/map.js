@@ -106,8 +106,7 @@ function render(){
   const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
   let s = `<rect x="${PARCELS.xs[0]-3000}" y="${PARCELS.ys[0]-3000}" width="${PARCELS.xs[PARCELS.xs.length-1]-PARCELS.xs[0]+6000}" height="${PARCELS.ys[PARCELS.ys.length-1]-PARCELS.ys[0]+6000}" fill="url(#contours)"/>`;
   $("#plotClipPoly").setAttribute("d", rd);
-  s += `<path d="${rd}" fill="var(--grass)"/><path d="${rd}" fill="url(#t-genesis-lawn)" pointer-events="none"/>`;
-  const vsig = pathVariantSig(), gen = THEMES.genesis;
+  s += `<path d="${rd}" fill="var(--grass)"/>`;
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
@@ -216,12 +215,6 @@ function render(){
     // painted center line (thin and faded so paths don't read as a parking lot)
     if(!svc && PT.center) body += `<polyline points="${pts}" stroke="${PT.center.c}" stroke-opacity="${PT.center.o}" stroke-width="${PT.center.w*inv}" stroke-dasharray="${PT.center.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-opacity=".5" stroke-width="${.7*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
-    // Genesis guest paths: timber boardwalk where they run beside an exhibit, a gold inlay line on the plaza by the entrance
-    if(!svc && themeKey(p) === "genesis" && !wj){
-      const V = pathVariants(p, vsig), butt = lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"');
-      for(const seg of V.boards) body += `<polyline points="${polyStr(seg)}" stroke="${live ? gen.path.boards.live : gen.path.boards.dead}" stroke-width="${w}" ${butt}/><polyline points="${polyStr(seg)}" stroke="url(#t-genesis-boards)" stroke-width="${w}" ${butt}/><polyline points="${polyStr(seg)}" stroke="#4A3623" stroke-opacity=".7" stroke-width="${w + .8*inv}" stroke-dasharray="0 ${w * 50}" ${butt}/>`;
-      for(const seg of V.plaza) body += `<polyline points="${polyStr(seg)}" stroke="${gen.path.plaza.c}" stroke-width="${w * .8}" ${butt}/><polyline points="${polyStr(seg)}" stroke="${live ? PT.live : PT.dead}" stroke-width="${Math.max(0, w * .8 - 2.4*inv)}" ${butt}/><polyline points="${polyStr(seg)}" stroke="${texFill(p)}" stroke-width="${Math.max(0, w * .8 - 2.4*inv)}" ${butt}/>`;
-    }
     if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
     // a taper where the path steps down to a narrower one: edge below, surface above
