@@ -147,6 +147,20 @@ function ridgeLine(pts){
 }
 // a building's roof class under a theme with `roofs` (0, 1, 2...), or -1
 const roofOf = (T, bl) => T.roofs && BUILDINGS[bl.type] ? T.roofs.of(BUILDINGS[bl.type], bl.type) : -1;
+// skylights: a block of glass panes (one rectangle split into `n` along its long side), each in a dark frame with a bright inner edge and a mullion down the middle
+function glassSvg(pts, g, ns){
+  const R = insetRect(pts, g.at), n = g.n || 1, gap = g.gap || 0, lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]), along = dist(R[0], R[1]) >= dist(R[1], R[2]);
+  const [a, b, c, d] = along ? [R[0], R[1], R[2], R[3]] : [R[1], R[2], R[3], R[0]];   // a to b is the long side, d to c the one across from it
+  let s = "";
+  for(let i = 0; i < n; i++){
+    const t0 = (i + gap / 2) / n, t1 = (i + 1 - gap / 2) / n, q = [lerp(a, b, t0), lerp(a, b, t1), lerp(d, c, t1), lerp(d, c, t0)];
+    s += `<polygon points="${polyStr(q)}" fill="url(#t-modern-glass)" stroke="#1F2D33" stroke-width="1.6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`
+      + `<polygon points="${polyStr(insetRect(q, .93))}" stroke="#EAFBF9" stroke-width=".7" stroke-opacity=".8" ${ns}/>`
+      + `<polyline points="${polyStr([lerp(q[0], q[1], .5), lerp(q[3], q[2], .5)])}" stroke="#1F2D33" stroke-width="1" stroke-opacity=".7" ${ns}/>`;
+  }
+  return s;
+}
 // a themed building: its roof texture (sod on small ones, else by roof class), any decay overlay, the eave band, the ridge, inner trim lines, and a cross brace on big ones
 function themeBuildSvg(bl, pts, trimPts){
   const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = roofOf(T, bl);
@@ -165,6 +179,8 @@ function themeBuildSvg(bl, pts, trimPts){
   // snow load by how warm the building runs, inset so the dark eaves still show
   const sn = T.snow && BUILDINGS[bl.type] && bl.points && T.snow.tex[T.snow.of(BUILDINGS[bl.type], bl.type)];
   if(sn) s += `<polygon points="${polyStr(insetRect(bl.points, T.snow.at))}" fill="url(#t-${sn})" stroke-linejoin="round" pointer-events="none"/>`;
+  const G = H >= 0 && T.roofs.glass && T.roofs.glass[H];
+  if(G && bl.points && bl.points.length === 4 && area(bl.points) >= (G.min || 0)) s += glassSvg(bl.points, G, ns);
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
