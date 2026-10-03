@@ -1040,10 +1040,13 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   path     live and dead surface colors, the edge line, and `kerb`: a dashed second color along the edge ({c, dash} in px)
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
+//   rot      optional decay pattern laid over buildings, stronger on some than others
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
+//   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
-//            band (the strip's color under the texture), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
+//            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
+//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash}: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1052,13 +1055,16 @@ const THEMES = {
     path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
     bord:{band:"#D8B04A", c:"#D8B04A", w:2, dash:"7 4", cap:"butt"},
     unlock:{hint:"Where you start.", check:() => true}},
-  gilded: {label:"Gilded Age", ground:"#CDB791", tex:"gilded", blurb:"Red brick, wrought iron and brass studs. 1800s paleontology, retro paleoart.",
-    path:{live:"#B5684E", dead:"#8C5340", edge:"#2B1D18", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#8E3B34", mix:.82, edge:"#2B1D18", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
-    bord:{band:"#6B2F2A", c:"#2B1D18", w:3.2, cap:"butt", c2:"#C9A24B", w2:1.6, dash2:"1 6", cap2:"round"},
+  gilded: {label:"Gilded Age", ground:"#7FA36A", tex:"gilded", ptex:"gilded-cobble", btex:"gilded-roof", gtex:"gilded-lawn", blurb:"Cobblestones, slate roofs, wrought iron and brass. 1800s paleontology, retro paleoart.",
+    path:{live:"#D2B98A", dead:"#B8A97F", edge:"#5E3226", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#6E2430", mix:.82, edge:"#2B2B30", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
+    // wrought iron: a black rail with pointed finials, thicker posts with brass caps, and a stone footing for dangerous animals
+    bord:{c:"#1F1F24", w:2.2, c2:"#1F1F24", w2:3.6, dash2:"0 4.5", cap2:"round",
+      more:[{c:"#1F1F24", w:6.5, dash:"0 36", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 36", cap:"round"}],
+      trim:{c:"#C9A24B", w:1.2}, base:{c:"#9A9486", w:7, c2:"#6F6A5C", dash2:"3 5"}},
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
-  bayou: {label:"Bayou", ground:"#6F8F5E", tex:"bayou", blurb:"Weathered boardwalks, rope rails, cypress and still water.",
-    path:{live:"#B08D57", dead:"#8A6B3E", edge:"#2F2418", kerb:{c:"#6E7F3E", dash:"9 6"}}, bld:"#6B5334", mix:.82, edge:"#2F2418", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#51683A", c:"#D2BC85", w:3, dash:"1 5", cap:"round", c2:"#2F4A2E", w2:1.2},
+  bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
+    path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"}},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
   volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
     path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],

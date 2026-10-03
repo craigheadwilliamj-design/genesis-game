@@ -126,7 +126,7 @@ function render(){
   for(const z of state.zones){
     const on = isSel("zone", z.id), dead = isDoomed("zone", z.id);
     const ZT = z.theme && THEMES[z.theme] && THEMES[z.theme].ground ? THEMES[z.theme] : null;
-    if(ZT) s += `<polygon points="${polyStr(z.points)}" fill="${ZT.ground}" fill-opacity=".6" stroke="none" pointer-events="none"/>` + (ZT.tex ? `<polygon points="${polyStr(z.points)}" fill="url(#t-${ZT.tex})" fill-opacity=".45" stroke="none" pointer-events="none"/>` : "");
+    if(ZT) s += `<polygon points="${polyStr(z.points)}" fill="${ZT.ground}" fill-opacity=".6" stroke="none" pointer-events="none"/>` + (groundTex(ZT) ? `<polygon points="${polyStr(z.points)}" fill="url(#t-${groundTex(ZT)})" fill-opacity="${ZT.gtex ? .75 : .45}" stroke="none" pointer-events="none"/>` : "");
     s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : ZT ? .04 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
@@ -160,7 +160,7 @@ function render(){
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     // a themed exhibit gets a trim line just inside its fence
-    if(themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4);
+    if(themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])));
     if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
