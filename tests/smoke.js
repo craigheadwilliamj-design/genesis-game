@@ -1003,6 +1003,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // themes: old saves get defaults, themes unlock by play, a matched area draws more, animals that suit a theme are happier
     const old = JSON.parse(JSON.stringify(state)); delete old.themes; upgradeSave(old);
     out.themesDefault = old.themes.brush === "genesis" && old.themes.have.length === 1;
+    // the Range theme was renamed Homestead: old saves move over
+    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range"]}; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
+    out.themeRangeRenamed = rg.paths[0].theme === "homestead" && rg.themes.brush === "homestead" && rg.themes.have.includes("homestead") && !THEMES.range;
     const tSaved = {paths:state.paths, buildings:state.buildings, exhibits:state.exhibits, themes:state.themes, rating:state.rating, tech:state.science.tech.slice(), money:state.money};
     state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded");
     state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100, flora:"cenozoic"}];

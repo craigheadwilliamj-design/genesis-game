@@ -99,6 +99,23 @@ const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
 // one stroked outline (polygon or polyline)
 const strokeSvg = (tag, pts, L, ns) => `<${tag} points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
+// a zigzag along a closed outline: every `step` it swings `amp` to one side then the other (world units), restarting at each corner
+function zigPts(pts, amp, step){
+  const out = [];
+  for(let i = 0; i < pts.length; i++){
+    const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length], len = Math.hypot(bx - ax, by - ay), n = Math.min(400, Math.max(2, Math.round(len / step / 2) * 2));
+    const nx = -(by - ay) / (len || 1), ny = (bx - ax) / (len || 1);
+    for(let k = 0; k < n; k++){ const t = k / n, o = k % 2 ? amp : -amp * (k ? 1 : 0); out.push([ax + (bx - ax) * t + nx * o, ay + (by - ay) * t + ny * o]); }
+  }
+  return out;
+}
+// one rail line: a straight outline, or with `zig: [amp, step]` (px) a zigzag, drawn as rails or, with `knots`, as round dots where the rails cross
+function railLine(pts, L, inv, ns){
+  if(!L.zig) return strokeSvg("polygon", pts, L, ns);
+  const raw = pts.split(" ").map(p => p.split(",").map(Number)), z = zigPts(raw, L.zig[0] * inv, L.zig[1] * inv);
+  if(L.knots) return `<path d="${z.map(([x, y]) => `M${x.toFixed(2)} ${y.toFixed(2)}h0`).join("")}" stroke="${L.c}" stroke-width="${L.w}" stroke-linecap="round" ${ns}/>`;
+  return strokeSvg("polygon", polyStr(z), L, ns);
+}
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
 // `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail (over the band)
 // and a theme whose border has its own `strong` rail draws that instead
@@ -109,9 +126,9 @@ function themeRailSvg(pts, T, inv, bw = 4, strong = false){
   if(T.tex && B.band) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
   if(strong && B.base) s += `<polygon points="${pts}" stroke="${B.base.c}" stroke-width="${B.base.w}" ${ns}/>` + (B.base.c2 ? `<polygon points="${pts}" stroke="${B.base.c2}" stroke-width="1" stroke-dasharray="${B.base.dash2 || "3 5"}" ${ns}/>` : "");
   if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
-  s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
+  if(B.c) s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
   if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
-  for(const m of B.more || []) s += strokeSvg("polygon", pts, m, ns);
+  for(const m of B.more || []) s += railLine(pts, m, inv, ns);
   return s;
 }
 // the inner trim lines on buildings (px): the border's own `trim` (one line or a list), else its second line, thinner
@@ -126,18 +143,20 @@ function ridgeLine(pts){
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], len = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
   return len(pts[0], pts[1]) < len(pts[1], pts[2]) ? [mid(pts[0], pts[1]), mid(pts[2], pts[3])] : [mid(pts[1], pts[2]), mid(pts[3], pts[0])];
 }
-// how hot a building runs under a theme with `heat` (0 to 2), or -1
-const heatOf = (T, bl) => T.heat && BUILDINGS[bl.type] ? T.heat.of(BUILDINGS[bl.type], bl.type) : -1;
-// a themed building: its roof texture (by heat, or sod on small ones), any decay overlay, the eave band, the ridge, and inner trim lines
+// a building's roof class under a theme with `roofs` (0, 1, 2...), or -1
+const roofOf = (T, bl) => T.roofs && BUILDINGS[bl.type] ? T.roofs.of(BUILDINGS[bl.type], bl.type) : -1;
+// a themed building: its roof texture (by roof class, or sod on small ones), any decay overlay, the eave band, the ridge, inner trim lines, and a cross brace on big ones
 function themeBuildSvg(bl, pts, trimPts){
-  const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = heatOf(T, bl);
-  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = H >= 0 ? T.heat.btex[H] : small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
+  const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = roofOf(T, bl);
+  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
   if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
   if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), L, ns);
-  for(const L of H >= 0 ? T.heat.trim[H] : themeTrim(T.bord)) s += strokeSvg("polygon", trimPts, L, ns);
+  for(const L of H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord)) s += strokeSvg("polygon", trimPts, L, ns);
+  const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");
+  if(X && X.of.includes(H) && tp.length === 4 && area(bl.points) >= X.min) for(const L of X.lines) s += strokeSvg("polyline", `${tp[0]} ${tp[2]}`, L, ns) + strokeSvg("polyline", `${tp[1]} ${tp[3]}`, L, ns);
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
