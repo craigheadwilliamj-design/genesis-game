@@ -185,7 +185,6 @@ function render(){
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
     under += cut(`<polyline points="${pts}" stroke="${svc ? "#4B4F55" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
-    if(!svc && PT.ptex) body += `<polyline points="${pts}" stroke="url(#${PT.ptex})" stroke-width="${w}" ${lj} pointer-events="none"/>`;
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
     if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
@@ -233,7 +232,6 @@ function render(){
     }
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
     s += `<polygon points="${polyStr(bl.points)}" fill="${themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-    if(themeOf(bl).btex) s += `<polygon points="${polyStr(bl.points)}" fill="url(#${themeOf(bl).btex})" pointer-events="none"/>`;
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
     else s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${fs}">${t.glyph}</text>`;
