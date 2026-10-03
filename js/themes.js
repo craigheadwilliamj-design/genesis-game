@@ -187,7 +187,7 @@ function themeBuildSvg(bl, pts, trimPts){
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
   // carved ridge tips: a crossed pair of short strokes with a dot at each end of the ridge
   if(rg && T.tips && area(bl.points) >= T.tips.min){
-    const r = Math.max(2.2, Math.min(5, Math.sqrt(area(bl.points)) / 4.5)), [[ax, ay], [bx, by]] = rg, L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
+    const r = Math.max(.5, Math.min(1.3, Math.sqrt(area(bl.points)) / 16)), [[ax, ay], [bx, by]] = rg, L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
     for(const [x, y, d] of [[ax, ay, -1], [bx, by, 1]]){
       const X = x + ux * d * r * .4, Y = y + uy * d * r * .4, c = k => `M${(X - (ux + k * uy) * r).toFixed(2)} ${(Y - (uy - k * ux) * r).toFixed(2)}L${(X + (ux + k * uy) * r).toFixed(2)} ${(Y + (uy - k * ux) * r).toFixed(2)}`;
       s += `<path d="${c(1) + c(-1)}" stroke="${T.tips.c}" stroke-width="3.2" stroke-linecap="round" ${ns}/><path d="${c(1) + c(-1)}" stroke="${T.tips.c2}" stroke-width="1.4" stroke-linecap="round" ${ns}/>`;
