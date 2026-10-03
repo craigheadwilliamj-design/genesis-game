@@ -106,7 +106,8 @@ function render(){
   const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
   let s = `<rect x="${PARCELS.xs[0]-3000}" y="${PARCELS.ys[0]-3000}" width="${PARCELS.xs[PARCELS.xs.length-1]-PARCELS.xs[0]+6000}" height="${PARCELS.ys[PARCELS.ys.length-1]-PARCELS.ys[0]+6000}" fill="url(#contours)"/>`;
   $("#plotClipPoly").setAttribute("d", rd);
-  s += `<path d="${rd}" fill="var(--grass)"/>`;
+  s += `<path d="${rd}" fill="var(--grass)"/><path d="${rd}" fill="url(#t-genesis-lawn)" pointer-events="none"/>`;
+  const vsig = pathVariantSig(), gen = THEMES.genesis;
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
@@ -151,18 +152,25 @@ function render(){
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
       s += `<polygon points="${pts}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
-      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       // a live electric fence has a dark zigzag over yellow; with no power it goes dull gray
-      if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      if(themeKey(e) === "genesis"){}   // Genesis shows power as amber lights on the posts, drawn below
+      else if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       else if(e.barrier === "electric" && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#1D2B22" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      if(e.barrier === "bars" && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      if(e.barrier === "bars" && !on && !dead && themeKey(e) !== "genesis") s += `<polygon points="${pts}" fill="none" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       if(e.aviary) s += `<polygon points="${pts}" fill="url(#mesh)" pointer-events="none"/>`;
       if(isBreached(e)) s += `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="4" stroke-dasharray="10 6" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     // a themed exhibit gets a trim line just inside its fence
-    if(themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    if(!e.viv || themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
+    if(e.barrier === "electric" && !e.viv && themeKey(e) === "genesis"){
+      const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+      if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
+      else s += `<polygon points="${pp}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFC25E" stroke-width="3.6" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFF1CC" stroke-width="1.4" stroke-dasharray="0 34" ${ns}/>`;
+    }
     if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
@@ -199,15 +207,21 @@ function render(){
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
     const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
-    under += cut(`<polyline points="${pts}" stroke="${svc ? "#4B4F55" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
+    under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
-    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#8A8F95" : "#A5A8AC") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
+    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
     if(!svc && texFill(p)) body += `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w}" ${lj}/>`;
     // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
     if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w * .4}" ${lj}/>` : "");
     // painted center line (thin and faded so paths don't read as a parking lot)
     if(!svc && PT.center) body += `<polyline points="${pts}" stroke="${PT.center.c}" stroke-opacity="${PT.center.o}" stroke-width="${PT.center.w*inv}" stroke-dasharray="${PT.center.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;
-    if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-width="${.6*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
+    if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-opacity=".5" stroke-width="${.7*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
+    // Genesis guest paths: timber boardwalk where they run beside an exhibit, a gold inlay line on the plaza by the entrance
+    if(!svc && themeKey(p) === "genesis" && !wj){
+      const V = pathVariants(p, vsig), butt = lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"');
+      for(const seg of V.boards) body += `<polyline points="${polyStr(seg)}" stroke="${live ? gen.path.boards.live : gen.path.boards.dead}" stroke-width="${w}" ${butt}/><polyline points="${polyStr(seg)}" stroke="url(#t-genesis-boards)" stroke-width="${w}" ${butt}/><polyline points="${polyStr(seg)}" stroke="#4A3623" stroke-opacity=".7" stroke-width="${w + .8*inv}" stroke-dasharray="0 ${w * 50}" ${butt}/>`;
+      for(const seg of V.plaza) body += `<polyline points="${polyStr(seg)}" stroke="${gen.path.plaza.c}" stroke-width="${w * .8}" ${butt}/><polyline points="${polyStr(seg)}" stroke="${live ? PT.live : PT.dead}" stroke-width="${Math.max(0, w * .8 - 2.4*inv)}" ${butt}/><polyline points="${polyStr(seg)}" stroke="${texFill(p)}" stroke-width="${Math.max(0, w * .8 - 2.4*inv)}" ${butt}/>`;
+    }
     if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
     // a taper where the path steps down to a narrower one: edge below, surface above
@@ -223,6 +237,7 @@ function render(){
   // entrance gate
   const [gx, gy] = state.gate;
   s += `<g pointer-events="none"><rect x="${gx-9}" y="${gy-3}" width="18" height="6" rx="1" fill="#1F3A2B"/><rect x="${gx-9}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/><rect x="${gx+6}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/>`;
+  s += emblemSvg(gx, gy - 9, 3.6);
   s += `<text class="lbl" x="${gx}" y="${gy + 3 + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}">Entrance</text></g>`;
 
   // litter on the paths
@@ -255,6 +270,8 @@ function render(){
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
+    // Genesis: a narrow pale gravel strip round the building, so it stands off the grass
+    if(themeKey(bl) === "genesis") s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
     s += `<polygon points="${polyStr(bl.points)}" fill="${down ? "#6E2A26" : themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;

@@ -1082,9 +1082,33 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
-  genesis: {label:"Genesis", blurb:"Clean white, dark green and gold. The baseline everything else is compared to.",
-    path:{live:"#F4F1E8", dead:"#D6D3C6", edge:"#2F5A3F"}, bld:"#FFFFFF", mix:0, edge:"#1D2B22", accent:"#D8B04A", fee:0, fits:[],
-    bord:{band:"#D8B04A", c:"#D8B04A", w:2, dash:"7 4", cap:"butt"},
+  genesis: {label:"Genesis", ground:"#6B9A5E", tex:"genesis", gtex:"genesis-lawn", ptex:"genesis-concrete", btex:"genesis-seam",
+    blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
+    // warm gray concrete between dark green curbs; `boards` (timber walk) goes where a path runs near an exhibit (`near` m), `plaza` (gold inlay) near the entrance (`near` m)
+    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", boards:{near:8, live:"#8B6B48", dead:"#76604A"}, plaza:{near:30, c:"#C9A24B"}},
+    bld:"#1F3D2B", mix:0, edge:"#14281C", accent:"#C9A24B", fee:0, fits:[],
+    // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
+    // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc"].includes(type) ? 1
+        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary"].includes(type) ? 2 : 0,
+      btex:["genesis-seam", "genesis-lab", "genesis-slate"],
+      trim:[[{c:"#C9A24B", w:.9, at:.94}],
+        [{c:"#1F3D2B", w:5, at:.985}, {c:"#C9A24B", w:.9, at:.92}],
+        [{c:"#C9A24B", w:.8, at:.94}]],
+      ridge:[[{c:"#10261A", w:3.6}, {c:"#C9A24B", w:1.5}], null, null],
+      units:[null, {c:"#B3AEA1", c2:"#6F6B61", n:3, min:150}, null]},
+    eave:{c:"#14281C", w:1.8},
+    emblem:["oracle", "ghost", "tar", "ceres"],
+    // dark green steel rail: two rails with a small gold cap on each post. Dangerous animals get a tall steel panel wall on a concrete base with a gold band along the top.
+    bord:{band:"#CBC5B4", c:"#1F3D2B", w:5, trim:[{c:"#C9A24B", w:1}],
+      more:[{c:"#CBC5B4", w:1.5}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}],
+      by:{
+        bars:{band:"#CBC5B4", c:"#1F3D2B", w:5,
+          more:[{c:"#CBC5B4", w:1.5}, {c:"#3F6B52", w:1, dash:"1 3"}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}]},
+        acrylic:{band:"#CBC5B4", c:"#1F3D2B", w:5,
+          more:[{c:"#D5ECE6", w:2.2}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}]}},
+      strong:{band:"#CBC5B4", base:{c:"#A8A396", w:13, c2:"#7D7869", dash2:"3 5"}, c:"#2E3A36", w:7,
+        more:[{c:"#1F3D2B", w:5}, {c:"#10261A", w:7, dash:".8 15"}, {c:"#C9A24B", w:1.7, dash:"11 4"}]}},
     unlock:{hint:"Where you start.", check:() => true}},
   gilded: {label:"Gilded Age", ground:"#7FA36A", tex:"gilded", ptex:"gilded-cobble", btex:"gilded-roof", gtex:"gilded-lawn", blurb:"Cobblestones, slate roofs, wrought iron and brass. 1800s paleontology, retro paleoart.",
     path:{live:"#D2B98A", dead:"#B8A97F", edge:"#5E3226", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#6E2430", mix:.82, edge:"#2B2B30", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
@@ -1335,6 +1359,7 @@ const THEMES = {
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
 // An animal that suits its exhibit's theme is happier and draws a little more too.
+THEMES.genesis.bord.by.concrete = THEMES.genesis.bord.strong;   // a plain concrete wall gets the same tall steel panel look
 const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
