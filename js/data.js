@@ -1079,6 +1079,22 @@ const THEMES = {
     path:{live:"#DDE1E3", dead:"#B9BFC2", edge:"#37454D", kerb:{c:"#7FD0E0", dash:"14 4"}}, bld:"#5F8A9A", mix:.85, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
     bord:{band:"#C6D0D3", c:"#26343B", w:1.2, c2:"#7FD0E0", w2:3.4, dash2:"15 3"},
     unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
+  classic: {label:"Classic", ground:"#C9B79B", tex:"classic", blurb:"A classic European zoo: cobbles, verdigris copper roofs and wrought iron.",
+    path:{live:"#D8C3A5", dead:"#B6A283", edge:"#2E3A36", kerb:{c:"#4FA38A", dash:"12 3"}}, bld:"#3F8F7A", mix:.85, edge:"#262B2A", accent:"#4FA38A", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
+    bord:{band:"#CDB89A", c:"#262B2A", w:2.2, c2:"#262B2A", w2:5, dash2:"1 11", cap2:"round"},
+    unlock:{hint:"Build 3 exhibits.", check:() => state.exhibits.length >= 3}},
+  tropical: {label:"Tropical", ground:"#5FA463", tex:"tropical", blurb:"Bamboo, thatch, big leaves and bright flowers.",
+    path:{live:"#D8C48E", dead:"#B8A56F", edge:"#2F7A3E", kerb:{c:"#F0508C", dash:"2 9"}}, bld:"#B08A4A", mix:.85, edge:"#3E5A2A", accent:"#F0508C", fee:.15, fits:["arch", "micr", "dimo", "psit", "quet"],
+    bord:{band:"#3E8A4A", c:"#A9C453", w:4, dash:"13 2", cap:"butt", c2:"#F0508C", w2:4, dash2:"1 16", cap2:"round"},
+    unlock:{hint:"Keep an animal in a tropical exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "tropical")}},
+  roadside: {label:"Retro Roadside", ground:"#6A6D75", tex:"roadside", blurb:"Neon, chrome and big signs: Jurassic meets Route 66.",
+    path:{live:"#5B5E66", dead:"#45484F", edge:"#F2F2F2", kerb:{c:"#E8334A", dash:"9 9"}}, bld:"#C9D2D8", mix:.85, edge:"#E8334A", accent:"#2EE6D6", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
+    bord:{band:"#2A2D33", glow:"#2EE6D6", c:"#2EE6D6", w:2.6, c2:"#E8334A", w2:1.6, dash2:"10 10"},
+    unlock:{hint:"Get 250 guests in a day.", check:() => lastGuests() >= 250}},
+  range: {label:"Range", ground:"#D3C18F", tex:"range", blurb:"Wyoming: dry prairie, weathered planks, barbed wire and tall dry grass.",
+    path:{live:"#CDB88A", dead:"#AE9A6E", edge:"#7A5C36", kerb:{c:"#D8C16A", dash:"3 5"}}, bld:"#8C7A62", mix:.85, edge:"#5A4128", accent:"#D8C16A", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
+    bord:{band:"#D8C16A", c:"#6E6558", w:3, dash:"3 15", cap:"butt", c2:"#B9BCC0", w2:.9},
+    unlock:{hint:"Keep an animal in a grassland exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "grassland")}},
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
 // An animal that suits its exhibit's theme is happier and draws a little more too.
