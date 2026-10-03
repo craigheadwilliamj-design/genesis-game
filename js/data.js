@@ -1067,7 +1067,12 @@ const THEMES = {
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
   bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
     path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"}},
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"},
+      // rusted chain-link for dangerous animals: a rust mesh band on leaning weathered posts, with vines and leaves creeping over it
+      strong:{band:"#3E4A2C", c:"#4A2E1A", w:5.4,
+        more:[{c:"#A8683A", w:4.4, dash:"1 1.1 .7 1.4"}, {c:"#D08A50", w:1.2, dash:".6 1.9 1 2.6", cap:"round"},
+          {c:"#2A2118", w:8, dash:"0 24 0 27", cap:"round"}, {c:"#7E7362", w:5, dash:"0 24 0 27", cap:"round"},
+          {c:"#3E5A26", w:3.2, dash:"9 14 4 22 13 30 6 25", cap:"round"}, {c:"#6E8A3A", w:3.4, dash:"0 6 0 4 0 27 0 9 0 36", cap:"round"}]}},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
   volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
     path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
