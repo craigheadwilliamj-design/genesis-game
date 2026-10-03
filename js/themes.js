@@ -111,22 +111,34 @@ function themeRailSvg(pts, T, inv, bw = 4, strong = false){
   for(const m of B.more || []) s += `<polygon points="${pts}" stroke="${m.c}" stroke-width="${m.w}"${m.dash ? ` stroke-dasharray="${m.dash}"` : ""} stroke-linecap="${m.cap || "butt"}" ${ns}/>`;
   return s;
 }
-// the inner trim line on buildings (px): the border's own `trim`, else its second line, thinner
-const themeTrim = B => !B ? null : B.trim ? B.trim : B.c2 ? {c:B.c2, w:Math.max(1, B.w2 * .45), dash:B.dash2 && B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" "), cap:B.cap2} : null;
+// the inner trim lines on buildings (px): the border's own `trim` (one line or a list), else its second line, thinner
+const themeTrim = B => !B ? [] : B.trim ? [].concat(B.trim) : B.c2 ? [{c:B.c2, w:Math.max(1, B.w2 * .45), dash:B.dash2 && B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" "), cap:B.cap2}] : [];
 // how rotten an item looks under the theme's `rot` overlay, fixed per item so each building keeps its look
 const rotLevel = it => { let h = 7; for(const ch of String(it.id || "")) h = (h * 31 + ch.charCodeAt(0)) % 997; return .2 + .8 * h / 996; };
-// a themed building: its texture over the fill, any decay overlay, and an inner trim line
+// a building's ridge: the line joining the middles of its two short sides (rectangles only)
+function ridgeLine(pts){
+  if(pts.length !== 4) return null;
+  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], len = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  return len(pts[0], pts[1]) < len(pts[1], pts[2]) ? [mid(pts[0], pts[1]), mid(pts[2], pts[3])] : [mid(pts[1], pts[2]), mid(pts[3], pts[0])];
+}
+const lineSvg = (pts, L, ns) => `<polyline points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
+// a themed building: its roof texture (sod on small ones), any decay overlay, the eave band, the ridge, and inner trim lines
 function themeBuildSvg(bl, pts, trimPts){
-  const T = themeOf(bl), R = themeTrim(T.bord); let s = "";
-  if(bldTex(T)) s += `<polygon points="${pts}" fill="url(#t-${bldTex(T)})" pointer-events="none"/>`;
+  const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+  const tex = T.sod && bl.points && area(bl.points) <= T.sod.max ? T.sod.tex : bldTex(T); let s = "";
+  if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
   if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
-  if(R) s += `<polygon points="${trimPts}" fill="none" stroke="${R.c}" stroke-width="${R.w}"${R.dash ? ` stroke-dasharray="${R.dash}"` : ""} stroke-linecap="${R.cap || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
+  const rg = T.ridge && tex !== (T.sod && T.sod.tex) && bl.points && ridgeLine(bl.points);
+  if(rg) for(const L of T.ridge) s += lineSvg(polyStr(rg), L, ns);
+  for(const L of themeTrim(T.bord)) s += `<polygon points="${trimPts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
 function themeProp(it, shape){
   const T = themeOf(it), B = T.bord; if(!B || T === THEMES.genesis) return "";
-  const R = B.trim || {c:B.c2 || B.c, w:Math.max(1, (B.c2 ? B.w2 : B.w) * .5)};
+  // a list of trims is drawn as one plain ring in its first color, kept thin on small props
+  const R = Array.isArray(B.trim) ? {c:B.trim[0].c, w:Math.min(B.trim[0].w, 2)} : B.trim || {c:B.c2 || B.c, w:Math.max(1, (B.c2 ? B.w2 : B.w) * .5)};
   const tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w) => `stroke="${c}" stroke-width="${w}" stroke-linecap="butt" fill="none" vector-effect="non-scaling-stroke"`;
   if(shape.round){
     const {cx, cy, r} = shape;

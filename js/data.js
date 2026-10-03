@@ -1041,12 +1041,15 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
 //   rot      optional decay pattern laid over buildings, stronger on some than others
+//   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
+//   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
+//   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex`
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
 //            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash}: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal)
+//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1074,9 +1077,13 @@ const THEMES = {
     path:{live:"#EEF3F5", dead:"#CBD4D9", edge:"#5A6069", kerb:{c:"#8FB8CC", dash:"4 4"}}, bld:"#6A7078", mix:.85, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
     bord:{band:"#A4ADB5", c:"#4A4F55", w:5, dash:"9 3", cap:"round", c2:"#E4EEF3", w2:2, dash2:"5 7", cap2:"round"},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
-  lodge: {label:"Lodge", ground:"#C9D2C0", tex:"lodge", blurb:"Log cabins, ski resorts and Alaskan lodges: timber and red trim.",
-    path:{live:"#D9C7A0", dead:"#BFAA80", edge:"#5A3A22", kerb:{c:"#B7432F", dash:"8 8"}}, bld:"#7A4B2A", mix:.85, edge:"#3A2312", accent:"#B7432F", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
-    bord:{band:"#8A5A36", c:"#5A3A22", w:4, dash:"10 2", cap:"butt", c2:"#B7432F", w2:1.6, dash2:"2 12", cap2:"round"},
+  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-roof", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
+    path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
+    eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:3.4}, {c:"#9E2A2B", w:1.6}], sod:{tex:"lodge-sod", max:80},
+    // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
+    bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
+      more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
+      trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}]},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
   western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
     path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
