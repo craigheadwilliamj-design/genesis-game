@@ -1169,24 +1169,31 @@ const THEMES = {
         more:[{c:"#2A2017", w:7.6, dash:"0 5.2", cap:"round"}, {c:"#6B5440", w:5.8, dash:"0 5.2", cap:"round"}, {c:"#A88A62", w:2.2, dash:"0 5.2", cap:"round"},
           {c:"#B8995A", w:1, dash:"1.6 9.8"}]}},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
-  lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-shingle", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
-    path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
-    // dark wood shingles or metal panels under snow, dark eaves, and a steep gable ridge with a deep red or forest green stripe; grass sod on small buildings
-    roofs:{of:() => 0, btex:[["lodge-shingle", "lodge-shingle", "lodge-metal"]],
-      // thick round log ends in warm tan along the eaves
-      trim:[[{c:"#3A2A1E", w:5.6, dash:"0 7.5", cap:"round", at:.98}, {c:"#C9A36A", w:4.2, dash:"0 7.5", cap:"round", at:.98}, {c:"#8A6A44", w:1.3, dash:"0 7.5", cap:"round", at:.98}]]},
+  lodge: {label:"Nordic", ground:"#DDE6EC", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-shingle", blurb:"Longhouses and stave churches in the snow: dark shingle roofs under blue-white drifts, turf-roofed huts, carved ridge tips, deep red trim and split-log rails. Warm, tidy and finished.",
+    path:{live:"#E4E8E8", dead:"#B9C0C4", edge:"#4F5C66", kerb:{c:"#8A6A44", dash:"5 1.6"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
+    // roofs: 0 storage, sheds and shops (dark shingle), 1 landmarks and heated halls (shingle with a stacked stave-church upper roof, red knotwork band, carved ridge tips); sod on small buildings
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "edcenter", "resort", "lodge", "restaurant", "megastore"].includes(type) ? 1 : 0, btex:[["lodge-shingle", "lodge-shingle", "lodge-metal"], ["lodge-shingle"]],
+      // thick round log ends in warm tan along the eaves; landmarks add a chunky deep red diamond band just inside
+      trim:[[{c:"#3A2A1E", w:5.6, dash:"0 7.5", cap:"round", at:.98}, {c:"#C9A36A", w:4.2, dash:"0 7.5", cap:"round", at:.98}, {c:"#8A6A44", w:1.3, dash:"0 7.5", cap:"round", at:.98}],
+        [{c:"#3A2A1E", w:5.6, dash:"0 7.5", cap:"round", at:.98}, {c:"#C9A36A", w:4.2, dash:"0 7.5", cap:"round", at:.98}, {c:"#8A6A44", w:1.3, dash:"0 7.5", cap:"round", at:.98},
+          {c:"#6B1F20", w:2.6, dash:"3 3", at:.9}, {c:"#C9A36A", w:.7, dash:"0 6", cap:"round", at:.9}]]},
     eave:{c:"#1F1E1D", w:2.6}, ridge:[{c:"#1F1E1D", w:4}, {c:["#9E2A2B", "#2F5A3A"], w:1.8}], sod:{tex:"lodge-sod", max:80},
+    // carved ridge tips: a small crossed bronze tip at each end of the ridge on big buildings
+    tips:{c:"#2A1E16", c2:"#A8793C", min:140},
+    // stave-church look: landmark buildings get a smaller stacked upper roof
+    tier:{min:170, next:2.2, at:[.6, .32], light:"#E4EDF2", shadow:"#2A2C30", drop:.4},
     // snow depth by how warm a building runs: sheds buried, labs and restrooms melted to wet dark shingles
     snow:{of:SNOW_HEAT, tex:["snow-deep", "snow-patchy", "snow-melt"], at:.9},
     // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
-    bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
-      more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
+    bord:{band:"#CAD6DD", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
+      more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#E4EDF2", w:5, dash:"0 44", cap:"round"}],
       trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}],
-      // tall timber palisade for dangerous animals: evenly set peeled logs on a mortared stone footing, a dark steel band across them, and snow on top
-      strong:{band:"#DCE3E7", c:"#3A2A1E", w:6.5,
+      // tall timber palisade for dangerous animals: peeled logs on a stone footing, pointed carved post tops, a dark steel band across them, and snow on top
+      strong:{band:"#CAD6DD", c:"#3A2A1E", w:6.5,
         base:{c:"#8E9196", w:13, c2:"#5E6268", dash2:"4 2 6 2"},
         more:[{c:"#3A2A1E", w:7.4, dash:"0 5", cap:"round"}, {c:"#C9A36A", w:5.6, dash:"0 5", cap:"round"}, {c:"#8A6A44", w:1.4, dash:"0 5", cap:"round"},
-          {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"}]}},
+          {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"},
+          {c:"#3A2A1E", w:8.6, dash:"0 30", cap:"round"}, {c:"#A8793C", w:4.8, dash:"0 30", cap:"round"}]}},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
   mesa: {label:"Mesa", ground:"#D6A26E", tex:"mesa", gtex:"mesa-sand", ptex:"mesa-flag", btex:"mesa-sand-roof", blurb:"Pueblo adobe, sandstone, cactus and turquoise in the Southwest desert.",
     path:{live:"#E3CBA4", dead:"#C9AE88", edge:"#9A5A3A"}, bld:"#C4683F", mix:.85, edge:"#7A3E26", accent:"#3FA7A0", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
