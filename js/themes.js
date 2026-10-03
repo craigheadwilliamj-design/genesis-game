@@ -107,20 +107,25 @@ function themeRailSvg(pts, T, inv, bw = 4){
   if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
   return s;
 }
-// a themed building: its texture over the fill, and an inner trim line in the theme's second border color
+// the inner trim line on buildings and props: the theme's own `trim`, else its second border line
+const themeTrim = T => T.trim || (T.bord && T.bord.c2 ? {c:T.bord.c2, w:T.bord.w2, dash:T.bord.dash2, cap:T.bord.cap2} : null);
+// how rotten an item looks under the theme's `rot` overlay, fixed per item so each building keeps its look
+const rotLevel = it => { let h = 7; for(const ch of String(it.id || "")) h = (h * 31 + ch.charCodeAt(0)) % 997; return .2 + .8 * h / 996; };
+// a themed building: its texture over the fill, any decay overlay, and an inner trim line
 function themeBuildSvg(bl, pts, trimPts){
-  const T = themeOf(bl), B = T.bord; let s = "";
+  const T = themeOf(bl), R = themeTrim(T); let s = "";
   if(bldTex(T)) s += `<polygon points="${pts}" fill="url(#t-${bldTex(T)})" pointer-events="none"/>`;
-  if(B && B.c2) s += `<polygon points="${trimPts}" fill="none" stroke="${B.c2}" stroke-width="${Math.max(1, B.w2 * .45)}"${B.dash2 ? ` stroke-dasharray="${B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" ")}"` : ""} stroke-linecap="${B.cap2 || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
+  if(R) s += `<polygon points="${trimPts}" fill="none" stroke="${R.c}" stroke-width="${Math.max(1, R.w * .45)}"${R.dash ? ` stroke-dasharray="${R.dash.split(" ").map(n => Math.max(1, +n * .6)).join(" ")}"` : ""} stroke-linecap="${R.cap || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
 function themeProp(it, shape){
   const T = themeOf(it), B = T.bord; if(!B || T === THEMES.genesis) return "";
-  const tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w, dash, cap, grow) => c ? `stroke="${c}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linecap="${cap || "butt"}" fill="none" vector-effect="non-scaling-stroke"` : "";
+  const R = themeTrim(T) || {c:B.c, w:B.w}, tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w, dash, cap, grow) => c ? `stroke="${c}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linecap="${cap || "butt"}" fill="none" vector-effect="non-scaling-stroke"` : "";
   if(shape.round){
     const {cx, cy, r} = shape;
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(B.c2 || B.c, Math.max(1, (B.c2 ? B.w2 : B.w) * .5), "", "", 0)} pointer-events="none"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(R.c, Math.max(1, R.w * .5), "", "", 0)} pointer-events="none"/>`;
   }
-  return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(B.c2 || B.c, Math.max(1, (B.c2 ? B.w2 : B.w) * .5), "", "", 0)} pointer-events="none"/>`;
+  return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(R.c, Math.max(1, R.w * .5), "", "", 0)} pointer-events="none"/>`;
 }

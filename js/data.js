@@ -1040,6 +1040,8 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   path     live and dead surface colors, the edge line, and `kerb`: a dashed second color along the edge ({c, dash} in px)
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
+//   trim     optional {c, w, dash} for the inner line on buildings and props (else the border's second line)
+//   rot      optional decay pattern laid over buildings, stronger on some than others
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
@@ -1056,9 +1058,10 @@ const THEMES = {
     path:{live:"#B5684E", dead:"#8C5340", edge:"#2B1D18", kerb:{c:"#C9A24B", dash:"2 7"}}, bld:"#8E3B34", mix:.82, edge:"#2B1D18", accent:"#C9A24B", fee:.15, fits:["mgal", "igua", "steg", "apat"],
     bord:{band:"#6B2F2A", c:"#2B1D18", w:3.2, cap:"butt", c2:"#C9A24B", w2:1.6, dash2:"1 6", cap2:"round"},
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
-  bayou: {label:"Bayou", ground:"#6F8F5E", tex:"bayou", blurb:"Weathered boardwalks, rope rails, cypress and still water.",
-    path:{live:"#B08D57", dead:"#8A6B3E", edge:"#2F2418", kerb:{c:"#6E7F3E", dash:"9 6"}}, bld:"#6B5334", mix:.82, edge:"#2F2418", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#51683A", c:"#D2BC85", w:3, dash:"1 5", cap:"round", c2:"#2F4A2E", w2:1.2},
+  bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
+    path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
+    trim:{c:"#6FA39A", w:2, dash:"10 3 4 2"},
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round"},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
   volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
     path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
