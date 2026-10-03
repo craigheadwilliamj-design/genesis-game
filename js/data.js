@@ -1050,6 +1050,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   roofs    optional {of(type def, type id) -> class 0, 1, 2..., btex: [a roof pattern, or a list (each building keeps one), per class], trim: [a list of trim lines per class],
 //            brace: {of: [classes], min: square meters, lines: [...]}}: roof and trim by building class, instead of btex/sod and bord.trim. A brace is an X across big rectangular buildings.
 //            A trim line's `at` draws it on the outline scaled by that much (1 is the building's edge) instead of the usual inner trim
+//            glass: [a skylight spec per class, or null]: {at, n, gap, min}, a block of glass panes (`at` scales it down from the roof, `n` splits it along the long side with `gap` between, `min` is the smallest building area in m²)
 //   tier     optional {min, next, at: [scales], light, shadow, drop}: rectangular buildings over `min` square meters get stepped upper stories (one per scale; each more needs `next` times the area)
 //   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
@@ -1169,9 +1170,41 @@ const THEMES = {
       strong:{band:"#D6A26E", base:{c:"#7A4028", w:14, c2:"#5A2E1C", dash2:"2 6"}, c:"#8A4A2E", w:9,
         more:[{c:"#C97E52", w:7.4}, {c:"#E8B48A", w:3}, {c:"#5A2A14", w:4.4, dash:"0 22", cap:"round"}, {c:"#7A3A1C", w:1.8}, {c:"#B8643A", w:.7, dash:"5 4 9 3"}]}},
     unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
-  modern: {label:"Modern", ground:"#BFC9CC", tex:"modern", blurb:"Polished concrete, steel and glass panels, with wood for warmth.",
-    path:{live:"#DDE1E3", dead:"#B9BFC2", edge:"#37454D", kerb:{c:"#7FD0E0", dash:"14 4"}}, bld:"#5F8A9A", mix:.85, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
-    bord:{band:"#C6D0D3", c:"#26343B", w:1.2, c2:"#7FD0E0", w2:3.4, dash2:"15 3"},
+  modern: {label:"Modern", ground:"#86AB70", tex:"modern", gtex:"modern-lawn", ptex:"modern-aggregate", btex:"modern-slat", blurb:"Cool and light: green roofs, gray metal and glass skylights on pale concrete and mown grass, with dark wood for warmth and glass panel fences.",
+    path:{live:"#DCD8D0", dead:"#BDB9B1", edge:"#8E8A82"}, bld:"#8A9A94", mix:.85, edge:"#1A1411", accent:"#B5552D", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
+    // roofs: 0 shops and food (green roof, louvered wood band), 1 restrooms and camping (green roof), 2 labs and backstage (standing-seam metal, cool and plain), 3 visitor buildings (off-white roof under big glazing, louvered band).
+    // Charred cedar edge on all of them. Skylights break up the big roofs, and a short corten door mark sits on 0 and 3.
+    roofs:{of:(t, type) => ["restaurant", "edcenter", "greenhouse"].includes(type) || t.rooms ? 3
+        : t.kind === "food" || t.kind === "merch" ? 0 : ["restroom", "campground", "platform"].includes(type) ? 1 : 2,
+      btex:["modern-sedum", "modern-sedum", "modern-seam", "modern-membrane"],
+      trim:[[{c:"#4B3121", w:6, at:.985}, {c:"#2B1D14", w:5, at:.94}, {c:"#54392A", w:5, dash:"1 2.4", at:.94}, {c:"#B5552D", w:2.4, dash:"6 9999", at:.985}],
+        [{c:"#4B3121", w:6, at:.985}, {c:"#6B4A32", w:.8, at:.93}],
+        [{c:"#C9D0D4", w:1, at:.97}],
+        [{c:"#4B3121", w:6, at:.985}, {c:"#2B1D14", w:5, at:.94}, {c:"#54392A", w:5, dash:"1 2.4", at:.94}, {c:"#B5552D", w:2.4, dash:"6 9999", at:.985}]],
+      // skylights: pale glass in a thin dark frame, `at` scales the pane block, `n` splits it along the long side
+      glass:[{at:.3, n:1, min:100}, null, {at:.5, n:2, min:150}, {at:.72, n:3, gap:.1}]},
+    eave:{c:"#1A1411", w:2.2},
+    // glass panel: a walnut frame holding pale blue-green glass with a bright glint, on espresso posts
+    bord:{band:"#CFCBC3", c:"#4B3121", w:7,
+      more:[{c:"#A9D8D3", w:4.6}, {c:"#F2FFFD", w:1.1, dash:"11 7 3 9"}, {c:"#2B1D14", w:9, dash:"0 40", cap:"round"}, {c:"#6B4A32", w:5, dash:"0 40", cap:"round"}],
+      trim:[{c:"#4B3121", w:3}, {c:"#A9D8D3", w:1.2}],
+      by:{
+        // privacy: dark vertical slats, a fine ticked line from above
+        wood:{band:"#CFCBC3", c:"#2B1D14", w:6,
+          more:[{c:"#5A3E2A", w:5, dash:"1 2.2"}, {c:"#2B1D14", w:8, dash:"0 44", cap:"square"}]},
+        // dry-stack stone: a low gray wall of uneven courses
+        concrete:{band:"#CFCBC3", c:"#4E5458", w:7.4,
+          more:[{c:"#A3A9AC", w:5.8}, {c:"#8A9094", w:5.8, dash:"7 3 11 4 5 3"}, {c:"#454B4F", w:5.8, dash:".8 9"}, {c:"#D2D6D8", w:1, dash:"4 6 8 5"}]},
+        // steel bars: charcoal rail with fine upright bars and a rust-brown post now and then
+        bars:{band:"#CFCBC3", c:"#2A3036", w:6,
+          more:[{c:"#9AA3A9", w:4, dash:"1 3.2"}, {c:"#B5552D", w:5, dash:"0 52", cap:"round"}]},
+        electric:{band:"#CFCBC3", c:"#2A3036", w:6,
+          more:[{c:"#9AA3A9", w:4, dash:"1 3.2"}, {c:"#B5552D", w:5, dash:"0 52", cap:"round"}]}},
+      // taller glass in a heavy timber-and-steel frame on a concrete footing
+      strong:{band:"#CFCBC3", c:"#1E2226", w:8,
+        base:{c:"#9A9EA0", w:14, c2:"#6C7276", dash2:"2 7"},
+        more:[{c:"#A9D8D3", w:5.4}, {c:"#F2FFFD", w:1.2, dash:"11 7 3 9"}, {c:"#4B3121", w:1.8},
+          {c:"#1E2226", w:11, dash:"0 30", cap:"square"}, {c:"#8E979D", w:5, dash:"0 30", cap:"square"}, {c:"#B5552D", w:2, dash:"0 120", cap:"square"}]}},
     unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
   classic: {label:"Classic", ground:"#C9B79B", tex:"classic", blurb:"A classic European zoo: cobbles, verdigris copper roofs and wrought iron.",
     path:{live:"#D8C3A5", dead:"#B6A283", edge:"#2E3A36", kerb:{c:"#4FA38A", dash:"12 3"}}, bld:"#3F8F7A", mix:.85, edge:"#262B2A", accent:"#4FA38A", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
