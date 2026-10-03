@@ -93,39 +93,44 @@ function themeZone(e){
 function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitAppeal * themeFitShare(e); }
 
 /* ---------- drawing: texture and borders (SVG strings used by map.js) ---------- */
-// paths use `ptex`, buildings and props `btex`, and the zone ground and border band `tex`
+// paths use `ptex`, buildings and props `btex`, the zone ground `gtex`, and the border band `tex`
 const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `url(#t-${x})` : null; };
 const bldTex = T => T.btex || T.tex;
+const groundTex = T => T.gtex || T.tex;
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
-function themeRailSvg(pts, T, inv, bw = 4){
+// `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail
+function themeRailSvg(pts, T, inv, bw = 4, strong = false){
   const B = T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(!B) return "";
   let s = "";
-  if(T.tex) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
+  if(strong && B.base) s += `<polygon points="${pts}" stroke="${B.base.c}" stroke-width="${B.base.w}" ${ns}/>` + (B.base.c2 ? `<polygon points="${pts}" stroke="${B.base.c2}" stroke-width="1" stroke-dasharray="${B.base.dash2 || "3 5"}" ${ns}/>` : "");
+  if(T.tex && B.band) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
   if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
   s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
   if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
+  for(const m of B.more || []) s += `<polygon points="${pts}" stroke="${m.c}" stroke-width="${m.w}"${m.dash ? ` stroke-dasharray="${m.dash}"` : ""} stroke-linecap="${m.cap || "butt"}" ${ns}/>`;
   return s;
 }
-// the inner trim line on buildings and props: the theme's own `trim`, else its second border line
-const themeTrim = T => T.trim || (T.bord && T.bord.c2 ? {c:T.bord.c2, w:T.bord.w2, dash:T.bord.dash2, cap:T.bord.cap2} : null);
+// the inner trim line on buildings (px): the border's own `trim`, else its second line, thinner
+const themeTrim = B => !B ? null : B.trim ? B.trim : B.c2 ? {c:B.c2, w:Math.max(1, B.w2 * .45), dash:B.dash2 && B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" "), cap:B.cap2} : null;
 // how rotten an item looks under the theme's `rot` overlay, fixed per item so each building keeps its look
 const rotLevel = it => { let h = 7; for(const ch of String(it.id || "")) h = (h * 31 + ch.charCodeAt(0)) % 997; return .2 + .8 * h / 996; };
 // a themed building: its texture over the fill, any decay overlay, and an inner trim line
 function themeBuildSvg(bl, pts, trimPts){
-  const T = themeOf(bl), R = themeTrim(T); let s = "";
+  const T = themeOf(bl), R = themeTrim(T.bord); let s = "";
   if(bldTex(T)) s += `<polygon points="${pts}" fill="url(#t-${bldTex(T)})" pointer-events="none"/>`;
   if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
-  if(R) s += `<polygon points="${trimPts}" fill="none" stroke="${R.c}" stroke-width="${Math.max(1, R.w * .45)}"${R.dash ? ` stroke-dasharray="${R.dash.split(" ").map(n => Math.max(1, +n * .6)).join(" ")}"` : ""} stroke-linecap="${R.cap || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(R) s += `<polygon points="${trimPts}" fill="none" stroke="${R.c}" stroke-width="${R.w}"${R.dash ? ` stroke-dasharray="${R.dash}"` : ""} stroke-linecap="${R.cap || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
 function themeProp(it, shape){
   const T = themeOf(it), B = T.bord; if(!B || T === THEMES.genesis) return "";
-  const R = themeTrim(T) || {c:B.c, w:B.w}, tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w, dash, cap, grow) => c ? `stroke="${c}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linecap="${cap || "butt"}" fill="none" vector-effect="non-scaling-stroke"` : "";
+  const R = B.trim || {c:B.c2 || B.c, w:Math.max(1, (B.c2 ? B.w2 : B.w) * .5)};
+  const tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w) => `stroke="${c}" stroke-width="${w}" stroke-linecap="butt" fill="none" vector-effect="non-scaling-stroke"`;
   if(shape.round){
     const {cx, cy, r} = shape;
-    return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(R.c, Math.max(1, R.w * .5), "", "", 0)} pointer-events="none"/>`;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(R.c, R.w)} pointer-events="none"/>`;
   }
-  return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(R.c, Math.max(1, R.w * .5), "", "", 0)} pointer-events="none"/>`;
+  return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(R.c, R.w)} pointer-events="none"/>`;
 }
