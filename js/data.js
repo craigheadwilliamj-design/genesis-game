@@ -1039,6 +1039,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
 //   path     live and dead surface colors and the edge line
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
+//   ptex/btex  optional SVG pattern ids (index.html) laid over its paths and buildings
 //   accent   the trim line drawn inside an exhibit's fence
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
@@ -1063,7 +1064,7 @@ const THEMES = {
     path:{live:"#EDE6D6", dead:"#C9BDA2", edge:"#6B4A2F"}, bld:"#8A5A36", mix:.55, edge:"#4A2F1C", accent:"#B7432F", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
   western: {label:"Western", ground:"#D9B48A", blurb:"Red rock, weathered wood, fence posts and Arizona desert.",
-    path:{live:"#D9A877", dead:"#B98557", edge:"#7A3E26"}, bld:"#B5502E", mix:.55, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+    path:{live:"#CBA06C", dead:"#A9805A", edge:"#7A5A38"}, bld:"#8A6A48", mix:.8, edge:"#4A3220", ptex:"t-dust", btex:"t-planks", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
     unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
   modern: {label:"Modern", ground:"#BFC9CC", blurb:"Sleek and natural: polished stone, metal and glass alongside wood.",
     path:{live:"#D8DCDD", dead:"#B4BABD", edge:"#3C4A52"}, bld:"#6F8791", mix:.5, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
