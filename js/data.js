@@ -799,6 +799,7 @@ const TECH = [
   {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
   {id:"gilded", group:"build", label:"Gilded Age design", points:30, text:"Unlocks the Gilded Age theme: Victorian brick and brass for paths, buildings and exhibits."},
+  {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
   {id:"security", group:"build", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
@@ -1055,6 +1056,18 @@ const THEMES = {
   volcanic: {label:"Volcanic", blurb:"Black rock and glowing lava.",
     path:{live:"#4A4A4F", dead:"#3A3A3E", edge:"#17171A"}, bld:"#2B2B30", mix:.65, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
+  stone: {label:"Stone Age", blurb:"Ice, dark grey stone, natural wood and snow.",
+    path:{live:"#E6EBEE", dead:"#C3CBD1", edge:"#4A4F55"}, bld:"#4B4F56", mix:.6, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
+    unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
+  lodge: {label:"Lodge", blurb:"Scandinavian lodges, ski resorts and Alaskan cabins.",
+    path:{live:"#EDE6D6", dead:"#C9BDA2", edge:"#6B4A2F"}, bld:"#8A5A36", mix:.55, edge:"#4A2F1C", accent:"#B7432F", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
+    unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
+  western: {label:"Western", blurb:"Red rock, weathered wood, fence posts and Arizona desert.",
+    path:{live:"#D9A877", dead:"#B98557", edge:"#7A3E26"}, bld:"#B5502E", mix:.55, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+    unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
+  modern: {label:"Modern", blurb:"Sleek and natural: polished stone, metal and glass alongside wood.",
+    path:{live:"#D8DCDD", dead:"#B4BABD", edge:"#3C4A52"}, bld:"#6F8791", mix:.5, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
+    unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
 // An animal that suits its exhibit's theme is happier and draws a little more too.

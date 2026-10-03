@@ -1017,6 +1017,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.themeVolcanicUnlock = themeHave("volcanic") && !themeHave("gilded");
     state.science.tech.push("gilded"); checkThemes();
     out.themeGildedUnlock = themeHave("gilded");
+    out.themeFitsValid = Object.values(THEMES).every(T => T.fits.every(id => SPECIES_BY_ID[id]));
+    out.themeModernUnlock = !themeHave("modern") && (state.science.tech.push("modern"), checkThemes(), themeHave("modern")) && themeHave("western");
     e0.theme = "volcanic"; recompute();
     out.themeMixedNothing = !derived.themes["e-t"].ok && derived.themes["e-t"].same === 0;
     const appealMixed = derived.appeal;
