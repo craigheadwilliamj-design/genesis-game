@@ -1060,7 +1060,7 @@ const THEMES = {
     path:{live:"#B08D57", dead:"#8A6B3E", edge:"#2F2418", kerb:{c:"#6E7F3E", dash:"9 6"}}, bld:"#6B5334", mix:.82, edge:"#2F2418", accent:"#7FB069", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
     bord:{band:"#51683A", c:"#D2BC85", w:3, dash:"1 5", cap:"round", c2:"#2F4A2E", w2:1.2},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
-  volcanic: {label:"Volcanic", ground:"#3A3236", tex:"volcanic", blurb:"Black basalt cut by glowing lava.",
+  volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
     path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#241E21", mix:.86, edge:"#FF5A1F", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     bord:{band:"#2B2326", glow:"#FF5A1F", c:"#FF7A2F", w:2.6, c2:"#1A1416", w2:1.2, dash2:"6 6"},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
