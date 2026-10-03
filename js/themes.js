@@ -26,13 +26,17 @@ function themedZoneAt(it){
   const [x, y] = itemSpot(it);
   return zones().find(z => z.theme && THEMES[z.theme] && inPoly(x, y, z.points)) || null;
 }
-// New things are built in the theme of the zone they sit in, else the one picked in the park office, if it's unlocked and you can afford the extra
-function themeNew(kind, it){
+// The theme a new thing gets: its zone's, else the brush's, if it's unlocked and you can afford the extra (null for Genesis)
+function themeFor(kind, it){
   const z = themedZoneAt(it), key = z ? z.theme : state.themes && state.themes.brush;
-  if(!key || key === "genesis" || !themeHave(key)) return;
-  const fee = themeFee(kind, it, key);
-  if(!canAfford(fee)) return;
-  spend(fee, "built"); it.theme = key;
+  if(!key || key === "genesis" || !THEMES[key] || !themeHave(key) || !canAfford(themeFee(kind, it, key))) return null;
+  return key;
+}
+// New things are built in that theme, and pay the extra
+function themeNew(kind, it){
+  const key = themeFor(kind, it);
+  if(!key) return;
+  spend(themeFee(kind, it, key), "built"); it.theme = key;
 }
 // Everything whose middle is inside the zone that isn't already in a theme: guest paths, buildings and exhibits
 function zoneThemePlan(z, key){
@@ -87,3 +91,36 @@ function themeZone(e){
 }
 // Extra appeal for an exhibit from its matched area and its animals' fit
 function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitAppeal * themeFitShare(e); }
+
+/* ---------- drawing: texture and borders (SVG strings used by map.js) ---------- */
+// paths use `ptex`, buildings and props `btex`, and the zone ground and border band `tex`
+const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `url(#t-${x})` : null; };
+const bldTex = T => T.btex || T.tex;
+// a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
+function themeRailSvg(pts, T, inv, bw = 4){
+  const B = T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+  if(!B) return "";
+  let s = "";
+  if(T.tex) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
+  if(B.glow) s += `<polygon points="${pts}" stroke="${B.glow}" stroke-opacity=".3" stroke-width="${B.w + 7}" ${ns}/>`;
+  s += `<polygon points="${pts}" stroke="${B.c}" stroke-width="${B.w}"${B.dash ? ` stroke-dasharray="${B.dash}"` : ""} stroke-linecap="${B.cap || "butt"}" ${ns}/>`;
+  if(B.c2) s += `<polygon points="${pts}" stroke="${B.c2}" stroke-width="${B.w2}"${B.dash2 ? ` stroke-dasharray="${B.dash2}"` : ""} stroke-linecap="${B.cap2 || "butt"}" ${ns}/>`;
+  return s;
+}
+// a themed building: its texture over the fill, and an inner trim line in the theme's second border color
+function themeBuildSvg(bl, pts, trimPts){
+  const T = themeOf(bl), B = T.bord; let s = "";
+  if(bldTex(T)) s += `<polygon points="${pts}" fill="url(#t-${bldTex(T)})" pointer-events="none"/>`;
+  if(B && B.c2) s += `<polygon points="${trimPts}" fill="none" stroke="${B.c2}" stroke-width="${Math.max(1, B.w2 * .45)}"${B.dash2 ? ` stroke-dasharray="${B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" ")}"` : ""} stroke-linecap="${B.cap2 || "butt"}" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  return s;
+}
+// a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
+function themeProp(it, shape){
+  const T = themeOf(it), B = T.bord; if(!B || T === THEMES.genesis) return "";
+  const tex = bldTex(T) ? `fill="url(#t-${bldTex(T)})"` : `fill="none"`, ring = (c, w, dash, cap, grow) => c ? `stroke="${c}" stroke-width="${w}"${dash ? ` stroke-dasharray="${dash}"` : ""} stroke-linecap="${cap || "butt"}" fill="none" vector-effect="non-scaling-stroke"` : "";
+  if(shape.round){
+    const {cx, cy, r} = shape;
+    return `<circle cx="${cx}" cy="${cy}" r="${r}" ${tex} pointer-events="none"/><circle cx="${cx}" cy="${cy}" r="${r * 1.12}" ${ring(B.c2 || B.c, Math.max(1, (B.c2 ? B.w2 : B.w) * .5), "", "", 0)} pointer-events="none"/>`;
+  }
+  return `<polygon points="${shape.pts}" ${tex} pointer-events="none"/><polygon points="${shape.trim}" stroke-linejoin="round" ${ring(B.c2 || B.c, Math.max(1, (B.c2 ? B.w2 : B.w) * .5), "", "", 0)} pointer-events="none"/>`;
+}
