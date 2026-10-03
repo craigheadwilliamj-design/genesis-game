@@ -99,8 +99,9 @@ const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
 // `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail
+// and a theme whose border has its own `strong` rail draws that instead
 function themeRailSvg(pts, T, inv, bw = 4, strong = false){
-  const B = T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+  const B = strong && T.bord && T.bord.strong || T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(!B) return "";
   let s = "";
   if(strong && B.base) s += `<polygon points="${pts}" stroke="${B.base.c}" stroke-width="${B.base.w}" ${ns}/>` + (B.base.c2 ? `<polygon points="${pts}" stroke="${B.base.c2}" stroke-width="1" stroke-dasharray="${B.base.dash2 || "3 5"}" ${ns}/>` : "");
@@ -115,6 +116,8 @@ function themeRailSvg(pts, T, inv, bw = 4, strong = false){
 const themeTrim = B => !B ? [] : B.trim ? [].concat(B.trim) : B.c2 ? [{c:B.c2, w:Math.max(1, B.w2 * .45), dash:B.dash2 && B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" "), cap:B.cap2}] : [];
 // how rotten an item looks under the theme's `rot` overlay, fixed per item so each building keeps its look
 const rotLevel = it => { let h = 7; for(const ch of String(it.id || "")) h = (h * 31 + ch.charCodeAt(0)) % 997; return .2 + .8 * h / 996; };
+// one of a list, fixed per item (a single value is just returned)
+const pickFor = (it, x) => Array.isArray(x) ? x[Math.floor((rotLevel(it) - .2) / .8 * x.length * .999)] : x;
 // a building's ridge: the line joining the middles of its two short sides (rectangles only)
 function ridgeLine(pts){
   if(pts.length !== 4) return null;
@@ -125,11 +128,11 @@ const lineSvg = (pts, L, ns) => `<polyline points="${pts}" stroke="${L.c}" strok
 // a themed building: its roof texture (sod on small ones), any decay overlay, the eave band, the ridge, and inner trim lines
 function themeBuildSvg(bl, pts, trimPts){
   const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
-  const tex = T.sod && bl.points && area(bl.points) <= T.sod.max ? T.sod.tex : bldTex(T); let s = "";
+  const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
   if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
   if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
-  const rg = T.ridge && tex !== (T.sod && T.sod.tex) && bl.points && ridgeLine(bl.points);
+  const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += lineSvg(polyStr(rg), L, ns);
   for(const L of themeTrim(T.bord)) s += `<polygon points="${trimPts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
   return s;

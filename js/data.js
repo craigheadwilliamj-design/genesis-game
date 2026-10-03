@@ -1043,13 +1043,13 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   rot      optional decay pattern laid over buildings, stronger on some than others
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
-//   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex`
+//   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
 //            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal)
+//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1073,9 +1073,20 @@ const THEMES = {
     path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     bord:{band:"#2B2326", glow:"#FF5A1F", c:"#FF7A2F", w:2.6, c2:"#1A1416", w2:1.2, dash2:"6 6"},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
-  stone: {label:"Stone Age", ground:"#DDE6EA", tex:"stone", blurb:"Snow, ice, stacked boulders and dark grey stone.",
-    path:{live:"#EEF3F5", dead:"#CBD4D9", edge:"#5A6069", kerb:{c:"#8FB8CC", dash:"4 4"}}, bld:"#6A7078", mix:.85, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
-    bord:{band:"#A4ADB5", c:"#4A4F55", w:5, dash:"9 3", cap:"round", c2:"#E4EEF3", w2:2, dash2:"5 7", cap2:"round"},
+  stone: {label:"Stone Age", ground:"#857D71", tex:"stone", gtex:"stone-tundra", ptex:"stone-flag", btex:"stone-slab", blurb:"Frozen tundra, flagstones, stacked stone and lashed timber, thatch and hide. Cold and rough, with no paint anywhere.",
+    path:{live:"#4E463D", dead:"#6E675E", edge:"#2B2D30"}, bld:"#4C5157", mix:.9, edge:"#2B2D30", accent:"#B8995A", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
+    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100},
+    // stacked-stone wall: a thick bumpy gray band of dry-laid stones, two courses of uneven size
+    bord:{band:"#3E4248", c:"#2B2D30", w:6,
+      more:[{c:"#2B2D30", w:8.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"}, {c:"#7E838A", w:6.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"},
+        {c:"#2B2D30", w:5, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"}, {c:"#9A9EA2", w:3.4, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"},
+        {c:"#EEF1F1", w:1.6, dash:"0 17 0 23 0 11", cap:"round"}],
+      // the building's base: a ring of stacked stones with the odd bone or antler
+      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"}],
+      // timber palisade for dangerous animals: a row of sharpened log tops, lashed with straw rope
+      strong:{band:"#3E4248", c:"#2A2017", w:6.5,
+        more:[{c:"#2A2017", w:7.6, dash:"0 5.2", cap:"round"}, {c:"#6B5440", w:5.8, dash:"0 5.2", cap:"round"}, {c:"#A88A62", w:2.2, dash:"0 5.2", cap:"round"},
+          {c:"#B8995A", w:1, dash:"1.6 9.8"}]}},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
   lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-roof", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
     path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
