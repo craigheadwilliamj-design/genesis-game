@@ -185,6 +185,14 @@ function themeBuildSvg(bl, pts, trimPts){
   if(T.corners && !small && bl.points){ const r = Math.max(.7, Math.min(2, Math.sqrt(area(bl.points)) / 14)); for(const [x, y] of bl.points) s += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="${r.toFixed(2)}" fill="${T.corners.c}" stroke="${T.corners.c2}" stroke-width=".7" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), {...L, c:pickFor(bl, L.c)}, ns);
+  // carved ridge tips: a crossed pair of short strokes with a dot at each end of the ridge
+  if(rg && T.tips && area(bl.points) >= T.tips.min){
+    const r = Math.max(2.2, Math.min(5, Math.sqrt(area(bl.points)) / 4.5)), [[ax, ay], [bx, by]] = rg, L = Math.hypot(bx - ax, by - ay) || 1, ux = (bx - ax) / L, uy = (by - ay) / L;
+    for(const [x, y, d] of [[ax, ay, -1], [bx, by, 1]]){
+      const X = x + ux * d * r * .4, Y = y + uy * d * r * .4, c = k => `M${(X - (ux + k * uy) * r).toFixed(2)} ${(Y - (uy - k * ux) * r).toFixed(2)}L${(X + (ux + k * uy) * r).toFixed(2)} ${(Y + (uy - k * ux) * r).toFixed(2)}`;
+      s += `<path d="${c(1) + c(-1)}" stroke="${T.tips.c}" stroke-width="3.2" stroke-linecap="round" ${ns}/><path d="${c(1) + c(-1)}" stroke="${T.tips.c2}" stroke-width="1.4" stroke-linecap="round" ${ns}/>`;
+    }
+  }
   const trims = H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord), along = (L, P) => strokeSvg("polygon", L.at || P !== bl.points ? polyStr(insetRect(P, L.at || .86)) : trimPts, L, ns);
   for(const L of trims) s += bl.points ? along(L, bl.points) : strokeSvg("polygon", trimPts, L, ns);
   const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");
