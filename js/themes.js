@@ -26,13 +26,17 @@ function themedZoneAt(it){
   const [x, y] = itemSpot(it);
   return zones().find(z => z.theme && THEMES[z.theme] && inPoly(x, y, z.points)) || null;
 }
-// New things are built in the theme of the zone they sit in, else the one picked in the park office, if it's unlocked and you can afford the extra
-function themeNew(kind, it){
+// The theme a new thing gets: its zone's, else the brush's, if it's unlocked and you can afford the extra (null for Genesis)
+function themeFor(kind, it){
   const z = themedZoneAt(it), key = z ? z.theme : state.themes && state.themes.brush;
-  if(!key || key === "genesis" || !themeHave(key)) return;
-  const fee = themeFee(kind, it, key);
-  if(!canAfford(fee)) return;
-  spend(fee, "built"); it.theme = key;
+  if(!key || key === "genesis" || !THEMES[key] || !themeHave(key) || !canAfford(themeFee(kind, it, key))) return null;
+  return key;
+}
+// New things are built in that theme, and pay the extra
+function themeNew(kind, it){
+  const key = themeFor(kind, it);
+  if(!key) return;
+  spend(themeFee(kind, it, key), "built"); it.theme = key;
 }
 // Everything whose middle is inside the zone that isn't already in a theme: guest paths, buildings and exhibits
 function zoneThemePlan(z, key){
