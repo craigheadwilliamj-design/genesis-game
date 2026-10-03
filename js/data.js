@@ -1043,13 +1043,14 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   rot      optional decay pattern laid over buildings, stronger on some than others
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
-//   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex`
+//   heat     optional {of(type def, type id) -> 0, 1 or 2, btex: [3 roof patterns], trim: [3 lists of trim lines]}: roof and trim by how hot a building runs, instead of btex/sod and bord.trim
+//   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
 //            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal)
+//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1067,15 +1068,45 @@ const THEMES = {
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
   bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
     path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"}},
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"},
+      // rusted chain-link for dangerous animals: a rust mesh band on leaning weathered posts, with vines and leaves creeping over it
+      strong:{band:"#3E4A2C", c:"#4A2E1A", w:5.4,
+        more:[{c:"#A8683A", w:4.4, dash:"1 1.1 .7 1.4"}, {c:"#D08A50", w:1.2, dash:".6 1.9 1 2.6", cap:"round"},
+          {c:"#2A2118", w:8, dash:"0 24 0 27", cap:"round"}, {c:"#7E7362", w:5, dash:"0 24 0 27", cap:"round"},
+          {c:"#3E5A26", w:3.2, dash:"9 14 4 22 13 30 6 25", cap:"round"}, {c:"#6E8A3A", w:3.4, dash:"0 6 0 4 0 27 0 9 0 36", cap:"round"}]}},
     unlock:{hint:"Keep your first water-loving animal.", check:() => state.exhibits.some(e => e.animals.some(a => likesOf(SPECIES_BY_ID[a.sp]).water >= .9))}},
-  volcanic: {label:"Volcanic", ground:"#2A2527", tex:"volcanic-rock", ptex:"volcanic", blurb:"Black basalt cut by glowing lava.",
-    path:{live:"#4A4045", dead:"#352E32", edge:"#1A1416", kerb:{c:"#FF5A1F", dash:"7 5"}}, bld:"#0E0C11", mix:.92, btex:"volcanic-obsidian", edge:"#4C465C", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
-    bord:{band:"#2B2326", glow:"#FF5A1F", c:"#FF7A2F", w:2.6, c2:"#1A1416", w2:1.2, dash2:"6 6"},
+  volcanic: {label:"Volcanic", ground:"#1E1B1D", tex:"volcanic-rock", gtex:"volcanic-ground", ptex:"volcanic-flow", btex:"volcanic-basalt-dim", blurb:"Black basalt, steel and ash, with heat glowing through the cracks.",
+    path:{live:"#4A1E14", dead:"#3A3436", edge:"#141113"}, bld:"#1A1719", mix:.92, edge:"#8A8488", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
+    // roofs by how hot a building runs: 0 storage and shops (dark basalt), 1 kitchens, hotels and work buildings (basalt with glowing seams), 2 labs, medicine and generators (steel plating, ember strips and vents)
+    heat:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
+        : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "toolshed"].includes(type) ? 1 : 0,
+      btex:["volcanic-basalt-dim", "volcanic-basalt", "volcanic-plate"],
+      trim:[[{c:"#5C7A8C", w:1}],
+        [{c:"#141113", w:3, dash:"1 1.6 1 1.6 1 1.6 1 18"}, {c:"#E0561C", w:1, dash:"6 24"}],
+        [{c:"#5A1A0E", w:4}, {c:"#FF7A2F", w:1.6}, {c:"#141113", w:3.6, dash:"1 1.4 1 1.4 1 1.4 1 22"}]]},
+    // black basalt wall: chunky dark columns with a faint, broken ember line along the top
+    bord:{band:"#2B2326", c:"#141113", w:7, trim:{c:"#8A8488", w:1},
+      more:[{c:"#0E0C0D", w:8, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"}, {c:"#363134", w:6.4, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"},
+        {c:"#4E484C", w:2.2, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"}, {c:"#FF5A1F", w:.9, dash:"18 7 30 12 9 14"}],
+      // heavy dark steel bars set into a stone base, with orange warning lights
+      strong:{band:"#2B2326", base:{c:"#3A3538", w:14, c2:"#1E1B1D", dash2:"6 2 4 2"}, c:"#2A2E34", w:4,
+        more:[{c:"#5C7A8C", w:1}, {c:"#101214", w:7, dash:"2.4 4"}, {c:"#3E444C", w:4.4, dash:"2.4 4"},
+          {c:"#5A1A0E", w:8, dash:"0 31", cap:"round"}, {c:"#FF5A1F", w:4.6, dash:"0 31", cap:"round"}, {c:"#FFD27A", w:1.8, dash:"0 31", cap:"round"}]}},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
-  stone: {label:"Stone Age", ground:"#DDE6EA", tex:"stone", blurb:"Snow, ice, stacked boulders and dark grey stone.",
-    path:{live:"#EEF3F5", dead:"#CBD4D9", edge:"#5A6069", kerb:{c:"#8FB8CC", dash:"4 4"}}, bld:"#6A7078", mix:.85, edge:"#2A2D32", accent:"#9CC7DB", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
-    bord:{band:"#A4ADB5", c:"#4A4F55", w:5, dash:"9 3", cap:"round", c2:"#E4EEF3", w2:2, dash2:"5 7", cap2:"round"},
+  stone: {label:"Stone Age", ground:"#857D71", tex:"stone", gtex:"stone-tundra", ptex:"stone-flag", btex:"stone-slab", blurb:"Frozen tundra, flagstones, stacked stone and lashed timber, thatch and hide. Cold and rough, with no paint anywhere.",
+    path:{live:"#4E463D", dead:"#6E675E", edge:"#2B2D30"}, bld:"#4C5157", mix:.9, edge:"#2B2D30", accent:"#B8995A", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],
+    eave:{c:"#2B2D30", w:2.4}, sod:{tex:["stone-thatch", "stone-hide"], max:100},
+    // stacked-stone wall: a thick bumpy gray band of dry-laid stones, two courses of uneven size
+    bord:{band:"#3E4248", c:"#2B2D30", w:6,
+      more:[{c:"#2B2D30", w:8.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"}, {c:"#7E838A", w:6.4, dash:"0 6.5 0 5.2 0 7.4 0 4.8", cap:"round"},
+        {c:"#2B2D30", w:5, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"}, {c:"#9A9EA2", w:3.4, dash:"0 3.1 0 8.7 0 5.6 0 6.5", cap:"round"},
+        {c:"#EEF1F1", w:1.6, dash:"0 17 0 23 0 11", cap:"round"}],
+      // the building's base: a ring of stacked stones with the odd bone or antler
+      trim:[{c:"#2B2D30", w:4.4, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#8A8F94", w:3, dash:"0 4.6 0 6 0 5.2", cap:"round"}, {c:"#E8E2D2", w:1.3, dash:"0 9.8 3 20", cap:"round"}],
+      // timber palisade for dangerous animals: a row of sharpened log tops, lashed with straw rope
+      strong:{band:"#3E4248", c:"#2A2017", w:6.5,
+        more:[{c:"#2A2017", w:7.6, dash:"0 5.2", cap:"round"}, {c:"#6B5440", w:5.8, dash:"0 5.2", cap:"round"}, {c:"#A88A62", w:2.2, dash:"0 5.2", cap:"round"},
+          {c:"#B8995A", w:1, dash:"1.6 9.8"}]}},
     unlock:{hint:"Keep your first Quaternary animal.", check:() => state.exhibits.some(e => e.animals.some(a => SPECIES_BY_ID[a.sp].period === "Quaternary"))}},
   lodge: {label:"Lodge", ground:"#E8EDEF", tex:"lodge-snow", gtex:"lodge-snow", ptex:"lodge-path", btex:"lodge-roof", blurb:"Log cabins, ski resorts and Alaskan lodges: snowy roofs, split-log rails and barn red.",
     path:{live:"#ECEDEA", dead:"#CDD1D3", edge:"#7D8A93", kerb:{c:"#F8FAFB", dash:"6 3"}}, bld:"#3B2E26", mix:.85, edge:"#1F1E1D", accent:"#9E2A2B", fee:.15, fits:["arct", "dire", "mamm", "mast", "cryo"],
@@ -1083,7 +1114,12 @@ const THEMES = {
     // split-log rail: a rough log with its split seam, thick posts with snow caps, and snow lying along the rail
     bord:{band:"#DCE3E7", c:"#8A6A44", w:5, c2:"#4A3524", w2:1,
       more:[{c:"#F4F7F8", w:2, dash:"4 14 7 11"}, {c:"#3A2A1E", w:9, dash:"0 44", cap:"round"}, {c:"#FFFFFF", w:5, dash:"0 44", cap:"round"}],
-      trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}]},
+      trim:[{c:"#C9A36A", w:4.4, dash:"0 6", cap:"round"}, {c:"#7A5A36", w:1.2, dash:"0 6", cap:"round"}],
+      // tall timber palisade for dangerous animals: evenly set peeled logs on a mortared stone footing, a dark steel band across them, and snow on top
+      strong:{band:"#DCE3E7", c:"#3A2A1E", w:6.5,
+        base:{c:"#8E9196", w:13, c2:"#5E6268", dash2:"4 2 6 2"},
+        more:[{c:"#3A2A1E", w:7.4, dash:"0 5", cap:"round"}, {c:"#C9A36A", w:5.6, dash:"0 5", cap:"round"}, {c:"#8A6A44", w:1.4, dash:"0 5", cap:"round"},
+          {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"}]}},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
   western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
     path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
