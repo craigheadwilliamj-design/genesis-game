@@ -41,7 +41,7 @@ function themeNew(kind, it){
 // Everything whose middle is inside the zone that isn't already in a theme: guest paths, buildings and exhibits
 function zoneThemePlan(z, key){
   const out = [], inside = it => it.points && it.points.length && inPoly(...itemSpot(it), z.points);
-  for(const p of state.paths) if(!isService(p) && inside(p) && themeKey(p) !== key) out.push(["path", p]);
+  for(const p of state.paths) if(!isService(p) && !isTram(p) && inside(p) && themeKey(p) !== key) out.push(["path", p]);
   for(const b of state.buildings) if(inside(b) && themeKey(b) !== key) out.push(["building", b]);
   for(const e of state.exhibits) if(inside(e) && themeKey(e) !== key) out.push(["exhibit", e]);
   return out;
@@ -80,7 +80,7 @@ function themeFitShare(e){
 // The themed area around an exhibit: guest paths and shops/restrooms nearby. Consistent when they all match the exhibit.
 function themeZone(e){
   const key = themeKey(e), near = [];
-  for(const p of state.paths) if(!isService(p) && lineShapeDist(p.points, e.points) <= THEME.radius) near.push(p);
+  for(const p of state.paths) if(!isService(p) && !isTram(p) && lineShapeDist(p.points, e.points) <= THEME.radius) near.push(p);
   for(const b of state.buildings){
     const t = BUILDINGS[b.type];
     if(t.dept || t.prop || !(t.serves || []).length || b.exhibitId) continue;

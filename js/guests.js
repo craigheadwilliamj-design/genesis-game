@@ -52,6 +52,21 @@ function buildGuestGraph(){
     }
     stop(e.id, best);
   }
+  // tram stations: one stop on the footpath beside it, one on the track beside it
+  const tc = state.paths.filter(isTram).map(p => ({pts:p.points, adds:[]})), stations = [];
+  if(tc.length) for(const b of state.buildings){
+    const t = BUILDINGS[b.type]; if(!t.tram || !isReachable(b)) continue;
+    const [cx, cy] = centroid(b.points), foot = nearest(cx, cy, Math.hypot(t.w, t.d) / 2 + REACH);
+    let rail = null;
+    for(const c of tc) for(let i = 1; i < c.pts.length; i++){
+      const r = segProj(cx, cy, c.pts[i-1], c.pts[i]);
+      if(r.d <= Math.max(t.w, t.d) / 2 + TRAM.reach && (!rail || r.d < rail.r.d)) rail = {c, i, r};
+    }
+    if(!foot || !rail) continue;
+    stop(b.id + ":foot", foot);
+    rail.c.adds.push({i:rail.i, t:rail.r.t, pt:[rail.r.x, rail.r.y], id:b.id + ":rail"});
+    stations.push(b.id);
+  }
   const nodes = new Map(), anchors = {};
   const node = p => { const k = nodeKey(p); if(!nodes.has(k)) nodes.set(k, {k, x:p[0], y:p[1], adj:new Map()}); return nodes.get(k); };
   const link = (a, b, mult = 1) => { if(a === b) return; const d = Math.hypot(a.x-b.x, a.y-b.y); a.adj.set(b, d); b.adj.set(a, d); if(mult > 1){ (a.room = a.room || new Map()).set(b, mult); (b.room = b.room || new Map()).set(a, mult); } };
@@ -74,8 +89,26 @@ function buildGuestGraph(){
     const c = onWide(n.x, n.y); if(!c || onWide(m.x, m.y) !== c || !onWide((n.x + m.x) / 2, (n.y + m.y) / 2)) continue;
     (n.room = n.room || new Map()).set(m, c.mult); (m.room = m.room || new Map()).set(n, c.mult);
   }
+  // the track: riders only get on and off at stations, so no joins in the middle. A ride costs its length over the tram's speed,
+  // and each platform link costs a wait on top. Both are roomier than a plain path.
+  if(stations.length){
+    const rnode = p => { const k = "T" + nodeKey(p); if(!nodes.has(k)) nodes.set(k, {k, x:p[0], y:p[1], adj:new Map(), rail:true}); return nodes.get(k); };
+    const both = (a, b, d, map) => { a.adj.set(b, d); b.adj.set(a, d); for(const [x, y] of [[a, b], [b, a]]){ if(map) (x[map] = x[map] || new Map()).set(y, true); (x.room = x.room || new Map()).set(y, TRAM.room); } };
+    for(const c of tc){
+      const seq = [];
+      c.pts.forEach((v, i) => {
+        if(i > 0) c.adds.filter(a => a.i === i).sort((a, b) => a.t - b.t).forEach(a => { const n = rnode(a.pt); anchors[a.id] = n; seq.push(n); });
+        seq.push(rnode(v));
+      });
+      for(let i = 1; i < seq.length; i++) if(seq[i-1] !== seq[i]) both(seq[i-1], seq[i], Math.hypot(seq[i].x - seq[i-1].x, seq[i].y - seq[i-1].y) / TRAM.speedMult, "ride");
+    }
+    for(const id of stations){
+      const f = anchors[id + ":foot"], r = anchors[id + ":rail"];
+      if(f && r) both(f, r, Math.hypot(f.x - r.x, f.y - r.y) + TRAM.wait);
+    }
+  }
   let gate = null, gd = 3;
-  for(const n of nodes.values()){ const d = Math.hypot(n.x - state.gate[0], n.y - state.gate[1]); if(d < gd){ gd = d; gate = n; } }
+  for(const n of nodes.values()){ if(n.rail) continue; const d = Math.hypot(n.x - state.gate[0], n.y - state.gate[1]); if(d < gd){ gd = d; gate = n; } }
   if(gate) anchors.gate = gate;
   // which exhibits guests can see from each stretch of path
   const boxes = state.exhibits.filter(isReachable).map(e => { const bb = bbox(e.points); return {e, x0:bb.x0 - REACH, y0:bb.y0 - REACH, x1:bb.x1 + REACH, y1:bb.y1 + REACH}; });
@@ -100,6 +133,17 @@ function nearestGuestNode(x, y){
   let best = null, bd = Infinity;
   for(const n of gGraph.nodes.values()){ const d = Math.hypot(n.x - x, n.y - y); if(d < bd){ bd = d; best = n; } }
   return best;
+}
+// How far along a stretch of tram track each working station sits ({cum} is the distance at each corner)
+function tramStops(p){
+  const cum = [0], stops = [];
+  for(let i = 1; i < p.points.length; i++) cum.push(cum[i-1] + dist(p.points[i-1], p.points[i]));
+  if(!gGraph) return {cum, stops};
+  for(const b of state.buildings){
+    const a = BUILDINGS[b.type].tram && gGraph.anchors[b.id + ":rail"]; if(!a) continue;
+    for(let i = 1; i < p.points.length; i++){ const r = segProj(a.x, a.y, p.points[i-1], p.points[i]); if(r.d < .5){ stops.push(cum[i-1] + r.t * (cum[i] - cum[i-1])); break; } }
+  }
+  return {cum, stops};
 }
 // The quickest way to a stop from everywhere: distance, and which node is the next step
 function guestField(id){
@@ -258,7 +302,7 @@ function headOut(p){
     if(p.home){ partyLeaves(p); return false; }
   }
   // wander: any way but back the way we came
-  const opts = [...p.at.adj.keys()].filter(n => n !== p.prev);
+  const opts = [...p.at.adj.keys()].filter(n => n !== p.prev && !(p.at.ride && p.at.ride.has(n)));
   p.to = opts.length ? opts[Math.floor(Math.random() * opts.length)] : p.prev;
   return !!p.to;
 }
@@ -294,16 +338,25 @@ function walkMins(p, id){
   const f = p.at && guestField(id), d = f && f.dist.get(p.at);
   return d === undefined || !f ? 0 : d / (WALK_PER_MIN * p.spd);
 }
+// Stepping onto the tram: each guest pays the fare once per ride, and it's remembered as a good thing
+function board(p){
+  const ride = !!(p.at.ride && p.at.ride.has(p.to));
+  if(!ride){ p.onTram = false; return; }
+  if(p.onTram) return;
+  p.onTram = true;
+  const fare = Math.min(TRAM.fare * p.n, p.cash);
+  p.cash -= fare; earn(fare, "fares"); thinks(p, "tram");
+}
 function walkParty(p, left){
   for(let i = 0; i < 40 && left > 0 && !p.gone && !p.in; i++){
-    if(!p.to && !headOut(p)) return;
-    const L = Math.hypot(p.to.x - p.at.x, p.to.y - p.at.y) || .01, rem = L * (1 - p.t);
+    if(!p.to){ if(!headOut(p)) return; board(p); }
+    const L = p.at.adj.get(p.to) || .01, rem = L * (1 - p.t);   // how far the edge feels: a ride is shorter than it looks, a platform wait longer
     if(left < rem){ p.t += left / L; return; }
     left -= rem;
     const ids = p.at.sees && p.at.sees.get(p.to);
     if(ids) for(const id of ids){ const e = state.exhibits.find(x => x.id === id); if(e) seeExhibit(p, e); }
     p.prev = p.at; p.at = p.to; p.to = null; p.t = 0;
-    trashCheck(p);
+    if(!p.at.rail) trashCheck(p);
   }
 }
 
@@ -361,14 +414,15 @@ function guestsTick(m0, m1){
   const near = ([x, y]) => { let n = 0; for(let i = -1; i <= 1; i++) for(let j = -1; j <= 1; j++) for(const [a, b] of busy.get(cell(x + i*10, y + j*10)) || []) if((a-x)*(a-x) + (b-y)*(b-y) <= 25) n++; return n; };
 
   for(const p of parties){
-    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + NEEDS[k].rate * dt);
-    let hurt = GUEST.tire;
+    const riding = !!(p.at && p.to && p.at.ride && p.at.ride.has(p.to));
+    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + (riding && k === "energy" ? 0 : NEEDS[k].rate * dt));
+    let hurt = riding ? 0 : GUEST.tire;   // sitting on the tram, feet up
     for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * o / (100 - d.seek); }
     if(p.at && p.to){
       if(near(pos.get(p)) > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
     }
     // walking through litter
-    const mess = p.at ? litterAt(p.at.x, p.at.y) : 0;
+    const mess = p.at && !p.at.rail ? litterAt(p.at.x, p.at.y) : 0;
     if(mess >= 3){ hurt += LITTER.hurt * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
     p.mood = clamp(p.mood - hurt * dt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }

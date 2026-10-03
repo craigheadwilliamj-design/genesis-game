@@ -11,6 +11,7 @@ const BUILD_MENU = [
     {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
     {label:"Wide Paths", tool:"wide", price:() => `${money(WIDE_PATH.perMeter)}/m`, note:"10 m wide. Holds twice the crowd before guests feel packed. Use it where the walk is busy."},
     {label:"Staff Paths", tool:"service", price:() => `${money(SERVICE_ROAD.perMeter)}/m`, note:"Staff paths always layer under guest paths where they meet."},
+    {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(TRAM.perMeter)}/m`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
     {label:"Bins", tool:"bin"},
     {label:"Benches", tool:"bench"},
     {label:"Picnic Areas", tool:"picnic"},
@@ -37,6 +38,7 @@ const BUILD_MENU = [
     {label:"Giftshop", sub:["cart", "shop", "megastore"]},
     {label:"Hotels", sub:["campground", "lodge", "resort"]},
     {label:"Education Center", tool:"edcenter"},
+    {label:"Tram Station", tool:"tramstop"},
   ]},
   {id:"staff", label:"Staff Buildings", items:[
     {label:"Keeper Hut", tool:"station"},
@@ -75,6 +77,7 @@ const BUILD_NAMES = {vivS:"Small", vivM:"Medium", vivL:"Large", kiosk:"Kiosk", f
 const ICON_LINES = {
   path:'<path d="M5 21c1-6 5-6 7-10s2-6 6-8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".35"/><path d="M5 21c1-6 5-6 7-10s2-6 6-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 3"/>',
   wide:'<path d="M5 21c1-6 5-6 7-10s2-6 6-8" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity=".35"/><path d="M5 21c1-6 5-6 7-10s2-6 6-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="2 3"/>',
+  tram:'<path d="M4 20L20 4" stroke="currentColor" stroke-width="5" stroke-linecap="butt" opacity=".35"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="5" stroke-dasharray="1 2.4"/><path d="M2.8 18.6L18.6 2.8M5.4 21.2L21.2 5.4" stroke="currentColor" stroke-width="1" fill="none"/>',
   service:'<path d="M4 20L20 4" stroke="currentColor" stroke-width="5" stroke-linecap="round" opacity=".4"/><path d="M4 20L20 4" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 3"/>',
   gate:'<path d="M3 12h5M16 12h5" stroke="currentColor" stroke-width="2.5"/><rect x="8" y="8" width="8" height="8" rx="1" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.4"/>',
   platform:'<rect x="3" y="9" width="18" height="7" rx="1" fill="#B08654" stroke="#1D2B22" stroke-width="1.2"/><path d="M5 16v4M19 16v4" stroke="currentColor" stroke-width="1.4"/>',

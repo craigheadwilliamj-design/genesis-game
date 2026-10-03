@@ -64,7 +64,7 @@ function gateCheck(e){
   if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
   if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
   const near = (p, list) => list.some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
-  if(!near(e.gate, state.paths)) return {ok:false, text:"The gate doesn't touch a path or service road."};
+  if(!near(e.gate, state.paths.filter(p => !isTram(p)))) return {ok:false, text:"The gate doesn't touch a path or service road."};
   return {ok:true, text:"Gate opens onto a path."};
 }
 

@@ -27,6 +27,7 @@ events.dayEnded = r => {
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
     ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
     ${L.rooms ? row("Hotel rooms", money(L.rooms)) : ""}
+    ${L.fares >= 1 ? row("Tram fares", money(L.fares)) : ""}
     ${L.rewards ? row("Goal rewards", money(L.rewards)) : ""}
     ${L.sold ? row("Sold and refunds", money(L.sold)) : ""}
     ${row("Animal food", "−" + money(L.feed))}
@@ -74,6 +75,7 @@ function step(now){
     animateAnimals(dt * Math.min(speed, 2));
   }
   drawParties();
+  drawTrams();
   drawKeepers();
   drawLoose();
   ui.hud();

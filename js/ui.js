@@ -527,6 +527,7 @@ function buildingBody(b){
   if(b.type === "oracle") return oracleHtml(b) + demolishRow(b);
   if(b.type === "ghost") return ghostHtml(b) + demolishRow(b);
   if(b.type === "tar") return tarHtml(b) + demolishRow(b);
+  if(BUILDINGS[b.type].tram) return tramStopHtml(b) + demolishRow(b);
   if(guestBuilding(b) || BUILDINGS[b.type].prop) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
@@ -536,7 +537,27 @@ function buildingBody(b){
 }
 function demolishRow(b){ return `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("building", b))}</button></div>`; }
 
+// Tram station: is it joined to a footpath and to track, and does a tram call here
+function tramStopHtml(b){
+  const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]);
+  const ok = foot && rail, why = !isReachable(b) ? "No path from the entrance." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Open to riders" : why}</span></div>`;
+  h += `<dl class="kv"><dt>Fare</dt><dd>${money(TRAM.fare)} a guest</dd><dt>Fares today</dt><dd>${money(Math.round(state.today.fares))}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+  if(!ok) h += `<div class="meta">Guests walk to it from the footpath and board from the track. It needs both beside it, and another station on the same track to ride to.</div>`;
+  return h;
+}
+// Tram track: how many working stations it serves, and what it costs
+function tramTrackHtml(p){
+  const stops = tramStops(p).stops.length;
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>Tram track</h2>`;
+  h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
+  h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace and pay ${money(TRAM.fare)} each. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run.</div>`;
+  h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
+  return h;
+}
 function pathHtml(p){
+  if(isTram(p)) return tramTrackHtml(p);
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
