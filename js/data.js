@@ -1037,7 +1037,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
-//   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity})
+//   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity}), and `center`: a thin painted dashed center line ({c, w, dash, o})
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
 //   rot      optional decay pattern laid over buildings, stronger on some than others (with `age`, it grows over that many days from when each was built)
@@ -1234,9 +1234,34 @@ const THEMES = {
           {c:"#24120A", w:9.4, dash:"0 22", cap:"round"}, {c:"#7A3E22", w:6.8, dash:"0 22", cap:"round"}, {c:"#B0643A", w:2, dash:"0 22", cap:"round"},
           {c:"#2F7A3E", w:3, dash:"9 11 4 18 12 24", cap:"round"}, {c:"#6FC04A", w:3.2, dash:"0 6 0 4 0 25 0 9 0 30", cap:"round"}, {c:"#D8333A", w:2.6, dash:"0 61 0 97", cap:"round"}]}},
     unlock:{hint:"Keep an animal in a tropical exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "tropical")}},
-  roadside: {label:"Retro Roadside", ground:"#6A6D75", tex:"roadside", blurb:"Neon, chrome and big signs: Jurassic meets Route 66.",
-    path:{live:"#5B5E66", dead:"#45484F", edge:"#F2F2F2", kerb:{c:"#E8334A", dash:"9 9"}}, bld:"#C9D2D8", mix:.85, edge:"#E8334A", accent:"#2EE6D6", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
-    bord:{band:"#2A2D33", glow:"#2EE6D6", c:"#2EE6D6", w:2.6, c2:"#E8334A", w2:1.6, dash2:"10 10"},
+  roadside: {label:"Retro", ground:"#86AB5E", tex:"roadside", gtex:"roadside-lawn", ptex:"roadside-asphalt", btex:"roadside-cream", blurb:"1960s highway attraction: cream and turquoise roofs with bold stripes, chrome trim, painted asphalt and pastel pipe rails, like a diner and a motor lodge that decided to have dinosaurs.",
+    // asphalt with a thin, faded dashed center line; a cream curb dash at the edge
+    path:{live:"#53565D", dead:"#43464C", edge:"#2B2D31", kerb:{c:"#E9E2CE", dash:"12 8"}, center:{c:"#E8C547", w:1, dash:"7 6", o:.65}}, bld:"#F2E8D0", mix:.85, edge:"#2A2D33", accent:"#E8334A", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
+    // roofs by building type: 0 food (cream, cherry stripe), 1 shops (pale turquoise, white stripe), 2 restrooms (cream, mustard stripe), 3 visitor buildings and hotels (starburst, red stripe, checker band), 4 labs and backstage (plain turquoise-gray).
+    // Every roof gets a thick stripe round the border and a thin chrome outline with a bright inner edge; 0, 1 and 3 carry a glowing rooftop sign.
+    roofs:{of:(t, type) => ["edcenter", "restaurant"].includes(type) || t.rooms ? 3
+        : t.kind === "food" ? 0 : t.kind === "merch" ? 1 : type === "restroom" ? 2 : 4,
+      btex:["roadside-roof-cream", "roadside-roof-turq", "roadside-roof-cream", "roadside-roof-burst", "roadside-roof-gray"],
+      trim:[[{c:"#D8333A", w:4.4, at:.9}, {c:"#F4EFE2", w:.9, at:.94}, {c:"#EDF2F4", w:1.3, at:1}, {c:"#8E979E", w:.6, at:.985}, {c:"#FF4FA3", w:8, dash:"11 9999", at:.97}, {c:"#FFE9F3", w:3.4, dash:"11 9999", at:.97}],
+        [{c:"#F4F7F7", w:4.4, at:.9}, {c:"#2F8F8A", w:.9, at:.94}, {c:"#EDF2F4", w:1.3, at:1}, {c:"#8E979E", w:.6, at:.985}, {c:"#2EE6D6", w:8, dash:"11 9999", at:.97}, {c:"#E6FFFC", w:3.4, dash:"11 9999", at:.97}],
+        [{c:"#E7B93A", w:4.4, at:.9}, {c:"#FFF6DA", w:.9, at:.94}, {c:"#EDF2F4", w:1.3, at:1}, {c:"#8E979E", w:.6, at:.985}],
+        [{c:"#D8333A", w:4.4, at:.9}, {c:"#141517", w:3, at:.8}, {c:"#F6F4EC", w:3, dash:"3 3", at:.8}, {c:"#EDF2F4", w:1.3, at:1}, {c:"#8E979E", w:.6, at:.985}, {c:"#46A8FF", w:8, dash:"13 9999", at:.97}, {c:"#E8F4FF", w:3.4, dash:"13 9999", at:.97}],
+        [{c:"#5FB4AE", w:2.4, at:.94}, {c:"#EDF2F4", w:1.1, at:1}]]},
+    // pastel pipe rail: a turquoise pipe with a bright highlight, on round posts
+    bord:{c:"#3FA39B", w:4.4, c2:"#D2F6F0", w2:1.3, trim:{c:"#3FA39B", w:1.6},
+      more:[{c:"#2C7F78", w:7.6, dash:"0 38", cap:"round"}, {c:"#8FE3D8", w:4.6, dash:"0 38", cap:"round"}],
+      by:{
+        // wooden fences become a pink pipe rail
+        wood:{c:"#E8749E", w:4.4, c2:"#FFE1EC", w2:1.3, more:[{c:"#B84C74", w:7.6, dash:"0 38", cap:"round"}, {c:"#FFB3CD", w:4.6, dash:"0 38", cap:"round"}]},
+        // chrome guardrail: a bright silver rail with a shadowed edge, post dots
+        bars:{c:"#7C858C", w:4.8, c2:"#F4F8FA", w2:1.6, more:[{c:"#5A6269", w:6.4, dash:"0 24", cap:"round"}, {c:"#DCE3E7", w:3.6, dash:"0 24", cap:"round"}]},
+        // with a pink neon tube along the top
+        electric:{glow:"#FF4FA3", c:"#7C858C", w:4.8, c2:"#F4F8FA", w2:1.6, more:[{c:"#FF4FA3", w:1.4}, {c:"#5A6269", w:6.4, dash:"0 24", cap:"round"}, {c:"#DCE3E7", w:3.6, dash:"0 24", cap:"round"}]},
+        // red and white striped concrete
+        concrete:{c:"#C9CDD0", w:8, more:[{c:"#D8333A", w:7, dash:"8 8"}, {c:"#F4F2EA", w:1.2}]}},
+      // heavy red and white striped concrete barrier on a footing, with a neon tube along the top
+      strong:{glow:"#2EE6D6", base:{c:"#9A9EA2", w:14, c2:"#6C7276", dash2:"3 6"}, c:"#F4F2EA", w:8,
+        more:[{c:"#D8333A", w:8, dash:"9 9"}, {c:"#4A4F55", w:1.2}, {c:"#2EE6D6", w:1.6}, {c:"#E6FFFC", w:.6}]}},
     unlock:{hint:"Get 250 guests in a day.", check:() => lastGuests() >= 250}},
   homestead: {label:"Homestead", ground:"#CDB06A", tex:"homestead", gtex:"homestead-prairie", ptex:"homestead-road", btex:"homestead-plank", blurb:"Wyoming ranch country: wind-combed prairie, dirt roads, rusty tin barns and split-rail fences.",
     path:{live:"#C4A574", dead:"#A88E66", edge:"#7A5E3C", ruts:{c:"#8A6A42", o:.45}}, bld:"#8E8B84", mix:.85, edge:"#3E352C", accent:"#A9C8DA", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
