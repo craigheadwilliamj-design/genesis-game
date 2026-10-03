@@ -1177,9 +1177,29 @@ const THEMES = {
     path:{live:"#D8C3A5", dead:"#B6A283", edge:"#2E3A36", kerb:{c:"#4FA38A", dash:"12 3"}}, bld:"#3F8F7A", mix:.85, edge:"#262B2A", accent:"#4FA38A", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
     bord:{band:"#CDB89A", c:"#262B2A", w:2.2, c2:"#262B2A", w2:5, dash2:"1 11", cap2:"round"},
     unlock:{hint:"Build 3 exhibits.", check:() => state.exhibits.length >= 3}},
-  tropical: {label:"Tropical", ground:"#5FA463", tex:"tropical", blurb:"Bamboo, thatch, big leaves and bright flowers.",
-    path:{live:"#D8C48E", dead:"#B8A56F", edge:"#2F7A3E", kerb:{c:"#F0508C", dash:"2 9"}}, bld:"#B08A4A", mix:.85, edge:"#3E5A2A", accent:"#F0508C", fee:.15, fits:["arch", "micr", "dimo", "psit", "quet"],
-    bord:{band:"#3E8A4A", c:"#A9C453", w:4, dash:"13 2", cap:"butt", c2:"#F0508C", w2:4, dash2:"1 16", cap2:"round"},
+  tropical: {label:"Tropical", ground:"#3F9A4A", tex:"tropical", gtex:"tropical-ground", ptex:"tropical-stones", btex:"tropical-bamboo", rot:"tropical-bloom", blurb:"Lush and bright: thatch huts, bamboo and teak, pale stepping stones, big leaves and bursts of flowers. Tidy and cared for, unlike the Bayou.",
+    path:{live:"#F4D6BE", dead:"#D6B49C", edge:"#256B35", kerb:{c:"#8BCB5A", dash:"7 4"}}, bld:"#A8742E", mix:.85, edge:"#4A2E14", accent:"#1FA7A0", fee:.15, fits:["arch", "micr", "dimo", "psit", "quet"],
+    // small buildings: round thatch huts, fresh gold to sun-faded gray (each keeps one); bigger ones: split bamboo, or dark teak planks on the labs.
+    // Trim is a lashed bamboo edge with a shell band, and a bright teal, coral or yellow stripe along the ridge. Dark brown eaves keep roofs readable on green.
+    eave:{c:"#4A2E14", w:2.6}, sod:{tex:["tropical-thatch-gold", "tropical-thatch-tan", "tropical-thatch-faded"], max:90, shade:["dome"]},
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 1 : 0,
+      btex:[["tropical-bamboo", "tropical-bamboo", "tropical-bamboo-dry"], "tropical-teak"],
+      trim:[[{c:"#4A2E14", w:3.4, at:.97}, {c:"#E0B65A", w:2.2, dash:"0 6", cap:"round", at:.97}, {c:"#FFF3DC", w:1, dash:"1 8", at:.9}],
+        [{c:"#2A140A", w:3.4, at:.97}, {c:"#C9803A", w:1.6, dash:"6 3", at:.97}, {c:"#1FA7A0", w:1.2, dash:"10 5", at:.9}]]},
+    ridge:[{c:"#3A2412", w:4.2}, {c:["#1FA7A0", "#F0644C", "#F2C230"], w:1.9}],
+    // bamboo fence: a row of small round poles with darker lashing across them
+    bord:{band:"#2F7A3E", trim:[{c:"#4A2E14", w:3}, {c:"#E0B65A", w:2, dash:"0 5", cap:"round"}],
+      more:[{c:"#3E2A14", w:7.4, dash:"0 5.2", cap:"round"}, {c:"#C8B84A", w:5.6, dash:"0 5.2", cap:"round"}, {c:"#EDE49A", w:2, dash:"0 5.2", cap:"round"},
+        {c:"#5A3A1A", w:1.1}, {c:"#5A3A1A", w:7.8, dash:"1.3 14.3"}],
+      // concrete (high privacy) becomes carved timber posts with woven panels between them
+      by:{concrete:{band:"#2F7A3E",
+        more:[{c:"#3A2412", w:6.6}, {c:"#C99A56", w:4.8, dash:"2 1.2"}, {c:"#8A5A2A", w:4.8, dash:"1 3.2"},
+          {c:"#2A170B", w:9.4, dash:"0 24", cap:"round"}, {c:"#6A3A1E", w:6.8, dash:"0 24", cap:"round"}, {c:"#E0A04A", w:2, dash:"0 24", cap:"round"}, {c:"#F0644C", w:1.6, dash:"0 24", cap:"round"}]}},
+      // heavy teak posts with steel cable and mesh for dangerous animals, vines trained over them and the odd hibiscus
+      strong:{band:"#2F7A3E", c:"#3A1F10", w:5,
+        more:[{c:"#9AA6A8", w:4.2, dash:"1 1.1 .7 1.4"}, {c:"#C9D2D4", w:.9},
+          {c:"#24120A", w:9.4, dash:"0 22", cap:"round"}, {c:"#7A3E22", w:6.8, dash:"0 22", cap:"round"}, {c:"#B0643A", w:2, dash:"0 22", cap:"round"},
+          {c:"#2F7A3E", w:3, dash:"9 11 4 18 12 24", cap:"round"}, {c:"#6FC04A", w:3.2, dash:"0 6 0 4 0 25 0 9 0 30", cap:"round"}, {c:"#D8333A", w:2.6, dash:"0 61 0 97", cap:"round"}]}},
     unlock:{hint:"Keep an animal in a tropical exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "tropical")}},
   roadside: {label:"Retro Roadside", ground:"#6A6D75", tex:"roadside", blurb:"Neon, chrome and big signs: Jurassic meets Route 66.",
     path:{live:"#5B5E66", dead:"#45484F", edge:"#F2F2F2", kerb:{c:"#E8334A", dash:"9 9"}}, bld:"#C9D2D8", mix:.85, edge:"#E8334A", accent:"#2EE6D6", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
