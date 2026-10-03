@@ -1050,7 +1050,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
 //            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap, pulse: seconds per slow blink}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
+//            more (extra lines on top, each {c, w, dash, cap}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1088,10 +1088,10 @@ const THEMES = {
     bord:{band:"#2B2326", c:"#141113", w:7, trim:{c:"#8A8488", w:1},
       more:[{c:"#0E0C0D", w:8, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"}, {c:"#363134", w:6.4, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"},
         {c:"#4E484C", w:2.2, dash:"0 5.2 0 6 0 4.6 0 5.6", cap:"round"}, {c:"#FF5A1F", w:.9, dash:"18 7 30 12 9 14"}],
-      // heavy dark steel bars set into a stone base, with orange warning lights that pulse
+      // heavy dark steel bars set into a stone base, with orange warning lights
       strong:{band:"#2B2326", base:{c:"#3A3538", w:14, c2:"#1E1B1D", dash2:"6 2 4 2"}, c:"#2A2E34", w:4,
         more:[{c:"#5C7A8C", w:1}, {c:"#101214", w:7, dash:"2.4 4"}, {c:"#3E444C", w:4.4, dash:"2.4 4"},
-          {c:"#5A1A0E", w:8, dash:"0 31", cap:"round"}, {c:"#FF5A1F", w:4.6, dash:"0 31", cap:"round", pulse:2.4}, {c:"#FFD27A", w:1.8, dash:"0 31", cap:"round", pulse:2.4}]}},
+          {c:"#5A1A0E", w:8, dash:"0 31", cap:"round"}, {c:"#FF5A1F", w:4.6, dash:"0 31", cap:"round"}, {c:"#FFD27A", w:1.8, dash:"0 31", cap:"round"}]}},
     unlock:{hint:"Reach a 4-star rating.", check:() => state.rating >= 4}},
   stone: {label:"Stone Age", ground:"#857D71", tex:"stone", gtex:"stone-tundra", ptex:"stone-flag", btex:"stone-slab", blurb:"Frozen tundra, flagstones, stacked stone and lashed timber, thatch and hide. Cold and rough, with no paint anywhere.",
     path:{live:"#4E463D", dead:"#6E675E", edge:"#2B2D30"}, bld:"#4C5157", mix:.9, edge:"#2B2D30", accent:"#B8995A", fee:.2, fits:["smil", "mgth", "doed", "elas", "macr"],

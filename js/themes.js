@@ -97,11 +97,8 @@ function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitApp
 const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `url(#t-${x})` : null; };
 const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
-// slow blinking lines and glowing pools stay still for players who ask for less motion
-const calmMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-if(calmMotion) document.querySelectorAll("#map defs animate").forEach(a => a.remove());
-// one stroked outline (polygon or polyline), blinking slowly if the line has `pulse`
-const strokeSvg = (tag, pts, L, ns) => `<${tag} points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}>` + (L.pulse && !calmMotion ? `<animate attributeName="stroke-opacity" values="1;.3;1" dur="${L.pulse}s" repeatCount="indefinite"/>` : "") + `</${tag}>`;
+// one stroked outline (polygon or polyline)
+const strokeSvg = (tag, pts, L, ns) => `<${tag} points="${pts}" stroke="${L.c}" stroke-width="${L.w}"${L.dash ? ` stroke-dasharray="${L.dash}"` : ""} stroke-linecap="${L.cap || "butt"}" ${ns}/>`;
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
 // `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail (over the band)
 // and a theme whose border has its own `strong` rail draws that instead
