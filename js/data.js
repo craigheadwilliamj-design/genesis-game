@@ -1044,14 +1044,16 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
 //   roofs    optional {of(type def, type id) -> class 0, 1, 2..., btex: [a roof pattern, or a list (each building keeps one), per class], trim: [a list of trim lines per class],
-//            brace: {of: [classes], min: square meters, lines: [...]}}: roof and trim by building class, instead of btex/sod and bord.trim. A brace is an X across big rectangular buildings
+//            brace: {of: [classes], min: square meters, lines: [...]}}: roof and trim by building class, instead of btex/sod and bord.trim. A brace is an X across big rectangular buildings.
+//            A trim line's `at` draws it on the outline scaled by that much (1 is the building's edge) instead of the usual inner trim
+//   tier     optional {min, next, at: [scales], light, shadow, drop}: rectangular buildings over `min` square meters get stepped upper stories (one per scale; each more needs `next` times the area)
 //   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
 //   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
 //            band (the strip's color under the texture; none means no strip), c/w/dash/cap (main line, px; none means no main line), c2/w2/dash2/cap2 (second line), glow (soft halo)
-//            more (extra lines on top, each {c, w, dash, cap, zig: [amp, step] px for a zigzag, knots: dots at the zigzag's corners instead of rails}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals)
+//            more (extra lines on top, each {c, w, dash, cap, zig: [amp, step] px for a zigzag, knots: dots at the zigzag's corners instead of rails}), trim ({c, w, dash, cap}, or a list drawn in order: the building and prop trim instead of c2), base ({c, w, c2, dash2}: a wider footing under the rail when the exhibit holds a dangerous animal), strong (a whole other border drawn instead for dangerous animals), by ({barrier id: a whole other border} for that fence type)
 //   fee      share of an item's price to build it in this theme, or to change an existing one to it
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
@@ -1122,9 +1124,27 @@ const THEMES = {
         more:[{c:"#3A2A1E", w:7.4, dash:"0 5", cap:"round"}, {c:"#C9A36A", w:5.6, dash:"0 5", cap:"round"}, {c:"#8A6A44", w:1.4, dash:"0 5", cap:"round"},
           {c:"#2A2C30", w:1.6}, {c:"#F4F7F8", w:2.6, dash:"6 9 3 13 9 8"}]}},
     unlock:{hint:"Build a hotel.", check:() => state.buildings.some(b => isHotel(b))}},
-  western: {label:"Western", ground:"#D9B48A", tex:"western", blurb:"Red rock, adobe, hitching rails and Arizona desert.",
-    path:{live:"#E2B27E", dead:"#C28E5C", edge:"#7A3E26", kerb:{c:"#5B2E1E", dash:"2 10"}}, bld:"#C4622D", mix:.85, edge:"#5B2E1E", accent:"#8C6A4A", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
-    bord:{band:"#D9B48A", c:"#8C6A4A", w:1.8, c2:"#4A2E1C", w2:5, dash2:"2 16"},
+  mesa: {label:"Mesa", ground:"#D6A26E", tex:"mesa", gtex:"mesa-sand", ptex:"mesa-flag", btex:"mesa-sand-roof", blurb:"Pueblo adobe, sandstone, cactus and turquoise in the Southwest desert.",
+    path:{live:"#E3CBA4", dead:"#C9AE88", edge:"#9A5A3A"}, bld:"#C4683F", mix:.85, edge:"#7A3E26", accent:"#3FA7A0", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
+    // flat adobe roofs: 0 work buildings (terracotta or deep clay), 1 guest buildings (sand or cream), 2 labs (cream). Guest buildings and labs get a turquoise door.
+    // A pale parapet runs round the top, with dark viga log ends poking out along the edge
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 2
+        : t.kind === "food" || t.kind === "merch" || t.rooms || ["edcenter", "campground", "platform"].includes(type) ? 1 : 0,
+      btex:[["mesa-terra", "mesa-clay"], ["mesa-sand-roof", "mesa-cream"], "mesa-cream"],
+      trim:[[{c:"#E8A882", w:4, at:.97}, {c:"#7A3E26", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}],
+        [{c:"#F6E8CE", w:4, at:.97}, {c:"#A8784E", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}, {c:"#3FA7A0", w:2.4, dash:"8 9999", at:.97}],
+        [{c:"#FBF3E2", w:4, at:.97}, {c:"#A8784E", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}, {c:"#3FA7A0", w:2.4, dash:"8 9999", at:.97}]]},
+    // stepped pueblo blocks on big buildings: a lighter upper story with a shadow, and a third on the biggest
+    tier:{min:150, next:2.4, at:[.62, .34], light:"#FFF2DC", shadow:"#5A2E1C", drop:.4},
+    // low adobe wall: a thick terracotta band with a rounded, sunlit top
+    bord:{band:"#D6A26E", c:"#8A4A2E", w:8, trim:{c:"#5A3A26", w:1.6},
+      more:[{c:"#D08A5E", w:6.4}, {c:"#EDB98E", w:2.4}, {c:"#F6D8B6", w:.8, dash:"14 6 22 9"}],
+      // wooden fences become a latilla fence: rows of thin peeled sticks, lashed every so often
+      by:{wood:{band:"#D6A26E", c:"#4A3220", w:1.2,
+        more:[{c:"#4A3220", w:6.4, dash:"1.3 1"}, {c:"#C8A47A", w:5.6, dash:"1 1.3"}, {c:"#3E2A1C", w:1.4}, {c:"#6E4A2E", w:7, dash:"1.6 18"}]}},
+      // tall adobe wall on a wide footing, capped with a rusted steel rail on posts
+      strong:{band:"#D6A26E", base:{c:"#7A4028", w:14, c2:"#5A2E1C", dash2:"2 6"}, c:"#8A4A2E", w:9,
+        more:[{c:"#C97E52", w:7.4}, {c:"#E8B48A", w:3}, {c:"#5A2A14", w:4.4, dash:"0 22", cap:"round"}, {c:"#7A3A1C", w:1.8}, {c:"#B8643A", w:.7, dash:"5 4 9 3"}]}},
     unlock:{hint:"Reach a 3-star rating.", check:() => state.rating >= 3}},
   modern: {label:"Modern", ground:"#BFC9CC", tex:"modern", blurb:"Polished concrete, steel and glass panels, with wood for warmth.",
     path:{live:"#DDE1E3", dead:"#B9BFC2", edge:"#37454D", kerb:{c:"#7FD0E0", dash:"14 4"}}, bld:"#5F8A9A", mix:.85, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],

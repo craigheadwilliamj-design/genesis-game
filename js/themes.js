@@ -118,9 +118,9 @@ function railLine(pts, L, inv, ns){
 }
 // a themed exhibit's border: a textured band just inside the fence, then the theme's own rail lines (px, so they stay thin when zoomed out)
 // `strong`: the exhibit holds a dangerous animal, so a theme with a `base` lays a footing under the rail (over the band)
-// and a theme whose border has its own `strong` rail draws that instead
-function themeRailSvg(pts, T, inv, bw = 4, strong = false){
-  const B = strong && T.bord && T.bord.strong || T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+// and a theme whose border has its own `strong` rail draws that instead. `barrier` picks a border from `by` (a lighter look for wooden fences, say)
+function themeRailSvg(pts, T, inv, bw = 4, strong = false, barrier = null){
+  const B = strong && T.bord && T.bord.strong || barrier && T.bord && T.bord.by && T.bord.by[barrier] || T.bord, ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(!B) return "";
   let s = "";
   if(T.tex && B.band) s += `<polygon points="${pts}" fill="none" stroke="${B.band}" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/><polygon points="${pts}" fill="none" stroke="url(#t-${T.tex})" stroke-width="${Math.max(bw * .75, bw*inv)}" stroke-linejoin="round" pointer-events="none"/>`;
@@ -154,9 +154,21 @@ function themeBuildSvg(bl, pts, trimPts){
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), L, ns);
-  for(const L of H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord)) s += strokeSvg("polygon", trimPts, L, ns);
+  const trims = H >= 0 ? T.roofs.trim[H] : themeTrim(T.bord), along = (L, P) => strokeSvg("polygon", L.at || P !== bl.points ? polyStr(insetRect(P, L.at || .86)) : trimPts, L, ns);
+  for(const L of trims) s += bl.points ? along(L, bl.points) : strokeSvg("polygon", trimPts, L, ns);
   const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");
   if(X && X.of.includes(H) && tp.length === 4 && area(bl.points) >= X.min) for(const L of X.lines) s += strokeSvg("polyline", `${tp[0]} ${tp[2]}`, L, ns) + strokeSvg("polyline", `${tp[1]} ${tp[3]}`, L, ns);
+  // stepped blocks: big buildings get a smaller upper story pushed toward the back corner, with a shadow cast down and to the right, and its own trim
+  const TI = T.tier;
+  if(TI && bl.points && bl.points.length === 4) for(const [i, f] of TI.at.entries()){
+    if(area(bl.points) < TI.min * (i ? TI.next : 1)) break;
+    const [cx, cy] = centroid(bl.points), bk = bl.points.reduce((a, p) => p[0] + p[1] < a[0] + a[1] ? p : a), ax = (cx + bk[0]) / 2, ay = (cy + bk[1]) / 2;
+    const up = bl.points.map(([x, y]) => [ax + (x - ax) * f, ay + (y - ay) * f]), d = TI.drop * Math.sqrt(area(bl.points)) / 10;
+    s += `<polygon points="${polyStr(up.map(([x, y]) => [x + d, y + d]))}" fill="${TI.shadow}" fill-opacity=".3" pointer-events="none"/>`;
+    if(tex) s += `<polygon points="${polyStr(up)}" fill="url(#t-${tex})" pointer-events="none"/>`;
+    s += `<polygon points="${polyStr(up)}" fill="${TI.light}" fill-opacity=".3" pointer-events="none"/>`;
+    for(const L of trims) s += along(L, up);
+  }
   return s;
 }
 // a themed prop (bin, bench, lamp, sign...): texture over its fill, then a ring or outline in the theme's border colors. `round` means a circle at (cx, cy) of radius r, else the polygon `pts`.
