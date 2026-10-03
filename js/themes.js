@@ -135,6 +135,8 @@ function themeRailSvg(pts, T, inv, bw = 4, strong = false, barrier = null){
 const themeTrim = B => !B ? [] : B.trim ? [].concat(B.trim) : B.c2 ? [{c:B.c2, w:Math.max(1, B.w2 * .45), dash:B.dash2 && B.dash2.split(" ").map(n => Math.max(1, +n * .6)).join(" "), cap:B.cap2}] : [];
 // how rotten an item looks under the theme's `rot` overlay, fixed per item so each building keeps its look
 const rotLevel = it => { let h = 7; for(const ch of String(it.id || "")) h = (h * 31 + ch.charCodeAt(0)) % 997; return .2 + .8 * h / 996; };
+// how decayed a building looks (0 to 1): with the theme's `age` it grows from when it was built (newer is cleaner), else it's fixed per item
+const decayOf = (T, it) => T.age ? Math.min(1, Math.max(0, (state.day - (it.day ?? state.day)) / T.age)) * (.55 + .45 * (rotLevel(it) - .2) / .8) : rotLevel(it);
 // one of a list, fixed per item (a single value is just returned)
 const pickFor = (it, x) => Array.isArray(x) ? x[Math.floor((rotLevel(it) - .2) / .8 * x.length * .999)] : x;
 // a building's ridge: the line joining the middles of its two short sides (rectangles only)
@@ -150,7 +152,15 @@ function themeBuildSvg(bl, pts, trimPts){
   const T = themeOf(bl), ns = `fill="none" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`, H = roofOf(T, bl);
   const small = T.sod && bl.points && area(bl.points) <= T.sod.max, tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : small ? pickFor(bl, T.sod.tex) : bldTex(T); let s = "";
   if(tex) s += `<polygon points="${pts}" fill="url(#t-${tex})" pointer-events="none"/>`;
-  if(T.rot) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rotLevel(bl).toFixed(2)}" pointer-events="none"/>`;
+  const rot = decayOf(T, bl);
+  if(T.rot && rot > .01) s += `<polygon points="${pts}" fill="url(#t-${T.rot})" fill-opacity="${rot.toFixed(2)}" pointer-events="none"/>`;
+  // moss in some of the corners, bigger as the building decays, kept inside the roof
+  if(T.moss && rot > .05 && bl.points){
+    const [cx, cy] = centroid(bl.points), h = Math.round(rotLevel(bl) * 996), big = T.moss.r * rot * Math.sqrt(area(bl.points)) / 6;
+    bl.points.forEach(([x, y], i) => { if(!(h >> i & 1) && i) return;
+      const reach = Math.hypot(cx - x, cy - y);
+      for(let k = 0; k < 3; k++){ const f = .14 + k * .09 + (h >> (k + i) & 1) * .04, r = Math.min(big * (1 - k * .25), reach * f * .85), j = (k - 1) * r * .6; s += `<circle cx="${(x + (cx - x) * f + j * (cy - y) / reach).toFixed(2)}" cy="${(y + (cy - y) * f - j * (cx - x) / reach).toFixed(2)}" r="${r.toFixed(2)}" fill="${T.moss.c[k % T.moss.c.length]}" fill-opacity=".85" pointer-events="none"/>`; } });
+  }
   if(T.eave) s += `<polygon points="${pts}" stroke="${T.eave.c}" stroke-width="${T.eave.w}" ${ns}/>`;
   const rg = T.ridge && !small && bl.points && ridgeLine(bl.points);
   if(rg) for(const L of T.ridge) s += strokeSvg("polyline", polyStr(rg), L, ns);

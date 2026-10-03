@@ -1040,7 +1040,8 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity})
 //   bld      color a building's own color is blended toward (by `mix`), and its outline
 //   accent   the trim color
-//   rot      optional decay pattern laid over buildings, stronger on some than others
+//   rot      optional decay pattern laid over buildings, stronger on some than others (with `age`, it grows over that many days from when each was built)
+//   moss     optional {c: [colors], r}: moss patches in a building's corners, growing with its decay
 //   eave     optional {c, w}: a dark band around a building's edge, so its shape reads under a busy roof
 //   ridge    optional line(s) {c, w} along a building's ridge (the middle of its long side), drawn in order
 //   roofs    optional {of(type def, type id) -> class 0, 1, 2..., btex: [a roof pattern, or a list (each building keeps one), per class], trim: [a list of trim lines per class],
@@ -1069,9 +1070,14 @@ const THEMES = {
       more:[{c:"#1F1F24", w:6.5, dash:"0 36", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 36", cap:"round"}],
       trim:{c:"#C9A24B", w:1.2}, base:{c:"#9A9486", w:7, c2:"#6F6A5C", dash2:"3 5"}},
     unlock:{hint:"Research Gilded Age design at ORACLE.", check:() => hasTech("gilded")}},
-  bayou: {label:"Bayou", ground:"#4F5E3A", tex:"bayou", ptex:"bayou-walk", btex:"bayou-roof", rot:"bayou-rot", blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
+  bayou: {label:"Bayou", ground:"#3E4A2E", tex:"bayou", gtex:"bayou-ground", ptex:"bayou-walk", btex:"bayou-planks", rot:"bayou-rot", age:40, blurb:"Weathered boardwalks, tin roofs, cypress posts and still water.",
     path:{live:"#8F7F66", dead:"#6E6250", edge:"#2A2118", kerb:{c:"#5F7A3A", dash:"9 6"}}, bld:"#7E7362", mix:.82, edge:"#2A2118", accent:"#6FA39A", fee:.1, fits:["dsuc", "bari", "kool", "simo", "prio"],
-    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#6FA39A", w:1.2, dash:"6 2 2.4 1.2"},
+    // roofs: weathered gray-brown planks with gaps, or rust-streaked corrugated tin (each building keeps one); a dark water-stained edge with faded teal paint peeling off it
+    roofs:{of:() => 0, btex:[["bayou-planks", "bayou-tin"]],
+      trim:[[{c:"#2A2118", w:3.2}, {c:"#6FA39A", w:1.6, dash:"9 3 4 7 13 2 6 9"}, {c:"#C9C2AE", w:1.4, dash:"0 11 3 17 2 26"}]]},
+    // moss creeps in from the corners as buildings age (decay grows over `age` days, so new ones are clean)
+    moss:{c:["#3E5A28", "#5F7A3A", "#7A9448"], r:2.2},
+    bord:{band:"#3E4A2C", c:"#B49A6A", w:1.3, c2:"#4A3824", w2:6.5, dash2:"0 20", cap2:"round", trim:{c:"#2A2118", w:1.4},
       // rusted chain-link for dangerous animals: a rust mesh band on leaning weathered posts, with vines and leaves creeping over it
       strong:{band:"#3E4A2C", c:"#4A2E1A", w:5.4,
         more:[{c:"#A8683A", w:4.4, dash:"1 1.1 .7 1.4"}, {c:"#D08A50", w:1.2, dash:".6 1.9 1 2.6", cap:"round"},

@@ -920,7 +920,7 @@ function placeBuilding(e){
     ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(e) ? "" : "bad");
     return;
   }
-  const b = {id:uid("b-"), type:tool, points:ghost.pts};
+  const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
   autoZone(b);
   themeNew("building", b);
   state.buildings.push(b);
@@ -1116,7 +1116,7 @@ function platformTap(ev){
   if(!g){ setStat("Tap an exhibit's fence.", true); return; }
   if(!g.ok){ setStat(g.why, true); return; }
   spend(BUILDINGS.platform.price, "built");
-  const b = {id:uid("b-"), type:"platform", exhibitId:g.e.id, points:g.pts, inward:true};
+  const b = {id:uid("b-"), type:"platform", exhibitId:g.e.id, points:g.pts, inward:true, day:state.day};
   state.buildings.push(b);
   afterChange(); render();
   ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
