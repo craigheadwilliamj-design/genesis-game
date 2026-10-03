@@ -12,6 +12,65 @@ const uid = p => p + Math.random().toString(36).slice(2, 9);
 const PARK_PLOT = [[0,0],[420,0],[420,305],[0,305]];
 const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
 
+/* ---------- land for sale ---------- */
+// Parcel (i, j) is the cell between PARCELS.xs[i..i+1] and ys[j..j+1]. The home plot's cells are always owned.
+const parcelRect = (i, j) => [PARCELS.xs[i], PARCELS.ys[j], PARCELS.xs[i+1], PARCELS.ys[j+1]];
+const parcelId = (i, j) => i + "," + j;
+const PARCEL_CELLS = (() => { const out = []; for(let i = 0; i < PARCELS.xs.length - 1; i++) for(let j = 0; j < PARCELS.ys.length - 1; j++) out.push([i, j]); return out; })();
+function parcelHome(i, j){ const [x0, y0, x1, y1] = parcelRect(i, j), h = PARCELS.home; return x0 >= h[0] && x1 <= h[2] && y0 >= h[1] && y1 <= h[3]; }
+const ownsParcel = (i, j) => parcelHome(i, j) || (state.parcels || []).includes(parcelId(i, j));
+const parcelArea = (i, j) => { const [x0, y0, x1, y1] = parcelRect(i, j); return (x1 - x0) * (y1 - y0); };
+// How many cells out from the home plot: 1 touches it
+function parcelRing(i, j){
+  let best = 9;
+  for(const [a, b] of PARCEL_CELLS) if(parcelHome(a, b)) best = Math.min(best, Math.max(Math.abs(a - i), Math.abs(b - j)));
+  return best;
+}
+const parcelPrice = (i, j) => Math.round(parcelArea(i, j) * (PARCELS.rates[Math.min(parcelRing(i, j), PARCELS.rates.length - 1)]) / 100) * 100;
+const parcelTouches = (i, j) => [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCELS.ys.length - 1 && ownsParcel(i + a, j + b));
+function parcelProblem(i, j){
+  if(ownsParcel(i, j)) return "You already own this land.";
+  if(!parcelTouches(i, j)) return "Not for sale yet. Buy the land next to it first.";
+  const cost = parcelPrice(i, j);
+  if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
+  return null;
+}
+function buyParcel(i, j){
+  if(parcelProblem(i, j)) return false;
+  spend(parcelPrice(i, j), "built"); state.parcels.push(parcelId(i, j)); return true;
+}
+// Rectangles of everything owned, merged by row so a long strip is one rect. Cached until a parcel is bought.
+let ownedCache = null;
+function ownedRects(){
+  const key = state.parcels.join("|");
+  if(ownedCache && ownedCache.state === state && ownedCache.key === key) return ownedCache.rects;
+  const rects = [];
+  for(let j = 0; j < PARCELS.ys.length - 1; j++){
+    let run = null;
+    for(let i = 0; i < PARCELS.xs.length - 1; i++){
+      if(ownsParcel(i, j)){ const r = parcelRect(i, j); if(run) run[2] = r[2]; else run = r.slice(); }
+      else if(run){ rects.push(run); run = null; }
+    }
+    if(run) rects.push(run);
+  }
+  ownedCache = {state, key, rects}; return rects;
+}
+const inOwned = (x, y, tol = .5) => ownedRects().some(r => x >= r[0] - tol && x <= r[2] + tol && y >= r[1] - tol && y <= r[3] + tol);
+// The park's outer fence line as segments [[x,y],[x,y]]: cell edges with no owned land on the far side
+function ownedEdges(){
+  const out = [], has = (a, c) => a >= 0 && c >= 0 && a < PARCELS.xs.length - 1 && c < PARCELS.ys.length - 1 && ownsParcel(a, c);
+  for(const [i, j] of PARCEL_CELLS){
+    if(!ownsParcel(i, j)) continue;
+    const [x0, y0, x1, y1] = parcelRect(i, j);
+    if(!has(i, j-1)) out.push([[x0, y0], [x1, y0]]);
+    if(!has(i, j+1)) out.push([[x0, y1], [x1, y1]]);
+    if(!has(i-1, j)) out.push([[x0, y0], [x0, y1]]);
+    if(!has(i+1, j)) out.push([[x1, y0], [x1, y1]]);
+  }
+  return out;
+}
+function ownedBox(){ const r = ownedRects(); return {x0:Math.min(...r.map(a => a[0])), y0:Math.min(...r.map(a => a[1])), x1:Math.max(...r.map(a => a[2])), y1:Math.max(...r.map(a => a[3]))}; }
+
 let state = null;     // the saved game
 let derived = null;   // numbers worked out from the saved game, rebuilt when it changes
 let arrivalCarry = 0; // fractions of a guest carried between frames
@@ -57,7 +116,7 @@ function newPark(){
     version:1, name:"Genesis Park",
     money:START.money, ticket:START.ticket, rating:START.rating,
     day:1, minute:OPEN_MIN,
-    boundary:PARK_PLOT.map(p => p.slice()),
+    boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
     exhibits:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
@@ -71,6 +130,7 @@ function newPark(){
 function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
+  if(!s.parcels) s.parcels = [];
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
   if(!s.science) s.science = freshScience();
@@ -479,6 +539,7 @@ function dailyCosts(){
   }
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
+  for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
   wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;
   // science staff are paid as research costs

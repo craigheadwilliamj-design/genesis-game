@@ -17,6 +17,9 @@ const BUILD_MENU = [
     {label:"Lamp Posts", tool:"lamp"},
     {label:"Info Signs", tool:"sign"},
   ]},
+  {id:"land-buy", label:"Land", items:[
+    {label:"Buy Land", tool:"parcels", price:() => `from ${money(Math.min(...PARCEL_CELLS.filter(([i, j]) => !parcelHome(i, j)).map(([i, j]) => parcelPrice(i, j))))}`, note:"Buy the plots around your park to build further out. Each costs a daily property tax."},
+  ]},
   {id:"exhibits", label:"Exhibit Tools", items:[
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
@@ -82,6 +85,7 @@ const ICON_LINES = {
     t.r < 4.5 ? `<circle cx="9" cy="13" r="3.4" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="15" cy="11" r="3" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>` : `<circle cx="8" cy="11" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="16" cy="10" r="4.5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="12" cy="16" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>`])),
   "land-shelter":'<rect x="6" y="6" width="12" height="12" rx="1.5" fill="#9A7B55" stroke="#3B3226" stroke-width="1.4"/><path d="M6 12h12" stroke="#3B3226" stroke-width="1"/>',
   "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
+  parcels:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/><rect x="9" y="9" width="6" height="6" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.2"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
   grid:'<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/>',
