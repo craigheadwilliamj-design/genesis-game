@@ -1068,6 +1068,18 @@ const THEMES = {
   modern: {label:"Modern", ground:"#BFC9CC", blurb:"Sleek and natural: polished stone, metal and glass alongside wood.",
     path:{live:"#D8DCDD", dead:"#B4BABD", edge:"#3C4A52"}, bld:"#6F8791", mix:.5, edge:"#26343B", accent:"#7FD0E0", fee:.25, fits:["dodo", "nura", "sdel", "hopl", "gtod"],
     unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
+  classic: {ground:"#C9B79B", label:"Classic", blurb:"A classic European zoo: brick, copper and wrought iron.",
+    path:{live:"#D8C3A5", dead:"#B6A283", edge:"#2E3A36"}, bld:"#9B4A36", mix:.55, edge:"#262B2A", accent:"#4FA38A", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
+    unlock:{hint:"Build 3 exhibits.", check:() => state.exhibits.length >= 3}},
+  tropical: {ground:"#5FA463", label:"Tropical", blurb:"Bamboo, thatch, big leaves and bright flowers.",
+    path:{live:"#D8C48E", dead:"#B8A56F", edge:"#2F7A3E"}, bld:"#B08A4A", mix:.5, edge:"#3E5A2A", accent:"#F0508C", fee:.15, fits:["arch", "micr", "dimo", "psit", "quet"],
+    unlock:{hint:"Keep an animal in a tropical exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "tropical")}},
+  roadside: {ground:"#6A6D75", label:"Retro Roadside", blurb:"Neon, chrome and big signs: Jurassic meets Route 66.",
+    path:{live:"#5B5E66", dead:"#45484F", edge:"#F2F2F2"}, bld:"#C9D2D8", mix:.5, edge:"#E8334A", accent:"#2EE6D6", fee:.25, fits:["trex", "velo", "spin", "tric", "pter"],
+    unlock:{hint:"Get 250 guests in a day.", check:() => lastGuests() >= 250}},
+  range: {ground:"#D3C18F", label:"Range", blurb:"Wyoming: dry prairie, worn planks, fence posts and tall dry grass.",
+    path:{live:"#CDB88A", dead:"#AE9A6E", edge:"#7A5C36"}, bld:"#A0794A", mix:.5, edge:"#5A4128", accent:"#D8C16A", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
+    unlock:{hint:"Keep an animal in a grassland exhibit.", check:() => state.exhibits.some(e => e.animals.length && biomeOf(e) === "grassland")}},
 };
 // A matched area (an exhibit, plus the guest paths and the shops and restrooms near it) in one non-Genesis theme draws more guests.
 // An animal that suits its exhibit's theme is happier and draws a little more too.
