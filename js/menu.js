@@ -36,8 +36,8 @@ const BUILD_MENU = [
   ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
-    {label:"Food Stall", sub:["kiosk", "food", "restaurant"]},
-    {label:"Giftshop", sub:["cart", "shop", "megastore"]},
+    {label:"Dining", sub:["kiosk", "food", "restaurant"]},
+    {label:"Retail", sub:["cart", "shop", "megastore"]},
     {label:"Hotels", sub:["campground", "lodge", "resort"]},
     {label:"Education Center", tool:"edcenter"},
     {label:"Tram Station", tool:"tramstop"},
@@ -73,7 +73,7 @@ const BUILD_MENU = [
 ];
 
 // Names the build menu shows when they differ from the building's own label
-const BUILD_NAMES = {vivS:"Small", vivM:"Medium", vivL:"Large", kiosk:"Kiosk", food:"Stand", restaurant:"Restaurant", cart:"Cart", shop:"Shop", megastore:"Megastore",
+const BUILD_NAMES = {vivS:"Small", vivM:"Medium", vivL:"Large", kiosk:"Cart", food:"Stand", restaurant:"Restaurant", cart:"Cart", shop:"Stand", megastore:"Shop",
   campground:"Campground", lodge:"Safari Lodge", resort:"Resort Hotel"};
 
 const ICON_LINES = {

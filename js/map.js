@@ -26,8 +26,8 @@ const isBuildTool = t => !!BUILDINGS[t];
 // Menu groups whose tools share a choice bar above the map (vivarium sizes, food stalls, hotels...)
 const FAMILIES = {
   viv:  {tools:["vivS", "vivM", "vivL"], labels:["Small", "Medium", "Large"]},
-  eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
-  gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
+  eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
+  gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
   props:{tools:["bin", "bench", "picnic", "lamp", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign", "No-feed sign"]},
 };
