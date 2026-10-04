@@ -232,9 +232,6 @@ function exhibitHtml(e){
   }
   h += `</section>`;
 
-  // starter animals from partner parks
-  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
-  h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
   return h;
 }
@@ -259,7 +256,11 @@ function cloneHtml(e, rep){
     h += tabBar("expd", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!has(id)})), exTabs.period);
     h += `<ul class="shop" style="margin-top:8px">${ready.filter(s => s.period === exTabs.period).map(s => animalCard(s, rep, "clone")).join("")}</ul>`;
   }
-  return h + `</section>`;
+  h += `</section>`;
+  // starter animals from partner parks
+  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
+  h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
+  return h;
 }
 
 // The biome the exhibit is laid out as: the ground picker and how each animal feels about it
