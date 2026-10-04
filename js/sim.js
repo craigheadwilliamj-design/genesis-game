@@ -633,10 +633,11 @@ function checkGoals(){
     if(state.goalsDone.includes(g.id)) continue;
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);
-      earn(g.reward, "rewards");
-      events.toast(`Goal complete: ${g.text}. You earned ${money(g.reward)}.`, "good");
+      if(g.reward) earn(g.reward, "rewards");
+      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}`, "good");
     }
   }
+  checkThemes();   // a grant can unlock a theme
 }
 
 /* ---------- formatting shared by the screen ---------- */
