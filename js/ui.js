@@ -167,7 +167,7 @@ panelEl.addEventListener("change", ev => {
 });
 
 /* ---------- an exhibit ---------- */
-const exTabs = {ex:null, tab:"main"};   // which tab the exhibit panel shows
+const exTabs = {ex:null, tab:"main", period:null};   // which tab the exhibit panel shows
 function exhibitHtml(e){
   const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e);
   let h = `<button class="back" data-action="deselect">‹ Park office</button>`;
@@ -176,9 +176,10 @@ function exhibitHtml(e){
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}], [{key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}], [{key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
   if(exTabs.tab === "land" && e.viv) exTabs.tab = "main";
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
   const n = e.animals.length;
@@ -231,14 +232,20 @@ function exhibitHtml(e){
   }
   h += `</section>`;
 
-  const sc = state.science;
+  // starter animals from partner parks
+  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
+  h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
+  h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
+  return h;
+}
 
-  // finished clones waiting for a home
+// Cloning tab: finished clones waiting for a home, and species with a complete genome, by period
+function cloneHtml(e, rep){
+  const sc = state.science;
+  let h = "";
   if(sc.ready.length){
     h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
-
-  // cloning: species with a complete genome
   const ready = SPECIES.filter(s => sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
   h += `<section><h3>Clone at TAR</h3>`;
@@ -247,15 +254,12 @@ function exhibitHtml(e){
     h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
       : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`}</div>`;
   } else {
-    h += `<ul class="shop">${ready.map(s => animalCard(s, rep, "clone")).join("")}</ul>`;
+    const has = id => ready.some(s => s.period === id);
+    if(!has(exTabs.period)) exTabs.period = PERIOD_ORDER.find(has);
+    h += tabBar("expd", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!has(id)})), exTabs.period);
+    h += `<ul class="shop" style="margin-top:8px">${ready.filter(s => s.period === exTabs.period).map(s => animalCard(s, rep, "clone")).join("")}</ul>`;
   }
-  h += `</section>`;
-
-  // starter animals from partner parks
-  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
-  h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
-  h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
-  return h;
+  return h + `</section>`;
 }
 
 // The biome the exhibit is laid out as: the ground picker and how each animal feels about it
@@ -661,6 +665,7 @@ panelEl.addEventListener("click", e => {
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
+  if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
