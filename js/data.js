@@ -957,7 +957,7 @@ const WATER = {
 //   tech   research needed first
 //   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at CERES.
 //   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic trees)
-//   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, placed only in an exhibit of that biome
+//   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, any exhibit can have them, but animals only count plants from the exhibit's own biome and dislike the rest
 //   legacy  old generic plants, kept so old saves load but not sold
 const LAND = {
   rock:   {label:"Rock",          one:"a rock",          price:600,  r:2, color:"#8E9188", cover:1},
@@ -986,6 +986,7 @@ const HAB = {
   dry:8,           // happiness lost when water lovers have no water
   dryIll:1.5,      // illness chance multiplier for them
   groveFull:.06,   // share of the floor in groves from an animal's own era that fully satisfies it
+  wrongPlants:8,   // happiness lost when plants from another biome fill as much floor as a full grove would
   groveBonus:6,    // happiness for animals with plenty of groves from their era
   waterMax:.1,     // share of the floor an animal that loves water (likes 1) wants under water; less keen animals want proportionally less
   waterBand:.2,    // no penalty within this share either side of what an animal wants

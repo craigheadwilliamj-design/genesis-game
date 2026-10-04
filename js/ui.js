@@ -301,7 +301,7 @@ function landHtml(e){
   if(!biomes.includes(landTabs.biome)) landTabs.biome = biomes[0];
   const lb = landTabs.biome, periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][lb]);
   if(!periods.includes(landTabs.period)) landTabs.period = periods[0];
-  const lp = landTabs.period, wrong = lb !== here ? `Needs a ${BIOMES[lb].label.toLowerCase()} exhibit.` : "";
+  const lp = landTabs.period, wrong = lb !== here ? `Rocks are matched to the exhibit's biome (${BIOMES[here].label.toLowerCase()}).` : "";
   const rockBtns = ROCKS.map(k => { const t = LAND[k], why = wrong || lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
   const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = wrong || lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Each animal wants its own share of water, a number of rocks (a boulder counts as 3) and some plants, set by the size and biome of the exhibit. Too much water is as bad as too little, and fish eaters can't do without any. Reshape water with the Move tool, like a fence.</div>
@@ -310,7 +310,7 @@ function landHtml(e){
     ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
     <div class="row" style="margin-top:6px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button>${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !t.legacy && !ROCKS.includes(k)).map(([k]) => k))}</div>
-    <div class="meta" style="margin-top:8px">Plants, by biome and period. They only grow in an exhibit of their own biome${wrong ? `, and this one is ${esc(BIOMES[here].label.toLowerCase())}` : ""}. Change the biome to plant another.</div>
+    <div class="meta" style="margin-top:8px">Plants, by biome and period. You can plant any of them anywhere, but animals only count plants from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and plants from another biome make them unhappy.</div>
     <div style="margin-top:6px">${tabBar("lbiome", biomes.map(b => ({key:b, label:BIOMES[b].label + (b === here ? " (here)" : ""), color:BIOMES[b].color})), lb)}</div>
     <div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} rocks</b></div>
     <div class="row" style="margin-top:4px">${rockBtns}</div>
