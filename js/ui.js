@@ -176,7 +176,9 @@ function exhibitHtml(e){
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}, {key:"health", label:"Health", color:"#B3261E"}], exTabs.tab)}</div>`;
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}], [{key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
+  if(exTabs.tab === "land" && e.viv) exTabs.tab = "main";
+  if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
   const n = e.animals.length;
@@ -227,7 +229,6 @@ function exhibitHtml(e){
 
   h += themeHtml("exhibit", e);
 
-  if(!e.viv) h += landHtml(e);
 
   // food and keeper access
   const g = gateCheck(e), need = dailyNeed(e);
@@ -270,9 +271,10 @@ function exhibitHtml(e){
 // Plant cover and rock coverage per species: "X/Y" (what it has / what it wants), then red lines for what's wrong or one green line when it's right
 function needsHtml(e){
   if(!e.animals.length) return "";
-  const b = biomeOf(e), bl = BIOMES[b].label, all = haveOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
-  const row = (label, x, y, ok) => `<div class="need-row ${ok ? "ok" : "no"}"><b>${label}</b><span>${x}/${y}</span></div>`;
-  const li = (ok, t) => `<div class="need-line ${ok ? "ok" : "no"}">${t}</div>`;
+  const b = biomeOf(e), all = haveOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
+  const row = (label, x, y, lv) => `<div class="need-row ${lv}"><b>${label}</b><span>${x}/${y}</span></div>`;
+  const li = (lv, t) => `<div class="need-line ${lv}">${t}</div>`;
+  const pc = x => `${Math.round(x * 1000) / 10}%`;
   const body = kinds.map(s => {
     const f = speciesFit(e, s), n = esc(s.name), ex = esc(e.name), home = biomesOf(s) && biomeFit(s, b) !== "home" ? BIOMES[biomesOf(s)[0]].label : "";
     const fine = (what, have, want, extra) => {
@@ -284,14 +286,18 @@ function needsHtml(e){
     };
     const pl = fine("plants", f.h.plants, f.w.plants, f.h.plants < f.w.plants && all.plants > f.h.plants ? `${n} prefers plants from the ${esc(s.period)} Period.` : "");
     const rk = fine("rocks", f.h.rock, f.w.rock, "");
-    return `<div class="need-sp">${kinds.length > 1 ? `<div class="need-name">${n}</div>` : ""}${row("Plant Cover", f.h.plants, f.w.plants, !pl.length)}${pl.length ? pl.map(t => li(false, t)).join("") : li(true, `${n} is very happy with the plant cover in ${ex}.`)}${row("Rock Coverage", f.h.rock, f.w.rock, !rk.length)}${rk.length ? rk.map(t => li(false, t)).join("") : li(true, `${n} is very happy with the rock coverage in ${ex}.`)}</div>`;
+    // water: under half of what it wants is red; over double is yellow, over triple is red
+    const wh = f.h.water, ww = f.w.water, r = ww > 0 ? wh / ww : 1;
+    const wl = ww <= 0 ? (wh > 0 ? "ok" : "ok") : r < .5 ? "no" : r < 1 - HAB.waterBand ? "mid" : r <= 2 ? "ok" : r < 3 ? "mid" : "no";
+    const wt = wl === "ok" ? `${n} is very happy with the water in ${ex}.` : r < 1 ? `${n} would prefer more water in ${ex}.` : `${n} would prefer less water in ${ex}.`;
+    return `<div class="need-sp">${kinds.length > 1 ? `<div class="need-name">${n}</div>` : ""}${row("Plant Cover", f.h.plants, f.w.plants, pl.length ? "no" : "ok")}${pl.length ? pl.map(t => li("no", t)).join("") : li("ok", `${n} is very happy with the plant cover in ${ex}.`)}${row("Rock Coverage", f.h.rock, f.w.rock, rk.length ? "no" : "ok")}${rk.length ? rk.map(t => li("no", t)).join("") : li("ok", `${n} is very happy with the rock coverage in ${ex}.`)}${row("Water", pc(wh), pc(ww), wl)}${li(wl, wt)}</div>`;
   }).join("");
   return `<div style="margin-top:6px">${body}</div>`;
 }
 
 // Water, rocks, groves and shelters in one exhibit, and buttons to add more
 const ROCKS = ["rock", "boulder"];
-const landTabs = {ex:null, biome:null, period:null};   // which biome and period tab the plant list shows
+const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";
   const landBtns = keys => keys.map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
@@ -303,18 +309,15 @@ function landHtml(e){
   const lp = landTabs.period;
   const rockBtns = ROCKS.map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
   const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
-  return `<section><h3>Landscaping</h3>
-    ${needsHtml(e)}
-    ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
-      return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
-    <div class="row" style="margin-top:6px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button>${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !t.legacy && !ROCKS.includes(k)).map(([k]) => k))}</div>
-    <div class="meta" style="margin-top:8px">Plants, by biome and period. You can plant any of them anywhere, but animals only count plants from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and plants from another biome make them unhappy.</div>
-    <div style="margin-top:6px">${tabBar("lbiome", biomes.map(b => ({key:b, label:BIOMES[b].label + (b === here ? " (here)" : ""), color:BIOMES[b].color})), lb)}</div>
-    <div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} rocks</b></div>
-    <div class="row" style="margin-top:4px">${rockBtns}</div>
-    <div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div>
-    <div style="margin-top:6px">${tabBar("lperiod", periods.map(p => ({key:p, label:p, color:PERIOD_COLOR[p]})), lp)}</div>
-    <div class="row" style="margin-top:6px">${plantBtns}</div></section>`;
+  const sub = ["plants", "rocks", "water", "shelter"].includes(landTabs.sub) ? landTabs.sub : "plants";
+  const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
+  const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
+    : sub === "rocks" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} rocks</b></div><div class="row" style="margin-top:4px">${rockBtns}</div>`
+    : sub === "water" ? `<div class="row" style="margin-top:8px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button></div><div class="meta" style="margin-top:4px">Draw it corner by corner like a fence. Reshape it with the Move tool.</div>`
+    : `${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
+      return `<div class="meta" style="margin-top:8px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
+    <div class="row" style="margin-top:6px">${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !t.legacy && !ROCKS.includes(k)).map(([k]) => k))}</div>`;
+  return `<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}, {key:"shelter", label:"Shelter", color:"#8C6A2E"}], sub)}${body}</section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
@@ -654,6 +657,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
