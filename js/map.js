@@ -366,8 +366,8 @@ function renderOverlay(){
     });
   }
   if(landGhost && landKey(tool)){
-    const t = LAND[landGhost.key];
-    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${t.color}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+    const t = LAND[landGhost.key], gfill = t.flora || t.slots ? t.color : rockTone(landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME, landGhost.key).fill;
+    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;

@@ -960,8 +960,8 @@ const WATER = {
 //   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, placed only in an exhibit of that biome
 //   legacy  old generic plants, kept so old saves load but not sold
 const LAND = {
-  rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
-  boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
+  rock:   {label:"Rock",          one:"a rock",          price:600,  r:2, color:"#8E9188", cover:1},
+  boulder:{label:"Boulder",       one:"a boulder",       price:2200, r:4, color:"#767A74", cover:3},
   flowers:{label:"Flower bed",    one:"a flower bed",    price:300,  r:2,   color:"#C98AB0", flora:"cenozoic", browse:1,   shade:2},
   shrubs: {label:"Shrubs",        one:"a patch of shrubs",  price:600,  r:3.5, color:"#79B05A", flora:"cenozoic", browse:2,   shade:4},
   trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
@@ -1063,6 +1063,10 @@ const PLANT_TABLE = {
 const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
   scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"]};
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+// Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
+const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73"};
+const rockTone = (biome, type) => { const base = plantMix(ROCK_STONE[biome] || ROCK_STONE[DEFAULT_BIOME], "#000000", type === "boulder" ? .16 : 0);
+  return {fill:base, light:plantMix(base, "#ffffff", .35), dark:plantMix(base, "#000000", .3)}; };
 // Per size: price by era, radius, daily browse, label style
 const PLANT_SIZE = {small:{r:2, browse:1, shade:2, a:"a patch of"}, medium:{r:3.5, browse:2, shade:4, a:"a stand of"}, large:{r:5, browse:4, shade:8, a:"a grove of"}};
 const PLANT_PRICE = {cenozoic:[300, 600, 1200], mesozoic:[380, 750, 1500], paleozoic:[450, 900, 1800]};
