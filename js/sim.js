@@ -88,13 +88,15 @@ function pickStarters(){
   return out;
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
+// stars the park needs for an animal: none for the starting pool
+const starsNeed = s => isStarter(s) ? 0 : s.stars;
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
   return {
     points:0,          // unspent ORACLE research points
     crew:{paleo:0, temporal:0, gene:0, botanist:0},  // science staff hired at each department
-    tech:[],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
+    tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
     projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals ORACLE has unlocked, so GHOST can look for their DNA
     dna:{},            // species id (or plant DNA id) -> {genome: 0-100, quality: 0-100}
@@ -255,6 +257,7 @@ function upgradeSave(s){
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
+  if(!s.science.tech.includes("bars")) s.science.tech.push("bars");   // metal bars are free in every park
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   return s;

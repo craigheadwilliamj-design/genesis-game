@@ -735,6 +735,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute(); buildKeeperGraph();
     out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
     const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= CLOSE_MIN - 2){ state.day++; state.minute = OPEN_MIN; } tick(1); if(fn && fn()) return true; } return false; };
+    sc.tech = sc.tech.filter(t => t !== "bars");   // bars are free in every park, so research is tested from scratch
     state.minute = OPEN_MIN + 60;
 
     // research: needs a paleontologist, takes time proportional to cost, and finishes mid-day

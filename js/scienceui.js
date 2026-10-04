@@ -62,7 +62,7 @@ function oracleHtml(b){
     const p = PERIOD_BY_ID[oracleTab], list = speciesToUnlock().filter(s => s.period === p.id);
     h += `<div class="meta" style="margin:8px 0">${p.ago}.</div><ul class="shop">`;
     for(const s of list) h += projectRow("species", s.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`,
-      `${s.space.toLocaleString()} m² each. ${s.stars ? `Needs ${s.stars}★ to clone. ` : ""}${isUnlocked(s.id) ? "GHOST can look for it." : ""}`);
+      `${s.space.toLocaleString()} m² each. ${starsNeed(s) ? `Needs ${starsNeed(s)}★ to clone. ` : ""}${isUnlocked(s.id) ? "GHOST can look for it." : ""}`);
     h += `</ul>`;
   } else {
     h += `<div class="meta" style="margin-bottom:8px">Plants and medicine are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
@@ -153,7 +153,7 @@ function tarHtml(b){
       const d = sc.dna[s.id], why = d.genome >= 100 ? cloneProblem(s.id) : "Genome incomplete.";
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += d.genome >= 100 ? `<button class="buy" data-action="clone" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}Quality ${d.quality}%. ${d.genome >= 100 ? `Takes ${spanText(cloneMinutes(s.id))}.` : ""}${d.genome >= 100 && state.rating + 1e-9 < s.stars ? ` Needs ${s.stars}★.` : ""}</span></li>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}Quality ${d.quality}%. ${d.genome >= 100 ? `Takes ${spanText(cloneMinutes(s.id))}.` : ""}${d.genome >= 100 && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
