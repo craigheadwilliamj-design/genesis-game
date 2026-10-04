@@ -167,6 +167,7 @@ panelEl.addEventListener("change", ev => {
 });
 
 /* ---------- an exhibit ---------- */
+const exTabs = {ex:null, tab:"main"};   // which tab the exhibit panel shows
 function exhibitHtml(e){
   const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e);
   let h = `<button class="back" data-action="deselect">‹ Park office</button>`;
@@ -174,6 +175,9 @@ function exhibitHtml(e){
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span><span class="meta">${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
+  if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}, {key:"health", label:"Health", color:"#B3261E"}], exTabs.tab)}</div>`;
+  if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
   const n = e.animals.length;
   if(n){
@@ -187,7 +191,6 @@ function exhibitHtml(e){
       <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
       <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
-  h += healthHtml(e);
 
   // barriers, moats, and aviary netting
   if(!e.viv){
@@ -232,9 +235,6 @@ function exhibitHtml(e){
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
   if(n){
-    const dirt = e.dirt || 0;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
-    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until day ${state.staff.feedFrom}.` : ""}</div>`;
   }
@@ -318,39 +318,58 @@ function landHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
+// Exhibit dirtiness: the meter and what it means
+function dirtHtml(e){
+  if(!e.animals.length) return "";
+  const dirt = e.dirt || 0;
+  let h = `<section><h3>Dirtiness</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
+    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
+  return h + `</section>`;
+}
+// One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
+const hli = (level, text) => `<li class="hl ${level}">${text}</li>`;
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
   if(!e.animals.length && !away.length) return "";
-  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`;
+  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
   let h = `<section><h3>Health</h3>`;
-  if(!healthActive()) h += `<div class="meta">Animals start falling ill on day ${state.health.from}.</div>`;
-  if(hr.sick.length) h += `<ul class="herd">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  else if(e.animals.length) h += `<div class="meta">Everyone looks healthy.</div>`;
-  if(e.animals.length){ const d = daysSinceCheck(e); h += `<div class="meta" style="margin-top:6px">${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${d >= HEALTH.checkEvery ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.</div>`; }
-  if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
+  if(!healthActive()) items.push(hli("ok", `Animals start falling ill on day ${state.health.from}.`));
+  if(hr.sick.length){
+    const worst = Math.max(...hr.sick.map(a => a.sick.sev));
+    items.push(hli(worst >= 40 ? "bad" : "warn", `${hr.sick.length} sick or injured.`));
+  } else if(e.animals.length) items.push(hli("ok", "Everyone looks healthy."));
+  if(e.animals.length){
+    const d = daysSinceCheck(e), late = d >= HEALTH.checkEvery;
+    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.`));
+  }
+  if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
-    h += `<div class="meta" style="margin-top:6px">${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}</div>`;
+    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
   }
   if(e.animals.length > hr.sick.length){
-    h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
     const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
-    if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
-    h += `</div>`;
+    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => why[w]).join(", ")}.` : ""}`));
   }
+  if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
+  if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
+  else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
+  if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
+  if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
   // genome therapy: lift a clone's DNA toward the lab's genome
   if(e.animals.length && hasTech("genetherapy")){
     const low = e.animals.filter(a => (a.q ?? 90) < 100);
     h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
       return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${genomeDone(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${genomeDone(a.sp) ? "Lab genome isn't better" : "Needs full genome"}</span>`}</li>`; }).join("")}</ul>`;
     h += `<div class="meta">A vet rewrites the animal's DNA up to the lab's quality for its species, at most ${GENE.step} points a go. To go further, send GHOST for better samples. Healthier DNA means fewer illnesses.</div>`;
-  } else if(hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) h += `<div class="meta" style="margin-top:6px">Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them.</div>`;
+  }
   // medicated feed from CERES
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
     h += `<div class="meta">${e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : ""}Medicated feed cuts illness by ${Math.round((1 - MEDICINE.feedCut) * 100)}% and clears up mild cases without a vet${treatable < e.animals.length ? `, but only for animals whose era's medicine ORACLE has researched (${treatable} of ${e.animals.length} here)` : ""}.</div>`;
-  } else h += `<div class="meta" style="margin-top:6px">Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed.</div>`;
+  }
   return h + `</section>`;
 }
 
@@ -635,6 +654,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }
