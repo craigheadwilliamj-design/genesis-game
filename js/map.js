@@ -28,7 +28,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Kiosk", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Shop", "Megastore"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "sign"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign", "No-feed sign"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
@@ -257,6 +257,7 @@ function render(){
       if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
+      if(bl.type === "nofeed" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">⊘</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       s += `</g>`;
       continue;
@@ -968,7 +969,7 @@ function placeGhost(clientX, clientY){
     const nx = -dy/L, ny = dx/L;
     // a sign goes on the edge of the path that faces the closest exhibit fence; everything else on the side you point at
     let fx = p.x, fy = p.y;
-    if(tool === "sign"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+    if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
     const dn = rot % 2 ? t.w : t.d;   // how deep it is across the path once turned
     let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at

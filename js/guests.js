@@ -441,6 +441,7 @@ function guestsTick(m0, m1){
     // set off for the gate in time to be out by the time they planned to leave
     if(!p.home && (m1 + walkMins(p, "gate") >= p.until || p.mood < GUEST.quitBelow)) goHome(p);
     vandalTick(p, dt);
+    throwTick(p, dt);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
     walkParty(p, WALK_PER_MIN * p.spd * dt);
   }

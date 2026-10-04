@@ -316,6 +316,10 @@ function healthHtml(e){
   else if(e.animals.length) h += `<div class="meta">Everyone looks healthy.</div>`;
   if(e.animals.length){ const d = daysSinceCheck(e); h += `<div class="meta" style="margin-top:6px">${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${d >= HEALTH.checkEvery ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.</div>`; }
   if(away.length) h += `<div class="meta" style="margin-top:6px">At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.</div>`;
+  if(e.animals.length && !e.viv){
+    const te = trashEaten(e);
+    h += `<div class="meta" style="margin-top:6px">${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}</div>`;
+  }
   if(e.animals.length > hr.sick.length){
     h += `<div class="meta" style="margin-top:6px">Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.`;
     const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
