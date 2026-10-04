@@ -421,7 +421,7 @@ const MENU = {
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
-  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4},
+  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains."},
   iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
   fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
   tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
@@ -431,7 +431,7 @@ const MENU = {
   arthplush:{label:"Arthropleura plushies", kind:"merch", good:"merch", price:14, cost:4, joy:8},
   tikshirt:{label:"Tiktaalik T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
   trexhat: {label:"T-Rex hats",    kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
-  paleobook:{label:"Paleontology books", kind:"merch", good:"merch", price:24, cost:7, joy:6},
+  paleobook:{label:"Paleontology books", kind:"merch", good:"merch", price:24, cost:7, joy:6, text:"Guests who read one learn more, and learn more at every exhibit after."},
   jacket:  {label:"Branded jackets", kind:"merch", good:"merch", price:55, cost:18, joy:10},
 };
 // How guests take prices: at the usual price everyone buys, at double nobody does
@@ -586,6 +586,7 @@ const EDU = {
   sign:8,              // more if an info sign stands by its fence, plus a quarter more for each species inside
   signReach:20,        // a sign this close to an exhibit's fence tells guests about it
   guide:10,            // learning from buying a field guide
+  book:16,             // learning from buying a paleontology book (it works like a field guide too)
   guideBoost:1.5,      // and guests with one learn this much more at every exhibit after
   center:35,           // learning from a visit to the Education Center
   centerJoy:12,        // and the mood it adds
@@ -594,7 +595,7 @@ const EDU = {
   joy:.08,             // mood gained for each point learned
   litterCut:.4,        // at 100 learning, guests drop litter this much less
   vandalCut:.6,        // and vandalize this much less
-  shopBoost:.3,        // and are this much keener in gift shops (double for plushes and field guides)
+  shopBoost:.3,        // and are this much keener in gift shops (double for dino plushes, field guides and paleontology books)
   donate:4,            // a guest who learned everything drops this in the donation box on the way out
   full:40,             // average learning that gets full marks in the rating
   learned:40,          // guests who learned this much say so
@@ -1018,12 +1019,13 @@ const HAB = {
 //   guests  share of the usual guests who come
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
+  umbrella:2.5,     // umbrellas sell this many times as well on a wet day
   startDay:4,       // new parks get fair weather until this day
   kinds:{
     fair: {label:"Fair",      odds:.55, happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
     hot:  {label:"Heat wave", odds:.17, happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
     cold: {label:"Cold snap", odds:.15, happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
-    storm:{label:"Storm",     odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+    storm:{label:"Storm",     wet:true, odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
   },
 };
 // Ice age animals shrug off the cold
