@@ -41,7 +41,7 @@ function habitatOf(e){
   const cover = land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0);
   const grove = {}, groveM2 = {};
   for(const era of Object.keys(FLORA)){
-    groveM2[era] = land.reduce((n, f) => n + (LAND[f.type].flora === era ? landM2(f) : 0), 0);
+    groveM2[era] = land.reduce((n, f) => n + (LAND[f.type].flora === era && plantHere(LAND[f.type], e) ? landM2(f) : 0), 0);
     grove[era] = clamp(groveM2[era] / a / HAB.groveFull, 0, 1);
   }
   const old = clamp((groveM2.mesozoic + groveM2.paleozoic) / a / HAB.groveFull, 0, 1);
@@ -57,12 +57,14 @@ function wantsOf(e, s){
   return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
 // A plant counts for a species when it's from the animal's own period (the old generic plants, when from its era)
+// Plants from another biome don't count for anything and make animals unhappy; the old generic ones have no biome and suit any
+const plantHere = (t, e) => !t.biome || t.biome === biomeOf(e);
 const plantSuits = (t, s) => t.period ? t.period === s.period : t.flora === ERA_OF[s.period];
 // What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters. With a species, only plants from its own period count.
 function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
   return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
-    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && (!s || plantSuits(LAND[f.type], s)) ? landM2(f) : 0), 0))};
+    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && plantHere(LAND[f.type], e) && (!s || plantSuits(LAND[f.type], s)) ? landM2(f) : 0), 0))};
 }
 // How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
 function waterFit(have, want){
@@ -150,6 +152,11 @@ function habitatScore(e){
   }
   const what = {water:"the right amount of water", rock:"enough rocks", plants:"enough plants from their own period"}, uniq = l => [...new Set(l)].join(", ");
   for(const k of ["water", "rock", "plants"]) if(lack[k].length) out.issues.push({bad:false, text:`${uniq(lack[k])} ${lack[k].length === 1 ? "wants" : "want"} ${what[k]}. See Landscaping.`});
+  const wrongM2 = landOf(e).reduce((m, f) => { const t = LAND[f.type]; return m + (t && t.flora && !plantHere(t, e) ? landM2(f) : 0); }, 0);
+  if(wrongM2 > 0){
+    out.delta -= HAB.wrongPlants * clamp(wrongM2 / (area(e.points) || 1) / HAB.groveFull, 0, 1);
+    out.issues.push({bad:true, text:`Wrong plants. ${Math.round(wrongM2)} m² of plants here belong in another biome and don't suit ${BIOMES[biomeOf(e)].label.toLowerCase()}. Bulldoze them or regrade the exhibit.`});
+  }
   biomeScore(e, out, n);
   // groves from the animals' own era
   let home = 0;
@@ -202,7 +209,6 @@ const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(
 function landProblem(e, key, x, y){
   const t = LAND[key];
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
-  if(t.biome && biomeOf(e) !== t.biome) return `${t.label} grows in ${BIOMES[t.biome].label.toLowerCase()}, and ${e.name} is ${BIOMES[biomeOf(e)].label.toLowerCase()}.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
   if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < t.r + LAND[f.type].r)) return "It overlaps something already there.";
@@ -220,11 +226,13 @@ function landSpot(x, y, key){
   const why = landProblem(e, key, x, y);
   return {e, x, y, ok:!why, why};
 }
-function placeLand(e, key, x, y){
+function placeLand(e, key, x, y, biome){
   const t = LAND[key];
   spend(t.price, "built");
   if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
-  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
+  const f = {id:uid("l-"), type:key, x, y};
+  if(biome && !t.flora && !t.slots) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
+  (e.land = e.land || []).push(f);
 }
 
 // Rocks and plants are drawn as lumpy blobs, shaped from the feature's id so each keeps its look. They stay inside their radius.
@@ -268,9 +276,9 @@ function landSvg(e, pick, isDead){
       s += `<path d="${blobPath(f.x - t.r * .15, f.y - t.r * .1, t.r * .2, sd + 7)}" fill="#fff" fill-opacity=".18"/>`;
     } else {
       // a lumpy rock with a light and a dark face
-      const sd = seedOf(f);
-      s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" fill-opacity=".95" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      s += `<path d="${blobPath(f.x - t.r * .3, f.y - t.r * .25, t.r * .45, sd + 3, true)}" fill="#B7BBB2" fill-opacity=".6"/><path d="${blobPath(f.x + t.r * .35, f.y + t.r * .3, t.r * .35, sd + 5, true)}" fill="#5F635D" fill-opacity=".6"/>`;
+      const sd = seedOf(f), tone = rockTone(BIOMES[f.biome] ? f.biome : biomeOf(e), f.type);
+      s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${tone.fill}" fill-opacity=".95" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="${blobPath(f.x - t.r * .3, f.y - t.r * .25, t.r * .45, sd + 3, true)}" fill="${tone.light}" fill-opacity=".6"/><path d="${blobPath(f.x + t.r * .35, f.y + t.r * .3, t.r * .35, sd + 5, true)}" fill="${tone.dark}" fill-opacity=".6"/>`;
     }
     s += `</g>`;
   }
