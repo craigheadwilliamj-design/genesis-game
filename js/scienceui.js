@@ -172,8 +172,8 @@ function growRow(kind, era, size){
   h += `<span class="need">`;
   if(!unlocked) h += `Research ${kind !== "med" ? `${FLORA[era].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
   else {
-    const have = size ? c.pots[era + "-" + size] || 0 : +(c.plants[era] || 0).toFixed(2), grove = size && Object.values(LAND).find(t => t.flora === era && t.size === size);
-    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for ${grove ? grove.label.toLowerCase() + "s" : "the landscape"}. ${have} ready.` : kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
+    const have = size ? c.pots[era + "-" + size] || 0 : +(c.plants[era] || 0).toFixed(2);
+    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for any ${ERA_LABEL[era]} biome. ${have} ready.` : kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
     if(why && era !== "cenozoic" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
   }
   h += `</span>`;
