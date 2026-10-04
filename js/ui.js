@@ -322,6 +322,13 @@ function healthHtml(e){
     if(hr.why.length) h += ` Raised by ${hr.why.map(w => why[w]).join(", ")}.`;
     h += `</div>`;
   }
+  // genome therapy: lift a clone's DNA toward the lab's genome
+  if(e.animals.length && hasTech("genetherapy")){
+    const low = e.animals.filter(a => (a.q ?? 90) < 100);
+    h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
+      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${genomeDone(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${genomeDone(a.sp) ? "Lab genome isn't better" : "Needs full genome"}</span>`}</li>`; }).join("")}</ul>`;
+    h += `<div class="meta">A vet rewrites the animal's DNA up to the lab's quality for its species, at most ${GENE.step} points a go. To go further, send GHOST for better samples. Healthier DNA means fewer illnesses.</div>`;
+  } else if(hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) h += `<div class="meta" style="margin-top:6px">Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them.</div>`;
   // medicated feed from CERES
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
@@ -621,6 +628,11 @@ panelEl.addEventListener("click", e => {
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "hireVet"){ const why = hireVet(); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireVet"){ state.staff.vets = state.staff.vets.filter(v => v.id !== b.dataset.id); syncVets(); done(); return; }
+  if(a === "gene" && it){
+    const an = it.animals.find(x => x.id === b.dataset.id);
+    if(an){ if(an.gene) delete an.gene; else { const why = geneProblem(an); if(why) ui.toast(why, "bad"); else an.gene = true; } }
+    done(); return;
+  }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
   if(a === "hireMech"){ const why = hireMechanic(); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "fireMech"){ state.staff.mechanics = state.staff.mechanics.filter(m => m.id !== b.dataset.id); done(); return; }

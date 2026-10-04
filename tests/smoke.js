@@ -173,6 +173,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
+    // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
+    vetsNight(); keepersNight();
+    const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
+    state.science.dna.arth = {genome:100, quality:75};
+    out.geneNeedsTech = !!geneProblem(ga);
+    state.science.tech.push("genetherapy");
+    out.geneGainCapped = geneGain(ga) === 15 && geneCost(15) === GENE.base + 15 * GENE.perPoint;
+    state.science.dna.arth.quality = 60;
+    out.geneNoBetterGenome = !!geneProblem(ga);
+    state.science.dna.arth.quality = 75;
+    out.geneQueues = !geneProblem(ga); ga.gene = true;
+    const money0 = state.money, illBefore = illChance(viv, ga).p;
+    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && money0 - state.money >= geneCost(15) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 

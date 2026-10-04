@@ -54,6 +54,7 @@ function oracleHtml(b){
     h += `<h3>Fences and barriers</h3><ul class="shop">${techRows("barrier")}</ul>`;
     h += `<h3 style="margin-top:12px">Buildings and systems</h3><ul class="shop">${techRows("build")}</ul>`;
     h += `<h3 style="margin-top:12px">TAR upgrades</h3><ul class="shop">${techRows("tar")}</ul>`;
+    h += `<h3 style="margin-top:12px">Genetics</h3><ul class="shop">${techRows("gene")}</ul>`;
   } else if(oracleMain === "animals"){
     if(!oracleTab) oracleTab = PERIOD_ORDER.find(id => speciesToUnlock().some(s => s.period === id && isUnlocked(s.id))) || "Quaternary";
     h += `<div class="meta" style="margin-bottom:8px">ORACLE unlocks an animal so GHOST can go looking for its DNA. Genome progress is at GHOST.</div>`;
