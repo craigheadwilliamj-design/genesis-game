@@ -1255,6 +1255,7 @@ function bulldozeTap(kind, id){
   const it = findItem(kind, id);
   if(!it) return;
   if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
+  if(kind === "exhibit"){ confirmExhibitRemoval(it); return; }
   if(!(doomed && doomed.kind === kind && doomed.id === id)){
     doomed = {kind, id};
     const refund = refundFor(kind, it);
@@ -1264,6 +1265,14 @@ function bulldozeTap(kind, id){
   }
   removeItem(kind, it);
   doomed = null; setStat("");
+}
+
+// Exhibits hold animals, so bulldozing one asks first
+function confirmExhibitRemoval(e){
+  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park. Are you sure?`, "Yes", () => {
+    if(!findItem("exhibit", e.id)) return;
+    removeItem("exhibit", e); doomed = null; setStat("");
+  }, "No");
 }
 
 function removeItem(kind, it){

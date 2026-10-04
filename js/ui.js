@@ -707,6 +707,7 @@ panelEl.addEventListener("click", e => {
     afterChange(); render();
   }
   if(a === "demolish"){
+    if(sel.kind === "exhibit"){ confirmExhibitRemoval(it); return; }
     if(b.dataset.armed !== "1"){
       b.dataset.armed = "1"; const orig = b.textContent; b.textContent = "Tap again to bulldoze";
       setTimeout(() => { if(b.isConnected){ b.dataset.armed = ""; b.textContent = orig; } }, 3000);
@@ -756,9 +757,9 @@ panelEl.addEventListener("change", ev => {
 });
 
 // A yes/no question inside the page
-function askConfirm(title, text, yes, onYes){
+function askConfirm(title, text, yes, onYes, no = "Cancel"){
   const d = $("#dlgConfirm");
-  $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes;
+  $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
   $("#confirmYes").onclick = () => { d.close(); onYes(); };
   $("#confirmNo").onclick = () => d.close();
   d.showModal();
