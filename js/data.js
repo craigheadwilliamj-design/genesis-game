@@ -421,6 +421,18 @@ const MENU = {
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
+  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4},
+  iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
+  fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
+  tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
+  sabhat:  {label:"Sabertooth hats", kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
+  dimebag: {label:"Dimetrodon backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
+  permshirt:{label:"Permian T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
+  arthplush:{label:"Arthropleura plushies", kind:"merch", good:"merch", price:14, cost:4, joy:8},
+  tikshirt:{label:"Tiktaalik T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
+  trexhat: {label:"T-Rex hats",    kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
+  paleobook:{label:"Paleontology books", kind:"merch", good:"merch", price:24, cost:7, joy:6},
+  jacket:  {label:"Branded jackets", kind:"merch", good:"merch", price:55, cost:18, joy:10},
 };
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
