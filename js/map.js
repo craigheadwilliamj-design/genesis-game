@@ -15,6 +15,7 @@ let tool = "select";
 let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
+let rockBiome = null;               // biome tab a rock was picked from, so it's placed in that stone color (null: the exhibit's biome)
 let landGhost = null;               // rock, grove or shelter being placed: {key, x, y, ok, why}
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
@@ -366,8 +367,8 @@ function renderOverlay(){
     });
   }
   if(landGhost && landKey(tool)){
-    const t = LAND[landGhost.key];
-    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${t.color}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+    const t = LAND[landGhost.key], gfill = t.flora || t.slots ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME), landGhost.key).fill;
+    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -716,7 +717,7 @@ const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null; landGhost = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -1243,7 +1244,7 @@ function landHover(ev){
 function landTap(ev){
   const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
   if(!g.ok){ setStat(g.why, true); return; }
-  placeLand(g.e, key, g.x, g.y);
+  placeLand(g.e, key, g.x, g.y, rockBiome);
   afterChange(); render();
   ui.toast(`Added ${LAND[key].one} to ${g.e.name}.`, "good");
 }

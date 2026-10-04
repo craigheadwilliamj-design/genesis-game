@@ -928,8 +928,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;
     out.plantsMenu = !!document.querySelector('[data-tool="land-jur-tropical-large"]') && !document.querySelector('[data-tool="land-jur-grassland-large"]') && !document.querySelector('[data-tool="land-cycads"]');
     sc.tech.push("paleoplant"); state.ceres.pots["paleozoic-small"] = 1; gx.biome = "tropical"; gx.land = [];
-    out.plantWrongBiome = /grows in wetland, and .* is tropical/.test(landSpot(115, 115, "car-wetland-small").why || "") && landSpot(115, 115, "car-tropical-small").ok;
+    { const w = landSpot(115, 115, "car-wetland-small"), n0 = haveOf(gx).plants; gx.land = [];
+      out.plantWrongBiome = w.ok && landSpot(115, 115, "car-tropical-small").ok;
+      placeLand(gx, "car-wetland-small", 115, 115);
+      out.plantWrongNoCount = haveOf(gx).plants === n0 && !plantHere(LAND["car-wetland-small"], gx);
+      state.ceres.pots["paleozoic-small"] = 1; gx.land = []; }
     placeLand(gx, "car-tropical-small", 115, 115);
+    { const land0 = gx.land, m0 = state.money; gx.land = []; state.money = 1e6; placeLand(gx, "rock", 115, 115, "desert"); placeLand(gx, "rock", 135, 135);
+      out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
+      gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["paleozoic-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // animals only count plants from their own period, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
