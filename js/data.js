@@ -942,6 +942,8 @@ const WATER = {
 //   tech   research needed first
 //   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at CERES.
 //   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic trees)
+//   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, placed only in an exhibit of that biome
+//   legacy  old generic plants, kept so old saves load but not sold
 const LAND = {
   rock:   {label:"Rock pile",     one:"a rock pile",     price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder field", one:"a boulder field", price:2200, r:4, color:"#767A74", cover:3},
@@ -959,6 +961,8 @@ const LAND = {
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
+// The first plants (one per era and size, any biome) stay for old saves but aren't sold any more. Plants now come per period and biome (PLANT_TABLE).
+for(const k of ["flowers", "shrubs", "trees", "ginkgos", "ferns", "cycads", "mosses", "horsetails", "lycopods"]) LAND[k].legacy = true;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after
@@ -1018,6 +1022,48 @@ const BIOMES = {
   temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", perSqM:.6, rock:0.8, plants:0.08},
   boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", perSqM:.8, rock:1, plants:0.08},
 };
+// Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
+// A biome missing from a period has no plants there (no grassland before the Neogene). They go in LAND below as keys like "jur-tropical-small".
+const PLANT_TABLE = {
+  Devonian:{tropical:"Cooksonia|Asteroxylon|Wattieza", wetland:"Rhynia|Aglaophyton|Pseudosporochnus", desert:"Zosterophyllum|Psilophyton|Prototaxites",
+    scrubland:"Hostinella|Sawdonia|Drepanophycus", temperate:"Gosslingia|Barinophyton|Archaeopteris"},
+  Carboniferous:{tropical:"Sphenophyllum|Calamites|Lepidodendron", wetland:"Asterophyllites|Medullosa|Sigillaria",
+    temperate:"Neuropteris|Alethopteris|Cordaites", desert:"Sphenopteris|Callipteris|Walchia"},
+  Permian:{desert:"Supaia|Ullmannia|Pseudovoltzia", tropical:"Taeniopteris|Gigantopteris|Psaronius", wetland:"Annularia|Pecopteris|Arthropitys",
+    scrubland:"Peltaspermum|Comia|Callistophyton", temperate:"Sphenobaiera|Rufloria|Ginkgophyllum", boreal:"Gangamopteris|Noeggerathiopsis|Glossopteris"},
+  Triassic:{desert:"Dicroidium|Pleuromeia|Voltzia", tropical:"Neocalamites|Zamites|Araucarioxylon", scrubland:"Lepidopteris|Scytophyllum|Pagiophyllum",
+    wetland:"Equisetites|Cladophlebis|Heidiphyllum", temperate:"Baiera|Podozamites|Elatocladus"},
+  Jurassic:{tropical:"Nilssonia|Williamsonia|Cycadeoidea", wetland:"Coniopteris|Todites|Matonidium", scrubland:"Otozamites|Ptilophyllum|Brachyphyllum",
+    temperate:"Ginkgoites|Czekanowskia|Araucarites", desert:"Pachypteris|Hirmeriella|Cupressinocladus", boreal:"Phoenicopsis|Pityophyllum|Elatides"},
+  Cretaceous:{tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
+    temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
+  Paleogene:{tropical:"Lygodium|Nypa|Dipterocarpoxylon", wetland:"Azolla|Salvinia|Taxodium", temperate:"Zelkova|Quercus|Metasequoia",
+    boreal:"Osmunda|Betula|Larix", scrubland:"Dodonaea|Acacia|Eucalyptus", desert:"Tamarix|Haloxylon|Prosopis"},
+  Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Musa|Ceiba", wetland:"Typha|Phragmites|Nyssa", scrubland:"Artemisia|Atriplex|Juniperus",
+    temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Opuntia|Agave|Carnegiea"},
+  Quaternary:{grassland:"Festuca|Bouteloua|Andropogon", tropical:"Philodendron|Euterpe|Swietenia", wetland:"Sphagnum|Carex|Salix", scrubland:"Salvia|Adenostoma|Arctostaphylos",
+    temperate:"Trillium|Corylus|Tilia", boreal:"Cladonia|Ledum|Pinus", desert:"Larrea|Ferocactus|Joshua tree"},
+};
+// Leaf colors by biome, small to large
+const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
+  scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"]};
+const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+// Per size: price by era, radius, daily browse, label style
+const PLANT_SIZE = {small:{r:2, browse:1, shade:2, a:"a patch of"}, medium:{r:3.5, browse:2, shade:4, a:"a stand of"}, large:{r:5, browse:4, shade:8, a:"a grove of"}};
+const PLANT_PRICE = {cenozoic:[300, 600, 1200], mesozoic:[380, 750, 1500], paleozoic:[450, 900, 1800]};
+const PLANTS_OF = {};   // period -> biome -> the three LAND keys, small to large
+for(const [period, biomes] of Object.entries(PLANT_TABLE)){
+  const era = ERA_OF[period], tech = FLORA[era].tech;
+  PLANTS_OF[period] = {};
+  for(const [biome, names] of Object.entries(biomes)){
+    PLANTS_OF[period][biome] = names.split("|").map((name, i) => {
+      const size = PLANT_SIZES[i], z = PLANT_SIZE[size], key = period.slice(0, 3).toLowerCase() + "-" + biome + "-" + size;
+      LAND[key] = {label:name, one:`${z.a} ${name}`, price:PLANT_PRICE[era][i], r:z.r, color:plantMix(PLANT_SHADE[biome][i], PERIOD_COLOR[period], .22), flora:era, size, browse:z.browse, shade:z.shade, period, biome};
+      if(tech) LAND[key].tech = tech;
+      return key;
+    });
+  }
+}
 const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
 // Each animal's home biome, then the one it gets by in. Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.

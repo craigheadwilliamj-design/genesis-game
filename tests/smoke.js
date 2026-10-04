@@ -906,6 +906,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
+    // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use CERES stock of their era and size
+    const periods = Object.keys(ERA_OF), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());
+    out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
+    out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
+    out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;
+    out.plantsMenu = !!document.querySelector('[data-tool="land-jur-tropical-large"]') && !document.querySelector('[data-tool="land-jur-grassland-large"]') && !document.querySelector('[data-tool="land-cycads"]');
+    sc.tech.push("paleoplant"); state.ceres.pots["paleozoic-small"] = 1; gx.biome = "tropical"; gx.land = [];
+    out.plantWrongBiome = /grows in wetland, and .* is tropical/.test(landSpot(115, 115, "car-wetland-small").why || "") && landSpot(115, 115, "car-tropical-small").ok;
+    placeLand(gx, "car-tropical-small", 115, 115);
+    out.plantUsesStock = state.ceres.pots["paleozoic-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     sc.tech = keepTech; state.ceres.pots = keepPots; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 

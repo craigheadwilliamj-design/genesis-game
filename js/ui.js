@@ -284,7 +284,7 @@ function landHtml(e){
   const hb = habitatOf(e), n = {};
   for(const f of landOf(e)) if(LAND[f.type]) n[f.type] = (n[f.type] || 0) + 1;
   const wn = waterOf(e).length;
-  const have = (wn ? [`${fmtArea(hb.waterM2)} of water in ${wn} part${wn === 1 ? "" : "s"}`] : []).concat(Object.entries(n).map(([k, c]) => `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`)).join(", ");
+  const have = (wn ? [`${fmtArea(hb.waterM2)} of water in ${wn} part${wn === 1 ? "" : "s"}`] : []).concat(Object.entries(n).map(([k, c]) => LAND[k].period ? `${c === 1 ? "" : c + " "}${LAND[k].label}` : `${c} ${LAND[k].label.toLowerCase()}${c === 1 ? "" : "s"}`)).join(", ");
   const need = dailyNeed(e), fed = ["paleoflora", "plants"].filter(t => need[t] && browseRate(e, t))
     .map(t => `${Math.round(browseShare(e, t, need[t]) * 100)}% of their ${t}`);
   const hv = haveOf(e), pc = x => Math.round(x * 1000) / 10;
@@ -293,12 +293,16 @@ function landHtml(e){
   const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
   const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";
+  const periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][biomeOf(e)]);
+  const landBtns = keys => keys.map(k => { const t = LAND[k]; return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Each animal wants its own share of water, a number of rocks (a boulder field counts as 3) and some plants, set by the size and biome of the exhibit. Too much water is as bad as too little, and fish eaters can't do without any. Reshape water with the Move tool, like a fence.</div>
     ${wants ? `<div class="meta" style="margin-top:4px">What they want in ${esc(BIOMES[biomeOf(e)].label.toLowerCase())}:<ul style="margin:2px 0 0 16px;padding:0">${wants}</ul></div>` : ""}
     <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Mesozoic and Paleozoic plantings keep old plant-eaters off the grass. Each one uses a plant of its size grown at CERES (no refund).</div>
     ${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:4px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
-    <div class="row" style="margin-top:6px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button>${Object.entries(LAND).map(([k, t]) => `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${lock(t) ? ` disabled title="${esc(lock(t))}"` : ""}>${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`).join("")}</div></section>`;
+    <div class="row" style="margin-top:6px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button>${landBtns(Object.entries(LAND).filter(([, t]) => !t.period && !t.legacy).map(([k]) => k))}</div>
+    <div class="meta" style="margin-top:8px">${esc(BIOMES[biomeOf(e)].label)} plants, by period. ${periods.length < Object.keys(PLANTS_OF).length ? `${esc(BIOMES[biomeOf(e)].label)} only existed in the ${periods.join(", ")}. ` : ""}Change the biome to see plants for another.</div>
+    ${periods.map(p => `<div class="row" style="margin-top:4px"><span class="meta" style="min-width:86px">${p}</span>${landBtns(PLANTS_OF[p][biomeOf(e)])}</div>`).join("")}</section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
