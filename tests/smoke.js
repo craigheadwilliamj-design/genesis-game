@@ -412,8 +412,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // a new stand is an empty shell until it has a menu
     afterChange();
     out.emptyShellServesNothing = !servesOf(buildingById("b-f")).length;
-    addToMenu(buildingById("b-f"), "burger"); addToMenu(buildingById("b-f"), "soda"); addToMenu(buildingById("b-s"), "plush");
-    out.menuSlotsLimit = !!addToMenu(buildingById("b-f"), "pizza");
+    addToMenu(buildingById("b-f"), "burger"); addToMenu(buildingById("b-f"), "soda"); addToMenu(buildingById("b-f"), "water"); addToMenu(buildingById("b-s"), "plush");
+    out.menuSlotsLimit = !!addToMenu(buildingById("b-f"), "coffee");
     out.guestStops = ["b-f", "b-r", "b-s", "e-g1", "e-g2", "gate"].every(id => !!gGraph.anchors[id]);
     // a party's route to a stop matches a plain walk there
     const f = guestField("b-f"), w = walkFrom(gGraph.anchors.gate, null, new Set());

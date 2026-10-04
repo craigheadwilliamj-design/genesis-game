@@ -35,7 +35,7 @@ function servesOf(b){
 const OLD_MENUS = {food:["burger", "soda"], shop:["plush", "tshirt", "map"]};
 function addToMenu(b, id){
   const t = BUILDINGS[b.type], m = MENU[id];
-  if(!t.kind || !m || m.kind !== t.kind) return "That isn't sold here.";
+  if(!t.kind || !m || m.kind !== t.kind || (m.only && m.only !== b.type)) return "That isn't sold here.";
   if(menuItem(b, id)) return "It's already on the menu.";
   if(menuOf(b).length >= t.menuSlots) return `${t.label}s have room for ${t.menuSlots} item${t.menuSlots === 1 ? "" : "s"}. Take one off first.`;
   b.menu = menuOf(b).concat([{id, price:m.price}]);
@@ -81,7 +81,7 @@ function serveAt(p, b, why){
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price);
-      const boost = 1 + EDU.shopBoost * edu * (m.id === "guide" || m.id === "plush" ? 2 : 1);
+      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && weatherNow().wet ? WEATHER.umbrella : 1);
       if(will < .6) thinks(p, "priceyGift");
       if(Math.random() < Math.min(.95, keen * boost) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
     }
@@ -119,6 +119,7 @@ function buy(p, b, m, n){
   if(it.joy) p.mood += it.joy;
   if(m.id === "map") p.map = true;
   if(m.id === "guide"){ if(!p.guide) learn(p, EDU.guide); p.guide = true; }
+  if(m.id === "paleobook"){ if(!p.guide) learn(p, EDU.book); p.guide = true; }
   if(it.litter){ p.trash = (p.trash || 0) + n; p.trashAt = state.minute; }
   if(it.kind === "food") state.today.servedFood += n; else state.today.servedShop += n;
   if(!b.served || b.served.day !== state.day) b.served = {day:state.day, n:0, money:0, items:{}};

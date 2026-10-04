@@ -331,12 +331,13 @@ const STARTER_POOLS = {
 //   patience   minutes a party will wait for a free spot (default GUEST.patience)
 //   minRating  stars the park needs before you can build it
 const BUILDINGS = {
-  kiosk:     {label:"Food kiosk",  one:"a food kiosk",  glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:6,  d:5,  kind:"food",  menuSlots:1, slots:2,  serveMin:3},
-  food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:8,  kind:"food",  menuSlots:2, slots:4,  serveMin:4},
-  restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:4, slots:10, serveMin:12, seats:true, minRating:2},
-  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:25,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
-  shop:      {label:"Gift shop",   one:"a gift shop",   glyph:"S", color:"#8C4F7D", price:8000,  upkeep:80,  w:12, d:10, kind:"merch", menuSlots:3, slots:3,  serveMin:5},
-  megastore: {label:"Megastore",   one:"a megastore",   glyph:"M", color:"#6E3661", price:25000, upkeep:250, w:20, d:14, kind:"merch", menuSlots:5, slots:8,  serveMin:6, minRating:3},
+  // Dining and retail come in the same three tiers and sizes: cart (1 item), stand (3 items), and a large restaurant or shop (5 items)
+  kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5,  d:4,  kind:"food",  menuSlots:1, slots:2,  serveMin:3},
+  food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:8,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
+  restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2},
+  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
+  shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:8,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
+  megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:18, d:14, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
   restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:8,  d:6,  serves:["bladder"], slots:4, serveMin:3},
   // small things beside the path
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true, onPath:true},
@@ -405,6 +406,7 @@ const NEEDS = {
 // and it uses that many units of its good (a $2 burger uses 2 units of snacks).
 //   fills   how much each need drops (food)        joy     mood a souvenir adds (merch)
 //   litter  leaves a wrapper or cup to throw away
+//   only    the one building type that can sell it (restaurant dishes)
 const MENU = {
   burger:  {label:"Burgers",     kind:"food", good:"snacks",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
   hotdog:  {label:"Hot dogs",    kind:"food", good:"snacks",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
@@ -415,11 +417,34 @@ const MENU = {
   soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
   water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
   coffee:  {label:"Coffee",      kind:"food", good:"drinks",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
+  smoothie:{label:"Smoothies",   kind:"food", good:"drinks",  price:6,  cost:1.4, fills:{thirst:55, hunger:15},  litter:true},
+  shake:   {label:"Milkshakes",  kind:"food", good:"drinks",  price:7,  cost:1.7, fills:{thirst:40, hunger:30},  litter:true},
+  turkey:  {label:"Turkey legs", kind:"food", good:"snacks",  price:11, cost:3,   fills:{hunger:80},             litter:true},
+  candy:   {label:"Cotton candy",kind:"food", good:"snacks",  price:4,  cost:.6,  fills:{hunger:15},             litter:true, joy:4},
+  nachos:  {label:"Nachos",      kind:"food", good:"snacks",  price:7,  cost:1.7, fills:{hunger:50},             litter:true},
+  veggie:  {label:"Veggie burgers", kind:"food", good:"snacks", price:8, cost:2,   fills:{hunger:65},             litter:true},
+  salad:   {label:"Salad",       kind:"food", good:"snacks",  price:10, cost:2.6, fills:{hunger:45, thirst:10},  only:"restaurant"},
+  pasta:   {label:"Pasta",       kind:"food", good:"snacks",  price:14, cost:3.6, fills:{hunger:75},             only:"restaurant"},
+  soup:    {label:"Soup",        kind:"food", good:"snacks",  price:9,  cost:2.2, fills:{hunger:50, thirst:15},  only:"restaurant"},
+  steak:   {label:"Steak",       kind:"food", good:"snacks",  price:26, cost:8,   fills:{hunger:100},            only:"restaurant", joy:3},
+  lobster: {label:"Lobster",     kind:"food", good:"snacks",  price:38, cost:12,  fills:{hunger:100},            only:"restaurant", joy:6},
   plush:   {label:"Dino plushes",  kind:"merch", good:"merch", price:14, cost:4,  joy:8},
   tshirt:  {label:"T-shirts",      kind:"merch", good:"merch", price:20, cost:6,  joy:6},
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
+  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains."},
+  iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
+  fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
+  tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
+  sabhat:  {label:"Sabertooth hats", kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
+  dimebag: {label:"Dimetrodon backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
+  permshirt:{label:"Permian T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
+  arthplush:{label:"Arthropleura plushies", kind:"merch", good:"merch", price:14, cost:4, joy:8},
+  tikshirt:{label:"Tiktaalik T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
+  trexhat: {label:"T-Rex hats",    kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
+  paleobook:{label:"Paleontology books", kind:"merch", good:"merch", price:24, cost:7, joy:6, text:"Guests who read one learn more, and learn more at every exhibit after."},
+  jacket:  {label:"Branded jackets", kind:"merch", good:"merch", price:55, cost:18, joy:10},
 };
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
@@ -573,6 +598,7 @@ const EDU = {
   sign:8,              // more if an info sign stands by its fence, plus a quarter more for each species inside
   signReach:20,        // a sign this close to an exhibit's fence tells guests about it
   guide:10,            // learning from buying a field guide
+  book:16,             // learning from buying a paleontology book (it works like a field guide too)
   guideBoost:1.5,      // and guests with one learn this much more at every exhibit after
   center:35,           // learning from a visit to the Education Center
   centerJoy:12,        // and the mood it adds
@@ -581,7 +607,7 @@ const EDU = {
   joy:.08,             // mood gained for each point learned
   litterCut:.4,        // at 100 learning, guests drop litter this much less
   vandalCut:.6,        // and vandalize this much less
-  shopBoost:.3,        // and are this much keener in gift shops (double for plushes and field guides)
+  shopBoost:.3,        // and are this much keener in gift shops (double for dino plushes, field guides and paleontology books)
   donate:4,            // a guest who learned everything drops this in the donation box on the way out
   full:40,             // average learning that gets full marks in the rating
   learned:40,          // guests who learned this much say so
@@ -792,7 +818,7 @@ BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyp
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
 for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
 // Food stands and gift shops keep their own stock
-for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:200, megastore:500}))
+for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:150, megastore:400}))
   BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
 // Production. Needs the food production research. Output goes into the building's own store.
 //   makes   units a day
@@ -1005,12 +1031,13 @@ const HAB = {
 //   guests  share of the usual guests who come
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
+  umbrella:2.5,     // umbrellas sell this many times as well on a wet day
   startDay:4,       // new parks get fair weather until this day
   kinds:{
     fair: {label:"Fair",      odds:.55, happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
     hot:  {label:"Heat wave", odds:.17, happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
     cold: {label:"Cold snap", odds:.15, happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
-    storm:{label:"Storm",     odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+    storm:{label:"Storm",     wet:true, odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
   },
 };
 // Ice age animals shrug off the cold
