@@ -968,9 +968,9 @@ function placeGhost(clientX, clientY){
   if(best){
     const dx = best.b[0] - best.a[0], dy = best.b[1] - best.a[1], L = Math.hypot(dx, dy) || 1;
     const nx = -dy/L, ny = dx/L;
-    // a sign goes on the edge of the path that faces the closest exhibit fence; everything else on the side you point at
+    // a sign goes on the edge of the path that faces the exhibit fence closest to where you point (so you can pick either side of a path); everything else on the side you point at
     let fx = p.x, fy = p.y;
-    if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(best.x, best.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+    if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
     const dn = rot % 2 ? t.w : t.d;   // how deep it is across the path once turned
     let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
