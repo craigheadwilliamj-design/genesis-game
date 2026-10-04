@@ -33,6 +33,7 @@ const FAMILIES = {
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
+const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
@@ -40,7 +41,7 @@ const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t 
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
-let rot = 0;                        // quarter turns a building is rotated by while placing it
+let rot = 0;                        // 45° steps a building is rotated by while placing it
 let lastPtr = null;                 // where the pointer last was while placing, so Rotate can redraw the ghost
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
@@ -733,7 +734,7 @@ function setTool(t){
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
-    const free = " Place it anywhere, but it only works once a path reaches it.", spin = " Rotate turns it a quarter (R).";
+    const free = " Place it anywhere, but it only works once a path reaches it.", spin = " Rotate turns it 45° (R).";
     showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and it snaps on.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
       : b.tram ? `Point beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
@@ -751,7 +752,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit or path to a new spot. Tap a building, then Rotate (R) to turn it a quarter. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
+    showBar("Move", "Drag a building, exhibit or path to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -951,7 +952,7 @@ function placeGhost(clientX, clientY){
     if(t.serviceOnly && !isService(q)) continue;   // depots go on service roads, where ATVs can drive
     for(let i = 1; i < q.points.length; i++){
       const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
-      if(r.d < 30 + t.d/2 && (!best || r.d < best.d)) best = {...r, a:q.points[i-1], b:q.points[i], hw:halfWidth(q)};
+      if(r.d < (t.onPath ? 30 + t.d/2 : halfWidth(q) + t.d/2 + SNAP_REACH) && (!best || r.d < best.d)) best = {...r, a:q.points[i-1], b:q.points[i], hw:halfWidth(q)};
     }
   }
   let x = p.x, y = p.y, angle = 0, why = null;
@@ -972,14 +973,14 @@ function placeGhost(clientX, clientY){
     let fx = p.x, fy = p.y;
     if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
-    const dn = rot % 2 ? t.w : t.d;   // how deep it is across the path once turned
+    const ra = rot*Math.PI/4, dn = Math.abs(t.w*Math.sin(ra)) + Math.abs(t.d*Math.cos(ra));   // how deep it is across the path once turned
     let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
     // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
-    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + rot*Math.PI/2), e.points))) off = Math.max(0, off - .1);
+    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + ra), e.points))) off = Math.max(0, off - .1);
     x = best.x + nx*side*off; y = best.y + ny*side*off;
     angle = Math.atan2(dy, dx);
   } else if(t.onPath) why = why || "Move it next to a path.";
-  angle += rot * Math.PI/2;
+  angle += rot * Math.PI/4;
   if(!best && gridSnap){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
   const pts = rectPts(x, y, t.w, t.d, angle);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
@@ -992,18 +993,19 @@ function placeGhost(clientX, clientY){
   setStat(why || `${money(t.price)}. Tap to build.${best ? "" : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
 }
 
-// Turn the building being placed a quarter, and redraw the ghost where the pointer is
+// Turn the building being placed 45°, and redraw the ghost where the pointer is
 function rotateTool(){
-  rot = (rot + 1) % 4;
+  rot = (rot + 1) % 8;
   if(lastPtr){ placeGhost(lastPtr.x, lastPtr.y); renderOverlay(); }
-  else setStat(`Turned a quarter. Tap to place it.`);
+  else setStat(`Turned 45°. Tap to place it.`);
 }
-// Turn the building picked with the Move tool a quarter about its middle, if it fits there
+// Turn the building picked with the Move tool 45° about its middle, if it fits there
 function rotateMoved(){
   const it = mvSel && findItem("building", mvSel);
   if(!it){ setStat("Tap a building first, then Rotate.", true); return; }
   const orig = it.points, [cx, cy] = centroid(orig);
-  it.points = orig.map(([x, y]) => [cx - (y - cy), cy + (x - cx)]);
+  const c45 = Math.SQRT1_2;
+  it.points = orig.map(([x, y]) => [cx + (x - cx)*c45 - (y - cy)*c45, cy + (x - cx)*c45 + (y - cy)*c45]);
   const why = moveProblem("building", it);
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
   afterChange(); render(); updateMoveBar();
