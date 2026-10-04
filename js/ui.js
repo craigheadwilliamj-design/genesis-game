@@ -420,7 +420,7 @@ const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCa
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
   const free = rep.area - rep.need;
-  const locked = state.rating + 1e-9 < s.stars;
+  const locked = state.rating + 1e-9 < starsNeed(s);
   let warn = "";
   for(const sp of rep.counts.keys()){ const w = conflict(s, SPECIES_BY_ID[sp]); if(w){ warn = w; break; } }
   const have = rep.counts.get(s.id) || 0, fits = Math.floor(free / s.space);
@@ -428,7 +428,7 @@ function animalCard(s, rep, mode){
   const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>`
     : have === 0 && s.group[0] > 1 ? `<span class="need">${fitText} Get at least ${s.group[0]} so they aren't lonely.</span>` : `<span class="fit">${fitText}</span>`;
   let h = `<li class="${locked ? "locked" : ""}"><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)} <span class="per">${s.period}</span></span>`;
-  if(locked) h += `<span class="meta">Needs ${s.stars}★ (you have ${starTxt(state.rating)})</span>`;
+  if(locked) h += `<span class="meta">Needs ${starsNeed(s)}★ (you have ${starTxt(state.rating)})</span>`;
   else if(mode === "clone"){
     const why = cloneProblem(s.id);
     h += `<button class="buy" data-action="clone" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone ${money(s.price)}</button>`;
@@ -694,7 +694,7 @@ panelEl.addEventListener("click", e => {
   if(a === "center") centerOn(it);
   if(a === "buy"){
     const s = SPECIES_BY_ID[b.dataset.sp];
-    if(!canAfford(s.price) || state.rating + 1e-9 < s.stars) return;
+    if(!canAfford(s.price) || state.rating + 1e-9 < starsNeed(s)) return;
     spend(s.price, "animals");
     if(!it.animals.length) it.happy = 70;
     it.animals.push({id:uid("a-"), sp:s.id});
@@ -771,7 +771,7 @@ let catFilter = "all";
 // Where a species stands: can you get it now, is it on its way, or not started yet?
 function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
-  const lock = state.rating + 1e-9 < s.stars ? `Needs ${s.stars}★. You have ${starTxt(state.rating)}.` : "";
+  const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
