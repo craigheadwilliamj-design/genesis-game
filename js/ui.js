@@ -244,22 +244,20 @@ function cloneHtml(e, rep){
     h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
   const ready = SPECIES.filter(s => sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
+  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
-  h += `<section><h3>Clone at TAR</h3>`;
+  h += `<section><h3>Add animals</h3>`;
   if(coming.length) h += `<div class="meta" style="margin-bottom:8px">Growing for this exhibit: ${coming.map(c => `${esc(SPECIES_BY_ID[c.sp].name)} (${whenText(c.end)})`).join(", ")}.</div>`;
-  if(!ready.length){
+  if(!ready.length && !forSale.length){
     h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
-      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`}</div>`;
+      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
   } else {
-    const has = id => ready.some(s => s.period === id);
+    const has = id => ready.some(s => s.period === id) || forSale.some(s => s.period === id);
     if(!has(exTabs.period)) exTabs.period = PERIOD_ORDER.find(has);
     h += tabBar("expd", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!has(id)})), exTabs.period);
-    h += `<ul class="shop" style="margin-top:8px">${ready.filter(s => s.period === exTabs.period).map(s => animalCard(s, rep, "clone")).join("")}</ul>`;
+    h += `<ul class="shop" style="margin-top:8px">${ready.filter(s => s.period === exTabs.period).map(s => animalCard(s, rep, "clone")).join("")}${forSale.filter(s => s.period === exTabs.period).map(s => animalCard(s, rep, "buy")).join("")}</ul>`;
   }
   h += `</section>`;
-  // starter animals from partner parks
-  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
-  h += `<section><h3>Buy from partner parks</h3>${forSale.length ? `<ul class="shop">${forSale.map(s => animalCard(s, rep, "buy")).join("")}</ul>` : `<div class="meta">Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}. ${e.viv ? "Arthropleura needs a large vivarium." : ""}</div>`}</section>`;
   return h;
 }
 
