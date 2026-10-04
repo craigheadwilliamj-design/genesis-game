@@ -35,7 +35,7 @@ function servesOf(b){
 const OLD_MENUS = {food:["burger", "soda"], shop:["plush", "tshirt", "map"]};
 function addToMenu(b, id){
   const t = BUILDINGS[b.type], m = MENU[id];
-  if(!t.kind || !m || m.kind !== t.kind) return "That isn't sold here.";
+  if(!t.kind || !m || m.kind !== t.kind || (m.only && m.only !== b.type)) return "That isn't sold here.";
   if(menuItem(b, id)) return "It's already on the menu.";
   if(menuOf(b).length >= t.menuSlots) return `${t.label}s have room for ${t.menuSlots} item${t.menuSlots === 1 ? "" : "s"}. Take one off first.`;
   b.menu = menuOf(b).concat([{id, price:m.price}]);

@@ -158,7 +158,7 @@ function menuHtml(b, served){
       ${will < 1 ? `<span class="${will < .6 ? "warn" : "need"}">${will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`}</span>` : ""}
       <span class="need"><button class="btn" data-action="menuDrop" data-id="${m.id}" style="padding:2px 9px">Take off the menu</button></span></li>`;
   }).join("")}</ul>`;
-  const more = Object.keys(MENU).filter(id => MENU[id].kind === t.kind && !menuItem(b, id));
+  const more = Object.keys(MENU).filter(id => MENU[id].kind === t.kind && (!MENU[id].only || MENU[id].only === b.type) && !menuItem(b, id));
   if(menu.length < t.menuSlots && more.length) h += `<div class="meta" style="margin:8px 0 4px">Add to the menu:</div><div class="row">${more.map(id => `<button class="btn" data-action="menuAdd" data-id="${id}" style="padding:4px 10px">${esc(MENU[id].label)}</button>`).join("")}</div>`;
   else if(menu.length >= t.menuSlots) h += `<div class="meta" style="margin-top:6px">The menu is full. Take something off to sell something else.</div>`;
   return h + `</section>`;

@@ -406,6 +406,7 @@ const NEEDS = {
 // and it uses that many units of its good (a $2 burger uses 2 units of snacks).
 //   fills   how much each need drops (food)        joy     mood a souvenir adds (merch)
 //   litter  leaves a wrapper or cup to throw away
+//   only    the one building type that can sell it (restaurant dishes)
 const MENU = {
   burger:  {label:"Burgers",     kind:"food", good:"snacks",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
   hotdog:  {label:"Hot dogs",    kind:"food", good:"snacks",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
@@ -416,6 +417,17 @@ const MENU = {
   soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
   water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
   coffee:  {label:"Coffee",      kind:"food", good:"drinks",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
+  smoothie:{label:"Smoothies",   kind:"food", good:"drinks",  price:6,  cost:1.4, fills:{thirst:55, hunger:15},  litter:true},
+  shake:   {label:"Milkshakes",  kind:"food", good:"drinks",  price:7,  cost:1.7, fills:{thirst:40, hunger:30},  litter:true},
+  turkey:  {label:"Turkey legs", kind:"food", good:"snacks",  price:11, cost:3,   fills:{hunger:80},             litter:true},
+  candy:   {label:"Cotton candy",kind:"food", good:"snacks",  price:4,  cost:.6,  fills:{hunger:15},             litter:true, joy:4},
+  nachos:  {label:"Nachos",      kind:"food", good:"snacks",  price:7,  cost:1.7, fills:{hunger:50},             litter:true},
+  veggie:  {label:"Veggie burgers", kind:"food", good:"snacks", price:8, cost:2,   fills:{hunger:65},             litter:true},
+  salad:   {label:"Salad",       kind:"food", good:"snacks",  price:10, cost:2.6, fills:{hunger:45, thirst:10},  only:"restaurant"},
+  pasta:   {label:"Pasta",       kind:"food", good:"snacks",  price:14, cost:3.6, fills:{hunger:75},             only:"restaurant"},
+  soup:    {label:"Soup",        kind:"food", good:"snacks",  price:9,  cost:2.2, fills:{hunger:50, thirst:15},  only:"restaurant"},
+  steak:   {label:"Steak",       kind:"food", good:"snacks",  price:26, cost:8,   fills:{hunger:100},            only:"restaurant", joy:3},
+  lobster: {label:"Lobster",     kind:"food", good:"snacks",  price:38, cost:12,  fills:{hunger:100},            only:"restaurant", joy:6},
   plush:   {label:"Dino plushes",  kind:"merch", good:"merch", price:14, cost:4,  joy:8},
   tshirt:  {label:"T-shirts",      kind:"merch", good:"merch", price:20, cost:6,  joy:6},
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
