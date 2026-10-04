@@ -48,6 +48,50 @@ const vetsOnDuty = () => state.staff.vets.length > 0 && pmcs().length > 0;
 function medCap(){ return MEDICINE.capacity; }
 const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
+/* ---------- trash thrown into exhibits ---------- */
+
+// Is there a working Do Not Feed sign by this exhibit's fence?
+const hasNoFeed = e => state.buildings.some(b => b.type === "nofeed" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= THROWN.signReach);
+// Chance a minute that a party at (x, y) throws trash into exhibit e: bins, guards and the sign cut it
+function throwChance(p, e, x, y){
+  let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
+  if(!c) return 0;
+  if(nearBin(x, y)) c *= THROWN.binCut;
+  if(hasNoFeed(e)) c *= THROWN.signCut;
+  if(guardNear(x, y)) c *= SECURITY.deterCut;
+  return c * (1 - EDU.vandalCut * (p.edu || 0) / 100);
+}
+// Each minute, a party out on the paths beside an open exhibit might throw trash over the fence
+function throwTick(p, dt){
+  if(p.home || p.in || !p.at || p.at.rail) return;
+  const x = p.at.x, y = p.at.y;
+  for(const e of state.exhibits){
+    if(e.viv || !e.animals.length || distToEdge(x, y, e.points) > THROWN.reach) continue;
+    if(Math.random() < 1 - Math.pow(1 - Math.min(.5, throwChance(p, e, x, y)), dt)){
+      e.trash = (e.trash || 0) + THROWN.pieces; p.trash = 0;
+      if(p.rowdy){ p.vandal = true; if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); } }
+      state.today.thrown = (state.today.thrown || 0) + 1;
+      if(state.today.thrown === 1) events.toast(`A guest threw trash into ${e.name}. Animals that eat it fall ill. Bins, guards and Do Not Feed signs by the fence cut down on it.`, "bad");
+    }
+    return;
+  }
+}
+// Chance a night that an animal in e eats some of the trash thrown in today
+const trashEaten = e => e.trash && e.animals.length ? Math.min(THROWN.eatMax, THROWN.eat * e.trash / e.animals.length) : 0;
+// Run each night: animals that ate trash fall ill or die, then the keepers clear the rest
+function trashNight(out){
+  for(const e of state.exhibits){
+    const p = trashEaten(e);
+    if(p && healthActive()) for(const a of [...e.animals]){
+      if(Math.random() >= p) continue;
+      if(Math.random() < THROWN.deadly){ a.sick = {kind:"illness", sev:100, cause:"trash"}; animalDies(e, a); out.poisoned++; continue; }
+      if(a.sick){ a.sick.sev = Math.min(99, a.sick.sev + THROWN.sev); continue; }
+      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; out.fed++;
+    }
+    e.trash = 0;
+  }
+}
+
 /* ---------- genome therapy ---------- */
 // A vet lifts a clone's DNA quality (a.q) toward the lab's genome for its species (sc.dna), which GHOST can improve.
 // The player queues animals (a.gene), and a free vet does them one by one.
@@ -406,7 +450,7 @@ function vetStatus(v){
 /* ---------- each night ---------- */
 
 function healthNight(){
-  const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[]};
+  const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0};
   modernMedsNight();
   // medicated feed: CERES doses go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
@@ -441,6 +485,7 @@ function healthNight(){
       }
     }
   }
+  trashNight(out);
   // the ward: patients don't get worse here, and vets treat as many as they can
   const pmc = dept("pmc");
   let cap = pmc ? state.staff.vets.length * VET.patients : 0;
@@ -469,8 +514,8 @@ function healthNight(){
   for(const e of state.exhibits) e.hungryMin = 0;
   // mild illness starts out hidden, so only injuries and cases that now show get a warning
   const ill = out.ill + out.showing.length;
-  if(ill || out.hurt){
-    const bits = [ill && `${ill} animal${ill === 1 ? " is" : "s are"} showing signs of illness`, out.hurt && `${out.hurt} ${out.hurt === 1 ? "was" : "were"} hurt fighting`].filter(Boolean);
+  if(ill || out.hurt || out.fed){
+    const bits = [ill && `${ill} animal${ill === 1 ? " is" : "s are"} showing signs of illness`, out.fed && `${out.fed} ate trash thrown in by guests`, out.hurt && `${out.hurt} ${out.hurt === 1 ? "was" : "were"} hurt fighting`].filter(Boolean);
     events.toast(`Overnight, ${bits.join(" and ")}. ${state.staff.vets.length ? "Vets will see to them." : "Build a Paleo-Medicine Center and hire vets to treat them."}`, "bad");
   }
   if(state.day + 1 === h.from) events.toast("Animals can start falling ill tomorrow. Keep them fed and clean, and build a Paleo-Medicine Center.", "bad");
@@ -480,5 +525,5 @@ function animalDies(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.rating = Math.max(0, state.rating - .05);
-  events.toast(`A ${SPECIES_BY_ID[a.sp].name} in ${e.name} died of ${a.sick.kind === "injury" ? "its injuries" : "illness"}.`, "bad");
+  events.toast(`A ${SPECIES_BY_ID[a.sp].name} in ${e.name} died ${a.sick.cause === "trash" ? "after eating trash thrown in by guests" : "of " + (a.sick.kind === "injury" ? "its injuries" : "illness")}.`, "bad");
 }

@@ -17,6 +17,7 @@ const BUILD_MENU = [
     {label:"Picnic Areas", tool:"picnic"},
     {label:"Lamp Posts", tool:"lamp"},
     {label:"Info Signs", tool:"sign"},
+    {label:"Do Not Feed Signs", tool:"nofeed", note:"Guests are less likely to throw trash into an exhibit with one beside its fence. Put it on the path within 20 m of the fence."},
   ]},
   {id:"land-buy", label:"Land", items:[
     {label:"Buy Land", tool:"parcels", price:() => `from ${money(Math.min(...PARCEL_CELLS.filter(([i, j]) => !parcelHome(i, j)).map(([i, j]) => parcelPrice(i, j))))}`, note:"Buy the plots around your park to build further out. Each costs a daily property tax."},

@@ -344,6 +344,7 @@ const BUILDINGS = {
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
+  nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
   lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
   resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
@@ -551,6 +552,20 @@ const VANDAL = {
   lampCut:.5,          // a working lamp nearby multiplies it by this
   lampReach:15,
   repairShare:.005,    // mechanics' parts cost this share of a prop's price for each point repaired
+};
+// Guests throw trash into exhibits. Rowdy ones do it most. Animals that eat it fall ill or die.
+const THROWN = {
+  reach:10,            // a guest this close to an open exhibit's fence might throw trash in
+  rowdy:.02,           // chance each minute for a rowdy party (more the unhappier it is)
+  normal:.0015,        // chance each minute for any other party that's carrying trash
+  binCut:.4,           // a working bin with room nearby multiplies it by this
+  signCut:.5,          // so does a Do Not Feed sign by the exhibit's fence
+  signReach:20,        // a sign this close to a fence counts for the exhibit
+  pieces:1,            // pieces of trash one throw adds
+  eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
+  eatMax:.6,
+  deadly:.15,          // share of animals that eat trash and die at once, rather than falling ill
+  sev:45,              // how bad the illness starts when one eats trash (0 to 100)
 };
 // Guests learn about the animals from info signs, field guides, and the Education Center
 const EDU = {
