@@ -198,6 +198,7 @@ const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(
 function landProblem(e, key, x, y){
   const t = LAND[key];
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
+  if(t.biome && biomeOf(e) !== t.biome) return `${t.label} grows in ${BIOMES[t.biome].label.toLowerCase()}, and ${e.name} is ${BIOMES[biomeOf(e)].label.toLowerCase()}.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
   if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < t.r + LAND[f.type].r)) return "It overlaps something already there.";
