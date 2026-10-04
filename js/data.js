@@ -827,6 +827,8 @@ const TECH = [
   {id:"incub2",   group:"tar", label:"Even more incubators", points:50, needs:"incub1", text:"Every geneticist runs 3 incubators."},
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:30, text:"Clones finish in three quarters of the time."},
   {id:"fast2",    group:"tar", label:"Much faster incubators", points:50, needs:"fast1", text:"Clones finish in about half the time."},
+  // Genetics
+  {id:"genetherapy", group:"gene", label:"Genome therapy", points:45, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
   {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
   {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. GHOST collects their DNA, then CERES grows planting stock for exhibits."},
@@ -880,6 +882,14 @@ const HEALTH = {
   beds:6,              // patients the PMC holds at once
   healPerNight:45,     // severity a treated patient recovers each night
   dose:2,              // medicine doses one patient's treatment uses
+};
+// Genome therapy (ORACLE tech "genetherapy"): a vet lifts a clone's DNA quality toward the lab's genome for its species
+const GENE = {
+  minutes:30,          // time a vet spends on one procedure
+  step:20,             // most DNA quality points one procedure adds
+  minGain:5,           // the lab's genome has to beat the animal by this much to be worth it
+  base:500,            // fixed price of a procedure
+  perPoint:60,         // plus this for each quality point gained
 };
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
