@@ -32,7 +32,7 @@ const BUILD_MENU = [
     {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it inside an exhibit like a fence: tap the shore corners, then the first one again."},
     ...Object.entries(LAND).filter(([, t]) => !t.period && !t.legacy).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
       note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need water. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
-    ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and they grow only in an exhibit of that biome. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES." : undefined})),
+    ...Object.keys(BIOMES).filter(b => Object.values(PLANTS_OF).some(p => p[b])).map((biome, i) => ({label:BIOMES[biome].label + " plants", biome, note:i === 0 ? "Pick a biome, then a period. Each period has its own small, medium and large plants, and they grow only in an exhibit of that biome. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES." : undefined})),
   ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
@@ -118,11 +118,13 @@ function menuRow(it){
     const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(fenceRate("wood"))}–${money(fenceRate("acrylic"))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
-  if(it.period){
-    const rows = Object.entries(PLANTS_OF[it.period]).map(([biome, keys]) => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + keys.map(k => { const t = LAND[k];
-      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${t.size}</span></span></button>`; }).join("")).join("");
-    const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
-    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${Object.keys(PLANTS_OF[it.period]).length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
+  if(it.biome){
+    const periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][it.biome]);
+    const rows = periods.map(p => { const keys = PLANTS_OF[p][it.biome];
+      const plants = keys.map(k => { const t = LAND[k];
+        return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${esc(t.size)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</span></span></button>`; }).join("");
+      return `<div class="sitem" data-open="plants-${it.biome}-${p}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + keys[1])}<span class="tl"><b>${esc(p)}</b><span class="price">small, medium, large</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plants}</div></div>`; }).join("");
+    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.biome}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + PLANTS_OF[periods[0]][it.biome][1])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${periods.length} period${periods.length === 1 ? "" : "s"}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   if(it.sub){
     const rows = it.sub.map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
