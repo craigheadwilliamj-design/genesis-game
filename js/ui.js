@@ -227,7 +227,7 @@ function exhibitHtml(e){
     const fl = e.flora || "cenozoic", hasCeres = hasDept("ceres");
     const hv = haveOf(e), pc = x => Math.round(x * 1000) / 10;
   const wants = e.animals.length ? [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s);
-    return `<li>${esc(s.name)}: water ${pc(f.w.water)}% (has ${pc(hv.water)}%), rocks ${f.w.rock} (has ${hv.rock}), plants ${f.w.plants} m² (has ${hv.plants} m²)</li>`; }).join("") : "";
+    return `<li>${esc(s.name)}: water ${pc(f.w.water)}% (has ${pc(hv.water)}%), rocks ${f.w.rock} (has ${hv.rock}), plants ${f.w.plants} m² (has ${f.h.plants} m²)</li>`; }).join("") : "";
   const eras = [...new Set(e.animals.map(x => ERA_OF[SPECIES_BY_ID[x.sp].period]))];
     h += `<section><h3>Plants</h3><label class="field"><span>Flora</span><select id="floraSel">${Object.entries(FLORA).map(([k, f]) => {
       const why = k === fl ? null : replantProblem(e, k), cost = k === fl ? 0 : Math.round(area(e.points) * f.perSqM), noTech = f.tech && !hasTech(f.tech);
@@ -289,7 +289,7 @@ function landHtml(e){
     .map(t => `${Math.round(browseShare(e, t, need[t]) * 100)}% of their ${t}`);
   const hv = haveOf(e), pc = x => Math.round(x * 1000) / 10;
   const wants = e.animals.length ? [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s);
-    return `<li>${esc(s.name)}: water ${pc(f.w.water)}% (has ${pc(hv.water)}%), rocks ${f.w.rock} (has ${hv.rock}), plants ${f.w.plants} m² (has ${hv.plants} m²)</li>`; }).join("") : "";
+    return `<li>${esc(s.name)}: water ${pc(f.w.water)}% (has ${pc(hv.water)}%), rocks ${f.w.rock} (has ${hv.rock}), plants ${f.w.plants} m² (has ${f.h.plants} m²)</li>`; }).join("") : "";
   const eras = [...new Set(e.animals.map(a => ERA_OF[SPECIES_BY_ID[a.sp].period]))];
   const groves = eras.map(era => `${FLORA[era].label} groves cover ${Math.round(hb.grove[era] * 100)}% of what their animals want`);
   const lock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";

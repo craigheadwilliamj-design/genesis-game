@@ -931,6 +931,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.plantWrongBiome = /grows in wetland, and .* is tropical/.test(landSpot(115, 115, "car-wetland-small").why || "") && landSpot(115, 115, "car-tropical-small").ok;
     placeLand(gx, "car-tropical-small", 115, 115);
     out.plantUsesStock = state.ceres.pots["paleozoic-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
+    // animals only count plants from their own period, and want none where their period had no plants in the biome
+    const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
+    px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
+    const wrongPeriod = haveOf(px, jurSp).plants, anyPeriod = haveOf(px).plants;
+    px.land.push({id:"l-b", type:"jur-tropical-large", x:135, y:135});
+    out.plantsOwnPeriod = wrongPeriod === 0 && anyPeriod > 0 && haveOf(px, jurSp).plants === Math.round(Math.PI * 25) && speciesFit(px, jurSp).plants > 0;
+    px.biome = "grassland";
+    out.plantsWaivedNoBiome = wantsOf(px, jurSp).plants === 0 && speciesFit(px, jurSp).plants === 1;
     sc.tech = keepTech; state.ceres.pots = keepPots; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
@@ -941,9 +949,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
     state.exhibits = [bx];
     const away = biomesOf(desertSp).includes(DEFAULT_BIOME) ? "wetland" : DEFAULT_BIOME;
+    const biomeD = b => { bx.biome = b; return biomeScore(bx, {delta:0, issues:[]}, bx.animals.length).delta; }, awayD = biomeD(away), homeD = biomeD("desert");
     bx.biome = away; const awayT = exhibitReport(bx).target, awayFlag = exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text));
     bx.biome = "desert"; const homeT = exhibitReport(bx).target;
-    out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeT - awayT === BIOME_HAPPY.home - BIOME_HAPPY.away && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
+    out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeD - awayD === BIOME_HAPPY.home - BIOME_HAPPY.away && homeT > awayT && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
     const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);

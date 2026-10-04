@@ -52,13 +52,17 @@ function habitatOf(e){
 function wantsOf(e, s){
   const a = area(e.points) || 1, l = likesOf(s), B = BIOMES[biomeOf(e)];
   const meat = !s.diet.some(d => d === "herbivore" || d === "omnivore");
-  return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
+  // no plants at all if its period had none in this biome (nothing to plant)
+  const none = !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);
+  return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
-// What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters from any era
-function haveOf(e){
+// A plant counts for a species when it's from the animal's own period (the old generic plants, when from its era)
+const plantSuits = (t, s) => t.period ? t.period === s.period : t.flora === ERA_OF[s.period];
+// What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters. With a species, only plants from its own period count.
+function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
   return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
-    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora ? landM2(f) : 0), 0))};
+    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && (!s || plantSuits(LAND[f.type], s)) ? landM2(f) : 0), 0))};
 }
 // How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
 function waterFit(have, want){
@@ -69,7 +73,7 @@ function waterFit(have, want){
 }
 const fitOf = (have, want) => want > 0 ? clamp(have / want, 0, 1) : 1;
 function speciesFit(e, s){
-  const w = wantsOf(e, s), h = haveOf(e), l = likesOf(s), pw = HAB.plantWeight;
+  const w = wantsOf(e, s), h = haveOf(e, s), l = likesOf(s), pw = HAB.plantWeight;
   const water = waterFit(h.water, w.water), rock = fitOf(h.rock, w.rock), plants = fitOf(h.plants, w.plants);
   return {w, h, water, rock, plants, sat:(l.water * water + l.rock * rock + pw * plants) / (l.water + l.rock + pw)};
 }
@@ -144,7 +148,7 @@ function habitatScore(e){
     out.delta += HAB.bonus * sat;
     out.issues.push({bad:false, text:sat >= .6 ? "Water, rocks and plants make it feel like home." : "Some water, rocks and plants. More of what they want would make them feel more at home."});
   }
-  const what = {water:"the right amount of water", rock:"enough rocks", plants:"enough plants"}, uniq = l => [...new Set(l)].join(", ");
+  const what = {water:"the right amount of water", rock:"enough rocks", plants:"enough plants from their own period"}, uniq = l => [...new Set(l)].join(", ");
   for(const k of ["water", "rock", "plants"]) if(lack[k].length) out.issues.push({bad:false, text:`${uniq(lack[k])} ${lack[k].length === 1 ? "wants" : "want"} ${what[k]}. See Landscaping.`});
   biomeScore(e, out, n);
   // groves from the animals' own era
