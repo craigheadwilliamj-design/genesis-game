@@ -215,17 +215,7 @@ function exhibitHtml(e){
     h += `</section>`;
   }
 
-  // the biome the exhibit is laid out as
-  {
-    const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
-    h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
-      const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
-      return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
-    }).join("")}</select></label>`;
-    h += kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
-      return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
-    h += `</section>`;
-  }
+  if(e.viv) h += biomeHtml(e);
 
   h += themeHtml("exhibit", e);
 
@@ -268,6 +258,19 @@ function exhibitHtml(e){
   return h;
 }
 
+// The biome the exhibit is laid out as: the ground picker and how each animal feels about it
+function biomeHtml(e){
+  let h = "";
+  const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
+  h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
+    const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
+    return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
+  }).join("")}</select></label>`;
+  h += kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
+    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
+  h += `</section>`;
+  return h;
+}
 // Plant cover and rock coverage per species: "X/Y" (what it has / what it wants), then red lines for what's wrong or one green line when it's right
 function needsHtml(e){
   if(!e.animals.length) return "";
@@ -317,7 +320,7 @@ function landHtml(e){
     : `${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:8px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
     <div class="row" style="margin-top:6px">${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !t.legacy && !ROCKS.includes(k)).map(([k]) => k))}</div>`;
-  return `<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}, {key:"shelter", label:"Shelter", color:"#8C6A2E"}], sub)}${body}</section>`;
+  return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}, {key:"shelter", label:"Shelter", color:"#8C6A2E"}], sub)}${body}</section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
