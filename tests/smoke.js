@@ -971,7 +971,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.wantsByBiome = dW.rock > tW.rock && tW.plants > dW.plants && wantsOf(mk("desert"), fish).water > wantsOf(mk("desert"), sp).water;
       const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
       out.waterTooMuchHurts = waterFit(wp, wp) === 1 && waterFit(0, wp) === 0 && waterFit(wp * 5, wp) < 1 && waterFit(wp * 5, wp) < waterFit(wp * 1.1, wp); }
-    try { const h = landHtml(bx); out.landPanelRenders = /What they want in/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
+    try { const h = landHtml(bx); out.landPanelRenders = /Plant Cover: ?<\/b>|Plant Cover/.test(h) && /Rock Coverage/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
     state.exhibits = keepEx; state.money = keepMoney; render();
 
