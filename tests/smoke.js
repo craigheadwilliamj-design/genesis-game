@@ -934,6 +934,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.plantWrongNoCount = haveOf(gx).plants === n0 && !plantHere(LAND["car-wetland-small"], gx);
       state.ceres.pots["paleozoic-small"] = 1; gx.land = []; }
     placeLand(gx, "car-tropical-small", 115, 115);
+    { const land0 = gx.land, m0 = state.money; gx.land = []; state.money = 1e6; placeLand(gx, "rock", 115, 115, "desert"); placeLand(gx, "rock", 135, 135);
+      out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
+      gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["paleozoic-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // animals only count plants from their own period, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};

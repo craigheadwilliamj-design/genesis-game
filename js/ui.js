@@ -301,9 +301,9 @@ function landHtml(e){
   if(!biomes.includes(landTabs.biome)) landTabs.biome = biomes[0];
   const lb = landTabs.biome, periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][lb]);
   if(!periods.includes(landTabs.period)) landTabs.period = periods[0];
-  const lp = landTabs.period, wrong = lb !== here ? `Rocks are matched to the exhibit's biome (${BIOMES[here].label.toLowerCase()}).` : "";
-  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = wrong || lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
-  const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = wrong || lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
+  const lp = landTabs.period;
+  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
+  const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   return `<section><h3>Landscaping</h3><div class="meta">${have ? `${have}. ` : "Nothing built yet. "}Water covers ${(hb.waterShare * 100).toFixed(1)}% of the floor; ${Math.round(HAB.waterFull * 100)}% is plenty. Each animal wants its own share of water, a number of rocks (a boulder counts as 3) and some plants, set by the size and biome of the exhibit. Too much water is as bad as too little, and fish eaters can't do without any. Reshape water with the Move tool, like a fence.</div>
     ${wants ? `<div class="meta" style="margin-top:4px">What they want in ${esc(BIOMES[biomeOf(e)].label.toLowerCase())}:<ul style="margin:2px 0 0 16px;padding:0">${wants}</ul></div>` : ""}
     <div class="meta" style="margin-top:4px">${groves.length ? groves.join(". ") + ". " : ""}${fed.length ? `Groves feed ${fed.join(" and ")}. ` : ""}Groves from an animal's own era let it browse and shelter. Mesozoic and Paleozoic plantings keep old plant-eaters off the grass. Each one uses a plant of its size grown at CERES (no refund).</div>
@@ -636,7 +636,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
-  if(a === "landTool"){ setTool("land-" + b.dataset.key); return; }
+  if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }

@@ -226,11 +226,13 @@ function landSpot(x, y, key){
   const why = landProblem(e, key, x, y);
   return {e, x, y, ok:!why, why};
 }
-function placeLand(e, key, x, y){
+function placeLand(e, key, x, y, biome){
   const t = LAND[key];
   spend(t.price, "built");
   if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
-  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
+  const f = {id:uid("l-"), type:key, x, y};
+  if(biome && !t.flora && !t.slots) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
+  (e.land = e.land || []).push(f);
 }
 
 // Rocks and plants are drawn as lumpy blobs, shaped from the feature's id so each keeps its look. They stay inside their radius.
@@ -274,7 +276,7 @@ function landSvg(e, pick, isDead){
       s += `<path d="${blobPath(f.x - t.r * .15, f.y - t.r * .1, t.r * .2, sd + 7)}" fill="#fff" fill-opacity=".18"/>`;
     } else {
       // a lumpy rock with a light and a dark face
-      const sd = seedOf(f), tone = rockTone(biomeOf(e), f.type);
+      const sd = seedOf(f), tone = rockTone(BIOMES[f.biome] ? f.biome : biomeOf(e), f.type);
       s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${tone.fill}" fill-opacity=".95" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       s += `<path d="${blobPath(f.x - t.r * .3, f.y - t.r * .25, t.r * .45, sd + 3, true)}" fill="${tone.light}" fill-opacity=".6"/><path d="${blobPath(f.x + t.r * .35, f.y + t.r * .3, t.r * .35, sd + 5, true)}" fill="${tone.dark}" fill-opacity=".6"/>`;
     }
