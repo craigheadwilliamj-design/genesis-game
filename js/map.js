@@ -1006,11 +1006,19 @@ function rotateMoved(){
   const orig = it.points, [cx, cy] = centroid(orig);
   const c45 = Math.SQRT1_2;
   it.points = orig.map(([x, y]) => [cx + (x - cx)*c45 - (y - cy)*c45, cy + (x - cx)*c45 + (y - cy)*c45]);
-  const why = moveProblem("building", it);
+  const turned = it.points;
+  let why = moveProblem("building", it), nudged = false;
+  // buildings sit right against their path, so a turn often clips it: slide to the nearest spot where the turned shape fits
+  if(why){
+    const offs = [];
+    for(let dx = -10; dx <= 10; dx += .5) for(let dy = -10; dy <= 10; dy += .5) offs.push([dx, dy]);
+    offs.sort((p, q) => Math.hypot(p[0], p[1]) - Math.hypot(q[0], q[1]));
+    for(const [dx, dy] of offs){ it.points = shiftPts(turned, dx, dy); if(!moveProblem("building", it)){ why = null; nudged = true; break; } }
+  }
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
-  setStat(reach ? "Turned." : "Turned, but it has no path to the entrance, so it won't work.", !reach);
+  setStat(reach ? (nudged ? "Turned, and nudged to fit." : "Turned.") : "Turned, but it has no path to the entrance, so it won't work.", !reach);
 }
 
 function placeBuilding(e){
