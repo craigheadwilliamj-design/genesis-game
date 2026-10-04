@@ -557,6 +557,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.custodianScrubsGraffiti = work(900, () => !fs4.graffiti);
     state.staff.custodians = []; syncCustodians();
 
+    // trash thrown into an exhibit: rowdy guests throw most, bins and a Do Not Feed sign cut it, and animals that eat it get sick or die
+    const tx = state.exhibits.find(x => !x.viv && x.animals.length);
+    if(tx){
+      const [tcx, tcy] = centroid(tx.points), tq = {rowdy:true, mood:10, trash:0, edu:0}, tn = {rowdy:false, mood:80, trash:1, edu:0};
+      const base = throwChance(tq, tx, tcx, tcy);
+      out.rowdyThrowsMore = base > throwChance(tn, tx, tcx, tcy) && throwChance({rowdy:false, mood:80, trash:0}, tx, tcx, tcy) === 0;
+      const nf = {id:"b-nf", type:"nofeed", points:rectPts(tx.points[0][0], tx.points[0][1], 1.6, 1, 0)}; state.buildings.push(nf);
+      out.noFeedCuts = hasNoFeed(tx) && throwChance(tq, tx, tcx, tcy) <= base * THROWN.signCut + 1e-9;
+      state.buildings = state.buildings.filter(b => b !== nf);
+      tx.trash = 1000; const saved = [...tx.animals], rt = state.rating, n0 = tx.animals.length, hp = state.health.from; state.health.from = 0;
+      const rr5 = Math.random; Math.random = () => 0; const tout = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0}; trashNight(tout); Math.random = rr5; state.health.from = hp;
+      out.trashKills = tx.trash === 0 && tout.poisoned === n0 && tx.animals.length === 0;
+      tx.animals = saved; state.rating = rt;
+    }
+
     // education: an info sign by an exhibit teaches far more than looking, unless it's broken
     resetParties(); state.minute = OPEN_MIN + 60;
     const g1 = state.exhibits.find(e => e.id === "e-g1"), kid = () => { guestsArrive(2); return parties[parties.length - 1]; };

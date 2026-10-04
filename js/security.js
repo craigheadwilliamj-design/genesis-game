@@ -19,10 +19,12 @@ const vandalLog = () => state.guestLog.vandal || (state.guestLog.vandal = freshV
 
 /* ---------- vandalism ---------- */
 
+// Is a guard close enough to put troublemakers off at this spot?
+const guardNear = (x, y) => gcrew.some(c => c.at && Math.hypot(keeperPos(c)[0] - x, keeperPos(c)[1] - y) < SECURITY.deterRadius);
 // How likely trouble is at a spot: guards and lamps put vandals off, heavy litter eggs them on
 function deterrence(x, y){
   let f = 1;
-  if(gcrew.some(c => c.at && Math.hypot(keeperPos(c)[0] - x, keeperPos(c)[1] - y) < SECURITY.deterRadius)) f *= SECURITY.deterCut;
+  if(guardNear(x, y)) f *= SECURITY.deterCut;
   if(state.buildings.some(b => b.type === "lamp" && !isBroken(b) && Math.hypot(centroid(b.points)[0] - x, centroid(b.points)[1] - y) < VANDAL.lampReach)) f *= VANDAL.lampCut;
   if(litterAt(x, y) >= 6) f *= VANDAL.litterBoost;
   return f;

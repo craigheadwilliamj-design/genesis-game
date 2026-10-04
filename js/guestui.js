@@ -50,6 +50,13 @@ function guestBuildingHtml(b){
   }
   if(b.type === "edcenter") h += eduCenterHtml(b, served);
   if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
+  if(b.type === "nofeed"){
+    h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+    const [x, y] = centroid(b.points), near = state.exhibits.filter(e => !e.viv && distToEdge(x, y, e.points) <= THROWN.signReach);
+    h += `<section><h3>Protects</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No open exhibit within ${THROWN.signReach} m. Move it closer to a fence.</div>`}`;
+    h += `<div class="meta" style="margin-top:6px">Guests are ${Math.round((1 - THROWN.signCut) * 100)}% less likely to throw trash into these exhibits. Trash makes animals ill, and some die. Bins and guards nearby help too.</div></section>`;
+    return h;
+  }
   if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
