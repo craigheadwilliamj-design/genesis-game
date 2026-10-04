@@ -185,7 +185,7 @@ function exhibitHtml(e){
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
       ${movesHtml(e)}
       <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
-      <div class="meta" style="margin-top:4px">${hasSign(e) ? "An info sign by the fence teaches guests about these animals." : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
+      <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
   h += healthHtml(e);
 
@@ -217,21 +217,12 @@ function exhibitHtml(e){
       const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
       return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
     }).join("")}</select></label>`;
-    h += `<div class="meta" style="margin-top:4px">${kinds.length ? kinds.map(s => `${esc(s.name)}: ${biomesOf(s).map((x, i) => i ? `gets by in ${BIOMES[x].label.toLowerCase()}` : `home is ${BIOMES[x].label.toLowerCase()}`).join(", ")}`).join(". ") + ". " : ""}Animals are happiest in their home biome. Regrading has no refund.${BIOMES[b].wet && !e.viv ? " Wetland gives water lovers half the water they want." : ""}</div></section>`;
+    h += kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
+      return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
+    h += `</section>`;
   }
 
   h += themeHtml("exhibit", e);
-
-  // what the exhibit is planted with
-  {
-    const fl = e.flora || "cenozoic", hasCeres = hasDept("ceres");
-  const eras = [...new Set(e.animals.map(x => ERA_OF[SPECIES_BY_ID[x.sp].period]))];
-    h += `<section><h3>Plants</h3><label class="field"><span>Flora</span><select id="floraSel">${Object.entries(FLORA).map(([k, f]) => {
-      const why = k === fl ? null : replantProblem(e, k), cost = k === fl ? 0 : Math.round(area(e.points) * f.perSqM), noTech = f.tech && !hasTech(f.tech);
-      return `<option value="${k}"${k === fl ? " selected" : ""}${why ? " disabled" : ""}>${f.label}: ${f.plants}${k === fl ? " (current)" : noTech ? " (research at ORACLE)" : why ? (!hasCeres ? " (needs CERES)" : " (needs planting stock)") : cost ? `, ${money(cost)}` : ", free"}</option>`;
-    }).join("")}</select></label>`;
-    h += `<div class="meta" style="margin-top:4px">${eras.length ? `Animals here come from the ${eras.map(x => FLORA[x].label).join(" and ")}. ` : ""}${hasCeres ? `Replanting uses ${batchesFor(e)} batch${batchesFor(e) === 1 ? "" : "es"} of planting stock grown at CERES (it has ${+(state.ceres.plants.mesozoic || 0).toFixed(2)} Mesozoic and ${+(state.ceres.plants.paleozoic || 0).toFixed(2)} Paleozoic). It has no refund.` : "Build CERES, research the flora at ORACLE, and grow planting stock to plant Mesozoic or Paleozoic flora."}</div></section>`;
-  }
 
   if(!e.viv) h += landHtml(e);
 
