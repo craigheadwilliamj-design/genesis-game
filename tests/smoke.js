@@ -1165,7 +1165,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const clc = JSON.parse(JSON.stringify(state)); clc.themes = {brush:"classic", have:["genesis", "classic"]}; clc.exhibits = [{id:"e-clc", theme:"classic", points:[[0, 0], [9, 0], [9, 9]], animals:[], land:[], water:[]}]; upgradeSave(clc);
     out.themeClassicRenamed = clc.exhibits[0].theme === "japanese" && clc.themes.brush === "japanese" && clc.themes.have.includes("japanese") && !clc.themes.have.includes("classic") && !THEMES.classic;
     const tSaved = {paths:state.paths, buildings:state.buildings, exhibits:state.exhibits, themes:state.themes, rating:state.rating, tech:state.science.tech.slice(), money:state.money};
-    state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded");
+    state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded"); state.goalsDone = state.goalsDone.filter(id => id !== "cash1m" && id !== "cloneq");
     state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100, flora:"cenozoic"}];
     state.paths = [{id:"p-gate", points:[[200,300],[200,240]], fixed:true}, {id:"p-t", points:[[200,240],[260,240]]}, {id:"p-t2", points:[[260,240],[260,300]]}];
     state.buildings = [{id:"b-t", type:"restroom", points:[[245,243],[253,243],[253,249],[245,249]]}];
@@ -1176,8 +1176,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.themeLocked = !themeHave("volcanic") && !themeHave("gilded") && !!themeProblem("exhibit", e0, "volcanic");
     state.rating = 4.6; recompute();   // no explicit check: recompute alone unlocks it
     out.themeVolcanicUnlock = themeHave("volcanic") && !themeHave("gilded");
-    state.science.tech.push("gilded"); checkThemes();
-    out.themeGildedUnlock = themeHave("gilded");
+    state.goalsDone.push("cash1m"); checkThemes();
+    out.themeGildedUnlock = themeHave("gilded") && !themeHave("stone");
+    state.goalsDone.push("cloneq"); checkThemes();
+    out.themeStoneUnlock = themeHave("stone");
     out.themeFitsValid = Object.values(THEMES).every(T => T.fits.every(id => SPECIES_BY_ID[id]));
     out.themeModernUnlock = !themeHave("modern") && (state.science.tech.push("modern"), checkThemes(), themeHave("modern")) && themeHave("mesa");
     e0.theme = "volcanic"; recompute();

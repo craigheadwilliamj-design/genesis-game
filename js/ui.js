@@ -65,16 +65,21 @@ function starsSvg(rating, size){
 function meter(v, color){ return `<div class="meter"><i style="width:${clamp(v,0,100).toFixed(0)}%;background:${color}"></i></div>`; }
 
 /* ---------- nothing selected: the park office ---------- */
+let officeTab = "office";   // which tab the park office shows
+function grantsHtml(goal){
+  const n = state.goalsDone.length;
+  let h = goal
+    ? `<div class="card goal"><div class="step">Grant ${GOALS.indexOf(goal) + 1} of ${GOALS.length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Grant ${grantPrize(goal)}</div></div>`
+    : `<div class="card goal"><div class="step">All grants awarded</div><b>Keep growing your park</b><div class="meta">Try for 5 stars, or see how many guests you can bring in.</div></div>`;
+  h += `<section><h3>Grants <span class="num">${n} of ${GOALS.length}</span></h3><ul class="checklist">${GOALS.map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
+  return h;
+}
 function overviewHtml(){
   const d = derived, t = state.today, goal = currentGoal();
-  const idx = goal ? GOALS.indexOf(goal) + 1 : GOALS.length;
   let h = `<h2>${esc(state.name)}</h2>`;
 
-  if(goal){
-    h += `<div class="card goal"><div class="step">Goal ${idx} of ${GOALS.length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Reward ${money(goal.reward)}</div></div>`;
-  } else {
-    h += `<div class="card goal"><div class="step">All goals done</div><b>Keep growing your park</b><div class="meta">Try for 5 stars, or see how many guests you can bring in.</div></div>`;
-  }
+  h += tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"grants", label:"Grants", color:"#B8860B"}], officeTab);
+  if(officeTab === "grants") return h + grantsHtml(goal);
 
   const c = dailyCosts();
   const inc = t.tickets + t.food + t.shop;
@@ -123,7 +128,6 @@ function overviewHtml(){
   }
 
   h += themesOverview();
-  h += `<section><h3>Goals</h3><ul class="checklist">${GOALS.map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${money(g.reward)}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
 
@@ -689,6 +693,7 @@ panelEl.addEventListener("click", e => {
   if(a === "fire"){ state.staff.keepers = state.staff.keepers.filter(k => k.id !== b.dataset.id); done(); return; }
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
+  if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
   if(a === "gotoDept"){ const d = state.buildings.find(x => x.type === b.dataset.t); if(d) select("building", d.id); return; }
   if(!it) return;
   if(a === "center") centerOn(it);
