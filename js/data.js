@@ -337,7 +337,7 @@ const BUILDINGS = {
   restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2},
   cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
   shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:8,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
-  megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:25000, upkeep:250, w:18, d:14, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:3},
+  megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:18, d:14, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
   restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:8,  d:6,  serves:["bladder"], slots:4, serveMin:3},
   // small things beside the path
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true, onPath:true},
