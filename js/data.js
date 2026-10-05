@@ -585,7 +585,7 @@ const THROWN = {
   normal:.0015,        // chance each minute for any other party that's carrying trash
   binCut:.4,           // a working bin with room nearby multiplies it by this
   signCut:.5,          // so does a Do Not Feed sign by the exhibit's fence
-  netCut:.2,           // catch netting (or aviary netting) over the fence multiplies it by this, so some still get through
+  netCatch:.95,        // share of throws catch netting (or aviary netting) stops with the fence in perfect shape; it falls with the fence condition
   signReach:20,        // a sign this close to a fence counts for the exhibit
   pieces:1,            // pieces of trash one throw adds
   eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
@@ -851,7 +851,7 @@ const TECH = [
   {id:"concrete", group:"barrier", label:"Concrete walls",    points:35, text:"Strength 140. Holds anything, but guests can barely see in."},
   {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:50, text:"Strength 85. Clear walls that guests love looking through."},
   {id:"aviary",   group:"barrier", label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
-  {id:"catchnet", group:"barrier", label:"Catch netting",     points:30, text:"Netting along an exhibit's fence that catches most trash guests throw in. Some still gets through."},
+  {id:"catchnet", group:"barrier", label:"Catch netting",     points:30, text:"Netting along an exhibit's fence that catches 95% of the trash guests throw in. It catches less as the fence wears."},
   {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
