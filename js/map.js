@@ -183,7 +183,7 @@ function render(){
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
     const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
-    if(tilt && !e.viv) s += fence34(e.points, true, e.barrier || "wood", "back", fo34);
+    if(tilt) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, e.barrier || "wood", "back", fo34);
     if(e.barrier === "electric" && !e.viv && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
       if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
@@ -192,7 +192,7 @@ function render(){
     // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
     if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
     s += landSvg(e, tool === "bulldoze", isDoomed);
-    if(tilt && !e.viv) s += fence34(e.points, true, e.barrier || "wood", "front", fo34);
+    if(tilt) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, e.barrier || "wood", "front", fo34);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if((e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
@@ -502,6 +502,38 @@ function fence34(P, closed, kind, which, o = {}){
     // the Genesis electric fence's amber post lights, dark when the power is out
     if(F.wire && o.lights){ let d = ""; for(let k = 0; k <= np; k++) d += M(up(H + .2)(at(a, b, k / np))) + "h0.001";
       s += o.powered === false ? `<path d="${d}" stroke="#2A2E2B" stroke-width="3.5" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>` : `<path d="${d}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/><path d="${d}" stroke="#FFC25E" stroke-width="3.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`; }
+  }
+  return `<g pointer-events="none">${s}</g>`;
+}
+// A vivarium in the 3/4 view: a glass tank in a steel frame. "back" draws the far panes (before what's inside),
+// "front" the near panes, the frame, the glass lid and its heat lamp, all see-through.
+function viv34(e, which, hi){
+  const P = e.points, V = VIVARIUMS[e.viv], H = V.d * .45, frame = hi || "#24414A", n2 = v => v.toFixed(2), up = lift34(H);
+  const fr = w => `stroke="${frame}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" fill="none"`;
+  let s = "", d = "";
+  for(let i = 0; i < P.length; i++){
+    const a = P[i], b = P[(i+1) % P.length], ny = norm34(P, i)[1];
+    if(which === "back" ? ny > .05 : ny <= .05) continue;
+    const q = [a, b, up(b), up(a)];
+    s += `<polygon points="${polyStr(q)}" fill="#A9D3DA" fill-opacity="${which === "back" ? .38 : .16}"/>`;
+    if(which === "front"){
+      // the substrate shows through the bottom of the glass, then a soft glare streak across the pane
+      const sub = [a, b, lift34(H * .18)(b), lift34(H * .18)(a)];
+      s += `<polygon points="${polyStr(sub)}" fill="#6B4F33" fill-opacity=".75"/><path d="M${n2(sub[3][0])} ${n2(sub[3][1])}L${n2(sub[2][0])} ${n2(sub[2][1])}" stroke="#8A6B47" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+      const g = f => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
+      s += `<polygon points="${polyStr([g(.12), g(.2), lift34(H)(g(.32)), lift34(H)(g(.24))])}" fill="#fff" fill-opacity=".22"/>`;
+      d += `M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}`;
+    }
+    d += `M${n2(up(a)[0])} ${n2(up(a)[1])}L${n2(up(b)[0])} ${n2(up(b)[1])}`;
+  }
+  // corner posts: the back ones behind, the front ones in front
+  const [, cy] = centroid(P);
+  for(const p of P) if(which === "back" ? p[1] <= cy : p[1] > cy) d += `M${n2(p[0])} ${n2(p[1])}L${n2(up(p)[0])} ${n2(up(p)[1])}`;
+  s += `<path d="${d}" ${fr(hi ? 3 : 2)}/>`;
+  if(which === "front"){
+    const L = P.map(up), [lx, ly] = centroid(L), r = Math.min(V.w, V.d) * .09;
+    s += `<polygon points="${polyStr(L)}" fill="#DDEFF2" fill-opacity=".12" ${fr(hi ? 3 : 1.5)}/>`;
+    s += `<circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * 2.2)}" fill="#FFC25E" fill-opacity=".18"/><rect x="${n2(lx - r)}" y="${n2(ly - r * .6)}" width="${n2(r * 2)}" height="${n2(r * 1.2)}" rx="${n2(r * .3)}" fill="#3A3A34"/><circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * .4)}" fill="#FFE2A0"/>`;
   }
   return `<g pointer-events="none">${s}</g>`;
 }
