@@ -52,12 +52,15 @@ const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
 // Is there a working Do Not Feed sign by this exhibit's fence?
 const hasNoFeed = e => state.buildings.some(b => b.type === "nofeed" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= THROWN.signReach);
+// Share of throws the netting stops: full at 100% fence condition, none when the fence is wrecked
+const netCatch = e => THROWN.netCatch * condOf(e) / 100;
 // Chance a minute that a party at (x, y) throws trash into exhibit e: bins, guards and the sign cut it
 function throwChance(p, e, x, y){
   let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
   if(!c) return 0;
   if(nearBin(x, y)) c *= THROWN.binCut;
   if(hasNoFeed(e)) c *= THROWN.signCut;
+  if(e.net || e.aviary) c *= 1 - netCatch(e);
   if(guardNear(x, y)) c *= SECURITY.deterCut;
   return c * (1 - EDU.vandalCut * (p.edu || 0) / 100);
 }

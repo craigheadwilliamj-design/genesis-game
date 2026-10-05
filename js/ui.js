@@ -215,6 +215,7 @@ function exhibitHtml(e){
     h += `<div class="row" style="margin-top:8px">`;
     h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
     h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at ORACLE</span>`;
+    h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at ORACLE</span>`;
     h += `</div>`;
     const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
     h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}Guests see in at ${Math.round(viewFactor(e, derived.reach) * 100)}%.${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
@@ -383,7 +384,7 @@ function healthHtml(e){
   if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
-    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
+    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
   }
   if(e.animals.length > hr.sick.length){
     const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating grass", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
@@ -688,6 +689,8 @@ panelEl.addEventListener("click", e => {
   }
   if(a === "moat"){ const c = moatCost(it); if(canAfford(c)){ spend(c, "built"); it.moat = true; done(); } return; }
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }
+  if(a === "net"){ const c = netCost(it); if(canAfford(c)){ spend(c, "built"); it.net = true; done(); } return; }
+  if(a === "netOff"){ it.net = false; done(); return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
