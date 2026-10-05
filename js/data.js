@@ -281,12 +281,13 @@ const TRIP = {fail:[.2, .35], trips:[3, 8], spread:.35, costMul:[.7, 1.3], bonus
 // Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
 const TRIP_SIZE = [10, 5000];
 
-// Paleoflora genomes. GHOST collects plant DNA from any period of the era; CERES needs it complete before it grows anything.
+// Plant genomes, one per Mesozoic or Paleozoic period. GHOST collects each from its own period, once ORACLE has researched that era's flora.
+// CERES needs a period's genome complete before it grows that period's plants (and any complete one lets it grow Paleoflora food).
 //   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
-const PLANT_DNA = {
-  mesozoic:  {id:"flora-mesozoic",  era:"mesozoic",  name:"Mesozoic flora",  space:300,  periods:["Triassic", "Jurassic", "Cretaceous"]},
-  paleozoic: {id:"flora-paleozoic", era:"paleozoic", name:"Paleozoic flora", space:900,  periods:["Devonian", "Carboniferous", "Permian"]},
-};
+const PLANT_DNA = {};
+for(const [period, era, space] of [["Devonian", "paleozoic", 900], ["Carboniferous", "paleozoic", 900], ["Permian", "paleozoic", 900],
+                                   ["Triassic", "mesozoic", 300], ["Jurassic", "mesozoic", 300], ["Cretaceous", "mesozoic", 300]])
+  PLANT_DNA[period] = {id:"flora-" + period, era, period, name:period + " flora", space};
 const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.id, p]));
 
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
@@ -299,17 +300,15 @@ const TAR_UPGRADE = {incubators:1, speed:.75};
 //   cost    what one batch costs
 //   doses   (medicine) doses one batch makes
 const CERES_GROW = {
-  flora:    {mesozoic:{days:1.5, cost:1500}, paleozoic:{days:2, cost:2200}},
   medicine: {cenozoic:{days:.75, cost:900, doses:20}, mesozoic:{days:1.25, cost:1500, doses:20}, paleozoic:{days:1.75, cost:2200, doses:20}},
 };
-// Plants for the landscape come in three sizes (LAND size), grown per era in batches that make several plants each.
+// Plants for the landscape come in three sizes (LAND size), grown in batches that make several plants each. Prices and times follow the era; each period's plants need that period's DNA.
 //   count   plants one batch makes
 const PLANT_SIZES = ["small", "medium", "large"];
 CERES_GROW.plant = {
   mesozoic:  {small:{days:.5,  cost:600,  count:6}, medium:{days:.75, cost:900,  count:3}, large:{days:1,   cost:1200, count:2}},
   paleozoic: {small:{days:.75, cost:900,  count:6}, medium:{days:1,   cost:1300, count:3}, large:{days:1.5, cost:1800, count:2}},
 };
-const FLORA_BATCH_M2 = 1200;   // one batch of planting stock covers this many m² of an exhibit
 
 // Period colors, the same ones the planning map uses
 const PERIOD_COLOR = {
@@ -344,6 +343,7 @@ const BUILDINGS = {
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, onPath:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true, onPath:true},
+  camera:    {label:"Security camera", one:"a security camera", glyph:"", color:"#2B3F6B", price:900, upkeep:4, tech:"cameras", w:1.2, d:1.2, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
@@ -633,6 +633,7 @@ const SECURITY = {
   deterCut:.3,
   catchRadius:15,      // a guard catches a vandal this close
   cameraRadius:60,     // with cameras, each Security Office watches this far
+  postRadius:30,       // and each working camera post on a path watches this far
   evacRadius:50,       // during an escape, guards send guests this close toward the gate
   patrolWait:8,        // minutes a guard stands at each stop
 };
@@ -708,12 +709,11 @@ const ERA_OF = {Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleoz
                 Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
 
 // What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
-//   perSqM   cost to replant, per square meter (needs CERES for anything but Cenozoic)
 //   tech     what ORACLE has to research first
 const FLORA = {
-  cenozoic:  {label:"Cenozoic",  plants:"grasses and flowering plants",              perSqM:0,   tech:null},
-  mesozoic:  {label:"Mesozoic",  plants:"cycads, conifers, ginkgos, and ferns",      perSqM:1.5, tech:"mesoplant"},
-  paleozoic: {label:"Paleozoic", plants:"lycopod trees, horsetails, and seed ferns", perSqM:1.5, tech:"paleoplant"},
+  cenozoic:  {label:"Cenozoic",  plants:"grasses and flowering plants",              tech:null},
+  mesozoic:  {label:"Mesozoic",  plants:"cycads, conifers, ginkgos, and ferns",      tech:"mesoplant"},
+  paleozoic: {label:"Paleozoic", plants:"lycopod trees, horsetails, and seed ferns", tech:"paleoplant"},
 };
 // CERES makes Paleoflora food at a steady rate and keeps a stock of it
 const PALEOFLORA = {
@@ -728,7 +728,7 @@ const GRASS_HIT = {intolerant:-15, cretaceous:-5};
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
-                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, planting stock for exhibits, and medicine for the PMC, once ORACLE has unlocked them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
+                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once ORACLE has unlocked them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -858,7 +858,7 @@ const TECH = [
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
   {id:"security", group:"build", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
   {id:"generator", group:"build", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
-  {id:"cameras",  group:"build", label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it. Guards are sent straight to vandals the cameras see."},
+  {id:"cameras",  group:"build", label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it, and you can put camera posts on paths to watch more. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   group:"build", label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"transit",   group:"build", label:"Guest tram",       points:40, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
   {id:"foodprod",  group:"build", label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
@@ -871,8 +871,8 @@ const TECH = [
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:45, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
   {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
-  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. GHOST collects their DNA, then CERES grows planting stock for exhibits."},
-  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:45, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. GHOST collects their DNA, then CERES grows planting stock for exhibits."},
+  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
+  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:45, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:25, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
   {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:35, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},

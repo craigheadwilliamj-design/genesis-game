@@ -107,8 +107,8 @@ function freshScience(){
   };
 }
 
-// CERES: Paleoflora fodder (stock), medicine on hand, planting stock by era, growing beds, and which medicines it keeps stocked
-function freshCeres(){ return {stock:0, meds:0, plants:{mesozoic:0, paleozoic:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
+// CERES: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
+function freshCeres(){ return {stock:0, meds:0, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
 // Themes: the one new builds use, and which are unlocked
 function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
@@ -215,13 +215,27 @@ function upgradeSave(s){
   if(sc.crew.botanist === undefined) sc.crew.botanist = s.buildings.some(b => b.type === "ceres") ? 1 : 0;
   // plant DNA and medicine refinement became things to collect and research: parks already using them have them
   if(!sc.dna) sc.dna = {};
-  const hasT = id => sc.tech.includes(id), giveDna = era => { if(!sc.dna[PLANT_DNA[era].id]) sc.dna[PLANT_DNA[era].id] = {genome:100, quality:90}; };
+  const hasT = id => sc.tech.includes(id), giveDna = era => { for(const f of Object.values(PLANT_DNA)) if(f.era === era && !sc.dna[f.id]) sc.dna[f.id] = {genome:100, quality:90}; };
   if(hasT("mesoplant")) giveDna("mesozoic");
   if(hasT("paleoplant")) giveDna("paleozoic");
   if(hasT("paleoflora") && !Object.values(PLANT_DNA).some(f => sc.dna[f.id] && sc.dna[f.id].genome >= 100)) giveDna("mesozoic");
-  if(!s.ceres.plants) s.ceres.plants = {mesozoic:0, paleozoic:0};
   if(!s.ceres.pots) s.ceres.pots = {};
   if(!s.ceres.beds) s.ceres.beds = [];
+  // plant DNA, and the plants CERES grows, became per period (and exhibit planting stock went away): split what an era had across its periods
+  const periodsOf = era => Object.values(PLANT_DNA).filter(f => f.era === era);
+  for(const era of ["mesozoic", "paleozoic"]){
+    const old = sc.dna["flora-" + era];
+    if(old){ for(const f of periodsOf(era)) if(!sc.dna[f.id]) sc.dna[f.id] = {...old}; delete sc.dna["flora-" + era]; }
+    for(const t of sc.trips) if(t.sp === "flora-" + era) t.sp = "flora-" + t.period;
+    for(const size of PLANT_SIZES){
+      const n = s.ceres.pots[era + "-" + size]; if(n === undefined) continue;
+      periodsOf(era).forEach((f, i) => { s.ceres.pots[f.period + "-" + size] = (s.ceres.pots[f.period + "-" + size] || 0) + Math.floor(n / 3) + (i < n % 3 ? 1 : 0); });
+      delete s.ceres.pots[era + "-" + size];
+    }
+  }
+  for(const j of s.ceres.beds) if(j.kind === "plant" && !PLANT_DNA[j.era]) j.era = j.era === "paleozoic" ? "Carboniferous" : "Jurassic";
+  if(s.ceres.beds.some(j => j.kind === "flora")){ for(const j of s.ceres.beds) if(j.kind === "flora") s.money += ({mesozoic:1500, paleozoic:2200})[j.era] || 0; s.ceres.beds = s.ceres.beds.filter(j => j.kind !== "flora"); }
+  delete s.ceres.plants;
   if(!s.ceres.auto){
     s.ceres.auto = {cenozoic:false, mesozoic:false, paleozoic:false};
     for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)){

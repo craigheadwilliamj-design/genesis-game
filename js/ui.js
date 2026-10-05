@@ -738,18 +738,6 @@ panelEl.addEventListener("change", ev => {
   afterChange(); render();
 });
 
-// Replanting an exhibit
-panelEl.addEventListener("change", ev => {
-  if(ev.target.id !== "floraSel") return;
-  const e = selItem(), key = ev.target.value; if(!e) return;
-  const why = replantProblem(e, key), cost = Math.round(area(e.points) * FLORA[key].perSqM);
-  if(why){ ui.toast(why, "bad"); ui.panel(); return; }
-  spend(cost, "built"); e.flora = key;
-  if(key !== "cenozoic") state.ceres.plants[key] -= batchesFor(e);
-  ui.toast(`${e.name} is now planted with ${FLORA[key].plants}${cost ? ` (${money(cost)})` : ""}.`, "good");
-  afterChange(); render();
-});
-
 // Changing an exhibit's wall type
 panelEl.addEventListener("change", ev => {
   if(ev.target.id !== "barrierSel") return;
