@@ -99,7 +99,7 @@ const grassyFloor = e => habitatOf(e).old < 1;
 // Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic plants give plants.
 function browseRate(e, t){
   if(t !== "plants" && t !== "paleoflora") return 0;
-  return landOf(e).reduce((n, f) => { const L = LAND[f.type]; return n + (L && L.browse && (t === "plants") === (L.flora === "cenozoic") ? L.browse : 0); }, 0);
+  return landOf(e).reduce((n, f) => { const L = LAND[f.type]; return n + (L && L.browse && (t === "plants") === (L.flora === "cenozoic") ? L.browse : 0) + (L && L.hay && t === "plants" ? L.hay : 0); }, 0);
 }
 // How much of today's eating the groves cover, capped so keepers still bring the rest
 const browseShare = (e, t, need) => need > 0 ? Math.min(HAB.browseMax, browseRate(e, t) / need) : 0;
@@ -409,7 +409,7 @@ function landSpot(x, y, key){
 function decorProblem(key, x, y){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  if(t.slots || t.tray || t.toy) return "Habitat props go inside an open exhibit.";
+  if(t.slots || t.tray || t.toy || t.toyFor) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return `${t.label} is locked. ${statueHint(key)}`;
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
@@ -583,6 +583,19 @@ function featSvg(f, biome, pick, isDead){
     const sd = seedOf(f);
     s += `<path d="${blobPath(f.x, f.y, t.r, sd, false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
     s += `<path d="${blobPath(f.x + t.r * .1, f.y + t.r * .05, t.r * .55, sd + 2, false)}" fill="#4E3B26" fill-opacity=".8"/><ellipse cx="${f.x - t.r * .2}" cy="${f.y - t.r * .15}" rx="${t.r * .22}" ry="${t.r * .1}" fill="#A08A6A" fill-opacity=".5"/>`;
+  } else if(t.look === "ball"){
+    // a big rubber ball with a stripe
+    s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/><path d="M${f.x - t.r} ${f.y}Q${f.x} ${f.y - t.r * .55} ${f.x + t.r} ${f.y}" fill="none" stroke="#F4F1E8" stroke-width="${t.r * .22}"/><circle cx="${f.x - t.r * .35}" cy="${f.y - t.r * .4}" r="${t.r * .18}" fill="#fff" fill-opacity=".5"/>`;
+  } else if(t.look === "ice" || t.look === "hay"){
+    // a block of ice with the treat frozen inside, or a round bale; both shrink as they're used up
+    const k = t.lasts ? .55 + .45 * clamp((f.left ?? t.lasts) / t.lasts, 0, 1) : 1, r = t.r * k;
+    if(t.look === "ice") s += `<rect x="${f.x - r}" y="${f.y - r}" width="${r * 2}" height="${r * 2}" rx="${r * .3}" fill="#CFE8F2" fill-opacity=".9" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x}" cy="${f.y}" rx="${r * .55}" ry="${r * .32}" fill="${t.color}"/><path d="M${f.x - r * .7} ${f.y - r * .6}l${r * .4} 0" stroke="#fff" stroke-width="${r * .12}" stroke-linecap="round"/>`;
+    else s += `<circle cx="${f.x}" cy="${f.y}" r="${r}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${f.x}" cy="${f.y}" r="${r * .62}" fill="none" stroke="#A8893A" stroke-width="${r * .12}"/><circle cx="${f.x}" cy="${f.y}" r="${r * .28}" fill="none" stroke="#A8893A" stroke-width="${r * .1}"/>`;
+  } else if(t.look === "buglog"){
+    // a hollow log riddled with holes
+    s += `<rect x="${f.x - t.r}" y="${f.y - t.r * .4}" width="${t.r * 2}" height="${t.r * .8}" rx="${t.r * .4}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+    for(const [ox, oy] of [[-.5, -.1], [-.1, .15], [.3, -.12], [.6, .1]]) s += `<circle cx="${f.x + ox * t.r}" cy="${f.y + oy * t.r}" r="${t.r * .09}" fill="#2A211A"/>`;
+    s += `<ellipse cx="${f.x + t.r * .85}" cy="${f.y}" rx="${t.r * .15}" ry="${t.r * .34}" fill="#B08E66"/>`;
   } else if(t.look === "vbark"){
     // a curl of bark to hide under
     s += `<path d="M${f.x - t.r} ${f.y + t.r * .3}A${t.r} ${t.r * .8} 0 0 1 ${f.x + t.r} ${f.y + t.r * .3}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;

@@ -1346,6 +1346,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
       behaviorNight();
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
+      // diet toys: a shank thrills a meat eater and bores a plant eater; hay feeds plant eaters; treats run out, frozen ones faster in a heat wave
+      {
+        const T = SPECIES_BY_ID.trex, H = SPECIES_BY_ID.tric, m = SPECIES_BY_ID.mamm;
+        const ex = {id:"bh4", name:"Treats", points:sq(400, 0, 60), animals:[{id:"bm0", sp:"mamm"}, {id:"bm1", sp:"mamm"}], happy:70, cond:100, land:[{id:"tz1", type:"hay", x:420, y:20}, {id:"tz2", type:"icefish", x:440, y:40}, {id:"tz3", type:"shank", x:410, y:45}]};
+        state.exhibits.push(ex);
+        const diet = toyFor(LAND.shank, T) === 4 && toyFor(LAND.shank, H) === 0 && toyFor(LAND.ball, H) === 2 && toyFor(LAND.hay, T) === 3 && toyPoints(ex, m) === 1;
+        const fed = browseRate(ex, "plants") === LAND.hay.hay && browseRate(ex, "paleoflora") === 0;
+        const w0 = state.weather.today; state.weather.today = "hot"; treatsNight(); treatsNight(); state.weather.today = "fair";
+        const melt = !landOf(ex).some(f => f.type === "icefish") && landOf(ex).some(f => f.type === "hay" && f.left === LAND.hay.lasts - 2);
+        for(let i = 0; i < LAND.hay.lasts; i++) treatsNight();
+        state.weather.today = w0;
+        out.behaviorDietToys = diet && fed && melt && !landOf(ex).length && !!decorProblem("shank", 0, 0) && HABITAT_PROPS.includes("buglog");
+        state.exhibits.splice(state.exhibits.indexOf(ex), 1);
+      }
       // vivariums take their own enrichment, picked from a list and set in the glass; it stays out of open exhibits and the park
       const viv = {id:"bh3", name:"Glass", viv:"L", points:sq(300, 0, 16).map(([x, y]) => [x, Math.min(y, 10)]), animals:[{id:"bv0", sp:"arth"}, {id:"bv1", sp:"arth"}], happy:70, cond:100};
       state.exhibits.push(viv); const m0 = state.money; state.money = 1e6;
