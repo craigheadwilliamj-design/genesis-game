@@ -986,8 +986,8 @@ const WATER = {
 const LAND = {
   rock:   {label:"Rock",          one:"a rock",          price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder",       one:"a boulder",       price:2200, r:4, color:"#767A74", cover:3},
-  shelter:{label:"Shelter",       one:"a shelter",       price:2500, r:4, color:"#9A7B55", slots:10},
-  barn:   {label:"Large shelter", one:"a large shelter", price:7000, r:7, color:"#7E6142", slots:36},
+  shelter:{label:"Small Barn",     one:"a small barn",     price:2500, r:4, color:"#9A7B55", slots:10},
+  barn:   {label:"Large Barn",     one:"a large barn",      price:7000, r:7, color:"#7E6142", slots:36},
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
