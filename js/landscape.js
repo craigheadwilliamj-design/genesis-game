@@ -106,19 +106,19 @@ function rollWeather(){
   w.next = state.day + 2 >= w.from ? pickWeather() : "fair";
 }
 // Shelter slots an exhibit's animals need today, and what it has. Ice age animals don't need cover from the cold.
-// A shelter only takes animals up to its `fits` size (coverSlots), so a pile of burrows never houses a T. rex.
+// A shelter only takes animals up to its `fits` size (coverSlots), so a pile of small shelters never houses a T. rex. A burrow ignores size and takes only the species in its `only` list.
 // Biggest animals go first, into the snuggest shelter they fit. `shelter` is what animals actually get, `idle` is room nobody here can use.
 function coverOf(e){
   const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
   let need = 0, shade = 0;
   const sizes = [], pools = [];
-  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push(n); } }
-  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots && !(wk === "cold" && L.noCold)) pools.push({left:L.slots, fits:L.fits || 99}); shade += (L.shade || 0) * w.grove; }
+  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push([n, s.id]); } }
+  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots && !(wk === "cold" && L.noCold)) pools.push({left:L.slots, fits:L.fits || 99, only:L.only}); shade += (L.shade || 0) * w.grove; }
   pools.sort((x, y) => x.fits - y.fits);
   let shelter = 0;
-  for(const n of sizes.sort((x, y) => y - x)){
+  for(const [n, id] of sizes.sort((x, y) => y[0] - x[0])){
     let want = n;
-    for(const p of pools){ if(want <= 0) break; if(p.fits < n || p.left <= 0) continue; const t = Math.min(want, p.left); p.left -= t; want -= t; shelter += t; }
+    for(const p of pools){ if(want <= 0) break; if(p.only ? !p.only.includes(id) : p.fits < n) continue; if(p.left <= 0) continue; const t = Math.min(want, p.left); p.left -= t; want -= t; shelter += t; }
   }
   const idle = pools.reduce((s, p) => s + p.left, 0);
   return {need, shelter, shade, idle, have:shelter + shade};

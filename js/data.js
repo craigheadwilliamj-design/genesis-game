@@ -979,7 +979,7 @@ const WATER = {
 //   r      radius in meters. Groves come small (r 2), medium (r 3.5) and large (r 5).
 //   cover  rock cover it adds (see HAB.rockEvery)
 //   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
-//   slots  shelter slots it gives (see coverSlots). fits: the biggest animal (in coverSlots) it takes, 19 is a sauropod. look: how it's drawn (burrow, cave, canopy; none is a barn). noCold: canopies give no cover in a cold snap.
+//   slots  shelter slots it gives (see coverSlots). only: species ids that can use it, whatever their size (a burrow). fits: the biggest animal (in coverSlots) it takes, 19 is a sauropod. look: how it's drawn (burrow, cave, canopy; none is a barn). noCold: canopies give no cover in a cold snap.
 //   tech   research needed first
 //   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at CERES.
 //   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic ones)
@@ -989,7 +989,7 @@ const LAND = {
   boulder:{label:"Boulder",       one:"a boulder",       price:2200, r:4, color:"#767A74", cover:3},
   shelter:{label:"Small Barn",     one:"a small barn",     price:2500, r:4, color:"#9A7B55", slots:10, fits:8},
   barn:   {label:"Large Barn",     one:"a large barn",      price:7000, r:7, color:"#7E6142", slots:36, fits:19},
-  burrow: {label:"Burrow",         one:"a burrow",          price:900,  r:2, color:"#8A6B47", slots:4, fits:2,  look:"burrow"},
+  burrow: {label:"Burrow",         one:"a burrow",          price:900,  r:2, color:"#8A6B47", slots:4, only:["lyst", "hete", "hyps", "hyae", "dire"], look:"burrow"},
   cavesm: {label:"Small Cave",     one:"a small cave",      price:3200, r:4, color:"#6F6A62", slots:14, fits:6, look:"cave"},
   cavelg: {label:"Large Cave",     one:"a large cave",      price:8500, r:6, color:"#5B5750", slots:40, fits:12, look:"cave"},
   canopysm:{label:"Small Canopy",  one:"a small canopy",    price:1400, r:3, color:"#B9A77E", slots:8, fits:8,  look:"canopy", noCold:true},
