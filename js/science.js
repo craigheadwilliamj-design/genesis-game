@@ -82,7 +82,9 @@ function genomeInfo(id){
   return null;
 }
 const genomeDone = id => { const d = state.science.dna[id]; return !!d && d.genome >= 100; };
-const plantDnaDone = era => !!PLANT_DNA[era] && genomeDone(PLANT_DNA[era].id);
+const plantDnaDone = period => !!PLANT_DNA[period] && genomeDone(PLANT_DNA[period].id);
+// Has GHOST finished plant DNA from any period of this era?
+const eraDnaDone = era => Object.values(PLANT_DNA).some(f => f.era === era && genomeDone(f.id));
 const anyPlantDna = () => Object.values(PLANT_DNA).some(f => genomeDone(f.id));
 // Can GHOST go looking for this yet? Animals need ORACLE to have unlocked them, plants need their flora type.
 function genomeOpen(id){
@@ -90,7 +92,7 @@ function genomeOpen(id){
   return g.animal ? isUnlocked(id) : hasTech(FLORA[g.plant.era].tech);
 }
 // The periods GHOST can look in for a genome
-const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : g.plant.periods; };
+const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : [g.plant.period]; };
 
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
@@ -221,20 +223,25 @@ function finishClone(c){
 
 const beds = () => dept("ceres") ? Math.max(0, state.science.crew.botanist) : 0;
 const growing = (kind, era, size) => state.ceres.beds.filter(b => b.kind === kind && b.era === era && (b.size || null) === (size || null)).length;
-const batchesFor = e => Math.max(1, Math.ceil(area(e.points) / FLORA_BATCH_M2));
-const growInfo = (kind, era, size) => kind === "plant" ? (CERES_GROW.plant[era] || {})[size] : CERES_GROW[kind === "flora" ? "flora" : "medicine"][era];
+// For plants `era` is the period they're from (a bed's `era` field too); for medicine it's the era
+const growInfo = (kind, era, size) => kind === "plant" ? (CERES_GROW.plant[ERA_OF[era]] || {})[size] : CERES_GROW.medicine[era];
 const growMinutes = (kind, era, size) => Math.round(growInfo(kind, era, size).days * DAY_MIN);
 // What a batch is called, for toasts and bed cards
-const growName = (kind, era, size) => kind === "plant" ? `${ERA_LABEL[era]} ${size} plants` : kind === "flora" ? `${ERA_LABEL[era]} planting stock` : `${ERA_LABEL[era]} medicine`;
+const growName = (kind, era, size) => kind === "plant" ? `${era} ${size} plants` : `${ERA_LABEL[era]} medicine`;
 
 function growProblem(kind, era, size){
   const sc = state.science, c = state.ceres;
   if(!growInfo(kind, era, size)) return "CERES can't grow that.";
   const blocker = deptProblem("ceres"); if(blocker) return blocker;
   if(!sc.crew.botanist) return "Hire a botanist at CERES to tend a growing bed.";
-  if(kind !== "med" && !hasTech(FLORA[era].tech)) return `Research ${FLORA[era].label} flora at ORACLE first.`;
-  if(kind === "med" && !hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
-  if(era !== "cenozoic" && !plantDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
+  if(kind === "plant"){
+    const f = FLORA[ERA_OF[era]];
+    if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at ORACLE first.`;
+    if(PLANT_DNA[era] && !plantDnaDone(era)) return `GHOST has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
+  } else {
+    if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
+    if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
+  }
   if(c.beds.length >= sc.crew.botanist * 3) return "Every bed has a full queue. Hire more botanists.";
   if(!canAfford(growInfo(kind, era, size).cost)) return `A batch costs ${money(growInfo(kind, era, size).cost)}. You have ${money(state.money)}.`;
   return null;
@@ -250,21 +257,10 @@ function growBatch(kind, era, size){
 function finishBatch(b){
   const c = state.ceres;
   if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
-  else if(b.kind === "flora"){ c.plants[b.era] = (c.plants[b.era] || 0) + 1; events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} planting stock.`, "good"); }
   else { c.meds = Math.min(medCap(), (c.meds || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce((s, b) => s + growInfo("med", b.era).doses, 0);
-
-// Replanting an exhibit uses up planting stock from CERES
-function replantProblem(e, key){
-  if(key === "cenozoic") return null;
-  const f = FLORA[key], need = batchesFor(e), have = state.ceres.plants[key] || 0, cost = Math.round(area(e.points) * f.perSqM);
-  return (f.tech && !hasTech(f.tech) ? `Research ${f.label} flora at ORACLE first.` : null) ||
-    (!hasDept("ceres") ? "Build CERES first." : null) ||
-    (have < need ? `${f.label} planting stock: needs ${need} batch${need === 1 ? "" : "es"} from CERES, which has ${have}.` : null) ||
-    (!canAfford(cost) ? `That costs ${money(cost)}.` : null);
-}
 
 /* ---------- time passing ---------- */
 

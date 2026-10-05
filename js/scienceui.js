@@ -9,7 +9,7 @@ const ERA_COLOR = {cenozoic:"#F2D32A", mesozoic:"#34B2C9", paleozoic:"#F04028"};
 const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="locked"><rect x="1" y="5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
 
 // Which tab is open in each department's panel
-let oracleMain = "manage", oracleTab = null, oracleEra = "mesozoic", ghostTab = null;
+let oracleMain = "manage", oracleTab = null, oracleEra = "mesozoic", ghostTab = null, cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
@@ -67,10 +67,8 @@ function oracleHtml(b){
   } else if(oracleMain === "flora"){
     h += `<div class="meta" style="margin-bottom:8px">Plants are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
     h += `<h3>Plants</h3><ul class="shop">${techRows("flora")}</ul>`;
-    for(const era of ["mesozoic", "paleozoic"]){
-      const d = sc.dna[PLANT_DNA[era].id];
-      if(hasTech(FLORA[era].tech)) h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA: ${d ? d.genome : 0}%${d && d.genome >= 100 ? ". Complete." : ". GHOST collects it."}</div>`;
-    }
+    for(const era of ["mesozoic", "paleozoic"]) if(hasTech(FLORA[era].tech))
+      h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA, which GHOST collects from each period: ${Object.values(PLANT_DNA).filter(f => f.era === era).map(f => `${f.period} ${(sc.dna[f.id] || {genome:0}).genome}%`).join(", ")}.</div>`;
   } else {
     h += `<div class="meta" style="margin-bottom:8px">Medicine is grown at CERES.</div>`;
     h += tabBar("oera", ERA_ORDER.map(era => ({key:era, label:ERA_LABEL[era], color:ERA_COLOR[era], lock:!hasTech(MED_TECH[era])})), oracleEra);
@@ -116,7 +114,7 @@ function ghostHtml(b){
   h += `</section>`;
 
   // one tab per period; animals ORACLE hasn't unlocked are greyed out
-  const inPeriod = id => speciesToUnlock().filter(s => s.period === id), plantsIn = id => Object.values(PLANT_DNA).filter(f => f.periods.includes(id));
+  const inPeriod = id => speciesToUnlock().filter(s => s.period === id), plantsIn = id => Object.values(PLANT_DNA).filter(f => f.period === id);
   const openIn = id => inPeriod(id).some(s => isUnlocked(s.id)) || plantsIn(id).some(f => genomeOpen(f.id));
   if(!ghostTab) ghostTab = PERIOD_ORDER.find(openIn) || "Quaternary";
   h += `<section><h3>Genomes by period</h3>${tabBar("gtab", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), ghostTab)}`;
@@ -125,7 +123,7 @@ function ghostHtml(b){
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
-  for(const f of plantsIn(p.id)) h += tripRow(f.id, p.id, `<span class="dot" style="background:${ERA_COLOR[f.era]}"></span>${esc(f.name)} <span class="per">plants</span>`);
+  for(const f of plantsIn(p.id)) h += tripRow(f.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${esc(f.name)} <span class="per">plants</span>`);
   h += `</ul></div></section>`;
   if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
   if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">Day ${l.day}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
@@ -165,17 +163,17 @@ function tarHtml(b){
 /* ---------- CERES ---------- */
 
 function growRow(kind, era, size){
-  const gi = growInfo(kind, era, size), unlocked = kind !== "med" ? hasTech(FLORA[era].tech) : hasTech(MED_TECH[era]);
+  const gi = growInfo(kind, era, size), unlocked = kind === "plant" ? hasTech(FLORA[ERA_OF[era]].tech) : hasTech(MED_TECH[era]);
   const why = unlocked ? growProblem(kind, era, size) : "locked", q = growing(kind, era, size), c = state.ceres;
   const name = growName(kind, era, size), sz = size ? ` data-size="${size}"` : "";
   let h = `<li class="${unlocked ? "" : "locked"}"><span class="nm">${name}</span>`;
   h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${sz}${why ? " disabled" : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need">`;
-  if(!unlocked) h += `Research ${kind !== "med" ? `${FLORA[era].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
+  if(!unlocked) h += `Research ${kind === "plant" ? `${FLORA[ERA_OF[era]].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
   else {
-    const have = size ? c.pots[era + "-" + size] || 0 : +(c.plants[era] || 0).toFixed(2);
-    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for any ${ERA_LABEL[era]} biome. ${have} ready.` : kind === "flora" ? `It covers ${FLORA_BATCH_M2.toLocaleString()} m² of an exhibit. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
-    if(why && era !== "cenozoic" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
+    const have = size ? c.pots[era + "-" + size] || 0 : 0;
+    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for any ${era} biome. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
+    if(why && kind === "plant" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
   }
   h += `</span>`;
   if(unlocked && kind === "med") h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="${era}" aria-pressed="${!!c.auto[era]}" style="padding:3px 9px">${c.auto[era] ? "Keeping it stocked" : "Keep it stocked"}</button> <span class="meta">${c.auto[era] ? "A free bed starts a batch whenever there's room for more." : "Starts batches by itself when there's room."}</span></span>`;
@@ -203,14 +201,12 @@ function ceresHtml(b){
   if(c.beds.length) h += `<div style="margin-top:8px">${[...c.beds].sort((a, d) => a.end - d.end).map(j => progressCard(growName(j.kind, j.era, j.size), beds() > 1 ? `bed ${(j.lane || 0) + 1}` : "", j)).join("")}</div>`;
   h += `</section>`;
 
-  const planted = era => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora === era).length, 0);
-  h += `<section><h3>Planting stock</h3><div class="meta">Replanting a whole exhibit uses up stock: tap the exhibit and change its flora.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => growRow("flora", era)).join("")}</ul></section>`;
-  h += `<section><h3>Plants for exhibits</h3><div class="meta">Small, medium and large plants for Landscaping. Each one placed in an exhibit uses up one plant. Planted so far: ${planted("mesozoic")} Mesozoic, ${planted("paleozoic")} Paleozoic.</div><ul class="shop" style="margin-top:8px">${["mesozoic", "paleozoic"].map(era => PLANT_SIZES.map(sz => growRow("plant", era, sz)).join("")).join("")}</ul>`;
-  for(const era of ["mesozoic", "paleozoic"]){
-    const d = sc.dna[PLANT_DNA[era].id];
-    if(hasTech(FLORA[era].tech) && !(d && d.genome >= 100)) h += `<div class="meta" style="margin-top:4px">${ERA_LABEL[era]} plant DNA: ${d ? d.genome : 0}%. GHOST is still collecting it.</div>`;
-  }
-  h += `</section>`;
+  const planted = period => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].period === period && LAND[f.type].flora !== "cenozoic").length, 0);
+  h += `<section><h3>Plants for exhibits</h3><div class="meta">Small, medium and large plants for Landscaping, grown per period from the DNA GHOST collects. Each one placed in an exhibit uses up one plant.</div>`;
+  h += `<div style="margin-top:8px">${tabBar("cperiod", Object.keys(PLANT_DNA).map(p => ({key:p, label:p, color:PERIOD_COLOR[p], lock:!hasTech(FLORA[PLANT_DNA[p].era].tech)})), cerePeriod)}</div>`;
+  const dna = sc.dna[PLANT_DNA[cerePeriod].id];
+  h += `<div class="meta" style="margin-top:4px">${cerePeriod} plant DNA: ${dna ? dna.genome : 0}%${dna && dna.genome >= 100 ? ". Complete." : hasTech(FLORA[PLANT_DNA[cerePeriod].era].tech) ? ". GHOST is still collecting it." : "."} Planted so far: ${planted(cerePeriod)}.</div>`;
+  h += `<ul class="shop" style="margin-top:8px">${PLANT_SIZES.map(sz => growRow("plant", cerePeriod, sz)).join("")}</ul></section>`;
 
   h += `<section><h3>Medicine</h3>`;
   if(!anyMedTech()) h += `<div class="meta">Research medicine at ORACLE and CERES can grow doses for the PMC and for medicated feed.</div>`;
@@ -219,9 +215,6 @@ function ceresHtml(b){
   h += `<div class="meta">Keepers carry doses to the PMC${stores().some(s => storeOf(s).cold) ? " and cold stores" : ""}. Doses spoil slowly, and slower in a powered cold store. Medicated feed uses ${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}.</div>`;
   h += `<ul class="shop" style="margin-top:8px">${ERA_ORDER.map(era => growRow("med", era)).join("")}</ul></section>`;
 
-  // exhibits whose plants don't suit their animals
-  const mismatched = state.exhibits.filter(e => e.animals.length && e.animals.some(a => ERA_OF[SPECIES_BY_ID[a.sp].period] !== (e.flora || "cenozoic")));
-  h += `<section><h3>Exhibits to replant</h3>${mismatched.length ? `<ul class="issues">${mismatched.map(e => { const eras = [...new Set(e.animals.map(a => FLORA[ERA_OF[SPECIES_BY_ID[a.sp].period]].label))]; return `<li class="bad">${esc(e.name)}: planted ${FLORA[e.flora || "cenozoic"].label}, animals want ${eras.join(" or ")}</li>`; }).join("")}</ul><div class="meta" style="margin-top:6px">Tap an exhibit and change its flora in the Plants section.</div>` : `<div class="meta">Every exhibit's plants suit its animals.</div>`}</section>`;
   return h;
 }
 
@@ -233,6 +226,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "omain"){ oracleMain = b.dataset.k; ui.panel(); return; }
   if(a === "otab"){ oracleTab = b.dataset.k; ui.panel(); return; }
   if(a === "oera"){ oracleEra = b.dataset.k; ui.panel(); return; }
+  if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
   if(a === "gtab"){ ghostTab = b.dataset.k; ui.panel(); return; }
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "trip"){ if(launchTrip(b.dataset.sp, b.dataset.p)) done(); return; }

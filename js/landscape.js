@@ -19,10 +19,10 @@ const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
 // What bulldozing gets back for everything inside an exhibit
 const landRefund = e => Math.round((landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) + waterOf(e).reduce((n, w) => n + waterCost(w.points), 0)) * COST.refundShare);
 
-// Mesozoic and Paleozoic plants each use up one plant of their era and size from CERES
-const potKey = t => t.tech && t.size ? t.flora + "-" + t.size : null;
+// Mesozoic and Paleozoic plants each use up one plant of their period and size from CERES
+const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : null;
 const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
-const potName = t => `${ERA_LABEL[t.flora]} ${t.size} plants`;
+const potName = t => `${t.period || ERA_LABEL[t.flora]} ${t.size} plants`;
 
 const landM2 = f => Math.PI * LAND[f.type].r ** 2;
 // The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome

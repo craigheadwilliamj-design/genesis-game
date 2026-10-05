@@ -50,6 +50,11 @@ function guestBuildingHtml(b){
   }
   if(b.type === "edcenter") h += eduCenterHtml(b, served);
   if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
+  if(b.type === "camera"){
+    h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd><dt>Watches</dt><dd>${SECURITY.postRadius} m around it</dd></dl>`;
+    h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? "Any vandal it sees sends the nearest guard running." : "Research security cameras at ORACLE or it does nothing."} ${offices().length ? "" : "Build a Security Office with guards, or nobody will answer."}</div>`;
+    return h;
+  }
   if(b.type === "nofeed"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
     const [x, y] = centroid(b.points), near = state.exhibits.filter(e => !e.viv && distToEdge(x, y, e.points) <= THROWN.signReach);

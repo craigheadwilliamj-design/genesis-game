@@ -31,7 +31,9 @@ function deterrence(x, y){
 }
 // Is this spot watched by a Security Office's cameras?
 function onCamera(x, y){
-  return hasTech("cameras") && offices().some(b => { const [cx, cy] = centroid(b.points); return Math.hypot(cx - x, cy - y) < SECURITY.cameraRadius; });
+  if(!hasTech("cameras")) return false;
+  const near = (b, r) => { const [cx, cy] = centroid(b.points); return Math.hypot(cx - x, cy - y) < r; };
+  return offices().some(b => near(b, SECURITY.cameraRadius)) || state.buildings.some(b => b.type === "camera" && !isBroken(b) && near(b, SECURITY.postRadius));
 }
 // Each minute, an unhappy rowdy party out on the paths might break something
 function vandalTick(p, dt){

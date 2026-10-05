@@ -126,8 +126,8 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 
 .drawbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:14px;background:var(--forest);color:var(--on-forest);border-radius:10px;padding:8px 8px 8px 14px;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:calc(100% - 24px)}
 .drawbar.on{display:flex}
-.drawbar{width:max-content;max-width:min(780px,calc(100% - 196px));left:184px;right:12px;transform:none;margin-inline:auto}
-.drawbar .dtext{display:flex;flex-direction:column;min-width:0;flex:1 1 280px}
+.drawbar{flex-wrap:wrap;width:max-content;max-width:min(780px,calc(100% - 196px));left:184px;right:12px;transform:none;margin-inline:auto}
+.drawbar .dtext{display:flex;flex-direction:column;min-width:min(260px,100%);flex:1 1 280px}
 .drawbar b{font:600 17px/1.15 "Barlow Condensed",sans-serif}
 .drawbar .dh{font-size:13px;opacity:.8}
 .drawbar .ds{font-size:13px;color:var(--money);font-weight:600;min-height:1em;font-variant-numeric:tabular-nums}
@@ -137,7 +137,7 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .drawbar button:hover{background:rgba(243,239,217,.12)}
 .drawbar button.primary{background:var(--money);border-color:var(--money);color:#1D2B22;font-weight:600}
 .drawbar button:disabled{opacity:.4}
-.drawbar .sizes{display:flex;border:1px solid rgba(243,239,217,.3);border-radius:7px;overflow:hidden}
+.drawbar .sizes{display:flex;flex-wrap:wrap;border:1px solid rgba(243,239,217,.3);border-radius:7px;overflow:hidden}
 .drawbar .sizes[hidden]{display:none}
 .drawbar .sizes button{border:0;border-radius:0}
 .drawbar .sizes button+button{border-left:1px solid rgba(243,239,217,.25)}
@@ -301,7 +301,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .tgroup.zoom button{width:40px}
   .tgroup.zoom button+button{border-left:0;border-top:1px solid var(--line)}
   .toasts{bottom:58px}
-  .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:none;flex-wrap:wrap;gap:8px}
+  .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:none;width:auto;flex-wrap:wrap;gap:8px}
   .drawbar .dbtns{width:100%}
   .drawbar .dbtns button{flex:1}
 }
