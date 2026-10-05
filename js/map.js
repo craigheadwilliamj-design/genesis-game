@@ -29,7 +29,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Camera", "Info sign", "No-feed sign"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Info sign", "No-feed"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
