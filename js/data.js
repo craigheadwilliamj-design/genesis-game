@@ -588,13 +588,16 @@ const THROWN = {
   normal:.0015,        // chance each minute for any other party that's carrying trash
   binCut:.4,           // a working bin with room nearby multiplies it by this
   signCut:.5,          // so does a Do Not Feed sign by the exhibit's fence
-  netCatch:.95,        // share of throws catch netting (or aviary netting) stops with the fence in perfect shape; it falls with the fence condition
+  netCatch:.98,        // share of throws catch netting (or aviary netting) stops with the fence in perfect shape; it falls with the fence condition
   signReach:20,        // a sign this close to a fence counts for the exhibit
+  dayDecay:.5,         // each throw already made into an exhibit today cuts the chance of the next by this share (crowds don't pile it up)
   pieces:1,            // pieces of trash one throw adds
   eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
   eatMax:.6,
-  deadly:.15,          // share of animals that eat trash and die at once, rather than falling ill
-  sev:45,              // how bad the illness starts when one eats trash (0 to 100)
+  deadly:.02,          // share of animals that eat trash and die at once, rather than falling ill
+  sev:50,              // how bad the illness starts when one eats trash (0 to 100)
+  worsen:25,           // and how much worse it gets each night untreated: dead in two nights
+  sevCap:70,           // an animal already sick gets worse from trash, but not past this, so a vet still has a night
 };
 // Guests learn about the animals from info signs, field guides, and the Education Center
 const EDU = {

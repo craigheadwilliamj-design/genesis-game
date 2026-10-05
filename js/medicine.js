@@ -58,6 +58,7 @@ const netCatch = e => THROWN.netCatch * condOf(e) / 100;
 function throwChance(p, e, x, y){
   let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
   if(!c) return 0;
+  c *= Math.pow(1 - THROWN.dayDecay, e.trash || 0);
   if(nearBin(x, y)) c *= THROWN.binCut;
   if(hasNoFeed(e)) c *= THROWN.signCut;
   if(e.net || e.aviary) c *= 1 - netCatch(e);
@@ -88,8 +89,15 @@ function trashNight(out){
     if(p && healthActive()) for(const a of [...e.animals]){
       if(Math.random() >= p) continue;
       if(Math.random() < THROWN.deadly){ a.sick = {kind:"illness", sev:100, cause:"trash"}; animalDies(e, a); out.poisoned++; continue; }
-      if(a.sick){ a.sick.sev = Math.min(99, a.sick.sev + THROWN.sev); continue; }
-      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; out.fed++;
+      if(a.sick){
+        // already sick: it gets worse, but never past what a vet can still reach in time, and it can't stay hidden
+        a.sick.sev = Math.max(a.sick.sev, Math.min(THROWN.sevCap, a.sick.sev + THROWN.sev));
+        delete a.sick.chronic;
+        a.sick.cause = "trash"; delete a.sick.hidden; out.fed++;
+        events.toast(`A sick ${SPECIES_BY_ID[a.sp].name} in ${e.name} ate trash too. It is much worse and needs a vet now.`, "bad"); continue;
+      }
+      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; delete a.sick.hidden; out.fed++;   // it shows at once, so a vet sees it today
+      events.toast(`A ${SPECIES_BY_ID[a.sp].name} in ${e.name} ate trash thrown in by guests. It will die in about two days unless a vet treats it.`, "bad");
     }
     e.trash = 0;
   }
@@ -189,7 +197,7 @@ function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && 
 // Can a vet cure this one where it stands?
 // A chronic case only comes back for a real cure, with the era's own medicine.
 function fieldTreatable(a){
-  if(!noticed(a) || a.darted || a.sick.kind !== "illness" || a.sick.sev >= HEALTH.minorBelow) return false;
+  if(!noticed(a) || a.darted || a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
   const k = pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
   return a.sick.chronic ? k === "era" : !!k;
 }
@@ -206,7 +214,7 @@ function sickStatus(e, a){
   const mine = vcrew.find(c => c.patient && c.patient.a === a.id);
   if(mine) return mine.patient.field ? (mine.job === "treating" ? "A vet is treating it here." : "A vet is on the way to treat it here.") : "A vet is on the way to dart it.";
   if(a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !fieldTreatable(a) && bedsFree() > 0) return "Minor, but the PMC is out of medicine, so it goes to the PMC. Waiting for a free vet.";
-  if(fieldTreatable(a)) return "Minor. A vet can treat it here. Waiting for a free vet.";
+  if(fieldTreatable(a)) return a.sick.cause === "trash" ? "Ate trash. A vet can flush it out here. Waiting for a free vet." : "Minor. A vet can treat it here. Waiting for a free vet.";
   if(bedsFree() <= 0) return "The PMC is full. It waits for a free bed.";
   return "Waiting for a free vet.";
 }
@@ -296,7 +304,8 @@ function pickPatient(c){
       if(!noticed(a) || a.darted || taken.has(a.id)) continue;
       const field = fieldTreatable(a);
       if(a.sick.chronic && !field) continue;
-      if((field || beds) && (!best || a.sick.sev > best.a.sick.sev)) best = {e, a, field};
+      const urgent = a.sick.cause === "trash" ? 1000 : 0;
+      if((field || beds) && (!best || a.sick.sev + urgent > best.score)) best = {e, a, field, score:a.sick.sev + urgent};
     }
   }
   return best;
@@ -476,10 +485,11 @@ function healthNight(){
             if(a.sick.sev <= 0){ delete a.sick; out.healed++; }
             continue;
           }
-          let w = a.sick.kind === "injury" ? HEALTH.injuryWorsen : HEALTH.illWorsen;
+          let w = a.sick.cause === "trash" ? THROWN.worsen : a.sick.kind === "injury" ? HEALTH.injuryWorsen : HEALTH.illWorsen;
           w *= (hungry ? 1.5 : 1) * (dirty ? 1.3 : 1) * (medicated(e, s) ? .5 : 1);
           a.sick.sev += w;
           if(a.sick.sev >= 100){ animalDies(e, a); continue; }
+          if(a.sick.cause === "trash" && a.sick.sev + w >= 100) events.toast(`Final warning: the ${s.name} in ${e.name} that ate trash will die tonight unless a vet treats it.`, "bad");
           if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; out.showing.push({e, a}); }
           continue;
         }
@@ -517,8 +527,8 @@ function healthNight(){
   for(const e of state.exhibits) e.hungryMin = 0;
   // mild illness starts out hidden, so only injuries and cases that now show get a warning
   const ill = out.ill + out.showing.length;
-  if(ill || out.hurt || out.fed){
-    const bits = [ill && `${ill} animal${ill === 1 ? " is" : "s are"} showing signs of illness`, out.fed && `${out.fed} ate trash thrown in by guests`, out.hurt && `${out.hurt} ${out.hurt === 1 ? "was" : "were"} hurt fighting`].filter(Boolean);
+  if(ill || out.hurt){
+    const bits = [ill && `${ill} animal${ill === 1 ? " is" : "s are"} showing signs of illness`, out.hurt && `${out.hurt} ${out.hurt === 1 ? "was" : "were"} hurt fighting`].filter(Boolean);
     events.toast(`Overnight, ${bits.join(" and ")}. ${state.staff.vets.length ? "Vets will see to them." : "Build a Paleo-Medicine Center and hire vets to treat them."}`, "bad");
   }
   if(state.day + 1 === h.from) events.toast("Animals can start falling ill tomorrow. Keep them fed and clean, and build a Paleo-Medicine Center.", "bad");
