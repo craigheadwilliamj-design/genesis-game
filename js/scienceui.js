@@ -14,15 +14,26 @@ let oracleMain = "manage", oracleManage = "barrier", oracleTab = null, oracleEra
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
-const progressCard = (title, sub, j) =>
-  `<div class="card" style="margin-bottom:6px"><b>${title}</b>${sub ? ` <span class="meta">${sub}</span>` : ""}<div style="margin-top:6px">${meter(doneShare(j), "var(--gold)")}</div><div class="meta" style="margin-top:4px">${leftText(j.end)} left. Ready ${whenText(j.end)}.</div></div>`;
+// A department's bays, one per scientist, in a fixed order so the lists below never move. Hiring is the only thing that adds one.
+function baysHtml(title, kind, cardOf, emptyText){
+  const n = bayCount(kind);
+  let h = `<section><h3>${title} (${BAY_JOBS[kind]().length} of ${n} bay${n === 1 ? "" : "s"} busy)</h3>`;
+  if(!n) return h + `<div class="meta">No bays yet. Each ${SCIENTISTS[kind].label.toLowerCase()} you hire opens one.</div></section>`;
+  for(let i = 0; i < n; i++){
+    const j = bayJob(kind, i);
+    h += j ? cardOf(j, i) : `<div class="card bay empty"><span class="bn">Bay ${i + 1}</span><span class="meta">${emptyText}</span></div>`;
+  }
+  return h + `</section>`;
+}
+const progressCard = (title, sub, j, bay) =>
+  `<div class="card bay"><div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${title}</b>${sub ? ` <span class="meta">${sub}</span>` : ""}<div style="margin-top:6px">${meter(doneShare(j), "var(--gold)")}</div><div class="meta" style="margin-top:4px">${leftText(j.end)} left. Ready ${whenText(j.end)}.</div></div>`;
 
 /* ---------- ORACLE ---------- */
 
 // Why nothing new can start at ORACLE right now, if that's so
 function labBlocker(){
   const sc = state.science;
-  return deptProblem("oracle") || (!sc.crew.paleo ? "Hire a paleontologist to run research." : sc.projects.length >= sc.crew.paleo ? `${sc.crew.paleo === 1 ? "Your paleontologist is" : "Every paleontologist is"} busy with a project. Hire more to run projects side by side.` : null);
+  return deptProblem("oracle") || (!sc.crew.paleo ? "Hire a paleontologist to run research." : null);
 }
 
 // One research item: its name, a button (or its progress), and what it does
@@ -32,7 +43,7 @@ function projectRow(kind, id, label, text){
   let right;
   if(info.done) right = `<span class="status ok">${kind === "species" ? "Unlocked" : "Researched"}</span>`;
   else if(run) right = `<span class="meta">${leftText(run.end)} left</span>`;
-  else right = `<button class="buy" data-action="research" data-kind="${kind}" data-id="${esc(id)}"${why ? " disabled" : ""}>${info.points} pts, ${spanText(projectMinutes(info.points))}</button>`;
+  else right = `<button class="buy" data-action="research" data-kind="${kind}" data-id="${esc(id)}"${why ? ` disabled title="${esc(why)}"` : ""}>${info.points} pts, ${spanText(projectMinutes(info.points))}</button>`;
   const need = prereq && !info.done ? ` Needs ${esc(projectInfo("tech", info.needs).label)} first.` : "";
   return `<li class="${prereq && !info.done ? "locked" : ""}"><span class="nm">${label}</span>${right}<span class="need">${text}${need}${run ? `<span style="display:block;margin-top:4px">${meter(doneShare(run), "var(--gold)")}</span>` : ""}</span></li>`;
 }
@@ -43,12 +54,9 @@ function oracleHtml(b){
   let h = deptHead(b);
   h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">research points. ${n ? `+${n * RESEARCH_PER_PALEO} a day from your paleontologist${n === 1 ? "" : "s"}.` : "Hire a paleontologist to earn them."} Research takes time: ${spanText(projectMinutes(20))} for every 20 points.</span></div></section>`;
   h += sciStaffHtml("paleo");
-  h += `<section><h3>In progress (${sc.projects.length} of ${n})</h3>`;
-  if(sc.projects.length) h += sc.projects.map(p => progressCard(esc(projectInfo(p.kind, p.id).label), p.kind === "species" ? "genome" : "", p)).join("");
-  else h += `<div class="meta">${n ? "Your lab is free. Pick something below." : "Nothing yet."}</div>`;
+  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), p.kind === "species" ? "genome" : "", p, i), "Empty. Pick a project below.");
   const block = labBlocker();
-  if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
-  h += `</section>`;
+  if(block) h = h.replace(/<\/section>$/, `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div></section>`);
 
   h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"animals", label:"Animals", color:"#1F6F73"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
   if(oracleMain === "manage"){
@@ -84,14 +92,14 @@ function oracleHtml(b){
 
 function ghostBlocker(){
   const sc = state.science;
-  return deptProblem("ghost") || (!sc.crew.temporal ? "Hire a Temporal Researcher to lead expeditions." : sc.trips.length >= sc.crew.temporal ? `All ${sc.crew.temporal} expedition team${sc.crew.temporal === 1 ? " is" : "s are"} in the field. Hire more Temporal Researchers to send more at once.` : null);
+  return deptProblem("ghost") || (!sc.crew.temporal ? "Hire a Temporal Researcher to lead expeditions." : null);
 }
 // One genome GHOST can chase: progress, odds, and a button
 function tripRow(id, periodId, label){
   const sc = state.science, d = sc.dna[id], open = genomeOpen(id), g = genomeInfo(id), out = sc.trips.filter(t => t.sp === id).length;
   const o = tripOdds(id, periodId), why = open ? tripProblem(id, periodId) : "locked";
   let h = `<li class="${open ? "" : "locked"}"><span class="nm">${label}</span>`;
-  h += open ? `<button class="buy" data-action="trip" data-p="${periodId}" data-sp="${id}"${why ? " disabled" : ""}>Send GHOST ${money(o.cost)}</button>` : `<span class="meta">Locked</span>`;
+  h += open ? `<button class="buy" data-action="trip" data-p="${periodId}" data-sp="${id}"${why ? ` disabled title="${esc(why)}"` : ""}>Send GHOST ${money(o.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}`;
   if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
@@ -108,10 +116,7 @@ function ghostHtml(b){
   let h = deptHead(b);
   h += `<div class="meta">${esc(BUILDINGS.ghost.blurb)}</div>`;
   h += sciStaffHtml("temporal");
-  h += `<section><h3>In the field (${sc.trips.length} of ${sc.crew.temporal} teams)</h3>`;
-  if(sc.trips.length) h += sc.trips.map(t => progressCard(esc(t.period), `looking for ${esc(genomeInfo(t.sp).name)}`, t)).join("");
-  else h += `<div class="meta">Every team is home.</div>`;
-  h += `</section>`;
+  h += baysHtml("Expedition bays", "temporal", (t, i) => progressCard(esc(t.period), `looking for ${esc(genomeInfo(t.sp).name)}`, t, i), "Team is home. Send it from a period below.");
 
   // one tab per period; animals ORACLE hasn't unlocked are greyed out
   const inPeriod = id => speciesToUnlock().filter(s => s.period === id), plantsIn = id => Object.values(PLANT_DNA).filter(f => f.period === id);
@@ -137,11 +142,9 @@ function tarHtml(b){
   let h = deptHead(b);
   h += `<div class="meta">A complete genome can be cloned as many times as you like. Clone quality follows the DNA quality: under 70% makes sickly animals, under 50% frail ones.</div>`;
   h += sciStaffHtml("gene");
-  const per = incubatorsPer(), speed = Math.round(cloneSpeed() * 100);
-  h += `<section><h3>Incubators (${sc.crew.gene * per})</h3><div class="meta">Each geneticist runs ${per} incubator${per === 1 ? "" : "s"}. Clones take ${speed === 100 ? "their usual time" : `${speed}% of the usual time`}. ${hasTech("incub2") && hasTech("fast2") ? "" : "Research upgrades at ORACLE, under Park management."}</div>`;
-  if(sc.clones.length) h += `<div style="margin-top:8px">${[...sc.clones].sort((a, c) => a.end - c.end).map(c => { const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId); return progressCard(esc(s.name), `for ${e ? esc(e.name) : "no exhibit yet"}${(c.lane || 0) >= 0 && sc.crew.gene * per > 1 ? `, incubator ${(c.lane || 0) + 1}` : ""}`, c); }).join("")}</div>`;
-  else h += `<div class="meta" style="margin-top:6px">Empty. Order clones here or from an exhibit's panel.</div>`;
-  h += `</section>`;
+  const speed = Math.round(cloneSpeed() * 100);
+  h += baysHtml("Incubator bays", "gene", (c, i) => { const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId); return progressCard(esc(s.name), `for ${e ? esc(e.name) : "no exhibit yet"}`, c, i); }, "Empty. Order a clone below or from an exhibit's panel.");
+  h = h.replace(/<\/section>$/, `<div class="meta">Clones take ${speed === 100 ? "their usual time" : `${speed}% of the usual time`}. ${hasTech("fast2") ? "" : "Research faster incubators at ORACLE, under Park management."}</div></section>`);
   if(sc.ready.length) h += `<section><h3>Waiting for an exhibit</h3><ul class="herd">${sc.ready.map(r => `<li><span class="dot" style="background:${PERIOD_COLOR[SPECIES_BY_ID[r.sp].period]}"></span><span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${r.q}% DNA</span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Tap an exhibit and choose "Move in here".</div></section>`;
   const lib = SPECIES.filter(s => sc.dna[s.id]);
   h += `<section><h3>Genome library</h3>`;
@@ -167,7 +170,7 @@ function growRow(kind, era, size){
   const why = unlocked ? growProblem(kind, era, size) : "locked", q = growing(kind, era, size), c = state.ceres;
   const name = growName(kind, era, size), sz = size ? ` data-size="${size}"` : "";
   let h = `<li class="${unlocked ? "" : "locked"}"><span class="nm">${name}</span>`;
-  h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${sz}${why ? " disabled" : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
+  h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${sz}${why ? ` disabled title="${esc(why)}"` : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need">`;
   if(!unlocked) h += `Research ${kind === "plant" ? `${FLORA[ERA_OF[era]].label} flora` : `${ERA_LABEL[era]} medicine`} at ORACLE first.`;
   else {
@@ -196,10 +199,8 @@ function ceresHtml(b){
   }
   h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect CERES to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
 
-  h += `<section><h3>Growing beds (${c.beds.length} batch${c.beds.length === 1 ? "" : "es"}, ${beds()} bed${beds() === 1 ? "" : "s"})</h3>`;
-  h += `<div class="meta">Like TAR's incubators, but with plants. Each botanist tends a bed and can have up to 3 batches lined up.</div>`;
-  if(c.beds.length) h += `<div style="margin-top:8px">${[...c.beds].sort((a, d) => a.end - d.end).map(j => progressCard(growName(j.kind, j.era, j.size), beds() > 1 ? `bed ${(j.lane || 0) + 1}` : "", j)).join("")}</div>`;
-  h += `</section>`;
+  h += baysHtml("Growing bays", "botanist", (j, i) => progressCard(growName(j.kind, j.era, j.size), "", j, i), "Empty. Grow something below.");
+  h = h.replace(/<\/section>$/, `<div class="meta">Like TAR's incubators, but with plants. Each botanist tends one bed, one batch at a time.</div></section>`);
 
   const planted = period => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].period === period && LAND[f.type].flora !== "cenozoic").length, 0);
   h += `<section><h3>Plants for exhibits</h3><div class="meta">Small, medium and large plants for Landscaping, grown per period from the DNA GHOST collects. Each one placed in an exhibit uses up one plant.</div>`;

@@ -101,7 +101,7 @@ function freshScience(){
     unlocked:[],       // animals ORACLE has unlocked, so GHOST can look for their DNA
     dna:{},            // species id (or plant DNA id) -> {genome: 0-100, quality: 0-100}
     trips:[],          // expeditions in the field: {period, sp, start, end}
-    clones:[],         // TAR's incubators: {id, sp, exhibitId, q, lane, start, end}
+    clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
   };
@@ -219,6 +219,20 @@ function upgradeSave(s){
   if(hasT("paleoflora") && !Object.values(PLANT_DNA).some(f => sc.dna[f.id] && sc.dna[f.id].genome >= 100)) giveDna("mesozoic");
   if(!s.ceres.pots) s.ceres.pots = {};
   if(!s.ceres.beds) s.ceres.beds = [];
+  // science jobs moved into bays, one per scientist. Running jobs keep a bay; queued ones and extra incubators are cancelled and paid back.
+  let back = 0;
+  for(const k of ["projects", "trips", "clones", "log"]) if(!sc[k]) sc[k] = [];
+  for(const [kind, jobs] of Object.entries({paleo:sc.projects, temporal:sc.trips, gene:sc.clones, botanist:s.ceres.beds})){
+    const n = sc.crew[kind] || 0, taken = new Set(jobs.filter(j => j.bay !== undefined).map(j => j.bay));
+    for(const j of jobs.filter(x => x.bay === undefined).sort((a, c) => a.start - c.start)){
+      let i = j.lane !== undefined && j.lane < n && !taken.has(j.lane) ? j.lane : -1;
+      for(let k = 0; i < 0 && k < n; k++) if(!taken.has(k)) i = k;
+      delete j.lane;
+      if(i < 0){ jobs.splice(jobs.indexOf(j), 1); const r = jobRefund(kind, j); sc.points += r.points || 0; s.money += r.money || 0; back++; continue; }
+      j.bay = i; taken.add(i);
+    }
+  }
+  if(back) sc.log.unshift({day:s.day, text:`Science now runs one job per scientist. ${back} queued job${back === 1 ? " was" : "s were"} cancelled and paid back.`, ok:true});
   // plant DNA, and the plants CERES grows, became per period (and exhibit planting stock went away): split what an era had across its periods
   const periodsOf = era => Object.values(PLANT_DNA).filter(f => f.era === era);
   for(const era of ["mesozoic", "paleozoic"]){
