@@ -32,7 +32,7 @@ function escapeRisk(e, s){
   const b = barrierOf(e), str = escapeStrength(s);
   if(str > b.strength) return `${s.name} can break through ${b.label.toLowerCase()} (strength ${b.strength}, it needs ${str}). Use ${barrierNeeded(s)} or a moat.`;
   if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return `The electric fence has no power, so it's just wire. ${s.name} can push through. Build or repair generators.`;
-  if(str > effectiveStrength(e)) return isBreached(e) ? `The fence is broken. ${s.name} can walk right out until a mechanic repairs it.` : `The fence is worn${knownCond(e) >= 60 ? " since its last inspection, so the condition below is out of date" : ""}. ${s.name} can push through it until a mechanic repairs it.`;
+  if(str > effectiveStrength(e)) return isBreached(e) ? `The fence is broken. ${s.name} can walk right out until a mechanic repairs it.` : `The fence is worn. ${s.name} can push through it until a mechanic repairs it.`;
   return null;
 }
 
