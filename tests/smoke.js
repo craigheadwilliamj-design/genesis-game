@@ -388,6 +388,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
     out.carryDeliveredNextDay = fed;
 
+    // food trays: a keeper with food left over walks inside the fence and fills them, and animals eat from them first
+    { const e2 = state.exhibits[1], money0 = state.money; state.money = 1e6; e2.land = []; placeLand(e2, "traymd", 250, 180); placeLand(e2, "traysm", 270, 200);
+      const tr0 = e2.land[0], tr1 = e2.land[1]; tr0.id = "l-tray0"; tr1.id = "l-tray1"; e2.stock = {meat:storeMax(e2, "meat")}; k.stamina = 100;
+      out.trayCaps = trayCap(tr0) === 30 && trayCap(tr1) === 12 && trayRoom(e2) === 42;
+      c.route = []; c.wait = 0; c.haul = null; c.at = kGraph.anchors["e-k2"]; setCarry(c, {type:"meat", amount:35}); c.plan = {exhibitId:e2.id}; c.job = "toExhibit"; arrive(c, k);
+      out.trayKeeperEnters = c.job === "filling" && !!fillPos(c);
+      let n = 0; while(c.job === "filling" && n++ < 200) keepersTick(1);
+      out.trayFilled = c.job !== "filling" && Math.abs(trayFood(e2, "meat") - 35) < .01 && !c.carry && (tr0.food.meat || 0) === 30 && (tr1.food.meat || 0) === 5;
+      // a tray with meat in it takes no fish until it's empty
+      out.trayOneFood = trayRoomOf(tr0, "fish") === 0 && trayRoomOf(tr1, "fish") === 0 && trayRoomOf(tr1, "meat") === 7; delete tr0.food.meat; out.trayEmptyTakesAny = trayRoomOf(tr0, "fish") === 30; tr0.food.meat = 30;
+      const before = trayFood(e2, "meat"), stock0 = e2.stock.meat; eatTick(30);
+      out.trayEatenFirst = trayFood(e2, "meat") < before && e2.stock.meat === stock0;
+      // a tray set to fish takes no meat, and unset-tray room is split by diet
+      tr0.food = {}; tr0.set = "fish"; out.traySet = trayRoomOf(tr0, "meat") === 0 && trayRoomOf(tr0, "fish") === 30 && trayShare(e2, "meat") === trayRoomOf(tr1, "meat"); tr0.set = null;
+      propsTabs.sub = "trays"; exTabs.ex = e2.id; exTabs.tab = "props"; const th = exhibitHtml(e2); out.trayTab = /data-key="traysm"/.test(th) && /data-tray="l-tray0"/.test(th) && !/data-key="barn"/.test(th); propsTabs.sub = "shelters"; exTabs.tab = "main";
+      state.money = money0; e2.land = []; }
     // a station full of one food doesn't send keepers to fetch another it has no room for
     for(const x of crew){ x.haul = null; setCarry(x, null); }
     st.store = {plants:storeCap(st)};
@@ -985,7 +1001,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
       out.waterTooMuchHurts = waterFit(wp, wp) === 1 && waterFit(0, wp) === 0 && waterFit(wp * 5, wp) < 1 && waterFit(wp * 5, wp) < waterFit(wp * 1.1, wp); }
     try { const h = landHtml(bx); out.landPanelRenders = /Plant Cover: ?<\/b>|Plant Cover/.test(h) && /Rock Coverage/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
-    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Dirtiness/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
+    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Dirtiness/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
     state.exhibits = keepEx; state.money = keepMoney; render();
 

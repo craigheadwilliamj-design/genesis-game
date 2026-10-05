@@ -994,6 +994,14 @@ const LAND = {
   cavelg: {label:"Large Cave",     one:"a large cave",      price:8500, r:6, color:"#5B5750", slots:40, fits:12, look:"cave"},
   canopysm:{label:"Small Canopy",  one:"a small canopy",    price:1400, r:3, color:"#B9A77E", slots:8, fits:8,  look:"canopy", noCold:true},
   canopylg:{label:"Large Canopy",  one:"a large canopy",    price:4200, r:5, color:"#A8946A", slots:24, fits:19, look:"canopy", noCold:true},
+  traysm: {label:"Small Food Tray",  one:"a small food tray",  price:400,  r:1.2, color:"#8A8F96", tray:12},
+  traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
+  traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
+};
+// Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
+// and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
+const TRAY = {
+  color:"#6E737A",   // rim
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;

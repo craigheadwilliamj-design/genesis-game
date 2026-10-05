@@ -241,7 +241,7 @@ function placeLand(e, key, x, y, biome){
   spend(t.price, "built");
   if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
   const f = {id:uid("l-"), type:key, x, y};
-  if(biome && !t.flora && !t.slots) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
+  if(biome && !t.flora && !t.slots && !t.tray) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
   (e.land = e.land || []).push(f);
 }
 
@@ -271,9 +271,15 @@ function landSvg(e, pick, isDead){
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
     const dead = pick && isDead("land", f.id);
-    const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
+    const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
     s += `<g${at("land", f.id)}>`;
-    if(t.look === "burrow"){
+    if(t.tray){
+      // a round steel tray, filled to the level of the food in it
+      const fill = t.tray ? clamp(trayHas(f) / t.tray, 0, 1) : 0, main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0];
+      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r * .78}" fill="#4B4F55"/>`;
+      if(fill > 0) s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r * .78 * Math.sqrt(fill)}" fill="${FOOD_COLOR[main[0]] || "#999"}"/>`;
+    } else if(t.look === "burrow"){
       // a dirt mound with a dark hole
       s += `<path d="${blobPath(f.x, f.y, t.r, seedOf(f), false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
       s += `<ellipse cx="${f.x}" cy="${f.y + t.r * .1}" rx="${t.r * .4}" ry="${t.r * .28}" fill="#2A211A"/>`;

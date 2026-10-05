@@ -372,7 +372,7 @@ function renderOverlay(){
     });
   }
   if(landGhost && landKey(tool)){
-    const t = LAND[landGhost.key], gfill = t.flora || t.slots ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME), landGhost.key).fill;
+    const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME), landGhost.key).fill;
     s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
@@ -1095,7 +1095,8 @@ function drawKeepers(){
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
     const nx = c.route[0];
-    const x = nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
+    const fp = fillPos(c);   // filling trays: inside the fence
+    const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
     const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
     const drive = onAtv(c), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}`;
     if(el.dataset.key !== key){
