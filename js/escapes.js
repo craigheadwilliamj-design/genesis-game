@@ -47,6 +47,7 @@ function viewFactor(e, reach){
 
 function upgradeCost(e, key){ return Math.round(perimeter(e.points) * BARRIERS[key].perMeter); }
 function moatCost(e){ return Math.round(perimeter(e.points) * MOAT_PER_METER); }
+function netCost(e){ return Math.round(perimeter(e.points) * NET_PER_METER); }
 function aviaryCost(e){ return Math.round(area(e.points) * AVIARY_PER_SQM); }
 
 /* ---------- breakouts ---------- */

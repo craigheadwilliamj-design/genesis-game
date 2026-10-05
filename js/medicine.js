@@ -58,6 +58,7 @@ function throwChance(p, e, x, y){
   if(!c) return 0;
   if(nearBin(x, y)) c *= THROWN.binCut;
   if(hasNoFeed(e)) c *= THROWN.signCut;
+  if(e.net || e.aviary) c *= THROWN.netCut;
   if(guardNear(x, y)) c *= SECURITY.deterCut;
   return c * (1 - EDU.vandalCut * (p.edu || 0) / 100);
 }
