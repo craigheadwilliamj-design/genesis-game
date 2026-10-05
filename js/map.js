@@ -586,7 +586,7 @@ function actGoal(h, e, a){
       return f ? featSpot(h, f, !!LAND[f.type].slots) : null;
     }
     case "hide": {
-      const cover = of("slots").length ? of("slots") : of("flora").length ? of("flora") : of("cover");
+      const cover = of("hide").length ? of("hide") : of("slots").length ? of("slots") : of("flora").length ? of("flora") : of("cover");
       if(!cover.length) return quietSpot(e);
       const far = f => state.paths.reduce((m, q) => Math.min(m, lineDist(f.x, f.y, q.points)), 60);
       const f = cover.slice().sort((x, y) => far(y) - far(x))[0];
