@@ -24,7 +24,7 @@ const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : nu
 const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
 const potName = t => `${t.period || ERA_LABEL[t.flora]} ${t.size} plants`;
 
-const landM2 = f => Math.PI * LAND[f.type].r ** 2;
+const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
 // The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome
 const biomeOf = e => BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
 function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l[0] === b ? "home" : l.includes(b) ? "near" : "away"; }
@@ -145,7 +145,17 @@ function biomeScore(e, out, n){
 function habitatScore(e){
   const out = {delta:0, issues:[]};
   if(!e.animals.length) return out;
-  if(e.viv) return biomeScore(e, out, e.animals.length);   // a vivarium only has its biome: no water, rocks or plants to place
+  if(e.viv){   // a vivarium has its biome and plants: no water or rocks
+    biomeScore(e, out, e.animals.length);
+    let sat = 0, n = 0, want = 0;
+    for(const [sp, c] of speciesCounts(e)){ const f = speciesFit(e, SPECIES_BY_ID[sp]); if(f.w.plants > 0){ sat += c * f.plants; n += c; want++; } }
+    if(want){
+      sat /= n;
+      out.delta += VIV_PLANT.bonus * sat;
+      out.issues.push({bad:false, text:sat >= .99 ? "Plants from their own period fill it out." : sat > 0 ? "Some plants from their own period. More would suit them." : "Bare. Plants from their own period and biome would make it feel like home."});
+    }
+    return out;
+  }
   const h = habitatOf(e), dry = [], lack = {water:[], rock:[], plants:[]};
   let sat = 0, n = 0;
   for(const [sp, c] of speciesCounts(e)){
@@ -214,6 +224,31 @@ function addWater(e, pts){
 }
 const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(e)) if(w.id === id) return {e, w}; return null; };
 
+/* ---------- vivarium plants ---------- */
+// A plant goes at the first free spot inside the glass. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in.
+function vivPlantSpot(e, key){
+  const r = LAND[key].r * VIV_PLANT.scale, bb = bbox(e.points);
+  for(let y = bb.y0 + r; y <= bb.y1 - r; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5)
+    if(deepInside(x, y, e.points, r + .3) && !landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < r + LAND[f.type].r * (f.k || 1))) return [x, y];
+  return null;
+}
+function vivPlantProblem(e, key){
+  const t = LAND[key];
+  if(!e.viv || !t || !t.flora) return "Only plants go in a vivarium.";
+  if(!plantHere(t, e)) return `${t.label} doesn't grow in ${BIOMES[biomeOf(e)].label.toLowerCase()}.`;
+  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
+  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
+  if(!vivPlantSpot(e, key)) return "No room left for one that size.";
+  if(!canAfford(t.price)) return `Costs ${money(t.price)}.`;
+  return null;
+}
+function addVivPlant(e, key){
+  const t = LAND[key], [x, y] = vivPlantSpot(e, key);
+  spend(t.price, "built");
+  if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
+  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y, k:VIV_PLANT.scale});
+}
+
 /* ---------- rocks, groves and shelters ---------- */
 // Why a rock, grove or shelter can't go at (x, y) in this exhibit, or null
 function landProblem(e, key, x, y){
@@ -269,7 +304,8 @@ function landSvg(e, pick, isDead){
     s += `<polygon points="${pts}" fill="none" stroke="#7DB6DD" stroke-opacity=".7" stroke-width="2.5" stroke-linejoin="round" transform="translate(${centroid(w.points).map(c => c * .12).join(" ")}) scale(.88)"/></g>`;
   }
   for(const f of landOf(e)){
-    const t = LAND[f.type]; if(!t) continue;
+    let t = LAND[f.type]; if(!t) continue;
+    if(f.k) t = {...t, r:t.r * f.k};   // a vivarium's plants are drawn shrunk
     const dead = pick && isDead("land", f.id);
     const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
     s += `<g${at("land", f.id)}>`;

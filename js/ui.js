@@ -222,7 +222,7 @@ function exhibitHtml(e){
     h += `</section>`;
   }
 
-  if(e.viv) h += biomeHtml(e);
+  if(e.viv) h += biomeHtml(e) + vivPlantsHtml(e);
 
   h += themeHtml("exhibit", e);
 
@@ -279,6 +279,23 @@ function biomeHtml(e){
     return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
   h += `</section>`;
   return h;
+}
+// A vivarium's plants: the biome's plants by period (the animals' own periods first), what's in there, and a remove button for each
+const vivTabs = {ex:null, period:null};
+function vivPlantsHtml(e){
+  const b = biomeOf(e), periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][b]), own = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp].period))];
+  if(vivTabs.ex !== e.id){ vivTabs.ex = e.id; vivTabs.period = null; }
+  if(!periods.includes(vivTabs.period)) vivTabs.period = periods.find(p => own.includes(p)) || periods[0];
+  const lp = vivTabs.period, here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora);
+  let h = `<section><h3>Plants</h3><div class="meta">Only ${esc(BIOMES[b].label.toLowerCase())} plants grow here. Animals count the ones from their own period.${own.length ? ` Here: ${esc(own.join(", "))}.` : ""}</div>`;
+  if(!periods.length) return h + `<div class="meta" style="margin-top:6px">No plants grow in ${esc(BIOMES[b].label.toLowerCase())}. Regrade the ground above.</div></section>`;
+  h += `<div style="margin-top:6px">${tabBar("vperiod", periods.map(x => ({key:x, label:x + (own.includes(x) ? " (here)" : ""), color:PERIOD_COLOR[x]})), lp)}</div>`;
+  h += `<div class="row" style="margin-top:6px">${PLANTS_OF[lp][b].map(k => { const t = LAND[k], why = vivPlantProblem(e, k); return `<button class="btn" data-action="vivPlant" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("")}</div>`;
+  if(e.animals.length){
+    h += [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s); return f.w.plants <= 0 ? "" : `<div class="need-line ${f.plants >= .99 ? "ok" : f.plants > 0 ? "mid" : "no"}">${esc(s.name)}: ${f.h.plants}/${f.w.plants} m² of ${esc(s.period)} plants.</div>`; }).join("");
+  }
+  if(here.length) h += `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${PERIOD_COLOR[t.period]}"></span><span>${esc(t.label)} (${esc(t.size)}, ${esc(t.period)})</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>`;
+  return h + `</section>`;
 }
 // Plant cover and rock coverage per species: "X/Y" (what it has / what it wants), then red lines for what's wrong or one green line when it's right
 function needsHtml(e){
@@ -694,6 +711,9 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
+  if(a === "vivPlant"){ const why = vivPlantProblem(it, b.dataset.key); if(why){ ui.toast(why, "bad"); return; } addVivPlant(it, b.dataset.key); afterChange(); render(); return; }
+  if(a === "vivPlantOff"){ const f = landOf(it).find(x => x.id === b.dataset.id); if(f){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); it.land.splice(it.land.indexOf(f), 1); afterChange(); render(); } return; }
   if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
@@ -762,7 +782,10 @@ panelEl.addEventListener("change", ev => {
   const why = regradeProblem(e, key), cost = regradeCost(e, key);
   if(why){ ui.toast(why, "bad"); ui.panel(); return; }
   spend(cost, "built"); e.biome = key;
-  ui.toast(`${e.name} is now ${BIOMES[key].label.toLowerCase()} (${money(cost)}).`, "good");
+  // a vivarium's old plants don't grow in the new ground, so they're cleared and refunded
+  const dead = e.viv ? landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora && !plantHere(LAND[f.type], e)) : [];
+  for(const f of dead){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); e.land.splice(e.land.indexOf(f), 1); }
+  ui.toast(`${e.name} is now ${BIOMES[key].label.toLowerCase()} (${money(cost)}).${dead.length ? ` Its ${dead.length} old plant${dead.length === 1 ? "" : "s"} were cleared and refunded.` : ""}`, "good");
   afterChange(); render();
 });
 

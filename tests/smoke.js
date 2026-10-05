@@ -1231,6 +1231,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const nz = zoneThemePlan(state.zones[0], "volcanic").length, rz = restyleZone(state.zones[0], "volcanic");
     render();
     out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
+    // vivariums take plants of their biome, scaled down, and regrading clears them
+    {
+      const v = {id:"e-vp", name:"Fern house", viv:"L", biome:"tropical", points:[[0,0],[16,0],[16,10],[0,10]].map(p => [p[0] + 900, p[1] + 900]), animals:[{id:"a-vp", sp:"arth"}], happy:70};
+      state.exhibits.push(v);
+      const ok = PLANTS_OF.Carboniferous.tropical[0], bad = PLANTS_OF.Carboniferous.wetland[0], m0 = state.money;
+      const wasTech = state.science.tech.slice(), pots0 = Object.assign({}, state.ceres.pots);
+      if(!hasTech(FLORA.paleozoic.tech)) state.science.tech.push(FLORA.paleozoic.tech);
+      state.ceres.pots[potKey(LAND[ok])] = 2;
+      const wrongBiome = !!vivPlantProblem(v, bad), before = habitatScore(v).delta;
+      const why = vivPlantProblem(v, ok); if(!why) addVivPlant(v, ok);
+      out.vivPlants = !why && wrongBiome && v.land.length === 1 && state.ceres.pots[potKey(LAND[ok])] === 1 && state.money < m0 && habitatScore(v).delta > before;
+      render(); out.vivPlantsDraw = world.innerHTML.includes(LAND[ok].color);
+      state.exhibits.splice(state.exhibits.indexOf(v), 1); state.science.tech = wasTech; state.ceres.pots = pots0; state.money = m0;
+    }
     state.zones = zs;
     Object.assign(state, {paths:tSaved.paths, buildings:tSaved.buildings, exhibits:tSaved.exhibits, themes:tSaved.themes, rating:tSaved.rating, money:tSaved.money}); state.science.tech = tSaved.tech; recompute(); render();
     return out;
