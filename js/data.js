@@ -1028,6 +1028,8 @@ const LAND = {
   shank:  {label:"Frozen Shank",    one:"a frozen whole shank", price:400, r:1.4, color:"#8A3A2A", toyFor:{carnivore:4, omnivore:2}, lasts:3, look:"ice"},
   buglog: {label:"Insect Log",      one:"an insect log",      price:1200, r:2.2, color:"#6E5034", toyFor:{insectivore:4, omnivore:3}, look:"buglog"},
   hay:    {label:"Hay Bale",        one:"a hay bale",         price:300,  r:1.8, color:"#D9B95A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, hay:40, look:"hay"},
+  // paleo: Paleoflora a day the older plant eaters eat off it; ceres: Paleoflora it takes from CERES to bale
+  pbale:  {label:"Paleoflora Bale", one:"a Paleoflora bale",  price:500,  r:1.8, color:"#6E9A4A", ring:"#3E5F2A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, paleo:25, ceres:100, tech:"paleoflora", look:"hay"},
   // vivarium enrichment (vivToy instead of toy): picked from the vivarium's Enrichment list and set in the glass, never out in an open exhibit
   vbark:  {label:"Cork Bark Hide",     one:"a cork bark hide",     price:300,  r:.7, color:"#7A5A3A", toy:1, vivToy:true, hide:true, look:"vbark"},
   vbranch:{label:"Climbing Branches",  one:"climbing branches",    price:500,  r:.9, color:"#8A6A48", toy:2, vivToy:true, look:"vbranch"},

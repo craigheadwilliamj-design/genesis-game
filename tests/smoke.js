@@ -1357,6 +1357,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const melt = !landOf(ex).some(f => f.type === "icefish") && landOf(ex).some(f => f.type === "hay" && f.left === LAND.hay.lasts - 2);
         for(let i = 0; i < LAND.hay.lasts; i++) treatsNight();
         state.weather.today = w0;
+        // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from CERES and the research to bale it
+        const st0 = state.ceres.stock, tech0 = state.science.tech.slice();
+        state.science.tech = tech0.filter(k => k !== "paleoflora"); const noTech = !!landProblem(ex, "pbale", 430, 30);
+        state.science.tech = tech0.concat("paleoflora"); state.ceres.stock = 10; const noStock = !!landProblem(ex, "pbale", 430, 30);
+        state.ceres.stock = 500; const okBale = !landProblem(ex, "pbale", 430, 30); placeLand(ex, "pbale", 430, 30);
+        const bale = noTech && noStock && okBale && state.ceres.stock === 500 - LAND.pbale.ceres && browseRate(ex, "paleoflora") === LAND.pbale.paleo;
+        ex.land = ex.land.filter(f => f.type !== "pbale"); state.ceres.stock = st0; state.science.tech = tech0;
+        out.behaviorPaleoBale = bale;
         out.behaviorDietToys = diet && fed && melt && !landOf(ex).length && !!decorProblem("shank", 0, 0) && HABITAT_PROPS.includes("buglog");
         state.exhibits.splice(state.exhibits.indexOf(ex), 1);
       }

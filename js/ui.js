@@ -338,7 +338,7 @@ function needsHtml(e){
 
 // Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Props tab)
 const ROCKS = ["rock", "boulder"];
-const landLock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";
+const landLock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from CERES.` : "";
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
   const here = biomeOf(e), biomes = Object.keys(BIOMES).filter(b => Object.values(PLANTS_OF).some(p => p[b]));
@@ -370,7 +370,7 @@ function propsHtml(e){
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to chase, chew, rub on and dig through keeps animals busy. Bored animals with nothing to do pace. Some toys only interest some diets, and frozen treats and hay bales get used up.</div>`;
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
-    h += `<div class="meta" style="margin-top:6px">${list.map(k => { const t = LAND[k]; return `<b>${esc(t.label)}</b>: ${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}.`; }).join(" ")} Rocks, plants and room count too.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${list.map(k => { const t = LAND[k]; return `<b>${esc(t.label)}</b>: ${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; }).join(" ")} Rocks, plants and room count too.</div>`;
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
   }
   if(sub === "shelters"){
