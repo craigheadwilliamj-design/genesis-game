@@ -36,13 +36,13 @@ const trayCap = f => LAND[f.type].tray;
 const trayHas = f => Object.values(f.food || {}).reduce((n, v) => n + v, 0);
 const trayKind = f => Object.keys(f.food || {}).find(t => f.food[t] > .001) || null;
 // room left in a tray, for food t (none if it holds another food); with no t, whatever's free
-const trayRoomOf = (f, t) => { const k = trayKind(f); return t && k && k !== t ? 0 : Math.max(0, trayCap(f) - trayHas(f)); };
+const trayRoomOf = (f, t) => { const k = trayKind(f); return t && ((k && k !== t) || (f.set && f.set !== t)) ? 0 : Math.max(0, trayCap(f) - trayHas(f)); };
 const trayFood = (e, t) => trays(e).reduce((n, f) => n + ((f.food || {})[t] || 0), 0);
 const trayRoom = e => trays(e).reduce((n, f) => n + trayRoomOf(f), 0);
-// Tray room a food can count on: trays already holding it, plus empty trays split by how much of each the herd eats
+// Tray room a food can count on: trays set to it or already holding it, plus unset empty trays split by how much of each the herd eats
 function trayShare(e, t){
   const need = dailyNeed(e), all = Object.values(need).reduce((n, v) => n + v, 0), part = all > 0 ? (need[t] || 0) / all : 0;
-  return trays(e).reduce((n, f) => n + (trayKind(f) === t ? trayRoomOf(f) : trayKind(f) ? 0 : trayCap(f) * part), 0);
+  return trays(e).reduce((n, f) => n + (f.set ? (f.set === t ? trayRoomOf(f, t) : 0) : trayKind(f) === t ? trayRoomOf(f) : trayKind(f) ? 0 : trayCap(f) * part), 0);
 }
 // Animals eat from the trays before the gate stock. Returns what's still to eat.
 function eatFromTrays(e, t, eat){

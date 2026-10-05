@@ -327,17 +327,31 @@ function landHtml(e){
   return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}], sub)}${body}</section>`;
 }
 
-// Habitat props tab: barns and other props inside an open exhibit, and how much cover they give
+// Habitat props tab: Shelters (barns, caves, canopies) and Food Trays, each with its own sub-tab
+const propsTabs = {sub:"shelters"};
+const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects"];
 function propsHtml(e){
-  const btns = HABITAT_PROPS.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.tray ? ` (${t.tray} units)` : ""}</button>`; }).join("");
-  const have = HABITAT_PROPS.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c);
-  let h = `<section><h3>Habitat props</h3><div class="meta">${have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "No props here yet."} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
-  const tr = trays(e);
-  if(tr.length){ const cap = tr.reduce((n, f) => n + trayCap(f), 0), has = tr.reduce((n, f) => n + trayHas(f), 0), foods = Object.entries(tr.reduce((m, f) => { for(const [t, v] of Object.entries(f.food || {})) m[t] = (m[t] || 0) + v; return m; }, {})).filter(([, v]) => v >= .5);
-    h += `<div class="meta" style="margin-top:6px">Food trays hold ${Math.round(has)} of ${cap} units${foods.length ? ` (${foods.map(([t, v]) => `${Math.round(v)} ${esc(t)}`).join(", ")})` : ""}. Animals eat from them first. Keepers walk in through the gate to fill them${e.gate ? "" : ", so this exhibit needs a gate"}.</div>`; }
-  if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
-    h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
-  return h + `<div class="row" style="margin-top:6px">${btns}</div></section>`;
+  const sub = propsTabs.sub === "trays" ? "trays" : "shelters", isTray = k => !!LAND[k].tray;
+  const btnsFor = list => list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.tray ? ` (${t.tray} units)` : ""}</button>`; }).join("");
+  const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
+  let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}], sub)}`;
+  if(sub === "shelters"){
+    const list = HABITAT_PROPS.filter(k => !isTray(k));
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
+    if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
+      h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
+    return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
+  }
+  const list = HABITAT_PROPS.filter(isTray), tr = trays(e), eaten = Object.keys(dailyNeed(e)), foods = eaten.length ? eaten : TRAY_FOODS;
+  h += `<div class="meta" style="margin-top:6px">${haveText(list)} Animals eat from trays first. Keepers walk in through the gate to fill them${e.gate ? "" : ", so this exhibit needs a gate"}. Each tray holds one kind of food.</div>`;
+  if(tr.length){
+    const cap = tr.reduce((n, f) => n + trayCap(f), 0), has = tr.reduce((n, f) => n + trayHas(f), 0);
+    h += `<div class="meta" style="margin-top:6px">Trays hold ${Math.round(has)} of ${cap} units.</div>`;
+    h += tr.map((f, i) => { const k = trayKind(f), opts = [...new Set([...foods, ...(f.set ? [f.set] : [])])];
+      return `<label class="field" style="margin-top:6px"><span>${esc(LAND[f.type].label)} ${i + 1}: ${Math.round(trayHas(f))}/${trayCap(f)}${k ? " " + esc(k) : ""}</span><select data-tray="${esc(f.id)}"><option value=""${f.set ? "" : " selected"}>Any food</option>${opts.map(t => `<option value="${t}"${f.set === t ? " selected" : ""}>${esc(t)} only</option>`).join("")}</select></label>`; }).join("");
+    h += `<div class="meta" style="margin-top:4px">Pick what a tray gets. Changing it empties the tray. "Any food" takes whatever keepers bring first.</div>`;
+  }
+  return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
@@ -677,6 +691,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
@@ -746,6 +761,14 @@ panelEl.addEventListener("change", ev => {
   spend(cost, "built"); e.biome = key;
   ui.toast(`${e.name} is now ${BIOMES[key].label.toLowerCase()} (${money(cost)}).`, "good");
   afterChange(); render();
+});
+
+// Setting what a food tray holds: changing it empties the tray
+panelEl.addEventListener("change", ev => {
+  const id = ev.target.dataset && ev.target.dataset.tray; if(!id) return;
+  const e = selItem(), f = e && landOf(e).find(x => x.id === id); if(!f) return;
+  f.set = ev.target.value || null; f.food = {};
+  ui.panel();
 });
 
 // Changing an exhibit's wall type
