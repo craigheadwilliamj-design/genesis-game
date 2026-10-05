@@ -104,8 +104,8 @@ function tripRow(id, periodId, label){
   h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}`;
   if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
-    h += `${d ? `Quality ${d.quality}%.${d.genome >= 100 ? " Complete. More trips can raise quality." : ""}` : "No DNA yet."}`;
-    if(!d || d.genome < 100) h += ` About ${Math.round(o.trips)} trips for a whole genome, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
+    h += `${d ? `DNA quality ${d.quality}%.${d.genome >= 100 ? " Complete. More trips can raise quality." : ""}` : "No DNA yet."}`;
+    if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? "more trips to finish the genome" : "trips for a whole genome"}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
     if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out looking for it.</b>`;
     if(g.animal && g.animal.stars) h += ` Needs ${g.animal.stars}★ to clone.`;
   }
@@ -156,7 +156,7 @@ function tarHtml(b){
       const d = sc.dna[s.id], why = d.genome >= 100 ? cloneProblem(s.id) : "Genome incomplete.";
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += d.genome >= 100 ? `<button class="buy" data-action="clone" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}Quality ${d.quality}%. ${d.genome >= 100 ? `Takes ${spanText(cloneMinutes(s.id))}.` : ""}${d.genome >= 100 && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}DNA quality ${d.quality}%. ${d.genome >= 100 ? `Takes ${spanText(cloneMinutes(s.id))}.` : ""}${d.genome >= 100 && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
