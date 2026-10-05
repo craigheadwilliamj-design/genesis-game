@@ -909,7 +909,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
     const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;
     state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
-    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], flora:"cenozoic"};
+    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
     state.exhibits = [gx];
     const grazer = SPECIES.find(s => !s.viv && foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ERA_OF[s.period] === "mesozoic");
     gx.animals = [1, 2, 3].map(i => ({id:"a-g" + i, sp:grazer.id, q:90}));
@@ -1178,7 +1178,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.themeClassicRenamed = clc.exhibits[0].theme === "japanese" && clc.themes.brush === "japanese" && clc.themes.have.includes("japanese") && !clc.themes.have.includes("classic") && !THEMES.classic;
     const tSaved = {paths:state.paths, buildings:state.buildings, exhibits:state.exhibits, themes:state.themes, rating:state.rating, tech:state.science.tech.slice(), money:state.money};
     state.themes = {brush:"genesis", have:["genesis"]}; state.rating = 1; state.science.tech = state.science.tech.filter(t => t !== "gilded"); state.goalsDone = state.goalsDone.filter(id => id !== "cash1m" && id !== "cloneq");
-    state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100, flora:"cenozoic"}];
+    state.exhibits = [{id:"e-t", name:"T", points:[[200,205],[240,205],[240,240],[200,240]], animals:[{sp:"cnot", q:90}], happy:70, cond:100}];
     state.paths = [{id:"p-gate", points:[[200,300],[200,240]], fixed:true}, {id:"p-t", points:[[200,240],[260,240]]}, {id:"p-t2", points:[[260,240],[260,300]]}];
     state.buildings = [{id:"b-t", type:"restroom", points:[[245,243],[253,243],[253,249],[245,249]]}];
     recompute();

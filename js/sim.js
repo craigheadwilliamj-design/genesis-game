@@ -159,8 +159,6 @@ function upgradeSave(s){
     s.ceres = {stock:0};
     const give = id => { if(!s.science.tech.includes(id)) s.science.tech.push(id); };
     if(s.buildings.some(b => b.type === "ceres")){ give("paleoflora"); s.ceres.stock = PALEOFLORA.perDay; }
-    if(s.exhibits.some(e => e.flora === "mesozoic")){ give("paleoflora"); give("mesoplant"); }
-    if(s.exhibits.some(e => e.flora === "paleozoic")){ give("paleoflora"); give("paleoplant"); }
   }
   for(const e of s.exhibits) if(!e.viv && e.cond === undefined){ e.cond = 100; e.inspected = {day:s.day, cond:100}; }
   // landscaping: rocks, groves and shelters (e.land) and drawn water (e.water) inside open exhibits.
@@ -369,11 +367,11 @@ function exhibitReport(e){
   }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
   if(counts.size){
-    const flora = e.flora || "cenozoic", kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
-    // planted landscape plants from the animal's own period (in the exhibit's biome) make it at home too
-    const away = kinds.filter(s => ERA_OF[s.period] !== flora && !(!e.viv && haveOf(e, s).plants > 0));
-    if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === flora) ? FLORA[flora].plants : "plants from their own time"}.`}); }
-    else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. ${[...new Set(away.map(s => FLORA[ERA_OF[s.period]].label))].join(" or ")} plants would suit ${away.length === 1 ? "it" : "them"}.`}); }
+    const kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
+    // Cenozoic animals are at home on the grass underfoot; older ones need plants from their own period (in the exhibit's biome)
+    const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(!e.viv && haveOf(e, s).plants > 0));
+    if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === "cenozoic") ? FLORA.cenozoic.plants : "plants from their own time"}.`}); }
+    else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. Plants from ${away.length === 1 ? "its" : "their"} own period would suit ${away.length === 1 ? "it" : "them"}.`}); }
     // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora
     const grassy = grassyFloor(e) || e.grassFed;
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");

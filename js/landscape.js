@@ -79,7 +79,7 @@ function speciesFit(e, s){
   const water = waterFit(h.water, w.water), rock = fitOf(h.rock, w.rock), plants = fitOf(h.plants, w.plants);
   return {w, h, water, rock, plants, sat:(l.water * water + l.rock * rock + pw * plants) / (l.water + l.rock + pw)};
 }
-const grassyFloor = e => (e.flora || "cenozoic") === "cenozoic" && habitatOf(e).old < 1;
+const grassyFloor = e => habitatOf(e).old < 1;
 // Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic trees give plants.
 function browseRate(e, t){
   if(t !== "plants" && t !== "paleoflora") return 0;
