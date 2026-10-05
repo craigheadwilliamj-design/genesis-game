@@ -161,6 +161,7 @@ function illChance(e, a){
   if(thirsty(e, s)){ p *= HAB.dryIll; why.push("no water"); }
   const wx = weatherNow(), x = exposure(e);
   if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))){ p *= 1 + wx.ill * x; why.push("weather"); }
+  if(a.need && a.need.stress > 60){ p *= BEHAVIOR.stressIll; why.push("stress"); }
   if(medicated(e, s)) p *= MEDICINE.feedCut;
   return {p, why};
 }

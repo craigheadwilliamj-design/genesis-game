@@ -289,6 +289,8 @@ function upgradeSave(s){
   if(!s.science.tech.includes("bars")) s.science.tech.push("bars");   // metal bars are free in every park
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
+  // animals from before behavior get a fresh set of needs (behavior.js)
+  for(const e of s.exhibits) for(const a of e.animals) if(!a.need) a.need = freshNeeds();
   return s;
 }
 
@@ -422,6 +424,8 @@ function exhibitReport(e){
   if(fight){ target -= 45; issues.push({bad:true, text:`Fighting. ${fight}`}); }
   // Water, rocks, groves and shelter: animals feel at home among what they like, and water lovers need water
   const hab = habitatScore(e); target += hab.delta; issues.push(...hab.issues);
+  // Behavior: stressed and bored animals are unhappy, and pacing and hiding show it
+  const beh = behaviorScore(e); target += beh.delta; issues.push(...beh.issues);
   // Theme: animals that look right in the exhibit's theme are happier
   if(e.animals.length && themeOf(e).fits.length){
     const sh = themeFitShare(e);
@@ -458,7 +462,7 @@ function recompute(){
     animals += n; happySum += e.happy * n;
     if(!reach[e.id]) continue;
     for(const [sp, c] of reports[e.id].counts){
-      appeal += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id]));
+      appeal += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id])) * liveliness(e);
       shown.add(sp);
     }
   }
@@ -550,6 +554,7 @@ function tick(dtMin){
   ceresTick(m1 - m0);
   logiTick(m1 - m0);
   eatTick(m1 - m0);
+  behaviorTick(m1 - m0);
   dirtTick(m1 - m0);
   keepersTick(m1 - m0);
   wearTick(m1 - m0);
@@ -622,6 +627,7 @@ function endDay(){
   guardsNight();
   healthNight();
   vetsNight();
+  behaviorNight();
   // today's weather has done its harm; tomorrow's forecast comes true
   rollWeather();
   if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer${weatherNow().guests < .9 ? ", and fewer guests will come" : ""}.`, "bad");

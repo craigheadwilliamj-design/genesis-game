@@ -462,11 +462,15 @@ function syncAnimals(){
         herd.set(a.id, h);
         animalLayer.appendChild(el);
       }
+      h.a = a;
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8;
-      // sick animals get a red ring
+      h.r = r;
+      // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
+      h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
+        (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
         `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
       h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
@@ -539,15 +543,120 @@ function animalWander(h, e){
   }
 }
 
+/* What each act looks like (behavior.js picks the act): where the animal heads, how fast, and whether it stays once there */
+const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1};
+const ACT_STAYS = new Set(["eat", "drink", "rest", "hide"]);
+// The edge of a land feature nearest the animal, or its middle for shelters it can walk into
+function featSpot(h, f, into){
+  const t = LAND[f.type], r = into ? 0 : t.r + (h.r || 1), dx = h.x - f.x, dy = h.y - f.y, d = Math.hypot(dx, dy) || 1;
+  return [f.x + dx / d * r, f.y + dy / d * r];
+}
+const nearestTo = (h, list, at = x => x) => { let b = null, bd = Infinity; for(const x of list){ const p = at(x), d = Math.hypot(p[0] - h.x, p[1] - h.y); if(d < bd){ bd = d; b = x; } } return b; };
+const pickOne = list => list.length ? list[Math.floor(Math.random() * list.length)] : null;
+// Just inside the keeper gate, where the trough and the food drop are
+function gateSpot(e){
+  if(!e.gate) return null;
+  const c = centroid(e.points), d = dist(e.gate, c) || 1, m = Math.min(3, d / 2);
+  const p = [e.gate[0] + (c[0] - e.gate[0]) / d * m, e.gate[1] + (c[1] - e.gate[1]) / d * m];
+  return inPoly(p[0], p[1], e.points) ? p : null;
+}
+// A spot as far from the guest paths as the exhibit allows
+function quietSpot(e){
+  const far = p => state.paths.reduce((m, q) => Math.min(m, lineDist(p[0], p[1], q.points)), 60);
+  let best = null, bd = -1;
+  for(const p of walkNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
+  return best;
+}
+// Where the act takes it, or null to stay where it is
+function actGoal(h, e, a){
+  const land = landOf(e).filter(f => LAND[f.type]), of = k => land.filter(f => LAND[f.type][k]);
+  switch(a.act){
+    case "eat": {
+      const t = trays(e).filter(f => trayHas(f) > 0);
+      return t.length ? featSpot(h, nearestTo(h, t, f => [f.x, f.y])) : gateSpot(e);
+    }
+    case "drink": {
+      const ws = waterOf(e);
+      if(!ws.length) return gateSpot(e);
+      const w = nearestTo(h, ws, w => centroid(w.points)), v = nearestTo(h, w.points), c = centroid(w.points);
+      return [v[0] + (c[0] - v[0]) * .25, v[1] + (c[1] - v[1]) * .25];   // a step into the shallows
+    }
+    case "rest": {
+      const f = nearestTo(h, of("slots").concat(of("flora")), f => [f.x, f.y]);
+      return f ? featSpot(h, f, !!LAND[f.type].slots) : null;
+    }
+    case "hide": {
+      const cover = of("slots").length ? of("slots") : of("flora").length ? of("flora") : of("cover");
+      if(!cover.length) return quietSpot(e);
+      const far = f => state.paths.reduce((m, q) => Math.min(m, lineDist(f.x, f.y, q.points)), 60);
+      const f = cover.slice().sort((x, y) => far(y) - far(x))[0];
+      return featSpot(h, f, !!LAND[f.type].slots);
+    }
+    case "forage": { const f = pickOne(of("flora")); return f ? featSpot(h, f) : null; }
+    case "play": { const f = pickOne(of("toy").concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
+    case "social": {
+      let mate = null, bd = Infinity;
+      for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.sp === h.sp){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; mate = o; } }
+      if(!mate) return null;
+      const r = (h.r || 1) * 2.5, dx = h.x - mate.x, dy = h.y - mate.y, d = Math.hypot(dx, dy) || 1;
+      return [mate.x + dx / d * r, mate.y + dy / d * r];
+    }
+  }
+  return null;
+}
+// Pacing: back and forth along a short beat just inside the nearest stretch of fence
+function paceRoute(h, e){
+  const pts = e.points, inset = e.viv ? .4 : (h.r || 1) + 1.5;
+  let best = null;
+  for(let i = 0; i < pts.length; i++){ const a = pts[i], b = pts[(i + 1) % pts.length], q = segProj(h.x, h.y, a, b); if(!best || q.d < best.q.d) best = {a, b, q}; }
+  const {a, b, q} = best, L = dist(a, b) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+  let nx = -uy, ny = ux;
+  if(!inPoly(q.x + nx * inset, q.y + ny * inset, pts)){ nx = -nx; ny = -ny; }
+  const beat = clamp(L * .4, e.viv ? 1 : 3, 14), t0 = clamp(q.t * L - beat / 2, 0, Math.max(0, L - beat));
+  const p1 = [a[0] + ux * t0 + nx * inset, a[1] + uy * t0 + ny * inset], p2 = [p1[0] + ux * beat, p1[1] + uy * beat];
+  if(!inPoly(p1[0], p1[1], pts) || !walkClear(p1, p2, pts)) return null;
+  const to = walkRoute([h.x, h.y], p1, pts);
+  return to ? to.concat([p2, p1, p2, p1, p2, p1]) : null;
+}
+// Patrolling: a lap of the fence line, from the nearest corner
+function patrolRoute(h, e){
+  const nodes = walkNodes(e.points); if(nodes.length < 3) return null;
+  const i0 = nodes.indexOf(nearestTo(h, nodes)), out = [];
+  let at = [h.x, h.y];
+  for(let k = 0; k <= nodes.length; k++){ const n = nodes[(i0 + k) % nodes.length], r = walkRoute(at, n, e.points); if(!r) break; out.push(...r); at = n; }
+  return out.length ? out : null;
+}
+function animalPlan(h, e){
+  const a = h.a;
+  if(!a || !a.act){ animalWander(h, e); return; }
+  h.key = JSON.stringify(e.points); h.path = [];
+  if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
+  if(a.act === "pace"){ const r = paceRoute(h, e); if(r){ h.path = r; return; } }
+  if(a.act === "patrol"){ const r = patrolRoute(h, e); if(r){ h.path = r; return; } }
+  const goal = actGoal(h, e, a);
+  if(goal){
+    if(Math.hypot(goal[0] - h.x, goal[1] - h.y) < .5) return;
+    const r = inPoly(goal[0], goal[1], e.points) && walkRoute([h.x, h.y], goal, e.points);
+    if(r){ h.path = r; return; }
+  }
+  // nothing to head for: settle where it is, or mill about
+  if(!ACT_STAYS.has(a.act)) animalWander(h, e);
+}
+
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
+    const act = h.a && h.a.act;
+    // a new act: drop what it was doing and head off at once
+    if(act !== h.act){ h.act = act; h.path = null; h.wait = Math.min(h.wait, Math.random() * .6); }
     if(h.wait > 0){ h.wait -= dt; continue; }
-    if(!h.path || h.key !== JSON.stringify(e.points)) animalWander(h, e);   // new animal, or the exhibit was reshaped
-    if(!h.path.length){ h.wait = 1 + Math.random()*3; h.path = null; continue; }
+    if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
+    // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
+    const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
+    if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
-    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = 1 + Math.random()*4; h.path = null; } continue; }
-    const step = Math.min(d, h.spd * 3 * dt);
+    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
+    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
   }

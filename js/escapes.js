@@ -66,7 +66,7 @@ function escapesTick(dtMin){
       if(x > excess){ excess = x; worst = a; }
     }
     if(!worst) continue;
-    const p = Math.min(.05, excess / 100 * .003) * (1.6 - e.happy / 100) * (isBreached(e) ? 3 : 1);
+    const p = Math.min(.05, excess / 100 * .003) * (1.6 - e.happy / 100) * (isBreached(e) ? 3 : 1) * stressEscape(worst);
     if(Math.random() < 1 - Math.pow(1 - p, dtMin)) breakOut(e, worst);
   }
   moveLoose(dtMin);
