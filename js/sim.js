@@ -369,7 +369,7 @@ function exhibitReport(e){
   if(counts.size){
     const kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
     // Cenozoic animals are at home on the grass underfoot; older ones need plants from their own period (in the exhibit's biome)
-    const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(!e.viv && haveOf(e, s).plants > 0));
+    const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(haveOf(e, s).plants > 0));
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === "cenozoic") ? FLORA.cenozoic.plants : "plants from their own time"}.`}); }
     else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. Plants from ${away.length === 1 ? "its" : "their"} own period would suit ${away.length === 1 ? "it" : "them"}.`}); }
     // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora

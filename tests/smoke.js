@@ -1242,6 +1242,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const wrongBiome = !!vivPlantProblem(v, bad), before = habitatScore(v).delta;
       const why = vivPlantProblem(v, ok); if(!why) addVivPlant(v, ok);
       out.vivPlants = !why && wrongBiome && v.land.length === 1 && state.ceres.pots[potKey(LAND[ok])] === 1 && state.money < m0 && habitatScore(v).delta > before;
+      out.vivEra = !exhibitReport(v).issues.some(i => /another era/.test(i.text));
       render(); out.vivPlantsDraw = world.innerHTML.includes(LAND[ok].color);
       state.exhibits.splice(state.exhibits.indexOf(v), 1); state.science.tech = wasTech; state.ceres.pots = pots0; state.money = m0;
     }
