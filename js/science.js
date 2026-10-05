@@ -124,6 +124,9 @@ function genomeOpen(id){
 // The periods GHOST can look in for a genome
 const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : [g.plant.period]; };
 
+// GHOST upgrade multiplier for "cost" or "speed", and the quality points added to every sample
+const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
+const ghostQuality = () => GHOST_UPGRADE.quality[hasTech("ghostq2") ? 2 : hasTech("ghostq1") ? 1 : 0];
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
 // What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
@@ -132,7 +135,7 @@ function tripOdds(id, periodId){
   const g = genomeInfo(id), p = PERIOD_BY_ID[periodId], t = sizeT(g.space);
   const fail = clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8), trips = lerpT(TRIP.trips, t);
   // a genome ends on a find that overshoots 100% by about half a find's worth, hence the .5
-  return {fail, trips, gain:100 / Math.max(.6, trips * (1 - fail) - .5), cost:Math.round(p.trip * lerpT(TRIP.costMul, t) / 50) * 50};
+  return {fail, trips, gain:100 / Math.max(.6, trips * (1 - fail) - .5), cost:Math.round(p.trip * lerpT(TRIP.costMul, t) * ghostLevel("cost") / 50) * 50};
 }
 
 function tripProblem(id, periodId){
@@ -148,7 +151,7 @@ function launchTrip(id, periodId){
   if(tripProblem(id, periodId)) return false;
   const p = PERIOD_BY_ID[periodId], now = nowMin();
   spend(tripOdds(id, periodId).cost, "science");
-  const end = now + Math.round(p.days * DAY_MIN);
+  const end = now + Math.round(p.days * DAY_MIN * ghostLevel("speed"));
   state.science.trips.push({period:periodId, sp:id, bay:freeBay("temporal"), start:now, end});
   events.toast(`GHOST left for the ${periodId} to find ${genomeInfo(id).name}. Back in about ${spanText(end - now)}.`);
   return true;
@@ -171,7 +174,7 @@ function tripReturns(t){
     const msg = `GHOST came back from the ${t.period} empty-handed. The ${g.name} trail went cold.`;
     logScience(msg, false); events.toast(msg, "bad"); return;
   }
-  const q = Math.round(rand(p.quality[0], p.quality[1]));
+  const q = Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality());
   const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q);
   const d = sc.dna[t.sp];
   let msg = r.gain ? `GHOST brought back ${g.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
@@ -180,7 +183,7 @@ function tripReturns(t){
   const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && isUnlocked(x.id) && !genomeDone(x.id));
   if(others.length && Math.random() < TRIP.bonus.chance){
     const o = others[Math.floor(Math.random() * others.length)];
-    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.round(rand(p.quality[0], p.quality[1])));
+    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality()));
     if(r2.gain) msg += ` They also found ${o.name} traces (+${Math.round(r2.gain)}%).`;
   }
   logScience(msg, true); events.toast(msg, "good");
