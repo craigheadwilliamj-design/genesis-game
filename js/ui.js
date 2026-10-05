@@ -305,7 +305,7 @@ function needsHtml(e){
   return `<div style="margin-top:6px">${body}</div>`;
 }
 
-// Water, rocks, groves and shelters in one exhibit, and buttons to add more
+// Water, rocks, groves and barns in one exhibit, and buttons to add more
 const ROCKS = ["rock", "boulder"];
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
@@ -319,15 +319,16 @@ function landHtml(e){
   const lp = landTabs.period;
   const rockBtns = ROCKS.map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
   const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = lock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
-  const sub = ["plants", "rocks", "water", "shelter"].includes(landTabs.sub) ? landTabs.sub : "plants";
+  const sub = ["plants", "rocks", "water"].includes(landTabs.sub) ? landTabs.sub : "plants";
   const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
   const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
     : sub === "rocks" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} rocks</b></div><div class="row" style="margin-top:4px">${rockBtns}</div>`
     : sub === "water" ? `<div class="row" style="margin-top:8px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button></div><div class="meta" style="margin-top:4px">Draw it corner by corner like a fence. Reshape it with the Move tool.</div>`
-    : `${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
-      return `<div class="meta" style="margin-top:8px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
-    <div class="row" style="margin-top:6px">${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !ROCKS.includes(k)).map(([k]) => k))}</div>`;
-  return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}, {key:"shelter", label:"Shelter", color:"#8C6A2E"}], sub)}${body}</section>`;
+    : "";
+  const propsBody = `${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
+      return `<div class="meta" style="margin-top:8px">Barns have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
+    <div class="row" style="margin-top:6px">${landBtns(HABITAT_PROPS)}</div>`;
+  return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}], sub)}${body}</section><section><h3>Habitat Props</h3>${propsBody}</section>`;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
