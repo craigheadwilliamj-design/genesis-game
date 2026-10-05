@@ -396,6 +396,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.trayKeeperEnters = c.job === "filling" && !!fillPos(c);
       let n = 0; while(c.job === "filling" && n++ < 200) keepersTick(1);
       out.trayFilled = c.job !== "filling" && Math.abs(trayFood(e2, "meat") - 35) < .01 && !c.carry && (tr0.food.meat || 0) === 30 && (tr1.food.meat || 0) === 5;
+      // a tray with meat in it takes no fish until it's empty
+      out.trayOneFood = trayRoomOf(tr0, "fish") === 0 && trayRoomOf(tr1, "fish") === 0 && trayRoomOf(tr1, "meat") === 7; delete tr0.food.meat; out.trayEmptyTakesAny = trayRoomOf(tr0, "fish") === 30; tr0.food.meat = 30;
       const before = trayFood(e2, "meat"), stock0 = e2.stock.meat; eatTick(30);
       out.trayEatenFirst = trayFood(e2, "meat") < before && e2.stock.meat === stock0;
       state.money = money0; e2.land = []; }

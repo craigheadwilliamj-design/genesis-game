@@ -30,17 +30,19 @@ function sourcesFor(t, k){
 }
 // Food an exhibit has for a need. Without Paleoflora, plain plant food (grass hay) stands in.
 function stockFor(e, t){ const s = e.stock || {}; return (s[t] || 0) + trayFood(e, t) + (t === "paleoflora" ? (s.plants || 0) * (dailyNeed(e).plants ? 0 : 1) : 0); }
-// Food trays: units each holds, what's in them, and the room left. A tray holds any mix of foods.
+// Food trays: units each holds, what's in them, and the room left. A tray holds one kind of food at a time (any kind, once it's empty).
 const trays = e => landOf(e).filter(f => LAND[f.type] && LAND[f.type].tray);
 const trayCap = f => LAND[f.type].tray;
 const trayHas = f => Object.values(f.food || {}).reduce((n, v) => n + v, 0);
-const trayRoomOf = f => Math.max(0, trayCap(f) - trayHas(f));
+const trayKind = f => Object.keys(f.food || {}).find(t => f.food[t] > .001) || null;
+// room left in a tray, for food t (none if it holds another food); with no t, whatever's free
+const trayRoomOf = (f, t) => { const k = trayKind(f); return t && k && k !== t ? 0 : Math.max(0, trayCap(f) - trayHas(f)); };
 const trayFood = (e, t) => trays(e).reduce((n, f) => n + ((f.food || {})[t] || 0), 0);
 const trayRoom = e => trays(e).reduce((n, f) => n + trayRoomOf(f), 0);
-// A food's share of the tray room: split by how much of each the herd eats
+// Tray room a food can count on: trays already holding it, plus empty trays split by how much of each the herd eats
 function trayShare(e, t){
-  const need = dailyNeed(e), all = Object.values(need).reduce((n, v) => n + v, 0);
-  return all > 0 ? trayRoom(e) * (need[t] || 0) / all : 0;
+  const need = dailyNeed(e), all = Object.values(need).reduce((n, v) => n + v, 0), part = all > 0 ? (need[t] || 0) / all : 0;
+  return trays(e).reduce((n, f) => n + (trayKind(f) === t ? trayRoomOf(f) : trayKind(f) ? 0 : trayCap(f) * part), 0);
 }
 // Animals eat from the trays before the gate stock. Returns what's still to eat.
 function eatFromTrays(e, t, eat){
@@ -388,11 +390,11 @@ function cleanJob(c, k, min = CLEAN.dirtyAt){
 // Leftover food goes into the exhibit's trays: the keeper walks in from the gate, visits the nearest trays with room, and walks back out
 function startFilling(c, e){
   if(!e.gate || !c.carry) return false;
-  const g = [e.gate[0], e.gate[1]]; let pos = g, left = c.carry.amount, pool = trays(e).filter(f => trayRoomOf(f) > .01);
+  const g = [e.gate[0], e.gate[1]]; let pos = g, left = c.carry.amount, pool = trays(e).filter(f => trayRoomOf(f, c.carry.type) > .01);
   const pts = [g], ids = [];
   while(pool.length && left > .01){
     pool.sort((a, b) => dist(pos, [a.x, a.y]) - dist(pos, [b.x, b.y]));
-    const f = pool.shift(); pts.push([f.x, f.y]); ids.push(f.id); pos = [f.x, f.y]; left -= trayRoomOf(f);
+    const f = pool.shift(); pts.push([f.x, f.y]); ids.push(f.id); pos = [f.x, f.y]; left -= trayRoomOf(f, c.carry.type);
   }
   if(!ids.length) return false;
   pts.push(g);
@@ -415,7 +417,7 @@ function fillStep(c, k, left){
   const tray = f.ids[f.i - 1] && landOf(e).find(x => x.id === f.ids[f.i - 1]);
   if(tray && f.i - 1 < f.ids.length){
     tray.food = tray.food || {};
-    const give = Math.min(trayRoomOf(tray), c.carry.amount);
+    const give = Math.min(trayRoomOf(tray, c.carry.type), c.carry.amount);
     tray.food[c.carry.type] = (tray.food[c.carry.type] || 0) + give; c.carry.amount -= give;
     noteFlow(null, e.id, give);
     k.stamina -= KEEPER.tirePerDelivery;

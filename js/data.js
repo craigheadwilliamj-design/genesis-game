@@ -992,7 +992,7 @@ const LAND = {
   traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
   traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
 };
-// Food trays (LAND items with `tray`, food units they hold). Any food goes in. Keepers walk inside the fence to fill them,
+// Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
 const TRAY = {
   color:"#6E737A",   // rim
