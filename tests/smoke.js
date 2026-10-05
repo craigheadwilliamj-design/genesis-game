@@ -309,6 +309,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     kGraph.anchors["fix:f1"] = kGraph.anchors["fix:f2"] = kGraph.anchors.f1 = kGraph.anchors.f2 = kGraph.anchors["b-st"];
     state.staff.mechanics = [{id:"mz", name:"Z", zone:"z-9"}, {id:"mf", name:"F"}];
     out.mechanicZone = pickFence({id:"mz"}) === f1 && pickFence({id:"mf"}).zone === undefined;
+    // a fence nobody can walk to doesn't stall the crew: they take the next job they can reach
+    kGraph.anchors["fix:f2"] = {k:"iso", x:0, y:0, adj:new Map(), svc:new Set()};
+    out.mechanicSkipsUnreachable = pickFence({id:"mf", at:kGraph.anchors["b-st"]}) === f1;
+    kGraph.anchors["fix:f2"] = kGraph.anchors["b-st"];
     state.health.from = 0; vcrew = [];
     state.staff.vets = [{id:"vz", name:"Z", zone:"z-9"}, {id:"vf", name:"F"}];
     out.vetZone = pickCheck({id:"vz"}) === f1 && !!pickCheck({id:"vf"});
@@ -317,6 +321,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     dropZone("z-9");
     out.dropClearsStaff = !state.staff.mechanics.some(m => m.zone) && !state.staff.vets.some(v => v.zone);
     state.exhibits = state.exhibits.filter(e => e !== f1 && e !== f2); state.zones = []; state.staff.mechanics = []; state.staff.vets = [];
+    // two roads ending a meter apart count as joined, and staff and guests can walk across the gap
+    {
+      const keepP = state.paths, [gx, gy] = state.gate;
+      state.paths = [{id:"pj1", points:[[gx, gy], [gx, gy - 30]]}, {id:"pj2", points:[[gx, gy - 31], [gx + 40, gy - 31]]}];
+      recompute(); buildKeeperGraph(); buildGuestGraph();
+      const far = g => [...g.nodes.values()].find(n => n.x === gx + 40), from = g => [...g.nodes.values()].find(n => n.x === gx && n.y === gy);
+      out.nearEndsJoin = derived.joinedAll.has("pj2") && walkFrom(from(kGraph), null).dist.has(far(kGraph)) && walkFrom(from(gGraph), null).dist.has(far(gGraph));
+      state.paths = keepP; recompute(); buildKeeperGraph(); buildGuestGraph();
+    }
 
     // an idle keeper tidies an exhibit however clean it is
     viv.dirt = 10; keepersNight(); crew.forEach(c => { c.job = "idle"; c.wait = 0; });
