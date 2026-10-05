@@ -58,6 +58,7 @@ const netCatch = e => THROWN.netCatch * condOf(e) / 100;
 function throwChance(p, e, x, y){
   let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
   if(!c) return 0;
+  c *= Math.pow(1 - THROWN.dayDecay, e.trash || 0);
   if(nearBin(x, y)) c *= THROWN.binCut;
   if(hasNoFeed(e)) c *= THROWN.signCut;
   if(e.net || e.aviary) c *= 1 - netCatch(e);
@@ -94,7 +95,7 @@ function trashNight(out){
         delete a.sick.chronic;
         a.sick.cause = "trash"; delete a.sick.hidden; out.fed++; continue;
       }
-      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; out.fed++;
+      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; delete a.sick.hidden; out.fed++;   // it shows at once, so a vet sees it today
     }
     e.trash = 0;
   }
