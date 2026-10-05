@@ -110,7 +110,7 @@ function coverOf(e){
   const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
   let need = 0, shelter = 0, shade = 0;
   for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))) need += coverSlots(s); }
-  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; shelter += L.slots || 0; shade += (L.shade || 0) * w.grove; }
+  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; shelter += wk === "cold" && L.noCold ? 0 : L.slots || 0; shade += (L.shade || 0) * w.grove; }
   return {need, shelter, shade, have:shelter + shade};
 }
 // Share of the herd out in today's weather with no cover: 0 to 1
@@ -263,7 +263,21 @@ function landSvg(e, pick, isDead){
     const dead = pick && isDead("land", f.id);
     const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
     s += `<g${at("land", f.id)}>`;
-    if(t.slots){
+    if(t.look === "burrow"){
+      // a dirt mound with a dark hole
+      s += `<path d="${blobPath(f.x, f.y, t.r, seedOf(f), false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<ellipse cx="${f.x}" cy="${f.y + t.r * .1}" rx="${t.r * .4}" ry="${t.r * .28}" fill="#2A211A"/>`;
+    } else if(t.look === "cave"){
+      // a rocky hill with a dark mouth
+      const sd = seedOf(f);
+      s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="M${f.x - t.r * .38} ${f.y + t.r * .4}A${t.r * .38} ${t.r * .5} 0 0 1 ${f.x + t.r * .38} ${f.y + t.r * .4}Z" fill="#1E1B17"/>`;
+    } else if(t.look === "canopy"){
+      // a round awning on spokes
+      const sp = Array.from({length:6}, (_, i) => { const a = i * Math.PI / 3; return `M${f.x} ${f.y}L${(f.x + t.r * .9 * Math.cos(a)).toFixed(2)} ${(f.y + t.r * .9 * Math.sin(a)).toFixed(2)}`; }).join("");
+      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r * .9}" fill="${t.color}" fill-opacity=".8" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="${sp}" stroke="#3B3226" stroke-opacity=".5" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/>`;
+    } else if(t.slots){
       // a square roof with a ridge
       const h = t.r * .78;
       s += `<rect x="${f.x - h}" y="${f.y - h}" width="${h * 2}" height="${h * 2}" rx="${h * .12}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
