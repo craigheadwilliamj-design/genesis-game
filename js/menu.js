@@ -6,6 +6,7 @@
    ===================================================================== */
 
 // What each group holds. {tool} picks a tool, {sub} opens a dropdown of tools, {fence} picks a fence.
+const HABITAT_PROPS = ["shelter", "barn"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
     {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
@@ -27,12 +28,13 @@ const BUILD_MENU = [
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
+    {label:"Habitat Props", props:["shelter", "barn"], note:"Place these inside an open exhibit. Barns cover animals from heat waves, cold snaps and storms."},
     {label:"Fence Types", fences:true, note:"Pick a fence before you build. Then draw the exhibit the same way."},
   ]},
   {id:"land", label:"Landscaping", items:[
     {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it inside an exhibit like a fence: tap the shore corners, then the first one again."},
-    ...Object.entries(LAND).filter(([, t]) => !t.period).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
-      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need water. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
+    ...Object.entries(LAND).filter(([k, t]) => !t.period && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
+      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need water." : undefined})),
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES." : undefined})),
   ]},
   {id:"guest", label:"Guest Buildings", items:[
@@ -112,9 +114,15 @@ const priceRange = tools => {
   const ps = tools.map(t => BUILDINGS[t].price), lo = Math.min(...ps), hi = Math.max(...ps);
   return lo === hi ? money(lo) : `${money(lo)}–${money(hi)}`;
 };
+const priceRange2 = ks => { const ps = ks.map(k => LAND[k].price); return `${money(Math.min(...ps))}–${money(Math.max(...ps))}`; };
 const toolLabel = t => BUILD_NAMES[t] || BUILDINGS[t].label;
 
 function menuRow(it){
+  if(it.props){
+    const rows = it.props.map(k => { const t = LAND[k];
+      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}</span></span></button>`; }).join("");
+    return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + it.props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(it.props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+  }
   if(it.fences){
     const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(fenceRate("wood"))}–${money(fenceRate("acrylic"))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
