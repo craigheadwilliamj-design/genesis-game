@@ -595,8 +595,9 @@ const THROWN = {
   eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
   eatMax:.6,
   deadly:.02,          // share of animals that eat trash and die at once, rather than falling ill
-  sev:30,              // how bad the illness starts when one eats trash (0 to 100); under HEALTH.minorBelow, so a vet treats it on the spot
-  sevCap:85,           // an animal already sick gets worse from trash, but not past this, so a vet still has a few days
+  sev:50,              // how bad the illness starts when one eats trash (0 to 100)
+  worsen:25,           // and how much worse it gets each night untreated: dead in two nights
+  sevCap:70,           // an animal already sick gets worse from trash, but not past this, so a vet still has a night
 };
 // Guests learn about the animals from info signs, field guides, and the Education Center
 const EDU = {
