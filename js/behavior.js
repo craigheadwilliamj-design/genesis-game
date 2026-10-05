@@ -46,13 +46,22 @@ function awake(s, min = state.minute){
 const isHunter = s => ["meat", "fish", "insects"].includes(foodType(s));
 
 /* ---------- enrichment ---------- */
-// Toy points (Rubbing Posts, Log Piles, Mud Wallows; bark hides, branches and the like in a vivarium) an exhibit's animals want: more for bigger herds and bigger animals
+// Toy points (Rubbing Posts, Log Piles, balls, treats and the like; bark hides, branches and so on in a vivarium) an exhibit's animals want: more for bigger herds and bigger animals
+const enrichNeedOf = (e, s, c) => ENRICH.per * Math.sqrt(c) * (e.viv ? clamp(Math.sqrt(s.space) / ENRICH.vivScale, 1, 3) : clamp(Math.sqrt(s.space) / 30, .3, 2));
 function enrichNeed(e){
   let n = 0;
-  for(const [sp, c] of speciesCounts(e)) n += ENRICH.per * Math.sqrt(c) * (e.viv ? clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / ENRICH.vivScale, 1, 3) : clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 30, .3, 2));
+  for(const [sp, c] of speciesCounts(e)) n += enrichNeedOf(e, SPECIES_BY_ID[sp], c);
   return n;
 }
-const toyPoints = e => landOf(e).reduce((n, f) => n + ((LAND[f.type] && LAND[f.type].toy) || 0), 0);
+// What one toy is worth to a species (its best diet counts), or its most to anyone with no species
+const toyFor = (t, s) => !t ? 0 : !t.toyFor ? t.toy || 0 : s ? Math.max(0, ...s.diet.map(d => t.toyFor[d] || 0)) : Math.max(...Object.values(t.toyFor));
+const toyPoints = (e, s) => landOf(e).reduce((n, f) => n + toyFor(LAND[f.type], s), 0);
+// How well the toys cover what every species here wants, 0 to 1
+function toyFit(e){
+  let fit = 0, n = 0;
+  for(const [sp, c] of speciesCounts(e)){ const s = SPECIES_BY_ID[sp]; fit += c * clamp(toyPoints(e, s) / (enrichNeedOf(e, s, c) || 1), 0, 1); n += c; }
+  return n ? fit / n : 0;
+}
 // How much there is to do, 0 to 1: toys, the landscaping they like (just plants, in a vivarium), and room to roam
 function enrichment(e){
   if(!e.animals.length) return 0;
@@ -61,7 +70,7 @@ function enrichment(e){
   sat /= n || 1;
   let need = 0; for(const [sp, c] of speciesCounts(e)) need += SPECIES_BY_ID[sp].space * c;
   const ratio = need ? area(e.points) / need : 2, room = ratio >= 1.5 ? 1 : ratio >= 1 ? .5 + (ratio - 1) : ratio * .5;
-  return clamp(ENRICH.toys * clamp(toyPoints(e) / (enrichNeed(e) || 1), 0, 1) + ENRICH.habitat * sat + ENRICH.room * room, 0, 1);
+  return clamp(ENRICH.toys * toyFit(e) + ENRICH.habitat * sat + ENRICH.room * room, 0, 1);
 }
 
 /* ---------- what the exhibit puts on its animals ---------- */
@@ -194,9 +203,24 @@ function behaviorTick(dtMin){
   }
 }
 
+// Treats and hay bales get used up: a day each night, faster for frozen ones in a heat wave
+function treatsNight(){
+  const hot = state.weather && state.weather.today === "hot";
+  for(const e of state.exhibits){
+    const gone = [];
+    e.land = landOf(e).filter(f => {
+      const t = LAND[f.type]; if(!t || !t.lasts) return true;
+      f.left = (f.left ?? t.lasts) - (hot && t.look === "ice" ? ENRICH.melt : 1);
+      if(f.left > 0) return true;
+      gone.push(t.label.toLowerCase()); return false;
+    });
+    if(gone.length && e.animals.length) events.toast(`${e.name}: the ${[...new Set(gone)].join(" and ")} ${gone.length === 1 ? "is" : "are"} all used up. Put out more in Habitat Props.`, "bad");
+  }
+}
 // Overnight they eat what's left, drink, sleep it off and wake up fresh
 function behaviorNight(){
   behaveAcc = 0;
+  treatsNight();
   for(const e of state.exhibits){
     if(!e.animals.length) continue;
     const ctx = behaviorCtx(e);

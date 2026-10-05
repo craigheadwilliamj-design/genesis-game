@@ -592,8 +592,13 @@ function actGoal(h, e, a){
       const f = cover.slice().sort((x, y) => far(y) - far(x))[0];
       return featSpot(h, f, !!LAND[f.type].slots);
     }
-    case "forage": { const f = pickOne(of("flora")); return f ? featSpot(h, f) : null; }
-    case "play": { const f = pickOne(of("toy").concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
+    case "forage": {
+      // plant eaters browse groves and hay; bug eaters work the insect logs
+      const s = SPECIES_BY_ID[a.sp], f = pickOne(of("flora").concat(eats(s, "herbivore") ? of(foodType(s) === "paleoflora" ? "paleo" : "hay") : [], land.filter(f => f.type === "buglog" && toyFor(LAND[f.type], s) > 0)));
+      return f ? featSpot(h, f) : null;
+    }
+    case "hunt": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null; }
+    case "play": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => toyFor(LAND[f.type], s) > 0).concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
     case "social": {
       let mate = null, bd = Infinity;
       for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.sp === h.sp){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; mate = o; } }

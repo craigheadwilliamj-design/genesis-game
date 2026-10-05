@@ -338,7 +338,7 @@ function needsHtml(e){
 
 // Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Props tab)
 const ROCKS = ["rock", "boulder"];
-const landLock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : "";
+const landLock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from CERES.` : "";
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
   const here = biomeOf(e), biomes = Object.keys(BIOMES).filter(b => Object.values(PLANTS_OF).some(p => p[b]));
@@ -361,14 +361,16 @@ function landHtml(e){
 const propsTabs = {sub:"shelters"};
 const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects"];
 function propsHtml(e){
-  const sub = ["trays", "toys"].includes(propsTabs.sub) ? propsTabs.sub : "shelters", isTray = k => !!LAND[k].tray, isToy = k => !!LAND[k].toy;
+  const sub = ["trays", "toys"].includes(propsTabs.sub) ? propsTabs.sub : "shelters", isTray = k => !!LAND[k].tray, isToy = k => !LAND[k].vivToy && !!(LAND[k].toy || LAND[k].toyFor);
   const btnsFor = list => list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.tray ? ` (${t.tray} units)` : ""}</button>`; }).join("");
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
   let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
-    const list = HABITAT_PROPS.filter(isToy), need = enrichNeed(e), have = toyPoints(e);
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to rub on, climb over and wallow in keeps animals busy. Bored animals with nothing to do pace.</div>`;
-    if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div><div class="meta">Toy points: ${list.map(k => `${esc(LAND[k].label.toLowerCase())} ${LAND[k].toy}`).join(", ")}. Bigger herds and bigger animals want more. Rocks, plants and room count too.</div>`;
+    const list = HABITAT_PROPS.filter(isToy), counts = speciesCounts(e);
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to chase, chew, rub on and dig through keeps animals busy. Bored animals with nothing to do pace. Some toys only interest some diets, and frozen treats and hay bales get used up.</div>`;
+    for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
+      h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
+    h += `<div class="meta" style="margin-top:6px">${list.map(k => { const t = LAND[k]; return `<b>${esc(t.label)}</b>: ${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; }).join(" ")} Rocks, plants and room count too.</div>`;
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
   }
   if(sub === "shelters"){

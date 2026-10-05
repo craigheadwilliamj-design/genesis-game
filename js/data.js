@@ -1020,6 +1020,16 @@ const LAND = {
   post:   {label:"Rubbing Post",   one:"a rubbing post",    price:600,  r:1.2, color:"#8A6A48", toy:1, look:"post"},
   logs:   {label:"Log Pile",       one:"a log pile",        price:1800, r:3,   color:"#7A5A3A", toy:3, look:"logs"},
   wallow: {label:"Mud Wallow",     one:"a mud wallow",      price:3500, r:5,   color:"#6B5236", toy:6, look:"wallow"},
+  // toyFor: points by diet, so a toy can mean a lot to one animal and nothing to another (an animal takes its best diet). lasts: days before it's used up.
+  // hay: plant food a day herbivores eat off it, like a grove (only those that eat plain plants; older ones need Paleoflora)
+  ball:   {label:"Enrichment Ball", one:"an enrichment ball", price:800,  r:1.5, color:"#C8452B", toy:2, look:"ball"},
+  icefish:{label:"Frozen Fish",     one:"a frozen fish block", price:250, r:1.2, color:"#E07A3A", toyFor:{piscivore:4, carnivore:2, omnivore:2}, lasts:3, look:"ice"},
+  icefruit:{label:"Frozen Fruit",   one:"a frozen fruit block", price:200, r:1.2, color:"#C83A5A", toyFor:{herbivore:3, omnivore:4}, lasts:3, look:"ice"},
+  shank:  {label:"Frozen Shank",    one:"a frozen whole shank", price:400, r:1.4, color:"#8A3A2A", toyFor:{carnivore:4, omnivore:2}, lasts:3, look:"ice"},
+  buglog: {label:"Insect Log",      one:"an insect log",      price:1200, r:2.2, color:"#6E5034", toyFor:{insectivore:4, omnivore:3}, look:"buglog"},
+  hay:    {label:"Hay Bale",        one:"a hay bale",         price:300,  r:1.8, color:"#D9B95A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, hay:40, look:"hay"},
+  // paleo: Paleoflora a day the older plant eaters eat off it; ceres: Paleoflora it takes from CERES to bale
+  pbale:  {label:"Paleoflora Bale", one:"a Paleoflora bale",  price:500,  r:1.8, color:"#6E9A4A", ring:"#3E5F2A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, paleo:25, ceres:100, tech:"paleoflora", look:"hay"},
   // vivarium enrichment (vivToy instead of toy): picked from the vivarium's Enrichment list and set in the glass, never out in an open exhibit
   vbark:  {label:"Cork Bark Hide",     one:"a cork bark hide",     price:300,  r:.7, color:"#7A5A3A", toy:1, vivToy:true, hide:true, look:"vbark"},
   vbranch:{label:"Climbing Branches",  one:"climbing branches",    price:500,  r:.9, color:"#8A6A48", toy:2, vivToy:true, look:"vbranch"},
@@ -1119,7 +1129,7 @@ const ACTS = {
   pace:  {label:"Pacing", tell:true},
 };
 // Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
-const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3};   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
+const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3, melt:2};   // melt: days a frozen treat loses in a heat wave   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
