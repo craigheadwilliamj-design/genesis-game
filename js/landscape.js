@@ -607,7 +607,7 @@ function featSvg(f, biome, pick, isDead){
   if(f.k) t = {...t, r:t.r * f.k};   // a vivarium's plants are drawn shrunk
   const dead = pick && isDead("land", f.id);
   const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
-  let s = `<g${pickAt(pick, "land", f.id)}>`;
+  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${f.y}"` : ""}>`;
   const up = tilted() && !f.k;
   if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
   else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
@@ -695,7 +695,9 @@ function featSvg(f, biome, pick, isDead){
 const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 // SVG for one exhibit's water, rocks, groves and shelters. When bulldozing they can be picked out one by one.
 function landSvg(e, pick, isDead){
-  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
+  const feats = byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
+  // in the 3/4 view the features go in their own group, where map.js slots the animals in among them by depth (place34)
+  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead)).join("");

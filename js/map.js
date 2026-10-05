@@ -191,11 +191,12 @@ function render(){
     }
     // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
     if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
+    if(tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;   // under the animals in the 3/4 view
     s += landSvg(e, tool === "bulldoze", isDoomed);
     if(tilt) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, e.barrier || "wood", "front", fo34);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
-    if((e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
+    if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
     if(e.gate){
       const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
       s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -842,6 +843,24 @@ function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} $
 /* ---------- animals wandering in their exhibits ---------- */
 const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
 
+// In the 3/4 view each animal sits among its exhibit's trees, rocks and shelters by depth, so what stands in front of it covers it,
+// and the near fence or glass (drawn after) covers them all. landscape.js puts the features in a data-z34 group, sorted north to south, each with its data-y.
+const depth34 = new Map();   // exhibit id -> {g, kids, ys}, rebuilt after every render
+function indexDepth34(){
+  depth34.clear(); if(!tilt) return;
+  for(const g of world.querySelectorAll("[data-z34]")){ const kids = [...g.children].filter(c => c.dataset.y !== undefined); depth34.set(g.dataset.z34, {g, kids, ys:kids.map(c => +c.dataset.y)}); }
+}
+function place34(h){
+  const z = tilt && depth34.get(h.exhibitId);
+  if(!z){ if(h.el.parentNode !== animalLayer) animalLayer.appendChild(h.el); h.slot = -1; return; }
+  let lo = 0, hi = z.ys.length; while(lo < hi){ const m = (lo + hi) >> 1; if(z.ys[m] <= h.y) lo = m + 1; else hi = m; }
+  if(h.el.parentNode === z.g && h.slot === lo) return;
+  h.slot = lo; z.g.insertBefore(h.el, z.kids[lo] || null);
+}
+
+// an animal's dot stands on its spot in the 3/4 view instead of sinking halfway into the ground
+function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * .85).toFixed(2)})` : ""; }
+
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
 function syncAnimals(){
@@ -870,10 +889,11 @@ function syncAnimals(){
         (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
         `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
-      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()}`);
+      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     }
   }
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
+  indexDepth34(); for(const h of herd.values()) place34(h);
 }
 
 // Can an animal walk straight from a to b without touching the fence? Samples the line, since L and U shaped exhibits cut corners.
@@ -1060,7 +1080,8 @@ function animateAnimals(dt){
     if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
-    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()}`);
+    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+    if(tilt) place34(h);
   }
 }
 
