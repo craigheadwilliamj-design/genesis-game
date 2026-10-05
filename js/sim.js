@@ -370,8 +370,9 @@ function exhibitReport(e){
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
   if(counts.size){
     const flora = e.flora || "cenozoic", kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
-    const away = kinds.filter(s => ERA_OF[s.period] !== flora);
-    if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${FLORA[flora].plants}.`}); }
+    // planted landscape plants from the animal's own period (in the exhibit's biome) make it at home too
+    const away = kinds.filter(s => ERA_OF[s.period] !== flora && !(!e.viv && haveOf(e, s).plants > 0));
+    if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === flora) ? FLORA[flora].plants : "plants from their own time"}.`}); }
     else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. ${[...new Set(away.map(s => FLORA[ERA_OF[s.period]].label))].join(" or ")} plants would suit ${away.length === 1 ? "it" : "them"}.`}); }
     // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora
     const grassy = grassyFloor(e) || e.grassFed;

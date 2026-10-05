@@ -954,6 +954,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     px.land.push({id:"l-b", type:"jur-tropical-large", x:135, y:135});
     out.plantsOwnPeriod = wrongPeriod === 0 && anyPeriod > 0 && haveOf(px, jurSp).plants === Math.round(Math.PI * 25) && speciesFit(px, jurSp).plants > 0;
     px.biome = "grassland";
+    { const lys = SPECIES.find(s => s.id === "lyst"), ex = {id:"e-lys", name:"Lys", points:px.points, animals:[{id:"a-l", sp:"lyst", q:90}], land:[], biome:"scrubland"};
+      const bad = () => exhibitReport(ex).issues.some(i => /another era/.test(i.text));
+      const before = bad(); ex.land = [{id:"l-s", type:"per-scrubland-large", x:130, y:130}];
+      out.ownPeriodPlantsAtHome = before && !bad(); }
     out.plantsWaivedNoBiome = wantsOf(px, jurSp).plants === 0 && speciesFit(px, jurSp).plants === 1;
     sc.tech = keepTech; state.ceres.pots = keepPots; state.staff.feedFrom = keepFeed;
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
