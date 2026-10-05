@@ -481,6 +481,8 @@ const THOUGHTS = {
   crowded:    {text:"The paths are packed."},
   bored:      {text:"There isn't much to see."},
   sadAnimals: {text:"The animals looked miserable."},
+  pacing:     {text:"The animals just paced back and forth."},
+  playful:    {text:"We watched the animals play!", good:true},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
   noSeat:     {text:"My feet hurt and there's nowhere to sit."},
@@ -1014,6 +1016,10 @@ const LAND = {
   traysm: {label:"Small Food Tray",  one:"a small food tray",  price:400,  r:1.2, color:"#8A8F96", tray:12},
   traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
   traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
+  // enrichment (toy: points of play it gives, see ENRICH): something to rub on, climb over and wallow in
+  post:   {label:"Rubbing Post",   one:"a rubbing post",    price:600,  r:1.2, color:"#8A6A48", toy:1, look:"post"},
+  logs:   {label:"Log Pile",       one:"a log pile",        price:1800, r:3,   color:"#7A5A3A", toy:3, look:"logs"},
+  wallow: {label:"Mud Wallow",     one:"a mud wallow",      price:3500, r:5,   color:"#6B5236", toy:6, look:"wallow"},
 };
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
@@ -1069,6 +1075,62 @@ const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 const LIKES_ROCK = {water:.2, rock:.9};
 const HABITAT_LIKES = {diic:LIKES_ROCK, lyst:LIKES_ROCK, seym:LIKES_ROCK, dime:LIKES_ROCK, plhy:LIKES_ROCK, mlan:LIKES_ROCK, mono:LIKES_ROCK, beel:{water:.6, rock:.6}};
 const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {water:.9, rock:.1} : {water:.4, rock:.4});
+
+// Animal behavior (behavior.js). Each animal has six needs, from 0 (met) to 100 (desperate):
+//   hunger, thirst, discomfort (habitat, weather, dirt), lonely, bored, stress
+// and every few minutes does whatever its most urgent need calls for (ACTS). Pacing and hiding are the tells that something's wrong.
+// Rates are per park minute.
+const BEHAVIOR = {
+  step:5,              // park minutes between decisions
+  minAct:15,           // an animal sticks with what it's doing at least this long, unless the need is met
+  stick:8,             // and favors carrying on by this much
+  hunger:.22, thirst:.28, bored:.22, lonely:.25,   // how fast each need grows while awake
+  eat:3, browse:1.2, drink:5, social:2, play:2.5, patrol:.15, forage:.6, graze:.15, pace:.15,   // how fast each act meets its need (forage among groves, graze on bare ground)
+  troughFloor:45,      // water lovers can't drink their thirst below this from the gate trough alone
+  hotThirst:1.6,       // heat waves make them thirstier
+  stressDrift:90,      // minutes for stress to close most of the gap to what the exhibit puts on it
+  comfortDrift:60,
+  hideCalm:.5,         // stress shed a minute hiding in cover (a third of it with no cover)
+  huntMin:20,          // meat eaters stalk this long before they eat
+  shyGuests:35,        // stress skittish animals take from a busy path, halved with cover to retreat to
+  busyAt:150,          // guests in the park for "busy"
+  happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
+  stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
+  escape:1.5,          // a stressed aggressive animal tries the fence up to this much more
+  lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
+};
+// What animals can be doing. idle marks what they fall back on with nothing pressing.
+const ACTS = {
+  eat:   {label:"Eating"},
+  drink: {label:"Drinking"},
+  rest:  {label:"Resting"},
+  patrol:{label:"Patrolling"},
+  hunt:  {label:"Hunting"},
+  forage:{label:"Foraging"},
+  social:{label:"Socializing"},
+  play:  {label:"Playing"},
+  hide:  {label:"Hiding", tell:true},
+  pace:  {label:"Pacing", tell:true},
+};
+// Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
+const ENRICH = {per:1, toys:.35, habitat:.35, room:.3};
+// Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
+//   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
+//   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
+//   temper   skittish (stressed by guests, hides), curious (bores fast, plays, likes watching people), aggressive (stressed by crowding, paces, tests the fence)
+const TRAITS = {
+  active:{
+    nocturnal:["lept", "ptil", "dgal", "ornw", "thyl", "pulm", "beel", "gtod", "tita", "mono", "arth"],
+    crepuscular:["velo", "utah", "dire", "smil", "amph", "hyae", "coel", "dilo", "dsuc", "prio", "bari", "kool", "dcau", "icht", "tikt", "eryo", "arct", "conc", "andr", "daeo", "micr", "anch", "comp", "orni"],
+  },
+  social:{pair:["arge", "ornw", "kele", "aind"], herd:["tric", "mast"], pack:["daeo"]},
+  temper:{
+    curious:["proc", "gpit", "aind", "ples", "ornm", "gall", "ovir", "dodo", "sdel", "arch", "micr", "comp"],
+    skittish:["para", "macr", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
+    aggressive:["dino", "daeo", "arsi", "doed", "arct"],
+  },
+};
+const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepuscular", solitary:"solitary", pair:"lives in pairs", herd:"herd animal", pack:"pack animal", skittish:"skittish", curious:"curious", aggressive:"aggressive"};
 
 // Biomes: the ground an open exhibit is laid out as. Each animal has a home biome and one it gets by in.
 //   color    floor color on the map (the pattern id is "b-" + the key)

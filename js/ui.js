@@ -181,10 +181,11 @@ function exhibitHtml(e){
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
   if((exTabs.tab === "land" || exTabs.tab === "props") && e.viv) exTabs.tab = "main";
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
@@ -350,12 +351,18 @@ function landHtml(e){
 const propsTabs = {sub:"shelters"};
 const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects"];
 function propsHtml(e){
-  const sub = propsTabs.sub === "trays" ? "trays" : "shelters", isTray = k => !!LAND[k].tray;
+  const sub = ["trays", "toys"].includes(propsTabs.sub) ? propsTabs.sub : "shelters", isTray = k => !!LAND[k].tray, isToy = k => !!LAND[k].toy;
   const btnsFor = list => list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.tray ? ` (${t.tray} units)` : ""}</button>`; }).join("");
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
-  let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}], sub)}`;
+  let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
+  if(sub === "toys"){
+    const list = HABITAT_PROPS.filter(isToy), need = enrichNeed(e), have = toyPoints(e);
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to rub on, climb over and wallow in keeps animals busy. Bored animals with nothing to do pace.</div>`;
+    if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div><div class="meta">Toy points: ${list.map(k => `${esc(LAND[k].label.toLowerCase())} ${LAND[k].toy}`).join(", ")}. Bigger herds and bigger animals want more. Rocks, plants and room count too.</div>`;
+    return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
+  }
   if(sub === "shelters"){
-    const list = HABITAT_PROPS.filter(k => !isTray(k));
+    const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k));
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
     if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
       h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
@@ -371,6 +378,33 @@ function propsHtml(e){
     h += `<div class="meta" style="margin-top:4px">Pick what a tray gets. Changing it empties the tray. "Any food" takes whatever keepers bring first.</div>`;
   }
   return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
+}
+
+// Behavior tab: what the animals are doing, how each species' needs stand, and what's stressing them
+const ACTIVE_TEXT = {diurnal:"Up all day.", nocturnal:"Sleeps through most of the day. Busiest at opening and closing.", crepuscular:"Busiest in the first and last two hours of the day, and drowsy in between."};
+const SOCIAL_TEXT = {solitary:"Wants no company, and rivals need room to keep apart.", pair:"Wants a partner of its own kind.", herd:"Feels safe in a herd, and nervous with too few.", pack:"Lives in a pack. Left alone it paces."};
+const TEMPER_TEXT = {skittish:"Busy paths stress it. Cover to retreat to helps.", curious:"Bores fast, loves to play, and likes watching people.", aggressive:"Crowding stresses it, and a stressed one tests the fence."};
+function behaviorHtml(e){
+  if(!e.animals.length) return `<section><h3>Behavior</h3><div class="meta">No animals here yet.</div></section>`;
+  const ctx = behaviorCtx(e), en = Math.round(ctx.enrich * 100), col = v => v < 35 ? "var(--good)" : v < 65 ? "var(--warn)" : "var(--bad)";
+  let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
+  h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
+  h += `<div class="meta">How much there is to do: enrichment props (Habitat Props), the rocks, plants and water they like, and room to roam.</div></section>`;
+  for(const [sp, c] of speciesCounts(e)){
+    const s = SPECIES_BY_ID[sp], t = traitsOf(s), list = e.animals.filter(a => a.sp === sp), aw = awake(s);
+    h += `<section><h3><span class="dot" style="background:${PERIOD_COLOR[s.period]};display:inline-block;margin-right:6px"></span>${esc(s.name)} × ${c}</h3>`;
+    h += `<div class="meta">${esc(traitText(s))}. ${aw >= .9 ? "Wide awake now." : aw >= .5 ? "A little drowsy now." : "Mostly asleep now."}</div>`;
+    h += `<div class="meta" style="margin-top:2px">${ACTIVE_TEXT[t.active]} ${SOCIAL_TEXT[t.social]} ${TEMPER_TEXT[t.temper]}</div>`;
+    h += `<div style="margin-top:6px">${NEED_KEYS.map(k => { const v = list.reduce((n, a) => n + needsOf(a)[k], 0) / list.length; return `<div class="factor" style="grid-template-columns:90px 1fr 44px"><span>${NEED_TEXT[k]}</span>${meter(v, col(v))}<span>${Math.round(v)}%</span></div>`; }).join("")}</div>`;
+    h += `<div class="meta" style="margin-top:4px">${esc(actsSummary(list))}.</div>`;
+    const pacing = list.filter(a => a.act === "pace");
+    if(pacing.length){ const why = pacing[0].why || "bored"; h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Pacing because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[why]}. ${esc(WHY_FIX[why])}</div>`; }
+    const worst = list.reduce((m, a) => needsOf(a).stress > needsOf(m).stress ? a : m, list[0]), why = [];
+    stressTarget(e, worst, s, ctx, why);
+    if(needsOf(worst).stress >= 30 && why.length) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Stressed because ${esc([...new Set(why)].join(", "))}.</div>`;
+    h += `</section>`;
+  }
+  return h;
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
@@ -462,7 +496,7 @@ $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
-const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `Home biome ${BIOMES[biomesOf(s)[0]].label.toLowerCase()}, gets by in ${BIOMES[biomesOf(s)[1]].label.toLowerCase()}. ` : "");
+const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `Home biome ${BIOMES[biomesOf(s)[0]].label.toLowerCase()}, gets by in ${BIOMES[biomesOf(s)[1]].label.toLowerCase()}. ` : "") + traitText(s) + ". ";
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){

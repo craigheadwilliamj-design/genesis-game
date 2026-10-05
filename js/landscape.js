@@ -393,7 +393,7 @@ function landSpot(x, y, key){
 // Why a plant, rock or statue can't go at (x, y) out in the park, or null
 function decorProblem(key, x, y){
   const t = LAND[key];
-  if(t.slots || t.tray) return "Habitat props go inside an open exhibit.";
+  if(t.slots || t.tray || t.toy) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return `${t.label} is locked. ${statueHint(key)}`;
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
@@ -553,6 +553,20 @@ function featSvg(f, biome, pick, isDead){
     const h = t.r * .78;
     s += `<rect x="${f.x - h}" y="${f.y - h}" width="${h * 2}" height="${h * 2}" rx="${h * .12}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
     s += `<path d="M${f.x - h} ${f.y}H${f.x + h}" stroke="#3B3226" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+  } else if(t.look === "post"){
+    // a stout post worn smooth on one side
+    s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r * .55}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/><circle cx="${f.x - t.r * .15}" cy="${f.y - t.r * .15}" r="${t.r * .2}" fill="#B08E66"/>`;
+  } else if(t.look === "logs"){
+    // three logs in a heap, end grain showing
+    for(const [ox, oy, a] of [[-.35, .3, 8], [.3, .25, -12], [0, -.3, 25]]){
+      const cx = f.x + ox * t.r, cy = f.y + oy * t.r, L = t.r * .95, w = t.r * .34;
+      s += `<g transform="rotate(${a} ${cx} ${cy})"><rect x="${cx - L / 2}" y="${cy - w / 2}" width="${L}" height="${w}" rx="${w / 2}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${cx + L / 2 - w / 2}" cy="${cy}" r="${w * .38}" fill="#B08E66"/></g>`;
+    }
+  } else if(t.look === "wallow"){
+    // a muddy hollow with a wet shine
+    const sd = seedOf(f);
+    s += `<path d="${blobPath(f.x, f.y, t.r, sd, false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
+    s += `<path d="${blobPath(f.x + t.r * .1, f.y + t.r * .05, t.r * .55, sd + 2, false)}" fill="#4E3B26" fill-opacity=".8"/><ellipse cx="${f.x - t.r * .2}" cy="${f.y - t.r * .15}" rx="${t.r * .22}" ry="${t.r * .1}" fill="#A08A6A" fill-opacity=".5"/>`;
   } else if(t.flora) s += plantSvg(f, t, edge, dead ? 3 : 1);
   else {
     // a lumpy rock with a light and a dark face

@@ -338,6 +338,10 @@ function seeExhibit(p, e){
   p.mood += GUEST.seeGain * a / (a + 15);
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
   if(a >= 30) thinks(p, "wow");
+  // what the animals were doing when they looked
+  const n = e.animals.length, pace = e.animals.filter(x => x.act === "pace").length, play = e.animals.filter(x => x.act === "play").length;
+  if(pace / n >= .5){ thinks(p, "pacing"); p.mood -= 2; }
+  else if(play / n >= .3){ thinks(p, "playful"); p.mood += 2; }
   // what they learn: a little from looking, a lot more with an info sign to read, and more again with a field guide
   const sign = hasSign(e);
   learn(p, (EDU.see + (sign ? EDU.sign * (1 + speciesCounts(e).size * .25) : 0)) * (p.guide ? EDU.guideBoost : 1));

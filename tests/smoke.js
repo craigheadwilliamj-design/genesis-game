@@ -1329,6 +1329,27 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     }
     state.zones = zs;
     Object.assign(state, {paths:tSaved.paths, buildings:tSaved.buildings, exhibits:tSaved.exhibits, themes:tSaved.themes, rating:tSaved.rating, money:tSaved.money}); state.science.tech = tSaved.tech; recompute(); render();
+
+    // behavior: every species gets real traits; a lone pack animal paces from loneliness while its fed pack doesn't; toys add enrichment; night resets
+    {
+      const okT = SPECIES.every(s => { const t = traitsOf(s); return ["diurnal", "nocturnal", "crepuscular"].includes(t.active) && ["solitary", "pair", "herd", "pack"].includes(t.social) && ["skittish", "curious", "aggressive"].includes(t.temper); });
+      out.behaviorTraits = okT && traitsOf(SPECIES_BY_ID.velo).social === "pack" && traitsOf(SPECIES_BY_ID.trex).social === "solitary" && traitsOf(SPECIES_BY_ID.ornw).active === "nocturnal" && traitsOf(SPECIES_BY_ID.velo).temper === "aggressive";
+      const keep = {exhibits:state.exhibits, minute:state.minute, day:state.day}, sq = (x, y, w) => [[x, y], [x + w, y], [x + w, y + w], [x, y + w]];
+      const lone = {id:"bh1", name:"Lone", points:sq(0, 0, 40), animals:[{id:"bl", sp:"velo"}], happy:70, cond:100, stock:{meat:999}};
+      const pack = {id:"bh2", name:"Pack", points:sq(100, 0, 60), animals:[0, 1, 2, 3].map(i => ({id:"bp" + i, sp:"velo"})), happy:70, cond:100, stock:{meat:999}};
+      state.exhibits = [lone, pack]; state.minute = 18 * 60; state.day = 1;
+      for(let i = 0; i < 60; i++) behaviorTick(BEHAVIOR.step);
+      out.behaviorLonelyPaces = lone.animals[0].act === "pace" && lone.animals[0].why === "lonely" && pack.animals.every(a => a.act !== "pace") && lone.animals[0].need.lonely > pack.animals[0].need.lonely;
+      out.behaviorTell = exhibitReport(lone).issues.some(i => i.bad && i.text.startsWith("Pacing.")) && behaviorHtml(lone).includes("Pacing because");
+      const bare = enrichment(pack); pack.land = [{id:"t1", type:"logs", x:110, y:10}, {id:"t2", type:"wallow", x:140, y:40}];
+      out.behaviorToys = enrichment(pack) > bare && toyPoints(pack) === 9 && !!decorProblem("logs", 0, 0);
+      out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
+      behaviorNight();
+      out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
+      const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
+      out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
+      Object.assign(state, keep); recompute();
+    }
     return out;
   }));
 
