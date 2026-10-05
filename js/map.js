@@ -29,7 +29,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Info sign", "No-feed sign"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Camera", "Info sign", "No-feed sign"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
@@ -254,10 +254,11 @@ function render(){
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
-      if(bl.type === "bin" || bl.type === "lamp") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
+      if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
+      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
+      if(bl.type === "camera" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#E8F0FF" pointer-events="none"/>`;
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
       if(bl.type === "nofeed" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">⊘</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -282,9 +283,9 @@ function render(){
   }
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
-  if(selB && selB.type === "security" && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security")){
+  if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
     const [ox, oy] = centroid(o.points);
-    s += `<circle cx="${ox}" cy="${oy}" r="${SECURITY.cameraRadius}" fill="#2B3F6B" fill-opacity=".08" stroke="#2B3F6B" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    s += `<circle cx="${ox}" cy="${oy}" r="${o.type === "camera" ? SECURITY.postRadius : SECURITY.cameraRadius}" fill="#2B3F6B" fill-opacity=".08" stroke="#2B3F6B" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
   // exhibit names and happiness

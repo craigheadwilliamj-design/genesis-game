@@ -559,6 +559,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null;
     Math.random = () => 0; vandalize(cp); Math.random = rr4;
     out.cameraSendsGuard = cp.wanted && gcrew[0].chase === cp;
+    // a camera post on a path watches its own small radius, and a broken one doesn't
+    out.postUnwatched = !onCamera(100, 200);
+    const cam = {id:"b-cam", type:"camera", points:rectPts(100, 200, BUILDINGS.camera.w, BUILDINGS.camera.d, 0)}; state.buildings.push(cam);
+    out.postWatches = onCamera(100 + SECURITY.postRadius - 2, 200) && !onCamera(100 + SECURITY.postRadius + 2, 200);
+    cam.cond = 0; out.brokenPostBlind = !onCamera(100, 200);
+    cam.cond = 100; resetParties(); guestsArrive(2); const cp2 = parties[0]; cp2.at = nearestGuestNode(100, 200); cp2.rowdy = true;
+    gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null; cp2.wanted = false;
+    Math.random = () => 0; vandalize(cp2); Math.random = rr4;
+    out.postSendsGuard = cp2.wanted && gcrew[0].chase === cp2;
+    state.buildings = state.buildings.filter(x => x !== cam);
     state.science.tech = state.science.tech.filter(t => t !== "cameras");
     state.staff.guards = []; syncGuards(); resetParties();
     // a mechanic fixes the broken bench, and a custodian scrubs off graffiti
@@ -805,27 +815,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
     sc.tar = null;
 
-    // CERES: needs a botanist, flora unlocked, and complete plant DNA from GHOST; then it grows planting stock in its beds
-    out.noBotanist = growProblem("flora", "mesozoic") === "Hire a botanist at CERES to tend a growing bed.";
+    // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
+    out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at CERES to tend a growing bed.";
     hireScientist("botanist");
-    out.floraLocked = /ORACLE/.test(growProblem("flora", "mesozoic"));
+    out.floraLocked = /ORACLE/.test(growProblem("plant", "Jurassic", "small"));
     sc.tech.push("paleoflora", "mesoplant", "medmeso");
-    out.floraNeedsDna = /plant DNA/.test(growProblem("flora", "mesozoic")) && !ceresRate();
-    sc.dna[PLANT_DNA.mesozoic.id] = {genome:50, quality:80};
-    out.halfDnaNotEnough = !!growProblem("flora", "mesozoic");
-    sc.dna[PLANT_DNA.mesozoic.id] = {genome:100, quality:80};
-    out.floraGrows = growProblem("flora", "mesozoic") === null && ceresRate() > 0;
-    const ex = {id:"e-fl", name:"Fl", points:[[300,200],[340,200],[340,240],[300,240]], animals:[], happy:70, cond:100};
-    out.replantNeedsStock = /planting stock/.test(replantProblem(ex, "mesozoic"));
+    out.floraNeedsDna = /plant DNA/.test(growProblem("plant", "Jurassic", "small")) && !ceresRate();
+    out.dnaPerPeriod = PLANT_DNA.Jurassic.id === "flora-Jurassic" && genomePeriods(PLANT_DNA.Jurassic.id).join() === "Jurassic" && genomeOpen(PLANT_DNA.Jurassic.id) && !genomeOpen(PLANT_DNA.Devonian.id);
+    out.noPlantingStock = !CERES_GROW.flora && typeof replantProblem === "undefined" && !("plants" in state.ceres);
+    sc.dna[PLANT_DNA.Jurassic.id] = {genome:50, quality:80};
+    out.halfDnaNotEnough = !!growProblem("plant", "Jurassic", "small");
+    sc.dna[PLANT_DNA.Jurassic.id] = {genome:100, quality:80};
+    out.floraGrows = growProblem("plant", "Jurassic", "small") === null && ceresRate() > 0;
+    out.otherPeriodNeedsOwnDna = /Triassic plant DNA/.test(growProblem("plant", "Triassic", "small"));
     state.minute = OPEN_MIN + 60;
-    growBatch("flora", "mesozoic");
-    out.bedBusy = state.ceres.beds.length === 1 && !state.ceres.plants.mesozoic;
-    out.batchTakesTime = adv(60) === false && !state.ceres.plants.mesozoic;
-    out.batchDone = adv(growMinutes("flora", "mesozoic"), () => state.ceres.plants.mesozoic === 1);
-    out.replantNeedsTwoBatches = batchesFor(ex) === 2 && /planting stock/.test(replantProblem(ex, "mesozoic"));
-    state.ceres.plants.mesozoic = 2;
-    out.replantWithStock = replantProblem(ex, "mesozoic") === null;
-    state.ceres.plants.mesozoic = 0;
+    growBatch("plant", "Jurassic", "small");
+    out.bedBusy = state.ceres.beds.length === 1 && !state.ceres.pots["Jurassic-small"];
+    out.batchTakesTime = adv(60) === false && !state.ceres.pots["Jurassic-small"];
+    out.batchDone = adv(growMinutes("plant", "Jurassic", "small"), () => state.ceres.pots["Jurassic-small"] === CERES_GROW.plant.mesozoic.small.count);
     // medicine comes from batches, not a steady trickle
     state.ceres.meds = 0; state.minute = OPEN_MIN + 60;
     out.medNoTrickle = (adv(30), state.ceres.meds === 0);
@@ -854,7 +861,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldUnlocksAnimals = up.science.unlocked.includes("trex") && up.science.unlocked.every(id => SPECIES_BY_ID[id]) && !up.science.unlocked.includes("arth");
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
-    out.oldKeepsFlora = up.science.dna[PLANT_DNA.mesozoic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
+    out.oldPlantsSplit = !up.science.dna["flora-mesozoic"] && up.science.dna[PLANT_DNA.Triassic.id].genome === 100 && !("plants" in up.ceres);
+    out.oldKeepsFlora = up.science.dna[PLANT_DNA.Jurassic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
 
     // landscaping: water drawn inside open exhibits, and rocks placed in them
     const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
@@ -928,17 +936,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
     out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;
     out.plantsMenu = !!document.querySelector('[data-tool="land-jur-tropical-large"]') && !document.querySelector('[data-tool="land-jur-grassland-large"]') && !document.querySelector('[data-tool="land-cycads"]');
-    sc.tech.push("paleoplant"); state.ceres.pots["paleozoic-small"] = 1; gx.biome = "tropical"; gx.land = [];
+    sc.tech.push("paleoplant"); state.ceres.pots["Carboniferous-small"] = 1; gx.biome = "tropical"; gx.land = [];
     { const w = landSpot(115, 115, "car-wetland-small"), n0 = haveOf(gx).plants; gx.land = [];
       out.plantWrongBiome = w.ok && landSpot(115, 115, "car-tropical-small").ok;
       placeLand(gx, "car-wetland-small", 115, 115);
       out.plantWrongNoCount = haveOf(gx).plants === n0 && !plantHere(LAND["car-wetland-small"], gx);
-      state.ceres.pots["paleozoic-small"] = 1; gx.land = []; }
+      state.ceres.pots["Carboniferous-small"] = 1; gx.land = []; }
     placeLand(gx, "car-tropical-small", 115, 115);
     { const land0 = gx.land, m0 = state.money; gx.land = []; state.money = 1e6; placeLand(gx, "rock", 115, 115, "desert"); placeLand(gx, "rock", 135, 135);
       out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
       gx.land = land0; state.money = m0; }
-    out.plantUsesStock = state.ceres.pots["paleozoic-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
+    out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // animals only count plants from their own period, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
     px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
