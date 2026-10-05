@@ -37,7 +37,7 @@ const SNAP_REACH = 6;              // meters past a path's edge where a new buil
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "zone" || t === "water";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "bridge" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
@@ -46,7 +46,7 @@ let lastPtr = null;                 // where the pointer last was while placing,
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
-const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : PATH_HALF_WIDTH;
+const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
 // Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
 // so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
 function wideJoin(p){
@@ -86,7 +86,8 @@ function wideJoin(p){
 }
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : kind === "water" ? state.exhibits.flatMap(waterOf) : null; }
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
+  : kind === "land" ? state.exhibits.flatMap(landOf).concat(decorOf()) : kind === "water" ? state.exhibits.flatMap(waterOf).concat(parkWater()) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
 function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
 
@@ -108,7 +109,9 @@ function render(){
   const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
   let s = `<rect x="${PARCELS.xs[0]-3000}" y="${PARCELS.ys[0]-3000}" width="${PARCELS.xs[PARCELS.xs.length-1]-PARCELS.xs[0]+6000}" height="${PARCELS.ys[PARCELS.ys.length-1]-PARCELS.ys[0]+6000}" fill="url(#contours)"/>`;
   $("#plotClipPoly").setAttribute("d", rd);
-  s += `<path d="${rd}" fill="var(--grass)"/>`;
+  // the park's own ground: its biome's color and texture, dimmed a little at night (dark mode)
+  const pb = parkBiome();
+  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/><path d="${rd}" fill="var(--ground-shade)"/>`;
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
@@ -134,6 +137,9 @@ function render(){
     s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : ZT ? .04 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
+  // ponds and lakes out in the park, under everything built
+  s += parkWaterSvg(tool === "bulldoze", isDoomed);
+
   // exhibits
   for(const e of state.exhibits){
     const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points);
@@ -148,12 +154,14 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[e.barrier || "wood"];
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
       s += `<polygon points="${pts}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
-      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      // a hedge row is drawn as a real hedge, as wide as it is
+      if(hedge) s += hedgeSvg("polygon", pts);
+      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : hedge ? (reach ? "none" : "#24461F") : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       // a live electric fence has a dark zigzag over yellow; with no power it goes dull gray
       if(themeKey(e) === "genesis"){}   // Genesis shows power as amber lights on the posts, drawn below
       else if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -165,7 +173,7 @@ function render(){
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     // a themed exhibit gets a trim line just inside its fence
-    if(!e.viv || themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    if((!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     if(e.barrier === "electric" && !e.viv && themeKey(e) === "genesis"){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
@@ -185,6 +193,9 @@ function render(){
     s += `</g>`;
   }
 
+  // open fences and hedge rows
+  for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
+
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "", clipDefs = "", wjN = 0;
@@ -200,6 +211,17 @@ function render(){
       let body = `<polyline points="${pts}" stroke="#8C877D" stroke-width="${w}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="#5E4B38" stroke-width="${w}" stroke-dasharray="${.7} ${1.6}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="#2E2C29" stroke-width="${w * .72}" ${lj}/><polyline points="${pts}" stroke="#8C877D" stroke-width="${w * .46}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+      over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
+      continue;
+    }
+    if(isBridge(p)){
+      const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id), live = joined.has(p.id);
+      if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
+      // dark timber rails along both sides, then the deck, then the gaps between the planks as thin dashes across it
+      let body = `<polyline points="${pts}" stroke="#4A3220" stroke-width="${w + .9}" ${lj}/><polyline points="${pts}" stroke="#7A5634" stroke-width="${w + .3}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="${live ? "#B48A5A" : "#9C8468"}" stroke-width="${w - .5}" ${lj}/><polyline points="${pts}" stroke="#6E4E30" stroke-opacity=".7" stroke-width="${w - .5}" stroke-dasharray=".12 .88" ${lj}/>`;
+      if(!live) body += `<polyline points="${pts}" stroke="#4A3220" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
       over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
       continue;
@@ -235,6 +257,8 @@ function render(){
     s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
   }
   s += clipDefs + under + over;
+  // plants, rocks and statues out in the park stand over the path edges
+  s += decorSvg(tool === "bulldoze", isDoomed);
 
   // entrance gate
   const [gx, gy] = state.gate;
@@ -374,7 +398,7 @@ function renderOverlay(){
     });
   }
   if(landGhost && landKey(tool)){
-    const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME), landGhost.key).fill;
+    const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
     s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
@@ -603,7 +627,7 @@ function snapAt(clientX, clientY, ev){
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
   // tram track only ever joins other tram track, and nothing else snaps to it
   const snapPaths = state.paths.filter(q => isTram(q) === !!(draw && draw.kind === "tram"));
-  if(draw && ["path", "wide", "service", "tram"].includes(draw.kind)){
+  if(draw && ["path", "wide", "service", "tram", "bridge"].includes(draw.kind)){
     let hit = null;
     for(const q of snapPaths) for(let i = 1; i < q.points.length; i++){
       const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
@@ -618,6 +642,7 @@ function snapAt(clientX, clientY, ev){
   for(const [a, c] of edges){ tryV(a, "boundary", "boundary"); tryV(c, "boundary", "boundary"); }
   for(const q of snapPaths) q.points.forEach(v => tryV(v, "path", q.id));
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
+  if(draw && draw.kind === "exhibit") for(const l of fenceLines()) l.points.forEach(v => tryV(v, "fence", l.id));
   if(best) return best;
   // with grid snap on, land on the nearest grid point (and still join a path if that point sits on one)
   if(gridSnap){
@@ -690,6 +715,7 @@ function exhibitProblem(pts){
   if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  const hit = shapeHitsLandscape(pts); if(hit) return hit;
   const fence = BARRIERS[fenceSel];
   if(fence.tech && !hasTech(fence.tech)) return `Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`;
   const cost = exhibitCost(pts, fenceSel);
@@ -704,6 +730,7 @@ function pathProblem(pts, type){
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
   if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  const hit = lineHitsLandscape(pts, halfWidth({type}), type === "bridge"); if(hit) return hit;
   const cost = pathCost(pts, type);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -711,15 +738,16 @@ function pathProblem(pts, type){
 
 /* ---------- drawing exhibits and paths ---------- */
 const DRAW_TEXT = {
-  exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it, or start and end on a neighbor's fence and tap the last corner again to share its wall."],
+  exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it into an exhibit (give it a keeper gate after), or start and end on a neighbor's fence to share its wall. Tap the last corner again to leave it as an open fence."],
   path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
   tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
-  water:["New water", "Tap to drop shore corners inside an open exhibit. Tap the first corner again to fill it. Animals like water, and fish eaters need some."]
+  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."],
+  bridge:["New wooden bridge", "A footpath that can cross water. Start on a path or the entrance, run it over the water, then tap the last point again to finish."]
 };
-const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram") ? draw.kind : undefined;
+const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram" || draw.kind === "bridge") ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
@@ -736,7 +764,13 @@ function setTool(t){
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(landKey(t)) showBar(`Place ${LAND[landKey(t)].one}`, "Tap inside an open exhibit, clear of any water. Animals feel at home among water and rocks, groves from their era, and shelter from bad weather.", `${money(LAND[landKey(t)].price)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(landKey(t)){
+    const L = LAND[landKey(t)];
+    showBar(`Place ${L.one}`, L.statue ? `Tap anywhere out in the park, clear of paths and fences. Guests stop to look${L.initials ? ", and learn a lot from the plaque" : ""}.${L.text ? " " + L.text : ""}`
+      : L.slots || L.tray ? "Tap inside an open exhibit, clear of any water. Barns, caves and canopies shelter the animals from bad weather."
+      : "Tap inside an open exhibit for the animals, or out in the park beside a path to cheer up the guests walking past. Animals feel at home among water, rocks and plants from their own period and biome.",
+      `${money(L.price)} each`, {undo:false, finish:false, cancel:"Done"});
+  }
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
@@ -758,7 +792,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit or path to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
+    showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -779,7 +813,7 @@ function startDraw(kind){
   draw = {kind, pts:[], snaps:[], hover:null, error:null};
   sel = null; ui.panel();
   const [t, hint] = DRAW_TEXT[kind];
-  showBar(kind === "exhibit" ? `New exhibit: ${BARRIERS[fenceSel].label.toLowerCase()}` : t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
+  showBar(kind === "exhibit" ? `New ${BARRIERS[fenceSel].label.toLowerCase()}` : t, hint, "", {undo:true, finish:true, cancel:"Cancel", finishText:kind === "exhibit" ? "Close exhibit" : null});
   updateDrawbar();
   const fence = BARRIERS[fenceSel];
   if(kind === "exhibit" && fence.tech && !hasTech(fence.tech)) setStat(`Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`, true);
@@ -793,13 +827,17 @@ function updateDrawbar(){
   const all = drawPoints();
   let stat = "", err = null;
   if(draw.kind === "exhibit"){
-    const shape = closeAlong(all);
-    if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${BARRIERS[fenceSel].label.toLowerCase()}. ${money(exhibitCost(shape, fenceSel))}`; err = exhibitProblem(shape); }
+    // closed, it's an exhibit; tapping the last corner again leaves it as an open fence
+    const shape = closeAlong(all), name = BARRIERS[fenceSel].label.toLowerCase();
+    const openWhy = all.length >= 2 && shape === all ? fenceProblem(all, fenceSel) : "x", openText = `${Math.round(lineLength(all))} m of open ${name}, ${money(fenceLineCost(all, fenceSel))}`;
+    const exWhy = shape.length >= 3 ? exhibitProblem(shape) : "x";
+    if(!exWhy) stat = `Exhibit: ${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${name}, ${money(exhibitCost(shape, fenceSel))}.${openWhy ? "" : ` Or tap the last corner again for ${openText}.`}`;
+    else if(!openWhy) stat = `Open fence: ${openText}. Tap the last corner again to build it.${shape.length >= 3 ? " " + exWhy : " Or keep going and close it into an exhibit."}`;
+    else if(all.length >= 2) err = shape.length >= 3 ? exWhy : openWhy;
   } else if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
   } else if(draw.kind === "water"){
-    if(all.length >= 3){ stat = `${fmtArea(area(all))} of water. ${money(waterCost(all))}`; err = waterProblem(all, waterHost(all), null, waterCost(all)); }
-    else if(all.length && !waterHost(all)) err = "Start it inside an open exhibit.";
+    if(all.length >= 3){ const h = waterHost(all); stat = `${fmtArea(area(all))} of water ${h ? "in " + h.name : "out in the park"}. ${money(waterCost(all))}`; err = waterProblem(all, h, null, waterCost(all)); }
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
@@ -882,7 +920,7 @@ function finishDraw(){
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw("water"); render();
-    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host.name} for ${money(cost)}.`, "good");
+    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host ? host.name : "the park"} for ${money(cost)}.`, "good");
     return;
   }
   if(d.kind === "zone"){
@@ -905,28 +943,42 @@ function finishDraw(){
     let n = 1; while(used.has(`Exhibit ${n}`)) n++;
     const e = {id:uid("e-"), name:`Exhibit ${n}`, points:pts, animals:[], happy:70, cond:100, inspected:{day:state.day, cond:100}};
     if(fenceSel !== "wood") e.barrier = fenceSel;
+    if(parkBiome() !== DEFAULT_BIOME) e.biome = parkBiome();   // new exhibits start out as the park's own ground
     autoZone(e);
     themeNew("exhibit", e);
     state.exhibits.push(e);
     afterChange();
     toolDone({kind:"exhibit", id:e.id});
-    ui.toast(`Built ${e.name} for ${money(cost)}.`);
+    ui.toast(`Built ${e.name} for ${money(cost)}.${e.gate ? "" : " Give it a keeper gate where a path meets the fence."}`);
   } else {
     d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
     const cost = pathCost(pts, type);
     spend(cost, "built");
-    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : "Path", points:pts};
+    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : type === "bridge" ? "Wooden bridge" : "Path", points:pts};
     if(type) p.type = type;
-    if(type !== "service" && type !== "tram") themeNew("path", p);
+    if(type !== "service" && type !== "tram" && type !== "bridge") themeNew("path", p);
     state.paths.push(p);
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw(d.kind);
     render();
     const joinedNow = type === "tram" || (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
-    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : "path";
+    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : type === "bridge" ? "wooden bridge" : "path";
     ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
   }
+}
+
+// Tapping the last corner again leaves an exhibit's fence open: a fence line on its own, like a hedge row along a path
+function finishFence(){
+  if(!draw) return;
+  const pts = draw.pts.map(p => [p[0], p[1]]), why = fenceProblem(pts, fenceSel);
+  if(why){ setStat(why, true); return; }
+  const cost = fenceLineCost(pts, fenceSel);
+  addFenceLine(pts, fenceSel);
+  afterChange();
+  // keep the tool going so you can draw the next one
+  startDraw("exhibit"); render();
+  ui.toast(`Built ${Math.round(lineLength(pts))} m of ${BARRIERS[fenceSel].label.toLowerCase()} for ${money(cost)}.`, "good");
 }
 
 function toolDone(newSel){
@@ -938,8 +990,8 @@ function drawTap(e){
   const sn = snapAt(e.clientX, e.clientY, e), k = view.k;
   const near = q => q && Math.hypot(q[0] - sn.x, q[1] - sn.y) * k < 14;
   if(isPoly(draw.kind) && draw.pts.length >= 3 && near(draw.pts[0])){ finishDraw(); return; }
-  // tapping the last corner again finishes an open shape that ends on a neighbor's fence
-  if(draw.kind === "exhibit" && draw.pts.length >= 2 && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
+  // tapping the last corner again closes a shape that ends on a neighbor's fence, or leaves the fence open
+  if(draw.kind === "exhibit" && draw.pts.length >= 2 && near(draw.pts[draw.pts.length-1])){ if(closeAlong(draw.pts) !== draw.pts) finishDraw(); else finishFence(); return; }
   if(!isPoly(draw.kind) && draw.pts.length && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
   draw.pts.push([sn.x, sn.y]); draw.snaps.push(sn.info);
   snapMark = null; updateDrawbar(); renderOverlay();
@@ -993,6 +1045,7 @@ function placeGhost(clientX, clientY){
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
   if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
+  if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
   const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
@@ -1227,6 +1280,7 @@ function findPlatformSpot(clientX, clientY){
   else if(!insidePlot(pts)) why = "Keep it inside the park boundary.";
   else if(state.exhibits.some(o => o !== e && shapesOverlap(pts, o.points))) why = "It overlaps another exhibit.";
   else if(state.buildings.some(o => shapesOverlap(pts, o.points))) why = "It overlaps a building.";
+  else if(shapeHitsLandscape(pts)) why = shapeHitsLandscape(pts);
   else if(!canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return {e, pts, x:x + nx*off, y:y + ny*off, ok:!why, why};
 }
@@ -1255,15 +1309,15 @@ function landPoint(ev){
 function landHover(ev){
   const key = landKey(tool), p = landPoint(ev);
   landGhost = {...landSpot(p.x, p.y, key), key};
-  setStat(landGhost.why || `${money(LAND[key].price)}. It goes in ${landGhost.e.name}.`, !landGhost.ok);
+  setStat(landGhost.why || `${money(LAND[key].price)}. It goes ${landGhost.e ? "in " + landGhost.e.name : "out in the park"}.`, !landGhost.ok);
   renderOverlay();
 }
 function landTap(ev){
   const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
   if(!g.ok){ setStat(g.why, true); return; }
-  placeLand(g.e, key, g.x, g.y, rockBiome);
+  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()));
   afterChange(); render();
-  ui.toast(`Added ${LAND[key].one} to ${g.e.name}.`, "good");
+  ui.toast(g.e ? `Added ${LAND[key].one} to ${g.e.name}.` : `Added ${LAND[key].one} to the park.`, "good");
 }
 
 /* ---------- bulldozing ---------- */
@@ -1296,8 +1350,8 @@ function removeItem(kind, it){
   const refund = refundFor(kind, it);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
-  if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)); if(o) o.land.splice(o.land.indexOf(it), 1); }
-  else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)); if(o) o.water.splice(o.water.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
+  if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
+  else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   if(kind === "zone") dropZone(it.id);
@@ -1309,11 +1363,11 @@ function removeItem(kind, it){
 }
 
 /* ---------- moving things ---------- */
-// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, and paths (not the entrance walk)
+// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, paths (not the entrance walk) and open fences
 function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
-  if(!it || !["exhibit", "path", "building"].includes(hit.kind)) return null;
+  if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
   if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   return it;
@@ -1327,16 +1381,22 @@ function moveProblem(kind, it){
     if(state.exhibits.some(e => e !== it && shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
     if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
     if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+    return shapeHitsLandscape(pts);
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
     else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+    return shapeHitsLandscape(pts);
+  } else if(kind === "fence"){
+    const keep = state.fences; state.fences = keep.filter(l => l !== it);
+    const why = fenceProblem(pts, it.barrier, true); state.fences = keep;
+    return why;
   } else {
     if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
     if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+    return lineHitsLandscape(pts, halfWidth(it), isBridge(it));
   }
-  return null;
 }
 // Everything that moves with the item: its own points, an exhibit's gate and platforms, and the animals wandering inside
 function moveBy(m, dx, dy){
@@ -1371,7 +1431,7 @@ function dropMove(m){
     for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.path = null; }
   }
   afterChange(); render();
-  const it = m.it, reach = m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it);
+  const it = m.it, reach = m.kind === "fence" || (m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it));
   ui.toast(reach ? "Moved." : "Moved, but it doesn't reach the entrance from there.", reach ? "" : "bad");
   setStat("");
 }
@@ -1381,6 +1441,7 @@ function dropMove(m){
 function reshapeables(){
   const out = [];
   for(const e of state.exhibits){ if(e.viv) continue; out.push({e, t:e}); for(const w of waterOf(e)) out.push({e, t:w, w}); }
+  for(const w of parkWater()) out.push({e:null, t:w, w});
   return out;
 }
 // Corners first (fences before water), then the + in the middle of each edge
@@ -1407,7 +1468,8 @@ function commitWaterReshape(e, w, orig){
   const diff = waterReshapeCost(w, orig);
   if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
   afterChange(); render();
-  ui.toast(diff > 0 ? `Reshaped the water in ${e.name} for ${money(diff)}.` : diff < 0 ? `Reshaped the water in ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped the water in ${e.name}.`);
+  const where = e ? `the water in ${e.name}` : "the water";
+  ui.toast(diff > 0 ? `Reshaped ${where} for ${money(diff)}.` : diff < 0 ? `Reshaped ${where}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${where}.`);
 }
 const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
 // Why this exhibit's new outline won't work, or null
@@ -1419,6 +1481,7 @@ function reshapeProblem(e, orig){
   if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
   if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";

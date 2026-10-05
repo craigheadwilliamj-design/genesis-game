@@ -11,6 +11,7 @@ const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
     {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
     {label:"Wide Paths", tool:"wide", price:() => `${money(WIDE_PATH.perMeter)}/m`, note:"10 m wide. Holds twice the crowd before guests feel packed. Use it where the walk is busy."},
+    {label:"Wooden Bridges", tool:"bridge", price:() => `${money(BRIDGE.perMeter)}/m`, note:"The only path that crosses water. Draw it like a path, from one bank over to the other."},
     {label:"Staff Paths", tool:"service", price:() => `${money(SERVICE_ROAD.perMeter)}/m`, note:"Staff paths always layer under guest paths where they meet."},
     {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(TRAM.perMeter)}/m`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
     {label:"Bins", tool:"bin"},
@@ -29,13 +30,15 @@ const BUILD_MENU = [
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
     {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold. Keepers walk in to fill food trays, which each hold one kind of food."},
-    {label:"Fence Types", fences:true, note:"Pick a fence before you build. Then draw the exhibit the same way."},
+    {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges are weak, but guests love them."},
   ]},
   {id:"land", label:"Landscaping", items:[
-    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it inside an exhibit like a fence: tap the shore corners, then the first one again."},
-    ...Object.entries(LAND).filter(([k, t]) => !t.period && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
-      note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need water." : undefined})),
-    ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES." : undefined})),
+    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it like a fence: tap the shore corners, then the first one again. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
+    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
+      note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
+    {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
+    {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
+    ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES. Out in the park, only Quaternary plants grow until ORACLE researches sterile prehistoric plants." : undefined})),
   ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
@@ -87,6 +90,9 @@ const ICON_LINES = {
   gate:'<path d="M3 12h5M16 12h5" stroke="currentColor" stroke-width="2.5"/><rect x="8" y="8" width="8" height="8" rx="1" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.4"/>',
   platform:'<rect x="3" y="9" width="18" height="7" rx="1" fill="#B08654" stroke="#1D2B22" stroke-width="1.2"/><path d="M5 16v4M19 16v4" stroke="currentColor" stroke-width="1.4"/>',
   water:'<path d="M4 9l6-4 9 2 2 7-5 6-9-1-3-5z" fill="#4C93C9" stroke="#2F6F9F" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 12c2-1.5 4 1.5 6 0" fill="none" stroke="#7DB6DD" stroke-width="1.4" stroke-linecap="round"/>',
+  bridge:'<path d="M2 15c4-3 6-3 10 0s6 3 10 0" fill="none" stroke="#4C93C9" stroke-width="2.2" opacity=".7"/><path d="M3 11.5L21 11.5" stroke="#4A3220" stroke-width="7.5"/><path d="M3 11.5L21 11.5" stroke="#B48A5A" stroke-width="5.5"/><path d="M3 11.5L21 11.5" stroke="#6E4E30" stroke-width="5.5" stroke-dasharray=".6 2"/>',
+  hedge:'<path d="M3 16h18" stroke="#24461F" stroke-width="6.5" stroke-linecap="round"/><path d="M3 16h18" stroke="#4E8A3E" stroke-width="5" stroke-linecap="round"/><path d="M3 16h18" stroke="#6BA851" stroke-width="3" stroke-dasharray="0 3.4" stroke-linecap="round"/>',
+  ...Object.fromEntries(Object.entries(LAND).filter(([, t]) => t.statue).map(([k, t]) => ["land-" + k, `<rect x="3" y="3" width="18" height="18" rx="3" fill="#D9D4C7" stroke="#1F3D2B" stroke-width="1.2"/><circle cx="12" cy="12" r="${t.initials ? 6 : 7.5}" fill="#9C6B33" stroke="#4E3115" stroke-width="1"/><text x="12" y="12.5" class="glyph" font-size="${(t.initials || "x").length > 2 ? 5.2 : t.initials ? 6.4 : 9}" style="fill:#F6E7C1;stroke:#3A2410">${t.initials || (SPECIES.find(s => s.id === t.sp) || {name:"?"}).name[0]}</text>`])),
   "land-rock":'<circle cx="12" cy="13" r="6" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/><circle cx="10" cy="11" r="2.4" fill="#B7BBB2" opacity=".7"/>',
   "land-boulder":'<circle cx="9" cy="14" r="5" fill="#767A74" stroke="#4E524C" stroke-width="1.4"/><circle cx="16" cy="11" r="4" fill="#8E9188" stroke="#4E524C" stroke-width="1.4"/>',
   ...Object.fromEntries(Object.entries(LAND).filter(([, t]) => t.flora).map(([k, t]) => ["land-" + k,
@@ -132,8 +138,20 @@ function menuRow(it){
     return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + it.props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(it.props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.fences){
-    const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
-    return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(fenceRate("wood"))}–${money(fenceRate("acrylic"))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${b.hedge ? menuIcon("hedge") : menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
+    const rates = Object.keys(BARRIERS).map(fenceRate);
+    return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+  }
+  if(it.parkPlants){
+    const rows = PLANT_SIZES.slice().reverse().map(size => `<p class="snote">${size[0].toUpperCase() + size.slice(1)}</p>` + Object.keys(PARK_PLANTS[size]).map(name => { const k = Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name), t = LAND[k];
+      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}, ${esc(BIOMES[t.biome].label.toLowerCase())}${t.aquatic ? ", in water" : t.wet ? ", land or water" : ""}</span></span></button>`; }).join("")).join("");
+    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+  }
+  if(it.statues){
+    const keys = Object.keys(LAND).filter(k => LAND[k].statue), row = k => { const t = LAND[k], g = statueGrant(k);
+      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="" data-lock="${k}"${g ? ` title="${esc(statueHint(k))}"` : ""}>${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${t.free ? "" : ", grant"}</span></span></button>`; };
+    const rows = `<p class="snote">Animals</p>${keys.filter(k => !LAND[k].initials).map(row).join("")}<p class="snote">People</p>${keys.filter(k => LAND[k].initials).map(row).join("")}`;
+    return `<div class="sitem" data-open="statues"><button class="srow head" aria-expanded="false">${menuIcon("land-st-owen")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(keys)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.period){
     const rows = Object.entries(PLANTS_OF[it.period]).map(([biome, keys]) => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + keys.map(k => { const t = LAND[k];
@@ -164,5 +182,5 @@ function buildMenu(){
 // Grey out what isn't researched yet. Called after anything changes.
 function refreshMenu(){
   if(!state) return;
-  document.querySelectorAll("#sideMenu [data-tech]").forEach(b => { const t = b.dataset.tech; b.classList.toggle("locked", !!t && !hasTech(t)); });
+  document.querySelectorAll("#sideMenu [data-tech]").forEach(b => { const t = b.dataset.tech, k = b.dataset.lock; b.classList.toggle("locked", (!!t && !hasTech(t)) || (!!k && !statueOpen(k))); });
 }
