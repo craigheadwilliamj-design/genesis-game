@@ -344,7 +344,7 @@ function statueSeen(p, id){
 /* ---------- vivarium plants ---------- */
 // A plant goes at the first free spot inside the glass. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in.
 function vivPlantSpot(e, key){
-  const r = LAND[key].r * VIV_PLANT.scale, bb = bbox(e.points);
+  const r = LAND[key].r * (LAND[key].vivToy ? 1 : VIV_PLANT.scale), bb = bbox(e.points);
   for(let y = bb.y0 + r; y <= bb.y1 - r; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5)
     if(deepInside(x, y, e.points, r + .3) && !landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < r + LAND[f.type].r * (f.k || 1))) return [x, y];
   return null;
@@ -366,11 +366,26 @@ function addVivPlant(e, key){
   (e.land = e.land || []).push({id:uid("l-"), type:key, x, y, k:VIV_PLANT.scale});
 }
 
+// Vivarium enrichment goes in the same way, full size
+function vivToyProblem(e, key){
+  const t = LAND[key];
+  if(!e.viv || !t || !t.vivToy) return "Only vivarium enrichment goes here.";
+  if(!vivPlantSpot(e, key)) return "No room left for one that size.";
+  if(!canAfford(t.price)) return `Costs ${money(t.price)}.`;
+  return null;
+}
+function addVivToy(e, key){
+  const [x, y] = vivPlantSpot(e, key);
+  spend(LAND[key].price, "built");
+  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
+}
+
 /* ---------- rocks, groves and shelters ---------- */
 // Why a rock, grove or shelter can't go at (x, y) in this exhibit, or null
 function landProblem(e, key, x, y){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
+  if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
@@ -393,6 +408,7 @@ function landSpot(x, y, key){
 // Why a plant, rock or statue can't go at (x, y) out in the park, or null
 function decorProblem(key, x, y){
   const t = LAND[key];
+  if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.slots || t.tray || t.toy) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return `${t.label} is locked. ${statueHint(key)}`;
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
@@ -567,6 +583,21 @@ function featSvg(f, biome, pick, isDead){
     const sd = seedOf(f);
     s += `<path d="${blobPath(f.x, f.y, t.r, sd, false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
     s += `<path d="${blobPath(f.x + t.r * .1, f.y + t.r * .05, t.r * .55, sd + 2, false)}" fill="#4E3B26" fill-opacity=".8"/><ellipse cx="${f.x - t.r * .2}" cy="${f.y - t.r * .15}" rx="${t.r * .22}" ry="${t.r * .1}" fill="#A08A6A" fill-opacity=".5"/>`;
+  } else if(t.look === "vbark"){
+    // a curl of bark to hide under
+    s += `<path d="M${f.x - t.r} ${f.y + t.r * .3}A${t.r} ${t.r * .8} 0 0 1 ${f.x + t.r} ${f.y + t.r * .3}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
+  } else if(t.look === "vbranch"){
+    // forked branches
+    s += `<path d="M${f.x - t.r} ${f.y + t.r * .6}L${f.x + t.r * .8} ${f.y - t.r * .7}M${f.x - t.r * .1} ${f.y - t.r * .05}L${f.x + t.r * .5} ${f.y + t.r * .7}M${f.x + t.r * .3} ${f.y - t.r * .3}L${f.x - t.r * .4} ${f.y - t.r * .8}" stroke="${t.color}" stroke-width="${t.r * .25}" stroke-linecap="round" fill="none"/>`;
+  } else if(t.look === "vdig"){
+    // a box of deep, loose earth
+    s += `<rect x="${f.x - t.r}" y="${f.y - t.r * .7}" width="${t.r * 2}" height="${t.r * 1.4}" rx="${t.r * .15}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${f.x - t.r * .3}" cy="${f.y}" r="${t.r * .25}" fill="#4E3B26"/>`;
+  } else if(t.look === "vfeed"){
+    // a little hopper with a hatch
+    s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${f.x}" cy="${f.y}" r="${t.r * .35}" fill="#4B4F55"/>`;
+  } else if(t.look === "vmist"){
+    // a shallow pool under the mister
+    s += `<ellipse cx="${f.x}" cy="${f.y}" rx="${t.r}" ry="${t.r * .75}" fill="${t.color}" fill-opacity=".85" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x - t.r * .3}" cy="${f.y - t.r * .2}" rx="${t.r * .3}" ry="${t.r * .12}" fill="#BFE0EE" fill-opacity=".7"/>`;
   } else if(t.flora) s += plantSvg(f, t, edge, dead ? 3 : 1);
   else {
     // a lumpy rock with a light and a dark face

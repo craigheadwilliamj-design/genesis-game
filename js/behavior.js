@@ -46,20 +46,19 @@ function awake(s, min = state.minute){
 const isHunter = s => ["meat", "fish", "insects"].includes(foodType(s));
 
 /* ---------- enrichment ---------- */
-// Toy points (Rubbing Posts, Log Piles, Mud Wallows) an exhibit's animals want: more for bigger herds and bigger animals
+// Toy points (Rubbing Posts, Log Piles, Mud Wallows; bark hides, branches and the like in a vivarium) an exhibit's animals want: more for bigger herds and bigger animals
 function enrichNeed(e){
   let n = 0;
-  for(const [sp, c] of speciesCounts(e)) n += ENRICH.per * Math.sqrt(c) * clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 30, .3, 2);
+  for(const [sp, c] of speciesCounts(e)) n += ENRICH.per * Math.sqrt(c) * (e.viv ? clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / ENRICH.vivScale, 1, 3) : clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 30, .3, 2));
   return n;
 }
 const toyPoints = e => landOf(e).reduce((n, f) => n + ((LAND[f.type] && LAND[f.type].toy) || 0), 0);
-// How much there is to do, 0 to 1: toys, the landscaping they like, and room to roam. A vivarium's glass is half the battle; plants do the rest.
+// How much there is to do, 0 to 1: toys, the landscaping they like (just plants, in a vivarium), and room to roam
 function enrichment(e){
   if(!e.animals.length) return 0;
   let sat = 0, n = 0;
   for(const [sp, c] of speciesCounts(e)){ const f = speciesFit(e, SPECIES_BY_ID[sp]); sat += c * (e.viv ? f.plants : f.sat); n += c; }
   sat /= n || 1;
-  if(e.viv) return .5 + .5 * sat;
   let need = 0; for(const [sp, c] of speciesCounts(e)) need += SPECIES_BY_ID[sp].space * c;
   const ratio = need ? area(e.points) / need : 2, room = ratio >= 1.5 ? 1 : ratio >= 1 ? .5 + (ratio - 1) : ratio * .5;
   return clamp(ENRICH.toys * clamp(toyPoints(e) / (enrichNeed(e) || 1), 0, 1) + ENRICH.habitat * sat + ENRICH.room * room, 0, 1);
@@ -217,7 +216,7 @@ function behaviorNight(){
 const actLabel = a => a.act && ACTS[a.act] ? ACTS[a.act].label : "Settling in";
 const whyText = {bored:"bored", stressed:"stressed", lonely:"lonely", hungry:"hungry", thirsty:"thirsty"};
 const WHY_FIX = {
-  bored:"Enrichment props (Habitat Props), rocks, plants and more room give them something to do.",
+  bored:"Enrichment props (Habitat Props, or Enrichment for a vivarium), rocks, plants and more room give them something to do.",
   stressed:"See the Behavior tab for what's bothering them.",
   lonely:"They need more of their own kind.",
   hungry:"There's no food. Keepers need to bring some.",

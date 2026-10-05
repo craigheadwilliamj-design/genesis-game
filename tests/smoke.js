@@ -1346,6 +1346,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
       behaviorNight();
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
+      // vivariums take their own enrichment, picked from a list and set in the glass; it stays out of open exhibits and the park
+      const viv = {id:"bh3", name:"Glass", viv:"L", points:sq(300, 0, 16).map(([x, y]) => [x, Math.min(y, 10)]), animals:[{id:"bv0", sp:"arth"}, {id:"bv1", sp:"arth"}], happy:70, cond:100};
+      state.exhibits.push(viv); const m0 = state.money; state.money = 1e6;
+      const vBare = enrichment(viv), vNeed = enrichNeed(viv);
+      addVivToy(viv, "vbranch"); addVivToy(viv, "vfeed");
+      const placed = landOf(viv).filter(f => LAND[f.type].vivToy);
+      out.vivToys = vNeed >= 2 && enrichment(viv) > vBare && toyPoints(viv) === 5 && placed.length === 2 && placed.every(f => inPoly(f.x, f.y, viv.points))
+        && !!landProblem(pack, "vbark", 130, 30) && !!decorProblem("vbark", 0, 0) && !!vivToyProblem(pack, "vbark") && !JSON.stringify(BUILD_MENU.map(g => g.items.map(i => i.tool))).includes("land-vbark") && vivToysHtml(viv).includes("Climbing Branches");
+      state.money = m0;
       const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
       out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
       Object.assign(state, keep); recompute();

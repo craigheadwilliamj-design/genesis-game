@@ -1020,6 +1020,12 @@ const LAND = {
   post:   {label:"Rubbing Post",   one:"a rubbing post",    price:600,  r:1.2, color:"#8A6A48", toy:1, look:"post"},
   logs:   {label:"Log Pile",       one:"a log pile",        price:1800, r:3,   color:"#7A5A3A", toy:3, look:"logs"},
   wallow: {label:"Mud Wallow",     one:"a mud wallow",      price:3500, r:5,   color:"#6B5236", toy:6, look:"wallow"},
+  // vivarium enrichment (vivToy instead of toy): picked from the vivarium's Enrichment list and set in the glass, never out in an open exhibit
+  vbark:  {label:"Cork Bark Hide",     one:"a cork bark hide",     price:300,  r:.7, color:"#7A5A3A", toy:1, vivToy:true, hide:true, look:"vbark"},
+  vbranch:{label:"Climbing Branches",  one:"climbing branches",    price:500,  r:.9, color:"#8A6A48", toy:2, vivToy:true, look:"vbranch"},
+  vdig:   {label:"Dig Box",            one:"a dig box",            price:700,  r:.8, color:"#6B5236", toy:2, vivToy:true, look:"vdig"},
+  vfeed:  {label:"Live-Feed Dispenser",one:"a live-feed dispenser",price:900,  r:.6, color:"#8A8F96", toy:3, vivToy:true, look:"vfeed"},
+  vmist:  {label:"Misting Pool",       one:"a misting pool",       price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
 };
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
@@ -1113,7 +1119,7 @@ const ACTS = {
   pace:  {label:"Pacing", tell:true},
 };
 // Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
-const ENRICH = {per:1, toys:.35, habitat:.35, room:.3};
+const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3};   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
