@@ -105,7 +105,7 @@ function tripRow(id, periodId, label){
   if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
     h += `${d ? `Quality ${d.quality}%.${d.genome >= 100 ? " Complete. More trips can raise quality." : ""}` : "No DNA yet."}`;
-    if(!d || d.genome < 100) h += ` About ${Math.round(o.trips)} trips for a whole genome, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
+    if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? "more trips to finish the genome" : "trips for a whole genome"}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
     if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out looking for it.</b>`;
     if(g.animal && g.animal.stars) h += ` Needs ${g.animal.stars}★ to clone.`;
   }
