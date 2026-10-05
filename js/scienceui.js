@@ -49,7 +49,7 @@ function oracleHtml(b){
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `</section>`;
 
-  h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"animals", label:"Animals", color:"#1F6F73"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}], oracleMain)}<div class="ptab-body">`;
+  h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"animals", label:"Animals", color:"#1F6F73"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
   if(oracleMain === "manage"){
     h += `<h3>Fences and barriers</h3><ul class="shop">${techRows("barrier")}</ul>`;
     h += `<h3 style="margin-top:12px">Buildings and systems</h3><ul class="shop">${techRows("build")}</ul>`;
@@ -64,14 +64,15 @@ function oracleHtml(b){
     for(const s of list) h += projectRow("species", s.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`,
       `${s.space.toLocaleString()} m² each. ${starsNeed(s) ? `Needs ${starsNeed(s)}★ to clone. ` : ""}${isUnlocked(s.id) ? "GHOST can look for it." : ""}`);
     h += `</ul>`;
-  } else {
-    h += `<div class="meta" style="margin-bottom:8px">Plants and medicine are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
+  } else if(oracleMain === "flora"){
+    h += `<div class="meta" style="margin-bottom:8px">Plants are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
     h += `<h3>Plants</h3><ul class="shop">${techRows("flora")}</ul>`;
     for(const era of ["mesozoic", "paleozoic"]){
       const d = sc.dna[PLANT_DNA[era].id];
       if(hasTech(FLORA[era].tech)) h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA: ${d ? d.genome : 0}%${d && d.genome >= 100 ? ". Complete." : ". GHOST collects it."}</div>`;
     }
-    h += `<h3 style="margin-top:12px">Medicine</h3>`;
+  } else {
+    h += `<div class="meta" style="margin-bottom:8px">Medicine is grown at CERES.</div>`;
     h += tabBar("oera", ERA_ORDER.map(era => ({key:era, label:ERA_LABEL[era], color:ERA_COLOR[era], lock:!hasTech(MED_TECH[era])})), oracleEra);
     h += `<ul class="shop" style="margin-top:8px">${projectRow("tech", MED_TECH[oracleEra], esc(TECH.find(t => t.id === MED_TECH[oracleEra]).label), esc(TECH.find(t => t.id === MED_TECH[oracleEra]).text))}</ul>`;
     h += `<div class="meta" style="margin:10px 0 6px">${hasTech(MED_TECH[oracleEra]) ? `Refine the medicine for each period. Only refined medicine cures that period's animals fully.` : `Unlock ${ERA_LABEL[oracleEra]} medicine first, then refine it for each period.`}</div>`;
