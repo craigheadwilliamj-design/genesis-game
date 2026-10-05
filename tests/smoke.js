@@ -896,7 +896,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.landMenu = !!document.querySelector('[data-tool="water"]') && !!document.querySelector('[data-tool="land-rock"]');
     setTool("water"); out.landTool = tool === "water" && $("#drawbar").classList.contains("on"); setTool("select");
     const sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
-    out.landRejectsOutside = waterHost(sq(10, 10, 4)) === null && !!waterProblem(sq(102, 130, 4), lx, null, 0) && !landSpot(10, 10, "rock").ok;
+    // out in the park, rocks are fine but habitat props aren't, and water outside the fence isn't this exhibit's
+    out.landRejectsOutside = waterHost(sq(10, 10, 4)) === null && !!waterProblem(sq(102, 130, 4), lx, null, 0) && landSpot(10, 10, "rock").ok && /inside an open exhibit/.test(landSpot(10, 10, "shelter").why || "");
     const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
     out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
     const pool = sq(130, 130, 6);
@@ -928,6 +929,66 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     oldP.exhibits.push({id:"e-oldp", name:"OldP", points:[[0,0],[40,0],[40,40],[0,40]], animals:[], happy:70, land:[{id:"l-p", type:"pond", x:20, y:20}, {id:"l-r", type:"rock", x:5, y:5}]});
     const upp = upgradeSave(oldP).exhibits.find(e => e.id === "e-oldp");
     out.oldPondsBecomeWater = upp.water.length === 1 && upp.land.length === 1 && upp.land[0].type === "rock" && Math.abs(area(upp.water[0].points) - Math.PI * WATER.oldPondR ** 2) < Math.PI * WATER.oldPondR ** 2 * .1;
+
+    // park landscaping: plants, rocks, statues and water out in the park, open fences and hedge rows, wooden bridges, and guests who enjoy them
+    {
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, money:state.money, tech:state.science.tech.slice(), done:state.goalsDone.slice(), zones:state.zones};
+      state.exhibits = []; state.buildings = []; state.zones = []; state.decor = []; state.water = []; state.fences = []; state.money = 1e6;
+      state.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-l", points:[[205,235],[100,235]]}];
+      recompute();
+      // modern plants grow anywhere; other periods' plants need sterile prehistoric plants first
+      out.decorPlantOutside = landSpot(150, 220, "q-white-oak").ok && landSpot(150, 220, "qua-temperate-large").ok;
+      state.science.tech = state.science.tech.filter(t => t !== "sterile");
+      out.decorNeedsSterile = /sterile/.test(landSpot(150, 220, "neo-temperate-large").why || "");
+      state.science.tech.push("sterile");
+      out.decorSterileOk = landSpot(150, 220, "neo-temperate-large").ok;
+      out.decorNotOnPath = !landSpot(150, 235, "q-white-oak").ok && !landSpot(150, 220, "shelter").ok;
+      out.parkPlantsCount = Object.values(PARK_PLANTS).reduce((n, l) => n + Object.keys(l).length, 0) === 27 && Object.keys(LAND).filter(k => LAND[k].park).every(k => BIOMES[LAND[k].biome] && LAND[k].period === "Quaternary");
+      // statues: some free, the rest from grants
+      state.goalsDone = state.goalsDone.filter(id => id !== "paleozoic");
+      out.statueFree = landSpot(150, 220, "st-owen").ok && landSpot(150, 220, "st-dodo").ok;
+      out.statueLocked = /locked/.test(landSpot(150, 220, "st-dime").why || "") && /Dimetrodon statue/.test(grantPrize(GOALS.find(g => g.id === "paleozoic")));
+      state.goalsDone.push("paleozoic"); out.statueGranted = landSpot(150, 220, "st-dime").ok;
+      out.statuesAll = Object.keys(STATUES).length === 16 && Object.keys(STATUES).every(id => STATUES[id].free || GOALS.some(g => g.statue === id));
+      const oak = placeLand(null, "q-white-oak", 150, 220), bust = placeLand(null, "st-anning", 120, 225);
+      out.decorPlaced = state.decor.length === 2 && findItem("land", oak.id) === oak && !landSpot(151, 221, "q-ginkgo").ok;
+      // water out in the park: only a wooden bridge crosses it
+      const pond = [[60,180],[90,180],[90,200],[60,200]];
+      out.parkWaterOk = waterHost(pond) === null && waterProblem(pond, null, null, waterCost(pond)) === null;
+      addWater(null, pond);
+      out.parkWaterBlocksPath = /bridge/.test(pathProblem([[100,235],[75,235],[75,170]]) || "") && pathProblem([[100,235],[75,235],[75,170]], "bridge") === null && pathCost([[0,0],[10,0]], "bridge") === 10 * BRIDGE.perMeter;
+      out.parkWaterBlocksBuilding = /water/.test(shapeHitsLandscape(rectPts(75, 190, 6, 6, 0)) || "") && !!exhibitProblem([[50,170],[100,170],[100,215],[50,215]]);
+      out.lilyNeedsWater = /only grows in water/.test(landSpot(110, 150, "q-water-lily").why || "") && landSpot(75, 190, "q-water-lily").ok && landSpot(75, 190, "q-cattails").ok && !landSpot(75, 190, "q-white-oak").ok;
+      // open fences and hedge rows
+      const hedgeLine = [[110,250],[180,250]];
+      out.fenceOpenOk = fenceProblem(hedgeLine, "hedge") === null && BARRIERS.hedge.strength < BARRIERS.wood.strength;
+      const m0 = state.money, hl = addFenceLine(hedgeLine, "hedge");
+      out.fenceOpenBuilt = state.fences.length === 1 && state.money === m0 - fenceLineCost(hedgeLine, "hedge") && refundFor("fence", hl) === Math.round(fenceLineCost(hedgeLine, "hedge") * COST.refundShare);
+      out.fenceBlocksPath = !!pathProblem([[150,235],[150,270]]);
+      // the fence tool leaves a fence open when you tap the last corner again, and still closes exhibits (on the park's own biome)
+      state.biome = "desert";
+      fenceSel = "hedge"; setTool("exhibit"); draw.pts = [[110,270],[180,270]]; finishFence();
+      out.fenceToolOpen = state.fences.length === 2 && state.fences[1].barrier === "hedge" && tool === "exhibit";
+      draw.pts = [[230,150],[280,150],[280,200],[230,200]]; finishDraw();
+      const ne = state.exhibits[state.exhibits.length - 1];
+      out.fenceToolCloses = !!ne && ne.barrier === "hedge" && biomeOf(ne) === "desert";
+      setTool("select"); fenceSel = "wood";
+      // guests enjoy the gardens and read the plaques
+      recompute(); buildGuestGraph(); render();
+      const near = [...gGraph.nodes.values()].filter(n => n.decor > 0), plaque = [...gGraph.nodes.values()].find(n => n.statues && n.statues.includes(bust.id));
+      out.decorIndexed = near.length > 0 && !!plaque;
+      const pa = newParty(2); pa.at = plaque; const e0 = pa.edu || 0, mood0 = pa.mood; statueSeen(pa, bust.id); statueSeen(pa, bust.id);
+      out.statueTeaches = pa.edu - e0 === DECOR.personLearn && pa.mood > mood0;
+      out.decorDraws = world.innerHTML.includes(LAND["q-white-oak"].color) && world.innerHTML.includes('data-kind="fence"') && world.innerHTML.includes("#9C6B33") && world.innerHTML.includes("url(#p-desert)");
+      removeItem("land", oak); removeItem("water", state.water[0]); removeItem("fence", hl);
+      out.decorBulldoze = state.decor.length === 1 && state.water.length === 0 && state.fences.length === 1;
+      // old saves get grassland and empty lists
+      const ob = JSON.parse(JSON.stringify(newPark())); delete ob.biome; delete ob.decor; delete ob.water; delete ob.fences; upgradeSave(ob);
+      out.parkBiomeOldSave = ob.biome === DEFAULT_PARK_BIOME && Array.isArray(ob.decor) && Array.isArray(ob.water) && Array.isArray(ob.fences);
+      state.biome = DEFAULT_PARK_BIOME;
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, money:keep.money, zones:keep.zones});
+      state.science.tech = keep.tech; state.goalsDone = keep.done; recompute(); buildGuestGraph(); render();
+    }
 
     // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
     const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;

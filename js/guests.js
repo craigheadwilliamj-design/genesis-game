@@ -122,6 +122,7 @@ function buildGuestGraph(){
   gGraph = {nodes, anchors, gate};
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
+  indexDecor(nodes);
   // everyone carries on from the same spot on the new map
   for(const p of parties){
     const x = p.at ? p.at.x : null, y = p.at ? p.at.y : null;
@@ -435,6 +436,9 @@ function guestsTick(m0, m1){
     // walking through litter
     const mess = p.at && !p.at.rail ? litterAt(p.at.x, p.at.y) : 0;
     if(mess >= 3){ hurt += LITTER.hurt * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
+    // gardens, water and statues along the way cheer them up, and they stop to read each statue's plaque
+    if(p.at && p.at.decor){ hurt -= DECOR.joy * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
+    if(p.at && p.at.statues) for(const id of p.at.statues) statueSeen(p, id);
     p.mood = clamp(p.mood - hurt * dt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }
     if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange)){ p.fled = true; thinks(p, "scared"); p.mood -= 15; goHome(p); }

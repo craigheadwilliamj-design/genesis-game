@@ -489,6 +489,7 @@ const THOUGHTS = {
   priceyFood: {text:"The food here costs too much."},
   priceyGift: {text:"The souvenirs are overpriced."},
   rested:     {text:"It was nice to sit down for a bit.", good:true},
+  pretty:     {text:"The gardens here are lovely.", good:true},
   tram:       {text:"The tram saved my feet.", good:true},
   noTram:     {text:"I couldn't afford the tram."},
   soldOut:    {text:"They'd sold out of what I wanted."},
@@ -669,6 +670,7 @@ const CLEAN = {
 //   tech       what ORACLE has to research first
 const BARRIERS = {
   wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
+  hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true},
   bars:     {label:"Metal bars",        strength:45,  perMeter:40,  view:.95,  tech:"bars",     color:"#4A4F57"},
   electric: {label:"Electrified fence", strength:65,  perMeter:60,  view:.95,  tech:"electric", color:"#D8B04A"},
   acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
@@ -682,6 +684,7 @@ const fenceRate = key => COST.fencePerMeter + BARRIERS[key].perMeter;
 //   wear     condition lost per day from weather and age (percent)
 //   repair   materials to fix a whole fence, per meter, from broken to 100%
 Object.assign(BARRIERS.wood,     {wear:3.0, repair:6});
+Object.assign(BARRIERS.hedge,    {wear:1.0, repair:4});   // a hedge grows back, so it barely wears
 Object.assign(BARRIERS.bars,     {wear:2.0, repair:10});
 Object.assign(BARRIERS.electric, {wear:2.5, repair:14});
 Object.assign(BARRIERS.acrylic,  {wear:1.5, repair:25});
@@ -882,6 +885,7 @@ const TECH = [
   {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
   {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
   {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:45, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
+  {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from CERES."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:25, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
   {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:35, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
@@ -1069,15 +1073,18 @@ const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {wat
 //   wet      counts as this share of the water that fully satisfies water lovers
 //   rock     how many rocks animals want here, next to grassland's 1 (see HAB.rockEvery)
 //   plants   share of the floor animals want planted here (see HAB.plantMax)
+//   park     the open ground between the exhibits when the park is set in this biome (the pattern id is "p-" + the key)
 const BIOMES = {
-  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", perSqM:.5, rock:1.6, plants:0.01},
-  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", perSqM:1, rock:0.6, plants:0.12},
-  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", perSqM:.3, rock:0.6, plants:0.03},
-  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", perSqM:.4, rock:1.3, plants:0.03},
-  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
-  temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", perSqM:.6, rock:0.8, plants:0.08},
-  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", perSqM:.8, rock:1, plants:0.08},
+  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", park:"#DCC892", perSqM:.5, rock:1.6, plants:0.01},
+  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", park:"#79AE6C", perSqM:1, rock:0.6, plants:0.12},
+  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", park:"#B7C995", perSqM:.3, rock:0.6, plants:0.03},
+  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", park:"#C8BC8A", perSqM:.4, rock:1.3, plants:0.03},
+  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", park:"#93B9A0", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
+  temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", park:"#A3C483", perSqM:.6, rock:0.8, plants:0.08},
+  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", park:"#8FA694", perSqM:.8, rock:1, plants:0.08},
+  tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#AEB9A2", park:"#CBD2C2", perSqM:.6, rock:1.4, plants:0.02},
 };
+const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
 // A biome missing from a period has no plants there (no grassland before the Neogene). They go in LAND below as keys like "jur-tropical-small".
 const PLANT_TABLE = {
@@ -1096,16 +1103,17 @@ const PLANT_TABLE = {
   Paleogene:{tropical:"Lygodium|Nypa|Dipterocarpoxylon", wetland:"Azolla|Salvinia|Taxodium", temperate:"Zelkova|Quercus|Metasequoia",
     boreal:"Osmunda|Betula|Larix", scrubland:"Dodonaea|Acacia|Eucalyptus", desert:"Tamarix|Haloxylon|Prosopis"},
   Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Musa|Ceiba", wetland:"Typha|Phragmites|Nyssa", scrubland:"Artemisia|Atriplex|Juniperus",
-    temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Opuntia|Agave|Carnegiea"},
+    temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Opuntia|Agave|Carnegiea", tundra:"Eriophorum|Empetrum|Salix arctica"},
   Quaternary:{grassland:"Festuca|Bouteloua|Andropogon", tropical:"Philodendron|Euterpe|Swietenia", wetland:"Sphagnum|Carex|Salix", scrubland:"Salvia|Adenostoma|Arctostaphylos",
-    temperate:"Trillium|Corylus|Tilia", boreal:"Cladonia|Ledum|Pinus", desert:"Larrea|Ferocactus|Joshua tree"},
+    temperate:"Trillium|Corylus|Tilia", boreal:"Cladonia|Ledum|Pinus", desert:"Larrea|Ferocactus|Joshua tree", tundra:"Saxifraga|Dryas|Betula nana"},
 };
 // Leaf colors by biome, small to large
 const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
-  scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"]};
+  scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"],
+  tundra:["#A9B48A", "#8C9A70", "#6F7F5A"]};
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
-const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73"};
+const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73", tundra:"#7F8780"};
 const rockTone = (biome, type) => { const base = plantMix(ROCK_STONE[biome] || ROCK_STONE[DEFAULT_BIOME], "#000000", type === "boulder" ? .16 : 0);
   return {fill:base, light:plantMix(base, "#ffffff", .35), dark:plantMix(base, "#000000", .3)}; };
 // Per size: price by era, radius, daily browse, label style
@@ -1124,6 +1132,92 @@ for(const [period, biomes] of Object.entries(PLANT_TABLE)){
     });
   }
 }
+// Park plants: named modern plants for gardens along the paths and for exhibits alike (LAND keys "q-<name>").
+// In an exhibit of their biome they count as Quaternary plants. Out in the park, guests enjoy them (DECOR).
+//   look    how it's drawn: conifer, willow, palm, bamboo, cactus, rosette, reeds, lily, knees (none: a leafy clump)
+//   accent  blossom, berry or fall color dotted over the leaves
+//   wet     it can stand in water as well as on land; aquatic: only in water
+const PARK_PLANTS = {
+  large:{
+    "Black Spruce":  {biome:"boreal",    color:"#2E5A45", look:"conifer"},
+    "Quaking Aspen": {biome:"boreal",    color:"#9CC25A", accent:"#E8D45A"},
+    "White Oak":     {biome:"temperate", color:"#4E8A3A"},
+    "Sugar Maple":   {biome:"temperate", color:"#D2602A", accent:"#F0A030"},
+    "Dawn Redwood":  {biome:"temperate", color:"#5E8F4A", look:"conifer"},
+    "Bald Cypress":  {biome:"wetland",   color:"#6E9A5A", look:"conifer"},
+    "Weeping Willow":{biome:"wetland",   color:"#9DBA5E", look:"willow"},
+    "Strangler Fig": {biome:"tropical",  color:"#2F7A3E"},
+    "Mahogany":      {biome:"tropical",  color:"#3B6E36", accent:"#8A4A2A"},
+  },
+  medium:{
+    "Japanese Cherry":{biome:"temperate", color:"#E9A3C0", accent:"#FBDDE8"},
+    "Rose Bush":      {biome:"temperate", color:"#4F7F3A", accent:"#D8334A"},
+    "Ginkgo":         {biome:"temperate", color:"#8DB84A", accent:"#E9D35A"},
+    "Lilac":          {biome:"temperate", color:"#6E9A4E", accent:"#B28AD6"},
+    "Mesquite":       {biome:"desert",    color:"#8A9A4E"},
+    "Mangrove":       {biome:"wetland",   color:"#3E7A4A", wet:true},
+    "Bamboo":         {biome:"tropical",  color:"#7DBA4A", look:"bamboo"},
+    "Banana":         {biome:"tropical",  color:"#6DBE4A", look:"palm"},
+    "Giant Tree Fern":{biome:"tropical",  color:"#3E9A4E", look:"palm"},
+  },
+  small:{
+    "Labrador Tea":       {biome:"tundra",    color:"#7E9A6A", accent:"#F4F2E8"},
+    "Sagebrush":          {biome:"desert",    color:"#A7B39A"},
+    "Prairie Wildflowers":{biome:"grassland", color:"#A8C46A", accent:"#E8B83A"},
+    "Prickly Pear":       {biome:"desert",    color:"#6E9A5A", look:"cactus", accent:"#E0507A"},
+    "Agave":              {biome:"desert",    color:"#7FA7A0", look:"rosette"},
+    "Hibiscus":           {biome:"tropical",  color:"#3E8A4A", accent:"#E8344A"},
+    "Cattails":           {biome:"wetland",   color:"#6E8A3A", look:"reeds", wet:true},
+    "Water Lily":         {biome:"wetland",   color:"#4E9A5A", look:"lily", accent:"#F4C6DA", aquatic:true},
+    "Cypress Knees":      {biome:"wetland",   color:"#7A5A3E", look:"knees", wet:true},
+  },
+};
+const PARK_PLANTS_OF = {};   // biome -> its park plant keys, large first
+for(const [size, list] of Object.entries(PARK_PLANTS)) for(const [name, p] of Object.entries(list)){
+  const z = PLANT_SIZE[size], key = "q-" + name.toLowerCase().replace(/[^a-z]+/g, "-");
+  LAND[key] = {label:name, one:(/^[AEIOU]/.test(name) ? "an " : "a ") + name, price:PLANT_PRICE.cenozoic[PLANT_SIZES.indexOf(size)], r:z.r, color:p.color, accent:p.accent, look:p.look, wet:p.wet || p.aquatic, aquatic:p.aquatic,
+    flora:"cenozoic", size, browse:z.browse, shade:z.shade, period:"Quaternary", biome:p.biome, park:true};
+  (PARK_PLANTS_OF[p.biome] = PARK_PLANTS_OF[p.biome] || []).push(key);
+}
+
+// Statues: bronze on a stone plinth, placed anywhere outside the exhibits. The plinth takes the paving color of the theme it stands in.
+//   sp       an animal: a bronze disc the size of the animal's dot on the map, with its letter
+//   initials a person: staff-sized, and guests learn a lot from the plaque (DECOR.personLearn)
+//   free     open from the start; the rest come with grants (GOALS `statue`)
+const STATUES = {
+  dodo:{sp:"dodo", free:true}, igua:{sp:"igua", free:true}, mgal:{sp:"mgal", free:true},
+  dime:{sp:"dime"}, lyst:{sp:"lyst"}, coel:{sp:"coel"}, herr:{sp:"herr"}, orni:{sp:"orni"}, prot:{sp:"prot"}, proc:{sp:"proc"}, kele:{sp:"kele"},
+  owen:  {label:"Richard Owen", initials:"RO", free:true, text:"Named the dinosaurs in 1842."},
+  anning:{label:"Mary Anning",  initials:"MA", text:"Found the first ichthyosaur and plesiosaurs on the cliffs at Lyme Regis."},
+  brown: {label:"Barnum Brown", initials:"BB", text:"Dug up the first Tyrannosaurus rex."},
+  marsh: {label:"O.C. Marsh",   initials:"OCM", text:"Named Stegosaurus, Triceratops and Apatosaurus in the Bone Wars."},
+  cope:  {label:"E.D. Cope",    initials:"EDC", text:"Named over a thousand species, Dimetrodon among them, in the Bone Wars."},
+};
+const STATUE_PRICE = {animal:4000, person:7500};
+for(const [id, st] of Object.entries(STATUES)){
+  const sp = st.sp && SPECIES.find(s => s.id === st.sp), name = sp ? sp.name : st.label;
+  const r = sp ? Math.min(6, Math.max(1.2, Math.sqrt(sp.space) / 9)) + .9 : 1.4;   // the plinth: the animal's dot plus a stone rim
+  LAND["st-" + id] = {label:sp ? `${name} Statue` : name, one:`a statue of ${sp ? (/^[AEIOU]/.test(name) ? "an " : "a ") + name : name}`, price:STATUE_PRICE[sp ? "animal" : "person"], r, color:"#9C6B33",
+    statue:id, sp:st.sp, initials:st.initials, text:st.text, free:!!st.free};
+}
+
+// Decorations out in the park cheer up the guests walking past: plants, rocks, water, statues and hedge rows
+const DECOR = {
+  reach:25,            // guests enjoy decorations this close to the path they're on
+  full:14,             // points within reach that make a stretch fully pretty
+  joy:.035,            // mood gained a minute on a fully pretty stretch (being on their feet costs .03)
+  pretty:.5,           // a stretch this pretty gets guests talking about the gardens
+  pts:{small:1, medium:2, large:3, rock:1, boulder:2, statue:4, person:3},
+  waterPer:60,         // a point for each this many square meters of water
+  hedgePer:12,         // and for each this many meters of hedge row
+  statueReach:15,      // guests read a statue's plaque from this close
+  personLearn:12,      // learning from a person's statue (once each)
+  animalLearn:2,       // and from an animal's
+  statueJoy:3,         // mood from a statue the first time they pass it
+};
+// Wooden bridges are the only paths that cross water
+const BRIDGE = {perMeter:45, upkeepPerMeter:.3, halfWidth:2.5};
+
 const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
 // Each animal's home biome, then the one it gets by in. Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.
@@ -1151,7 +1245,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   drom:"scrubland grassland", plty:"wetland grassland",    amph:"temperate grassland",  gpit:"tropical temperate",
   siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland boreal",     macr:"grassland scrubland",
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
-  smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"boreal grassland",
+  smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
   colm:"grassland temperate",
   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
@@ -1506,6 +1600,7 @@ const TRAM = {
 
 // Grants give new players something to aim for, and pay out when met (ids stay "goal" ids so old saves carry over).
 // Each check() looks at the park and returns true when the grant is met. A grant pays `reward` in cash, or unlocks a `theme` instead.
+// Some also unlock a `statue` (STATUES) to place in the park.
 const eraUnlocked = era => g => g.state.science.unlocked.some(id => SPECIES_BY_ID[id] && ERA_OF[SPECIES_BY_ID[id].period] === era);
 const GOALS = [
   {id:"exhibit",  text:"Draw your first exhibit",            hint:"Open Build, then Exhibit Tools, pick a fence type, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
@@ -1521,24 +1616,24 @@ const GOALS = [
   {id:"mechanic", text:"Hire a Mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:4500, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a Vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:14000, check:g=>(g.state.staff.vets || []).length>0},
   {id:"zone",     text:"Draw a Work Zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
-  {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  check:g=>g.state.history.some(h=>h.guests>=100)},
-  {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  check:g=>g.state.history.some(h=>h.guests>=1000)},
-  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:12000, check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"cenozoic", text:"Unlock a Cenozoic Animal's genome",  hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open the Cenozoic tab (Paleogene, Neogene, Quaternary) and start unlocking an animal.", reward:6000, check:eraUnlocked("cenozoic")},
-  {id:"mesozoic", text:"Unlock a Mesozoic Animal's genome",  hint:"Open the Mesozoic tab (Triassic, Jurassic, Cretaceous) at ORACLE and start unlocking an animal.", reward:8000, check:eraUnlocked("mesozoic")},
-  {id:"paleozoic",text:"Unlock a Paleozoic Animal's genome", hint:"Open the Paleozoic tab (Devonian, Carboniferous, Permian) at ORACLE and start unlocking an animal.", reward:10000, check:eraUnlocked("paleozoic")},
+  {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  statue:"lyst", check:g=>g.state.history.some(h=>h.guests>=100)},
+  {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  statue:"kele", check:g=>g.state.history.some(h=>h.guests>=1000)},
+  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"cenozoic", text:"Unlock a Cenozoic Animal's genome",  hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open the Cenozoic tab (Paleogene, Neogene, Quaternary) and start unlocking an animal.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
+  {id:"mesozoic", text:"Unlock a Mesozoic Animal's genome",  hint:"Open the Mesozoic tab (Triassic, Jurassic, Cretaceous) at ORACLE and start unlocking an animal.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
+  {id:"paleozoic",text:"Unlock a Paleozoic Animal's genome", hint:"Open the Paleozoic tab (Devonian, Carboniferous, Permian) at ORACLE and start unlocking an animal.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
   {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Unlock and complete the genome of a Quaternary animal, then clone it at TAR.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
-  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to the periods of animals you've unlocked. Hire a Temporal Researcher at GHOST, then pick the animal under its period's tab and send GHOST.", reward:30000, check:g=>Object.keys(g.state.science.dna).length>0},
-  {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
-  {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:22000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
+  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to the periods of animals you've unlocked. Hire a Temporal Researcher at GHOST, then pick the animal under its period's tab and send GHOST.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
+  {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
+  {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
   {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once ORACLE has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
-  {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  check:g=>g.speciesShown()>=4},
-  {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, check:g=>g.state.rating>=3},
+  {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
+  {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
   {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report after closing.", theme:"gilded", check:g=>g.state.money>=1000000},
-  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:60000, check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at ORACLE. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},
 ];
 // What a grant pays: cash, or a theme
-const grantPrize = g => g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward);
+const grantPrize = g => (g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward)) + (g.statue ? ` and ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue` : "");

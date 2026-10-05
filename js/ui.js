@@ -33,13 +33,14 @@ const ui = {
     else if(sel.kind === "exhibit") h = exhibitHtml(it);
     else if(sel.kind === "building") h = buildingHtml(it);
     else if(sel.kind === "zone") h = zoneHtml(it);
+    else if(sel.kind === "fence") h = fenceLineHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
     panelEl.innerHTML = h;
     aside.scrollTop = sc;
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
-    $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || "Path") : "Park office";
+    $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
   },
 
   toast(text, kind, html){
@@ -290,7 +291,7 @@ function vivPlantsHtml(e){
   let h = `<section><h3>Plants</h3><div class="meta">Only ${esc(BIOMES[b].label.toLowerCase())} plants grow here. Animals count the ones from their own period.${own.length ? ` Here: ${esc(own.join(", "))}.` : ""}</div>`;
   if(!periods.length) return h + `<div class="meta" style="margin-top:6px">No plants grow in ${esc(BIOMES[b].label.toLowerCase())}. Regrade the ground above.</div></section>`;
   h += `<div style="margin-top:6px">${tabBar("vperiod", periods.map(x => ({key:x, label:x + (own.includes(x) ? " (here)" : ""), color:PERIOD_COLOR[x]})), lp)}</div>`;
-  h += `<div class="row" style="margin-top:6px">${PLANTS_OF[lp][b].map(k => { const t = LAND[k], why = vivPlantProblem(e, k); return `<button class="btn" data-action="vivPlant" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("")}</div>`;
+  h += `<div class="row" style="margin-top:6px">${PLANTS_OF[lp][b].concat(lp === "Quaternary" ? (PARK_PLANTS_OF[b] || []).filter(k => !LAND[k].aquatic) : []).map(k => { const t = LAND[k], why = vivPlantProblem(e, k); return `<button class="btn" data-action="vivPlant" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("")}</div>`;
   if(e.animals.length){
     h += [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s); return f.w.plants <= 0 ? "" : `<div class="need-line ${f.plants >= .99 ? "ok" : f.plants > 0 ? "mid" : "no"}">${esc(s.name)}: ${f.h.plants}/${f.w.plants} m² of ${esc(s.period)} plants.</div>`; }).join("");
   }
@@ -336,7 +337,7 @@ function landHtml(e){
   if(!periods.includes(landTabs.period)) landTabs.period = periods[0];
   const lp = landTabs.period;
   const rockBtns = ROCKS.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
-  const plantBtns = PLANTS_OF[lp][lb].map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
+  const plantBtns = PLANTS_OF[lp][lb].concat(lp === "Quaternary" ? PARK_PLANTS_OF[lb] || [] : []).map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   const sub = ["plants", "rocks", "water"].includes(landTabs.sub) ? landTabs.sub : "plants";
   const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
   const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
@@ -670,14 +671,24 @@ function tramTrackHtml(p){
 function pathHtml(p){
   if(isTram(p)) return tramTrackHtml(p);
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : "Footpath"}</h2>`;
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
   if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like ORACLE, GHOST, and TAR can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
-  if(!svc) h += themeHtml("path", p);
+  if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
+  if(!svc && !isBridge(p)) h += themeHtml("path", p);
   if(!p.fixed) h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   else h += `<div class="meta">This is where guests come in. It can't be removed.</div>`;
+  return h;
+}
+
+// An open fence: a hedge row or a wall that isn't closed into an exhibit
+function fenceLineHtml(l){
+  const B = BARRIERS[l.barrier] || BARRIERS.wood;
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(B.label)}</h2>`;
+  h += `<div class="meta">${Math.round(lineLength(l.points))} m of open fence. ${B.hedge ? "Guests enjoy hedge rows along the paths." : "It marks off part of the park."} To make an exhibit, draw a fence that closes on its first corner.</div>`;
+  h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("fence", l))}</button></div>`;
   return h;
 }
 

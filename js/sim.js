@@ -115,12 +115,12 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
-    version:1, name:"Genesis Park",
+    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
-    exhibits:[],
+    exhibits:[], decor:[], water:[], fences:[],
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
@@ -171,6 +171,9 @@ function upgradeSave(s){
     e.land = e.land.filter(f => LAND[f.type]);   // ponds, and the old generic plants, are gone
   }
   if(!s.themes) s.themes = freshThemes();
+  // park landscaping: plants, rocks and statues (decor), water and open fences out in the park, and the ground the park is set in
+  if(!BIOMES[s.biome]) s.biome = DEFAULT_PARK_BIOME;
+  for(const k of ["decor", "water", "fences"]) if(!Array.isArray(s[k])) s[k] = [];
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
   // renamed themes: Range is now Homestead, Western is now Mesa, Classic is now Japanese Garden
@@ -303,6 +306,7 @@ function speciesCounts(e){
 const isService = p => p.type === "service";
 const isWide = p => p.type === "wide";
 const isTram = p => p.type === "tram";   // track: nobody walks it, guests ride it between stations
+const isBridge = p => p.type === "bridge";   // a wooden footpath, the only one that crosses water
 // What a ride costs a guest now, and the share of guests who'll pay it (everyone at the usual fare, nobody at double)
 const tramFare = () => state.tramFare ?? TRAM.fare;
 const tramWill = () => clamp(1 - PRICE_SENSE * (tramFare() - TRAM.fare) / TRAM.fare, 0, 1);
@@ -515,12 +519,15 @@ function spend(cost, kind){ state.money -= cost; state.today[kind] += cost; }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
-function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : type === "tram" ? TRAM.perMeter : COST.pathPerMeter)); }
+function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : type === "tram" ? TRAM.perMeter : type === "bridge" ? BRIDGE.perMeter : COST.pathPerMeter)); }
+// An open fence line: the fence alone, by the meter
+const fenceLineCost = (pts, barrier) => Math.round(lineLength(pts) * fenceRate(barrier || "wood"));
 function refundFor(kind, item){
   if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
+  if(kind === "fence") return Math.round(fenceLineCost(item.points, item.barrier) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;
 }
@@ -573,7 +580,7 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : UPKEEP.pathPerMeter);
+  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
@@ -661,7 +668,7 @@ function checkGoals(){
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);
       if(g.reward) earn(g.reward, "rewards");
-      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}`, "good");
+      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${g.statue ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
     }
   }
   checkThemes();   // a grant can unlock a theme

@@ -131,16 +131,35 @@ function startWith(s, fresh){
   recompute(); buildGuestGraph(); buildKeeperGraph();
   fit(); ui.panel(); ui.hud(true); refreshMenu();
   setSpeed(state.over ? 0 : 1);
-  if(fresh){ setSpeed(0); $("#dlgIntro").showModal(); }
+  // a new park starts with a name and the biome it's set in
+  $("#introSetup").hidden = !fresh;
+  if(fresh){ $("#introName").value = ""; biomeCards($("#introBiomes")); setSpeed(0); $("#dlgIntro").showModal(); }
 }
 
+/* ---------- the park's biome: picked when it opens, and changed any time in the park office ---------- */
+// One card per biome: a swatch of the park's ground in it, its name, and what it looks like
+function biomeCards(el){
+  const cur = parkBiome();
+  el.innerHTML = Object.entries(BIOMES).map(([k, b]) => `<button type="button" data-biome="${k}" role="radio" aria-checked="${k === cur}" aria-pressed="${k === cur}"><svg viewBox="0 0 48 22" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="48" height="22" fill="${b.park}"/><rect width="48" height="22" fill="url(#p-${k})"/></svg>${esc(b.label)}<small>${esc(b.ground[0].toUpperCase() + b.ground.slice(1))}</small></button>`).join("");
+}
+function pickBiome(e){
+  const b = e.target.closest("[data-biome]"); if(!b || !BIOMES[b.dataset.biome]) return;
+  state.biome = b.dataset.biome;
+  biomeCards(e.currentTarget); render(); saveSoon();
+}
+$("#introBiomes").addEventListener("click", pickBiome);
+$("#menuBiomes").addEventListener("click", pickBiome);
+
 /* ---------- dialogs ---------- */
-$("#introGo").onclick = () => { $("#dlgIntro").close(); setSpeed(1); };
+$("#introGo").onclick = () => {
+  if(!$("#introSetup").hidden){ state.name = $("#introName").value.trim().slice(0, 40) || "Genesis Park"; $("#introSetup").hidden = true; ui.hud(true); ui.panel(); saveSoon(); }
+  $("#dlgIntro").close(); setSpeed(1);
+};
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
-$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
+$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; biomeCards($("#menuBiomes")); saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
 $("#closeMenu").onclick = () => $("#dlgMenu").close();
 $("#nameInput").addEventListener("input", e => { state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true); if(!sel) ui.panel(); saveSoon(); });
-$("#howBtn").onclick = () => { $("#dlgMenu").close(); $("#dlgIntro").showModal(); };
+$("#howBtn").onclick = () => { $("#dlgMenu").close(); $("#introSetup").hidden = true; $("#dlgIntro").showModal(); };
 $("#newGame").onclick = () => {
   const b = $("#newGame");
   if(b.dataset.armed !== "1"){ b.dataset.armed = "1"; b.textContent = "Tap again. This erases your park"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Start a new park"; }, 3500); return; }
