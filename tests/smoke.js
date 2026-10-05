@@ -1160,12 +1160,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rc0 = svg.getBoundingClientRect();
     // a building flush against its path can still be turned with the Move tool (it slides clear)
     state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-t", points:[[100,100],[160,100]]}]; state.buildings = []; recompute();
-    setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*view.k); const flush = ghost;
+    setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*ky()); const flush = ghost;
     out.rotateFlush = false;
     if(flush.ok){ const fb = {id:"b-flush", type:"food", points:flush.pts}; state.buildings.push(fb); setTool("move"); mvSel = fb.id; rotateMoved(); out.rotateFlush = Math.abs(Math.atan2(fb.points[1][1] - fb.points[0][1], fb.points[1][0] - fb.points[0][0]) - flush.angle) > .5 && !moveProblem("building", fb); }
     // drawing a path onto the edge of another snaps to its centerline, so they join
     state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}]; recompute();
-    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*view.k];
+    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*ky()];
     const sn = snapAt(...cl(250, 297.5));   // on the edge of the 5 m path, 2.5 m off its centerline
     out.pathEdgeSnaps = Math.abs(sn.y - 300) < .01 && sn.info && sn.info.type === "seg";
     const farSn = snapAt(...cl(250, 290));  // well clear of it
@@ -1242,7 +1242,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     render(); drawTrams();
     out.tramDrawn = world.innerHTML.includes("#5E4B38") && $("#tramLayer").children.length === 1 && tramStops(state.paths[2]).stops.length === 2;
     // the track only snaps to other track, and footpaths don't snap onto it
-    setTool("tram"); const trc = svg.getBoundingClientRect(), trcl = (x, y) => [trc.left + view.tx + x*view.k, trc.top + view.ty + y*view.k];
+    setTool("tram"); const trc = svg.getBoundingClientRect(), trcl = (x, y) => [trc.left + view.tx + x*view.k, trc.top + view.ty + y*ky()];
     const trsn = snapAt(...trcl(300, 300)); setTool("path"); const trsn2 = snapAt(...trcl(300, 312)); setTool("select");
     out.tramSnaps = !(trsn.info && trsn.info.id === "p-tr") && !(trsn2.info && trsn2.info.id === "p-rail");
     // no stations, no ride; and the same trip is a long walk

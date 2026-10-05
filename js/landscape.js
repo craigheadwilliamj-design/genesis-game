@@ -538,6 +538,69 @@ function statueSvg(f, t, edge, dead){
   s += `<text class="glyph" x="${x}" y="${y}" font-size="${br * (txt.length > 2 ? .62 : txt.length > 1 ? .82 : 1.1)}" style="fill:#F6E7C1;stroke:#3A2410">${esc(txt)}</text>`;
   return s;
 }
+// The 3/4 view (map.js `tilt`, prototype): trees stand on trunks and rocks get height. A height of h meters is drawn h/TILT up the map.
+const tilted = () => typeof tilt !== "undefined" && tilt;
+// how high a plant's canopy sits, in meters; 0 keeps it on the ground (low plants, reeds, lilies, cactus pads)
+function treeLift(t){
+  const k = t.size === "small" ? .45 : t.size === "large" ? 1.15 : .85;
+  return t.look === "palm" ? t.r * 1.7 * k : t.look === "willow" ? t.r * .9 * k : t.look ? 0 : t.r * k;
+}
+// a plant standing up: a shadow, a trunk, and its canopy lifted; conifers become a stack of cones
+function tree34(f, t, edge, sw){
+  const x = f.x, y = f.y, r = t.r, n2 = v => v.toFixed(2), ns = `vector-effect="non-scaling-stroke"`;
+  if(t.look === "conifer"){
+    const dark = plantMix(t.color, "#000000", .3), light = plantMix(t.color, "#ffffff", .2), H = r * 2.6;
+    let s = `<ellipse cx="${n2(x + r*.5)}" cy="${n2(y + r*.35)}" rx="${n2(r*.75)}" ry="${n2(r*.5)}" fill="#1D2B22" fill-opacity=".2"/>`;
+    s += `<rect x="${n2(x - r*.08)}" y="${n2(y - r*.6 / TILT)}" width="${n2(r*.16)}" height="${n2(r*.6 / TILT)}" fill="#5A4128"/>`;
+    for(let k = 0; k < 3; k++){ const b = r * (.35 + k * .7), top = b + r * 1.25, w = r * (1 - k * .24), yb = y - b / TILT, yt = y - top / TILT;
+      s += `<path d="M${n2(x - w)} ${n2(yb)}L${n2(x)} ${n2(yt)}L${n2(x + w)} ${n2(yb)}Q${n2(x)} ${n2(yb + w * .35)} ${n2(x - w)} ${n2(yb)}Z" fill="${k % 2 ? light : t.color}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" ${ns}/>`
+        + `<path d="M${n2(x)} ${n2(yt)}L${n2(x + w)} ${n2(yb)}Q${n2(x + w*.5)} ${n2(yb + w * .2)} ${n2(x)} ${n2(yb + w * .18)}Z" fill="${dark}" fill-opacity=".45"/>`; }
+    return s;
+  }
+  const h = treeLift(t), H = h / TILT, tw = r * (t.look === "palm" ? .09 : .13);
+  return `<ellipse cx="${n2(x + h*.3)}" cy="${n2(y + h*.22)}" rx="${n2(r*.8)}" ry="${n2(r*.55)}" fill="#1D2B22" fill-opacity=".2"/>`
+    + `<rect x="${n2(x - tw/2)}" y="${n2(y - H)}" width="${n2(tw)}" height="${n2(H)}" rx="${n2(tw*.3)}" fill="#5A4128"/>`
+    + `<g transform="translate(0 ${n2(-H)})">${plantSvg(f, t, edge, sw)}</g>`;
+}
+// a rock or a cave given height: the same lumpy outline stacked up from a dark base to the lit top
+function rock34(f, t, tone, edge, sw, cave){
+  const sd = seedOf(f), r = t.r, h = r * (cave ? .85 : .7), H = h / TILT, n = 10, ns = `vector-effect="non-scaling-stroke"`;
+  let s = `<path d="${blobPath(f.x + h*.3, f.y + h*.2, r, sd, true)}" fill="#1D2B22" fill-opacity=".2"/>`;
+  for(let k = 0; k < n; k++) s += `<path d="${blobPath(f.x, f.y - H * k / n, r, sd, true)}" fill="${mixHex(tone.dark, tone.fill, k / n)}" ${k ? "" : `stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" ${ns}`}/>`;
+  s += `<path d="${blobPath(f.x, f.y - H, r, sd, true)}" fill="${tone.fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" ${ns}/>`;
+  s += `<path d="${blobPath(f.x - r * .3, f.y - H - r * .25, r * .45, sd + 3, true)}" fill="${tone.light}" fill-opacity=".6"/>`;
+  if(cave){ const w = r * .4, mh = Math.min(H * .85, r * .9); s += `<path d="M${f.x - w} ${f.y + r * .7}A${w} ${mh} 0 0 1 ${f.x + w} ${f.y + r * .7}Z" fill="#1E1B17"/>`; }
+  return s;
+}
+// a barn shelter: wooden walls with a dark open front under a gable roof turned to the viewer
+function shelter34(f, t, edge, sw){
+  const h = t.r * .78, x = f.x, y = f.y, P = [[x - h, y - h], [x + h, y - h], [x + h, y + h], [x - h, y + h]], wall = t.r * .5;
+  const line = `stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"`, w = walls34(P, 0, wall, t.color, line);
+  return `<polygon points="${polyStr(P.map(([a, b]) => [a + wall*.3, b + wall*.25]))}" fill="#1D2B22" fill-opacity=".2"/>` + w.s
+    + (w.main >= 0 ? quad34(P, w.main, .18, .82, 0, wall * .85, "#2A211A") : "") + hipRoof34(P, wall, t.r * .45, "#6B5A44", null, line, "ns", t.color);
+}
+// a canopy: a round shade cloth on poles, peaked in the middle
+function canopy34(f, t, edge, sw){
+  const r = t.r * .9, x = f.x, y = f.y, H = t.r * .55, top = y - H / TILT, peak = y - (H + t.r * .22) / TILT, n2 = v => v.toFixed(2), ns = `vector-effect="non-scaling-stroke"`;
+  const rim = Array.from({length:12}, (_, i) => { const a = i * Math.PI / 6; return [x + r * Math.cos(a), top + r * Math.sin(a)]; });
+  let s = `<ellipse cx="${n2(x + H*.3)}" cy="${n2(y + H*.2)}" rx="${n2(r)}" ry="${n2(r*.9)}" fill="#1D2B22" fill-opacity=".18"/>`;
+  s += rim.filter((_, i) => i % 2 === 0 && Math.sin(i * Math.PI / 6) > -.1).map(([px, py]) => `<path d="M${n2(px)} ${n2(py + H / TILT)}L${n2(px)} ${n2(py)}" stroke="#3B3226" stroke-width="1.5" ${ns}/>`).join("");
+  // each wedge from the rim to the peak, lighter toward the viewer
+  rim.forEach(([px, py], i) => { const [qx, qy] = rim[(i + 1) % 12], l = Math.sin((i + .5) * Math.PI / 6) * .5 - Math.cos((i + .5) * Math.PI / 6) * .2;
+    s += `<polygon points="${n2(px)},${n2(py)} ${n2(qx)},${n2(qy)} ${n2(x)},${n2(peak)}" fill="${mixHex(t.color, l > 0 ? "#ffffff" : "#000000", Math.abs(l) * .35)}" stroke="${edge}" stroke-width="${i % 2 ? 0 : sw * .6}" stroke-linejoin="round" ${ns}/>`; });
+  return s;
+}
+// a statue standing up: the plinth as a block, and the bronze medallion upright on top
+function statue34(f, t, edge, dead){
+  const T = themeOf(f), base = T.path.live, rim = dead ? edge : T.path.edge, x = f.x, y = f.y, r = t.r, p = r * .92, ph = p * .7, ns = `vector-effect="non-scaling-stroke"`;
+  const P = [[x - p, y - p], [x + p, y - p], [x + p, y + p], [x - p, y + p]], line = `stroke="${rim}" stroke-width="${dead ? 3 : 1.2}" stroke-linejoin="round" ${ns}`;
+  let s = `<polygon points="${polyStr(P.map(([a, b]) => [a + ph*.3, b + ph*.25]))}" fill="#1D2B22" fill-opacity=".2"/>` + walls34(P, 0, ph, base, line).s + `<polygon points="${polyStr(P.map(lift34(ph)))}" fill="${mixHex(base, "#ffffff", .18)}" ${line}/>`;
+  const br = t.initials ? r * .62 : r - .9, cy = y - (ph + br * 1.15) / TILT, txt = t.initials || (SPECIES_BY_ID[t.sp] ? SPECIES_BY_ID[t.sp].name[0] : "?");
+  s += `<rect x="${x - br*.15}" y="${cy}" width="${br*.3}" height="${(br * 1.15) / TILT}" fill="#4E3115"/>`;
+  s += `<ellipse cx="${x}" cy="${cy}" rx="${br}" ry="${br / TILT}" fill="#9C6B33" stroke="#4E3115" stroke-width="1.2" ${ns}/><ellipse cx="${x - br * .28}" cy="${cy - br * .3 / TILT}" rx="${br * .5}" ry="${br * .5 / TILT}" fill="#D9A766" fill-opacity=".45"/>`;
+  s += `<text class="glyph" x="${x}" y="${cy}" font-size="${br * (txt.length > 2 ? .62 : txt.length > 1 ? .82 : 1.1)}" style="fill:#F6E7C1;stroke:#3A2410">${esc(txt)}</text>`;
+  return s;
+}
 // One rock, plant, shelter, tray or statue. biome is the ground it stands on (rocks take their stone color from it).
 function featSvg(f, biome, pick, isDead){
   let t = LAND[f.type]; if(!t) return "";
@@ -545,7 +608,11 @@ function featSvg(f, biome, pick, isDead){
   const dead = pick && isDead("land", f.id);
   const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
   let s = `<g${pickAt(pick, "land", f.id)}>`;
-  if(t.statue) s += statueSvg(f, t, edge, dead);
+  const up = tilted() && !f.k;
+  if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
+  else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
+  else if(up && t.look === "canopy") s += canopy34(f, t, edge, dead ? 3 : 1.5);
+  else if(up && t.slots && !t.look) s += shelter34(f, t, edge, dead ? 3 : 1.5);
   else if(t.tray){
     // a round steel tray, filled to the level of the food in it
     const fill = t.tray ? clamp(trayHas(f) / t.tray, 0, 1) : 0, main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0];
@@ -556,7 +623,8 @@ function featSvg(f, biome, pick, isDead){
     // a dirt mound with a dark hole
     s += `<path d="${blobPath(f.x, f.y, t.r, seedOf(f), false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
     s += `<ellipse cx="${f.x}" cy="${f.y + t.r * .1}" rx="${t.r * .4}" ry="${t.r * .28}" fill="#2A211A"/>`;
-  } else if(t.look === "cave"){
+  } else if(t.look === "cave" && tilted() && !f.k) s += rock34(f, t, {fill:t.color, light:mixHex(t.color, "#ffffff", .25), dark:mixHex(t.color, "#000000", .35)}, edge, dead ? 3 : 1.5, true);
+  else if(t.look === "cave"){
     // a rocky hill with a dark mouth
     const sd = seedOf(f);
     s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
@@ -613,7 +681,8 @@ function featSvg(f, biome, pick, isDead){
   } else if(t.look === "vmist"){
     // a shallow pool under the mister
     s += `<ellipse cx="${f.x}" cy="${f.y}" rx="${t.r}" ry="${t.r * .75}" fill="${t.color}" fill-opacity=".85" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x - t.r * .3}" cy="${f.y - t.r * .2}" rx="${t.r * .3}" ry="${t.r * .12}" fill="#BFE0EE" fill-opacity=".7"/>`;
-  } else if(t.flora) s += plantSvg(f, t, edge, dead ? 3 : 1);
+  } else if(t.flora) s += tilted() && !f.k && (t.look === "conifer" || treeLift(t)) ? tree34(f, t, edge, dead ? 3 : 1) : plantSvg(f, t, edge, dead ? 3 : 1);
+  else if(tilted() && !f.k) s += rock34(f, t, rockTone(BIOMES[f.biome] ? f.biome : biome, f.type), edge, dead ? 3 : 1.5);
   else {
     // a lumpy rock with a light and a dark face
     const sd = seedOf(f), tone = rockTone(BIOMES[f.biome] ? f.biome : biome, f.type);
@@ -622,13 +691,15 @@ function featSvg(f, biome, pick, isDead){
   }
   return s + `</g>`;
 }
+// in the 3/4 view things further north draw first, so a tree in front covers the one behind
+const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 // SVG for one exhibit's water, rocks, groves and shelters. When bulldozing they can be picked out one by one.
 function landSvg(e, pick, isDead){
-  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + landOf(e).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
+  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead)).join("");
-const decorSvg = (pick, isDead) => decorOf().map(f => featSvg(f, parkBiome(), pick, isDead)).join("");
+const decorSvg = (pick, isDead) => byDepth(decorOf()).map(f => featSvg(f, parkBiome(), pick, isDead)).join("");
 // A hedge: a dark base, the leafy body, and lighter clumps along the top (in meters, so it's as wide as a real hedge)
 const hedgeSvg = (tag, pts) => { const lj = `fill="none" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"`; return `<${tag} points="${pts}" stroke="#24461F" stroke-width="2.6" ${lj}/><${tag} points="${pts}" stroke="#4E8A3E" stroke-width="2" ${lj}/><${tag} points="${pts}" stroke="#6BA851" stroke-width="1.2" stroke-dasharray="0 1.6" ${lj}/>`; };
 // An open fence line: a hedge, or a rail with posts in the fence's color
@@ -636,7 +707,8 @@ function fenceLineSvg(l, on, dead){
   const pts = polyStr(l.points), B = BARRIERS[l.barrier] || BARRIERS.wood, ns = `fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"`;
   let s = `<g data-kind="fence" data-id="${esc(l.id)}" style="cursor:pointer">`;
   if(on || dead) s += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${B.hedge ? 3.6 : 1.6}" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
-  if(B.hedge) s += hedgeSvg("polyline", pts);
+  if(tilted()) s += fence34(l.points, false, B.hedge ? "hedge" : l.barrier || "wood", "all", {hi:dead ? "var(--bad)" : on ? "var(--sel)" : null});
+  else if(B.hedge) s += hedgeSvg("polyline", pts);
   else s += `<polyline points="${pts}" stroke="${B.color}" stroke-width="2.2" ${ns}/><polyline points="${pts}" stroke="${B.color}" stroke-width="5" stroke-dasharray="0 16" ${ns}/>`;
   return s + `<polyline points="${pts}" stroke="transparent" stroke-width="4" fill="none"/></g>`;
 }
