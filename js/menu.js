@@ -6,7 +6,7 @@
    ===================================================================== */
 
 // What each group holds. {tool} picks a tool, {sub} opens a dropdown of tools, {fence} picks a fence.
-const HABITAT_PROPS = ["shelter", "barn"];
+const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
     {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
@@ -28,7 +28,7 @@ const BUILD_MENU = [
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
-    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns cover animals from heat waves, cold snaps and storms."},
+    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold."},
     {label:"Fence Types", fences:true, note:"Pick a fence before you build. Then draw the exhibit the same way."},
   ]},
   {id:"land", label:"Landscaping", items:[
@@ -92,6 +92,11 @@ const ICON_LINES = {
   ...Object.fromEntries(Object.entries(LAND).filter(([, t]) => t.flora).map(([k, t]) => ["land-" + k,
     t.r < 4.5 ? `<circle cx="9" cy="13" r="3.4" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="15" cy="11" r="3" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>` : `<circle cx="8" cy="11" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="16" cy="10" r="4.5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/><circle cx="12" cy="16" r="5" fill="${t.color}" stroke="#1F3A2B" stroke-width="1"/>`])),
   "land-shelter":'<rect x="6" y="6" width="12" height="12" rx="1.5" fill="#9A7B55" stroke="#3B3226" stroke-width="1.4"/><path d="M6 12h12" stroke="#3B3226" stroke-width="1"/>',
+  "land-burrow":'<ellipse cx="12" cy="14" rx="9" ry="6" fill="#8A6B47" stroke="#3B3226" stroke-width="1.4"/><ellipse cx="12" cy="14" rx="3.5" ry="2.4" fill="#2A211A"/>',
+  "land-cavesm":'<path d="M4 19L6 9L13 5L20 10L19 19Z" fill="#6F6A62" stroke="#3B3226" stroke-width="1.4"/><path d="M9 19A3 4 0 0 1 15 19Z" fill="#1E1B17"/>',
+  "land-cavelg":'<path d="M2 20L4 8L12 3L21 8L22 20Z" fill="#5B5750" stroke="#3B3226" stroke-width="1.4"/><path d="M7 20A5 6 0 0 1 17 20Z" fill="#1E1B17"/>',
+  "land-canopysm":'<circle cx="12" cy="12" r="7" fill="#B9A77E" fill-opacity=".85" stroke="#3B3226" stroke-width="1.4"/><path d="M12 5V19M6 8.5L18 15.5M6 15.5L18 8.5" stroke="#3B3226" stroke-opacity=".5"/>',
+  "land-canopylg":'<circle cx="12" cy="12" r="10" fill="#A8946A" fill-opacity=".85" stroke="#3B3226" stroke-width="1.4"/><path d="M12 2V22M3.3 7L20.7 17M3.3 17L20.7 7" stroke="#3B3226" stroke-opacity=".5"/>',
   "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
   parcels:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/><rect x="9" y="9" width="6" height="6" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.2"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',

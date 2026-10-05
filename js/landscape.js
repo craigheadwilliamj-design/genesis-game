@@ -106,12 +106,22 @@ function rollWeather(){
   w.next = state.day + 2 >= w.from ? pickWeather() : "fair";
 }
 // Shelter slots an exhibit's animals need today, and what it has. Ice age animals don't need cover from the cold.
+// A shelter only takes animals up to its `fits` size (coverSlots), so a pile of small shelters never houses a T. rex. A burrow ignores size and takes only the species in its `only` list.
+// Biggest animals go first, into the snuggest shelter they fit. `shelter` is what animals actually get, `idle` is room nobody here can use.
 function coverOf(e){
   const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
-  let need = 0, shelter = 0, shade = 0;
-  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))) need += coverSlots(s); }
-  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; shelter += L.slots || 0; shade += (L.shade || 0) * w.grove; }
-  return {need, shelter, shade, have:shelter + shade};
+  let need = 0, shade = 0;
+  const sizes = [], pools = [];
+  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push([n, s.id]); } }
+  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots && !(wk === "cold" && L.noCold)) pools.push({left:L.slots, fits:L.fits || 99, only:L.only}); shade += (L.shade || 0) * w.grove; }
+  pools.sort((x, y) => x.fits - y.fits);
+  let shelter = 0;
+  for(const [n, id] of sizes.sort((x, y) => y[0] - x[0])){
+    let want = n;
+    for(const p of pools){ if(want <= 0) break; if(p.only ? !p.only.includes(id) : p.fits < n) continue; if(p.left <= 0) continue; const t = Math.min(want, p.left); p.left -= t; want -= t; shelter += t; }
+  }
+  const idle = pools.reduce((s, p) => s + p.left, 0);
+  return {need, shelter, shade, idle, have:shelter + shade};
 }
 // Share of the herd out in today's weather with no cover: 0 to 1
 function exposure(e){
@@ -263,7 +273,21 @@ function landSvg(e, pick, isDead){
     const dead = pick && isDead("land", f.id);
     const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : "#4E524C";
     s += `<g${at("land", f.id)}>`;
-    if(t.slots){
+    if(t.look === "burrow"){
+      // a dirt mound with a dark hole
+      s += `<path d="${blobPath(f.x, f.y, t.r, seedOf(f), false)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<ellipse cx="${f.x}" cy="${f.y + t.r * .1}" rx="${t.r * .4}" ry="${t.r * .28}" fill="#2A211A"/>`;
+    } else if(t.look === "cave"){
+      // a rocky hill with a dark mouth
+      const sd = seedOf(f);
+      s += `<path d="${blobPath(f.x, f.y, t.r, sd, true)}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="M${f.x - t.r * .38} ${f.y + t.r * .4}A${t.r * .38} ${t.r * .5} 0 0 1 ${f.x + t.r * .38} ${f.y + t.r * .4}Z" fill="#1E1B17"/>`;
+    } else if(t.look === "canopy"){
+      // a round awning on spokes
+      const sp = Array.from({length:6}, (_, i) => { const a = i * Math.PI / 3; return `M${f.x} ${f.y}L${(f.x + t.r * .9 * Math.cos(a)).toFixed(2)} ${(f.y + t.r * .9 * Math.sin(a)).toFixed(2)}`; }).join("");
+      s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r * .9}" fill="${t.color}" fill-opacity=".8" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="${sp}" stroke="#3B3226" stroke-opacity=".5" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/>`;
+    } else if(t.slots){
       // a square roof with a ridge
       const h = t.r * .78;
       s += `<rect x="${f.x - h}" y="${f.y - h}" width="${h * 2}" height="${h * 2}" rx="${h * .12}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
