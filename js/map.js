@@ -11,6 +11,11 @@ const mapwrap = $("#mapwrap");
 
 const KMIN = 0.4, KMAX = 14;       // zoom limits, in screen pixels per meter
 let view = {k:2, tx:0, ty:0};
+// 3/4 view (prototype): the ground is squashed by TILT top to bottom, so it reads as seen at an angle
+const TILT = .7;
+let tilt = (() => { try { return localStorage.getItem("gp-tilt") !== "0"; } catch(e){ return true; } })();
+function tf(){ return tilt ? TILT : 1; }
+function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
 let tool = "select";
 let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
@@ -298,6 +303,7 @@ function render(){
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
+    if(tilt && bl.type === "restroom"){ s += restroom34(bl, t, on, dead, reach, inv) + `</g>`; continue; }
     s += `<polygon points="${polyStr(bl.points)}" fill="${down ? "#6E2A26" : themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
@@ -356,6 +362,48 @@ function render(){
 }
 
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
+// Restrooms standing up in the 3/4 view (prototype): front walls and a hip roof.
+// A height of h meters is drawn h/TILT up the map, because the camera squashes north-south.
+const R34 = {wall:3.4, rise:1.6, wallCol:"#D9CFBB", door:"#2E3A33"};
+function restroom34(bl, t, on, dead, reach, inv){
+  const P = bl.points, n = P.length, [cx, cy] = centroid(P), up = h => ([x, y]) => [x, y - h / TILT];
+  const W = R34.wall, eave = P.map(up(W)), edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)";
+  const sw = on || dead ? 3.5 : 1.2, dash = reach ? "" : `stroke-dasharray="4 3"`, line = `stroke="${edge}" stroke-width="${sw}" ${dash} stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+  // outward normal of each footprint edge, and light from the upper left
+  const norm = i => { const [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1; let nx = (by - ay)/L, ny = -(bx - ax)/L; if(nx*((ax+bx)/2 - cx) + ny*((ay+by)/2 - cy) < 0){ nx = -nx; ny = -ny; } return [nx, ny]; };
+  const lit = ([nx, ny]) => nx*-.55 + ny*-.83;
+  const shade = (pts, l) => l > 0 ? `<polygon points="${polyStr(pts)}" fill="#fff" fill-opacity="${(l*.22).toFixed(2)}" pointer-events="none"/>` : `<polygon points="${polyStr(pts)}" fill="#000" fill-opacity="${(-l*.3).toFixed(2)}" pointer-events="none"/>`;
+  let s = `<polygon points="${polyStr(P.map(([x, y]) => [x + .9, y + .7]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
+  s += `<polygon points="${polyStr(P)}" fill="#8E8778"/>`;
+  // walls that face the viewer, the widest one gets the doors and the sign
+  const front = [...Array(n).keys()].filter(i => norm(i)[1] > .05);
+  const len = i => Math.hypot(P[(i+1) % n][0] - P[i][0], P[(i+1) % n][1] - P[i][1]), main = front.reduce((m, i) => m < 0 || len(i) > len(m) ? i : m, -1);
+  for(const i of front){
+    const a = P[i], b = P[(i+1) % n], q = [a, b, up(W)(b), up(W)(a)];
+    s += `<polygon points="${polyStr(q)}" fill="${R34.wallCol}" ${line}/>` + shade(q, lit(norm(i)) * .6);
+    if(i !== main) continue;
+    const L = len(i), at = (f, h) => up(h)([a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f]), dw = Math.min(1.1, L*.12) / L;
+    for(const f of [.3, .7]) s += `<polygon points="${polyStr([at(f - dw/2, 0), at(f + dw/2, 0), at(f + dw/2, 2.1), at(f - dw/2, 2.1)])}" fill="${R34.door}" pointer-events="none"/>`;
+    const [gx, gy] = at(.5, 1.6), fs = Math.min(1.3, L*.15);
+    s += `<text class="glyph" transform="translate(${gx.toFixed(2)} ${gy.toFixed(2)}) scale(1 ${(1/TILT).toFixed(3)})" font-size="${fs}" style="fill:#2E3A33" pointer-events="none">WC</text>`;
+    s += `<polygon points="${polyStr([at(.05, W - .15), at(.95, W - .15), at(.95, W - .45), at(.05, W - .45)])}" fill="${themeFill(bl, t.color)}" pointer-events="none"/>`;
+    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = at(.38, 1.1), [x1] = at(.62, 1.1), w = (x1 - x0)/4;
+      s += `<path d="M${x0} ${y0}q${w/2} ${-w*.8} ${w} 0t${w} 0t${w} 0t${w} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
+  }
+  // hip roof: the ridge runs along the long side, with 45 degree ends
+  const e0 = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]), e1 = Math.hypot(P[2][0] - P[1][0], P[2][1] - P[1][1]);
+  const [ux, uy] = e0 >= e1 ? [(P[1][0] - P[0][0])/e0, (P[1][1] - P[0][1])/e0] : [(P[2][0] - P[1][0])/e1, (P[2][1] - P[1][1])/e1];
+  const half = Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), lift = up(W + R34.rise);
+  const ridge = [lift([cx - ux*half, cy - uy*half]), lift([cx + ux*half, cy + uy*half])];
+  const T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);   // the theme's roof, without its trim
+  const near = p => (p[0] - cx)*ux + (p[1] - cy)*uy < 0 ? ridge[0] : ridge[1];
+  const faces = [...Array(n).keys()].map(i => { const a = eave[i], b = eave[(i+1) % n], ra = near(P[i]), rb = near(P[(i+1) % n]);
+    return {i, pts:ra === rb ? [a, b, ra] : [a, b, rb, ra], y:(P[i][1] + P[(i+1) % n][1]) / 2}; }).sort((f, g) => f.y - g.y);
+  for(const f of faces) s += `<polygon points="${polyStr(f.pts)}" fill="${themeFill(bl, t.color)}" ${line}/>` + (tex ? `<polygon points="${polyStr(f.pts)}" fill="url(#t-${tex})" pointer-events="none"/>` : "") + shade(f.pts, lit(norm(f.i)));
+  s += `<path d="M${ridge[0].map(v => v.toFixed(2)).join(" ")}L${ridge[1].map(v => v.toFixed(2)).join(" ")}" stroke="#1D2B22" stroke-opacity=".5" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  return s;
+}
+
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
 function parcelOverlay(){
@@ -440,7 +488,7 @@ function renderOverlay(){
   overlay.innerHTML = s;
 }
 
-function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k})`); }
+function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`); }
 
 /* ---------- animals wandering in their exhibits ---------- */
 const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
@@ -730,7 +778,7 @@ function drawTrams(){
 }
 
 /* ---------- snapping new corners to things nearby ---------- */
-function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/view.k}; }
+function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/ky()}; }
 
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
@@ -1630,20 +1678,20 @@ function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:
 function fit(){
   const {w, h} = svgSize(); if(!w || !h) return;
   const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:PARCELS.ys[PARCELS.ys.length-1]} : ownedBox(), pad = 40;
-  view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/(b.y1 - b.y0)), KMIN, KMAX);
+  view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/((b.y1 - b.y0)*tf())), KMIN, KMAX);
   view.tx = (w - (b.x1 - b.x0)*view.k)/2 - b.x0*view.k;
-  view.ty = (h - (b.y1 - b.y0)*view.k)/2 - b.y0*view.k;
+  view.ty = (h - (b.y1 - b.y0)*ky())/2 - b.y0*ky();
   render();
 }
 function zoomAt(mx, my, f){
-  const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/view.k;
-  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender();
+  const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/ky();
+  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender();
 }
 function centerOn(it){
   if(!it) return;
   const {w, h} = svgSize(), b = bbox(it.points);
-  const cx = (b.x0 + b.x1)/2, cy = (b.y0 + b.y1)/2 + (window.matchMedia("(max-width:760px)").matches ? h*.2/view.k : 0);
-  view.tx = w/2 - cx*view.k; view.ty = h/2 - cy*view.k; render();
+  const cx = (b.x0 + b.x1)/2, cy = (b.y0 + b.y1)/2 + (window.matchMedia("(max-width:760px)").matches ? h*.2/ky() : 0);
+  view.tx = w/2 - cx*view.k; view.ty = h/2 - cy*ky(); render();
 }
 
 /* ---------- picking things ---------- */
@@ -1668,7 +1716,7 @@ svg.addEventListener("pointerdown", e => {
   pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if(pointers.size === 2){
     drag = null; const [a, b] = [...pointers.values()];
-    pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
+    pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, ky:ky(), tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
     return;
   }
   if(pointers.size > 2) return;
@@ -1713,9 +1761,9 @@ svg.addEventListener("pointermove", e => {
   if(pinch && pointers.size === 2){
     const [a, b] = [...pointers.values()], d = Math.hypot(a.x-b.x, a.y-b.y) || 1;
     const r = svg.getBoundingClientRect(), k = clamp(pinch.k * d / pinch.d, KMIN, KMAX);
-    const wx = (pinch.mx - r.left - pinch.tx)/pinch.k, wy = (pinch.my - r.top - pinch.ty)/pinch.k;
+    const wx = (pinch.mx - r.left - pinch.tx)/pinch.k, wy = (pinch.my - r.top - pinch.ty)/pinch.ky;
     const mx = (a.x+b.x)/2 - r.left, my = (a.y+b.y)/2 - r.top;
-    view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender(); return;
+    view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender(); return;
   }
   if(drag && drag.zv !== undefined){
     const z = zedit && zoneById(zedit.id); if(!z) return;
@@ -1829,6 +1877,13 @@ $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
+// flip the 3/4 view, keeping the middle of the screen where it is
+$("#ztilt").onclick = () => {
+  const {w, h} = svgSize(), wy = (h/2 - view.ty)/ky();
+  tilt = !tilt; try { localStorage.setItem("gp-tilt", tilt ? "1" : "0"); } catch(e){}
+  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); applyTransform(); render();
+};
+$("#ztilt").setAttribute("aria-pressed", tilt);
 function setGridSnap(on){
   gridSnap = on;
   try{ localStorage.setItem("genesis-grid-snap", on ? "1" : "0"); }catch{}
