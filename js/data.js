@@ -256,11 +256,11 @@ const TIME_PERIODS = [
 //   wage       pay per day
 const SCIENTISTS = {
   paleo:    {label:"Paleontologist",     plural:"Paleontologists",     dept:"oracle", hireCost:3000, wage:250,
-             text:"Each one earns 5 research points a day and runs one research project at a time."},
+             text:"Each one earns 5 research points a day and runs one research bay, one project at a time."},
   temporal: {label:"Temporal Researcher", plural:"Temporal Researchers", dept:"ghost",  hireCost:4000, wage:400,
-             text:"Each one runs an expedition team. More researchers means more trips at the same time."},
+             text:"Each one runs an expedition bay with one team. More researchers means more trips at the same time."},
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
-             text:"Each one runs an incubator, so TAR can grow that many clones at the same time."},
+             text:"Each one runs an incubator bay, so TAR can grow that many clones at the same time."},
   botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
              text:"Each one tends a growing bed, so CERES can grow that many batches at the same time."},
 };
@@ -292,8 +292,8 @@ const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.
 
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
-// TAR upgrades, researched at ORACLE: each level of incubators adds one more per geneticist, each level of speed cuts clone time
-const TAR_UPGRADE = {incubators:1, speed:.75};
+// TAR upgrades, researched at ORACLE: each level of speed cuts clone time
+const TAR_UPGRADE = {speed:.75};
 
 // What CERES grows in its beds. Works like TAR's incubators, but with plants.
 //   days    how long one batch takes, in open days
@@ -865,8 +865,6 @@ const TECH = [
   {id:"transit",   group:"build", label:"Guest tram",       points:40, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
   {id:"foodprod",  group:"build", label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   // TAR upgrades
-  {id:"incub1",   group:"tar", label:"More incubators",     points:30, text:"Every geneticist runs 2 incubators instead of 1."},
-  {id:"incub2",   group:"tar", label:"Even more incubators", points:50, needs:"incub1", text:"Every geneticist runs 3 incubators."},
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:30, text:"Clones finish in three quarters of the time."},
   {id:"fast2",    group:"tar", label:"Much faster incubators", points:50, needs:"fast1", text:"Clones finish in about half the time."},
   // Genetics

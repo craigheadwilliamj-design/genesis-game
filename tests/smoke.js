@@ -770,7 +770,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.points = 100;
     out.startResearch = startProject("tech", "bars") === null && sc.points === 85 && !hasTech("bars");
     const t15 = sc.projects[0].end - sc.projects[0].start;
-    out.oneAtATime = !!startProject("tech", "moat") && sc.projects.length === 1;
+    out.oneAtATime = !!startProject("tech", "moat") && sc.projects.length === 1 && sc.projects[0].bay === 0;
     out.researchTakesTime = adv(60) === false && !hasTech("bars");
     const day0 = state.day;
     out.researchFinishesMidDay = adv(600, () => hasTech("bars")) && state.day === day0;
@@ -824,10 +824,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.cloneTimed = base === Math.round((1 + small.space / CLONE_DAYS_PER_SPACE) * DAY_MIN);
     state.rating = 5; state.minute = OPEN_MIN + 60;
     out.cloneOrder = orderClone(small.id, null) && sc.clones.length === 1;
-    out.incubatorCount = incubators() === 1;
-    sc.tech.push("incub1", "fast1");
-    out.upgradesApply = incubators() === 2 && Math.abs(cloneMinutes(small.id) - base * TAR_UPGRADE.speed) <= 1;
-    out.secondLane = (() => { const before = nowMin(); orderClone(small.id, null); return sc.clones[1].lane === 1 && sc.clones[1].start <= before + 1; })();
+    out.incubatorCount = bayCount("gene") === 1 && sc.clones[0].bay === 0;
+    sc.tech.push("fast1");
+    out.upgradesApply = Math.abs(cloneMinutes(small.id) - base * TAR_UPGRADE.speed) <= 1;
+    out.oneCloneAtATime = /bay is busy/.test(cloneProblem(small.id)) && !orderClone(small.id, null) && sc.clones.length === 1;
+    hireScientist("gene");
+    out.hireOpensBay = freeBay("gene") === 1 && orderClone(small.id, null) && sc.clones[1].bay === 1;
+    out.fireClosesBay = (() => { const n = sc.clones.length; fireScientist("gene"); return sc.clones.length === n - 1 && bayCount("gene") === 1; })();
     out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
     sc.tar = null;
 
@@ -871,9 +874,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const oldS = JSON.parse(JSON.stringify(newPark()));
     oldS.day = 6; oldS.starters = ["arth"]; oldS.science.unlocked = ["Cretaceous"]; delete oldS.science.projects;
     oldS.science.trips = [{period:"Jurassic", sp:"dryo", back:7}]; oldS.science.clones = [{id:"c1", sp:"lyst", exhibitId:null, q:90, lane:0, done:8}];
+    oldS.science.crew.temporal = 1; oldS.science.crew.gene = 1;
+    oldS.science.clones.push({id:"c2", sp:"lyst", exhibitId:null, q:90, lane:2, start:9 * DAY_MIN, end:12 * DAY_MIN});   // a second incubator in an old save, no geneticist for it
     oldS.science.tech = ["paleoflora", "mesoplant", "medmeso"]; delete oldS.science.crew.botanist; delete oldS.ceres;
     oldS.buildings.push({id:"b-c", type:"ceres", points:rectPts(180, 290, 26, 18, H)});
-    const up = upgradeSave(oldS);
+    const money0 = oldS.money, up = upgradeSave(oldS);
+    out.oldJobsGetBays = up.science.trips[0].bay === 0 && up.science.clones.length === 1 && up.science.clones[0].bay === 0 && up.science.clones[0].lane === undefined;
+    out.oldExtraJobRefunded = up.money === money0 + SPECIES_BY_ID.lyst.price;
     out.oldUnlocksAnimals = up.science.unlocked.includes("trex") && up.science.unlocked.every(id => SPECIES_BY_ID[id]) && !up.science.unlocked.includes("arth");
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;

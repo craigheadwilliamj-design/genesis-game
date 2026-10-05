@@ -26,6 +26,36 @@ function spanText(min){
 const leftText = end => spanText(end - nowMin());
 const doneShare = j => clamp((nowMin() - j.start) / Math.max(1, j.end - j.start), 0, 1) * 100;
 
+/* ---------- bays: one per scientist ---------- */
+
+// Every scientist runs one bay. A bay holds one job (a research project, an expedition, a clone or a growing batch) or nothing.
+// Jobs carry the `bay` they run in. The only way to get more bays is to hire more scientists.
+const BAY_JOBS = {paleo:() => state.science.projects, temporal:() => state.science.trips, gene:() => state.science.clones, botanist:() => state.ceres.beds};
+const bayCount = kind => state.science.crew[kind] || 0;
+const bayJob = (kind, i) => BAY_JOBS[kind]().find(j => j.bay === i) || null;
+// The first empty bay, or -1 when they're all busy
+function freeBay(kind){ for(let i = 0; i < bayCount(kind); i++) if(!bayJob(kind, i)) return i; return -1; }
+const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Every bay is"} busy. Hire another ${who} to open a new bay.`;
+
+// What a job cost, so cancelling it can give it back: {points} of research or {money}
+function jobRefund(kind, j){
+  if(kind === "paleo") return {points:j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
+  if(kind === "temporal") return {money:tripOdds(j.sp, j.period).cost};
+  if(kind === "gene") return {money:SPECIES_BY_ID[j.sp].price};
+  return {money:growInfo(j.kind, j.era, j.size).cost};
+}
+// Let one scientist go. Their bay closes, and so does the job in the highest bay if it was busy (the cost comes back).
+function fireScientist(kind){
+  const sc = state.science; if(!sc.crew[kind]) return;
+  sc.crew[kind]--;
+  const jobs = BAY_JOBS[kind]();
+  for(const j of jobs.filter(x => x.bay >= sc.crew[kind])){
+    jobs.splice(jobs.indexOf(j), 1);
+    const r = jobRefund(kind, j); sc.points += r.points || 0; state.money += r.money || 0;
+    events.toast("Closing that bay stopped the job in it. The cost came back.");
+  }
+}
+
 /* ---------- ORACLE: research ---------- */
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
@@ -53,7 +83,7 @@ function projectProblem(kind, id){
   const blocker = deptProblem("oracle"); if(blocker) return blocker;
   if(info.needs && !hasTech(info.needs)) return `Research ${TECH.find(x => x.id === info.needs).label} first.`;
   if(!sc.crew.paleo) return "Hire a paleontologist to run research.";
-  if(sc.projects.length >= sc.crew.paleo) return `${sc.crew.paleo === 1 ? "Your paleontologist is" : `All ${sc.crew.paleo} paleontologists are`} busy. Hire more to run projects side by side.`;
+  if(freeBay("paleo") < 0) return bayFull("paleo", "paleontologist");
   if(sc.points + 1e-9 < info.points) return `Needs ${info.points} research points. You have ${Math.floor(sc.points)}.`;
   return null;
 }
@@ -61,7 +91,7 @@ function startProject(kind, id){
   const why = projectProblem(kind, id); if(why) return why;
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
-  sc.projects.push({kind, id, start:now, end:now + projectMinutes(info.points)});
+  sc.projects.push({kind, id, bay:freeBay("paleo"), start:now, end:now + projectMinutes(info.points)});
   events.toast(`ORACLE started ${kind === "species" ? `unlocking the ${info.label}` : `researching ${info.label.toLowerCase()}`}. It takes about ${spanText(projectMinutes(info.points))}.`);
   return null;
 }
@@ -111,7 +141,7 @@ function tripProblem(id, periodId){
   return deptProblem("ghost") ||
     (!genomeOpen(id) ? (g.animal ? `Unlock the ${g.name} at ORACLE first.` : `Research ${g.name} at ORACLE first.`) : null) ||
     (!sc.crew.temporal ? "Hire a Temporal Researcher at GHOST to lead expeditions." : null) ||
-    (sc.trips.length >= sc.crew.temporal ? `All ${sc.crew.temporal} expedition team${sc.crew.temporal === 1 ? " is" : "s are"} in the field. Hire more Temporal Researchers at GHOST to send more at once.` : null) ||
+    (freeBay("temporal") < 0 ? bayFull("temporal", "Temporal Researcher") : null) ||
     (!canAfford(tripOdds(id, periodId).cost) ? `A trip costs ${money(tripOdds(id, periodId).cost)}. You have ${money(state.money)}.` : null);
 }
 function launchTrip(id, periodId){
@@ -119,7 +149,7 @@ function launchTrip(id, periodId){
   const p = PERIOD_BY_ID[periodId], now = nowMin();
   spend(tripOdds(id, periodId).cost, "science");
   const end = now + Math.round(p.days * DAY_MIN);
-  state.science.trips.push({period:periodId, sp:id, start:now, end});
+  state.science.trips.push({period:periodId, sp:id, bay:freeBay("temporal"), start:now, end});
   events.toast(`GHOST left for the ${periodId} to find ${genomeInfo(id).name}. Back in about ${spanText(end - now)}.`);
   return true;
 }
@@ -158,10 +188,7 @@ function tripReturns(t){
 
 /* ---------- TAR: cloning ---------- */
 
-const incubatorsPer = () => 1 + (hasTech("incub1") ? TAR_UPGRADE.incubators : 0) + (hasTech("incub2") ? TAR_UPGRADE.incubators : 0);
 const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fast1") ? TAR_UPGRADE.speed : 1;
-// Incubators in the lab. An empty lab still queues one so an order isn't lost.
-const incubators = () => Math.max(1, state.science.crew.gene * incubatorsPer());
 // How long a clone takes: 1 open day plus 1 more for every CLONE_DAYS_PER_SPACE m², less with faster incubators
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
@@ -170,28 +197,18 @@ function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
     (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
+    (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
     (!d || d.genome < 100 ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. It needs 100%.` : null) ||
     (state.rating + 1e-9 < starsNeed(s) ? `Needs a ${starsNeed(s)}-star park. You have ${starTxt(state.rating)}.` : null) ||
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
-// A job queue per lane (incubator, growing bed): the next job starts when the lane's last one ends. Picks the lane that frees up first.
-function freeLane(jobs, lanes){
-  const now = nowMin();
-  let best = {lane:0, start:Infinity};
-  for(let l = 0; l < lanes; l++){
-    const mine = jobs.filter(c => (c.lane || 0) === l);
-    const start = mine.length ? Math.max(now, ...mine.map(c => c.end)) : now;
-    if(start < best.start) best = {lane:l, start};
-  }
-  return best;
-}
-const cloneReadyMin = sp => freeLane(state.science.clones, incubators()).start + cloneMinutes(sp);
+const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
 function orderClone(sp, exhibitId){
   if(cloneProblem(sp)) return false;
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   spend(s.price, "animals");
-  const {lane, start} = freeLane(state.science.clones, incubators()), end = start + cloneMinutes(sp);
-  state.science.clones.push({id:uid("a-"), sp, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), lane, start, end});
+  const start = nowMin(), end = start + cloneMinutes(sp);
+  state.science.clones.push({id:uid("a-"), sp, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
   events.toast(`TAR started a ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }
@@ -242,15 +259,15 @@ function growProblem(kind, era, size){
     if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
     if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
   }
-  if(c.beds.length >= sc.crew.botanist * 3) return "Every bed has a full queue. Hire more botanists.";
+  if(freeBay("botanist") < 0) return bayFull("botanist", "botanist");
   if(!canAfford(growInfo(kind, era, size).cost)) return `A batch costs ${money(growInfo(kind, era, size).cost)}. You have ${money(state.money)}.`;
   return null;
 }
 function growBatch(kind, era, size){
   if(growProblem(kind, era, size)) return false;
-  const gi = growInfo(kind, era, size), {lane, start} = freeLane(state.ceres.beds, Math.max(1, state.science.crew.botanist));
+  const gi = growInfo(kind, era, size), start = nowMin();
   spend(gi.cost, "science");
-  state.ceres.beds.push({id:uid("g-"), kind, era, ...(size ? {size} : {}), lane, start, end:start + growMinutes(kind, era, size)});
+  state.ceres.beds.push({id:uid("g-"), kind, era, ...(size ? {size} : {}), bay:freeBay("botanist"), start, end:start + growMinutes(kind, era, size)});
   events.toast(`CERES started a batch of ${growName(kind, era, size)}. Ready ${whenText(start + growMinutes(kind, era, size))}.`);
   return true;
 }
@@ -298,7 +315,7 @@ function scienceTick(dtMin){
     }
   }
   // CERES keeps medicine stocked for the types set to "keep stocked"
-  if(beds() && c.beds.length < beds()){
+  if(beds() && freeBay("botanist") >= 0){
     for(const era of Object.keys(c.auto)){
       if(!c.auto[era] || (c.meds || 0) + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
       if(growBatch("med", era)) break;
