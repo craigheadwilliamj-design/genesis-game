@@ -400,6 +400,10 @@ const STAND34 = {
   insectary: {wall:4,   rise:0, front:"lab", glass:true, glassCol:"#C6D3A8"},
   hatchery:  {wall:3.5, rise:0, front:"lab", top:"tanks"},
   farm:      {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#9A3B2E", roofCol:"#6B6B66"},
+  // the rest of the guest side
+  edcenter:  {wall:5,   rise:2.6, front:"glass", sign:"EDUCATION"},
+  tramstop:  {wall:.9,  canopy:3.4, front:"tram"},
+  platform:  {wall:3,   canopy:4.1, front:"deck"},
   ranch:     {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#7A4A32", roofCol:"#6B6B66"},
 };
 const WALL34 = "#D9CFBB", DARK34 = "#2E3A33", AWNING34 = "#F4F1E8";
@@ -559,6 +563,26 @@ function building34(bl, t, on, dead, reach, inv){
     s += P.map((p, j) => { const a = lift34(S.wall)(p), b = C[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#3A3A34" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }).join("");
     if(i >= 0) for(const f of [.22, .78]){ const [x, y] = onEdge34(P, i, f, .1); s += `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx=".42" ry="${(.42 / TILT).toFixed(2)}" fill="${DARK34}" pointer-events="none"/>`; }
     return s + stripes34(C, 7, col, AWNING34, line);
+  }
+  if(S.front === "tram"){
+    // a raised platform under a flat canopy on posts, the name hung under the front edge; a worn out one goes dark red with a cross
+    const down = !tramWorking(bl), roof = down ? "#6E2A26" : col, w = walls34(P, 0, S.wall, "#B8B1A2", line), C = insetRect(P, 1.06).map(lift34(S.canopy)), i = w.main;
+    s += w.s + `<polygon points="${polyStr(P.map(lift34(S.wall)))}" fill="#CFC8B8" ${line}/>`;
+    s += P.map((p, j) => { const a = lift34(S.wall)(p), b = C[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#3A3A34" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }).join("");
+    s += `<polygon points="${polyStr(C)}" fill="${roof}" ${line}/>` + shade34(C, .35);
+    if(i >= 0) s += quad34(P, i, .3, .7, S.canopy - .7, S.canopy - .1, "#F1E6C8") + sign34(P, i, S.canopy - .4, "TRAM", .45).replace('class="glyph"', 'class="glyph" style="fill:#3A2A1A;stroke:none"');
+    if(down){ const [x, y] = centroid(C), r = Math.min(t.w, t.d) * .3; s += `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x + r} ${y - r}L${x - r} ${y + r}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    return s;
+  }
+  if(S.front === "deck"){
+    // a wooden deck on stilts with a rail all round, looking out over the animals (no shadow pad: it juts over the exhibit)
+    s = `<polygon points="${polyStr(P.map(([x, y]) => [x + .8, y + .7]))}" fill="#1D2B22" fill-opacity=".18" pointer-events="none"/>`;
+    const D = P.map(lift34(S.wall)), rail = P.map(lift34(S.wall + 1.1)), post = `stroke="#5A4128" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"`;
+    s += insetRect(P, .9).map(p => { const a = lift34(0)(p), b = lift34(S.wall)(p); return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
+    s += walls34(P, S.wall - .35, S.wall, col, line).s + `<polygon points="${polyStr(D)}" fill="${col}" ${line}/>` + shade34(D, .3);
+    for(let k = 1; k < 7; k++){ const f = k / 7, a = [D[0][0] + (D[1][0] - D[0][0])*f, D[0][1] + (D[1][1] - D[0][1])*f], b = [D[3][0] + (D[2][0] - D[3][0])*f, D[3][1] + (D[2][1] - D[3][1])*f]; s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#5A4128" stroke-opacity=".35" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    s += P.map((p, j) => { const a = D[j], b = rail[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
+    return s + `<polygon points="${polyStr(rail)}" fill="none" stroke="#5A4128" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
