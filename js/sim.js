@@ -168,7 +168,7 @@ function upgradeSave(s){
     if(e.land === undefined) e.land = [];
     if(e.water === undefined) e.water = [];
     for(const f of e.land.filter(f => f.type === "pond")) e.water.push({id:f.id, points:circlePts(f.x, f.y, WATER.oldPondR, 12)});
-    e.land = e.land.filter(f => f.type !== "pond");
+    e.land = e.land.filter(f => LAND[f.type]);   // ponds, and the old generic plants, are gone
   }
   if(!s.themes) s.themes = freshThemes();
   // the day each building went up (older themed buildings weather more); ones from before this count as old

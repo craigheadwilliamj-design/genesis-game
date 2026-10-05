@@ -31,7 +31,7 @@ const BUILD_MENU = [
   ]},
   {id:"land", label:"Landscaping", items:[
     {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it inside an exhibit like a fence: tap the shore corners, then the first one again."},
-    ...Object.entries(LAND).filter(([, t]) => !t.period && !t.legacy).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
+    ...Object.entries(LAND).filter(([, t]) => !t.period).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
       note:i === all.length - 1 ? "Place these inside an open exhibit. Animals like water and rocks, and fish eaters need water. Shelters cover animals from heat waves, cold snaps and storms." : undefined})),
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES." : undefined})),
   ]},

@@ -326,7 +326,7 @@ function landHtml(e){
     : sub === "water" ? `<div class="row" style="margin-top:8px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button></div><div class="meta" style="margin-top:4px">Draw it corner by corner like a fence. Reshape it with the Move tool.</div>`
     : `${e.animals.length ? (() => { const c = coverOf(e), w = weatherNow(), x = exposure(e);
       return `<div class="meta" style="margin-top:8px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; })() : ""}
-    <div class="row" style="margin-top:6px">${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !t.legacy && !ROCKS.includes(k)).map(([k]) => k))}</div>`;
+    <div class="row" style="margin-top:6px">${landBtns(Object.entries(LAND).filter(([k, t]) => !t.period && !ROCKS.includes(k)).map(([k]) => k))}</div>`;
   return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}, {key:"shelter", label:"Shelter", color:"#8C6A2E"}], sub)}${body}</section>`;
 }
 

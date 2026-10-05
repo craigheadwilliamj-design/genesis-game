@@ -981,28 +981,16 @@ const WATER = {
 //   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
 //   tech   research needed first
 //   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at CERES.
-//   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic trees)
+//   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic ones)
 //   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, any exhibit can have them, but animals only count plants from the exhibit's own biome and dislike the rest
-//   legacy  old generic plants, kept so old saves load but not sold
 const LAND = {
   rock:   {label:"Rock",          one:"a rock",          price:600,  r:2, color:"#8E9188", cover:1},
   boulder:{label:"Boulder",       one:"a boulder",       price:2200, r:4, color:"#767A74", cover:3},
-  flowers:{label:"Flower bed",    one:"a flower bed",    price:300,  r:2,   color:"#C98AB0", flora:"cenozoic", browse:1,   shade:2},
-  shrubs: {label:"Shrubs",        one:"a patch of shrubs",  price:600,  r:3.5, color:"#79B05A", flora:"cenozoic", browse:2,   shade:4},
-  trees:  {label:"Tree grove",    one:"a tree grove",    price:1200, r:5, color:"#5E9B4A", flora:"cenozoic", browse:4},
-  ginkgos:{label:"Ginkgo saplings", one:"ginkgo saplings", price:380, r:2,   color:"#8DB04A", flora:"mesozoic",  tech:"mesoplant",  size:"small", browse:1,   shade:2},
-  ferns:  {label:"Fern patch",    one:"a fern patch",    price:750,  r:3.5, color:"#52934A", flora:"mesozoic",  tech:"mesoplant",  size:"medium", browse:2,   shade:4},
-  cycads: {label:"Cycad grove",   one:"a cycad grove",   price:1500, r:5, color:"#3F7D3A", flora:"mesozoic",  tech:"mesoplant",  size:"large", browse:4},
-  mosses: {label:"Club moss",     one:"a club moss bed", price:450,  r:2,   color:"#5E9E7A", flora:"paleozoic", tech:"paleoplant", size:"small", browse:1,   shade:2},
-  horsetails:{label:"Horsetail patch", one:"a horsetail patch", price:900, r:3.5, color:"#3F8268", flora:"paleozoic", tech:"paleoplant", size:"medium", browse:2, shade:4},
-  lycopods:{label:"Lycopod stand", one:"a lycopod stand", price:1800, r:5, color:"#2E6B55", flora:"paleozoic", tech:"paleoplant", size:"large", browse:4},
   shelter:{label:"Shelter",       one:"a shelter",       price:2500, r:4, color:"#9A7B55", slots:10},
   barn:   {label:"Large shelter", one:"a large shelter", price:7000, r:7, color:"#7E6142", slots:36},
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
-// The first plants (one per era and size, any biome) stay for old saves but aren't sold any more. Plants now come per period and biome (PLANT_TABLE).
-for(const k of ["flowers", "shrubs", "trees", "ginkgos", "ferns", "cycads", "mosses", "horsetails", "lycopods"]) LAND[k].legacy = true;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after

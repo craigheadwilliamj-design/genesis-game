@@ -909,19 +909,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
     const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;
     state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
-    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[]};
+    const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], biome:"tropical"};
     state.exhibits = [gx];
     const grazer = SPECIES.find(s => !s.viv && foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && ERA_OF[s.period] === "mesozoic");
     gx.animals = [1, 2, 3].map(i => ({id:"a-g" + i, sp:grazer.id, q:90}));
-    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.pots["mesozoic-large"] = 0;
-    out.groveNeedsTech = /Research/.test(landSpot(115, 115, "cycads").why || "");
+    sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.pots["Jurassic-large"] = 0;
+    out.groveNeedsTech = /Research/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     sc.tech.push("mesoplant");
-    out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "cycads").why || "");
-    out.treesNeedNoStock = landSpot(115, 115, "trees").ok;
+    out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "jur-tropical-large").why || "");
+    out.treesNeedNoStock = landSpot(115, 115, "qua-tropical-large").ok;
     const grassyBefore = grassyFloor(gx) && grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
-    state.ceres.pots["mesozoic-large"] = 3;
-    for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "cycads", x, y);
-    out.groveUsesStock = state.ceres.pots["mesozoic-large"] === 0 && gx.land.length === 3;
+    state.ceres.pots["Jurassic-large"] = 3;
+    for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "jur-tropical-large", x, y);
+    out.groveUsesStock = state.ceres.pots["Jurassic-large"] === 0 && gx.land.length === 3;
     out.grovesStopGrass = grassyBefore && !grassyFloor(gx) && !grassSick(gx, grazer);
     out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
     // browsing: the stock drains slower, but keepers are still needed
@@ -929,7 +929,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     gx.stock = {paleoflora:100}; eatTick(60); const withGroves = 100 - gx.stock.paleoflora;
     const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
-    out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND.cycads.browse;
+    out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
     // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use CERES stock of their era and size
     const periods = Object.keys(ERA_OF), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
@@ -1008,7 +1008,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       && at("storm", () => illChance(wx, wx.animals[0]).p) > at("fair", () => illChance(wx, wx.animals[0]).p)
       && at("storm", () => injuryChance(wx, wx.animals[0]).p) > at("fair", () => injuryChance(wx, wx.animals[0]).p)
       && Math.abs(at("storm", () => wearPerDay(wx)) - at("fair", () => wearPerDay(wx)) * WEATHER.kinds.storm.wear) < 1e-9;
-    placeLand(wx, "trees", 115, 145);
+    placeLand(wx, "qua-" + biomeOf(wx) + "-large", 115, 145);
     out.grovesShadeOnlyWhenHot = at("hot", () => exposure(wx)) < 1 && at("cold", () => exposure(wx)) === 1;
     placeLand(wx, "shelter", 130, 120);
     out.shelterCovers = coverOf(wx).shelter >= at("cold", () => coverOf(wx).need) && at("cold", () => exposure(wx)) === 0 && at("storm", () => exhibitReport(wx).issues.some(i => /Sheltered/.test(i.text)));

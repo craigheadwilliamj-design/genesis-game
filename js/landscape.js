@@ -56,10 +56,10 @@ function wantsOf(e, s){
   const none = !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);
   return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
-// A plant counts for a species when it's from the animal's own period (the old generic plants, when from its era)
-// Plants from another biome don't count for anything and make animals unhappy; the old generic ones have no biome and suit any
-const plantHere = (t, e) => !t.biome || t.biome === biomeOf(e);
-const plantSuits = (t, s) => t.period ? t.period === s.period : t.flora === ERA_OF[s.period];
+// A plant counts for a species when it's from the animal's own period
+// Plants from another biome don't count for anything and make animals unhappy
+const plantHere = (t, e) => t.biome === biomeOf(e);
+const plantSuits = (t, s) => t.period === s.period;
 // What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters. With a species, only plants from its own period count.
 function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
@@ -80,7 +80,7 @@ function speciesFit(e, s){
   return {w, h, water, rock, plants, sat:(l.water * water + l.rock * rock + pw * plants) / (l.water + l.rock + pw)};
 }
 const grassyFloor = e => habitatOf(e).old < 1;
-// Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic trees give plants.
+// Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic plants give plants.
 function browseRate(e, t){
   if(t !== "plants" && t !== "paleoflora") return 0;
   return landOf(e).reduce((n, f) => { const L = LAND[f.type]; return n + (L && L.browse && (t === "plants") === (L.flora === "cenozoic") ? L.browse : 0); }, 0);
