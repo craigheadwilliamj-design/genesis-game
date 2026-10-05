@@ -9,7 +9,8 @@ const ERA_COLOR = {cenozoic:"#F2D32A", mesozoic:"#34B2C9", paleozoic:"#F04028"};
 const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="locked"><rect x="1" y="5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
 
 // Which tab is open in each department's panel
-let oracleMain = "manage", oracleTab = null, oracleEra = "mesozoic", ghostTab = null, cerePeriod = "Jurassic";
+const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"TAR", title:"TAR upgrades", color:"#4B3A8C"}, {key:"gene", label:"Genetics", title:"Genetics", color:"#4B3A8C"}];
+let oracleMain = "manage", oracleManage = "barrier", oracleTab = null, oracleEra = "mesozoic", ghostTab = null, cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
@@ -51,10 +52,9 @@ function oracleHtml(b){
 
   h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"animals", label:"Animals", color:"#1F6F73"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
   if(oracleMain === "manage"){
-    h += `<h3>Fences and barriers</h3><ul class="shop">${techRows("barrier")}</ul>`;
-    h += `<h3 style="margin-top:12px">Buildings and systems</h3><ul class="shop">${techRows("build")}</ul>`;
-    h += `<h3 style="margin-top:12px">TAR upgrades</h3><ul class="shop">${techRows("tar")}</ul>`;
-    h += `<h3 style="margin-top:12px">Genetics</h3><ul class="shop">${techRows("gene")}</ul>`;
+    const secs = MANAGE_TABS.find(t => t.key === oracleManage) || MANAGE_TABS[0];
+    h += tabBar("omanage", MANAGE_TABS, secs.key);
+    h += `<h3 style="margin-top:8px">${secs.title}</h3><ul class="shop">${techRows(secs.key)}</ul>`;
   } else if(oracleMain === "animals"){
     if(!oracleTab) oracleTab = PERIOD_ORDER.find(id => speciesToUnlock().some(s => s.period === id && isUnlocked(s.id))) || "Quaternary";
     h += `<div class="meta" style="margin-bottom:8px">ORACLE unlocks an animal so GHOST can go looking for its DNA. Genome progress is at GHOST.</div>`;
@@ -224,6 +224,7 @@ panelEl.addEventListener("click", ev => {
   const b = ev.target.closest("[data-action]"); if(!b) return;
   const a = b.dataset.action, done = () => { afterChange(); render(); };
   if(a === "omain"){ oracleMain = b.dataset.k; ui.panel(); return; }
+  if(a === "omanage"){ oracleManage = b.dataset.k; ui.panel(); return; }
   if(a === "otab"){ oracleTab = b.dataset.k; ui.panel(); return; }
   if(a === "oera"){ oracleEra = b.dataset.k; ui.panel(); return; }
   if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
