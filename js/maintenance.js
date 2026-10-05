@@ -2,7 +2,7 @@
    MAINTENANCE
    Fences wear down from weather and from animals attacking them.
    Mechanics walk out from a Workshop to inspect and repair them.
-   The condition the player sees is what the last inspection found.
+   The player sees the live condition. Inspections only set when mechanics check a fence.
    ===================================================================== */
 
 let mcrew = [];   // mechanics walking around right now (positions aren't saved)
@@ -10,8 +10,8 @@ let repairsHaltedDay = -1;   // the day we last warned that repairs stopped for 
 
 const isAttacker = s => !!s.predator || SMART.includes(s.id);
 function condOf(e){ return e.cond ?? 100; }
-// What the player knows: the last inspection
-function knownCond(e){ return e.inspected ? e.inspected.cond : condOf(e); }
+// What the player sees: the live condition
+function knownCond(e){ return condOf(e); }
 function daysSinceInspect(e){ return e.inspected ? state.day - e.inspected.day : 99; }
 
 // A worn fence holds less. A broken one holds nothing.
