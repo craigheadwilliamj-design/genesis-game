@@ -294,6 +294,8 @@ const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.
 const CLONE_DAYS_PER_SPACE = 1000;
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
+// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level, and quality points added to every sample
+const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5], quality:[0, 8, 16]};
 
 // What CERES grows in its beds. Works like TAR's incubators, but with plants.
 //   days    how long one batch takes, in open days
@@ -867,6 +869,13 @@ const TECH = [
   // TAR upgrades
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:30, text:"Clones finish in three quarters of the time."},
   {id:"fast2",    group:"tar", label:"Much faster incubators", points:50, needs:"fast1", text:"Clones finish in about half the time."},
+  // GHOST upgrades
+  {id:"ghostcost1", group:"ghost", label:"Leaner expeditions",   points:30, text:"Trips cost about a fifth less."},
+  {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:50, needs:"ghostcost1", text:"Trips cost about a third less."},
+  {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:30, text:"Expeditions take three quarters of the time."},
+  {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:50, needs:"ghostspeed1", text:"Expeditions take about half the time."},
+  {id:"ghostq1",   group:"ghost", label:"Careful sampling",     points:35, text:"Every DNA sample comes back 8 points better in quality."},
+  {id:"ghostq2",   group:"ghost", label:"Cryo-preserved samples", points:55, needs:"ghostq1", text:"Every DNA sample comes back 16 points better in quality."},
   // Genetics
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:45, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES

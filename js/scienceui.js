@@ -9,7 +9,7 @@ const ERA_COLOR = {cenozoic:"#F2D32A", mesozoic:"#34B2C9", paleozoic:"#F04028"};
 const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="locked"><rect x="1" y="5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3 5V3.5a2 2 0 0 1 4 0V5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`;
 
 // Which tab is open in each department's panel
-const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"TAR", title:"TAR upgrades", color:"#4B3A8C"}, {key:"gene", label:"Genetics", title:"Genetics", color:"#4B3A8C"}];
+const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"TAR", title:"TAR upgrades", color:"#4B3A8C"}, {key:"ghost", label:"GHOST", title:"GHOST upgrades", color:"#4B3A8C"},{key:"gene", label:"Genetics", title:"Genetics", color:"#4B3A8C"}];
 let oracleMain = "manage", oracleManage = "barrier", oracleTab = null, oracleEra = "mesozoic", ghostTab = null, cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
@@ -124,7 +124,7 @@ function ghostHtml(b){
   if(!ghostTab) ghostTab = PERIOD_ORDER.find(openIn) || "Quaternary";
   h += `<section><h3>Genomes by period</h3>${tabBar("gtab", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), ghostTab)}`;
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
-  h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN))} and bring back DNA of ${p.quality[0]}–${p.quality[1]}% quality. Bigger animals take more trips.</div>`;
+  h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))} and bring back DNA of ${Math.min(100, p.quality[0] + ghostQuality())}–${Math.min(100, p.quality[1] + ghostQuality())}% quality. Bigger animals take more trips.</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
