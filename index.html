@@ -286,6 +286,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 /* ----- map drawing classes ----- */
 .lbl{font-family:"Barlow Condensed",sans-serif;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--halo);stroke-linejoin:round;pointer-events:none;text-anchor:middle;dominant-baseline:central}
 .sublbl{font-family:Barlow,sans-serif;font-weight:600;paint-order:stroke;stroke:var(--halo);stroke-linejoin:round;pointer-events:none;text-anchor:middle;dominant-baseline:central}
+/* 3/4 view: map text stands back up against the squashed camera (1/TILT in map.js) */
+#map.tilt #world text,#map.tilt #overlay text{transform:scale(1,1.4286);transform-box:fill-box;transform-origin:center}
 .glyph{font-family:"Barlow Condensed",sans-serif;font-weight:700;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:rgba(20,20,20,.6);stroke-width:.15em;stroke-linejoin:round}
 
 @media (max-width:760px){

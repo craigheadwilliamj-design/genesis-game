@@ -16,6 +16,7 @@ const TILT = .7;
 let tilt = (() => { try { return localStorage.getItem("gp-tilt") !== "0"; } catch(e){ return true; } })();
 function tf(){ return tilt ? TILT : 1; }
 function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
+function upright(){ return tilt ? ` scale(1 ${(1/TILT).toFixed(4)})` : ""; }   // added to a sprite's transform so it isn't squashed
 let tool = "select";
 let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
@@ -290,6 +291,7 @@ function render(){
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
+      if(tilt){ s += prop34(bl, t, r, fill, edge, sw) + (isBroken(bl) ? `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") + `</g>`; continue; }
       if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
@@ -303,7 +305,7 @@ function render(){
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
-    if(tilt && bl.type === "restroom"){ s += restroom34(bl, t, on, dead, reach, inv) + `</g>`; continue; }
+    if(tilt && STAND34[bl.type]){ s += building34(bl, t, on, dead, reach, inv) + `</g>`; continue; }
     s += `<polygon points="${polyStr(bl.points)}" fill="${down ? "#6E2A26" : themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
@@ -362,46 +364,138 @@ function render(){
 }
 
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
-// Restrooms standing up in the 3/4 view (prototype): front walls and a hip roof.
+// Guest buildings standing up in the 3/4 view (prototype): front walls, a roof, and a shopfront.
 // A height of h meters is drawn h/TILT up the map, because the camera squashes north-south.
-const R34 = {wall:3.4, rise:1.6, wallCol:"#D9CFBB", door:"#2E3A33"};
-function restroom34(bl, t, on, dead, reach, inv){
-  const P = bl.points, n = P.length, [cx, cy] = centroid(P), up = h => ([x, y]) => [x, y - h / TILT];
-  const W = R34.wall, eave = P.map(up(W)), edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)";
-  const sw = on || dead ? 3.5 : 1.2, dash = reach ? "" : `stroke-dasharray="4 3"`, line = `stroke="${edge}" stroke-width="${sw}" ${dash} stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
-  // outward normal of each footprint edge, and light from the upper left
-  const norm = i => { const [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1; let nx = (by - ay)/L, ny = -(bx - ax)/L; if(nx*((ax+bx)/2 - cx) + ny*((ay+by)/2 - cy) < 0){ nx = -nx; ny = -ny; } return [nx, ny]; };
-  const lit = ([nx, ny]) => nx*-.55 + ny*-.83;
-  const shade = (pts, l) => l > 0 ? `<polygon points="${polyStr(pts)}" fill="#fff" fill-opacity="${(l*.22).toFixed(2)}" pointer-events="none"/>` : `<polygon points="${polyStr(pts)}" fill="#000" fill-opacity="${(-l*.3).toFixed(2)}" pointer-events="none"/>`;
-  let s = `<polygon points="${polyStr(P.map(([x, y]) => [x + .9, y + .7]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
-  s += `<polygon points="${polyStr(P)}" fill="#8E8778"/>`;
-  // walls that face the viewer, the widest one gets the doors and the sign
-  const front = [...Array(n).keys()].filter(i => norm(i)[1] > .05);
-  const len = i => Math.hypot(P[(i+1) % n][0] - P[i][0], P[(i+1) % n][1] - P[i][1]), main = front.reduce((m, i) => m < 0 || len(i) > len(m) ? i : m, -1);
-  for(const i of front){
-    const a = P[i], b = P[(i+1) % n], q = [a, b, up(W)(b), up(W)(a)];
-    s += `<polygon points="${polyStr(q)}" fill="${R34.wallCol}" ${line}/>` + shade(q, lit(norm(i)) * .6);
-    if(i !== main) continue;
-    const L = len(i), at = (f, h) => up(h)([a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f]), dw = Math.min(1.1, L*.12) / L;
-    for(const f of [.3, .7]) s += `<polygon points="${polyStr([at(f - dw/2, 0), at(f + dw/2, 0), at(f + dw/2, 2.1), at(f - dw/2, 2.1)])}" fill="${R34.door}" pointer-events="none"/>`;
-    const [gx, gy] = at(.5, 1.6), fs = Math.min(1.3, L*.15);
-    s += `<text class="glyph" transform="translate(${gx.toFixed(2)} ${gy.toFixed(2)}) scale(1 ${(1/TILT).toFixed(3)})" font-size="${fs}" style="fill:#2E3A33" pointer-events="none">WC</text>`;
-    s += `<polygon points="${polyStr([at(.05, W - .15), at(.95, W - .15), at(.95, W - .45), at(.05, W - .45)])}" fill="${themeFill(bl, t.color)}" pointer-events="none"/>`;
-    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = at(.38, 1.1), [x1] = at(.62, 1.1), w = (x1 - x0)/4;
-      s += `<path d="M${x0} ${y0}q${w/2} ${-w*.8} ${w} 0t${w} 0t${w} 0t${w} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
-  }
-  // hip roof: the ridge runs along the long side, with 45 degree ends
-  const e0 = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]), e1 = Math.hypot(P[2][0] - P[1][0], P[2][1] - P[1][1]);
+const STAND34 = {
+  restroom:  {wall:3.4, rise:1.6, front:"wc"},
+  food:      {wall:3,   rise:1.3, front:"window", sign:"FOOD"},
+  shop:      {wall:3,   rise:1.3, front:"window", sign:"GIFTS"},
+  restaurant:{wall:4.2, rise:2.4, front:"glass",  sign:"RESTAURANT"},
+  megastore: {wall:4.2, rise:2.4, front:"glass",  sign:"GIFT SHOP"},
+  kiosk:     {wall:1.1, canopy:2.6, front:"cart"},
+  cart:      {wall:1.1, canopy:2.6, front:"cart"},
+};
+const WALL34 = "#D9CFBB", DARK34 = "#2E3A33", AWNING34 = "#F4F1E8";
+function lift34(h){ return ([x, y]) => [x, y - h / TILT]; }
+// light from the upper left: positive is lit, negative in shadow
+function lit34([nx, ny]){ return nx*-.55 + ny*-.83; }
+function shade34(pts, l){ return l > 0 ? `<polygon points="${polyStr(pts)}" fill="#fff" fill-opacity="${(l*.22).toFixed(2)}" pointer-events="none"/>` : `<polygon points="${polyStr(pts)}" fill="#000" fill-opacity="${(-l*.3).toFixed(2)}" pointer-events="none"/>`; }
+// outward normal of footprint edge i
+function norm34(P, i){
+  const n = P.length, [cx, cy] = centroid(P), [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1;
+  let nx = (by - ay)/L, ny = -(bx - ax)/L; if(nx*((ax+bx)/2 - cx) + ny*((ay+by)/2 - cy) < 0){ nx = -nx; ny = -ny; } return [nx, ny];
+}
+function edgeLen34(P, i){ const b = P[(i+1) % P.length]; return Math.hypot(b[0] - P[i][0], b[1] - P[i][1]); }
+// the walls facing the viewer, from h0 up to h1; returns the svg and the widest front edge
+function walls34(P, h0, h1, fill, line, extra = ""){
+  const front = [...Array(P.length).keys()].filter(i => norm34(P, i)[1] > .05);
+  let s = "";
+  for(const i of front){ const a = P[i], b = P[(i+1) % P.length], q = [lift34(h0)(a), lift34(h0)(b), lift34(h1)(b), lift34(h1)(a)];
+    s += `<polygon points="${polyStr(q)}" fill="${fill}" ${line} ${extra}/>` + shade34(q, lit34(norm34(P, i)) * .6); }
+  return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
+}
+// a point on footprint edge i, f of the way along, pushed out by `out` meters and lifted h
+function onEdge34(P, i, f, h, out = 0){ const a = P[i], b = P[(i+1) % P.length], [nx, ny] = norm34(P, i); return lift34(h)([a[0] + (b[0] - a[0])*f + nx*out, a[1] + (b[1] - a[1])*f + ny*out]); }
+function quad34(P, i, f0, f1, h0, h1, fill, more = ""){ return `<polygon points="${polyStr([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)])}" fill="${fill}" pointer-events="none" ${more}/>`; }
+// hip roof: the ridge runs along the long side, with 45 degree ends
+function hipRoof34(P, wall, rise, fill, tex, line){
+  const [cx, cy] = centroid(P), eave = P.map(lift34(wall)), n = P.length;
+  const e0 = edgeLen34(P, 0), e1 = edgeLen34(P, 1);
   const [ux, uy] = e0 >= e1 ? [(P[1][0] - P[0][0])/e0, (P[1][1] - P[0][1])/e0] : [(P[2][0] - P[1][0])/e1, (P[2][1] - P[1][1])/e1];
-  const half = Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), lift = up(W + R34.rise);
-  const ridge = [lift([cx - ux*half, cy - uy*half]), lift([cx + ux*half, cy + uy*half])];
-  const T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);   // the theme's roof, without its trim
+  const half = Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), up = lift34(wall + rise);
+  const ridge = [up([cx - ux*half, cy - uy*half]), up([cx + ux*half, cy + uy*half])];
   const near = p => (p[0] - cx)*ux + (p[1] - cy)*uy < 0 ? ridge[0] : ridge[1];
   const faces = [...Array(n).keys()].map(i => { const a = eave[i], b = eave[(i+1) % n], ra = near(P[i]), rb = near(P[(i+1) % n]);
     return {i, pts:ra === rb ? [a, b, ra] : [a, b, rb, ra], y:(P[i][1] + P[(i+1) % n][1]) / 2}; }).sort((f, g) => f.y - g.y);
-  for(const f of faces) s += `<polygon points="${polyStr(f.pts)}" fill="${themeFill(bl, t.color)}" ${line}/>` + (tex ? `<polygon points="${polyStr(f.pts)}" fill="url(#t-${tex})" pointer-events="none"/>` : "") + shade(f.pts, lit(norm(f.i)));
-  s += `<path d="M${ridge[0].map(v => v.toFixed(2)).join(" ")}L${ridge[1].map(v => v.toFixed(2)).join(" ")}" stroke="#1D2B22" stroke-opacity=".5" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  let s = "";
+  for(const f of faces) s += `<polygon points="${polyStr(f.pts)}" fill="${fill}" ${line}/>` + (tex ? `<polygon points="${polyStr(f.pts)}" fill="url(#t-${tex})" pointer-events="none"/>` : "") + shade34(f.pts, lit34(norm34(P, f.i)));
+  return s + `<path d="M${ridge[0].map(v => v.toFixed(2)).join(" ")}L${ridge[1].map(v => v.toFixed(2)).join(" ")}" stroke="#1D2B22" stroke-opacity=".5" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+}
+// a striped canopy over a 4 cornered footprint, stripes running front to back
+function stripes34(C, n, c1, c2, line){
+  const lerp = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
+  let s = `<polygon points="${polyStr(C)}" fill="${c2}" ${line}/>`;
+  for(let i = 0; i < n; i += 2) s += `<polygon points="${polyStr([lerp(C[0], C[1], i/n), lerp(C[0], C[1], (i+1)/n), lerp(C[3], C[2], (i+1)/n), lerp(C[3], C[2], i/n)])}" fill="${c1}" pointer-events="none"/>`;
   return s;
+}
+function sign34(P, i, h, text, fs){ const [x, y] = onEdge34(P, i, .5, h); return `<text class="glyph" x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${fs.toFixed(2)}" letter-spacing=".06em" pointer-events="none">${text}</text>`; }
+
+function building34(bl, t, on, dead, reach, inv){
+  const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
+  const edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? T.edge : "var(--bad)";
+  const line = `stroke="${edge}" stroke-width="${on || dead ? 3.5 : 1.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+  const top = S.canopy || S.wall + S.rise, sh = top * .22;
+  let s = `<polygon points="${polyStr(P.map(([x, y]) => [x + sh, y + sh*.8]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/><polygon points="${polyStr(P)}" fill="#8E8778"/>`;
+  if(S.front === "cart"){
+    // a cart: a colored counter under a striped canopy on four poles, on two wheels
+    const w = walls34(P, 0, S.wall, col, line), i = w.main, C = insetRect(P, 1.12).map(lift34(S.canopy));
+    s += w.s + `<polygon points="${polyStr(P.map(lift34(S.wall)))}" fill="${AWNING34}" ${line}/>`;
+    s += P.map((p, j) => { const a = lift34(S.wall)(p), b = C[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#3A3A34" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }).join("");
+    if(i >= 0) for(const f of [.22, .78]){ const [x, y] = onEdge34(P, i, f, .1); s += `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx=".42" ry="${(.42 / TILT).toFixed(2)}" fill="${DARK34}" pointer-events="none"/>`; }
+    return s + stripes34(C, 7, col, AWNING34, line);
+  }
+  const w = walls34(P, 0, S.wall, WALL34, line), i = w.main;
+  s += w.s;
+  if(i >= 0){
+    const L = edgeLen34(P, i);
+    if(S.front === "wc"){
+      const dw = Math.min(1.1, L*.12) / L;
+      for(const f of [.3, .7]) s += quad34(P, i, f - dw/2, f + dw/2, 0, 2.1, DARK34);
+      s += quad34(P, i, .05, .95, S.wall - .45, S.wall - .15, col);
+      const [x, y] = onEdge34(P, i, .5, 1.6); s += `<text class="glyph" x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${Math.min(1.3, L*.15).toFixed(2)}" style="fill:#2E3A33;stroke:none" pointer-events="none">WC</text>`;
+    } else if(S.front === "window"){
+      // a serving window with a counter, under a striped awning
+      s += quad34(P, i, .18, .82, 1, 2.2, DARK34) + quad34(P, i, .16, .84, .92, 1.05, "#B9AE97");
+      const aw = [onEdge34(P, i, .14, 2.6), onEdge34(P, i, .86, 2.6), onEdge34(P, i, .86, 2.05, 1.2), onEdge34(P, i, .14, 2.05, 1.2)];
+      s += stripes34(aw, 9, col, AWNING34, `stroke="#1D2B22" stroke-opacity=".4" stroke-width="1" vector-effect="non-scaling-stroke"`);
+      s += quad34(P, i, .1, .9, S.wall - .05, S.wall - .55, col) + sign34(P, i, S.wall - .3, S.sign, .5);
+    } else if(S.front === "glass"){
+      // a glazed front with mullions and a double door, and the name on the fascia
+      s += quad34(P, i, .06, .94, .5, 3, "#3B5566");
+      const n = Math.max(3, Math.round(L / 2.6));
+      for(let k = 1; k < n; k++){ const a = onEdge34(P, i, .06 + .88*k/n, .5), b = onEdge34(P, i, .06 + .88*k/n, 3); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="${WALL34}" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+      s += quad34(P, i, .06, .5, 2.2, 3, "#fff", `fill-opacity=".12"`);
+      const dw = 2.2 / L; s += quad34(P, i, .5 - dw/2, .5 + dw/2, 0, 2.5, DARK34);
+      s += quad34(P, i, .04, .96, S.wall - .1, S.wall - .9, col) + sign34(P, i, S.wall - .5, S.sign, .7);
+    }
+    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
+      s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
+  }
+  return s + hipRoof34(P, S.wall, S.rise, col, tex, line);
+}
+
+// Path props standing up in the 3/4 view: bins, lamps, cameras, signs, benches and picnic tables.
+// r is the prop's drawn radius, which never shrinks below a tappable size.
+function prop34(bl, t, r, fill, edge, sw){
+  const [cx, cy] = centroid(bl.points), up = h => cy - h / TILT, ln = `stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
+  const shadow = (rx, h) => `<ellipse cx="${(cx + h*.22).toFixed(2)}" cy="${(cy + h*.18).toFixed(2)}" rx="${rx.toFixed(2)}" ry="${(rx*.7).toFixed(2)}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
+  const pole = (h, w) => `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="#3A3A34" pointer-events="none"/>`;
+  const R = r * .75;
+  if(bl.type === "bin"){ const h = R * 1.6;
+    return shadow(R, h) + `<rect x="${(cx - R).toFixed(2)}" y="${up(h).toFixed(2)}" width="${(2*R).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${cy.toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="#1D2B22" ${ln}/>`; }
+  if(bl.type === "lamp" || bl.type === "camera"){ const h = R * 5, w = Math.max(.15, R*.25);
+    return shadow(R*.7, h*.3) + pole(h, w) + (bl.type === "lamp" ? `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.8).toFixed(2)}" ry="${(R*.8 / TILT).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.4).toFixed(2)}" ry="${(R*.4 / TILT).toFixed(2)}" fill="#FFF6C8" pointer-events="none"/>`}`
+      : `<rect x="${(cx - R*.9).toFixed(2)}" y="${up(h + R*.4).toFixed(2)}" width="${(R*1.8).toFixed(2)}" height="${(R*.9 / TILT).toFixed(2)}" rx="${(R*.2).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${(cx + R*.9).toFixed(2)}" cy="${up(h).toFixed(2)}" rx="${(R*.25).toFixed(2)}" ry="${(R*.25 / TILT).toFixed(2)}" fill="#E8F0FF" pointer-events="none"/>`}`); }
+  if(bl.type === "sign" || bl.type === "nofeed"){ const h = R * 3, w = Math.max(.12, R*.2), bw = R * 1.6, bh = R * 1.3;
+    return shadow(R*.6, h*.3) + pole(h, w) + `<rect x="${(cx - bw/2).toFixed(2)}" y="${up(h + bh*.5).toFixed(2)}" width="${bw.toFixed(2)}" height="${(bh / TILT).toFixed(2)}" rx="${(R*.15).toFixed(2)}" fill="${fill}" ${ln}/>` +
+      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h).toFixed(2)}" font-size="${(bh*.85).toFixed(2)}" pointer-events="none">${bl.type === "sign" ? "i" : "⊘"}</text>`); }
+  // benches and picnic tables: slats on thin legs, drawn back to front
+  const P = insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))), line = `${ln} stroke-linejoin="round"`, dark = "#3A3A34";
+  const [px, py] = centroid(P), U = [(P[1][0] - P[0][0])/2, (P[1][1] - P[0][1])/2], V = [(P[3][0] - P[0][0])/2, (P[3][1] - P[0][1])/2];
+  const [L, W] = Math.hypot(...U) >= Math.hypot(...V) ? [U, V] : [V, U], north = W[1] <= 0 ? 1 : -1;   // which way along the short axis is north
+  const box = (sl, sw, dw) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [px + L[0]*a*sl + W[0]*(b*sw + dw), py + L[1]*a*sl + W[1]*(b*sw + dw)]);
+  const slab = (Q, h0, h1) => walls34(Q, h0, h1, fill, line).s + `<polygon points="${polyStr(Q.map(lift34(h1)))}" fill="${fill}" ${line}/>` + shade34(Q.map(lift34(h1)), .5);
+  let out = `<polygon points="${polyStr(P.map(([x, y]) => [x + .25, y + .2]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
+  const leg = (f, d, h) => { const x = px + L[0]*f + W[0]*d, y = py + L[1]*f + W[1]*d; return `<path d="M${x.toFixed(2)} ${y.toFixed(2)}V${(y - h / TILT).toFixed(2)}" stroke="${dark}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; };
+  if(bl.type === "bench"){
+    // the backrest goes on the far side, so the seat faces the viewer
+    out += leg(-.85, 0, .42) + leg(.85, 0, .42) + slab(box(1, .38, north*.62), .5, .95) + slab(box(1, .55, -north*.2), .42, .5);
+    return out;
+  }
+  // picnic table: a bench each side and the top in between
+  out += slab(box(.9, .17, north*.78), .4, .47);
+  out += leg(-.8, 0, .72) + leg(.8, 0, .72) + slab(box(1, .42, 0), .72, .8);
+  return out + slab(box(.9, .17, -north*.78), .4, .47);
 }
 
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
@@ -521,7 +615,7 @@ function syncAnimals(){
         (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
         `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
-      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
+      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()}`);
     }
   }
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
@@ -711,7 +805,7 @@ function animateAnimals(dt){
     if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
-    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
+    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()}`);
   }
 }
 
@@ -1323,7 +1417,7 @@ function drawKeepers(){
         `<circle r="${r}" fill="#2E6B3A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
         (food ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${food}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
   }
   // mechanics: orange with a white wrench-dot
   for(const c of mcrew){
@@ -1338,7 +1432,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#C8642A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><circle r="${r*.35}" fill="#fff"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
   }
   // vets: white with a red cross
   for(const c of vcrew){
@@ -1352,7 +1446,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#fff" stroke="#B0384F" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${-r*.55} 0H${r*.55}M0 ${-r*.55}V${r*.55}" stroke="#B0384F" stroke-width="${r*.35}"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
   }
   // custodians: teal, with a square of whatever stock they're carrying
   for(const c of ccrew){
@@ -1367,7 +1461,7 @@ function drawKeepers(){
         (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
   }
   // security guards: navy, with a white badge; a dashed ring while chasing
   for(const c of gcrew){
@@ -1381,7 +1475,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
   for(const a of usableAtvs()){
@@ -1392,7 +1486,7 @@ function drawKeepers(){
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
     const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
     if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
-    el.setAttribute("transform", `translate(${n.x.toFixed(2)} ${n.y.toFixed(2)})`);
+    el.setAttribute("transform", `translate(${n.x.toFixed(2)} ${n.y.toFixed(2)})${upright()}`);
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
 }
@@ -1410,7 +1504,7 @@ function drawLoose(){
     if(l.status === "carried"){ const c = crew.find(x => x.hunt === l); if(c && c.at) p = keeperPos(c); }
     if(!p) continue;
     const sp = SPECIES_BY_ID[l.sp], r = Math.max(2.5, 7*inv), pulse = 1 + .25 * Math.sin(performance.now() / 180);
-    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})">`;
+    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${upright()}">`;
     if(l.status === "loose") s += `<circle r="${r * 1.8 * pulse}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     s += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     s += `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text></g>`;
@@ -1881,9 +1975,9 @@ $("#zfit").onclick = fit;
 $("#ztilt").onclick = () => {
   const {w, h} = svgSize(), wy = (h/2 - view.ty)/ky();
   tilt = !tilt; try { localStorage.setItem("gp-tilt", tilt ? "1" : "0"); } catch(e){}
-  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); applyTransform(); render();
+  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt); applyTransform(); render(); syncAnimals();
 };
-$("#ztilt").setAttribute("aria-pressed", tilt);
+$("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt);
 function setGridSnap(on){
   gridSnap = on;
   try{ localStorage.setItem("genesis-grid-snap", on ? "1" : "0"); }catch{}
