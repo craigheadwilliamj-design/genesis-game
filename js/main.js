@@ -19,6 +19,21 @@ document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => setSpee
 
 /* ---------- what the simulation tells the screen ---------- */
 events.toast = (t, kind) => ui.toast(t, kind);
+// Deaths pile up while the day rolls over, then show once in a dialog that pauses the game
+let deathQueue = [];
+events.died = d => deathQueue.push(d);
+function showDeaths(){
+  if(!deathQueue.length) return;
+  const n = deathQueue.length;
+  $("#deathsTitle").textContent = n === 1 ? "An animal died" : `${n} animals died`;
+  $("#deathsList").innerHTML = `<tr><th>Animal</th><th>Exhibit</th><th>Cause of death</th></tr>` + deathQueue.map(d => `<tr><td>${esc(d.animal)}</td><td>${esc(d.exhibit)}</td><td>${esc(d.cause)}</td></tr>`).join("");
+  deathQueue = [];
+  setSpeed(0);
+  if(!$("#dlgDeaths").open) $("#dlgDeaths").showModal();
+}
+$("#deathsOk").onclick = () => $("#dlgDeaths").close();
+$("#dlgDeaths").addEventListener("close", () => { if(deathQueue.length) showDeaths(); else if(!state.over) setSpeed(lastSpeed || 1); });
+$("#dlgDeaths").addEventListener("cancel", e => e.preventDefault());   // Esc doesn't skip it
 events.dayEnded = r => {
   const L = r.ledger, row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
   const stars = r.rating - r.ratingBefore;
@@ -43,6 +58,7 @@ events.dayEnded = r => {
   </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${starTxt(r.rating)} stars.</div>` : ""}`);
   render(); ui.panel(); ui.hud(true);
   saveNow();
+  showDeaths();
 };
 events.gameOver = () => {
   setSpeed(0);

@@ -76,7 +76,7 @@ let derived = null;   // numbers worked out from the saved game, rebuilt when it
 let arrivalCarry = 0; // fractions of a guest carried between frames
 
 // Hooks other files fill in, so the simulation can tell the screen what happened
-const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){} };
+const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){}, died(){} };
 
 // Starter species partner parks sell in this park: random picks from each pool
 function pickStarters(){

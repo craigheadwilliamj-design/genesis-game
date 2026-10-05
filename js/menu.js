@@ -136,12 +136,11 @@ function buildMenu(){
   const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.map(menuRow).join("")}</div></section>`).join("");
   const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>
     <button class="srow" id="gridBtn" aria-pressed="false" title="Snap corners and buildings to a 1 m grid (G). Hold Alt to place freely.">${menuIcon("grid")}<span class="tl"><b>Grid snapping</b><span class="price">Off. Press G</span></span></button>
-    <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>
-    <section class="sgroup flat">
-    <button class="srow" data-tool="bulldoze" aria-pressed="false" title="Remove things (25% back)">${menuIcon("bulldoze")}<span class="tl"><b>Bulldoze</b><span class="price">${Math.round(COST.refundShare * 100)}% back</span></span></button>
-    <button class="srow" data-tool="move" aria-pressed="false" title="Drag a building, exhibit or path to a new spot">${menuIcon("move")}<span class="tl"><b>Move</b><span class="price">Free</span></span></button></section>`;
+    <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
   $("#sideMenu").innerHTML = `<div class="sidebar-top"><button class="sidetab" id="sideTab" aria-expanded="false" aria-controls="sideBody">${menuIcon("path").replace("ticon", "ticon tab")}<span class="tl"><b>Build</b></span></button>
-    <button class="sidetab sel" data-tool="select" aria-pressed="true" title="Look around and pick things (Esc)">${menuIcon("select")}<span class="tl"><b>Select</b></span></button></div>
+    <button class="sidetab sel" data-tool="select" aria-pressed="true" title="Look around and pick things (Esc)">${menuIcon("select")}<span class="tl"><b>Select</b></span></button>
+    <button class="sidetab" data-tool="bulldoze" aria-pressed="false" title="Remove things (${Math.round(COST.refundShare * 100)}% back)">${menuIcon("bulldoze")}<span class="tl"><b>Bulldoze</b></span></button>
+    <button class="sidetab" data-tool="move" aria-pressed="false" title="Drag a building, exhibit or path to a new spot">${menuIcon("move")}<span class="tl"><b>Move</b></span></button></div>
     <div class="sidebody" id="sideBody" hidden>${groups}${rest}</div>`;
 }
 
