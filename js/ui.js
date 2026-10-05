@@ -333,7 +333,7 @@ function propsHtml(e){
   const have = HABITAT_PROPS.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c);
   let h = `<section><h3>Habitat props</h3><div class="meta">${have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "No props here yet."} Barns cover animals from heat waves, cold snaps and storms.</div>`;
   if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
-    h += `<div class="meta" style="margin-top:6px">Shelters have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
+    h += `<div class="meta" style="margin-top:6px">Barns have room for ${c.shelter} of the ${c.need} slots these animals take${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more. Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
   return h + `<div class="row" style="margin-top:6px">${btns}</div></section>`;
 }
 
