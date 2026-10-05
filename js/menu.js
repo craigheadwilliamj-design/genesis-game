@@ -6,7 +6,7 @@
    ===================================================================== */
 
 // What each group holds. {tool} picks a tool, {sub} opens a dropdown of tools, {fence} picks a fence.
-const HABITAT_PROPS = ["shelter", "barn"];
+const HABITAT_PROPS = ["shelter", "barn", "traysm", "traymd", "traylg"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
     {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
@@ -28,7 +28,7 @@ const BUILD_MENU = [
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
-    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns cover animals from heat waves, cold snaps and storms."},
+    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns cover animals from heat waves, cold snaps and storms. Keepers walk in to fill food trays, which hold any food."},
     {label:"Fence Types", fences:true, note:"Pick a fence before you build. Then draw the exhibit the same way."},
   ]},
   {id:"land", label:"Landscaping", items:[

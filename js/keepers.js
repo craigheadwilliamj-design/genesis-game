@@ -29,7 +29,24 @@ function sourcesFor(t, k){
   return mine.length ? mine : have;
 }
 // Food an exhibit has for a need. Without Paleoflora, plain plant food (grass hay) stands in.
-function stockFor(e, t){ const s = e.stock || {}; return (s[t] || 0) + (t === "paleoflora" ? (s.plants || 0) * (dailyNeed(e).plants ? 0 : 1) : 0); }
+function stockFor(e, t){ const s = e.stock || {}; return (s[t] || 0) + trayFood(e, t) + (t === "paleoflora" ? (s.plants || 0) * (dailyNeed(e).plants ? 0 : 1) : 0); }
+// Food trays: units each holds, what's in them, and the room left. A tray holds any mix of foods.
+const trays = e => landOf(e).filter(f => LAND[f.type] && LAND[f.type].tray);
+const trayCap = f => LAND[f.type].tray;
+const trayHas = f => Object.values(f.food || {}).reduce((n, v) => n + v, 0);
+const trayRoomOf = f => Math.max(0, trayCap(f) - trayHas(f));
+const trayFood = (e, t) => trays(e).reduce((n, f) => n + ((f.food || {})[t] || 0), 0);
+const trayRoom = e => trays(e).reduce((n, f) => n + trayRoomOf(f), 0);
+// A food's share of the tray room: split by how much of each the herd eats
+function trayShare(e, t){
+  const need = dailyNeed(e), all = Object.values(need).reduce((n, v) => n + v, 0);
+  return all > 0 ? trayRoom(e) * (need[t] || 0) / all : 0;
+}
+// Animals eat from the trays before the gate stock. Returns what's still to eat.
+function eatFromTrays(e, t, eat){
+  for(const f of trays(e)){ const v = (f.food || {})[t] || 0; if(eat <= 0) break; if(v <= 0) continue; const take = Math.min(v, eat); f.food[t] = v - take; if(f.food[t] <= 0.001) delete f.food[t]; eat -= take; }
+  return eat;
+}
 // Room an exhibit has for a delivery
 function roomFor(e, t){
   const need = dailyNeed(e), s = e.stock || {};
@@ -253,8 +270,8 @@ function shortages(k, self){
       const t = need_t === "paleoflora" && !paleofloraReady() ? "plants" : need_t;
       if(t === "plants" && need_t === "paleoflora" && need.plants) continue;   // the exhibit's own plant order covers it
       const coming = crew.reduce((s, c) => s + (c !== self && c.plan && c.plan.exhibitId === e.id && c.carry && c.carry.type === t ? c.carry.amount : 0), 0);
-      const have = stockFor(e, need_t), short = storeMax(e, need_t) - have - coming;
-      if(short > 0.5) out.push({e, t, short, ratio:have / Math.max(1, storeMax(e, need_t))});
+      const have = stockFor(e, need_t), full = storeMax(e, need_t) + trayFood(e, need_t) + trayShare(e, need_t), short = full - have - coming;
+      if(short > 0.5) out.push({e, t, short, ratio:have / Math.max(1, full)});
     }
   }
   return out.sort((a, b) => a.ratio - b.ratio);
@@ -366,6 +383,46 @@ function dirtTick(dtMin){
 function cleanJob(c, k, min = CLEAN.dirtyAt){
   const taken = new Set(crew.filter(x => x !== c && x.cleanId).map(x => x.cleanId));
   return state.exhibits.filter(e => (e.dirt || 0) >= min && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
+}
+
+// Leftover food goes into the exhibit's trays: the keeper walks in from the gate, visits the nearest trays with room, and walks back out
+function startFilling(c, e){
+  if(!e.gate || !c.carry) return false;
+  const g = [e.gate[0], e.gate[1]]; let pos = g, left = c.carry.amount, pool = trays(e).filter(f => trayRoomOf(f) > .01);
+  const pts = [g], ids = [];
+  while(pool.length && left > .01){
+    pool.sort((a, b) => dist(pos, [a.x, a.y]) - dist(pos, [b.x, b.y]));
+    const f = pool.shift(); pts.push([f.x, f.y]); ids.push(f.id); pos = [f.x, f.y]; left -= trayRoomOf(f);
+  }
+  if(!ids.length) return false;
+  pts.push(g);
+  c.fill = {e:e.id, pts, ids, i:0, pos:g.slice()};
+  c.job = "filling";
+  return true;
+}
+// Where a keeper filling trays is standing, inside the fence
+const fillPos = c => c.job === "filling" && c.fill ? c.fill.pos : null;
+// Walk the next stretch of the round; returns the park minutes left over
+function fillStep(c, k, left){
+  const f = c.fill, e = f && state.exhibits.find(x => x.id === f.e);
+  if(!e || !c.carry){ c.fill = null; c.job = "idle"; c.wait = 0; return left; }
+  const to = f.pts[f.i + 1], d = dist(f.pos, to), go = Math.min(left, d / KEEPER.speed);
+  if(d > 0){ f.pos = [f.pos[0] + (to[0] - f.pos[0]) * go * KEEPER.speed / d, f.pos[1] + (to[1] - f.pos[1]) * go * KEEPER.speed / d]; }
+  k.stamina -= go * KEEPER.speed * tireRate();
+  left -= go;
+  if(go * KEEPER.speed < d - 1e-6) return left;
+  f.pos = to.slice(); f.i++;
+  const tray = f.ids[f.i - 1] && landOf(e).find(x => x.id === f.ids[f.i - 1]);
+  if(tray && f.i - 1 < f.ids.length){
+    tray.food = tray.food || {};
+    const give = Math.min(trayRoomOf(tray), c.carry.amount);
+    tray.food[c.carry.type] = (tray.food[c.carry.type] || 0) + give; c.carry.amount -= give;
+    noteFlow(null, e.id, give);
+    k.stamina -= KEEPER.tirePerDelivery;
+    if(c.carry.amount <= 0.01){ setCarry(c, null); f.pts = f.pts.slice(0, f.i + 1).concat([f.pts[f.pts.length - 1]]); f.ids = f.ids.slice(0, f.i); }
+  }
+  if(f.i >= f.pts.length - 1){ c.fill = null; c.job = "idle"; c.wait = 0; }
+  return left;
 }
 
 function decide(c, k){
@@ -496,6 +553,7 @@ function arrive(c, k){
       noteFlow(c.plan && c.plan.src, e.id, give);
       k.stamina -= KEEPER.tirePerDelivery;
       if(c.carry.amount <= 0.01) setCarry(c, null);
+      if(c.carry && startFilling(c, e)){ c.plan = null; return; }
     }
     c.plan = null; c.job = "idle"; c.wait = 0;
     return;
@@ -524,6 +582,7 @@ function keepersTick(dtMin){
         if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
+      if(c.job === "filling"){ left = fillStep(c, k, left); continue; }
       if(c.job === "sedating"){
         const w = Math.min(c.sedate, left); c.sedate -= w; left -= w;
         if(c.sedate <= 0 && c.hunt){ c.hunt.status = "carried"; c.job = "idle"; chase(c, c.hunt); }
@@ -565,6 +624,7 @@ function eatTick(dtMin){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
       // groves in the exhibit feed part of it; keepers bring the rest
       let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN) * (1 - browseShare(e, t, need[t]));
+      eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
       e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat);
       // out of Paleoflora: they eat the grass hay instead
@@ -582,7 +642,7 @@ function keepersNight(){
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
   // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to CERES
-  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; } }
+  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; c.fill = null; } }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(){
@@ -603,7 +663,7 @@ function keeperStatus(k){
   const src = c.plan && c.plan.src && buildingById(c.plan.src);
   return {toStation:`Heading to ${c.plan && c.plan.type === "paleoflora" ? "CERES" : src ? "the " + BUILDINGS[src.type].label.toLowerCase() : "a store"}` + (e ? ` for ${e.name}` : ""),
           toHaulSrc:`Heading to the ${hs ? BUILDINGS[hs.type].label.toLowerCase() : "store"} to restock the ${hb ? BUILDINGS[hb.type].label.toLowerCase() : "store"}`,
-          toHaulDst:`Restocking the ${hv ? BUILDINGS[hv.type].label.toLowerCase() : "store"}${carry}`, toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`,
+          toHaulDst:`Restocking the ${hv ? BUILDINGS[hv.type].label.toLowerCase() : "store"}${carry}`, toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`, filling:`Filling food trays in ${(state.exhibits.find(x => x.id === (c.fill && c.fill.e)) || {}).name || "an exhibit"}${carry}`,
           toClean:`Heading to muck out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`, mucking:`Mucking out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`,
           toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,

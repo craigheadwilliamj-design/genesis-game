@@ -388,6 +388,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
     out.carryDeliveredNextDay = fed;
 
+    // food trays: a keeper with food left over walks inside the fence and fills them, and animals eat from them first
+    { const e2 = state.exhibits[1], money0 = state.money; state.money = 1e6; e2.land = []; placeLand(e2, "traymd", 250, 180); placeLand(e2, "traysm", 270, 200);
+      const tr0 = e2.land[0], tr1 = e2.land[1]; tr0.id = "l-tray0"; tr1.id = "l-tray1"; e2.stock = {meat:storeMax(e2, "meat")}; k.stamina = 100;
+      out.trayCaps = trayCap(tr0) === 30 && trayCap(tr1) === 12 && trayRoom(e2) === 42;
+      c.route = []; c.wait = 0; c.haul = null; c.at = kGraph.anchors["e-k2"]; setCarry(c, {type:"meat", amount:35}); c.plan = {exhibitId:e2.id}; c.job = "toExhibit"; arrive(c, k);
+      out.trayKeeperEnters = c.job === "filling" && !!fillPos(c);
+      let n = 0; while(c.job === "filling" && n++ < 200) keepersTick(1);
+      out.trayFilled = c.job !== "filling" && Math.abs(trayFood(e2, "meat") - 35) < .01 && !c.carry && (tr0.food.meat || 0) === 30 && (tr1.food.meat || 0) === 5;
+      const before = trayFood(e2, "meat"), stock0 = e2.stock.meat; eatTick(30);
+      out.trayEatenFirst = trayFood(e2, "meat") < before && e2.stock.meat === stock0;
+      state.money = money0; e2.land = []; }
     // a station full of one food doesn't send keepers to fetch another it has no room for
     for(const x of crew){ x.haul = null; setCarry(x, null); }
     st.store = {plants:storeCap(st)};

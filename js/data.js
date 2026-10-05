@@ -988,6 +988,14 @@ const LAND = {
   boulder:{label:"Boulder",       one:"a boulder",       price:2200, r:4, color:"#767A74", cover:3},
   shelter:{label:"Small Barn",     one:"a small barn",     price:2500, r:4, color:"#9A7B55", slots:10},
   barn:   {label:"Large Barn",     one:"a large barn",      price:7000, r:7, color:"#7E6142", slots:36},
+  traysm: {label:"Small Food Tray",  one:"a small food tray",  price:400,  r:1.2, color:"#8A8F96", tray:12},
+  traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
+  traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
+};
+// Food trays (LAND items with `tray`, food units they hold). Any food goes in. Keepers walk inside the fence to fill them,
+// and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
+const TRAY = {
+  color:"#6E737A",   // rim
 };
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
