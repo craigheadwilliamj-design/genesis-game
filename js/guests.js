@@ -82,7 +82,7 @@ function buildGuestGraph(){
   // a corner of one path sitting on the middle of another joins them
   const all = [...nodes.values()];
   for(const c of copies) for(let i = 1; i < c.pts.length; i++)
-    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), c.mult); link(n, node(c.pts[i]), c.mult); } }
+    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d >= 1.5) continue; if(r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), c.mult); link(n, node(c.pts[i]), c.mult); } else link(n, node(c.pts[r.t <= .01 ? i-1 : i]), c.mult); }
   // a plain stretch that runs inside a wide path's body (one drawn over another) has the wide path's room too
   const wides = copies.filter(c => c.mult > 1), onWide = (x, y) => wides.find(c => c.pts.some((v, i) => i > 0 && segProj(x, y, c.pts[i-1], v).d <= WIDE_PATH.halfWidth));
   if(wides.length) for(const n of nodes.values()) for(const m of n.adj.keys()){

@@ -97,9 +97,11 @@ function syncMechanics(){
 function pickFence(c){
   const taken = new Set(mcrew.filter(x => x !== c && x.target).map(x => x.target));
   const mz = (state.staff.mechanics.find(m => m.id === c.id) || {}).zone;   // a mechanic in a zone only looks after that zone
+  // only jobs this mechanic can walk to, so one cut-off fence can't stall the whole crew
+  const w = c.at && walkFrom(c.at, c), far = o => w && !w.dist.has(anchorFor(o));
   let best = null;
   for(const e of state.exhibits.filter(x => !x.viv).concat(generators(), depots(), tramStations())){
-    if(taken.has(e.id) || !anchorFor(e) || (mz && e.zone !== mz)) continue;
+    if(taken.has(e.id) || !anchorFor(e) || far(e) || (mz && e.zone !== mz)) continue;
     const k = knownCond(e), overdue = daysSinceInspect(e) >= MAINT.inspectEvery;
     let score = 0;
     if(isDown(e)) score = 1000;                               // broken fences and dead generators are obvious
@@ -109,7 +111,7 @@ function pickFence(c){
   }
   // vandalized benches, bins, picnic areas, and lamps: obvious, so no inspection round, and after fences
   for(const b of state.buildings){
-    if(!isPropB(b) || propCond(b) >= 60 || taken.has(b.id) || !anchorFor(b) || (mz && b.zone !== mz)) continue;
+    if(!isPropB(b) || propCond(b) >= 60 || taken.has(b.id) || !anchorFor(b) || far(b) || (mz && b.zone !== mz)) continue;
     const score = 300 + (100 - propCond(b));
     if(!best || score > best.score) best = {e:b, score};
   }

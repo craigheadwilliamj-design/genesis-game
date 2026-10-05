@@ -140,7 +140,7 @@ function buildKeeperGraph(){
   // a corner of one path sitting on the middle of another joins them
   const all = [...nodes.values()];
   for(const c of copies) for(let i = 1; i < c.pts.length; i++)
-    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d < 1.5 && r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), isService(c.p)); link(n, node(c.pts[i]), isService(c.p)); } }
+    for(const n of all){ const r = segProj(n.x, n.y, c.pts[i-1], c.pts[i]); if(r.d >= 1.5) continue; if(r.t > .01 && r.t < .99){ link(n, node(c.pts[i-1]), isService(c.p)); link(n, node(c.pts[i]), isService(c.p)); } else link(n, node(c.pts[r.t <= .01 ? i-1 : i]), isService(c.p)); }
   kGraph = {nodes, anchors};
   // point everyone at the new map (the old one is thrown away)
   for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; rebaseAtv(k); if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
