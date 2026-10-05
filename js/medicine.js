@@ -88,7 +88,12 @@ function trashNight(out){
     if(p && healthActive()) for(const a of [...e.animals]){
       if(Math.random() >= p) continue;
       if(Math.random() < THROWN.deadly){ a.sick = {kind:"illness", sev:100, cause:"trash"}; animalDies(e, a); out.poisoned++; continue; }
-      if(a.sick){ a.sick.sev = Math.min(99, a.sick.sev + THROWN.sev); continue; }
+      if(a.sick){
+        // already sick: it gets worse, but never past what a vet can still reach in time, and it can't stay hidden
+        a.sick.sev = Math.max(a.sick.sev, Math.min(THROWN.sevCap, a.sick.sev + THROWN.sev));
+        delete a.sick.chronic;
+        a.sick.cause = "trash"; delete a.sick.hidden; out.fed++; continue;
+      }
       fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; out.fed++;
     }
     e.trash = 0;
