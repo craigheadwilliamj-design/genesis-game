@@ -146,9 +146,10 @@ function render(){
   // ponds and lakes out in the park, under everything built
   s += parkWaterSvg(tool === "bulldoze", isDoomed);
 
-  // exhibits
+  // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  const tanks = [];
   for(const e of state.exhibits){
-    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points);
+    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
     if(e.viv){
@@ -202,6 +203,7 @@ function render(){
       s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     s += `</g>`;
+    if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
   }
 
   // open fences and hedge rows
@@ -287,9 +289,11 @@ function render(){
   }
 
   // guest buildings, back to front in the 3/4 view so taller ones in front cover the ones behind
+  tanks.sort((a, b) => a.y - b.y);
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : themeOf(bl).edge, full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
@@ -323,6 +327,7 @@ function render(){
     }
     s += `</g>`;
   }
+  for(const tk of tanks) s += tk.svg;
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
   if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
@@ -637,7 +642,7 @@ function camp34(bl, P, col, line){
 }
 
 // Standing buildings hide the guests and staff walking behind them: each one's footprint swept up to its roof line.
-// Open canopies, decks and camps are left out, since people stand under or on them.
+// Vivarium tanks count too. Open canopies, decks and camps are left out, since people stand under or on them.
 let occ34 = [];
 function occluders34(){
   const out = [];
@@ -645,6 +650,12 @@ function occluders34(){
     const S = STAND34[bl.type];
     if(!S || S.canopy || S.front === "deck" || S.front === "camp" || BUILDINGS[bl.type].prop) continue;
     const P = bl.points, Q = P.map(lift34(S.wall + S.rise)), all = P.concat(Q);
+    out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
+  }
+  // vivarium tanks too
+  for(const e of state.exhibits){
+    if(!e.viv) continue;
+    const P = e.points, Q = P.map(lift34(VIVARIUMS[e.viv].d * .45)), all = P.concat(Q);
     out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
   }
   return out;
