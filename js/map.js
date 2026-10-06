@@ -146,9 +146,10 @@ function render(){
   // ponds and lakes out in the park, under everything built
   s += parkWaterSvg(tool === "bulldoze", isDoomed);
 
-  // exhibits
+  // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  const tanks = [];
   for(const e of state.exhibits){
-    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points);
+    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
     if(e.viv){
@@ -202,6 +203,7 @@ function render(){
       s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     s += `</g>`;
+    if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
   }
 
   // open fences and hedge rows
@@ -287,9 +289,11 @@ function render(){
   }
 
   // guest buildings, back to front in the 3/4 view so taller ones in front cover the ones behind
+  tanks.sort((a, b) => a.y - b.y);
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : themeOf(bl).edge, full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
@@ -323,6 +327,7 @@ function render(){
     }
     s += `</g>`;
   }
+  for(const tk of tanks) s += tk.svg;
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
   if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
@@ -362,6 +367,7 @@ function render(){
     s += `<g data-kind="zone" data-id="${esc(z.id)}" style="cursor:pointer"><rect x="${zx - 34*inv}" y="${zy - 9*inv}" width="${68*inv}" height="${18*inv}" rx="${4*inv}" fill="${z.color}" fill-opacity="${on ? 1 : .85}" stroke="${on ? "var(--sel)" : "none"}" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" x="${zx}" y="${zy}" font-size="${fs}" style="fill:#fff">${esc(z.name.slice(0, 12))}</text></g>`;
   }
 
+  occ34 = tilt ? occluders34() : [];
   world.innerHTML = s;
   renderOverlay();
   syncAnimals();
@@ -633,6 +639,35 @@ function camp34(bl, P, col, line){
   s += `<circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r="1" fill="#6E6A60"/><circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r=".6" fill="#E8742A"/><circle cx="${fx.toFixed(2)}" cy="${(fy - .2).toFixed(2)}" r=".3" fill="#FFD27A"/>`;
   for(const tn of tents) s += `<polygon points="${polyStr(tn.pts.map(([x, y]) => [x + .35, y + .3]))}" fill="#1D2B22" fill-opacity=".2" pointer-events="none"/>` + hipRoof34(tn.pts, 0, 1.8, tn.c, null, line, true) + tentDoor34(tn.pts);
   return s;
+}
+
+// Standing buildings hide the guests and staff walking behind them: each one's footprint swept up to its roof line.
+// Vivarium tanks count too. Open canopies, decks and camps are left out, since people stand under or on them.
+let occ34 = [];
+function occluders34(){
+  const out = [];
+  for(const bl of state.buildings){
+    const S = STAND34[bl.type];
+    if(!S || S.canopy || S.front === "deck" || S.front === "camp" || BUILDINGS[bl.type].prop) continue;
+    const P = bl.points, Q = P.map(lift34(S.wall + S.rise)), all = P.concat(Q);
+    out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
+  }
+  // vivarium tanks too
+  for(const e of state.exhibits){
+    if(!e.viv) continue;
+    const P = e.points, Q = P.map(lift34(VIVARIUMS[e.viv].d * .45)), all = P.concat(Q);
+    out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
+  }
+  return out;
+}
+// is this ground spot behind (or inside) a standing building in the 3/4 view
+function hidden34(x, y){
+  for(const o of occ34){
+    if(x < o.x0 || x > o.x1 || y < o.y0 || y > o.y1) continue;
+    if(inPoly(x, y, o.P) || inPoly(x, y, o.Q)) return true;
+    for(let i = 0, n = o.P.length; i < n; i++){ const j = (i+1) % n; if(inPoly(x, y, [o.P[i], o.P[j], o.Q[j], o.Q[i]])) return true; }
+  }
+  return false;
 }
 
 function building34(bl, t, on, dead, reach, inv){
@@ -1115,6 +1150,7 @@ function drawParties(){
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
+    if(hidden34(x, y)) continue;
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
     d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : p.shirt].push(m); all.push(m);
   }
@@ -1674,6 +1710,7 @@ function gateTap(e){
 
 /* ---------- keepers on the map ---------- */
 const keeperEls = new Map();
+function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; }
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
   for(const c of crew){
@@ -1693,7 +1730,7 @@ function drawKeepers(){
         `<circle r="${r}" fill="#2E6B3A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
         (food ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${food}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
+    walker34(el, x, y);
   }
   // mechanics: orange with a white wrench-dot
   for(const c of mcrew){
@@ -1708,7 +1745,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#C8642A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><circle r="${r*.35}" fill="#fff"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
+    walker34(el, x, y);
   }
   // vets: white with a red cross
   for(const c of vcrew){
@@ -1722,7 +1759,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#fff" stroke="#B0384F" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${-r*.55} 0H${r*.55}M0 ${-r*.55}V${r*.55}" stroke="#B0384F" stroke-width="${r*.35}"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
+    walker34(el, x, y);
   }
   // custodians: teal, with a square of whatever stock they're carrying
   for(const c of ccrew){
@@ -1737,7 +1774,7 @@ function drawKeepers(){
         (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
+    walker34(el, x, y);
   }
   // security guards: navy, with a white badge; a dashed ring while chasing
   for(const c of gcrew){
@@ -1751,7 +1788,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`);
+    walker34(el, x, y);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
   for(const a of usableAtvs()){
@@ -1762,7 +1799,7 @@ function drawKeepers(){
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
     const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
     if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
-    el.setAttribute("transform", `translate(${n.x.toFixed(2)} ${n.y.toFixed(2)})${upright()}`);
+    walker34(el, n.x, n.y);
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
 }
