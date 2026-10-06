@@ -893,8 +893,8 @@ function place34(h){
   h.slot = lo; z.g.insertBefore(h.el, z.kids[lo] || null);
 }
 
-// an animal's dot stands on its spot in the 3/4 view instead of sinking halfway into the ground
-function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * .85).toFixed(2)})` : ""; }
+// an animal stands on its spot in the 3/4 view: a dot on its lower edge, a picture on its feet (spriteSvg puts them half a dot down)
+function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (h.spr ? .5 : .85)).toFixed(2)})` : ""; }
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
@@ -934,7 +934,8 @@ function syncAnimals(){
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8, sprite = !e.viv && SPRITES[a.sp] && r * view.k >= 6;
-      h.r = r;
+      h.r = r; h.spr = sprite;
+      if(!h.placed){ h.placed = true; const A = walkArea(h, e); for(let i = 0; i < 20; i++){ const p = randomInside(e.points); if(standable(p, A)){ [h.x, h.y] = p; break; } } }   // a new animal starts somewhere it fits
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
@@ -948,55 +949,105 @@ function syncAnimals(){
   indexDepth34(); for(const h of herd.values()) place34(h);
 }
 
-// Can an animal walk straight from a to b without touching the fence? Samples the line, since L and U shaped exhibits cut corners.
-function walkClear(a, b, pts){
-  for(let i = 0; i < pts.length; i++) if(segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
-  const n = Math.max(2, Math.ceil(dist(a, b) / 1.5));
-  for(let i = 0; i <= n; i++){ const t = i/n; if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false; }
+// What an animal walks around: its fence, kept half a body's length off so it doesn't poke through, and the rocks, trees, caves and barns
+// standing in the exhibit (each a circle it keeps its feet out of)
+function walkArea(h, e){
+  const pts = e.points, c = centroid(pts), body = (h.r || 1) * .5;
+  const m = Math.min((h.r || 1) * 1.3, inPoly(c[0], c[1], pts) ? distToEdge(c[0], c[1], pts) * .5 : 1);
+  const obs = [];
+  for(const f of landOf(e)){
+    const t = LAND[f.type]; if(!t) continue;
+    const r = t.r * (f.k || 1);
+    const R = t.flora ? (t.look === "conifer" || treeLift(t) ? r * .35 : 0)   // a tree's trunk; low plants are walked through
+      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : r * .9;
+    if(R) obs.push({x:f.x, y:f.y, c:R + body});
+  }
+  return {pts, obs, m};
+}
+const inObstacle = (p, A) => A.obs.some(o => Math.hypot(p[0] - o.x, p[1] - o.y) < o.c);
+// Is p somewhere an animal can stand: inside, off the fence, out of the rocks and trees?
+const standable = (p, A) => inPoly(p[0], p[1], A.pts) && distToEdge(p[0], p[1], A.pts) >= A.m && !inObstacle(p, A);
+// A spot by the fence moved in toward the middle until the animal fits there; solid also steps it out of any rock or tree it's in
+function offFence(p, A, solid){
+  const c = centroid(A.pts);
+  for(let k = 0, q = p; k < 12; k++, q = [q[0] + (c[0] - q[0]) * .15, q[1] + (c[1] - q[1]) * .15]){
+    if(!inPoly(q[0], q[1], A.pts)) break;
+    if(distToEdge(q[0], q[1], A.pts) >= A.m){ p = q; break; }
+  }
+  if(solid && inObstacle(p, A)) for(let r = 1; r <= 8; r++) for(let k = 0; k < 8; k++){ const q = [p[0] + Math.cos(k * Math.PI / 4) * r, p[1] + Math.sin(k * Math.PI / 4) * r]; if(standable(q, A)) return q; }
+  return p;
+}
+
+// Can an animal walk straight from a to b? Not across the fence or too close along it, and not through a rock or tree
+// (one it's standing in, or heading into, doesn't count). Checks a few points are inside too, in case it only touches a corner.
+function walkClear(a, b, A){
+  const pts = A.pts, need = Math.min(A.m, distToEdge(a[0], a[1], pts), distToEdge(b[0], b[1], pts)) * .9;
+  for(let i = 0; i < pts.length; i++) if(segSegDist(a, b, pts[i], pts[(i+1) % pts.length]) < need || segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
+  for(const o of A.obs){
+    if(Math.hypot(a[0] - o.x, a[1] - o.y) < o.c || Math.hypot(b[0] - o.x, b[1] - o.y) < o.c) continue;
+    if(segProj(o.x, o.y, a, b).d < o.c) return false;
+  }
+  for(const t of [.25, .5, .75]) if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false;
   return true;
 }
 
-// Every corner nudged a little way inward, so a route can bend around the inside corners of an irregular exhibit
+// Every corner nudged inward past the animal's margin, so a route can bend around the inside corners of an irregular exhibit
 const walkNodeCache = new Map();
-function walkNodes(pts){
-  const key = JSON.stringify(pts); let nodes = walkNodeCache.get(key);
+function cornerNodes(pts, m = 0){
+  const key = JSON.stringify(pts) + m.toFixed(1); let nodes = walkNodeCache.get(key);
   if(nodes) return nodes;
   nodes = [];
-  const n = pts.length, c = centroid(pts);
+  const n = pts.length;
   for(let i = 0; i < n; i++){
     const p = pts[i], a = pts[(i+n-1) % n], b = pts[(i+1) % n];
     const u = [(a[0]-p[0])/(dist(a,p)||1), (a[1]-p[1])/(dist(a,p)||1)], v = [(b[0]-p[0])/(dist(b,p)||1), (b[1]-p[1])/(dist(b,p)||1)];
     let bx = u[0] + v[0], by = u[1] + v[1], L = Math.hypot(bx, by);
     if(L < 1e-6){ bx = -u[1]; by = u[0]; L = 1; }
     bx /= L; by /= L;
-    for(const m of [1, 2.5]){   // bisector of the two edges, flipped if it points outside
-      let q = [p[0] + bx*m, p[1] + by*m];
-      if(!inPoly(q[0], q[1], pts)) q = [p[0] - bx*m, p[1] - by*m];
-      if(inPoly(q[0], q[1], pts) && distToEdge(q[0], q[1], pts) > .3){ nodes.push(q); break; }
+    for(const k of [1, 2.5, 4]){   // bisector of the two edges, flipped if it points outside
+      const d = m * 1.5 + k;
+      let q = [p[0] + bx*d, p[1] + by*d];
+      if(!inPoly(q[0], q[1], pts)) q = [p[0] - bx*d, p[1] - by*d];
+      if(inPoly(q[0], q[1], pts) && distToEdge(q[0], q[1], pts) > Math.max(.3, m)){ nodes.push(q); break; }
     }
   }
   if(walkNodeCache.size > 60) walkNodeCache.clear();
   walkNodeCache.set(key, nodes);
   return nodes;
 }
+// The corners, plus a ring of spots around each rock and tree to walk round it by
+function walkNodes(A){
+  const out = cornerNodes(A.pts, A.m).filter(p => !inObstacle(p, A));
+  for(const o of A.obs) for(let k = 0; k < 6; k++){ const a = k * Math.PI / 3 + .3, p = [o.x + Math.cos(a) * (o.c + .4), o.y + Math.sin(a) * (o.c + .4)]; if(standable(p, A)) out.push(p); }
+  return out;
+}
 
-// Waypoints from a to b that stay inside the exhibit, or null if there's no way
-function walkRoute(a, b, pts){
-  if(walkClear(a, b, pts)) return [b];
-  const nodes = walkNodes(pts), pos = [a, ...nodes, b], N = pos.length, d = new Array(N).fill(Infinity), prev = new Array(N).fill(-1), done = new Array(N).fill(false);
-  d[0] = 0;
+// Which waypoints see each other, worked out once per exhibit layout and body size, since every animal of a kind shares it
+const walkGraphCache = new Map();
+function walkGraph(A){
+  const key = JSON.stringify([A.pts, A.obs, A.m]); let g = walkGraphCache.get(key);
+  if(g) return g;
+  const nodes = walkNodes(A), adj = nodes.map(() => []);
+  for(let i = 0; i < nodes.length; i++) for(let j = i + 1; j < nodes.length; j++) if(walkClear(nodes[i], nodes[j], A)){ const w = dist(nodes[i], nodes[j]); adj[i].push([j, w]); adj[j].push([i, w]); }
+  if(walkGraphCache.size > 40) walkGraphCache.clear();
+  walkGraphCache.set(key, g = {nodes, adj});
+  return g;
+}
+// Waypoints from a to b that stay inside the exhibit and around what stands in it, or null if there's no way
+function walkRoute(a, b, A){
+  if(walkClear(a, b, A)) return [b];
+  const {nodes, adj} = walkGraph(A), N = nodes.length, done = new Array(N).fill(false), prev = new Array(N).fill(-1);
+  const d = nodes.map(n => walkClear(a, n, A) ? dist(a, n) : Infinity);
+  let best = Infinity, last = -1;
   for(;;){
     let u = -1; for(let i = 0; i < N; i++) if(!done[i] && d[i] < Infinity && (u < 0 || d[i] < d[u])) u = i;
-    if(u < 0) return null;
-    if(u === N-1) break;
+    if(u < 0 || d[u] >= best) break;
     done[u] = true;
-    for(let v = 1; v < N; v++){
-      if(done[v]) continue;
-      const w = dist(pos[u], pos[v]); if(d[u] + w >= d[v] || !walkClear(pos[u], pos[v], pts)) continue;
-      d[v] = d[u] + w; prev[v] = u;
-    }
+    const tail = dist(nodes[u], b); if(d[u] + tail < best && walkClear(nodes[u], b, A)){ best = d[u] + tail; last = u; }
+    for(const [v, w] of adj[u]) if(!done[v] && d[u] + w < d[v]){ d[v] = d[u] + w; prev[v] = u; }
   }
-  const out = []; for(let i = N-1; i > 0; i = prev[i]) out.unshift(pos[i]);
+  if(last < 0) return null;
+  const out = [b]; for(let i = last; i >= 0; i = prev[i]) out.unshift(nodes[i]);
   return out;
 }
 
@@ -1004,10 +1055,11 @@ function walkRoute(a, b, pts){
 function animalWander(h, e){
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
-  for(let i = 0; i < 6; i++){
-    const [x, y] = randomInside(e.points);
-    if(distToEdge(x, y, e.points) < .5) continue;
-    const r = walkRoute([h.x, h.y], [x, y], e.points);
+  const A = walkArea(h, e);
+  for(let i = 0; i < 8; i++){
+    const p = randomInside(e.points);
+    if(!standable(p, A)) continue;
+    const r = walkRoute([h.x, h.y], p, A);
     if(r){ h.path = r; return; }
   }
 }
@@ -1017,7 +1069,9 @@ const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1};
 const ACT_STAYS = new Set(["eat", "drink", "rest", "hide"]);
 // The edge of a land feature nearest the animal, or its middle for shelters it can walk into
 function featSpot(h, f, into){
-  const t = LAND[f.type], r = into ? 0 : t.r + (h.r || 1), dx = h.x - f.x, dy = h.y - f.y, d = Math.hypot(dx, dy) || 1;
+  const t = LAND[f.type];
+  if(into && (t.look === "cave" || t.look === "burrow")) return [f.x, f.y + t.r * .85 + (h.r || 1) * .6];   // at the mouth, which faces the viewer
+  const r = into ? 0 : t.r + (h.r || 1), dx = h.x - f.x, dy = h.y - f.y, d = Math.hypot(dx, dy) || 1;
   return [f.x + dx / d * r, f.y + dy / d * r];
 }
 const nearestTo = (h, list, at = x => x) => { let b = null, bd = Infinity; for(const x of list){ const p = at(x), d = Math.hypot(p[0] - h.x, p[1] - h.y); if(d < bd){ bd = d; b = x; } } return b; };
@@ -1033,7 +1087,7 @@ function gateSpot(e){
 function quietSpot(e){
   const far = p => state.paths.reduce((m, q) => Math.min(m, lineDist(p[0], p[1], q.points)), 60);
   let best = null, bd = -1;
-  for(const p of walkNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
+  for(const p of cornerNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
   return best;
 }
 // Where the act takes it, or null to stay where it is
@@ -1080,24 +1134,24 @@ function actGoal(h, e, a){
 }
 // Pacing: back and forth along a short beat just inside the nearest stretch of fence
 function paceRoute(h, e){
-  const pts = e.points, inset = e.viv ? .4 : (h.r || 1) + 1.5;
+  const pts = e.points, A = walkArea(h, e), inset = e.viv ? .4 : (h.r || 1) + 1.5;
   let best = null;
   for(let i = 0; i < pts.length; i++){ const a = pts[i], b = pts[(i + 1) % pts.length], q = segProj(h.x, h.y, a, b); if(!best || q.d < best.q.d) best = {a, b, q}; }
   const {a, b, q} = best, L = dist(a, b) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
   let nx = -uy, ny = ux;
   if(!inPoly(q.x + nx * inset, q.y + ny * inset, pts)){ nx = -nx; ny = -ny; }
-  const beat = clamp(L * .4, e.viv ? 1 : 3, 14), t0 = clamp(q.t * L - beat / 2, 0, Math.max(0, L - beat));
+  const beat = Math.min(clamp(L * .4, e.viv ? 1 : 3, 14), Math.max(0, L - inset * 2)), t0 = clamp(q.t * L - beat / 2, inset, Math.max(inset, L - beat - inset));
   const p1 = [a[0] + ux * t0 + nx * inset, a[1] + uy * t0 + ny * inset], p2 = [p1[0] + ux * beat, p1[1] + uy * beat];
-  if(!inPoly(p1[0], p1[1], pts) || !walkClear(p1, p2, pts)) return null;
-  const to = walkRoute([h.x, h.y], p1, pts);
+  if(!inPoly(p1[0], p1[1], pts) || inObstacle(p1, A) || inObstacle(p2, A) || !walkClear(p1, p2, A)) return null;
+  const to = walkRoute([h.x, h.y], p1, A);
   return to ? to.concat([p2, p1, p2, p1, p2, p1]) : null;
 }
 // Patrolling: a lap of the fence line, from the nearest corner
 function patrolRoute(h, e){
-  const nodes = walkNodes(e.points); if(nodes.length < 3) return null;
+  const A = walkArea(h, e), nodes = cornerNodes(e.points, A.m).filter(p => !inObstacle(p, A)); if(nodes.length < 3) return null;
   const i0 = nodes.indexOf(nearestTo(h, nodes)), out = [];
   let at = [h.x, h.y];
-  for(let k = 0; k <= nodes.length; k++){ const n = nodes[(i0 + k) % nodes.length], r = walkRoute(at, n, e.points); if(!r) break; out.push(...r); at = n; }
+  for(let k = 0; k <= nodes.length; k++){ const n = nodes[(i0 + k) % nodes.length], r = walkRoute(at, n, A); if(!r) break; out.push(...r); at = n; }
   return out.length ? out : null;
 }
 function animalPlan(h, e){
@@ -1107,10 +1161,12 @@ function animalPlan(h, e){
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
   if(a.act === "pace"){ const r = paceRoute(h, e); if(r){ h.path = r; return; } }
   if(a.act === "patrol"){ const r = patrolRoute(h, e); if(r){ h.path = r; return; } }
-  const goal = actGoal(h, e, a);
+  // only a barn is walked into (featSpot sends it to the middle); every other spot steps clear of rocks and trees
+  const A = walkArea(h, e), aim = actGoal(h, e, a), barn = aim && landOf(e).some(f => LAND[f.type] && LAND[f.type].slots && !LAND[f.type].look && dist(aim, [f.x, f.y]) < .01);
+  const goal = aim && offFence(aim, A, !barn);
   if(goal){
     if(Math.hypot(goal[0] - h.x, goal[1] - h.y) < .5) return;
-    const r = inPoly(goal[0], goal[1], e.points) && walkRoute([h.x, h.y], goal, e.points);
+    const r = inPoly(goal[0], goal[1], e.points) && walkRoute([h.x, h.y], goal, A);
     if(r){ h.path = r; return; }
   }
   // nothing to head for: settle where it is, or mill about
