@@ -320,7 +320,7 @@ const PERIOD_COLOR = {
 
 // Species drawn with a picture instead of a dot: sprites/<id>.png standing, side-on and facing right, with the width over the height.
 // walk is how many frames sprites/<id>-walk.png has, side by side, each the same size as the standing picture.
-const SPRITES = {coel:{ratio:100/75}, dime:{ratio:100/75, walk:2}, tikt:{ratio:100/75, idle:6, ms:450}};
+const SPRITES = {coel:{ratio:100/75, walk:2}, dime:{ratio:100/75, walk:2}, tikt:{ratio:100/75, idle:6, ms:450}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
