@@ -899,9 +899,9 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
 function spriteSvg(sp, h){
-  const S = SPRITES[sp], r = h.r, w = r * 2.5, ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" ${box}${f >= 0 && S.walk ? ` display="none"` : ""}/>`
-    + (S.walk ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-walk.png" width="${S.walk}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * 2.5, ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" ${box}${f >= 0 && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // -1 stands, 0 and up is a walk frame
 function setPose(h, f){
@@ -912,6 +912,9 @@ function setPose(h, f){
   st.setAttribute("display", "none"); wk.removeAttribute("display");
   const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" "));
 }
+
+// a vivarium animal stays put, so keep new ones a couple of bodies apart
+function cramped(h, p){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * 2.5) return true; return false; }
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
@@ -933,9 +936,9 @@ function syncAnimals(){
       h.a = a;
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
-      const showLetter = r * view.k >= 8, sprite = !e.viv && SPRITES[a.sp] && r * view.k >= 6;
-      h.r = r; h.spr = sprite;
-      if(!h.placed){ h.placed = true; const A = walkArea(h, e); for(let i = 0; i < 20; i++){ const p = randomInside(e.points); if(standable(p, A)){ [h.x, h.y] = p; break; } } }   // a new animal starts somewhere it fits
+      const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= 6;
+      h.r = r; h.spr = sprite; h.viv = !!e.viv;
+      if(!h.placed){ h.placed = true; const A = walkArea(h, e); for(let i = 0; i < 20; i++){ const p = randomInside(e.points); if(standable(p, A) && !(e.viv && cramped(h, p))){ [h.x, h.y] = p; break; } } }   // a new animal starts somewhere it fits
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
@@ -1179,6 +1182,12 @@ function animateAnimals(dt){
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
     if(act !== h.act){ h.act = act; h.path = null; h.wait = Math.min(h.wait, Math.random() * .6); }
+    // vivarium animals don't walk: they stay on their spot and cycle an idle strip if their picture has one (else the standing picture or dot)
+    if(e.viv){
+      const S = SPRITES[h.sp];
+      if(h.spr && S && S.idle){ h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); }
+      continue;
+    }
     if(h.wait > 0){ h.wait -= dt; setPose(h, -1); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
