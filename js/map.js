@@ -896,10 +896,21 @@ function place34(h){
 // an animal's dot stands on its spot in the 3/4 view instead of sinking halfway into the ground
 function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * .85).toFixed(2)})` : ""; }
 
-// A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the right
-function spriteSvg(sp, r, face){
-  const w = r * 2.5, ht = w / SPRITES[sp];
-  return `<g class="spr" transform="scale(${face || 1} 1)"><image href="sprites/${sp}.png" x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"/></g>`;
+// A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
+// The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
+function spriteSvg(sp, h){
+  const S = SPRITES[sp], r = h.r, w = r * 2.5, ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" ${box}${f >= 0 && S.walk ? ` display="none"` : ""}/>`
+    + (S.walk ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-walk.png" width="${S.walk}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+}
+// -1 stands, 0 and up is a walk frame
+function setPose(h, f){
+  if(f === h.pose) return;
+  h.pose = f;
+  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"); if(!st || !wk) return;
+  if(f < 0){ st.removeAttribute("display"); wk.setAttribute("display", "none"); return; }
+  st.setAttribute("display", "none"); wk.removeAttribute("display");
+  const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" "));
 }
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
@@ -928,7 +939,7 @@ function syncAnimals(){
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
         (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
-        (sprite ? spriteSvg(a.sp, r, h.face) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
+        (sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
         (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : ""));
       h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     }
@@ -1112,7 +1123,7 @@ function animateAnimals(dt){
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
     if(act !== h.act){ h.act = act; h.path = null; h.wait = Math.min(h.wait, Math.random() * .6); }
-    if(h.wait > 0){ h.wait -= dt; continue; }
+    if(h.wait > 0){ h.wait -= dt; setPose(h, -1); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
     const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
@@ -1121,8 +1132,10 @@ function animateAnimals(dt){
     if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
-    // pictures face the way they walk
-    if(Math.abs(dx) > .05){ const face = dx < 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
+    // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
+    const S = SPRITES[h.sp];
+    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * .5)) % S.walk); }
+    if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     if(tilt) place34(h);
   }
