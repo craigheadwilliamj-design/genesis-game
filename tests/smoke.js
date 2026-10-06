@@ -184,8 +184,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.geneNoBetterGenome = !!geneProblem(ga);
     state.science.dna.arth.quality = 75;
     out.geneQueues = !geneProblem(ga); ga.gene = true;
-    const money0 = state.money, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && money0 - state.money >= geneCost(15) && illChance(viv, ga).p < illBefore;
+    const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
+    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && state.today.medicine - med0 >= geneCost(15) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -491,7 +491,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 20 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested
@@ -826,7 +826,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const tiny = SPECIES.slice().sort((a, c) => a.space - c.space)[0];
     sc.unlocked.push(big.id);
     const aSmall = avgTrips(tiny.id), aBig = avgTrips(big.id);
-    out.smallGenome3 = aSmall > 2.6 && aSmall < 4.2;
+    out.smallGenome3 = aSmall > 1.6 && aSmall < 3.2;
     out.bigGenome8 = aBig > 6.8 && aBig < 9.2;
     out.bigTakesMoreTrips = aBig > aSmall + 3 && tripOdds(big.id, big.period).trips > tripOdds(tiny.id, tiny.period).trips + 4;
     out.genomeVaries = (() => { const ns = []; for(let n = 0; n < 40; n++){ delete sc.dna[big.id]; let k = 0; while(!genomeDone(big.id) && k < 60){ tripReturns({sp:big.id, period:big.period}); k++; } ns.push(k); } return Math.min(...ns) < Math.max(...ns); })();

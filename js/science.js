@@ -64,7 +64,7 @@ const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s));
 const isUnlocked = id => state.science.unlocked.includes(id);
 
 // What unlocking an animal's genome costs in research points: its period's base plus a share of its price
-function unlockPoints(s){ return Math.max(5, Math.round(PERIOD_BY_ID[s.period].research * .2 + s.price * UNLOCK_PER_PRICE)); }
+function unlockPoints(s){ return Math.max(3, Math.round(PERIOD_BY_ID[s.period].research * .08 + s.price * UNLOCK_PER_PRICE)); }
 
 // A project is {kind, id}: "tech" (anything in TECH), "refine" (an era's medicine, for one period) or "species" (an animal's genome)
 function projectInfo(kind, id){

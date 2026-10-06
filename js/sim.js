@@ -6,6 +6,8 @@
    ===================================================================== */
 
 const SPECIES_BY_ID = Object.fromEntries(SPECIES.map(s => [s.id, s]));
+// How hard a species pulls guests in. Appeal is stretched so showstoppers dominate: at the pivot it counts as is, a Plateosaurus (8) counts about 4, a starter (3) under 1.
+const speciesDraw = s => GUEST.drawPivot * Math.pow(s.appeal / GUEST.drawPivot, GUEST.drawPower);
 const uid = p => p + Math.random().toString(36).slice(2, 9);
 
 // The park plot: a 420 × 305 m rectangle, every corner on the 5 m grid
@@ -462,7 +464,7 @@ function recompute(){
     animals += n; happySum += e.happy * n;
     if(!reach[e.id]) continue;
     for(const [sp, c] of reports[e.id].counts){
-      appeal += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id])) * liveliness(e);
+      appeal += speciesDraw(SPECIES_BY_ID[sp]) * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id])) * liveliness(e);
       shown.add(sp);
     }
   }
