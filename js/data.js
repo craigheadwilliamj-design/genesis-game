@@ -318,6 +318,9 @@ const PERIOD_COLOR = {
   Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
 };
 
+// Species drawn with a picture instead of a dot: sprites/<id>.png, side-on and facing left, with the width over the height
+const SPRITES = {dime:100/75};
+
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
