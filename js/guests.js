@@ -240,7 +240,7 @@ function bestStop(p, need){
 function exhibitAppeal(e){
   if(!e.animals.length) return 0;
   let a = 0;
-  for(const [sp, c] of speciesCounts(e)) a += SPECIES_BY_ID[sp].appeal * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100);
+  for(const [sp, c] of speciesCounts(e)) a += speciesDraw(SPECIES_BY_ID[sp]) * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100);
   return a * viewFactor(e, derived.reach);
 }
 // Pick an exhibit not seen yet, or the Education Center if it hasn't been: popular ones, and close ones, are likelier

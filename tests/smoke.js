@@ -826,7 +826,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const tiny = SPECIES.slice().sort((a, c) => a.space - c.space)[0];
     sc.unlocked.push(big.id);
     const aSmall = avgTrips(tiny.id), aBig = avgTrips(big.id);
-    out.smallGenome3 = aSmall > 2.6 && aSmall < 4.2;
+    out.smallGenome3 = aSmall > 1.6 && aSmall < 3.2;
     out.bigGenome8 = aBig > 6.8 && aBig < 9.2;
     out.bigTakesMoreTrips = aBig > aSmall + 3 && tripOdds(big.id, big.period).trips > tripOdds(tiny.id, tiny.period).trips + 4;
     out.genomeVaries = (() => { const ns = []; for(let n = 0; n < 40; n++){ delete sc.dna[big.id]; let k = 0; while(!genomeDone(big.id) && k < 60){ tripReturns({sp:big.id, period:big.period}); k++; } ns.push(k); } return Math.min(...ns) < Math.max(...ns); })();

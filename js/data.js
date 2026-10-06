@@ -268,16 +268,16 @@ const RESEARCH_PER_PALEO = 5;   // research points each paleontologist earns per
 // How long research takes, in park minutes per point. A 60-point project is 3 open days.
 const RESEARCH_MIN_PER_POINT = DAY_MIN / 20;
 // What unlocking one animal's genome costs at ORACLE: its period's base plus this much for every $ of its price
-const UNLOCK_PER_PRICE = 1 / 2000;
+const UNLOCK_PER_PRICE = 1 / 1500;
 
 // Expeditions. A trip either finds something or comes back empty-handed, and a find fills part of a genome.
-// Bigger animals are harder to find, and a genome takes about 3 trips for the smallest and 8 for the largest.
+// Bigger animals are harder to find, and a genome takes about 2 trips for the smallest and 8 for the largest.
 //   fail     chance of nothing, before the period's own risk: [smallest animal, largest animal]
 //   trips    trips a genome takes on average: [smallest, largest]
 //   spread   a find is worth between this share less and this share more than average
 //   costMul  trip price multiplier: [smallest, largest]
 //   bonus    chance a trip also turns up traces of another unlocked animal from that period, and what they add
-const TRIP = {fail:[.2, .35], trips:[3, 8], spread:.35, costMul:[.7, 1.3], bonus:{chance:.12, gain:[4, 8]}};
+const TRIP = {fail:[.1, .35], trips:[2, 8], spread:.35, costMul:[.35, 1.4], bonus:{chance:.12, gain:[4, 8]}};
 // Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
 const TRIP_SIZE = [10, 5000];
 
@@ -378,6 +378,7 @@ const BUILDINGS = {
    Guests come in parties. Needs run from 0 (fine) to 100 (desperate).
    --------------------------------------------------------------------- */
 const GUEST = {
+  drawPivot:6,         // species appeal is squeezed around this: speciesDraw = sqrt(drawPivot * appeal), so famous animals pull in far fewer extra guests
   maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home
