@@ -9,7 +9,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), overlay = $("#overlay");
 const mapwrap = $("#mapwrap");
 
-const KMIN = 0.4, KMAX = 14;       // zoom limits, in screen pixels per meter
+const KMIN = 0.4, KMAX = 18.2;     // zoom limits, in screen pixels per meter
 let view = {k:2, tx:0, ty:0};
 // 3/4 view (prototype): the ground is squashed by TILT top to bottom, so it reads as seen at an angle
 const TILT = .7;
