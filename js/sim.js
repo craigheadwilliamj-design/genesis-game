@@ -6,8 +6,8 @@
    ===================================================================== */
 
 const SPECIES_BY_ID = Object.fromEntries(SPECIES.map(s => [s.id, s]));
-// How hard a species pulls guests in. The square root squeezes the range, so a T. rex draws about 3 times a starter, not 8.
-const speciesDraw = s => Math.sqrt(GUEST.drawPivot * s.appeal);
+// How hard a species pulls guests in. Appeal is stretched so showstoppers dominate: at the pivot it counts as is, a Plateosaurus (8) counts about 4, a starter (3) under 1.
+const speciesDraw = s => GUEST.drawPivot * Math.pow(s.appeal / GUEST.drawPivot, GUEST.drawPower);
 const uid = p => p + Math.random().toString(36).slice(2, 9);
 
 // The park plot: a 420 × 305 m rectangle, every corner on the 5 m grid
@@ -491,7 +491,7 @@ function recompute(){
   // Stars come from five things: happy animals, looked-after guests, variety, how much there is to see, and what guests learn.
   // Each part is scored 0 to 1. Animals count as fully happy at 90% or more.
   const welfare = clamp((avgHappy - 30) / 60, 0, 1);
-  const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / 100);
+  const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / 150);
   // what guests learned: today's leavers once enough have gone home, otherwise yesterday's
   const learnt = t.eduN >= 20 ? t.eduSum / t.eduN : state.guestLog.edu, education = learnt == null ? 0 : Math.min(1, learnt / EDU.full);
   const eduNote = learnt == null ? "Nobody has left yet. Info signs by exhibits, field guides, and an Education Center teach guests."

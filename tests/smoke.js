@@ -184,8 +184,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.geneNoBetterGenome = !!geneProblem(ga);
     state.science.dna.arth.quality = 75;
     out.geneQueues = !geneProblem(ga); ga.gene = true;
-    const money0 = state.money, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && money0 - state.money >= geneCost(15) && illChance(viv, ga).p < illBefore;
+    const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
+    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && state.today.medicine - med0 >= geneCost(15) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -491,7 +491,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 20 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested
