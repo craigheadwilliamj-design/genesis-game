@@ -331,6 +331,8 @@ const EDU_FOCUS = {
 //   boost    adds to the strength of those focuses
 //   slots    more guests that can sit through a visit at once
 //   perSpecies  learning grows with the animals ORACLE has unlocked
+//   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab" or "nursery"
+//   dept     science buildings it needs (any one of them) before it can be installed
 const EDU_MODULES = {
   theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
               text:"A stage for puppet shows and animal talks. Crowds love it."},
@@ -338,7 +340,12 @@ const EDU_MODULES = {
               text:"Real casts and bones. It teaches more as ORACLE unlocks more animals."},
   auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
               text:"Tiered seating for lectures. More guests can sit through a talk at once."},
+  labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
+              text:"A gallery over the working labs. It's only as good as what's going on: ORACLE, GHOST, TAR and CERES all busy makes the best show."},
+  nursery:   {label:"Nursery Window",   tech:"ednursery",   price:11000, upkeep:100, learn:3, joy:4, appeal:6, live:"nursery", dept:["tar"], boost:{family:.7, conservation:.3, spectacle:.2},
+              text:"Watch clones in the incubators, and the day one hatches. Needs TAR, and the best shows are while clones are growing."},
 };
+const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5};   // a live module with nothing going on still works at this share
 const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
@@ -925,6 +932,8 @@ const TECH = [
   {id:"edtheater", group:"build", label:"Education theater", points:30, needs:"education", text:"Add a Theater module to an Education Center for shows that draw crowds."},
   {id:"edfossils", group:"build", label:"Fossil displays", points:30, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
   {id:"edauditorium", group:"build", label:"Education auditorium", points:40, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
+  {id:"edlabwindow", group:"build", label:"Live lab window", points:35, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
+  {id:"ednursery", group:"build", label:"Nursery window", points:35, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
   {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},

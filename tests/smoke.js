@@ -1403,6 +1403,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"y", type:"edcenter", points:[]}]}))).buildings[0].mods);
         ec.focus = "conservation"; const m2 = state.money, d0 = state.today.donations || 0; serveAt({n:4, mood:50, needs:{}, cash:100, cool:{}, edu:0}, ec, "learn");
         out.eduModules = out.eduModules && (state.today.donations || 0) > d0 && state.money > m2;
+        // live modules: need a lab, and work harder when the lab is busy
+        const modsKeep = ec.mods; ec.mods = []; sc.tech.push("edlabwindow", "ednursery"); const deptKeep = dept; dept = t => state.buildings.find(x => x.type === t) || null;
+        const hadTar = state.buildings.some(x => x.type === "tar"), labs = state.buildings.filter(x => ["oracle", "ghost", "tar", "ceres"].includes(x.type));
+        state.buildings = state.buildings.filter(x => !labs.includes(x));
+        const noLab = modProblem(ec, "labwindow"), noTar = modProblem(ec, "nursery");
+        state.buildings.push({id:"tt", type:"tar", points:sq(500, 0, 10), day:0});
+        const keepC = sc.clones, keepH = sc.hatchDay; sc.clones = [];
+        const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
+        const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
+        out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
+        state.buildings.pop(); state.buildings.push(...labs); sc.clones = keepC; sc.hatchDay = keepH; dept = deptKeep; ec.mods = modsKeep;
         dropMod(ec, "theater"); out.eduModules = out.eduModules && modsOf(ec).length === 2; ec.mods = []; ec.focus = null;
         dropShow(ec, ev.id); out.museum = out.museum && showsOf(ec).length === 0;
         state.buildings.splice(state.buildings.indexOf(ec), 1); delete sc.dna[ev.id]; sc.tech.splice(sc.tech.indexOf("education"), 1); state.money = m1;

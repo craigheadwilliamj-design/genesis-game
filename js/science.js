@@ -314,7 +314,7 @@ function scienceTick(dtMin){
     else if(sc.clones.some(j => j.end <= now)){
       const done = sc.clones.filter(j => j.end <= now);
       sc.clones = sc.clones.filter(j => j.end > now);
-      done.forEach(finishClone);
+      done.forEach(finishClone); sc.hatchDay = state.day;
     }
   }
   // the same goes for the growing beds

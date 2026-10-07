@@ -179,6 +179,7 @@ function upgradeSave(s){
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
+  if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
   for(const b of s.buildings) if(b.type === "edcenter" && !b.mods) b.mods = [];   // modules and focus, see services.js   // museum attractions, see services.js
   // renamed themes: Range is now Homestead, Western is now Mesa, Classic is now Japanese Garden
   const renamed = {range:"homestead", western:"mesa", classic:"japanese"}, rn = k => renamed[k] || k;

@@ -236,19 +236,30 @@ function dropShow(b, id){ b.shows = (b.shows || []).filter(x => x !== id); }
 const modsOf = b => (b.mods || []).filter(id => EDU_MODULES[id]);
 const focusOf = b => EDU_FOCUS[b.focus] ? b.focus : null;
 // How strongly the center's focus works: 1 plus each module's boost to it (0 with no focus)
-const focusPower = b => { const f = focusOf(b); return f ? 1 + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].boost[f] || 0), 0) : 0; };
+const focusPower = b => { const f = focusOf(b); return f ? 1 + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].boost[f] || 0) * modLive(id), 0) : 0; };
 const focusFx = (b, k) => focusOf(b) ? (EDU_FOCUS[b.focus][k] || 0) * focusPower(b) : 0;
-const modLearn = id => { const m = EDU_MODULES[id]; return m.learn * (m.perSpecies ? clamp(.4 + state.science.unlocked.length / 15, .4, 1.4) : 1); };
+// How busy the thing a live module shows is: 1 for an ordinary module. Labs count the science departments with work in them; the nursery, clones growing, and a hatching today.
+function modLive(id){
+  const m = EDU_MODULES[id], sc = state.science; if(!m.live) return 1;
+  if(m.live === "lab"){
+    const busy = [dept("oracle") && sc.projects.length, dept("ghost") && sc.trips.length, dept("tar") && sc.clones.length, dept("ceres") && state.ceres.beds.length].filter(Boolean).length;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * busy / 4;
+  }
+  if(!dept("tar")) return 0;
+  return Math.min(EDU_LIVE.cap, EDU_LIVE.nurseryIdle + (1 - EDU_LIVE.nurseryIdle) * Math.min(1, sc.clones.length / 2) + (sc.hatchDay === state.day ? EDU_LIVE.hatchBonus : 0));
+}
+const modLearn = id => { const m = EDU_MODULES[id]; return m.learn * modLive(id) * (m.perSpecies ? clamp(.4 + state.science.unlocked.length / 15, .4, 1.4) : 1); };
 const slotsOf = b => BUILDINGS[b.type].slots + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].slots || 0), 0) : 0);
 // Everything a center adds to one visit: museum attractions, modules, and the focus
 const eduLearn = b => showsLearn(b) + modsOf(b).reduce((n, id) => n + modLearn(id), 0) + focusFx(b, "learn");
-const eduJoy = b => showsJoy(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].joy || 0), 0) + focusFx(b, "joy");
-const eduAppeal = b => showsAppeal(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].appeal || 0), 0) + focusFx(b, "appeal");
+const eduJoy = b => showsJoy(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].joy || 0) * modLive(id), 0) + focusFx(b, "joy");
+const eduAppeal = b => showsAppeal(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].appeal || 0) * modLive(id), 0) + focusFx(b, "appeal");
 const eduUpkeep = b => showsUpkeep(b) + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + EDU_MODULES[id].upkeep, 0) : 0);
 const modsReady = b => Object.keys(EDU_MODULES).filter(id => hasTech(EDU_MODULES[id].tech) && !modsOf(b).includes(id));
 function modProblem(b, id){
   const m = EDU_MODULES[id];
   return !m ? "No such module." : !hasTech(m.tech) ? "Research it at ORACLE first."
+    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "TAR"} first.`
     : modsOf(b).includes(id) ? "It's already installed."
     : modsOf(b).length >= EDU_CENTER.moduleSlots ? `An Education Center has room for ${EDU_CENTER.moduleSlots} modules. Remove one first.`
     : !canAfford(m.price) ? `Installing it costs ${money(m.price)}. You have ${money(state.money)}.` : null;
