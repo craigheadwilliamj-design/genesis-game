@@ -259,7 +259,7 @@ function pickSight(p){
     for(const b of state.buildings){
       if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
       const home = (fieldFor(p, "gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
-      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal);
+      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal + showsAppeal(b));
     }
   let r = Math.random() * tot;
   for(const [e, w] of opts){ r -= w; if(r <= 0) return e; }

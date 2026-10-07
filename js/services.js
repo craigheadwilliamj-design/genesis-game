@@ -94,7 +94,7 @@ function serveAt(p, b, why){
     else {
       if(fee){ p.cash -= fee * n; earn(fee * n, "edfees"); bill = fee * n; }
       // they sit through a talk and use the restrooms while they're in there
-      learn(p, EDU.center); p.mood += EDU.centerJoy; p.needs.energy = 0; p.needs.bladder = 0; served = n;
+      learn(p, EDU.center + showsLearn(b)); p.mood += EDU.centerJoy + showsJoy(b); p.needs.energy = 0; p.needs.bladder = 0; served = n;
     }
   } else if(b.type === "restroom"){
     p.needs.bladder = 0;
@@ -201,3 +201,29 @@ function servicesNight(){
   state.litter = {};
   for(const b of state.buildings){ if(b.type === "bin") b.fill = 0; if(b.type === "restroom") b.dirt = 0; }
 }
+
+/* ---------- Museum attractions in the Education Center ---------- */
+
+// Each one is an event GHOST has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
+const showsOf = b => (b.shows || []).filter(id => MUSEUM_BY_ID[id]);
+// A better record makes a better show
+const showPower = id => { const d = state.science.dna[id]; return MUSEUM.minQuality + (1 - MUSEUM.minQuality) * clamp((d ? d.quality : 0) / 100, 0, 1); };
+const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn * showPower(id), 0);
+const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy * showPower(id), 0);
+const showsAppeal = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].appeal, 0);
+const showsUpkeep = b => b.type === "edcenter" ? showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].upkeep, 0) : 0;
+// Events GHOST has finished recording that this center isn't showing yet
+const showsReady = b => MUSEUM_EVENTS.filter(ev => genomeDone(ev.id) && !showsOf(b).includes(ev.id));
+function showProblem(b, id){
+  const ev = MUSEUM_BY_ID[id];
+  return !ev || !genomeDone(id) ? "GHOST hasn't finished recording that yet."
+    : showsOf(b).includes(id) ? "It's already on show here."
+    : showsOf(b).length >= MUSEUM.slots ? `An Education Center has room for ${MUSEUM.slots} attractions. Take one down first.`
+    : !canAfford(ev.price) ? `Installing it costs ${money(ev.price)}. You have ${money(state.money)}.` : null;
+}
+function addShow(b, id){
+  const why = showProblem(b, id); if(why) return why;
+  spend(MUSEUM_BY_ID[id].price, "built"); (b.shows || (b.shows = [])).push(id);
+  return null;
+}
+function dropShow(b, id){ b.shows = (b.shows || []).filter(x => x !== id); }

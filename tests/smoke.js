@@ -1379,6 +1379,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.money = m0;
       const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
       out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
+      // museum: GHOST records an event, and the finished record becomes an Education Center attraction
+      {
+        const sc = state.science, m1 = state.money; state.money = 1e6;
+        const ec = {id:"ec1", type:"edcenter", points:sq(0, 0, 16), day:0, shows:[]};
+        state.buildings.push(ec);
+        const ev = MUSEUM_BY_ID["ev-dying"], tp0 = tripProblem(ev.id, ev.id);
+        sc.tech.push("education"); sc.dna[ev.id] = {genome:100, quality:80};
+        const l0 = showsLearn(ec), u0 = showsUpkeep(ec);
+        const why = addShow(ec, ev.id);
+        out.museum = !!tp0 && !why && showsOf(ec).length === 1 && showsLearn(ec) > l0 && showsUpkeep(ec) === ev.upkeep + u0 && !!addShow(ec, ev.id)
+          && !showsReady(ec).includes(ev) && museumHtml(ec).includes("Take it down") && eduCenterHtml(ec).includes("Museum attractions")
+          && genomeInfo(ev.id).event === ev && genomePeriods(ev.id)[0] === ev.id && tripOdds("ev-hadean", "ev-hadean").cost > 0
+          && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"x", type:"edcenter", points:[]}]}))).buildings[0].shows);
+        dropShow(ec, ev.id); out.museum = out.museum && showsOf(ec).length === 0;
+        state.buildings.splice(state.buildings.indexOf(ec), 1); delete sc.dna[ev.id]; sc.tech.splice(sc.tech.indexOf("education"), 1); state.money = m1;
+      }
       Object.assign(state, keep); recompute();
     }
     return out;

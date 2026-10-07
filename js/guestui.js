@@ -106,8 +106,22 @@ function eduCenterHtml(b){
   const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
   let h = `<section><h3>Entry fee</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="eduFee" data-d="-1" aria-label="Lower the fee" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${fee ? money(fee) : "Free"}</b><button class="btn" data-action="eduFee" data-d="1" aria-label="Raise the fee" style="padding:2px 9px">+</button></div>`;
   h += `<div class="meta" style="margin-top:4px">${fee <= EDU.centerFee ? "Everyone will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual price is ${money(EDU.centerFee)}.</div></section>`;
+  h += museumHtml(b);
   h += `<div class="meta">Guests spend ${BUILDINGS.edcenter.serveMin} minutes here, sitting through a talk and using the restrooms, and come out knowing far more about prehistoric life. Learning makes them happier, tidier, and more generous, and counts toward your rating.</div>`;
   return h;
+}
+// The museum: attractions on show, and a dropdown of the events GHOST has recorded that aren't up yet
+function museumHtml(b){
+  const on = showsOf(b), ready = showsReady(b), dn = state.science.dna;
+  let h = `<section><h3>Museum attractions <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${MUSEUM.slots}</span></h3>`;
+  if(on.length) h += `<ul class="shop">${on.map(id => { const ev = MUSEUM_BY_ID[id];
+    return `<li><span class="nm">${esc(ev.name)}<span class="per">${esc(ev.ago)}</span></span><span class="need">${esc(ev.text)} Teaches ${Math.round(ev.learn * showPower(id))} more, ${money(ev.upkeep)} a day, ${dn[id] ? dn[id].quality : 0}% record quality.</span><span class="need"><button class="btn" data-action="showDrop" data-id="${id}" style="padding:2px 9px">Take it down</button></span></li>`; }).join("")}</ul>`;
+  else h += `<div class="meta">Nothing on show yet.</div>`;
+  if(!hasTech(MUSEUM.needTech)) {}
+  else if(on.length >= MUSEUM.slots) h += `<div class="meta" style="margin-top:6px">The center is full. Take one down to show another.</div>`;
+  else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="showSel" aria-label="Attraction to add" style="flex:1;min-width:0">${ready.map(ev => `<option value="${ev.id}">${esc(ev.name)}, ${money(ev.price)}</option>`).join("")}</select><button class="btn" data-action="showAdd">Add</button></div>`;
+  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything GHOST has recorded is on show." : "GHOST can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
+  return h + `</section>`;
 }
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
 // What's on the shelves, and who fills them
@@ -178,6 +192,8 @@ panelEl.addEventListener("click", ev => {
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
   if(a === "roomRate" && it && isHotel(it)){ it.rate = clamp(roomRate(it) + (+b.dataset.d), 10, BUILDINGS[it.type].roomPrice * 3); ui.panel(); saveSoon(); return; }
+  if(a === "showAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#showSel"), why = sel ? addShow(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }
+  if(a === "showDrop" && it && it.type === "edcenter"){ dropShow(it, b.dataset.id); ui.panel(); saveSoon(); return; }
   if(a === "eduFee" && it && it.type === "edcenter"){ it.fee = clamp((it.fee || 0) + (+b.dataset.d), 0, EDU.centerFee * 4); ui.panel(); saveSoon(); return; }
   if(!it || sel.kind !== "building" || !isVendor(it)) return;
   if(a === "menuAdd"){ const why = addToMenu(it, b.dataset.id); if(why) ui.toast(why, "bad"); }
