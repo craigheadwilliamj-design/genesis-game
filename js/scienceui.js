@@ -102,11 +102,13 @@ function tripRow(id, periodId, label){
   let h = `<li class="${open ? "" : "locked"}"><span class="nm">${label}</span>`;
   h += open ? `<button class="buy" data-action="trip" data-p="${periodId}" data-sp="${id}"${why ? ` disabled title="${esc(why)}"` : ""}>Send GHOST ${money(o.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}`;
-  if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : `Research ${esc(g.name)} at ORACLE first.`;
+  if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : g.event ? "Research education programs at ORACLE first." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
-    h += `${d ? `DNA quality ${d.quality}%.${d.genome >= 100 ? " Complete. More trips can raise quality." : ""}` : "No DNA yet."}`;
-    if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? "more trips to finish the genome" : "trips for a whole genome"}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
-    if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out looking for it.</b>`;
+    const ev = !!g.event, what = ev ? "record" : "DNA";
+    h += `${d ? `${ev ? "Record" : "DNA"} quality ${d.quality}%.${d.genome >= 100 ? (ev ? " Complete, and on offer at Education Centers. More trips can raise quality." : " Complete. More trips can raise quality.") : ""}` : `No ${what} yet.`}`;
+    if(ev) h += ` Trips take ${spanText(Math.round(g.event.days * DAY_MIN * ghostLevel("speed")))}.`;
+    if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? `more trips to finish the ${ev ? "record" : "genome"}` : `trips for a whole ${ev ? "record" : "genome"}`}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
+    if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out ${ev ? "recording" : "looking for"} it.</b>`;
     if(g.animal && g.animal.stars) h += ` Needs ${g.animal.stars}★ to clone.`;
   }
   return h + `</span></li>`;
@@ -117,13 +119,23 @@ function ghostHtml(b){
   let h = deptHead(b);
   h += `<div class="meta">${esc(BUILDINGS.ghost.blurb)}</div>`;
   h += sciStaffHtml("temporal");
-  h += baysHtml("Expedition bays", "temporal", (t, i) => progressCard(esc(t.period), `looking for ${esc(genomeInfo(t.sp).name)}`, t, i), "Team is home. Send it from a period below.");
+  h += baysHtml("Expedition bays", "temporal", (t, i) => progressCard(esc(placeName(t.period)), `${MUSEUM_BY_ID[t.sp] ? "recording" : "looking for"} ${esc(genomeInfo(t.sp).name)}`, t, i), "Team is home. Send it from a period below.");
 
   // one tab per period; animals ORACLE hasn't unlocked are greyed out
   const inPeriod = id => speciesToUnlock().filter(s => s.period === id), plantsIn = id => Object.values(PLANT_DNA).filter(f => f.period === id);
   const openIn = id => inPeriod(id).some(s => isUnlocked(s.id)) || plantsIn(id).some(f => genomeOpen(f.id));
   if(!ghostTab) ghostTab = PERIOD_ORDER.find(openIn) || "Quaternary";
-  h += `<section><h3>Genomes by period</h3>${tabBar("gtab", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), ghostTab)}`;
+  const museumOpen = hasTech(MUSEUM.needTech);
+  h += `<section><h3>Genomes by period</h3>${tabBar("gtab", [...PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), {key:"events", label:"Events", color:"#8A6D3B", lock:!museumOpen}], ghostTab)}`;
+  if(ghostTab === "events"){
+    const block = ghostBlocker();
+    h += `<div class="ptab-body"><div class="meta">Moments from deep time. Each trip brings back recordings, scans and samples. A finished record becomes an attraction for an Education Center, and a better record makes a better show.${museumOpen ? "" : " Research education programs at ORACLE first."}</div>`;
+    if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
+    h += `<ul class="shop" style="margin-top:10px">${MUSEUM_EVENTS.map(ev => tripRow(ev.id, ev.id, `<span class="dot" style="background:#8A6D3B"></span>${esc(ev.name)} <span class="per">${esc(ev.ago)}</span>`)).join("")}</ul></div></section>`;
+    if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
+    if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">Day ${l.day}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
+    return h;
+  }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))} and bring back DNA of ${Math.min(100, p.quality[0] + ghostQuality())}–${Math.min(100, p.quality[1] + ghostQuality())}% quality. Bigger animals take more trips.</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;

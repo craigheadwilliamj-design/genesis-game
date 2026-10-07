@@ -259,7 +259,7 @@ function pickSight(p){
     for(const b of state.buildings){
       if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
       const home = (fieldFor(p, "gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
-      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal);
+      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal + eduAppeal(b));
     }
   let r = Math.random() * tot;
   for(const [e, w] of opts){ r -= w; if(r <= 0) return e; }
@@ -390,7 +390,7 @@ function serviceTick(dt, now){
       serveParty(p, b);
       if(q.queue.length){ const n = q.queue.shift(); n.readyAt = at + t.serveMin; q.busy.push(n); q.busy.sort((a, c) => a.readyAt - c.readyAt); }
     }
-    while(q.busy.length < t.slots && q.queue.length){ const n = q.queue.shift(); n.readyAt = now + t.serveMin; q.busy.push(n); }
+    while(q.busy.length < slotsOf(b) && q.queue.length){ const n = q.queue.shift(); n.readyAt = now + t.serveMin; q.busy.push(n); }
     for(const p of [...q.queue]){
       p.waited += dt;
       if(p.waited > (t.patience ?? GUEST.patience)){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }

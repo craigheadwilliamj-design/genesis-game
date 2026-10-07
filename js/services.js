@@ -94,7 +94,10 @@ function serveAt(p, b, why){
     else {
       if(fee){ p.cash -= fee * n; earn(fee * n, "edfees"); bill = fee * n; }
       // they sit through a talk and use the restrooms while they're in there
-      learn(p, EDU.center); p.mood += EDU.centerJoy; p.needs.energy = 0; p.needs.bladder = 0; served = n;
+      learn(p, EDU.center + eduLearn(b)); p.mood += EDU.centerJoy + eduJoy(b);
+      const fx = EDU_FOCUS[b.focus];
+      if(fx && fx.donate) earn(n * fx.donate * focusPower(b), "donations");
+      if(fx && fx.science && dept("oracle")) state.science.points += n * fx.science * focusPower(b); p.needs.energy = 0; p.needs.bladder = 0; served = n;
     }
   } else if(b.type === "restroom"){
     p.needs.bladder = 0;
@@ -201,3 +204,85 @@ function servicesNight(){
   state.litter = {};
   for(const b of state.buildings){ if(b.type === "bin") b.fill = 0; if(b.type === "restroom") b.dirt = 0; }
 }
+
+/* ---------- Museum attractions in the Education Center ---------- */
+
+// Each one is an event GHOST has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
+const showsOf = b => (b.shows || []).filter(id => MUSEUM_BY_ID[id]);
+// A better record makes a better show
+const showPower = id => { const d = state.science.dna[id]; return MUSEUM.minQuality + (1 - MUSEUM.minQuality) * clamp((d ? d.quality : 0) / 100, 0, 1); };
+const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn * showPower(id), 0);
+const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy * showPower(id), 0);
+const showsAppeal = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].appeal, 0);
+const showsUpkeep = b => b.type === "edcenter" ? showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].upkeep, 0) : 0;
+// Events GHOST has finished recording that this center isn't showing yet
+const showsReady = b => MUSEUM_EVENTS.filter(ev => genomeDone(ev.id) && !showsOf(b).includes(ev.id));
+function showProblem(b, id){
+  const ev = MUSEUM_BY_ID[id];
+  return !ev || !genomeDone(id) ? "GHOST hasn't finished recording that yet."
+    : showsOf(b).includes(id) ? "It's already on show here."
+    : showsOf(b).length >= MUSEUM.slots ? `An Education Center has room for ${MUSEUM.slots} attractions. Take one down first.`
+    : !canAfford(ev.price) ? `Installing it costs ${money(ev.price)}. You have ${money(state.money)}.` : null;
+}
+function addShow(b, id){
+  const why = showProblem(b, id); if(why) return why;
+  spend(MUSEUM_BY_ID[id].price, "built"); (b.shows || (b.shows = [])).push(id);
+  return null;
+}
+function dropShow(b, id){ b.shows = (b.shows || []).filter(x => x !== id); }
+
+/* ---------- Education Center focus and modules ---------- */
+
+const modsOf = b => (b.mods || []).filter(id => EDU_MODULES[id]);
+const focusOf = b => EDU_FOCUS[b.focus] ? b.focus : null;
+// How strongly the center's focus works: 1 plus each module's boost to it (0 with no focus)
+const focusPower = b => { const f = focusOf(b); return f ? 1 + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].boost[f] || 0) * modLive(id), 0) : 0; };
+const focusFx = (b, k) => focusOf(b) ? (EDU_FOCUS[b.focus][k] || 0) * focusPower(b) : 0;
+// How busy the thing a live module shows is: 1 for an ordinary module. Labs count the science departments with work in them; the nursery, clones growing, and a hatching today.
+function modLive(id){
+  const m = EDU_MODULES[id], sc = state.science; if(!m.live) return 1;
+  if(m.live === "lab"){
+    const busy = [dept("oracle") && sc.projects.length, dept("ghost") && sc.trips.length, dept("tar") && sc.clones.length, dept("ceres") && state.ceres.beds.length].filter(Boolean).length;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * busy / 4;
+  }
+  if(m.live === "botany"){
+    // plant DNA CERES has finished (6 periods, 4 is plenty), and beds growing now
+    const dna = Object.values(PLANT_DNA).filter(f => genomeDone(f.id)).length;
+    return dept("ceres") ? EDU_LIVE.idle + (1 - EDU_LIVE.idle) * (.7 * Math.min(1, dna / 4) + (state.ceres.beds.length ? .3 : 0)) : 0;
+  }
+  if(m.live === "biomes"){
+    // different habitats with animals living in them
+    const n = new Set(state.exhibits.filter(e => !e.viv && e.animals.length).map(biomeOf)).size;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.biomes);
+  }
+  if(m.live === "touch"){
+    // animal genomes GHOST has finished: more to hold
+    const n = SPECIES.filter(s => genomeDone(s.id)).length;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.genomes);
+  }
+  if(m.live === "sim"){
+    // one place to visit for each finished event record
+    const places = MUSEUM_EVENTS.filter(ev => genomeDone(ev.id)).length;
+    return dept("ghost") ? EDU_LIVE.simIdle + (1 - EDU_LIVE.simIdle) * Math.min(1, places / EDU_LIVE.simPlaces) : 0;
+  }
+  if(!dept("tar")) return 0;
+  return Math.min(EDU_LIVE.cap, EDU_LIVE.nurseryIdle + (1 - EDU_LIVE.nurseryIdle) * Math.min(1, sc.clones.length / 2) + (sc.hatchDay === state.day ? EDU_LIVE.hatchBonus : 0));
+}
+const modLearn = id => { const m = EDU_MODULES[id]; return m.learn * modLive(id) * (m.perSpecies ? clamp(.4 + state.science.unlocked.length / 15, .4, 1.4) : 1); };
+const slotsOf = b => BUILDINGS[b.type].slots + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].slots || 0), 0) : 0);
+// Everything a center adds to one visit: museum attractions, modules, and the focus
+const eduLearn = b => showsLearn(b) + modsOf(b).reduce((n, id) => n + modLearn(id), 0) + focusFx(b, "learn");
+const eduJoy = b => showsJoy(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].joy || 0) * modLive(id), 0) + focusFx(b, "joy");
+const eduAppeal = b => showsAppeal(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].appeal || 0) * modLive(id), 0) + focusFx(b, "appeal");
+const eduUpkeep = b => showsUpkeep(b) + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + EDU_MODULES[id].upkeep, 0) : 0);
+const modsReady = b => Object.keys(EDU_MODULES).filter(id => hasTech(EDU_MODULES[id].tech) && !modsOf(b).includes(id));
+function modProblem(b, id){
+  const m = EDU_MODULES[id];
+  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at ORACLE first."
+    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "TAR"} first.`
+    : modsOf(b).includes(id) ? "It's already installed."
+    : modsOf(b).length >= EDU_CENTER.moduleSlots ? `An Education Center has room for ${EDU_CENTER.moduleSlots} modules. Remove one first.`
+    : !canAfford(m.price) ? `Installing it costs ${money(m.price)}. You have ${money(state.money)}.` : null;
+}
+function addMod(b, id){ const why = modProblem(b, id); if(why) return why; spend(EDU_MODULES[id].price, "built"); (b.mods || (b.mods = [])).push(id); return null; }
+function dropMod(b, id){ b.mods = (b.mods || []).filter(x => x !== id); }

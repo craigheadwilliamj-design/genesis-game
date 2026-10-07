@@ -109,8 +109,12 @@ function finishProject(p){
 function genomeInfo(id){
   const s = SPECIES_BY_ID[id]; if(s) return {id, name:s.name, space:s.space, animal:s};
   const f = PLANT_DNA_BY_ID[id]; if(f) return {id, name:f.name, space:f.space, plant:f};
+  const ev = MUSEUM_BY_ID[id]; if(ev) return {id, name:ev.name, space:ev.space, event:ev};
   return null;
 }
+// Where a trip goes: a time period, or one of the museum events
+const placeOf = id => PERIOD_BY_ID[id] || MUSEUM_BY_ID[id];
+const placeName = id => MUSEUM_BY_ID[id] ? MUSEUM_BY_ID[id].name : id;
 const genomeDone = id => { const d = state.science.dna[id]; return !!d && d.genome >= 100; };
 const plantDnaDone = period => !!PLANT_DNA[period] && genomeDone(PLANT_DNA[period].id);
 // Has GHOST finished plant DNA from any period of this era?
@@ -119,10 +123,10 @@ const anyPlantDna = () => Object.values(PLANT_DNA).some(f => genomeDone(f.id));
 // Can GHOST go looking for this yet? Animals need ORACLE to have unlocked them, plants need their flora type.
 function genomeOpen(id){
   const g = genomeInfo(id); if(!g) return false;
-  return g.animal ? isUnlocked(id) : hasTech(FLORA[g.plant.era].tech);
+  return g.animal ? isUnlocked(id) : g.event ? hasTech(MUSEUM.needTech) : hasTech(FLORA[g.plant.era].tech);
 }
 // The periods GHOST can look in for a genome
-const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : [g.plant.period]; };
+const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : g.event ? [g.id] : [g.plant.period]; };
 
 // GHOST upgrade multiplier for "cost" or "speed", and the quality points added to every sample
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
@@ -132,7 +136,7 @@ const lerpT = ([a, b], t) => a + (b - a) * t;
 // What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
 // the trips a whole genome takes on average, and the price
 function tripOdds(id, periodId){
-  const g = genomeInfo(id), p = PERIOD_BY_ID[periodId], t = sizeT(g.space);
+  const g = genomeInfo(id), p = placeOf(periodId), t = sizeT(g.space);
   const fail = clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8), trips = lerpT(TRIP.trips, t);
   // a genome ends on a find that overshoots 100% by about half a find's worth, hence the .5
   return {fail, trips, gain:100 / Math.max(.6, trips * (1 - fail) - .5), cost:Math.round(p.trip * lerpT(TRIP.costMul, t) * ghostLevel("cost") / 50) * 50};
@@ -140,20 +144,20 @@ function tripOdds(id, periodId){
 
 function tripProblem(id, periodId){
   const sc = state.science, g = genomeInfo(id);
-  if(!g || !PERIOD_BY_ID[periodId] || !genomePeriods(id).includes(periodId)) return "GHOST can't find that there.";
+  if(!g || !placeOf(periodId) || !genomePeriods(id).includes(periodId)) return "GHOST can't find that there.";
   return deptProblem("ghost") ||
-    (!genomeOpen(id) ? (g.animal ? `Unlock the ${g.name} at ORACLE first.` : `Research ${g.name} at ORACLE first.`) : null) ||
+    (!genomeOpen(id) ? (g.animal ? `Unlock the ${g.name} at ORACLE first.` : g.event ? `Research education programs at ORACLE first.` : `Research ${g.name} at ORACLE first.`) : null) ||
     (!sc.crew.temporal ? "Hire a Temporal Researcher at GHOST to lead expeditions." : null) ||
     (freeBay("temporal") < 0 ? bayFull("temporal", "Temporal Researcher") : null) ||
     (!canAfford(tripOdds(id, periodId).cost) ? `A trip costs ${money(tripOdds(id, periodId).cost)}. You have ${money(state.money)}.` : null);
 }
 function launchTrip(id, periodId){
   if(tripProblem(id, periodId)) return false;
-  const p = PERIOD_BY_ID[periodId], now = nowMin();
+  const p = placeOf(periodId), now = nowMin();
   spend(tripOdds(id, periodId).cost, "science");
   const end = now + Math.round(p.days * DAY_MIN * ghostLevel("speed"));
   state.science.trips.push({period:periodId, sp:id, bay:freeBay("temporal"), start:now, end});
-  events.toast(`GHOST left for the ${periodId} to find ${genomeInfo(id).name}. Back in about ${spanText(end - now)}.`);
+  events.toast(`GHOST left for the ${placeName(periodId)} to ${MUSEUM_BY_ID[id] ? "record" : "find"} ${genomeInfo(id).name}. Back in about ${spanText(end - now)}.`);
   return true;
 }
 
@@ -169,14 +173,19 @@ function addSample(sp, gain, q){
 }
 
 function tripReturns(t){
-  const sc = state.science, p = PERIOD_BY_ID[t.period], g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
+  const sc = state.science, p = placeOf(t.period), g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
   if(Math.random() < odds.fail){
-    const msg = `GHOST came back from the ${t.period} empty-handed. The ${g.name} trail went cold.`;
+    const msg = `GHOST came back from the ${placeName(t.period)} empty-handed. The ${g.name} trail went cold.`;
     logScience(msg, false); events.toast(msg, "bad"); return;
   }
   const q = Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality());
   const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q);
   const d = sc.dna[t.sp];
+  if(g.event){
+    const m = r.gain ? `GHOST recorded the ${g.name} (${q}% quality). ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
+                     : `GHOST brought back more of the ${g.name}. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than the record the lab already has."}`;
+    logScience(m, true); events.toast(m, "good"); return;
+  }
   let msg = r.gain ? `GHOST brought back ${g.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
                    : `GHOST brought back more ${g.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than what the lab already has."}`;
   // Sometimes the team turns up traces of another animal ORACLE has unlocked
@@ -305,7 +314,7 @@ function scienceTick(dtMin){
     else if(sc.clones.some(j => j.end <= now)){
       const done = sc.clones.filter(j => j.end <= now);
       sc.clones = sc.clones.filter(j => j.end > now);
-      done.forEach(finishClone);
+      done.forEach(finishClone); sc.hatchDay = state.day;
     }
   }
   // the same goes for the growing beds

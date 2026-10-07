@@ -290,6 +290,72 @@ for(const [period, era, space] of [["Devonian", "paleozoic", 900], ["Carbonifero
   PLANT_DNA[period] = {id:"flora-" + period, era, period, name:period + " flora", space};
 const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.id, p]));
 
+// Events from deep time. GHOST records each one on trips (like a genome: sc.dna[id]), and a finished record unlocks a museum
+// attraction for the Education Center. A trip's place is the event itself, so it carries what a TIME_PERIODS entry does.
+//   ago/trip/days/risk/quality/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
+//   price/upkeep   installing it in an Education Center, and its cost a day
+//   learn   extra learning a visit gives (0 to 100 per guest), scaled by the record's quality
+//   joy     mood it adds or takes away. appeal: how much keener guests are to visit the center for it
+const MUSEUM_EVENTS = [
+  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, quality:[30,75], space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
+   text:"Walk through a glowing blue-green sea as the first oxygen-makers poison the old air and the iron rusts red."},
+  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, quality:[25,70], space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
+   text:"A hall of lava seas, a sky full of rocks, and the Moon hanging huge and close. Nothing lives here yet."},
+  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, quality:[35,80], space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
+   text:"A reef tank of trilobites, spined worms and Anomalocaris, when nearly every kind of body suddenly appeared."},
+  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, quality:[35,80], space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
+   text:"Follow a Tiktaalik-like fish from the shallows up onto the mud, as fins turn into legs."},
+  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, quality:[40,85], space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
+   text:"The worst mass extinction there ever was, told in a dim hall of volcanoes and a dying sea. Sobering."},
+  {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, quality:[45,90], space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
+   text:"A shaking floor, a fireball overhead, and the end of the dinosaurs. A crowd favorite."},
+];
+const MUSEUM_BY_ID = Object.fromEntries(MUSEUM_EVENTS.map(e => [e.id, e]));
+const MUSEUM = {
+  slots:3,             // attractions one Education Center can show at once
+  minQuality:.6,       // an attraction built on the worst record teaches this share of its learning (the best teaches all of it)
+  needTech:"education",// GHOST can start recording events once ORACLE has researched this
+};
+
+// What an Education Center is for. A center with a focus gets its effect every visit, times its strength:
+// 1 plus the boost each installed module gives that focus. Pick it in the center's panel.
+//   donate   dollars a guest drops in the box per visit. appeal: keenness to visit. joy/learn: mood and learning per visit.
+//   science  ORACLE research points a guest's visit adds
+const EDU_FOCUS = {
+  conservation:{label:"Conservation", donate:2.5, text:"Guests give to the cause. Donations on every visit."},
+  spectacle:   {label:"Spectacle",    appeal:12,  text:"A show worth walking across the park for. Guests are keener to come."},
+  family:      {label:"Family",       joy:5, learn:4, text:"Made for kids and parents. Guests leave happier and know more."},
+  research:    {label:"Research",     science:.06, text:"Visitors help real science. Every visit earns ORACLE research points."},
+};
+// Modules added to a center (ORACLE tech `tech`, which needs education programs). Each also teaches on its own.
+//   boost    adds to the strength of those focuses
+//   slots    more guests that can sit through a visit at once
+//   perSpecies  learning grows with the animals ORACLE has unlocked
+//   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab", "nursery", "botany", "sim", "biomes" or "touch"
+//   dept     science buildings it needs (any one of them) before it can be installed
+const EDU_MODULES = {
+  theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
+              text:"A stage for puppet shows and animal talks. Crowds love it."},
+  fossils:   {label:"Fossil Displays",  tech:"edfossils",   price:10000, upkeep:80,  learn:6, perSpecies:true, boost:{research:.5, conservation:.25},
+              text:"Real casts and bones. It teaches more as ORACLE unlocks more animals."},
+  auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
+              text:"Tiered seating for lectures. More guests can sit through a talk at once."},
+  labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
+              text:"A gallery over the working labs. It's only as good as what's going on: ORACLE, GHOST, TAR and CERES all busy makes the best show."},
+  nursery:   {label:"Nursery Window",   tech:"ednursery",   price:11000, upkeep:100, learn:3, joy:4, appeal:6, live:"nursery", dept:["tar"], boost:{family:.7, conservation:.3, spectacle:.2},
+              text:"Watch clones in the incubators, and the day one hatches. Needs TAR, and the best shows are while clones are growing."},
+  botanical: {label:"Botanical Hall",   tech:"edbotanical", price:13000, upkeep:110, learn:5, joy:3, appeal:3, live:"botany", dept:["ceres"], boost:{conservation:.6, family:.4, research:.2},
+              text:"A glasshouse of living prehistoric plants from CERES. It grows richer as more plant DNA is finished and while beds are growing."},
+  simroom:   {label:"Simulation Room",  tech:"edsimroom",   price:18000, upkeep:150, learn:7, joy:3, appeal:8, live:"sim", dept:["ghost"], boost:{spectacle:.5, research:.5, family:.2},
+              text:"A VR walk through deep time, built from GHOST's records. Every finished event record adds a place to visit."},
+  diorama:   {label:"Ecosystem Diorama", tech:"ediorama",   price:12000, upkeep:100, learn:6, joy:2, appeal:5, live:"biomes", boost:{conservation:.5, family:.4, spectacle:.2},
+              text:"A walk-around model of how living things fit together. It gets richer with every kind of habitat you keep animals in."},
+  touch:     {label:"Touch Gallery",    tech:"edtouch",     price:9000,  upkeep:70,  learn:4, joy:5, appeal:3, live:"touch", boost:{family:.6, conservation:.3, research:.2},
+              text:"Egg shells, casts, teeth and bones to hold. The shelves fill up as GHOST finishes more genomes."},
+};
+const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5, simIdle:.2, simPlaces:4, biomes:4, genomes:8};   // a live module with nothing going on still works at this share
+const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
+
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
@@ -871,6 +937,15 @@ const TECH = [
   {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"edtheater", group:"build", label:"Education theater", points:30, needs:"education", text:"Add a Theater module to an Education Center for shows that draw crowds."},
+  {id:"edfossils", group:"build", label:"Fossil displays", points:30, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
+  {id:"edauditorium", group:"build", label:"Education auditorium", points:40, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
+  {id:"edlabwindow", group:"build", label:"Live lab window", points:35, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
+  {id:"ednursery", group:"build", label:"Nursery window", points:35, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
+  {id:"edbotanical", group:"build", label:"Botanical hall", points:35, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
+  {id:"edsimroom", group:"build", label:"Simulation room", points:45, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
+  {id:"ediorama", group:"build", label:"Ecosystem diorama", points:35, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
+  {id:"edtouch", group:"build", label:"Touch gallery", points:30, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
   {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},

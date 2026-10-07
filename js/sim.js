@@ -178,6 +178,9 @@ function upgradeSave(s){
   for(const k of ["decor", "water", "fences"]) if(!Array.isArray(s[k])) s[k] = [];
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
+  for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
+  if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
+  for(const b of s.buildings) if(b.type === "edcenter" && !b.mods) b.mods = [];   // modules and focus, see services.js   // museum attractions, see services.js
   // renamed themes: Range is now Homestead, Western is now Mesa, Classic is now Japanese Garden
   const renamed = {range:"homestead", western:"mesa", classic:"japanese"}, rn = k => renamed[k] || k;
   for(const it of [...s.paths, ...s.buildings, ...s.exhibits, ...(s.zones || [])]) if(renamed[it.theme]) it.theme = rn(it.theme);
@@ -588,7 +591,7 @@ function dailyCosts(){
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
   for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
-  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep;
+  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
   wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;

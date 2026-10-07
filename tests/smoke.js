@@ -1379,6 +1379,64 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.money = m0;
       const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
       out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
+      // museum: GHOST records an event, and the finished record becomes an Education Center attraction
+      {
+        const sc = state.science, m1 = state.money; state.money = 1e6;
+        const ec = {id:"ec1", type:"edcenter", points:sq(0, 0, 16), day:0, shows:[]};
+        state.buildings.push(ec);
+        const ev = MUSEUM_BY_ID["ev-dying"], tp0 = tripProblem(ev.id, ev.id);
+        sc.tech.push("education"); sc.dna[ev.id] = {genome:100, quality:80};
+        const l0 = showsLearn(ec), u0 = showsUpkeep(ec);
+        const why = addShow(ec, ev.id);
+        out.museum = !!tp0 && !why && showsOf(ec).length === 1 && showsLearn(ec) > l0 && showsUpkeep(ec) === ev.upkeep + u0 && !!addShow(ec, ev.id)
+          && !showsReady(ec).includes(ev) && museumHtml(ec).includes("Take it down") && eduCenterHtml(ec).includes("Museum attractions")
+          && genomeInfo(ev.id).event === ev && genomePeriods(ev.id)[0] === ev.id && tripOdds("ev-hadean", "ev-hadean").cost > 0
+          && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"x", type:"edcenter", points:[]}]}))).buildings[0].shows);
+        // focus and modules: a focus works at strength 1, modules that suit it make it stronger, and the auditorium seats more
+        sc.tech.push("edtheater", "edfossils", "edauditorium");
+        const s0 = slotsOf(ec), a0 = eduAppeal(ec); ec.focus = "spectacle";
+        const sp0 = focusPower(ec), a1 = eduAppeal(ec);
+        const w1 = addMod(ec, "theater"), w2 = addMod(ec, "auditorium"), w3 = addMod(ec, "fossils"), w4 = addMod(ec, "theater");
+        out.eduModules = sp0 === 1 && a1 > a0 && !w1 && !w2 && !w3 && !!w4 && modsOf(ec).length === 3 && focusPower(ec) > 1.5 && eduAppeal(ec) > a1
+          && slotsOf(ec) === s0 + EDU_MODULES.auditorium.slots && eduUpkeep(ec) > u0 && eduLearn(ec) > l0 && modsReady(ec).length === 0
+          && modulesHtml(ec).includes("Remove") && focusHtml(ec).includes("Spectacle")
+          && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"y", type:"edcenter", points:[]}]}))).buildings[0].mods);
+        ec.focus = "conservation"; const m2 = state.money, d0 = state.today.donations || 0; serveAt({n:4, mood:50, needs:{}, cash:100, cool:{}, edu:0}, ec, "learn");
+        out.eduModules = out.eduModules && (state.today.donations || 0) > d0 && state.money > m2;
+        // live modules: need a lab, and work harder when the lab is busy
+        const modsKeep = ec.mods; ec.mods = []; sc.tech.push("edlabwindow", "ednursery"); const deptKeep = dept; dept = t => state.buildings.find(x => x.type === t) || null;
+        const hadTar = state.buildings.some(x => x.type === "tar"), labs = state.buildings.filter(x => ["oracle", "ghost", "tar", "ceres"].includes(x.type));
+        state.buildings = state.buildings.filter(x => !labs.includes(x));
+        const noLab = modProblem(ec, "labwindow"), noTar = modProblem(ec, "nursery");
+        state.buildings.push({id:"tt", type:"tar", points:sq(500, 0, 10), day:0});
+        const keepC = sc.clones, keepH = sc.hatchDay; sc.clones = [];
+        const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
+        const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
+        out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
+        // botanical hall and simulation room need CERES and GHOST, and grow with finished plant DNA and event records
+        state.buildings.push({id:"tc", type:"ceres", points:sq(520, 0, 10), day:0}, {id:"tg", type:"ghost", points:sq(540, 0, 10), day:0});
+        sc.tech.push("edbotanical", "edsimroom");
+        const keepD = sc.dna, keepB = state.ceres.beds; sc.dna = {}; state.ceres.beds = [];
+        const b0 = modLive("botanical"), s0m = modLive("simroom");
+        sc.dna = {"flora-Jurassic":{genome:100, quality:80}, "flora-Triassic":{genome:100, quality:80}, "ev-dying":{genome:100, quality:80}, "ev-kpg":{genome:100, quality:80}};
+        const b1 = modLive("botanical"), s1m = modLive("simroom"); state.ceres.beds = [{id:"g", kind:"plant", era:"Jurassic", bay:0, start:0, end:9e9}]; const b2 = modLive("botanical");
+        out.eduModules = out.eduModules && b0 < b1 && b1 < b2 && b2 <= 1 && s0m < s1m && s1m <= 1 && !modProblem(ec, "botanical") && !modProblem(ec, "simroom");
+        // diorama grows with habitats that have animals, touch gallery with finished animal genomes; neither needs a lab
+        sc.tech.push("ediorama", "edtouch");
+        const keepE = state.exhibits.map(e => [e, e.biome]), bios = Object.keys(BIOMES);
+        sc.dna = {}; const dio0 = modLive("diorama"), tch0 = modLive("touch");
+        state.exhibits.filter(e => !e.viv && e.animals.length).slice(0, bios.length).forEach((e, i) => { e.biome = bios[i]; });
+        const dn = new Set(state.exhibits.filter(e => !e.viv && e.animals.length).map(biomeOf)).size;
+        sc.dna = Object.fromEntries(SPECIES.slice(0, 5).map(s => [s.id, {genome:100, quality:80}]));
+        const tch1 = modLive("touch"), dio1 = modLive("diorama");
+        out.eduModules = out.eduModules && tch0 < tch1 && tch1 <= 1 && dio0 <= dio1 && dio1 <= 1 && (dn < 2 || dio0 < dio1) && !modProblem(ec, "diorama") && !modProblem(ec, "touch");
+        for(const [e, b] of keepE) e.biome = b;
+        sc.dna = keepD; state.ceres.beds = keepB; state.buildings.pop(); state.buildings.pop();
+        state.buildings.pop(); state.buildings.push(...labs); sc.clones = keepC; sc.hatchDay = keepH; dept = deptKeep; ec.mods = modsKeep;
+        dropMod(ec, "theater"); out.eduModules = out.eduModules && modsOf(ec).length === 2; ec.mods = []; ec.focus = null;
+        dropShow(ec, ev.id); out.museum = out.museum && showsOf(ec).length === 0;
+        state.buildings.splice(state.buildings.indexOf(ec), 1); delete sc.dna[ev.id]; sc.tech.splice(sc.tech.indexOf("education"), 1); state.money = m1;
+      }
       Object.assign(state, keep); recompute();
     }
     return out;
