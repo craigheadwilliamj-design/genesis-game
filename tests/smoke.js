@@ -1392,6 +1392,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           && !showsReady(ec).includes(ev) && museumHtml(ec).includes("Take it down") && eduCenterHtml(ec).includes("Museum attractions")
           && genomeInfo(ev.id).event === ev && genomePeriods(ev.id)[0] === ev.id && tripOdds("ev-hadean", "ev-hadean").cost > 0
           && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"x", type:"edcenter", points:[]}]}))).buildings[0].shows);
+        // focus and modules: a focus works at strength 1, modules that suit it make it stronger, and the auditorium seats more
+        sc.tech.push("edtheater", "edfossils", "edauditorium");
+        const s0 = slotsOf(ec), a0 = eduAppeal(ec); ec.focus = "spectacle";
+        const sp0 = focusPower(ec), a1 = eduAppeal(ec);
+        const w1 = addMod(ec, "theater"), w2 = addMod(ec, "auditorium"), w3 = addMod(ec, "fossils"), w4 = addMod(ec, "theater");
+        out.eduModules = sp0 === 1 && a1 > a0 && !w1 && !w2 && !w3 && !!w4 && modsOf(ec).length === 3 && focusPower(ec) > 1.5 && eduAppeal(ec) > a1
+          && slotsOf(ec) === s0 + EDU_MODULES.auditorium.slots && eduUpkeep(ec) > u0 && eduLearn(ec) > l0 && modsReady(ec).length === 0
+          && modulesHtml(ec).includes("Remove") && focusHtml(ec).includes("Spectacle")
+          && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"y", type:"edcenter", points:[]}]}))).buildings[0].mods);
+        ec.focus = "conservation"; const m2 = state.money, d0 = state.today.donations || 0; serveAt({n:4, mood:50, needs:{}, cash:100, cool:{}, edu:0}, ec, "learn");
+        out.eduModules = out.eduModules && (state.today.donations || 0) > d0 && state.money > m2;
+        dropMod(ec, "theater"); out.eduModules = out.eduModules && modsOf(ec).length === 2; ec.mods = []; ec.focus = null;
         dropShow(ec, ev.id); out.museum = out.museum && showsOf(ec).length === 0;
         state.buildings.splice(state.buildings.indexOf(ec), 1); delete sc.dna[ev.id]; sc.tech.splice(sc.tech.indexOf("education"), 1); state.money = m1;
       }

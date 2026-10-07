@@ -94,7 +94,10 @@ function serveAt(p, b, why){
     else {
       if(fee){ p.cash -= fee * n; earn(fee * n, "edfees"); bill = fee * n; }
       // they sit through a talk and use the restrooms while they're in there
-      learn(p, EDU.center + showsLearn(b)); p.mood += EDU.centerJoy + showsJoy(b); p.needs.energy = 0; p.needs.bladder = 0; served = n;
+      learn(p, EDU.center + eduLearn(b)); p.mood += EDU.centerJoy + eduJoy(b);
+      const fx = EDU_FOCUS[b.focus];
+      if(fx && fx.donate) earn(n * fx.donate * focusPower(b), "donations");
+      if(fx && fx.science && dept("oracle")) state.science.points += n * fx.science * focusPower(b); p.needs.energy = 0; p.needs.bladder = 0; served = n;
     }
   } else if(b.type === "restroom"){
     p.needs.bladder = 0;
@@ -227,3 +230,28 @@ function addShow(b, id){
   return null;
 }
 function dropShow(b, id){ b.shows = (b.shows || []).filter(x => x !== id); }
+
+/* ---------- Education Center focus and modules ---------- */
+
+const modsOf = b => (b.mods || []).filter(id => EDU_MODULES[id]);
+const focusOf = b => EDU_FOCUS[b.focus] ? b.focus : null;
+// How strongly the center's focus works: 1 plus each module's boost to it (0 with no focus)
+const focusPower = b => { const f = focusOf(b); return f ? 1 + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].boost[f] || 0), 0) : 0; };
+const focusFx = (b, k) => focusOf(b) ? (EDU_FOCUS[b.focus][k] || 0) * focusPower(b) : 0;
+const modLearn = id => { const m = EDU_MODULES[id]; return m.learn * (m.perSpecies ? clamp(.4 + state.science.unlocked.length / 15, .4, 1.4) : 1); };
+const slotsOf = b => BUILDINGS[b.type].slots + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].slots || 0), 0) : 0);
+// Everything a center adds to one visit: museum attractions, modules, and the focus
+const eduLearn = b => showsLearn(b) + modsOf(b).reduce((n, id) => n + modLearn(id), 0) + focusFx(b, "learn");
+const eduJoy = b => showsJoy(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].joy || 0), 0) + focusFx(b, "joy");
+const eduAppeal = b => showsAppeal(b) + modsOf(b).reduce((n, id) => n + (EDU_MODULES[id].appeal || 0), 0) + focusFx(b, "appeal");
+const eduUpkeep = b => showsUpkeep(b) + (b.type === "edcenter" ? modsOf(b).reduce((n, id) => n + EDU_MODULES[id].upkeep, 0) : 0);
+const modsReady = b => Object.keys(EDU_MODULES).filter(id => hasTech(EDU_MODULES[id].tech) && !modsOf(b).includes(id));
+function modProblem(b, id){
+  const m = EDU_MODULES[id];
+  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at ORACLE first."
+    : modsOf(b).includes(id) ? "It's already installed."
+    : modsOf(b).length >= EDU_CENTER.moduleSlots ? `An Education Center has room for ${EDU_CENTER.moduleSlots} modules. Remove one first.`
+    : !canAfford(m.price) ? `Installing it costs ${money(m.price)}. You have ${money(state.money)}.` : null;
+}
+function addMod(b, id){ const why = modProblem(b, id); if(why) return why; spend(EDU_MODULES[id].price, "built"); (b.mods || (b.mods = [])).push(id); return null; }
+function dropMod(b, id){ b.mods = (b.mods || []).filter(x => x !== id); }

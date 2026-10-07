@@ -106,9 +106,29 @@ function eduCenterHtml(b){
   const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
   let h = `<section><h3>Entry fee</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="eduFee" data-d="-1" aria-label="Lower the fee" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${fee ? money(fee) : "Free"}</b><button class="btn" data-action="eduFee" data-d="1" aria-label="Raise the fee" style="padding:2px 9px">+</button></div>`;
   h += `<div class="meta" style="margin-top:4px">${fee <= EDU.centerFee ? "Everyone will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual price is ${money(EDU.centerFee)}.</div></section>`;
-  h += museumHtml(b);
+  h += focusHtml(b) + modulesHtml(b) + museumHtml(b);
   h += `<div class="meta">Guests spend ${BUILDINGS.edcenter.serveMin} minutes here, sitting through a talk and using the restrooms, and come out knowing far more about prehistoric life. Learning makes them happier, tidier, and more generous, and counts toward your rating.</div>`;
   return h;
+}
+// The center's focus: what it is for. Modules make it stronger.
+function focusHtml(b){
+  const cur = focusOf(b);
+  let h = `<section><h3>Focus</h3><div class="row" style="gap:4px">${Object.entries(EDU_FOCUS).map(([k, f]) => `<button class="btn${cur === k ? " on" : ""}" data-action="eduFocus" data-f="${k}" aria-pressed="${cur === k}" style="padding:4px 10px">${esc(f.label)}</button>`).join("")}</div>`;
+  h += `<div class="meta" style="margin-top:6px">${cur ? `${esc(EDU_FOCUS[cur].text)} Strength ${Math.round(focusPower(b) * 100)}%.` : "Pick what this center is for. Modules boost the focus they suit."}</div></section>`;
+  return h;
+}
+// Modules: what's installed, and a dropdown of researched ones to add
+function modulesHtml(b){
+  const on = modsOf(b), ready = modsReady(b), locked = Object.values(EDU_MODULES).filter(m => !hasTech(m.tech)).length;
+  const boosts = m => Object.keys(m.boost).map(k => `${EDU_FOCUS[k].label} +${Math.round(m.boost[k] * 100)}%`).join(", ");
+  let h = `<section><h3>Modules <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${EDU_CENTER.moduleSlots}</span></h3>`;
+  if(on.length) h += `<ul class="shop">${on.map(id => { const m = EDU_MODULES[id];
+    return `<li><span class="nm">${esc(m.label)}</span><span class="need">${esc(m.text)} Teaches ${Math.round(modLearn(id))} more${m.slots ? `, seats ${m.slots} more guests` : ""}. Boosts ${boosts(m)}. ${money(m.upkeep)} a day.</span><span class="need"><button class="btn" data-action="modDrop" data-id="${id}" style="padding:2px 9px">Remove</button></span></li>`; }).join("")}</ul>`;
+  else h += `<div class="meta">No modules yet.</div>`;
+  if(on.length >= EDU_CENTER.moduleSlots) h += `<div class="meta" style="margin-top:6px">The center is full. Remove a module to add another.</div>`;
+  else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="modSel" aria-label="Module to add" style="flex:1;min-width:0">${ready.map(id => `<option value="${id}">${esc(EDU_MODULES[id].label)}, ${money(EDU_MODULES[id].price)}</option>`).join("")}</select><button class="btn" data-action="modAdd">Add</button></div>`;
+  if(locked) h += `<div class="meta" style="margin-top:6px">${locked} more module${locked === 1 ? "" : "s"} to research at ORACLE, under Park management, Buildings.</div>`;
+  return h + `</section>`;
 }
 // The museum: attractions on show, and a dropdown of the events GHOST has recorded that aren't up yet
 function museumHtml(b){
@@ -192,6 +212,9 @@ panelEl.addEventListener("click", ev => {
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
   if(a === "roomRate" && it && isHotel(it)){ it.rate = clamp(roomRate(it) + (+b.dataset.d), 10, BUILDINGS[it.type].roomPrice * 3); ui.panel(); saveSoon(); return; }
+  if(a === "eduFocus" && it && it.type === "edcenter"){ it.focus = it.focus === b.dataset.f ? null : b.dataset.f; recompute(); ui.panel(); saveSoon(); return; }
+  if(a === "modAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#modSel"), why = sel ? addMod(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }
+  if(a === "modDrop" && it && it.type === "edcenter"){ dropMod(it, b.dataset.id); recompute(); ui.panel(); saveSoon(); return; }
   if(a === "showAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#showSel"), why = sel ? addShow(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }
   if(a === "showDrop" && it && it.type === "edcenter"){ dropShow(it, b.dataset.id); ui.panel(); saveSoon(); return; }
   if(a === "eduFee" && it && it.type === "edcenter"){ it.fee = clamp((it.fee || 0) + (+b.dataset.d), 0, EDU.centerFee * 4); ui.panel(); saveSoon(); return; }

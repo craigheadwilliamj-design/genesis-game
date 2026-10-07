@@ -317,6 +317,30 @@ const MUSEUM = {
   needTech:"education",// GHOST can start recording events once ORACLE has researched this
 };
 
+// What an Education Center is for. A center with a focus gets its effect every visit, times its strength:
+// 1 plus the boost each installed module gives that focus. Pick it in the center's panel.
+//   donate   dollars a guest drops in the box per visit. appeal: keenness to visit. joy/learn: mood and learning per visit.
+//   science  ORACLE research points a guest's visit adds
+const EDU_FOCUS = {
+  conservation:{label:"Conservation", donate:2.5, text:"Guests give to the cause. Donations on every visit."},
+  spectacle:   {label:"Spectacle",    appeal:12,  text:"A show worth walking across the park for. Guests are keener to come."},
+  family:      {label:"Family",       joy:5, learn:4, text:"Made for kids and parents. Guests leave happier and know more."},
+  research:    {label:"Research",     science:.06, text:"Visitors help real science. Every visit earns ORACLE research points."},
+};
+// Modules added to a center (ORACLE tech `tech`, which needs education programs). Each also teaches on its own.
+//   boost    adds to the strength of those focuses
+//   slots    more guests that can sit through a visit at once
+//   perSpecies  learning grows with the animals ORACLE has unlocked
+const EDU_MODULES = {
+  theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
+              text:"A stage for puppet shows and animal talks. Crowds love it."},
+  fossils:   {label:"Fossil Displays",  tech:"edfossils",   price:10000, upkeep:80,  learn:6, perSpecies:true, boost:{research:.5, conservation:.25},
+              text:"Real casts and bones. It teaches more as ORACLE unlocks more animals."},
+  auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
+              text:"Tiered seating for lectures. More guests can sit through a talk at once."},
+};
+const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
+
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
@@ -898,6 +922,9 @@ const TECH = [
   {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
   {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
   {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"edtheater", group:"build", label:"Education theater", points:30, needs:"education", text:"Add a Theater module to an Education Center for shows that draw crowds."},
+  {id:"edfossils", group:"build", label:"Fossil displays", points:30, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
+  {id:"edauditorium", group:"build", label:"Education auditorium", points:40, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
   {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
