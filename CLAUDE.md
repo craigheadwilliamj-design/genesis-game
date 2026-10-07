@@ -64,6 +64,7 @@ Artifact: https://claude.ai/artifact/WrtBukrdr1fijyDGdFRbM9 (capabilities `db`, 
 - Artifact reads of the live page return the wrapped HTML, so don't save that over `index.html`.
 
 ## Godot port (in progress)
+Start with `godot/PORT_STATUS.md`: what's done, what's next, how to run tests, and the gotchas already hit.
 The game is being ported to Godot 4 (GDScript, Compatibility renderer) for itch.io and Steam. The JS game stays as the reference until the port catches up.
 - `godot/`: the Godot project (open `godot/project.godot`). `scripts/sim.gd` is the headless sim (port of `js/sim.js`), `scripts/main.gd` the map view, `scripts/data.gd` reads `data/data.json`.
 - `data/data.json` is GENERATED from `js/data.js`: run `node tools/export_data.js` after any balance change there. Don't hand-edit it.

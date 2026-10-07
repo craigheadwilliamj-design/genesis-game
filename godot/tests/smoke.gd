@@ -5,11 +5,18 @@ const GameData = preload("res://scripts/data.gd")
 const SimCore = preload("res://scripts/sim.gd")
 const Geo = preload("res://scripts/geometry.gd")
 var fails := 0
+var passes := 0
+# Quiet by default: only FAIL lines and a summary. Add `-- --verbose` after the command to list every PASS too.
+var verbose := "--verbose" in OS.get_cmdline_user_args()
 
 func check(name: String, ok: bool) -> void:
-	print(("PASS " if ok else "FAIL ") + name)
-	if not ok:
+	if ok:
+		passes += 1
+		if verbose:
+			print("PASS " + name)
+	else:
 		fails += 1
+		print("FAIL " + name)
 
 func _init() -> void:
 	check("species loaded", GameData.get_const("SPECIES", []).size() > 100)
@@ -29,6 +36,7 @@ func _init() -> void:
 	exhibit_tests()
 	animal_tests()
 	guest_tests()
+	print("%d passed, %d failed" % [passes, fails])
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
