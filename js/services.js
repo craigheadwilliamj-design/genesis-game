@@ -245,6 +245,16 @@ function modLive(id){
     const busy = [dept("oracle") && sc.projects.length, dept("ghost") && sc.trips.length, dept("tar") && sc.clones.length, dept("ceres") && state.ceres.beds.length].filter(Boolean).length;
     return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * busy / 4;
   }
+  if(m.live === "botany"){
+    // plant DNA CERES has finished (6 periods, 4 is plenty), and beds growing now
+    const dna = Object.values(PLANT_DNA).filter(f => genomeDone(f.id)).length;
+    return dept("ceres") ? EDU_LIVE.idle + (1 - EDU_LIVE.idle) * (.7 * Math.min(1, dna / 4) + (state.ceres.beds.length ? .3 : 0)) : 0;
+  }
+  if(m.live === "sim"){
+    // one place to visit for each finished event record
+    const places = MUSEUM_EVENTS.filter(ev => genomeDone(ev.id)).length;
+    return dept("ghost") ? EDU_LIVE.simIdle + (1 - EDU_LIVE.simIdle) * Math.min(1, places / EDU_LIVE.simPlaces) : 0;
+  }
   if(!dept("tar")) return 0;
   return Math.min(EDU_LIVE.cap, EDU_LIVE.nurseryIdle + (1 - EDU_LIVE.nurseryIdle) * Math.min(1, sc.clones.length / 2) + (sc.hatchDay === state.day ? EDU_LIVE.hatchBonus : 0));
 }

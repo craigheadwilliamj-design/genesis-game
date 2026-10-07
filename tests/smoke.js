@@ -1413,6 +1413,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
         const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
         out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
+        // botanical hall and simulation room need CERES and GHOST, and grow with finished plant DNA and event records
+        state.buildings.push({id:"tc", type:"ceres", points:sq(520, 0, 10), day:0}, {id:"tg", type:"ghost", points:sq(540, 0, 10), day:0});
+        sc.tech.push("edbotanical", "edsimroom");
+        const keepD = sc.dna, keepB = state.ceres.beds; sc.dna = {}; state.ceres.beds = [];
+        const b0 = modLive("botanical"), s0m = modLive("simroom");
+        sc.dna = {"flora-Jurassic":{genome:100, quality:80}, "flora-Triassic":{genome:100, quality:80}, "ev-dying":{genome:100, quality:80}, "ev-kpg":{genome:100, quality:80}};
+        const b1 = modLive("botanical"), s1m = modLive("simroom"); state.ceres.beds = [{id:"g", kind:"plant", era:"Jurassic", bay:0, start:0, end:9e9}]; const b2 = modLive("botanical");
+        out.eduModules = out.eduModules && b0 < b1 && b1 < b2 && b2 <= 1 && s0m < s1m && s1m <= 1 && !modProblem(ec, "botanical") && !modProblem(ec, "simroom");
+        sc.dna = keepD; state.ceres.beds = keepB; state.buildings.pop(); state.buildings.pop();
         state.buildings.pop(); state.buildings.push(...labs); sc.clones = keepC; sc.hatchDay = keepH; dept = deptKeep; ec.mods = modsKeep;
         dropMod(ec, "theater"); out.eduModules = out.eduModules && modsOf(ec).length === 2; ec.mods = []; ec.focus = null;
         dropShow(ec, ev.id); out.museum = out.museum && showsOf(ec).length === 0;
