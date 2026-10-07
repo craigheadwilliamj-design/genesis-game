@@ -92,14 +92,16 @@ function step(now){
   }
   drawParties();
   if(sel && sel.kind === "guest") guestLive();
+  if(sel && sel.kind === "staff") staffLive();
   drawTrams();
   drawKeepers();
+  drawStaffRing();
   drawLoose();
   ui.hud();
   sinceDraw += dt; sincePanel += dt;
   if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }
   // refresh the side panel now and then, but not while the mouse is over it (so buttons don't jump)
-  if(sincePanel > 1.5 && !(sel && sel.kind === "guest") && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
+  if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
 }
 
 /* ---------- saving ---------- */
