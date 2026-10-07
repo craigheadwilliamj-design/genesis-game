@@ -21,7 +21,10 @@ var guests := Guests.new()   # the guests in the park right now (not saved)
 
 func _init() -> void:
 	state = new_park()
-	layout_changed.connect(func(): guests.dirty = true)
+	layout_changed.connect(_on_layout_changed)
+
+func _on_layout_changed() -> void:
+	guests.dirty = true
 
 func open_min() -> float:
 	return float(GameData.get_const("OPEN_MIN", 480))
