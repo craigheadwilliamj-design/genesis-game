@@ -422,7 +422,7 @@ func _plan(sim, p: Dictionary) -> void:
 		p["done"] = true
 		var saw_any := false
 		for id in p["seen"]:
-			var x := sim.find_exhibit(id)
+			var x: Dictionary = sim.find_exhibit(id)
 			if not x.is_empty() and not x["animals"].is_empty():
 				saw_any = true
 		if not saw_any:
@@ -461,7 +461,7 @@ func _reach_dest(sim, p: Dictionary) -> void:
 	if id == "gate":
 		_leaves(sim, p)
 		return
-	var e := sim.find_exhibit(id)
+	var e: Dictionary = sim.find_exhibit(id)
 	if not e.is_empty():
 		_see(sim, p, e)
 	p["dest"] = ""
@@ -494,7 +494,7 @@ func _walk(sim, p: Dictionary, left: float) -> void:
 		left -= rem
 		if a.has("sees") and a["sees"].has(p["to"]):
 			for id in a["sees"][p["to"]]:
-				var e := sim.find_exhibit(id)
+				var e: Dictionary = sim.find_exhibit(id)
 				if not e.is_empty():
 					_see(sim, p, e)
 		p["prev"] = p["at"]
