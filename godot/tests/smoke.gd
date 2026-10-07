@@ -204,7 +204,7 @@ func guest_tests() -> void:
 	check("exhibit beside the walk is reachable", sim.guests.is_reachable(ex["id"]))
 	check("exhibit gets a stop on the map", sim.guests.anchors.has(ex["id"]))
 	check("there is demand", sim.guests.demand(sim) > 0.0)
-	check("far-off exhibit isn't reachable", not SimCore.new().guests.is_reachable("nope"))
+	check("unknown ids aren't reachable", not sim.guests.is_reachable("nope"))
 	var money0: int = sim.state["money"]
 	var seen_parties := false
 	var steps := 0
@@ -219,9 +219,9 @@ func guest_tests() -> void:
 	check("tickets paid at the gate", h["income"] == h["guests"] * 25)
 	check("everyone went home at closing", sim.guests.parties.is_empty())
 	check("their mood was remembered", sim.state["guestLog"]["mood"] != null and sim.state["guestLog"]["last"]["guests"] == h["guests"])
-	check("nightly costs charged", sim.state["money"] == money0 + h["income"] - h["costs"] + 0 or true)
+	check("upkeep was charged overnight", sim.state["money"] < money0 + h["income"] and h["costs"] > 0)
 	# a park with nothing joined to the gate draws nobody
 	var empty := SimCore.new()
-	for i in 200:
+	while empty.state["day"] == 1:
 		empty.tick(1.0)
 	check("no exhibits, no guests", empty.state["history"].size() == 1 and empty.state["history"][0]["guests"] == 0)
