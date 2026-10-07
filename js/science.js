@@ -39,7 +39,7 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 
 // What a job cost, so cancelling it can give it back: {points} of research or {money}
 function jobRefund(kind, j){
-  if(kind === "paleo") return {points:j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
+  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
   if(kind === "temporal") return {money:tripOdds(j.sp, j.period).cost};
   if(kind === "gene") return {money:SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
@@ -63,8 +63,9 @@ const researching = (kind, id) => state.science.projects.some(p => p.kind === ki
 const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s));
 const isUnlocked = id => state.science.unlocked.includes(id);
 
-// What unlocking an animal's genome costs in research points: its period's base plus a share of its price
-function unlockPoints(s){ return Math.max(3, Math.round(PERIOD_BY_ID[s.period].research * .08 + s.price * UNLOCK_PER_PRICE)); }
+// What unlocking an animal's genome costs in research points: its period's base plus a share of its price,
+// and dearer for every animal already unlocked
+function unlockPoints(s){ return Math.max(4, Math.round((PERIOD_BY_ID[s.period].research * .1 + s.price * UNLOCK_PER_PRICE) * (1 + UNLOCK_GROWTH * state.science.unlocked.length))); }
 
 // A project is {kind, id}: "tech" (anything in TECH), "refine" (an era's medicine, for one period) or "species" (an animal's genome)
 function projectInfo(kind, id){
@@ -82,8 +83,8 @@ function projectProblem(kind, id){
   if(researching(kind, id)) return "Already being researched.";
   const blocker = deptProblem("oracle"); if(blocker) return blocker;
   if(info.needs && !hasTech(info.needs)) return `Research ${TECH.find(x => x.id === info.needs).label} first.`;
-  if(!sc.crew.paleo) return "Hire a paleontologist to run research.";
-  if(freeBay("paleo") < 0) return bayFull("paleo", "paleontologist");
+  if(!sc.crew.paleo) return "Hire a researcher to run research.";
+  if(freeBay("paleo") < 0) return bayFull("paleo", "researcher");
   if(sc.points + 1e-9 < info.points) return `Needs ${info.points} research points. You have ${Math.floor(sc.points)}.`;
   return null;
 }
@@ -91,9 +92,15 @@ function startProject(kind, id){
   const why = projectProblem(kind, id); if(why) return why;
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
-  sc.projects.push({kind, id, bay:freeBay("paleo"), start:now, end:now + projectMinutes(info.points)});
+  sc.projects.push({kind, id, bay:freeBay("paleo"), cost:info.points, start:now, end:now + projectMinutes(info.points)});
   events.toast(`ORACLE started ${kind === "species" ? `unlocking the ${info.label}` : `researching ${info.label.toLowerCase()}`}. It takes about ${spanText(projectMinutes(info.points))}.`);
   return null;
+}
+// Take a researcher off a project and back to general research. The points come back.
+function stopProject(p){
+  const sc = state.science, i = sc.projects.indexOf(p); if(i < 0) return;
+  sc.projects.splice(i, 1); sc.points += jobRefund("paleo", p).points || 0;
+  events.toast("That researcher is back on general research. The points came back.");
 }
 function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
@@ -296,7 +303,8 @@ const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce
 // Called every tick. Research points trickle in, and every project, trip, clone and batch checks its own clock.
 function scienceTick(dtMin){
   const sc = state.science, c = state.ceres;
-  if(dept("oracle")) sc.points += sc.crew.paleo * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
+  // researchers with no project are on general research and earn points. Ones running a project don't.
+  if(dept("oracle")) sc.points += Math.max(0, sc.crew.paleo - sc.projects.length) * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
   const now = nowMin();
   if(sc.projects.length && sc.projects.some(p => p.end <= now)){
     const done = sc.projects.filter(p => p.end <= now);

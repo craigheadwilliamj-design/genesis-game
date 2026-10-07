@@ -33,7 +33,7 @@ const progressCard = (title, sub, j, bay) =>
 // Why nothing new can start at ORACLE right now, if that's so
 function labBlocker(){
   const sc = state.science;
-  return deptProblem("oracle") || (!sc.crew.paleo ? "Hire a paleontologist to run research." : null);
+  return deptProblem("oracle") || (!sc.crew.paleo ? "Hire a researcher to run research." : null);
 }
 
 // One research item: its name, a button (or its progress), and what it does
@@ -50,11 +50,11 @@ function projectRow(kind, id, label, text){
 const techRows = group => TECH.filter(t => t.group === group).map(t => projectRow("tech", t.id, esc(t.label), esc(t.text))).join("");
 
 function oracleHtml(b){
-  const sc = state.science, n = sc.crew.paleo;
+  const sc = state.science, n = sc.crew.paleo, idle = Math.max(0, n - sc.projects.length);
   let h = deptHead(b);
-  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">research points. ${n ? `+${n * RESEARCH_PER_PALEO} a day from your paleontologist${n === 1 ? "" : "s"}.` : "Hire a paleontologist to earn them."} Research takes time: ${spanText(projectMinutes(20))} for every 20 points.</span></div></section>`;
+  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">research points. ${n ? `+${idle * RESEARCH_PER_PALEO} a day from ${idle} researcher${idle === 1 ? "" : "s"} on general research${idle < n ? ` (${n - idle} busy on projects)` : ""}.` : "Hire a researcher to earn them."} Educated guests add more when they leave. Research takes time: ${spanText(projectMinutes(30))} for every 30 points.</span></div></section>`;
   h += sciStaffHtml("paleo");
-  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), p.kind === "species" ? "genome" : "", p, i), "Empty. Pick a project below.");
+  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), p.kind === "species" ? "genome" : "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `On general research: +${RESEARCH_PER_PALEO} points a day. Pick a project below to assign them.`);
   const block = labBlocker();
   if(block) h = h.replace(/<\/section>$/, `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div></section>`);
 
@@ -244,6 +244,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
   if(a === "gtab"){ ghostTab = b.dataset.k; ui.panel(); return; }
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "stopResearch"){ const p = state.science.projects[+b.dataset.i]; if(p) stopProject(p); done(); return; }
   if(a === "trip"){ if(launchTrip(b.dataset.sp, b.dataset.p)) done(); return; }
   if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "CERES can't grow that.", "bad"); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }
