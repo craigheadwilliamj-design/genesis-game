@@ -21,6 +21,11 @@ var draw_pts: Array = []        # corners of the path being drawn
 var draw_snaps: Array = []      # what each corner snapped to (null for open ground)
 var hover: Dictionary = {}      # the snapped point under the mouse while a draw tool is active
 var toast_until := 0
+var build_opt: OptionButton
+var build_ids: Array = []       # building ids in the dropdown, after its heading
+var build_type := ""
+var rot := 0                    # turns of 45 degrees for the building being placed
+var ghost: Dictionary = {}      # where the building would go under the mouse
 
 func _ready() -> void:
 	sim = SimCore.new()
@@ -40,7 +45,7 @@ func _ready() -> void:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	bar.offset_left = 12
 	bar.offset_top = -56
-	bar.offset_right = 520
+	bar.offset_right = 760
 	bar.offset_bottom = -12
 	var group := ButtonGroup.new()
 	for t in TOOLS:
@@ -53,6 +58,15 @@ func _ready() -> void:
 		b.add_to_group("tool_buttons")
 		b.pressed.connect(_set_tool.bind(t))
 		bar.add_child(b)
+	build_opt = OptionButton.new()
+	build_opt.focus_mode = Control.FOCUS_NONE
+	build_opt.add_item("Buildings")
+	var defs: Dictionary = GameData.get_const("BUILDINGS")
+	for id in sim.building_types():
+		build_ids.append(id)
+		build_opt.add_item("%s  %s" % [defs[id]["label"], sim.money_text(int(defs[id]["price"]))])
+	build_opt.item_selected.connect(_pick_building)
+	bar.add_child(build_opt)
 	sim.changed.connect(_refresh_hud)
 	sim.layout_changed.connect(queue_redraw)
 	_refresh_hud()
@@ -71,8 +85,23 @@ func _set_tool(t: String) -> void:
 	draw_pts.clear()
 	draw_snaps.clear()
 	hover = {}
-	_set_status("" if t == "pan" else "%s: click to add points. Click the last point again, or press Enter, to finish. Esc cancels." % TOOLS[t])
+	ghost = {}
+	build_opt.select(0)
+	_set_status("" if t == "pan" or t == "build" else "%s: click to add points. Click the last point again, or press Enter, to finish. Esc cancels." % TOOLS[t])
 	queue_redraw()
+
+func _pick_building(index: int) -> void:
+	if index == 0:
+		_set_tool("pan")
+		_select_button("pan")
+		return
+	var keep := index
+	_set_tool("build")
+	build_opt.select(keep)
+	build_type = build_ids[keep - 1]
+	for b in get_tree().get_nodes_in_group("tool_buttons"):
+		b.button_pressed = false
+	_set_status("R turns it. Click to build. Esc cancels.")
 
 func _path_type() -> String:
 	return "" if tool == "path" else tool
@@ -91,7 +120,12 @@ func _process(delta: float) -> void:
 	dir.y += float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W))
 	if dir != Vector2.ZERO:
 		cam.position += dir.limit_length(1.0) * PAN_KEYS_SPEED * delta / cam.zoom.x
-	if tool != "pan":
+	if tool == "build":
+		var m := get_global_mouse_position()
+		ghost = sim.building_spot(build_type, m.x, m.y, rot)
+		_ghost_status()
+		queue_redraw()
+	elif tool != "pan":
 		hover = snap_at(get_global_mouse_position(), Input.is_key_pressed(KEY_ALT))
 		_preview_status()
 		queue_redraw()
@@ -117,6 +151,29 @@ func _preview_status() -> void:
 		_set_status(problem, true)
 	else:
 		_set_status("%s, %d m: %s. Click the last point again to build." % [TOOLS[tool], int(Geo.line_length(pts)), sim.money_text(sim.path_cost(pts, type))])
+
+func _ghost_status() -> void:
+	if Time.get_ticks_msec() < toast_until or ghost.is_empty():
+		return
+	if not ghost["ok"]:
+		_set_status(ghost["why"], true)
+	else:
+		var note := "" if ghost["has_path"] else " No path nearby, so it won't work until one reaches it."
+		_set_status("%s. Click to build.%s" % [sim.money_text(ghost["price"]), note])
+
+func _build_tap() -> void:
+	if ghost.is_empty():
+		return
+	var m := get_global_mouse_position()
+	var label: String = sim.building_def(build_type)["label"]
+	var problem := sim.place_building(build_type, m.x, m.y, rot)
+	if problem != "":
+		_set_status(problem, true, 2500)
+	else:
+		_set_status("Built %s for %s." % [label.to_lower(), sim.money_text(int(sim.building_def(build_type)["price"]))], false, 2500)
+		if sim.building_def(build_type).get("unique", false):
+			_set_tool("pan")
+			_select_button("pan")
 
 # ---------- snapping (snapAt in map.js) ----------
 # Nearest corner, entrance or path to the point, so a new path really joins what it starts on. Alt skips snapping.
@@ -195,6 +252,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and (mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			_zoom_at(1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15)
+		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and tool == "build":
+			_build_tap()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and tool != "pan":
 			_draw_tap()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -207,6 +266,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: speed = 1
 			KEY_2: speed = 2
 			KEY_3: speed = 3
+			KEY_R:
+				if tool == "build":
+					rot = (rot + 1) % 8
 			KEY_ENTER, KEY_KP_ENTER:
 				if tool != "pan" and not draw_pts.is_empty():
 					_finish_draw()
@@ -216,7 +278,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					draw_snaps.pop_back()
 					queue_redraw()
 			KEY_ESCAPE:
-				if draw_pts.is_empty():
+				if tool == "build" or draw_pts.is_empty():
 					_set_tool("pan")
 					_select_button("pan")
 				else:
@@ -228,6 +290,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _select_button(t: String) -> void:
 	for b in get_tree().get_nodes_in_group("tool_buttons"):
 		b.button_pressed = b.text == TOOLS[t]
+	build_opt.select(0)
 
 # Zoom keeping the point under the mouse where it is
 func _zoom_at(factor: float) -> void:
@@ -265,6 +328,10 @@ func _draw() -> void:
 				_draw_path(p["points"], sim.half_width(type), PATH_COLORS[type])
 	var g: Array = sim.state["gate"]
 	draw_circle(Vector2(g[0], g[1]), 4.0, Color(0.85, 0.65, 0.2))
+	for b in sim.state["buildings"]:
+		_draw_building(b["points"], sim.building_def(b["type"]), 1.0, false)
+	if tool == "build" and not ghost.is_empty():
+		_draw_building(ghost["pts"], sim.building_def(build_type), 0.6, true, ghost["ok"])
 	# the path being drawn
 	if tool != "pan":
 		var pts := _preview_pts()
@@ -284,3 +351,24 @@ func _draw_path(pts: Array, half: float, color: Color) -> void:
 		draw_circle(Vector2(q[0], q[1]), half, color)   # round joints and ends
 	if line.size() >= 2:
 		draw_polyline(line, color, half * 2.0)
+
+# A building: its footprint in the type's color with its letter on top. The ghost is tinted green or red.
+func _draw_building(pts: Array, def: Dictionary, alpha: float, is_ghost: bool, ok := true) -> void:
+	var poly := PackedVector2Array()
+	for q in pts:
+		poly.append(Vector2(q[0], q[1]))
+	var fill := Color.html(def.get("color", "#888888"))
+	if is_ghost:
+		fill = fill.lerp(Color(0.4, 1, 0.4) if ok else Color(1, 0.35, 0.3), 0.55)
+	fill.a = alpha
+	draw_colored_polygon(poly, fill)
+	var outline := poly.duplicate()
+	outline.append(poly[0])
+	draw_polyline(outline, Color(0, 0, 0, 0.6 * alpha), 0.4)
+	var c: Array = Geo.centroid(pts)
+	var font := ThemeDB.fallback_font
+	var glyph: String = def.get("glyph", "?")
+	draw_set_transform(Vector2(c[0], c[1]), 0.0, Vector2(0.15, 0.15))
+	var sz := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 40)
+	draw_string(font, Vector2(-sz.x / 2.0, sz.y * 0.3), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 1, 1, alpha))
+	draw_set_transform_matrix(Transform2D.IDENTITY)

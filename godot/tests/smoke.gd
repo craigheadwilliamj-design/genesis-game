@@ -25,6 +25,7 @@ func _init() -> void:
 	check("save round trip", other.load_game("user://smoke_save.json") and other.state["day"] == 2)
 	geometry_parity()
 	path_tests()
+	building_tests()
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
@@ -100,3 +101,20 @@ func path_tests() -> void:
 	check("junction added to the path it lands on", sim.state["paths"][0]["points"].size() == 3 and sim.state["paths"][2]["type"] == "service")
 	sim.state["money"] = 10
 	check("can't afford", sim.add_path([[0, 0], [100, 0]], "", [null, null]).begins_with("Costs $1,500."))
+
+func building_tests() -> void:
+	var sim := SimCore.new()
+	# a restroom pointed at the main walk snaps beside it: 2.5 m half width + 0.5 + half its 6 m depth
+	var spot: Dictionary = sim.building_spot("restroom", 215.0, 270.0, 0)
+	check("restroom snaps beside the path", spot["ok"] and spot["has_path"] and absf(spot["x"] - 211.0) < 1e-6 and absf(spot["y"] - 270.0) < 1e-6)
+	check("restroom far from paths is fine", sim.building_spot("restroom", 50.0, 50.0, 0)["ok"])
+	check("restroom far from paths has no path", not sim.building_spot("restroom", 50.0, 50.0, 0)["has_path"])
+	check("bin needs a path", sim.building_spot("bin", 50.0, 50.0, 0)["why"] == "Move it next to a path.")
+	check("outside the plot", sim.building_spot("restroom", 2.0, 2.0, 0)["why"] == "Keep it inside the park boundary.")
+	var m0: int = sim.state["money"]
+	check("place restroom", sim.place_building("restroom", 215.0, 270.0, 0) == "" and sim.state["buildings"].size() == 1 and m0 - sim.state["money"] == 4000)
+	check("no overlapping buildings", sim.place_building("restroom", 215.0, 272.0, 0) == "It overlaps another building.")
+	check("restaurant needs 2 stars", sim.building_spot("restaurant", 195.0, 270.0, 0)["why"] == "Your park needs 2 stars first.")
+	check("tram station needs tech", sim.building_spot("tramstop", 195.0, 270.0, 0)["why"].begins_with("Research"))
+	check("oracle is one per park", sim.place_building("oracle", 195.0, 270.0, 0) == "" and sim.building_spot("oracle", 195.0, 150.0, 0)["why"] == "You already have ORACLE. There's one per park.")
+	check("greenhouse needs CERES", sim.building_spot("greenhouse", 195.0, 270.0, 0)["why"] == "Build CERES first.")

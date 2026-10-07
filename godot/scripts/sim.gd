@@ -8,6 +8,7 @@ const PATH_HALF_WIDTH := 2.5   # footpaths are 5 m wide
 const UID_CHARS := "0123456789abcdefghijklmnopqrstuvwxyz"
 # the home plot (PARK_PLOT in sim.js). Land for sale comes later.
 const HOME_PLOT := Rect2(0, 0, 420, 305)
+const SNAP_REACH := 6.0   # meters past a path's edge where a new building still snaps to it
 
 signal changed
 signal layout_changed   # something was built or removed: redraw the map
@@ -44,6 +45,7 @@ func new_park() -> Dictionary:
 		"buildings": [],
 		"today": fresh_ledger(),
 		"history": [],
+		"science": {"tech": ["bars"]},   # ORACLE tech researched (freshScience in sim.js has much more)
 		"goalsDone": [],
 		"over": false,
 	}
@@ -199,3 +201,139 @@ func load_game(path: String = "user://save.json") -> bool:
 		changed.emit()
 		return true
 	return false
+
+# ---------- buildings ----------
+# Everything with a footprint that isn't an exhibit. Vivariums and viewing platforms have their own tools, so they're left out.
+
+func has_tech(id: String) -> bool:
+	return id in state["science"]["tech"]
+
+func has_dept(type: String) -> bool:
+	for b in state["buildings"]:
+		if b["type"] == type:
+			return true
+	return false
+
+func last_guests() -> int:
+	var h: Array = state["history"]
+	return int(h[-1].get("guests", 0)) if not h.is_empty() else 0
+
+func building_def(type: String) -> Dictionary:
+	return GameData.get_const("BUILDINGS")[type]
+
+# Placeable on the map with the building tool
+func building_types() -> Array:
+	var out := []
+	for id in GameData.get_const("BUILDINGS"):
+		var t: Dictionary = building_def(id)
+		if not t.has("viv") and id != "platform":
+			out.append(id)
+	return out
+
+# Why this kind of building is locked right now (not about where it goes), or ""
+func building_locked(type: String) -> String:
+	var t := building_def(type)
+	if t.get("unique", false) and has_dept(type):
+		return "You already have %s. There's one per park." % t["label"]
+	if t.has("tech") and not has_tech(t["tech"]):
+		var label := str(t["tech"])
+		for x in GameData.get_const("TECH"):
+			if x["id"] == t["tech"]:
+				label = x["label"]
+		return "Research %s at ORACLE first." % label.to_lower()
+	if t.has("needsDept") and not has_dept(t["needsDept"]):
+		return "Build %s first." % building_def(t["needsDept"])["label"]
+	if t.has("minRating") and state["rating"] < float(t["minRating"]):
+		return "Your park needs %d stars first." % int(t["minRating"])
+	if t.has("minGuests") and last_guests() < int(t["minGuests"]):
+		return "Your park needs %d guests a day first. Yesterday had %d." % [int(t["minGuests"]), last_guests()]
+	return ""
+
+# Where a building would go if the pointer is at (px, py), and whether it can be built there (placeGhost in map.js).
+# Guest buildings face the nearest footpath and sit beside it; props (bins, benches, lamps) sit on it.
+# Returns {pts, x, y, angle, ok, why, has_path, price}. rot is turns of 45 degrees.
+func building_spot(type: String, px: float, py: float, rot: int) -> Dictionary:
+	var t := building_def(type)
+	var w: float = t["w"]
+	var d: float = t["d"]
+	var on_path: bool = t.get("onPath", false)
+	var best := {}
+	# guest buildings face footpaths; backstage departments can face service roads too
+	for q in state["paths"]:
+		var qt: String = q.get("type", "")
+		if qt == "tram":
+			continue
+		if qt == "service" and not t.get("dept", false):
+			continue
+		if t.get("serviceOnly", false) and qt != "service":
+			continue
+		var pts: Array = q["points"]
+		for i in range(1, pts.size()):
+			var r := Geo.seg_proj(px, py, pts[i - 1], pts[i])
+			var reach: float = (30.0 + d / 2.0) if on_path else (half_width(qt) + d / 2.0 + SNAP_REACH)
+			if r["d"] < reach and (best.is_empty() or r["d"] < best["d"]):
+				best = {"x": r["x"], "y": r["y"], "d": r["d"], "a": pts[i - 1], "b": pts[i], "hw": half_width(qt)}
+	var x := px
+	var y := py
+	var angle := 0.0
+	var why := building_locked(type)
+	var ra := rot * PI / 4.0
+	if not best.is_empty():
+		var dx: float = best["b"][0] - best["a"][0]
+		var dy: float = best["b"][1] - best["a"][1]
+		var l := sqrt(dx * dx + dy * dy)
+		if l == 0.0:
+			l = 1.0
+		var nx := -dy / l
+		var ny := dx / l
+		# it goes on the side of the path you point at
+		var side := 1.0 if ((px - best["x"]) * nx + (py - best["y"]) * ny) >= 0.0 else -1.0
+		var dn := absf(w * sin(ra)) + absf(d * cos(ra))   # how deep it is across the path once turned
+		var hw: float = best["hw"]
+		var off := maxf(0.0, hw - dn / 2.0 - 0.1) if on_path else (dn / 2.0 + hw + 0.5)
+		# a fence right at the path edge: slide in until the prop clears it
+		if on_path:
+			while off > 0.0 and _hits_exhibit(Geo.rect_pts(best["x"] + nx * side * off, best["y"] + ny * side * off, w, d, atan2(dy, dx) + ra)):
+				off = maxf(0.0, off - 0.1)
+		x = best["x"] + nx * side * off
+		y = best["y"] + ny * side * off
+		angle = atan2(dy, dx)
+	elif on_path and why == "":
+		why = "Move it next to a path."
+	angle += ra
+	var fp := Geo.rect_pts(x, y, w, d, angle)
+	if why == "" and not inside_plot(fp):
+		why = "Keep it inside the park boundary."
+	if why == "" and _hits_exhibit(fp):
+		why = "It overlaps an exhibit."
+	if why == "":
+		for b in state["buildings"]:
+			if Geo.shapes_overlap(fp, b["points"]):
+				why = "It overlaps another building."
+				break
+	if why == "" and not on_path:
+		for q in state["paths"]:
+			if Geo.line_enters_shape(q["points"], fp):
+				why = "It sits on a path."
+				break
+	var price := int(t["price"])
+	if why == "" and not can_afford(price):
+		why = "Costs %s. You have %s." % [money_text(price), money_text(int(state["money"]))]
+	return {"pts": fp, "x": x, "y": y, "angle": angle, "ok": why == "", "why": why, "has_path": not best.is_empty(), "price": price}
+
+func _hits_exhibit(fp: Array) -> bool:
+	for e in state["exhibits"]:
+		if Geo.shapes_overlap(fp, e["points"]):
+			return true
+	return false
+
+# Build it at the spot under the pointer. Returns "" or the reason it failed.
+func place_building(type: String, px: float, py: float, rot: int) -> String:
+	var spot := building_spot(type, px, py, rot)
+	if not spot["ok"]:
+		return spot["why"]
+	spend(spot["price"], "built")
+	state["buildings"].append({"id": uid("b-"), "type": type, "points": spot["pts"], "day": state["day"]})
+	layout_changed.emit()
+	changed.emit()
+	return ""
