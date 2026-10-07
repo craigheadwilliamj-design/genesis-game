@@ -7,7 +7,7 @@ const Geo = preload("res://scripts/geometry.gd")
 
 const GRID := 5.0
 const PAN_KEYS_SPEED := 400.0   # screen px per second at zoom 1
-const TOOLS := {"pan": "Pan", "path": "Path", "wide": "Wide path", "service": "Service road"}
+const TOOLS := {"pan": "Pan", "path": "Path", "wide": "Wide path", "service": "Service road", "exhibit": "Exhibit"}
 const PATH_COLORS := {"": Color(0.80, 0.74, 0.62), "wide": Color(0.87, 0.81, 0.69), "service": Color(0.52, 0.52, 0.55)}
 
 var sim: SimCore
@@ -22,6 +22,9 @@ var draw_snaps: Array = []      # what each corner snapped to (null for open gro
 var hover: Dictionary = {}      # the snapped point under the mouse while a draw tool is active
 var toast_until := 0
 var build_opt: OptionButton
+var fence_opt: OptionButton
+var fence_ids: Array = []
+var fence_sel := "wood"         # the fence new exhibits are built with
 var build_ids: Array = []       # building ids in the dropdown, after its heading
 var build_type := ""
 var rot := 0                    # turns of 45 degrees for the building being placed
@@ -45,7 +48,7 @@ func _ready() -> void:
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	bar.offset_left = 12
 	bar.offset_top = -56
-	bar.offset_right = 760
+	bar.offset_right = 1000
 	bar.offset_bottom = -12
 	var group := ButtonGroup.new()
 	for t in TOOLS:
@@ -67,6 +70,13 @@ func _ready() -> void:
 		build_opt.add_item("%s  %s" % [defs[id]["label"], sim.money_text(int(defs[id]["price"]))])
 	build_opt.item_selected.connect(_pick_building)
 	bar.add_child(build_opt)
+	fence_opt = OptionButton.new()
+	fence_opt.focus_mode = Control.FOCUS_NONE
+	for key in sim.barrier_keys():
+		fence_ids.append(key)
+		fence_opt.add_item("%s  $%d/m" % [sim.barrier_def(key)["label"], int(sim.fence_rate(key))])
+	fence_opt.item_selected.connect(func(i: int): fence_sel = fence_ids[i])
+	bar.add_child(fence_opt)
 	sim.changed.connect(_refresh_hud)
 	sim.layout_changed.connect(queue_redraw)
 	_refresh_hud()
@@ -87,7 +97,10 @@ func _set_tool(t: String) -> void:
 	hover = {}
 	ghost = {}
 	build_opt.select(0)
-	_set_status("" if t == "pan" or t == "build" else "%s: click to add points. Click the last point again, or press Enter, to finish. Esc cancels." % TOOLS[t])
+	if t == "exhibit":
+		_set_status("Exhibit: click to drop fence corners. Click the first corner to close it. Pick the fence from the dropdown. Backspace undoes, Esc cancels.")
+	else:
+		_set_status("" if t == "pan" or t == "build" else "%s: click to add points. Click the last point again, or press Enter, to finish. Esc cancels." % TOOLS[t])
 	queue_redraw()
 
 func _pick_building(index: int) -> void:
@@ -144,6 +157,9 @@ func _preview_pts() -> Array:
 func _preview_status() -> void:
 	if Time.get_ticks_msec() < toast_until or draw_pts.is_empty():
 		return
+	if tool == "exhibit":
+		_exhibit_status()
+		return
 	var pts := _preview_pts()
 	var type := _path_type()
 	var problem := sim.path_problem(pts, type)
@@ -175,6 +191,28 @@ func _build_tap() -> void:
 			_set_tool("pan")
 			_select_button("pan")
 
+func _exhibit_status() -> void:
+	if draw_pts.size() < 3:
+		_set_status("Click to drop the next fence corner.")
+		return
+	var problem := sim.exhibit_problem(draw_pts, fence_sel)
+	if problem != "":
+		_set_status(problem, true)
+	else:
+		_set_status("Exhibit, %d m², %s. Click the first corner to close it." % [int(Geo.area(draw_pts)), sim.money_text(sim.exhibit_cost(draw_pts, fence_sel))])
+
+func _finish_exhibit() -> void:
+	var cost := sim.exhibit_cost(draw_pts, fence_sel)
+	var problem := sim.add_exhibit(draw_pts, fence_sel)
+	if problem != "":
+		_set_status(problem, true, 2500)
+		return
+	var e: Dictionary = sim.state["exhibits"][-1]
+	_set_status("Built %s for %s." % [e["name"], sim.money_text(cost)], false, 2500)
+	draw_pts.clear()
+	draw_snaps.clear()
+	queue_redraw()
+
 # ---------- snapping (snapAt in map.js) ----------
 # Nearest corner, entrance or path to the point, so a new path really joins what it starts on. Alt skips snapping.
 func snap_at(p: Vector2, free: bool) -> Dictionary:
@@ -183,6 +221,7 @@ func snap_at(p: Vector2, free: bool) -> Dictionary:
 		return open
 	var r := 12.0 / cam.zoom.x
 	var paths: Array = sim.state["paths"]
+	var path_kind := tool != "exhibit"   # drawing a path: anywhere on another path snaps onto its centerline
 	var near_vertex := false
 	for q in paths:
 		for v in q["points"]:
@@ -190,7 +229,7 @@ func snap_at(p: Vector2, free: bool) -> Dictionary:
 				near_vertex = true
 	# anywhere on another path's body snaps onto its centerline
 	var hit := {}
-	if not near_vertex:
+	if not near_vertex and path_kind:
 		for q in paths:
 			var pts: Array = q["points"]
 			for i in range(1, pts.size()):
@@ -206,9 +245,20 @@ func snap_at(p: Vector2, free: bool) -> Dictionary:
 	for q in paths:
 		for v in q["points"]:
 			_try_vertex(p, v, "path", q["id"], best)
+	for q in sim.state["exhibits"]:
+		for v in q["points"]:
+			_try_vertex(p, v, "exhibit", q["id"], best)
 	if best["snap"] != null:
 		return best["snap"]
 	best["bd"] = r * 0.8
+	if not path_kind:
+		for q in paths:
+			for i in range(1, q["points"].size()):
+				_try_segment(p, q["points"][i - 1], q["points"][i], "path", q["id"], best)
+		for q in sim.state["exhibits"]:
+			var ep: Array = q["points"]
+			for i in ep.size():
+				_try_segment(p, ep[i], ep[(i + 1) % ep.size()], "exhibit", q["id"], best)
 	var bounds: Array = sim.state["boundary"]
 	for i in bounds.size():
 		var pr := Geo.seg_proj(p.x, p.y, bounds[i], bounds[(i + 1) % bounds.size()])
@@ -216,6 +266,12 @@ func snap_at(p: Vector2, free: bool) -> Dictionary:
 			best["bd"] = pr["d"]
 			best["snap"] = {"x": pr["x"], "y": pr["y"], "info": {"type": "seg", "kind": "boundary", "id": "boundary"}}
 	return best["snap"] if best["snap"] != null else open
+
+func _try_segment(p: Vector2, a: Array, b: Array, kind: String, id: String, best: Dictionary) -> void:
+	var pr := Geo.seg_proj(p.x, p.y, a, b)
+	if pr["d"] < best["bd"]:
+		best["bd"] = pr["d"]
+		best["snap"] = {"x": pr["x"], "y": pr["y"], "info": {"type": "seg", "kind": kind, "id": id}}
 
 func _try_vertex(p: Vector2, v: Array, kind: String, id: String, best: Dictionary) -> void:
 	var d := Vector2(v[0], v[1]).distance_to(p)
@@ -226,7 +282,12 @@ func _try_vertex(p: Vector2, v: Array, kind: String, id: String, best: Dictionar
 # ---------- drawing a path ----------
 func _draw_tap() -> void:
 	var sn := snap_at(get_global_mouse_position(), Input.is_key_pressed(KEY_ALT))
-	if not draw_pts.is_empty():
+	if tool == "exhibit":
+		# tapping the first corner again closes the fence
+		if draw_pts.size() >= 3 and Vector2(draw_pts[0][0], draw_pts[0][1]).distance_to(Vector2(sn["x"], sn["y"])) * cam.zoom.x < 14.0:
+			_finish_exhibit()
+			return
+	elif not draw_pts.is_empty():
 		var last: Array = draw_pts[-1]
 		if Vector2(last[0], last[1]).distance_to(Vector2(sn["x"], sn["y"])) * cam.zoom.x < 14.0:
 			_finish_draw()
@@ -270,7 +331,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				if tool == "build":
 					rot = (rot + 1) % 8
 			KEY_ENTER, KEY_KP_ENTER:
-				if tool != "pan" and not draw_pts.is_empty():
+				if tool == "exhibit":
+					_finish_exhibit()
+				elif tool != "pan" and not draw_pts.is_empty():
 					_finish_draw()
 			KEY_BACKSPACE:
 				if not draw_pts.is_empty():
@@ -321,6 +384,8 @@ func _draw() -> void:
 		draw_line(Vector2(0, y), Vector2(plot.size.x, y), gc, 0.15)
 		y += GRID
 	draw_rect(plot, Color(0.95, 0.85, 0.45), false, 1.2)
+	for e in sim.state["exhibits"]:
+		_draw_exhibit(e)
 	# paths: widest and lightest first, so service roads sit on top where they cross
 	for type in ["wide", "", "service"]:
 		for p in sim.state["paths"]:
@@ -333,7 +398,9 @@ func _draw() -> void:
 	if tool == "build" and not ghost.is_empty():
 		_draw_building(ghost["pts"], sim.building_def(build_type), 0.6, true, ghost["ok"])
 	# the path being drawn
-	if tool != "pan":
+	if tool == "exhibit":
+		_draw_exhibit_preview()
+	elif tool != "pan" and tool != "build":
 		var pts := _preview_pts()
 		if pts.size() >= 2:
 			var ok := sim.path_problem(pts, _path_type()) == ""
@@ -372,3 +439,43 @@ func _draw_building(pts: Array, def: Dictionary, alpha: float, is_ghost: bool, o
 	var sz := font.get_string_size(glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 40)
 	draw_string(font, Vector2(-sz.x / 2.0, sz.y * 0.3), glyph, HORIZONTAL_ALIGNMENT_LEFT, -1, 40, Color(1, 1, 1, alpha))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+# An exhibit: ground in its biome's color, fenced in the barrier's color, named in the middle
+func _draw_exhibit(e: Dictionary) -> void:
+	var poly := PackedVector2Array()
+	for q in e["points"]:
+		poly.append(Vector2(q[0], q[1]))
+	var biome: String = e.get("biome", GameData.get_const("DEFAULT_BIOME", "grassland"))
+	var fill := Color.html(GameData.get_const("BIOMES")[biome]["color"])
+	fill.a = 0.85
+	draw_colored_polygon(poly, fill)
+	var fence := Color.html(sim.barrier_def(e.get("barrier", "wood"))["color"])
+	var outline := poly.duplicate()
+	outline.append(poly[0])
+	draw_polyline(outline, fence, 1.0)
+	var c: Array = Geo.centroid(e["points"])
+	var font := ThemeDB.fallback_font
+	draw_set_transform(Vector2(c[0], c[1]), 0.0, Vector2(0.2, 0.2))
+	var sz := font.get_string_size(e["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 24)
+	draw_string(font, Vector2(-sz.x / 2.0, sz.y * 0.3), e["name"], HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(1, 1, 1, 0.9))
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+# The fence being drawn: its corners, the next edge to the pointer, and the closed shape tinted green or red
+func _draw_exhibit_preview() -> void:
+	if draw_pts.is_empty():
+		return
+	var poly := PackedVector2Array()
+	for v in draw_pts:
+		poly.append(Vector2(v[0], v[1]))
+	if draw_pts.size() >= 3:
+		var ok := sim.exhibit_problem(draw_pts, fence_sel) == ""
+		draw_colored_polygon(poly, Color(0.5, 1, 0.5, 0.35) if ok else Color(1, 0.4, 0.35, 0.35))
+	var line := poly.duplicate()
+	if not hover.is_empty():
+		line.append(Vector2(hover["x"], hover["y"]))
+	if line.size() >= 2:
+		draw_polyline(line, Color.WHITE, 0.6)
+	for i in draw_pts.size():
+		draw_circle(poly[i], 1.6 if i == 0 and draw_pts.size() >= 3 else 1.0, Color(1, 0.9, 0.3) if i == 0 else Color.WHITE)
+	if not hover.is_empty() and hover["info"] != null:
+		draw_arc(Vector2(hover["x"], hover["y"]), 3.0, 0.0, TAU, 20, Color(1, 0.9, 0.3), 0.6)

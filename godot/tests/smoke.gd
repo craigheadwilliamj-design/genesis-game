@@ -26,6 +26,7 @@ func _init() -> void:
 	geometry_parity()
 	path_tests()
 	building_tests()
+	exhibit_tests()
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
@@ -121,3 +122,24 @@ func building_tests() -> void:
 	check("greenhouse needs its tech first", sim.building_spot("greenhouse", 195.0, 150.0, 0)["why"].begins_with("Research"))
 	sim.state["science"]["tech"].append("greenhouse")
 	check("then it needs CERES", sim.building_spot("greenhouse", 195.0, 150.0, 0)["why"] == "Build CERES first.")
+
+func exhibit_tests() -> void:
+	var sim := SimCore.new()
+	var sq := [[20, 20], [40, 20], [40, 40], [20, 40]]   # 20 m square: 80 m of fence, 400 m2
+	check("exhibit cost (wood)", sim.exhibit_cost(sq, "wood") == 2400)
+	check("exhibit cost (bars)", sim.exhibit_cost(sq, "bars") == 5600)
+	check("exhibit ok", sim.exhibit_problem(sq, "wood") == "")
+	check("exhibit needs 3 corners", sim.exhibit_problem([[20, 20], [40, 20]], "wood") == "Needs at least 3 corners.")
+	check("exhibit too small", sim.exhibit_problem([[20, 20], [25, 20], [25, 25], [20, 25]], "wood") == "Too small. Exhibits need at least 60 m².")
+	check("exhibit crosses itself", sim.exhibit_problem([[20, 20], [40, 40], [40, 20], [20, 40]], "wood") == "The fence crosses itself.")
+	check("exhibit outside the plot", sim.exhibit_problem([[410, 20], [440, 20], [440, 40], [410, 40]], "wood") == "Keep it inside the park boundary.")
+	check("path through exhibit", sim.exhibit_problem([[190, 250], [220, 250], [220, 280], [190, 280]], "wood") == "A path runs through it.")
+	check("electric fence needs tech", sim.exhibit_problem(sq, "electric").begins_with("Research"))
+	var m0: int = sim.state["money"]
+	check("add exhibit", sim.add_exhibit(sq, "wood") == "" and m0 - sim.state["money"] == 2400 and sim.state["exhibits"][0]["name"] == "Exhibit 1")
+	check("wood fence leaves barrier off", not sim.state["exhibits"][0].has("barrier"))
+	check("overlapping exhibit", sim.exhibit_problem([[30, 30], [50, 30], [50, 50], [30, 50]], "wood") == "It overlaps another exhibit.")
+	sim.add_exhibit([[60, 20], [80, 20], [80, 40], [60, 40]], "bars")
+	check("second exhibit is named 2 with its barrier", sim.state["exhibits"][1]["name"] == "Exhibit 2" and sim.state["exhibits"][1]["barrier"] == "bars")
+	check("building can't overlap an exhibit", sim.building_spot("restroom", 30.0, 30.0, 0)["why"] == "It overlaps an exhibit.")
+	check("path can't cross an exhibit", sim.path_problem([[10, 30], [50, 30]], "") == "Paths can't go through an exhibit.")

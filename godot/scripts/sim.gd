@@ -46,6 +46,7 @@ func new_park() -> Dictionary:
 		"today": fresh_ledger(),
 		"history": [],
 		"science": {"tech": ["bars"]},   # ORACLE tech researched (freshScience in sim.js has much more)
+		"biome": GameData.get_const("DEFAULT_PARK_BIOME", "grassland"),   # the park's own ground; new exhibits start on it
 		"goalsDone": [],
 		"over": false,
 	}
@@ -334,6 +335,75 @@ func place_building(type: String, px: float, py: float, rot: int) -> String:
 		return spot["why"]
 	spend(spot["price"], "built")
 	state["buildings"].append({"id": uid("b-"), "type": type, "points": spot["pts"], "day": state["day"]})
+	layout_changed.emit()
+	changed.emit()
+	return ""
+
+# ---------- exhibits ----------
+# A closed fence around an area. Open fence lines and shared walls come later.
+
+func barrier_def(key: String) -> Dictionary:
+	return GameData.get_const("BARRIERS")[key]
+
+func barrier_keys() -> Array:
+	return GameData.get_const("BARRIERS").keys()
+
+# dollars per meter of fence: the base rate plus the barrier's own
+func fence_rate(key: String) -> float:
+	return float(GameData.get_const("COST")["fencePerMeter"]) + float(barrier_def(key)["perMeter"])
+
+func exhibit_cost(pts: Array, barrier: String) -> int:
+	return int(roundf(Geo.perimeter(pts) * fence_rate(barrier) + Geo.area(pts) * float(GameData.get_const("COST")["landPerSqM"])))
+
+# Why this fence can't be built, or "" if it can (exhibitProblem in map.js)
+func exhibit_problem(pts: Array, barrier: String) -> String:
+	if pts.size() < 3:
+		return "Needs at least 3 corners."
+	if Geo.self_crosses(pts):
+		return "The fence crosses itself."
+	if not inside_plot(pts):
+		return "Keep it inside the park boundary."
+	if Geo.area(pts) < 60.0:
+		return "Too small. Exhibits need at least 60 m²."
+	for e in state["exhibits"]:
+		if Geo.shapes_overlap(pts, e["points"]):
+			return "It overlaps another exhibit."
+	for b in state["buildings"]:
+		if Geo.shapes_overlap(pts, b["points"]):
+			return "It overlaps a building."
+	for p in state["paths"]:
+		if Geo.line_enters_shape(p["points"], pts):
+			return "A path runs through it."
+	var fence := barrier_def(barrier)
+	if fence.get("tech") != null and not has_tech(fence["tech"]):
+		var label := str(fence["tech"])
+		for x in GameData.get_const("TECH"):
+			if x["id"] == fence["tech"]:
+				label = x["label"]
+		return "Research %s at ORACLE first." % label.to_lower()
+	var cost := exhibit_cost(pts, barrier)
+	if not can_afford(cost):
+		return "Costs %s. You have %s." % [money_text(cost), money_text(int(state["money"]))]
+	return ""
+
+# Build an exhibit. Returns "" or the reason it failed.
+func add_exhibit(pts: Array, barrier: String) -> String:
+	var problem := exhibit_problem(pts, barrier)
+	if problem != "":
+		return problem
+	spend(exhibit_cost(pts, barrier), "built")
+	var used := {}
+	for x in state["exhibits"]:
+		used[x["name"]] = true
+	var n := 1
+	while used.has("Exhibit %d" % n):
+		n += 1
+	var e := {"id": uid("e-"), "name": "Exhibit %d" % n, "points": pts.duplicate(true), "animals": [], "happy": 70, "cond": 100, "inspected": {"day": state["day"], "cond": 100}}
+	if barrier != "wood":
+		e["barrier"] = barrier
+	if state["biome"] != GameData.get_const("DEFAULT_BIOME", "grassland"):
+		e["biome"] = state["biome"]   # new exhibits start out as the park's own ground
+	state["exhibits"].append(e)
 	layout_changed.emit()
 	changed.emit()
 	return ""
