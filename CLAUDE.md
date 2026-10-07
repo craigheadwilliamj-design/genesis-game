@@ -62,3 +62,10 @@ Artifact: https://claude.ai/artifact/WrtBukrdr1fijyDGdFRbM9 (capabilities `db`, 
 - `index.html` is stored WITHOUT the publish wrapper (it starts with `<title>`, with no `<!doctype>`/`<head>`). Never commit a wrapped copy back, because it would get double-wrapped.
 - Publish with `file_path: index.html`, `url` set to the link above, and `files` listing only the changed `js/*.js` (unchanged files are kept).
 - Artifact reads of the live page return the wrapped HTML, so don't save that over `index.html`.
+
+## Godot port (in progress)
+The game is being ported to Godot 4 (GDScript, Compatibility renderer) for itch.io and Steam. The JS game stays as the reference until the port catches up.
+- `godot/`: the Godot project (open `godot/project.godot`). `scripts/sim.gd` is the headless sim (port of `js/sim.js`), `scripts/main.gd` the map view, `scripts/data.gd` reads `data/data.json`.
+- `data/data.json` is GENERATED from `js/data.js`: run `node tools/export_data.js` after any balance change there. Don't hand-edit it.
+- Test: `godot --headless --path godot --script res://tests/smoke.gd` (run `godot --headless --path godot --import` once first).
+- Sim code stays free of nodes and drawing, as in the JS. Keep the saved `state` the same JSON shape as the JS one.
