@@ -448,9 +448,10 @@ const GUEST = {
   drawPower:1.6,
   maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
-  stay:[180, 360],     // minutes a party plans to spend before heading home
+  stay:[180, 360],     // minutes a party plans to spend before heading home, before dividing by pace (slower guests stay longer, so they see the same amount)
   cash:[20, 45],       // money each guest brings to spend inside
-  speed:[.85, 1.15],   // each party's own pace, times WALK_PER_MIN
+  speed:[.85, 1.15],   // each party's own pace, times pace, times WALK_PER_MIN
+  pace:.5,             // guests live at this share of staff pace: they walk, get hungry and tired, and tire of crowds this much slower, so you can click one before it's gone but a trip still feels the same
   startMood:62,        // mood on arrival, plus 4 for each star
   quitBelow:20,        // a party this unhappy heads home early
   tire:.03,            // mood lost each minute just from being on their feet
@@ -469,6 +470,53 @@ const GUEST = {
   wordOfMouth:.25,     // yesterday's mood moves today's crowd by up to this share
   goodMood:75,         // an average leaving mood this high gets full marks for guest comfort
   badMood:30,          // and this low gets none
+};
+/* ---------------------------------------------------------------------
+   GUEST PERSONALITIES
+   Every party has a primary and a secondary personality. The primary pulls in full and the
+   secondary PERS.second as hard. Each personality has:
+     weight  odds of being picked (primary, then secondary from what's left)
+     fx      multipliers on how the party behaves (1 is neutral; read through pm() in personas.js):
+             food, shop, museum (will buy), donate, learn, infra (mood lost to needs, litter, crowds),
+             ticket (how dear a ticket can be before they grumble), price (price sensitivity), patience,
+             walk (mood lost to being on their feet), decor, broken, toilet (filthy restrooms), litter,
+             flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build)
+     n       numbers its exhibit tastes and reactions use (see personas.js)
+   --------------------------------------------------------------------- */
+const PERS = {
+  second:.5,           // the secondary personality counts for this share of the primary's pull
+  ejectWait:240,       // minutes a call to security waits before the party carries on
+  ejectMood:25,        // mood a party loses when security walks it to the gate
+  escortRadius:30,     // a guard this close to a waiting party can take it to the gate
+  activeActs:["hunt", "patrol", "pace", "play"],   // what animals do that counts as visibly active
+  rarePrice:9000,      // a species this dear counts as rare
+  hooligan:{sneak:.35, tease:.03, stress:18},   // chance a hooligan party skips the ticket; chance each minute at a fence of banging on the glass; stress it gives the animals
+};
+const PERSONALITIES = {
+  thrill:{label:"Thrill Seeker", color:"#E5484D", weight:.16,
+    text:"Wants big predators and animals that look dangerous. Bored by calm herbivores and long walks. Spends on viewing, little on food and gifts.",
+    fx:{food:.7, shop:.6, walk:1.4, flee:.5, fleeHurt:.3, patience:.9},
+    n:{danger:7, active:4, platform:3, tame:3, slow:2, tasteDanger:1.5, tasteActive:.5, tasteTame:.5, center:1, spectacle:1.6}},
+  conserv:{label:"Conservationist", color:"#3E9B4F", weight:.12,
+    text:"Cares how the animals are treated: roomy, well-kept exhibits, rare species, research and education. Gives to conservation. Hates a park that feels like pure entertainment.",
+    fx:{donate:3, learn:1.3, shop:.9},
+    n:{well:5, poor:8, rare:5, stress:4, showy:6, showyBelow:15, tasteWelfare:.8, tasteRare:.5, center:1.8}},
+  paleo:{label:"Paleo-Nerd", color:"#8A5CC2", weight:.14,
+    text:"Wants variety and accuracy: many species across the eras, complete genomes, signs and museum shows. Bored by repeats and by low-genome clones.",
+    fx:{learn:1.4, museum:1.4, food:.9},
+    n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
+  family:{label:"Family Focused", color:"#2F86C8", weight:.26,
+    text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
+    fx:{infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, need:{energy:1.25, bladder:1.15}},
+    n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
+  fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
+    text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
+    fx:{patience:.8, decor:1.3, food:1.2, shop:1.1, broken:1.5},
+    n:{variety:2}},
+  hooligan:{label:"Hooligan", color:"#E0509B", weight:.06,
+    text:"Here to cause trouble. May sneak in without paying, drops litter, vandalizes, throws trash at the animals and bangs on the glass. Security has to catch them.",
+    fx:{food:.8, shop:.5, learn:.5, litter:3},
+    n:{}},
 };
 const NEEDS = {
   hunger: {rate:.2,  seek:55, start:30},
@@ -575,6 +623,21 @@ const THOUGHTS = {
   learned:    {text:"I learned so much about prehistoric life!", good:true},
   wow:        {text:"The animals were amazing!", good:true},
   fed:        {text:"That hit the spot.", good:true},
+  rush:       {text:"Being that close to a predator was a rush!", good:true},
+  tame:       {text:"Where are the scary ones? These just stand around."},
+  welfare:    {text:"The animals all looked well cared for.", good:true},
+  poorCare:   {text:"Those animals deserve better care than this."},
+  rare:       {text:"I'm glad to see rare species being looked after.", good:true},
+  showy:      {text:"This felt like a theme park, not a conservation effort."},
+  variety:    {text:"So many different species and eras!", good:true},
+  repeats:    {text:"I've already seen that animal."},
+  accurate:   {text:"Those clones are impressively complete.", good:true},
+  lowGenome:  {text:"Those animals are mostly guesswork. The genomes are too incomplete."},
+  collection: {text:"I saw nearly everything this park has!", good:true},
+  cuddly:     {text:"The kids loved the gentle animals!", good:true},
+  scary:      {text:"That was far too scary for the kids."},
+  gory:       {text:"We watched an animal hunting. Not for kids."},
+  ejected:    {text:"Security threw us out!"},
 };
 
 // Each vivarium size is also a building you can place
@@ -641,7 +704,6 @@ const CUSTODIAN = {
 };
 // Rowdy guests break things when they're unhappy
 const VANDAL = {
-  rowdyShare:.12,      // share of parties that are rowdy
   moodBelow:80,        // a rowdy party under this mood might cause trouble
   rate:.006,           // chance each minute that it does something, 30 points under that; more the unhappier it gets
   reach:15,            // what it damages is this close

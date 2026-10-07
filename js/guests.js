@@ -167,23 +167,25 @@ const nextHop = (f, n) => { const s = f.prev.get(n); return s ? s[0] : null; };
 function newParty(n){
   const needs = {};
   for(const [k, d] of Object.entries(NEEDS)) needs[k] = Math.random() * d.start;
-  const p = {id:uid("g"), n, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
-             until:state.minute + rand(...GUEST.stay), at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
-             spd:rand(...GUEST.speed), off:(Math.random()*2-1) * 1.4, shirt:Math.floor(Math.random() * 4), tramRoll:Math.random(), in:null, rowdy:Math.random() < VANDAL.rowdyShare};
-  if(state.ticket > fairTicket() * 1.3){ thinks(p, "pricey"); p.mood -= 8; }
+  const pers = rollPers();
+  const p = {id:uid("g"), n, name:SURNAMES[Math.floor(Math.random() * SURNAMES.length)] + " party", pers, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
+             until:state.minute + rand(...GUEST.stay) / GUEST.pace, at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
+             spd:rand(...GUEST.speed) * GUEST.pace, off:(Math.random()*2-1) * 1.4, tramRoll:Math.random(), in:null, rowdy:pers.includes("hooligan")};
+  p.sneaked = sneaksIn(p);   // hooligans may slip in without a ticket
+  if(!p.sneaked && state.ticket > fairTicket() * 1.3 * pm(p, "ticket")){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
 }
 function guestsArrive(n){
   state.today.guests += n;
+  if(parties.length < GUEST.maxParties){ const p = newParty(n); if(!p.sneaked) earn(state.ticket * n, "tickets"); parties.push(p); return; }
   earn(state.ticket * n, "tickets");
-  if(parties.length < GUEST.maxParties){ parties.push(newParty(n)); return; }
   // the map is full: these guests tag along with a party that just got here
   const p = parties[parties.length - 1 - Math.floor(Math.random() * Math.min(50, parties.length))];
   p.n += n; p.cash += n * rand(...GUEST.cash);
 }
 function thinks(p, k){ p.thought.add(k); }
 // A party learns something. Learning is per guest, 0 to 100, and cheers them up as it comes.
-function learn(p, n){ const g = clamp(n, 0, 100 - (p.edu || 0)); p.edu = (p.edu || 0) + g; p.mood += g * EDU.joy; }
+function learn(p, n){ const g = clamp(n * pm(p, "learn"), 0, 100 - (p.edu || 0)); p.edu = (p.edu || 0) + g; p.mood += g * EDU.joy; }
 // A party walks out of the gate. How it feels now counts toward the day's guest comfort.
 function partyLeaves(p){
   if(p.gone) return;
@@ -192,11 +194,12 @@ function partyLeaves(p){
   // going home still hungry, thirsty, or needing the restroom spoils the day
   for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) p.mood -= GUEST.leftWanting * o / (100 - d.seek); }
   const t = state.today, L = state.guestLog, edu = p.edu || 0;
+  personaLeaves(p);
   t.moodSum += clamp(p.mood, 0, 100) * p.n; t.moodN += p.n;
   t.eduSum += edu * p.n; t.eduN += p.n;
   if(edu >= EDU.learned) thinks(p, "learned");
   // guests who learned something drop a little in the donation box
-  if(edu > 0) earn(p.n * EDU.donate * edu / 100, "donations");
+  if(edu > 0) earn(p.n * EDU.donate * edu / 100 * pm(p, "donate"), "donations");
   L.guests += p.n;
   for(const k of p.thought) L.thoughts[k] = (L.thoughts[k] || 0) + p.n;
 }
@@ -247,19 +250,19 @@ function exhibitAppeal(e){
 function pickSight(p){
   let tot = 0;
   const opts = [];
-  const add = (x, appeal) => {
+  const add = (x, appeal, taste) => {
     const f = fieldFor(p, x.id), d = f && f.dist.get(p.at);
     if(d === undefined) return;
-    const w = (appeal + 1) / (1 + d / 60);
+    const w = (appeal + 1) / (1 + d / 60) * taste;
     opts.push([x, w]); tot += w;
   };
-  for(const e of state.exhibits) if(!p.seen.has(e.id) && e.animals.length && gGraph.anchors[e.id]) add(e, exhibitAppeal(e));
+  for(const e of state.exhibits) if(!p.seen.has(e.id) && e.animals.length && gGraph.anchors[e.id]) add(e, exhibitAppeal(e), tasteOf(p, e));
   // the Education Center, once, if there's time left for the walk and the visit (and they didn't just give up on its line)
   if(!p.learnt && (p.cool.see || 0) <= state.minute)
     for(const b of state.buildings){
       if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
       const home = (fieldFor(p, "gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
-      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal + eduAppeal(b));
+      if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal + eduAppeal(b), centerTaste(p, b));
     }
   let r = Math.random() * tot;
   for(const [e, w] of opts){ r -= w; if(r <= 0) return e; }
@@ -337,6 +340,7 @@ function seeExhibit(p, e){
   const a = exhibitAppeal(e);
   p.mood += GUEST.seeGain * a / (a + 15);
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
+  personaSee(p, e);
   if(a >= 30) thinks(p, "wow");
   // what the animals were doing when they looked
   const n = e.animals.length, pace = e.animals.filter(x => x.act === "pace").length, play = e.animals.filter(x => x.act === "play").length;
@@ -393,7 +397,7 @@ function serviceTick(dt, now){
     while(q.busy.length < slotsOf(b) && q.queue.length){ const n = q.queue.shift(); n.readyAt = now + t.serveMin; q.busy.push(n); }
     for(const p of [...q.queue]){
       p.waited += dt;
-      if(p.waited > (t.patience ?? GUEST.patience)){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }
+      if(p.waited > (t.patience ?? GUEST.patience) * pm(p, "patience")){ leaveQueue(p); thinks(p, "queue"); p.mood -= 8; p.cool[p.why] = now + 45; p.dest = null; p.why = null; }
     }
   }
 }
@@ -414,7 +418,7 @@ function arrivalShare(m0, m1){
 }
 
 function guestsTick(m0, m1){
-  const dt = m1 - m0;
+  const dt = m1 - m0, gdt = dt * GUEST.pace;   // guests live in slow motion: gdt is their own time
   if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path Tools). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
   hotelGuestsArrive();
   arrivalCarry += derived.demand * arrivalShare(m0, m1);
@@ -431,25 +435,29 @@ function guestsTick(m0, m1){
 
   for(const p of parties){
     const riding = !!(p.at && p.to && p.at.ride && p.at.ride.has(p.to));
-    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + (riding && k === "energy" ? 0 : NEEDS[k].rate * dt));
-    let hurt = riding ? 0 : GUEST.tire;   // sitting on the tram, feet up
-    for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * o / (100 - d.seek); }
+    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + (riding && k === "energy" ? 0 : NEEDS[k].rate * pneed(p, k) * gdt));
+    const inf = pm(p, "infra");   // family parties take bad infrastructure harder
+    let hurt = riding ? 0 : GUEST.tire * pm(p, "walk");   // sitting on the tram, feet up
+    for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * inf * o / (100 - d.seek); }
     if(p.at && p.to){
-      if(near(pos.get(p)) > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt; thinks(p, "crowded"); }
+      if(near(pos.get(p)) > GUEST.crowd * ((p.at.room && p.at.room.get(p.to)) || 1)){ hurt += GUEST.crowdHurt * inf; thinks(p, "crowded"); }
     }
     // walking through litter
     const mess = p.at && !p.at.rail ? litterAt(p.at.x, p.at.y) : 0;
-    if(mess >= 3){ hurt += LITTER.hurt * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
+    if(mess >= 3){ hurt += LITTER.hurt * inf * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
     // gardens, water and statues along the way cheer them up, and they stop to read each statue's plaque
-    if(p.at && p.at.decor){ hurt -= DECOR.joy * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
+    if(p.at && p.at.decor){ hurt -= DECOR.joy * pm(p, "decor") * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
     if(p.at && p.at.statues) for(const id of p.at.statues) statueSeen(p, id);
-    p.mood = clamp(p.mood - hurt * dt, 0, 100);
+    p.mood = clamp(p.mood - hurt * gdt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }
-    if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange)){ p.fled = true; thinks(p, "scared"); p.mood -= 15; goHome(p); }
+    if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange * pm(p, "flee"))){ p.fled = true; thinks(p, "scared"); p.mood -= 15 * pm(p, "fleeHurt"); goHome(p); }
     // set off for the gate in time to be out by the time they planned to leave
-    if(!p.home && (m1 + walkMins(p, "gate") >= p.until || p.mood < GUEST.quitBelow)) goHome(p);
-    vandalTick(p, dt);
-    throwTick(p, dt);
+    if(!p.home && !p.hold && (m1 + walkMins(p, "gate") >= p.until || p.mood < GUEST.quitBelow)) goHome(p);
+    if(p.ejecting) ejectTick(p);
+    if(p.hold) continue;   // standing where they are until security comes
+    vandalTick(p, gdt);
+    throwTick(p, gdt);
+    teaseTick(p, gdt);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
     walkParty(p, WALK_PER_MIN * p.spd * dt);
   }

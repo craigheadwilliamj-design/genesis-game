@@ -18,7 +18,7 @@ function tf(){ return tilt ? TILT : 1; }
 function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
 function upright(){ return tilt ? ` scale(1 ${(1/TILT).toFixed(4)})` : ""; }   // added to a sprite's transform so it isn't squashed
 let tool = "select";
-let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
+let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building"|"guest", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
 let rockBiome = null;               // biome tab a rock was picked from, so it's placed in that stone color (null: the exhibit's biome)
@@ -95,7 +95,7 @@ function wideJoin(p){
 function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
   : kind === "land" ? state.exhibits.flatMap(landOf).concat(decorOf()) : kind === "water" ? state.exhibits.flatMap(waterOf).concat(parkWater()) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
-function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
+function selItem(){ return !sel ? null : sel.kind === "guest" ? parties.find(p => p.id === sel.id) || null : findItem(sel.kind, sel.id); }
 
 function exhibitColor(e){
   const counts = speciesCounts(e); let best = null, bn = 0;
@@ -1207,18 +1207,26 @@ function animateAnimals(dt){
 }
 
 /* ---------- guests walking the paths ---------- */
-const SHIRTS = ["#C8452B", "#2F6E8F", "#E3B23C", "#F4F1E8"];
+// A party is a dot in its primary personality's color (or its mood's, when that's switched on)
+const PERS_KEYS = Object.keys(PERSONALITIES), PERS_INDEX = Object.fromEntries(PERS_KEYS.map((k, i) => [k, i]));
+const SHIRTS = PERS_KEYS.map(k => PERSONALITIES[k].color);
 const MOOD_SHIRTS = ["#3E9B4F", "#E3B23C", "#D9483B"];   // happy, so-so, unhappy
 const shirtPaths = SHIRTS.map(c => {
   const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  el.setAttribute("stroke", c); el.setAttribute("stroke-width", "5"); el.setAttribute("stroke-linecap", "round");
+  el.setAttribute("stroke", c); el.setAttribute("stroke-width", "6.5"); el.setAttribute("stroke-linecap", "round");
   el.setAttribute("vector-effect", "non-scaling-stroke"); el.setAttribute("fill", "none");
   guestLayer.appendChild(el); return el;
 });
 const outline = document.createElementNS("http://www.w3.org/2000/svg", "path");
-outline.setAttribute("stroke", "#1D2B22"); outline.setAttribute("stroke-width", "7"); outline.setAttribute("stroke-linecap", "round");
+outline.setAttribute("stroke", "#1D2B22"); outline.setAttribute("stroke-width", "8.5"); outline.setAttribute("stroke-linecap", "round");
 outline.setAttribute("vector-effect", "non-scaling-stroke"); outline.setAttribute("fill", "none"); outline.setAttribute("stroke-opacity", ".55");
 guestLayer.insertBefore(outline, guestLayer.firstChild);
+
+// A ring around the party whose panel is open
+const guestRing = document.createElementNS("http://www.w3.org/2000/svg", "g");
+guestRing.setAttribute("pointer-events", "none"); guestRing.style.display = "none";
+guestRing.innerHTML = `<circle r="8" fill="none" stroke="#fff" stroke-width="3" vector-effect="non-scaling-stroke"/><circle r="8" fill="none" stroke="#1D2B22" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+guestLayer.appendChild(guestRing);
 
 const nodeKey = p => Math.round(p[0]*4) + ":" + Math.round(p[1]*4);
 
@@ -1238,10 +1246,24 @@ function drawParties(){
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : p.shirt].push(m); all.push(m);
+    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0].push(m); all.push(m);
   }
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
+  const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
+  if(at && !hidden34(at[0], at[1])){ guestRing.style.display = ""; guestRing.setAttribute("transform", `translate(${at[0].toFixed(2)} ${at[1].toFixed(2)})${upright()}`); }
+  else guestRing.style.display = "none";
+}
+// The party under a tap or click, if there is one (they're drawn as dots, so this is by distance on screen)
+function guestAt(cx, cy){
+  const w = toWorld(cx, cy);
+  let best = null, bd = 14;
+  for(const p of parties){
+    if(!p.at) continue;
+    const [x, y] = partyPos(p), d = Math.hypot((x - w.x) * view.k, (y - w.y) * ky());
+    if(d < bd && !hidden34(x, y)){ bd = d; best = p; }
+  }
+  return best;
 }
 
 /* ---------- trams: one car shuttles between the end stations of each stretch of track ---------- */
@@ -2324,6 +2346,7 @@ function endPointer(e){
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
+  if(tool === "select"){ const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } }
   if(d.hit.kind) select(d.hit.kind, d.hit.id); else if(sel) select(null);
 }
 svg.addEventListener("pointerup", endPointer);
