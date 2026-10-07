@@ -44,7 +44,8 @@ function addToMenu(b, id){
 function dropFromMenu(b, id){ b.menu = menuOf(b).filter(m => m.id !== id); }
 function setMenuPrice(b, id, price){ const m = menuItem(b, id); if(m) m.price = clamp(Math.round(price), 1, MENU[id].price * 4); }
 // Share of guests who'll pay this price: everyone at the usual price or less, nobody at double
-const willPay = (id, price) => clamp(1 - PRICE_SENSE * (price - MENU[id].price) / MENU[id].price, 0, 1);
+// (a party can be touchier about price: family parties are)
+const willPay = (id, price, p) => clamp(1 - PRICE_SENSE * (p ? pm(p, "price") : 1) * (price - MENU[id].price) / MENU[id].price, 0, 1);
 
 /* ---------- being served ---------- */
 
@@ -52,7 +53,7 @@ const willPay = (id, price) => clamp(1 - PRICE_SENSE * (price - MENU[id].price) 
 function serveAt(p, b, why){
   const t = BUILDINGS[b.type], n = p.n;
   let bill = 0, served = n, short = false;
-  if((b.graffiti || 0) >= VANDAL.grossAt){ thinks(p, "graffiti"); p.mood -= 4; }
+  if((b.graffiti || 0) >= VANDAL.grossAt){ thinks(p, "graffiti"); p.mood -= 4 * pm(p, "broken"); }
   if(t.kind === "food"){
     // each need that's bad enough gets the best thing on the menu for it, if the price is right
     for(const need of ["hunger", "thirst", "energy"]){
@@ -61,12 +62,12 @@ function serveAt(p, b, why){
       for(const m of menuOf(b)){
         const f = (MENU[m.id].fills || {})[need]; if(!f) continue;
         if(!inStock(b, m.id, n)){ gone = true; continue; }
-        const score = f * willPay(m.id, m.price);
-        if(!best || score > best.score) best = {m, f, score, will:willPay(m.id, m.price)};
+        const score = f * willPay(m.id, m.price, p);
+        if(!best || score > best.score) best = {m, f, score, will:willPay(m.id, m.price, p)};
       }
       if(!best){ if(gone && need === why) thinks(p, "soldOut"); continue; }
       if(best.will < .6) thinks(p, "priceyFood");
-      if(Math.random() > best.will) continue;
+      if(Math.random() > Math.min(1, best.will * pm(p, "food"))) continue;
       if(p.cash - bill < best.m.price * n){ short = true; continue; }
       buy(p, b, best.m, n); bill += best.m.price * n;
     }
@@ -80,14 +81,14 @@ function serveAt(p, b, why){
     const keen = clamp((p.mood - 30) / 60, .15, .9), edu = (p.edu || 0) / 100;
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
-      const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price);
+      const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price, p);
       const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && weatherNow().wet ? WEATHER.umbrella : 1);
       if(will < .6) thinks(p, "priceyGift");
-      if(Math.random() < Math.min(.95, keen * boost) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
+      if(Math.random() < Math.min(.95, keen * boost * pm(p, "shop")) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
     }
   } else if(b.type === "edcenter"){
     // the entry fee, if there is one: too steep and they turn around
-    const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
+    const fee = b.fee || 0, will = clamp((1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee) * pm(p, "museum"), 0, 1);
     served = 0; p.learnt = true;
     if(fee && Math.random() > will){ thinks(p, "priceyEdu"); p.mood -= 3; }
     else if(p.cash < fee * n) thinks(p, "broke");
@@ -101,7 +102,7 @@ function serveAt(p, b, why){
     }
   } else if(b.type === "restroom"){
     p.needs.bladder = 0;
-    if((b.dirt || 0) >= RESTROOM.gross){ thinks(p, "grossLoo"); p.mood -= 6; }
+    if((b.dirt || 0) >= RESTROOM.gross){ thinks(p, "grossLoo"); p.mood -= 6 * pm(p, "toilet"); }
     b.dirt = Math.min(100, (b.dirt || 0) + RESTROOM.dirtPerGuest * n);
   }
   if(t.seats && (why === "energy" || t.kind)){ p.needs.energy = 0; if(why === "energy") thinks(p, "rested"); }
@@ -153,7 +154,7 @@ function trashCheck(p){
     p.trash = 0; return;
   }
   if(state.minute - p.trashAt < LITTER.holdMin) return;
-  if(Math.random() < (LITTER.drop + LITTER.dirtyDrop * litterAt(p.at.x, p.at.y)) * (1 - EDU.litterCut * (p.edu || 0) / 100)){ addLitter(p.at.x, p.at.y, p.trash); p.trash = 0; }
+  if(Math.random() < (LITTER.drop + LITTER.dirtyDrop * litterAt(p.at.x, p.at.y)) * (1 - EDU.litterCut * (p.edu || 0) / 100) * pm(p, "litter")){ addLitter(p.at.x, p.at.y, p.trash); p.trash = 0; }
   else p.trashAt = state.minute;
 }
 // Where along the footpaths each litter square's specks go. Called when the guest map is rebuilt.

@@ -121,10 +121,16 @@ function guardWatch(){
     for(const p of parties){
       if(p.gone || !p.at) continue;
       const d = Math.hypot(p.at.x - gx, p.at.y - gy);
-      if(p.vandal && d < SECURITY.catchRadius){
-        leaveQueue(p); p.gone = true; p.ejected = true; L.caught++;
+      // a party the player called security on, waiting where it stands: the guard walks it to the gate
+      if(p.hold && !p.vandal && d < PERS.escortRadius){ escortOut(p, c); continue; }
+      if((p.vandal || p.ejecting === true) && d < SECURITY.catchRadius){
+        leaveQueue(p); p.gone = true; p.ejected = true;
         if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
-        if(L.caught === 1 || L.caught % 5 === 0) events.toast(`${(guardRec(c) || {}).name || "A guard"} threw out a party of vandals. ${L.caught} caught today.`, "good");
+        if(!p.vandal) events.toast(`${(guardRec(c) || {}).name || "A guard"} caught the ${p.name} and threw them out.`, "good");
+        else {
+          L.caught++;
+          if(L.caught === 1 || L.caught % 5 === 0) events.toast(`${(guardRec(c) || {}).name || "A guard"} threw out a party of vandals. ${L.caught} caught today.`, "good");
+        }
         continue;
       }
       if(d < SECURITY.deterRadius && !p.rowdy) thinks(p, "safe");

@@ -18,6 +18,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   const checks = await page.evaluate(() => {
     const out = {};
     document.querySelector("#introGo").click(); setSpeed(0);
+    // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
+    PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
+    window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;
     const sp = SPECIES.find(s => !s.viv);
 
     // old saves without staff/safety upgrade without throwing
@@ -600,6 +603,99 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings = state.buildings.filter(x => x !== cam);
     state.science.tech = state.science.tech.filter(t => t !== "cameras");
     state.staff.guards = []; syncGuards(); resetParties();
+
+    // guest personalities: odds, slow walking, tastes, reactions, hooligans, and calling security
+    {
+      const mk = (a, c) => { const q = newParty(2); q.pers = [a, c]; q.fxc = {}; q.rowdy = q.pers.includes("hooligan"); return q; };
+      const cnt = {}; let dupes = 0;
+      for(let i = 0; i < 4000; i++){ const [a, c] = realRollPers(); cnt[a] = (cnt[a] || 0) + 1; if(a === c) dupes++; }
+      out.persOdds = dupes === 0 && Object.entries(PERSONALITIES).filter(([k, x]) => x.weight).every(([k, x]) => Math.abs((cnt[k] || 0) / 4000 - x.weight) < .04);
+      out.persHooliganShare = hooliganShare() > PERSONALITIES.hooligan.weight && hooliganShare() < .2;
+      out.guestsStroll = newParty(2).spd * WALK_PER_MIN <= WALK_PER_MIN * GUEST.speed[1] * GUEST.pace + 1e-9 && GUEST.pace < 1;
+      const fam = mk("family", "fun"), thr = mk("thrill", "fun");
+      out.persBlend = Math.abs(pm(mk("fun", "family"), "infra") - (1 + (PERSONALITIES.family.fx.infra - 1) * PERS.second)) < 1e-9 && pm(fam, "infra") === PERSONALITIES.family.fx.infra && pm(mk("fun", "fun"), "infra") === 1;
+      const con = mk("conserv", "fun"); learn(con, 10);
+      out.conservLearnsMore = Math.abs(con.edu - 10 * PERSONALITIES.conserv.fx.learn) < 1e-9;
+      // tastes and reactions
+      const bad = SPECIES.find(s => isDangerous(s)), mild = SPECIES.find(s => !isDangerous(s) && s.diet.length === 1 && s.diet[0] === "herbivore");
+      const fake = (sp, happy) => ({id:"x-" + sp + "-" + happy, points:[[0, 0], [1, 0], [1, 1]], animals:[{id:"a1", sp}, {id:"a2", sp}], happy});
+      const eBad = fake(bad.id, 70), eMild = fake(mild.id, 70);
+      out.thrillTaste = tasteOf(thr, eBad) > tasteOf(thr, eMild) && tasteOf(fam, eMild) > tasteOf(fam, eBad);
+      const p1 = mk("thrill", "fun"), p2 = mk("thrill", "fun"); p1.mood = p2.mood = 50;
+      personaSee(p1, eBad); personaSee(p2, eMild);
+      out.thrillReacts = p1.mood > 50 && p1.thought.has("rush") && p2.mood < 50 && p2.thought.has("tame");
+      const f1 = mk("family", "fun"), f2 = mk("family", "fun"); f1.mood = f2.mood = 50;
+      personaSee(f1, eBad); personaSee(f2, eMild);
+      out.familyReacts = f1.mood < 50 && f1.thought.has("scary") && f2.mood > 50 && f2.thought.has("cuddly");
+      const c1 = mk("conserv", "fun"), c2 = mk("conserv", "fun"); c1.mood = c2.mood = 50;
+      personaSee(c1, fake(mild.id, 85)); personaSee(c2, fake(mild.id, 30));
+      out.conservWelfare = c1.mood > 50 && c1.thought.has("welfare") && c2.mood < 50 && c2.thought.has("poorCare");
+      const n1 = mk("paleo", "fun"); n1.mood = 50; personaSee(n1, eMild); const m1 = n1.mood; personaSee(n1, eMild);
+      out.paleoLikesNew = m1 > 50 && n1.mood < m1 && n1.thought.has("repeats") && tasteOf(n1, eMild) < tasteOf(n1, eBad);
+      const lo = mk("conserv", "fun"); lo.mood = 60; personaLeaves(lo);
+      out.conservDislikesShow = lo.mood < 60 && lo.thought.has("showy");
+      // hooligans: rowdy, sneak in without paying, and tease the animals
+      const hoo = mk("hooligan", "fun");
+      out.hooliganRowdy = hoo.rowdy && isHooligan(hoo) && !mk("fun", "hooligan").sneaked && mk("fun", "hooligan").rowdy && !isHooligan(mk("fun", "hooligan"));
+      PERS.hooligan.sneak = 1;
+      out.hooliganSneaks = sneaksIn(hoo) && !sneaksIn(mk("fun", "hooligan")) && !sneaksIn(fam);
+      rollPers = () => ["hooligan", "fun"]; resetParties();
+      const tk0 = state.today.tickets, gs0 = state.today.guests; guestsArrive(2);
+      out.hooliganFreeEntry = state.today.tickets === tk0 && state.today.guests - gs0 === 2 && parties.length === 1;
+      PERS.hooligan.sneak = 0; guestsArrive(2);
+      out.hooliganPaysOtherwise = state.today.tickets - tk0 === state.ticket * 2;
+      rollPers = () => ["neutral", "neutral"]; resetParties();
+      PERSONALITIES.hooligan.n.x = 0;
+      const tg = state.exhibits.find(e => e.animals.length && !e.viv), th = mk("hooligan", "fun");
+      if(tg){
+        th.at = nearestGuestNode(...centroid(tg.points)); let near = th.at;
+        for(const n of gGraph.nodes.values()) if(distToEdge(n.x, n.y, tg.points) < distToEdge(near.x, near.y, tg.points)) near = n;
+        th.at = near; for(const a of tg.animals) a.need = a.need || {stress:0};
+        const s0 = tg.animals[0].need.stress; const rr5 = Math.random; Math.random = () => 0; teaseTick(th, 1); Math.random = rr5;
+        out.hooliganTeases = distToEdge(th.at.x, th.at.y, tg.points) > THROWN.reach * .7 || (tg.animals[0].need.stress > s0 && th.vandal);
+      } else out.hooliganTeases = true;
+
+      // calling security
+      hireGuard(); state.staff.guards = []; syncGuards();
+      const ej = mk("fun", "fun"); ej.at = nearestGuestNode(100, 200); parties = [ej];
+      out.ejectNeedsGuard = typeof ejectGuest(ej) === "string" && !ej.hold;
+      hireGuard(); syncGuards();
+      out.ejectNeedsGuardOnDuty = typeof ejectProblem(ej) === "string";
+      gcrew[0].at = nearestNode(300, 235); gcrew[0].route = []; gcrew[0].chase = null;
+      out.ejectCalls = ejectGuest(ej) === null && ej.hold === true && ej.ejecting === true && gcrew[0].chase === ej && /Waiting for security/.test(partyStatus(ej));
+      out.ejectOnlyOnce = typeof ejectGuest(ej) === "string";
+      // the party waits where it stands while the guard is far away
+      const at0 = ej.at, t0 = ej.t; guestsTick(state.minute, state.minute + 2);
+      out.ejectWaits = ej.at === at0 && ej.t === t0 && !ej.gone && ej.hold;
+      // the panel opens on it and shows the button, and tapping its dot finds it
+      select("guest", ej.id); guestLive(true);
+      const [gx, gy] = partyPos(ej), box = svg.getBoundingClientRect();
+      out.guestPanel = panelEl.innerHTML.includes('data-action="ejectGuest"') && document.getElementById("gEject").textContent === "Security called" && panelEl.innerHTML.includes("Personalities") && /Waiting for security/.test(document.getElementById("gStatus").textContent) && document.getElementById("gEject").disabled;
+      out.guestTapFinds = guestAt(gx * view.k + view.tx + box.left + 3, gy * ky() + view.ty + box.top - 3) === ej && guestAt(gx * view.k + view.tx + box.left + 300, gy * ky() + view.ty + box.top) !== ej;
+      drawParties();
+      out.guestDotColored = shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0 && guestRing.style.display === "";
+      // the guard reaches it: it is walked to the gate, unhappy, rather than thrown out
+      gcrew[0].at = nearestNode(ej.at.x, ej.at.y); const mood0 = ej.mood, mn0 = state.today.moodN;
+      guardWatch();
+      out.ejectEscorts = !ej.hold && ej.ejecting === "escort" && ej.home && !ej.gone && ej.thought.has("ejected") && mood0 - ej.mood >= PERS.ejectMood - 1e-9 && gcrew[0].chase === null;
+      let m = state.minute; for(let i = 0; i < 900 && !ej.gone; i++){ guestsTick(m, m + 2); m += 2; }
+      out.ejectWalksOut = ej.gone && !ej.ejected && state.today.moodN > mn0;
+      guestLive(true);
+      out.guestPanelCloses = sel === null;
+      // a hooligan won't wait: a guard has to catch it
+      const ho = mk("hooligan", "fun"); ho.at = nearestGuestNode(100, 200); parties = [ho];
+      gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null;
+      out.ejectHooligan = ejectGuest(ho) === null && !ho.hold && ho.ejecting === true && gcrew[0].chase === ho;
+      guardWatch(); out.hooliganRunsFree = !ho.gone;
+      gcrew[0].at = nearestNode(ho.at.x, ho.at.y); guardWatch();
+      out.hooliganCaught = ho.gone && ho.ejected;
+      // security that never shows up gives up after a while
+      const wt = mk("fun", "fun"); wt.at = nearestGuestNode(100, 200); parties = [wt]; gcrew[0].at = nearestNode(300, 235);
+      ejectGuest(wt); state.minute += PERS.ejectWait + 1; ejectTick(wt);
+      out.ejectTimesOut = wt.ejecting === false && !wt.hold;
+      state.minute -= PERS.ejectWait + 1;
+      state.staff.guards = []; syncGuards(); resetParties(); select(null);
+    }
     // a mechanic fixes the broken bench, and a custodian scrubs off graffiti
     hireMechanic();
     const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };

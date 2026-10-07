@@ -34,12 +34,14 @@ const ui = {
     else if(sel.kind === "building") h = buildingHtml(it);
     else if(sel.kind === "zone") h = zoneHtml(it);
     else if(sel.kind === "fence") h = fenceLineHtml(it);
+    else if(sel.kind === "guest") h = guestHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
     panelEl.innerHTML = h;
     aside.scrollTop = sc;
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
+    if(sel && sel.kind === "guest") guestLive(true);
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
   },
 

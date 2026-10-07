@@ -24,8 +24,59 @@ function guestsOverviewHtml(){
   const th = topThoughts(5);
   if(th.length) h += `<ul class="issues" style="margin-top:8px">${th.map(x => `<li class="${x.good ? "" : "bad"}"><span>"${esc(x.text)}" <span class="meta">${Math.round(x.share * 100)}%</span></span></li>`).join("")}</ul>`;
   else h += `<div class="meta" style="margin-top:4px">Guests haven't said much yet.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="moodColors">${moodColors ? "Show guests' shirts" : "Color guests by mood"}</button></div></section>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="moodColors">${moodColors ? "Show guests' personalities" : "Color guests by mood"}</button></div>`;
+  if(!moodColors) h += `<ul class="herd" style="margin-top:8px">${PERS_KEYS.map(k => `<li><span class="dot" style="background:${PERSONALITIES[k].color}"></span><span><b>${esc(PERSONALITIES[k].label)}</b> <span class="meta">${esc(PERSONALITIES[k].text)}</span></span></li>`).join("")}</ul>`;
+  h += `<div class="meta" style="margin-top:6px">Tap a guest on the map to see how they feel, what they're thinking, and to call security on them.</div></section>`;
   return h;
+}
+
+/* ---------- one party ---------- */
+let guestSelName = "", guestLiveAt = 0;
+const NEED_LABELS = {hunger:"Hunger", thirst:"Thirst", bladder:"Restroom", energy:"Tiredness"};
+const moodWord = m => m >= 80 ? "Delighted" : m >= 60 ? "Happy" : m >= 40 ? "Okay" : m >= 20 ? "Unhappy" : "Miserable";
+const moodColor = m => m >= 60 ? "#3E9B4F" : m >= 35 ? "#E3B23C" : "#D9483B";
+// The panel for a tapped party. The numbers inside are filled in (and kept fresh) by guestLive.
+function guestHtml(p){
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(p.name)}</h2>`;
+  h += `<div class="meta">Party of ${p.n}${p.hotel ? " · hotel guests" : ""}${p.sneaked ? " · slipped in without a ticket" : ""}</div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ok" id="gStatus"></span></div>`;
+  h += `<section><h3>Happiness <span class="num" id="gMoodN"></span></h3><div class="meter"><i id="gMoodBar"></i></div></section>`;
+  h += `<section><h3>Personalities</h3><ul class="herd">${p.pers.map((k, i) => `<li><span class="dot" style="background:${PERSONALITIES[k].color};align-self:flex-start;margin-top:5px"></span><span><b>${esc(PERSONALITIES[k].label)}</b> <span class="meta">${i ? "Secondary" : "Primary"}</span><br><span class="meta">${esc(PERSONALITIES[k].text)}</span></span></li>`).join("")}</ul></section>`;
+  h += `<section><h3>Thoughts</h3><ul class="issues" id="gThoughts"></ul></section>`;
+  h += `<section><h3>Needs</h3>${Object.keys(NEEDS).map(k => `<div class="need-row"><span>${NEED_LABELS[k]}</span><span id="gN-${k}"></span></div><div class="meter"><i id="gB-${k}"></i></div>`).join("")}</section>`;
+  h += `<section><h3>Wallet</h3><dl class="kv"><dt>Cash</dt><dd id="gCash"></dd><dt>People in the group</dt><dd>${p.n}</dd><dt>Learned</dt><dd id="gEdu"></dd></dl></section>`;
+  h += `<section><div class="row"><button class="btn" id="gEject" data-action="ejectGuest"></button></div><div class="meta" id="gEjectNote" style="margin-top:6px"></div></section>`;
+  return h;
+}
+// Keep the open party's panel up to date without redrawing it (so the button doesn't jump under a finger)
+function guestLive(force){
+  const now = performance.now();
+  if(!force && now - guestLiveAt < 250) return;
+  guestLiveAt = now;
+  const p = selItem();
+  if(!p){ const n = guestSelName; select(null); if(n) ui.toast(`The ${n} left the park.`); return; }
+  const set = (id, v) => { const el = document.getElementById(id); if(el && el.dataset.v !== String(v)){ el.dataset.v = v; el.textContent = v; } };
+  const mood = clamp(p.mood, 0, 100), bar = document.getElementById("gMoodBar");
+  if(!bar) return;
+  bar.style.width = mood.toFixed(0) + "%"; bar.style.background = moodColor(mood);
+  set("gMoodN", `${moodWord(mood)}, ${Math.round(mood)}%`);
+  set("gStatus", partyStatus(p));
+  for(const [k, d] of Object.entries(NEEDS)){
+    const v = p.needs[k], b = document.getElementById("gB-" + k);
+    set("gN-" + k, v >= GUEST.desperate ? "Desperate" : v >= d.seek ? "Needs attention" : v >= 25 ? "Getting there" : "Fine");
+    if(b){ b.style.width = Math.round(v) + "%"; b.style.background = v >= GUEST.desperate ? "#D9483B" : v >= d.seek ? "#E3B23C" : "#3E9B4F"; }
+  }
+  set("gCash", money(p.cash));
+  set("gEdu", `${Math.round(p.edu || 0)}%`);
+  const th = [...p.thought].reverse().slice(0, 6).filter(k => THOUGHTS[k]), key = th.join(), ul = document.getElementById("gThoughts");
+  if(ul && ul.dataset.v !== key){
+    ul.dataset.v = key;
+    ul.innerHTML = th.length ? th.map(k => `<li class="${THOUGHTS[k].good ? "" : "bad"}"><span>"${esc(THOUGHTS[k].text)}"</span></li>`).join("") : `<li><span class="meta">Nothing on their mind yet.</span></li>`;
+  }
+  const why = ejectProblem(p), btn = document.getElementById("gEject");
+  const label = p.ejecting === "escort" ? "Being walked out" : p.ejecting ? "Security called" : p.home && p.why === "home" ? "Already leaving" : "Eject from park";
+  if(btn){ set("gEject", label); btn.disabled = !!why; }
+  set("gEjectNote", why ? (p.ejecting ? "" : why) : isHooligan(p) ? "Hooligans won't wait around. A guard has to catch this party first." : "Calls security. The party stops and waits for a guard, who walks them to the gate.");
 }
 
 // A food stand, gift shop, restroom, Education Center, or anything beside the path
@@ -160,7 +211,7 @@ function securityHtml(b){
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireGuard"${canAfford(SECURITY.hireCost) ? "" : " disabled"}>Hire a guard, ${money(SECURITY.hireCost)}</button><span class="meta">${money(SECURITY.wage)} a day each.</span></div></section>`;
   const broken = state.buildings.filter(isBroken).length, tagged = state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length;
   h += `<section><h3>Vandalism</h3><dl class="kv"><dt>Today</dt><dd>${L.acts} act${L.acts === 1 ? "" : "s"}, ${L.caught} caught</dd>${Y ? `<dt>Yesterday</dt><dd>${Y.acts} act${Y.acts === 1 ? "" : "s"}, ${Y.caught} caught</dd>` : ""}<dt>Broken props</dt><dd>${broken}</dd><dt>Buildings with graffiti</dt><dd>${tagged}</dd></dl>`;
-  h += `<div class="meta" style="margin-top:6px">About 1 party in ${Math.round(1 / VANDAL.rowdyShare)} is rowdy, and unhappy rowdy guests break things. Vandalism near a guard is ${Math.round((1 - SECURITY.deterCut) * 100)}% rarer, and a guard throws out any vandal within ${SECURITY.catchRadius} m. Lamp posts help, and heavy litter makes it worse. Mechanics fix broken props and custodians scrub off graffiti.</div>`;
+  h += `<div class="meta" style="margin-top:6px">About 1 party in ${Math.round(1 / hooliganShare())} has a hooligan in it, and unhappy hooligans break things, throw trash at the animals, bang on the glass and sometimes sneak in without paying. Vandalism near a guard is ${Math.round((1 - SECURITY.deterCut) * 100)}% rarer, and a guard throws out any vandal within ${SECURITY.catchRadius} m. Lamp posts help, and heavy litter makes it worse. Mechanics fix broken props and custodians scrub off graffiti.</div>`;
   h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? `Cameras watch ${SECURITY.cameraRadius} m around each office, and send the nearest guard straight to any vandal they see.` : "Research security cameras at ORACLE so each office watches the paths around it."}</div></section>`;
   return h;
 }
@@ -207,6 +258,12 @@ panelEl.addEventListener("click", ev => {
   const b = ev.target.closest("[data-action]"); if(!b) return;
   const a = b.dataset.action, it = selItem();
   if(a === "moodColors"){ moodColors = !moodColors; drawParties(); ui.panel(); return; }
+  if(a === "ejectGuest" && sel && sel.kind === "guest"){
+    const p = selItem(); if(!p) return;
+    const why = ejectGuest(p);
+    ui.toast(why || (isHooligan(p) ? `Security is after the ${p.name}. Hooligans won't wait, so a guard has to catch them.` : `Security is on the way. The ${p.name} will wait here.`), why ? "bad" : "");
+    guestLive(true); return;
+  }
   if(a === "hireGuard"){ const why = hireGuard(); if(why) ui.toast(why, "bad"); afterChange(); return; }
   if(a === "fireGuard"){ state.staff.guards = state.staff.guards.filter(m => m.id !== b.dataset.id); syncGuards(); afterChange(); return; }
   if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
