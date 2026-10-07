@@ -205,9 +205,8 @@ function vendorStockHtml(b){
 // The Security Office: its guards, and today's trouble
 function securityHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.security.blurb)}</div>` + zoneRow("building", b);
-  const gs = state.staff.guards, L = vandalLog(), Y = state.guestLog.last.vandal;
-  h += `<section><h3>Guards (${gs.length})</h3>`;
-  h += gs.length ? `<ul class="herd">${gs.map(m => `<li><span class="dot" style="background:#2B3F6B"></span><span><b>${esc(m.name)}</b>${(gcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(guardStatus(m))}</span></span>${zoneSelect("guard", m.id, m.zone)}<button class="btn sell" data-action="fireGuard" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No guards yet.</div>`;
+  const L = vandalLog(), Y = state.guestLog.last.vandal;
+  h += staffNote("guard");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireGuard"${canAfford(SECURITY.hireCost) ? "" : " disabled"}>Hire a guard, ${money(SECURITY.hireCost)}</button><span class="meta">${money(SECURITY.wage)} a day each.</span></div></section>`;
   const broken = state.buildings.filter(isBroken).length, tagged = state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length;
   h += `<section><h3>Vandalism</h3><dl class="kv"><dt>Today</dt><dd>${L.acts} act${L.acts === 1 ? "" : "s"}, ${L.caught} caught</dd>${Y ? `<dt>Yesterday</dt><dd>${Y.acts} act${Y.acts === 1 ? "" : "s"}, ${Y.caught} caught</dd>` : ""}<dt>Broken props</dt><dd>${broken}</dd><dt>Buildings with graffiti</dt><dd>${tagged}</dd></dl>`;
@@ -218,10 +217,7 @@ function securityHtml(b){
 // The Custodial Closet: its staff, and what they've been up to
 function closetHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.closet.blurb)}</div>` + zoneRow("building", b);
-  const cs = state.staff.custodians;
-  h += `<section><h3>Custodians (${cs.length})</h3>`;
-  h += cs.length ? `<ul class="herd">${cs.map(m => `<li><span class="dot" style="background:#2E8B8B"></span><span><b>${esc(m.name)}</b>${(ccrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(custodianStatus(m))}</span></span>${zoneSelect("custodian", m.id, m.zone)}<button class="btn sell" data-action="fireCust" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No custodians yet.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireCust"${canAfford(CUSTODIAN.hireCost) ? "" : " disabled"}>Hire a custodian, ${money(CUSTODIAN.hireCost)}</button><span class="meta">${money(CUSTODIAN.wage)} a day each. Carries ${custCarry()} units of stock a trip.</span></div></section>`;
+  h += staffNote("custodian", `Each carries ${custCarry()} units of stock a trip.`);
   const dirty = state.buildings.filter(x => x.type === "restroom" && (x.dirt || 0) >= CUSTODIAN.restroomAt).length;
   const full = state.buildings.filter(x => x.type === "bin" && (x.fill || 0) >= LITTER.binCap * CUSTODIAN.binAt).length;
   const low = state.buildings.filter(x => isVendor(x) && storeOf(x).holds.some(t => storeTarget(x, t) && stockOf(x, t) < storeTarget(x, t) * .35)).length;
@@ -264,10 +260,6 @@ panelEl.addEventListener("click", ev => {
     ui.toast(why || (isHooligan(p) ? `Security is after the ${p.name}. Hooligans won't wait, so a guard has to catch them.` : `Security is on the way. The ${p.name} will wait here.`), why ? "bad" : "");
     guestLive(true); return;
   }
-  if(a === "hireGuard"){ const why = hireGuard(); if(why) ui.toast(why, "bad"); afterChange(); return; }
-  if(a === "fireGuard"){ state.staff.guards = state.staff.guards.filter(m => m.id !== b.dataset.id); syncGuards(); afterChange(); return; }
-  if(a === "hireCust"){ const why = hireCustodian(); if(why) ui.toast(why, "bad"); afterChange(); return; }
-  if(a === "fireCust"){ state.staff.custodians = state.staff.custodians.filter(m => m.id !== b.dataset.id); syncCustodians(); afterChange(); return; }
   if(a === "roomRate" && it && isHotel(it)){ it.rate = clamp(roomRate(it) + (+b.dataset.d), 10, BUILDINGS[it.type].roomPrice * 3); ui.panel(); saveSoon(); return; }
   if(a === "eduFocus" && it && it.type === "edcenter"){ it.focus = it.focus === b.dataset.f ? null : b.dataset.f; recompute(); ui.panel(); saveSoon(); return; }
   if(a === "modAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#modSel"), why = sel ? addMod(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }

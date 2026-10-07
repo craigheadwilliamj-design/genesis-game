@@ -1535,6 +1535,34 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
       Object.assign(state, keep); recompute();
     }
+    // staff tab: hire and fire from the park office, energy and morale, tap a worker for their panel
+    {
+      const keep = JSON.stringify(state.staff), mon = state.money, bs = state.buildings.length;
+      state.money = 1e6; state.staff.keepers = []; state.staff.mechanics = []; state.staff.vets = []; state.staff.custodians = []; state.staff.guards = [];
+      state.buildings.push({id:"b-stf", type:"station", points:[[400,400],[404,400],[404,404],[400,404]]}, {id:"b-clo", type:"closet", points:[[410,400],[414,400],[414,404],[410,404]]});
+      out.staffNeedsBuilding = typeof hireStaff("guard") === "string" && state.staff.guards.length === 0;
+      out.staffHire = hireStaff("keeper") === null && hireStaff("custodian") === null && state.staff.keepers.length === 1 && state.staff.custodians.length === 1 && state.staff.keepers[0].morale === STAFF.startMorale;
+      officeTab = "staff"; select(null); ui.panel();
+      const tab = document.getElementById("panel").innerHTML;
+      out.staffTab = tab.includes(state.staff.keepers[0].name) && tab.includes('data-action="fireStaff"') && tab.includes('data-action="hireStaff"') && tab.includes("Scientists");
+      const k = state.staff.keepers[0]; select("staff", k.id);
+      const pn = document.getElementById("panel").innerHTML;
+      out.staffPanel = pn.includes("Morale") && pn.includes("Energy") && pn.includes("Thoughts") && document.getElementById("sMoraleN").textContent.length > 0 && document.getElementById("sStatus").textContent.length > 0;
+      // morale drifts toward what the job gives them, energy drains for non-keepers
+      const m0 = moraleOf(k), c = state.staff.custodians[0]; c.stamina = 100; k.stamina = 5; k.workMin = 100; k.idleMin = 0;
+      syncCrew(); syncCustodians(); const cc = ccrew[0]; const nd = {x:100, y:200}; cc.at = nd; cc.job = "scrubbing"; crew[0].at = nd;
+      for(let i = 0; i < 40; i++) staffTick(5);
+       out.staffMorale = moraleOf(k) < m0 && moraleOf(k) >= 0 && c.stamina < 100 && moraleFactors(k, "keeper").some(f => !f.good);
+      staffNight(); out.staffNight = c.stamina === 100 && k.workMin === 0;
+      // fire asks first, then removes; panel closes with the worker
+      staffFireDialog(k.id);
+      const dlg = document.getElementById("dlgConfirm"), asked = dlg.open && document.getElementById("confirmTitle").textContent === "Are you sure?" && state.staff.keepers.length === 1;
+      document.getElementById("confirmYes").click();
+      out.staffFire = asked && state.staff.keepers.length === 0 && crew.length === 0;
+      staffLive(true); out.staffFireDeselect = !sel;
+      const sc0 = state.science.crew.paleo; sciFireDialog("paleo"); document.getElementById("confirmNo").click(); out.sciFireAsks = state.science.crew.paleo === sc0;
+      state.staff = JSON.parse(keep); state.money = mon; state.buildings.length = bs; officeTab = "office"; select(null); syncCrew(); syncCustodians(); recompute();
+    }
     return out;
   }));
 

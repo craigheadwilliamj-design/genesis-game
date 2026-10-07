@@ -658,6 +658,15 @@ const KEEPER = {
   topUpBelow:.6,       // keepers only set out to feed an exhibit once its food drops under this share of a full store
   restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)
 };
+// Staff overview: energy and morale for every hired worker (keepers tire by walking, so theirs lives in KEEPER)
+const STAFF = {
+  workDrain:.1,        // energy a mechanic, vet, custodian or guard loses per minute on a task
+  idleDrain:.03,       // and per minute waiting around
+  moraleStep:200,      // morale closes the gap to what the job gives them over about this many minutes
+  startMorale:70,
+  worked:[.35, .85],   // a share of the day spent working that feels like a good day (less is boring, more is a grind)
+  minSample:60,        // minutes on the clock before work-share thoughts count
+};
 const FOOD_UNIT_COST = 20;   // one food unit per $20 of an animal's daily food cost
 const STORE_DAYS = 1.5;      // exhibits hold this many days of food
 const GATE_COST = 1500;
