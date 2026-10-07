@@ -156,6 +156,7 @@ function upgradeSave(s){
   if(!s.staff.custodians) s.staff.custodians = [];
   if(!s.staff.guards) s.staff.guards = [];
   if(!s.staff.atvs) s.staff.atvs = [];
+  for(const k of ["keepers", "mechanics", "vets", "custodians", "guards"]) for(const w of s.staff[k]){ if(w.stamina === undefined) w.stamina = 100; if(w.morale === undefined) w.morale = STAFF.startMorale; }
   // Paleoflora became research: parks already using it keep what they had
   if(!s.ceres){
     s.ceres = {stock:0};
@@ -567,6 +568,7 @@ function tick(dtMin){
   vetsTick(m1 - m0);
   custodiansTick(m1 - m0);
   guardsTick(m1 - m0);
+  staffTick(m1 - m0);
   escapesTick(m1 - m0);
   if(state.over) return;
 
@@ -630,6 +632,7 @@ function endDay(){
   mechanicsNight();
   custodiansNight();
   guardsNight();
+  staffNight();
   healthNight();
   vetsNight();
   behaviorNight();

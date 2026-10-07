@@ -35,6 +35,7 @@ const ui = {
     else if(sel.kind === "zone") h = zoneHtml(it);
     else if(sel.kind === "fence") h = fenceLineHtml(it);
     else if(sel.kind === "guest") h = guestHtml(it);
+    else if(sel.kind === "staff") h = staffHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
@@ -42,6 +43,7 @@ const ui = {
     aside.scrollTop = sc;
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
     if(sel && sel.kind === "guest") guestLive(true);
+    if(sel && sel.kind === "staff") staffLive(true);
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
   },
 
@@ -81,7 +83,8 @@ function overviewHtml(){
   const d = derived, t = state.today, goal = currentGoal();
   let h = `<h2>${esc(state.name)}</h2>`;
 
-  h += tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"grants", label:"Grants", color:"#B8860B"}], officeTab);
+  h += tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#B8860B"}], officeTab);
+  if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
 
   const c = dailyCosts();
@@ -547,22 +550,18 @@ function deptHead(b){
 }
 const dnaBar = d => `<div class="factor" style="grid-template-columns:1fr 44px"><span>${meter(d ? d.genome : 0, d && d.genome >= 100 ? "var(--good)" : "var(--gold)")}</span><span>${d ? d.genome : 0}%</span></div>`;
 
-// Hiring science staff at a department: count, pay, and hire/let go buttons
+// Science staff are hired from the Staff tab; the department just says how many it has
 function sciStaffHtml(kind){
   const k = SCIENTISTS[kind], n = state.science.crew[kind];
-  return `<section><h3>${k.plural} (${n})</h3><div class="meta">${esc(k.text)} ${money(k.wage)} a day each.</div>
-    <div class="row" style="margin-top:8px"><button class="btn" data-action="hireSci" data-k="${kind}"${canAfford(k.hireCost) ? "" : " disabled"}>Hire a ${k.label.toLowerCase()}, ${money(k.hireCost)}</button>${n ? `<button class="btn" data-action="fireSci" data-k="${kind}">Let one go</button>` : ""}</div></section>`;
+  return `<section><h3>${k.plural} (${n})</h3><div class="meta">${esc(k.text)} ${money(k.wage)} a day each. Hire and fire from the Staff tab in the park office.</div>
+    <div class="row" style="margin-top:8px"><button class="btn" data-action="gotoStaff">Open Staff tab</button></div></section>`;
 }
 
 function stationHtml(b){
   let h = deptHead(b);
   h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>` + zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
-  const ks = state.staff.keepers;
-  h += `<section><h3>Keepers (${ks.length})</h3>`;
-  if(ks.length) h += `<ul class="herd">${ks.map(k => `<li><span class="dot" style="background:#2E6B3A"></span><span><b>${esc(k.name)}</b>${(crew.find(c => c.id === k.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(keeperStatus(k))}</span>${meter(k.stamina, k.stamina > 50 ? "var(--good)" : k.stamina > 25 ? "var(--warn)" : "var(--bad)")}</span>${zoneSelect("keeper", k.id, k.zone)}<button class="btn sell" data-action="fire" data-id="${k.id}">Let go</button></li>`).join("")}</ul>`;
-  else h += `<div class="meta">No keepers yet.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hire"${canAfford(KEEPER.hireCost) ? "" : " disabled"}>Hire a keeper, ${money(KEEPER.hireCost)}</button><span class="meta">${money(KEEPER.wage)} a day each</span></div></section>`;
+  h += staffNote("keeper");
   h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
@@ -588,10 +587,7 @@ function toolshedHtml(b){
 function workshopHtml(b){
   let h = deptHead(b);
   h += `<div class="meta">${esc(BUILDINGS.workshop.blurb)} They check every fence every ${MAINT.inspectEvery} days and fix anything under ${MAINT.repairBelow}%, broken fences first.</div>`;
-  const ms = state.staff.mechanics;
-  h += `<section><h3>Mechanics (${ms.length})</h3>`;
-  h += ms.length ? `<ul class="herd">${ms.map(m => `<li><span class="dot" style="background:#C8642A"></span><span><b>${esc(m.name)}</b>${(mcrew.find(c => c.id === m.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(mechanicStatus(m))}</span></span>${zoneSelect("mechanic", m.id, m.zone)}<button class="btn sell" data-action="fireMech" data-id="${m.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No mechanics yet.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireMech"${canAfford(MAINT.hireCost) ? "" : " disabled"}>Hire a mechanic, ${money(MAINT.hireCost)}</button><span class="meta">${money(MAINT.wage)} a day each</span></div></section>`;
+  h += staffNote("mechanic");
   // every fence, worst first, as of its last inspection
   const fences = state.exhibits.filter(e => !e.viv).sort((a, b) => knownCond(a) - knownCond(b));
   if(fences.length){
@@ -615,10 +611,8 @@ function generatorHtml(b){
 
 function pmcHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.pmc.blurb)}</div>`;
-  const vs = state.staff.vets, ward = state.health.ward;
-  h += `<section><h3>Vets (${vs.length})</h3>`;
-  h += vs.length ? `<ul class="herd">${vs.map(v => `<li><span class="dot" style="background:#B0384F"></span><span><b>${esc(v.name)}</b>${(vcrew.find(c => c.id === v.id) || {}).riding ? ' <span class="vtag" style="background:#4F6273;color:#fff;border-color:#4F6273">ATV</span>' : ""} <span class="meta">${esc(vetStatus(v))}</span></span>${zoneSelect("vet", v.id, v.zone)}<button class="btn sell" data-action="fireVet" data-id="${v.id}">Let go</button></li>`).join("")}</ul>` : `<div class="meta">No vets yet. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.</div>`;
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireVet"${canAfford(VET.hireCost) ? "" : " disabled"}>Hire a vet, ${money(VET.hireCost)}</button><span class="meta">${money(VET.wage)} a day each. Each treats ${VET.patients} PMC patients a night.</span></div></section>`;
+  const ward = state.health.ward;
+  h += staffNote("vet", `Each treats ${VET.patients} PMC patients a night. Until you hire one, keepers dart escaped animals themselves and sick animals go untreated.`);
   h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
   h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
   h += `<div class="meta" style="margin-top:6px">Patients don't get worse here. Each treatment uses ${HEALTH.dose} doses.</div></section>`;
@@ -782,23 +776,16 @@ panelEl.addEventListener("click", e => {
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "fireSci"){ fireScientist(b.dataset.k); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
-  if(a === "hireVet"){ const why = hireVet(); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "fireVet"){ state.staff.vets = state.staff.vets.filter(v => v.id !== b.dataset.id); syncVets(); done(); return; }
   if(a === "gene" && it){
     const an = it.animals.find(x => x.id === b.dataset.id);
     if(an){ if(an.gene) delete an.gene; else { const why = geneProblem(an); if(why) ui.toast(why, "bad"); else an.gene = true; } }
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
-  if(a === "hireMech"){ const why = hireMechanic(); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "fireMech"){ state.staff.mechanics = state.staff.mechanics.filter(m => m.id !== b.dataset.id); done(); return; }
-  if(a === "hire"){ const why = hireKeeper(); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "fire"){ state.staff.keepers = state.staff.keepers.filter(k => k.id !== b.dataset.id); done(); return; }
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
