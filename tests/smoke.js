@@ -873,7 +873,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech = sc.tech.filter(t => t !== "bars");   // bars are free in every park, so research is tested from scratch
     state.minute = OPEN_MIN + 60;
 
-    // research: needs a paleontologist, takes time proportional to cost, and finishes mid-day
+    // research: needs a researcher, takes time proportional to cost, and finishes mid-day
     out.needsPaleo = !!startProject("tech", "bars");
     hireScientist("paleo");
     sc.points = 100;
@@ -889,6 +889,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // points accrue with time, not at night
     const pts0 = sc.points; state.minute = OPEN_MIN + 60; tick(60);
     out.pointsTrickle = Math.abs(sc.points - pts0 - RESEARCH_PER_PALEO * 60 / DAY_MIN) < 1e-6;
+    // a researcher on a project earns nothing, and stopping it gives the points back
+    sc.points = 100; startProject("tech", "moat");
+    const pts1 = sc.points; tick(60);
+    out.busyResearcherEarnsNothing = sc.points === pts1;
+    const refund = sc.points + sc.projects[0].cost; stopProject(sc.projects[0]);
+    out.stopProjectRefunds = sc.projects.length === 0 && Math.abs(sc.points - refund) < 1e-6;
+    // educated guests fund research
+    const pts2 = sc.points; parties = [{n:4, edu:50, mood:50, needs:{}, thought:new Set(), pers:[]}]; partyLeaves(parties[0]); parties = [];
+    out.guestsFundResearch = Math.abs(sc.points - pts2 - 4 * RESEARCH_GUEST * .5) < 1e-6;
 
     // animals are unlocked one by one under their period
     const small = SPECIES.filter(x => !x.viv).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];

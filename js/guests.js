@@ -200,6 +200,8 @@ function partyLeaves(p){
   if(edu >= EDU.learned) thinks(p, "learned");
   // guests who learned something drop a little in the donation box
   if(edu > 0) earn(p.n * EDU.donate * edu / 100 * pm(p, "donate"), "donations");
+  // and educated guests fund science
+  if(edu > 0 && dept("oracle")) state.science.points += p.n * RESEARCH_GUEST * edu / 100;
   L.guests += p.n;
   for(const k of p.thought) L.thoughts[k] = (L.thoughts[k] || 0) + p.n;
 }

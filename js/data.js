@@ -255,8 +255,8 @@ const TIME_PERIODS = [
 //   hireCost   one-time cost to hire
 //   wage       pay per day
 const SCIENTISTS = {
-  paleo:    {label:"Paleontologist",     plural:"Paleontologists",     dept:"oracle", hireCost:3000, wage:250,
-             text:"Each one earns 5 research points a day and runs one research bay, one project at a time."},
+  paleo:    {label:"Researcher",         plural:"Researchers",         dept:"oracle", hireCost:3000, wage:250,
+             text:"Each one runs one research bay. Left on general research, a researcher earns 4 research points a day. Put them on a project and they stop earning until it is done."},
   temporal: {label:"Temporal Researcher", plural:"Temporal Researchers", dept:"ghost",  hireCost:4000, wage:400,
              text:"Each one runs an expedition bay with one team. More researchers means more trips at the same time."},
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
@@ -264,11 +264,14 @@ const SCIENTISTS = {
   botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
              text:"Each one tends a growing bed, so CERES can grow that many batches at the same time."},
 };
-const RESEARCH_PER_PALEO = 5;   // research points each paleontologist earns per open day
-// How long research takes, in park minutes per point. A 60-point project is 3 open days.
-const RESEARCH_MIN_PER_POINT = DAY_MIN / 20;
+const RESEARCH_PER_PALEO = 4;   // research points each researcher earns per open day while they're on general research (no project)
+const RESEARCH_GUEST = .03;     // research points a guest adds on leaving, times how much they learned (0 to 1). Educated crowds fund science.
+// How long research takes, in park minutes per point. A 60-point project is 2 open days.
+const RESEARCH_MIN_PER_POINT = DAY_MIN / 30;
 // What unlocking one animal's genome costs at ORACLE: its period's base plus this much for every $ of its price
-const UNLOCK_PER_PRICE = 1 / 2000;
+const UNLOCK_PER_PRICE = 1 / 1000;
+// Each animal already unlocked makes the next one this much dearer, so points never pile up late in the game
+const UNLOCK_GROWTH = .04;
 
 // Expeditions. A trip either finds something or comes back empty-handed, and a find fills part of a genome.
 // Bigger animals are harder to find, and a genome takes about 2 trips for the smallest and 8 for the largest.
@@ -1000,56 +1003,56 @@ const ZONE_MIN_AREA = 200;
 //   era     (flora, med) the era it belongs to
 const TECH = [
   {id:"bars",     group:"barrier", label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
-  {id:"electric", group:"barrier", label:"Electrified fence", points:30, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
-  {id:"concrete", group:"barrier", label:"Concrete walls",    points:35, text:"Strength 140. Holds anything, but guests can barely see in."},
-  {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:50, text:"Strength 85. Clear walls that guests love looking through."},
-  {id:"aviary",   group:"barrier", label:"Aviary netting",    points:45, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
-  {id:"catchnet", group:"barrier", label:"Catch netting",     points:30, text:"Netting along an exhibit's fence that catches 95% of the trash guests throw in. It catches less as the fence wears."},
+  {id:"electric", group:"barrier", label:"Electrified fence", points:18, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
+  {id:"concrete", group:"barrier", label:"Concrete walls",    points:20, text:"Strength 140. Holds anything, but guests can barely see in."},
+  {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:40, text:"Strength 85. Clear walls that guests love looking through."},
+  {id:"aviary",   group:"barrier", label:"Aviary netting",    points:35, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
+  {id:"catchnet", group:"barrier", label:"Catch netting",     points:25, text:"Netting along an exhibit's fence that catches 95% of the trash guests throw in. It catches less as the fence wears."},
   {id:"moat",     group:"barrier", label:"Moats",             points:60, text:"Stops every escape from an exhibit, whatever its walls."},
-  {id:"platform", group:"barrier", label:"Viewing platforms", points:40, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
-  {id:"education", group:"build", label:"Education programs", points:25, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
-  {id:"edtheater", group:"build", label:"Education theater", points:30, needs:"education", text:"Add a Theater module to an Education Center for shows that draw crowds."},
-  {id:"edfossils", group:"build", label:"Fossil displays", points:30, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
-  {id:"edauditorium", group:"build", label:"Education auditorium", points:40, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
-  {id:"edlabwindow", group:"build", label:"Live lab window", points:35, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
-  {id:"ednursery", group:"build", label:"Nursery window", points:35, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
-  {id:"edbotanical", group:"build", label:"Botanical hall", points:35, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
-  {id:"edsimroom", group:"build", label:"Simulation room", points:45, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
-  {id:"ediorama", group:"build", label:"Ecosystem diorama", points:35, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
-  {id:"edtouch", group:"build", label:"Touch gallery", points:30, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
-  {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
+  {id:"platform", group:"barrier", label:"Viewing platforms", points:30, text:"Raised decks on an exhibit's edge. Guests enjoy the exhibit far more."},
+  {id:"education", group:"build", label:"Education programs", points:12, text:"Build an Education Center, where guests learn about prehistoric life. Educated guests are happier, tidier, and more generous."},
+  {id:"edtheater", group:"build", label:"Education theater", points:40, needs:"education", text:"Add a Theater module to an Education Center for shows that draw crowds."},
+  {id:"edfossils", group:"build", label:"Fossil displays", points:40, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
+  {id:"edauditorium", group:"build", label:"Education auditorium", points:55, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
+  {id:"edlabwindow", group:"build", label:"Live lab window", points:50, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
+  {id:"ednursery", group:"build", label:"Nursery window", points:50, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
+  {id:"edbotanical", group:"build", label:"Botanical hall", points:50, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
+  {id:"edsimroom", group:"build", label:"Simulation room", points:65, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
+  {id:"ediorama", group:"build", label:"Ecosystem diorama", points:50, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
+  {id:"edtouch", group:"build", label:"Touch gallery", points:40, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
+  {id:"modern", group:"build", label:"Modern design", points:50, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
-  {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
-  {id:"security", group:"build", label:"Security offices",  points:25, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
-  {id:"generator", group:"build", label:"Power generators", points:30, text:"Diesel generators that power electrified fences and cold stores."},
-  {id:"cameras",  group:"build", label:"Security cameras",  points:30, text:"Each Security Office watches the paths around it, and you can put camera posts on paths to watch more. Guards are sent straight to vandals the cameras see."},
-  {id:"vehicles",   group:"build", label:"Staff vehicles",   points:50, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
-  {id:"transit",   group:"build", label:"Guest tram",       points:40, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
-  {id:"foodprod",  group:"build", label:"Food production",  points:30, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
+  {id:"coldstore", group:"build", label:"Cold stores",      points:15, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
+  {id:"security", group:"build", label:"Security offices",  points:15, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
+  {id:"generator", group:"build", label:"Power generators", points:15, text:"Diesel generators that power electrified fences and cold stores."},
+  {id:"cameras",  group:"build", label:"Security cameras",  points:25, text:"Each Security Office watches the paths around it, and you can put camera posts on paths to watch more. Guards are sent straight to vandals the cameras see."},
+  {id:"vehicles",   group:"build", label:"Staff vehicles",   points:70, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
+  {id:"transit",   group:"build", label:"Guest tram",       points:60, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
+  {id:"foodprod",  group:"build", label:"Food production",  points:18, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   // TAR upgrades
-  {id:"fast1",    group:"tar", label:"Faster incubators",   points:30, text:"Clones finish in three quarters of the time."},
-  {id:"fast2",    group:"tar", label:"Much faster incubators", points:50, needs:"fast1", text:"Clones finish in about half the time."},
+  {id:"fast1",    group:"tar", label:"Faster incubators",   points:35, text:"Clones finish in three quarters of the time."},
+  {id:"fast2",    group:"tar", label:"Much faster incubators", points:80, needs:"fast1", text:"Clones finish in about half the time."},
   // GHOST upgrades
-  {id:"ghostcost1", group:"ghost", label:"Leaner expeditions",   points:30, text:"Trips cost about a fifth less."},
-  {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:50, needs:"ghostcost1", text:"Trips cost about a third less."},
-  {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:30, text:"Expeditions take three quarters of the time."},
-  {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:50, needs:"ghostspeed1", text:"Expeditions take about half the time."},
-  {id:"ghostq1",   group:"ghost", label:"Careful sampling",     points:35, text:"Every DNA sample comes back 8 points better in quality."},
-  {id:"ghostq2",   group:"ghost", label:"Cryo-preserved samples", points:55, needs:"ghostq1", text:"Every DNA sample comes back 16 points better in quality."},
+  {id:"ghostcost1", group:"ghost", label:"Leaner expeditions",   points:35, text:"Trips cost about a fifth less."},
+  {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:80, needs:"ghostcost1", text:"Trips cost about a third less."},
+  {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:35, text:"Expeditions take three quarters of the time."},
+  {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:80, needs:"ghostspeed1", text:"Expeditions take about half the time."},
+  {id:"ghostq1",   group:"ghost", label:"Careful sampling",     points:40, text:"Every DNA sample comes back 8 points better in quality."},
+  {id:"ghostq2",   group:"ghost", label:"Cryo-preserved samples", points:90, needs:"ghostq1", text:"Every DNA sample comes back 16 points better in quality."},
   // Genetics
-  {id:"genetherapy", group:"gene", label:"Genome therapy", points:45, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
+  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
-  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:40, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
-  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:35, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
-  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:45, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
+  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
+  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
+  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
   {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from CERES."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
-  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:25, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
-  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:35, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:40, text:"CERES grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
+  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"CERES grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
-const REFINE_POINTS = {cenozoic:6, mesozoic:9, paleozoic:12};
+const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 const NET_PER_METER = 25;   // catch netting along the fence
@@ -1852,7 +1855,7 @@ const GOALS = [
   {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  statue:"lyst", check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  statue:"kele", check:g=>g.state.history.some(h=>h.guests>=1000)},
   {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"cenozoic", text:"Unlock a Cenozoic Animal's genome",  hint:"Tap ORACLE and hire a paleontologist. They earn research points as the day goes on. Open the Cenozoic tab (Paleogene, Neogene, Quaternary) and start unlocking an animal.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
+  {id:"cenozoic", text:"Unlock a Cenozoic Animal's genome",  hint:"Tap ORACLE and hire a researcher. Idle researchers earn research points as the day goes on. Open the Cenozoic tab (Paleogene, Neogene, Quaternary) and start unlocking an animal.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
   {id:"mesozoic", text:"Unlock a Mesozoic Animal's genome",  hint:"Open the Mesozoic tab (Triassic, Jurassic, Cretaceous) at ORACLE and start unlocking an animal.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
   {id:"paleozoic",text:"Unlock a Paleozoic Animal's genome", hint:"Open the Paleozoic tab (Devonian, Carboniferous, Permian) at ORACLE and start unlocking an animal.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
   {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Unlock and complete the genome of a Quaternary animal, then clone it at TAR.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
