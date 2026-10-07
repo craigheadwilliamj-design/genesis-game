@@ -5,6 +5,7 @@ const GameData = preload("res://scripts/data.gd")
 const SimCore = preload("res://scripts/sim.gd")
 const Geo = preload("res://scripts/geometry.gd")
 const AnimalsView = preload("res://scripts/animals_view.gd")
+const GuestsView = preload("res://scripts/guests_view.gd")
 
 const GRID := 5.0
 const PAN_KEYS_SPEED := 400.0   # screen px per second at zoom 1
@@ -100,6 +101,10 @@ func _ready() -> void:
 	var animals_view := AnimalsView.new()
 	animals_view.sim = sim
 	add_child(animals_view)
+	var guests_view := GuestsView.new()
+	guests_view.sim = sim
+	add_child(guests_view)
+	sim.day_ended.connect(_on_day_ended)
 	sim.layout_changed.connect(_refresh_panel)
 	sim.changed.connect(_refresh_hud)
 	sim.layout_changed.connect(queue_redraw)
@@ -169,7 +174,7 @@ func _process(delta: float) -> void:
 
 func _refresh_hud() -> void:
 	var s: Dictionary = sim.state
-	hud.text = "Day %d   %s   %s   x%d%s" % [s["day"], sim.clock_text(), sim.money_text(int(s["money"])), speed, "  (paused)" if speed == 0 else ""]
+	hud.text = "Day %d   %s   %s   Guests %d   Ticket $%d   x%d%s" % [s["day"], sim.clock_text(), sim.money_text(int(s["money"])), sim.guests.guest_count(), int(s["ticket"]), speed, "  (paused)" if speed == 0 else ""]
 
 # The line under construction, with the hovered point as its end, and what it would cost or why it can't be built
 func _preview_pts() -> Array:
@@ -353,6 +358,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: speed = 1
 			KEY_2: speed = 2
 			KEY_3: speed = 3
+			KEY_BRACKETLEFT: sim.set_ticket(int(sim.state["ticket"]) - 1)
+			KEY_BRACKETRIGHT: sim.set_ticket(int(sim.state["ticket"]) + 1)
 			KEY_R:
 				if tool == "build":
 					rot = (rot + 1) % 8
@@ -621,3 +628,6 @@ func _on_buy(exhibit_id: String, sp: String) -> void:
 
 func _on_sell(exhibit_id: String, sp: String) -> void:
 	sim.sell_animal(exhibit_id, sp)
+
+func _on_day_ended(report: Dictionary) -> void:
+	_set_status("Day %d: %d guests. Income %s, costs %s, net %s." % [report["day"], report["guests"], sim.money_text(report["income"]), sim.money_text(report["costs"]), sim.money_text(report["net"])], report["net"] < 0, 10000)

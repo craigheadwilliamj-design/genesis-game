@@ -3,6 +3,7 @@ extends RefCounted
 # Port of js/sim.js. Only the clock and the money so far; add systems here one at a time.
 const GameData = preload("res://scripts/data.gd")
 const Geo = preload("res://scripts/geometry.gd")
+const Guests = preload("res://scripts/guests.gd")
 
 const PATH_HALF_WIDTH := 2.5   # footpaths are 5 m wide
 const UID_CHARS := "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -12,12 +13,15 @@ const SNAP_REACH := 6.0   # meters past a path's edge where a new building still
 
 signal changed
 signal layout_changed   # something was built or removed: redraw the map
-signal day_ended(day: int)
+signal day_ended(report: Dictionary)   # day, guests, income, costs, net, rating
+signal game_over
 
 var state: Dictionary = {}
+var guests := Guests.new()   # the guests in the park right now (not saved)
 
 func _init() -> void:
 	state = new_park()
+	layout_changed.connect(func(): guests.dirty = true)
 
 func open_min() -> float:
 	return float(GameData.get_const("OPEN_MIN", 480))
@@ -46,6 +50,8 @@ func new_park() -> Dictionary:
 		"today": fresh_ledger(),
 		"history": [],
 		"science": {"tech": ["bars"]},   # ORACLE tech researched (freshScience in sim.js has much more)
+		"guestLog": {"guests": 0, "mood": null, "last": {"guests": 0}},   # how yesterday's guests felt
+		"staff": {"feedFrom": 7},   # partner parks feed the animals until this day
 		"starters": pick_starters(),   # the species partner parks sell from day one
 		"biome": GameData.get_const("DEFAULT_PARK_BIOME", "grassland"),   # the park's own ground; new exhibits start on it
 		"goalsDone": [],
@@ -53,7 +59,7 @@ func new_park() -> Dictionary:
 	}
 
 func fresh_ledger() -> Dictionary:
-	return {"guests": 0, "tickets": 0, "food": 0, "shop": 0, "feed": 0, "wages": 0, "upkeep": 0, "built": 0}
+	return {"guests": 0, "tickets": 0, "food": 0, "shop": 0, "feed": 0, "wages": 0, "upkeep": 0, "built": 0, "animals": 0, "science": 0, "sold": 0, "rewards": 0, "fines": 0, "repairs": 0, "moodSum": 0.0, "moodN": 0, "donations": 0, "edfees": 0, "rooms": 0, "fares": 0, "supplies": 0, "cleaning": 0, "medicine": 0}
 
 func spend(cost: int, kind: String) -> void:
 	state["money"] -= cost
@@ -171,18 +177,67 @@ func add_path(pts: Array, type: String, snaps: Array) -> String:
 func tick(dt_min: float) -> void:
 	if state["over"]:
 		return
-	var m1: float = minf(close_min(), float(state["minute"]) + dt_min)
+	var m0: float = state["minute"]
+	var m1: float = minf(close_min(), m0 + dt_min)
 	state["minute"] = m1
+	guests.tick(self, m0, m1)
 	changed.emit()
 	if m1 >= close_min():
 		end_day()
 
+func free_feeding() -> bool:
+	return state["day"] < state["staff"]["feedFrom"]
+
+# What the park costs to keep going each night (dailyCosts in sim.js). Keepers' wages and the rest come with their systems.
+func daily_costs() -> Dictionary:
+	var feed := 0.0
+	var upkeep := 0.0
+	var vivs: Dictionary = GameData.get_const("VIVARIUMS")
+	var up: Dictionary = GameData.get_const("UPKEEP")
+	for e in state["exhibits"]:
+		if free_feeding():
+			for a in e["animals"]:
+				feed += float(GameData.species(a["sp"])["food"])
+		upkeep += float(vivs[e["viv"]]["upkeep"]) if e.has("viv") else Geo.area(e["points"]) * float(up["exhibitPerSqM"])
+	for p in state["paths"]:
+		var per: float = float(up["pathPerMeter"])
+		match p.get("type", ""):
+			"service": per = float(GameData.get_const("SERVICE_ROAD")["upkeepPerMeter"])
+			"wide": per = float(GameData.get_const("WIDE_PATH")["upkeepPerMeter"])
+		upkeep += Geo.line_length(p["points"]) * per
+	for b in state["buildings"]:
+		upkeep += float(building_def(b["type"]).get("upkeep", 0))
+	return {"feed": int(roundf(feed)), "upkeep": int(roundf(upkeep))}
+
+func set_ticket(price: int) -> void:
+	state["ticket"] = clampi(price, 1, 150)
+	changed.emit()
+
 func end_day() -> void:
-	state["history"].append({"day": state["day"], "money": state["money"]})
+	guests.flush(self)
+	var c := daily_costs()
+	spend(c["feed"], "feed")
+	spend(c["upkeep"], "upkeep")
+	var t: Dictionary = state["today"]
+	var income := 0
+	for k in ["tickets", "food", "shop", "sold", "rewards", "donations", "edfees", "rooms", "fares"]:
+		income += int(t.get(k, 0))
+	var costs := 0
+	for k in ["feed", "wages", "upkeep", "built", "animals", "science", "fines", "repairs", "supplies", "cleaning", "medicine"]:
+		costs += int(t.get(k, 0))
+	var report := {"day": state["day"], "guests": int(t["guests"]), "income": income, "costs": costs, "net": income - costs, "rating": state["rating"]}
+	state["history"].append(report.duplicate())
+	if state["history"].size() > 60:
+		state["history"].pop_front()
+	guests.night(self)
 	state["day"] += 1
 	state["minute"] = open_min()
 	state["today"] = fresh_ledger()
-	day_ended.emit(state["day"] - 1)
+	guests.dirty = true
+	if state["money"] < -25000:
+		state["over"] = true
+		game_over.emit()
+	day_ended.emit(report)
 	changed.emit()
 
 func clock_text() -> String:
@@ -200,6 +255,13 @@ func load_game(path: String = "user://save.json") -> bool:
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if parsed is Dictionary:
 		state = parsed
+		# an older save gets a default for anything added since (upgradeSave in sim.js)
+		var fresh := new_park()
+		for k in fresh:
+			if not state.has(k):
+				state[k] = fresh[k]
+		guests.parties.clear()
+		guests.dirty = true
 		changed.emit()
 		return true
 	return false

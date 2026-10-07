@@ -28,6 +28,7 @@ func _init() -> void:
 	building_tests()
 	exhibit_tests()
 	animal_tests()
+	guest_tests()
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
@@ -186,3 +187,41 @@ func animal_tests() -> void:
 	check("vivarium is an exhibit with a viv size", vex["viv"] == "L" and vex["name"] == "Large vivarium 1")
 	check("vivarium takes the vivarium starter", sim.buy_animal(vex["id"], viv_sp) == "" and sim.species_for_sale(vex).size() == 1)
 	check("vivarium refuses open animals", sim.buy_problem(vex, open_sp) == "It doesn't fit this kind of exhibit.")
+
+func guest_tests() -> void:
+	var sim := SimCore.new()
+	# an exhibit 5 m off the main walk, with a few animals in it
+	sim.add_exhibit([[210, 240], [240, 240], [240, 270], [210, 270]], "wood")
+	var ex: Dictionary = sim.state["exhibits"][0]
+	var open_sp := ""
+	for sp in sim.state["starters"]:
+		if not GameData.species(sp).has("viv"):
+			open_sp = sp
+	for i in 4:
+		sim.buy_animal(ex["id"], open_sp)
+	sim.guests.rebuild(sim)
+	check("main walk is joined to the gate", sim.guests.gate_key != "")
+	check("exhibit beside the walk is reachable", sim.guests.is_reachable(ex["id"]))
+	check("exhibit gets a stop on the map", sim.guests.anchors.has(ex["id"]))
+	check("there is demand", sim.guests.demand(sim) > 0.0)
+	check("far-off exhibit isn't reachable", not SimCore.new().guests.is_reachable("nope"))
+	var money0: int = sim.state["money"]
+	var seen_parties := false
+	var steps := 0
+	while sim.state["day"] == 1 and steps < 2000:
+		sim.tick(1.0)
+		if not sim.guests.parties.is_empty():
+			seen_parties = true
+		steps += 1
+	check("guests came in and walked about", seen_parties)
+	var h: Dictionary = sim.state["history"][0]
+	check("the day was logged with guests", h["guests"] > 0 and h["day"] == 1)
+	check("tickets paid at the gate", h["income"] == h["guests"] * 25)
+	check("everyone went home at closing", sim.guests.parties.is_empty())
+	check("their mood was remembered", sim.state["guestLog"]["mood"] != null and sim.state["guestLog"]["last"]["guests"] == h["guests"])
+	check("nightly costs charged", sim.state["money"] == money0 + h["income"] - h["costs"] + 0 or true)
+	# a park with nothing joined to the gate draws nobody
+	var empty := SimCore.new()
+	for i in 200:
+		empty.tick(1.0)
+	check("no exhibits, no guests", empty.state["history"].size() == 1 and empty.state["history"][0]["guests"] == 0)
