@@ -117,4 +117,7 @@ func building_tests() -> void:
 	check("restaurant needs 2 stars", sim.building_spot("restaurant", 195.0, 270.0, 0)["why"] == "Your park needs 2 stars first.")
 	check("tram station needs tech", sim.building_spot("tramstop", 195.0, 270.0, 0)["why"].begins_with("Research"))
 	check("oracle is one per park", sim.place_building("oracle", 195.0, 270.0, 0) == "" and sim.building_spot("oracle", 195.0, 150.0, 0)["why"] == "You already have ORACLE. There's one per park.")
-	check("greenhouse needs CERES", sim.building_spot("greenhouse", 195.0, 270.0, 0)["why"] == "Build CERES first.")
+	# the greenhouse is behind an ORACLE tech and CERES; tech is checked first, as in the JS
+	check("greenhouse needs its tech first", sim.building_spot("greenhouse", 195.0, 150.0, 0)["why"].begins_with("Research"))
+	sim.state["science"]["tech"].append("greenhouse")
+	check("then it needs CERES", sim.building_spot("greenhouse", 195.0, 150.0, 0)["why"] == "Build CERES first.")
