@@ -250,6 +250,16 @@ function modLive(id){
     const dna = Object.values(PLANT_DNA).filter(f => genomeDone(f.id)).length;
     return dept("ceres") ? EDU_LIVE.idle + (1 - EDU_LIVE.idle) * (.7 * Math.min(1, dna / 4) + (state.ceres.beds.length ? .3 : 0)) : 0;
   }
+  if(m.live === "biomes"){
+    // different habitats with animals living in them
+    const n = new Set(state.exhibits.filter(e => !e.viv && e.animals.length).map(biomeOf)).size;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.biomes);
+  }
+  if(m.live === "touch"){
+    // animal genomes GHOST has finished: more to hold
+    const n = SPECIES.filter(s => genomeDone(s.id)).length;
+    return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.genomes);
+  }
   if(m.live === "sim"){
     // one place to visit for each finished event record
     const places = MUSEUM_EVENTS.filter(ev => genomeDone(ev.id)).length;

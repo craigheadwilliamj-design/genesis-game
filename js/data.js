@@ -331,7 +331,7 @@ const EDU_FOCUS = {
 //   boost    adds to the strength of those focuses
 //   slots    more guests that can sit through a visit at once
 //   perSpecies  learning grows with the animals ORACLE has unlocked
-//   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab", "nursery", "botany" or "sim"
+//   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab", "nursery", "botany", "sim", "biomes" or "touch"
 //   dept     science buildings it needs (any one of them) before it can be installed
 const EDU_MODULES = {
   theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
@@ -348,8 +348,12 @@ const EDU_MODULES = {
               text:"A glasshouse of living prehistoric plants from CERES. It grows richer as more plant DNA is finished and while beds are growing."},
   simroom:   {label:"Simulation Room",  tech:"edsimroom",   price:18000, upkeep:150, learn:7, joy:3, appeal:8, live:"sim", dept:["ghost"], boost:{spectacle:.5, research:.5, family:.2},
               text:"A VR walk through deep time, built from GHOST's records. Every finished event record adds a place to visit."},
+  diorama:   {label:"Ecosystem Diorama", tech:"ediorama",   price:12000, upkeep:100, learn:6, joy:2, appeal:5, live:"biomes", boost:{conservation:.5, family:.4, spectacle:.2},
+              text:"A walk-around model of how living things fit together. It gets richer with every kind of habitat you keep animals in."},
+  touch:     {label:"Touch Gallery",    tech:"edtouch",     price:9000,  upkeep:70,  learn:4, joy:5, appeal:3, live:"touch", boost:{family:.6, conservation:.3, research:.2},
+              text:"Egg shells, casts, teeth and bones to hold. The shelves fill up as GHOST finishes more genomes."},
 };
-const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5, simIdle:.2, simPlaces:4};   // a live module with nothing going on still works at this share
+const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5, simIdle:.2, simPlaces:4, biomes:4, genomes:8};   // a live module with nothing going on still works at this share
 const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
@@ -940,6 +944,8 @@ const TECH = [
   {id:"ednursery", group:"build", label:"Nursery window", points:35, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
   {id:"edbotanical", group:"build", label:"Botanical hall", points:35, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
   {id:"edsimroom", group:"build", label:"Simulation room", points:45, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
+  {id:"ediorama", group:"build", label:"Ecosystem diorama", points:35, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
+  {id:"edtouch", group:"build", label:"Touch gallery", points:30, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
   {id:"modern", group:"build", label:"Modern design", points:35, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:25, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},

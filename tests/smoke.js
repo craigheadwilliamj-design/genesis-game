@@ -1421,6 +1421,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         sc.dna = {"flora-Jurassic":{genome:100, quality:80}, "flora-Triassic":{genome:100, quality:80}, "ev-dying":{genome:100, quality:80}, "ev-kpg":{genome:100, quality:80}};
         const b1 = modLive("botanical"), s1m = modLive("simroom"); state.ceres.beds = [{id:"g", kind:"plant", era:"Jurassic", bay:0, start:0, end:9e9}]; const b2 = modLive("botanical");
         out.eduModules = out.eduModules && b0 < b1 && b1 < b2 && b2 <= 1 && s0m < s1m && s1m <= 1 && !modProblem(ec, "botanical") && !modProblem(ec, "simroom");
+        // diorama grows with habitats that have animals, touch gallery with finished animal genomes; neither needs a lab
+        sc.tech.push("ediorama", "edtouch");
+        const keepE = state.exhibits.map(e => [e, e.biome]), bios = Object.keys(BIOMES);
+        sc.dna = {}; const dio0 = modLive("diorama"), tch0 = modLive("touch");
+        state.exhibits.filter(e => !e.viv && e.animals.length).slice(0, bios.length).forEach((e, i) => { e.biome = bios[i]; });
+        const dn = new Set(state.exhibits.filter(e => !e.viv && e.animals.length).map(biomeOf)).size;
+        sc.dna = Object.fromEntries(SPECIES.slice(0, 5).map(s => [s.id, {genome:100, quality:80}]));
+        const tch1 = modLive("touch"), dio1 = modLive("diorama");
+        out.eduModules = out.eduModules && tch0 < tch1 && tch1 <= 1 && dio0 <= dio1 && dio1 <= 1 && (dn < 2 || dio0 < dio1) && !modProblem(ec, "diorama") && !modProblem(ec, "touch");
+        for(const [e, b] of keepE) e.biome = b;
         sc.dna = keepD; state.ceres.beds = keepB; state.buildings.pop(); state.buildings.pop();
         state.buildings.pop(); state.buildings.push(...labs); sc.clones = keepC; sc.hatchDay = keepH; dept = deptKeep; ec.mods = modsKeep;
         dropMod(ec, "theater"); out.eduModules = out.eduModules && modsOf(ec).length === 2; ec.mods = []; ec.focus = null;
