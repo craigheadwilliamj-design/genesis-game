@@ -27,6 +27,7 @@ func _init() -> void:
 	path_tests()
 	building_tests()
 	exhibit_tests()
+	animal_tests()
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
@@ -143,3 +144,45 @@ func exhibit_tests() -> void:
 	check("second exhibit is named 2 with its barrier", sim.state["exhibits"][1]["name"] == "Exhibit 2" and sim.state["exhibits"][1]["barrier"] == "bars")
 	check("building can't overlap an exhibit", sim.building_spot("restroom", 30.0, 30.0, 0)["why"] == "It overlaps an exhibit.")
 	check("path can't cross an exhibit", sim.path_problem([[10, 30], [50, 30]], "") == "Paths can't go through an exhibit.")
+
+func animal_tests() -> void:
+	var sim := SimCore.new()
+	var st: Array = sim.state["starters"]
+	var pools: Dictionary = GameData.get_const("STARTER_POOLS")
+	check("three starters, one from pool a and two from b", st.size() == 3 and st[0] in pools["a"]["ids"] and st[1] in pools["b"]["ids"] and st[2] in pools["b"]["ids"] and st[1] != st[2])
+	sim.add_exhibit([[20, 20], [60, 20], [60, 60], [20, 60]], "wood")   # 1,600 m2, open habitat
+	var ex: Dictionary = sim.state["exhibits"][0]
+	var open_sp := ""
+	var viv_sp := ""
+	for sp in st:
+		if GameData.species(sp).has("viv"):
+			viv_sp = sp
+		else:
+			open_sp = sp
+	check("starter that lives in a vivarium can't go in the open", sim.buy_problem(ex, viv_sp) == "It doesn't fit this kind of exhibit.")
+	check("only open starters are for sale in an open exhibit", sim.species_for_sale(ex).size() == 2)
+	var price: int = int(GameData.species(open_sp)["price"])
+	var m0: int = sim.state["money"]
+	check("buy animal", sim.buy_animal(ex["id"], open_sp) == "" and ex["animals"].size() == 1 and m0 - sim.state["money"] == price)
+	check("animal has an id and species", ex["animals"][0]["sp"] == open_sp and str(ex["animals"][0]["id"]).begins_with("a-"))
+	check("space used", sim.exhibit_need(ex) == float(GameData.species(open_sp)["space"]))
+	var m1: int = sim.state["money"]
+	check("sell animal for half", sim.sell_animal(ex["id"], open_sp) and ex["animals"].is_empty() and sim.state["money"] - m1 == int(roundf(price * 0.5)))
+	check("can't sell what isn't there", not sim.sell_animal(ex["id"], open_sp))
+	var locked := ""
+	for s in GameData.get_const("SPECIES"):
+		if not (s["id"] in st) and float(s["stars"]) > 1.0 and not s.has("viv"):
+			locked = s["id"]
+			break
+	check("non-starters need stars the park lacks", sim.buy_problem(ex, "") == "Unknown species." and sim.buy_problem(ex, locked).begins_with("Needs"))
+	sim.state["money"] = 0
+	check("can't afford an animal", sim.buy_problem(ex, open_sp).begins_with("Costs"))
+	sim.state["money"] = 100000
+	# a vivarium is placed with the building tool and comes out as an exhibit that takes the vivarium starter
+	var n_ex: int = sim.state["exhibits"].size()
+	var m2: int = sim.state["money"]
+	check("place a vivarium", sim.place_building("vivL", 100.0, 100.0, 0) == "" and sim.state["exhibits"].size() == n_ex + 1 and m2 - sim.state["money"] == 15000)
+	var vex: Dictionary = sim.state["exhibits"][-1]
+	check("vivarium is an exhibit with a viv size", vex["viv"] == "L" and vex["name"] == "Large vivarium 1")
+	check("vivarium takes the vivarium starter", sim.buy_animal(vex["id"], viv_sp) == "" and sim.species_for_sale(vex).size() == 1)
+	check("vivarium refuses open animals", sim.buy_problem(vex, open_sp) == "It doesn't fit this kind of exhibit.")

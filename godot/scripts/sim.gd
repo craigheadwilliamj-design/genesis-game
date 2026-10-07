@@ -46,6 +46,7 @@ func new_park() -> Dictionary:
 		"today": fresh_ledger(),
 		"history": [],
 		"science": {"tech": ["bars"]},   # ORACLE tech researched (freshScience in sim.js has much more)
+		"starters": pick_starters(),   # the species partner parks sell from day one
 		"biome": GameData.get_const("DEFAULT_PARK_BIOME", "grassland"),   # the park's own ground; new exhibits start on it
 		"goalsDone": [],
 		"over": false,
@@ -222,12 +223,12 @@ func last_guests() -> int:
 func building_def(type: String) -> Dictionary:
 	return GameData.get_const("BUILDINGS")[type]
 
-# Placeable on the map with the building tool
+# Placeable on the map with the building tool (vivariums too: they come out as exhibits)
 func building_types() -> Array:
 	var out := []
 	for id in GameData.get_const("BUILDINGS"):
 		var t: Dictionary = building_def(id)
-		if not t.has("viv") and id != "platform":
+		if id != "platform":
 			out.append(id)
 	return out
 
@@ -334,7 +335,18 @@ func place_building(type: String, px: float, py: float, rot: int) -> String:
 	if not spot["ok"]:
 		return spot["why"]
 	spend(spot["price"], "built")
-	state["buildings"].append({"id": uid("b-"), "type": type, "points": spot["pts"], "day": state["day"]})
+	var def := building_def(type)
+	if def.has("viv"):
+		# a vivarium is an exhibit, just one that comes pre-built
+		var used := {}
+		for x in state["exhibits"]:
+			used[x["name"]] = true
+		var n := 1
+		while used.has("%s %d" % [def["label"], n]):
+			n += 1
+		state["exhibits"].append({"id": uid("e-"), "name": "%s %d" % [def["label"], n], "points": spot["pts"], "animals": [], "happy": 70, "viv": def["viv"]})
+	else:
+		state["buildings"].append({"id": uid("b-"), "type": type, "points": spot["pts"], "day": state["day"]})
 	layout_changed.emit()
 	changed.emit()
 	return ""
@@ -407,3 +419,115 @@ func add_exhibit(pts: Array, barrier: String) -> String:
 	layout_changed.emit()
 	changed.emit()
 	return ""
+
+# ---------- animals ----------
+# Open-habitat animals only for now: the species list is the starter pool, so no science yet.
+
+func pick_starters() -> Array:
+	var out := []
+	var pools: Dictionary = GameData.get_const("STARTER_POOLS", {})
+	for key in pools:
+		var pool: Array = pools[key]["ids"].duplicate()
+		for i in int(pools[key]["pick"]):
+			if pool.is_empty():
+				break
+			out.append(pool.pop_at(randi() % pool.size()))
+	return out
+
+func is_starter(sp: String) -> bool:
+	return sp in state["starters"]
+
+# stars the park needs for an animal: none for the starting pool
+func stars_need(s: Dictionary) -> float:
+	return 0.0 if is_starter(s["id"]) else float(s["stars"])
+
+func viv_rank(size: String) -> int:
+	return {"S": 1, "M": 2, "L": 3}.get(size, 0)
+
+# Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
+func fits_habitat(s: Dictionary, e: Dictionary) -> bool:
+	if e.has("viv"):
+		return s.has("viv") and viv_rank(e["viv"]) >= viv_rank(s["viv"])
+	return not s.has("viv")
+
+func find_exhibit(id: String) -> Dictionary:
+	for e in state["exhibits"]:
+		if e["id"] == id:
+			return e
+	return {}
+
+func find_building(id: String) -> Dictionary:
+	for b in state["buildings"]:
+		if b["id"] == id:
+			return b
+	return {}
+
+func species_counts(e: Dictionary) -> Dictionary:
+	var counts := {}
+	for a in e["animals"]:
+		counts[a["sp"]] = counts.get(a["sp"], 0) + 1
+	return counts
+
+# square meters the animals in there want
+func exhibit_need(e: Dictionary) -> float:
+	var need := 0.0
+	var counts := species_counts(e)
+	for sp in counts:
+		need += float(GameData.species(sp)["space"]) * counts[sp]
+	return need
+
+func exhibit_free(e: Dictionary) -> float:
+	return Geo.area(e["points"]) - exhibit_need(e)
+
+# Species this exhibit could take, from the partner parks
+func species_for_sale(e: Dictionary) -> Array:
+	var out := []
+	for s in GameData.get_const("SPECIES", []):
+		if is_starter(s["id"]) and fits_habitat(s, e):
+			out.append(s)
+	return out
+
+# Why you can't buy this species into this exhibit, or "" if you can
+func buy_problem(e: Dictionary, sp: String) -> String:
+	var s := GameData.species(sp)
+	if s.is_empty():
+		return "Unknown species."
+	if not fits_habitat(s, e):
+		return "It doesn't fit this kind of exhibit."
+	if float(state["rating"]) + 1e-9 < stars_need(s):
+		return "Needs %s stars. Your park has %s." % [str(stars_need(s)), str(state["rating"])]
+	if not can_afford(int(s["price"])):
+		return "Costs %s. You have %s." % [money_text(int(s["price"])), money_text(int(state["money"]))]
+	return ""
+
+# Buy one into the exhibit. Overcrowding is allowed (the JS just warns); returns "" or the reason it failed.
+func buy_animal(exhibit_id: String, sp: String) -> String:
+	var e := find_exhibit(exhibit_id)
+	if e.is_empty():
+		return "No such exhibit."
+	var problem := buy_problem(e, sp)
+	if problem != "":
+		return problem
+	spend(int(GameData.species(sp)["price"]), "animals")
+	if e["animals"].is_empty():
+		e["happy"] = 70
+	e["animals"].append({"id": uid("a-"), "sp": sp})
+	layout_changed.emit()
+	changed.emit()
+	return ""
+
+# Sell the last one of that species for its resale share
+func sell_animal(exhibit_id: String, sp: String) -> bool:
+	var e := find_exhibit(exhibit_id)
+	if e.is_empty():
+		return false
+	var i: int = e["animals"].size() - 1
+	while i >= 0 and e["animals"][i]["sp"] != sp:
+		i -= 1
+	if i < 0:
+		return false
+	earn(int(roundf(float(GameData.species(sp)["price"]) * float(GameData.get_const("COST")["animalResale"]))), "sold")
+	e["animals"].remove_at(i)
+	layout_changed.emit()
+	changed.emit()
+	return true

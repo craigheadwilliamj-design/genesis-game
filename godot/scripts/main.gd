@@ -4,6 +4,7 @@ extends Node2D
 const GameData = preload("res://scripts/data.gd")
 const SimCore = preload("res://scripts/sim.gd")
 const Geo = preload("res://scripts/geometry.gd")
+const AnimalsView = preload("res://scripts/animals_view.gd")
 
 const GRID := 5.0
 const PAN_KEYS_SPEED := 400.0   # screen px per second at zoom 1
@@ -21,6 +22,10 @@ var draw_pts: Array = []        # corners of the path being drawn
 var draw_snaps: Array = []      # what each corner snapped to (null for open ground)
 var hover: Dictionary = {}      # the snapped point under the mouse while a draw tool is active
 var toast_until := 0
+var ui_layer: CanvasLayer
+var panel: PanelContainer       # side panel for the selected exhibit or building
+var panel_box: VBoxContainer
+var selected: Dictionary = {}   # {kind, id} of what the Pan tool clicked
 var build_opt: OptionButton
 var fence_opt: OptionButton
 var fence_ids: Array = []
@@ -38,6 +43,7 @@ func _ready() -> void:
 	cam.zoom = Vector2(2.2, 2.2)
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	ui_layer = layer
 	hud = _label(layer, 12, 8, 20)
 	status = _label(layer, 12, 0, 16)
 	status.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -77,6 +83,24 @@ func _ready() -> void:
 		fence_opt.add_item("%s  $%d/m" % [sim.barrier_def(key)["label"], int(sim.fence_rate(key))])
 	fence_opt.item_selected.connect(func(i: int): fence_sel = fence_ids[i])
 	bar.add_child(fence_opt)
+	panel = PanelContainer.new()
+	panel.hide()
+	layer.add_child(panel)
+	panel.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
+	panel.offset_left = -360
+	panel.offset_right = -8
+	panel.offset_top = 48
+	panel.offset_bottom = -104
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(scroll)
+	panel_box = VBoxContainer.new()
+	panel_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(panel_box)
+	var animals_view := AnimalsView.new()
+	animals_view.sim = sim
+	add_child(animals_view)
+	sim.layout_changed.connect(_refresh_panel)
 	sim.changed.connect(_refresh_hud)
 	sim.layout_changed.connect(queue_redraw)
 	_refresh_hud()
@@ -315,6 +339,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom_at(1.15 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1.0 / 1.15)
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and tool == "build":
 			_build_tap()
+		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and tool == "pan":
+			_select_at(get_global_mouse_position())
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and tool != "pan":
 			_draw_tap()
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
@@ -341,7 +367,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					draw_snaps.pop_back()
 					queue_redraw()
 			KEY_ESCAPE:
-				if tool == "build" or draw_pts.is_empty():
+				if tool == "pan" and not selected.is_empty():
+					_select({})
+				elif tool == "build" or draw_pts.is_empty():
 					_set_tool("pan")
 					_select_button("pan")
 				else:
@@ -397,6 +425,13 @@ func _draw() -> void:
 		_draw_building(b["points"], sim.building_def(b["type"]), 1.0, false)
 	if tool == "build" and not ghost.is_empty():
 		_draw_building(ghost["pts"], sim.building_def(build_type), 0.6, true, ghost["ok"])
+	var chosen := _selected_item()
+	if not chosen.is_empty():
+		var sp := PackedVector2Array()
+		for q in chosen["points"]:
+			sp.append(Vector2(q[0], q[1]))
+		sp.append(sp[0])
+		draw_polyline(sp, Color(1, 0.9, 0.3), 0.9)
 	# the path being drawn
 	if tool == "exhibit":
 		_draw_exhibit_preview()
@@ -479,3 +514,110 @@ func _draw_exhibit_preview() -> void:
 		draw_circle(poly[i], 1.6 if i == 0 and draw_pts.size() >= 3 else 1.0, Color(1, 0.9, 0.3) if i == 0 else Color.WHITE)
 	if not hover.is_empty() and hover["info"] != null:
 		draw_arc(Vector2(hover["x"], hover["y"]), 3.0, 0.0, TAU, 20, Color(1, 0.9, 0.3), 0.6)
+
+# ---------- selecting, and the side panel ----------
+func _selected_item() -> Dictionary:
+	if selected.is_empty():
+		return {}
+	return sim.find_exhibit(selected["id"]) if selected["kind"] == "exhibit" else sim.find_building(selected["id"])
+
+func _select(sel: Dictionary) -> void:
+	selected = sel
+	_refresh_panel()
+	queue_redraw()
+
+# What's under the point: buildings first, then exhibits
+func _select_at(p: Vector2) -> void:
+	var blds: Array = sim.state["buildings"]
+	for i in range(blds.size() - 1, -1, -1):
+		if Geo.in_poly(p.x, p.y, blds[i]["points"]):
+			_select({"kind": "building", "id": blds[i]["id"]})
+			return
+	for e in sim.state["exhibits"]:
+		if Geo.in_poly(p.x, p.y, e["points"]):
+			_select({"kind": "exhibit", "id": e["id"]})
+			return
+	_select({})
+
+func _add_text(text: String, size := 14, color := Color.WHITE) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 320
+	panel_box.add_child(l)
+	return l
+
+# A line of text with a button at its right edge
+func _add_row(text: String, button_text: String, disabled: bool, on_press: Callable) -> void:
+	var row := HBoxContainer.new()
+	var l := Label.new()
+	l.text = text
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size.x = 190
+	row.add_child(l)
+	var b := Button.new()
+	b.text = button_text
+	b.disabled = disabled
+	b.focus_mode = Control.FOCUS_NONE
+	b.pressed.connect(on_press)
+	row.add_child(b)
+	panel_box.add_child(row)
+
+func _refresh_panel() -> void:
+	for c in panel_box.get_children():
+		panel_box.remove_child(c)
+		c.queue_free()
+	var it := _selected_item()
+	if it.is_empty():
+		panel.hide()
+		return
+	panel.show()
+	if selected["kind"] == "exhibit":
+		_exhibit_panel(it)
+	else:
+		_building_panel(it)
+
+func _building_panel(b: Dictionary) -> void:
+	var def := sim.building_def(b["type"])
+	_add_text(def["label"], 20)
+	_add_text("Built on day %d. Upkeep %s a day." % [int(b.get("day", 1)), sim.money_text(int(def.get("upkeep", 0)))], 13, Color(0.8, 0.8, 0.8))
+	if def.has("blurb"):
+		_add_text(def["blurb"], 13)
+
+func _exhibit_panel(e: Dictionary) -> void:
+	var kind: String = sim.building_def("viv" + e["viv"])["label"] if e.has("viv") else "%s fence" % sim.barrier_def(e.get("barrier", "wood"))["label"]
+	_add_text(e["name"], 20)
+	var area := Geo.area(e["points"])
+	_add_text("%d m², %s. Space used: %d of %d m²." % [int(area), kind, int(sim.exhibit_need(e)), int(area)], 13, Color(0.8, 0.8, 0.8))
+	_add_text("Animals", 16, Color(1, 0.9, 0.5))
+	var counts := sim.species_counts(e)
+	if counts.is_empty():
+		_add_text("None yet.", 13, Color(0.8, 0.8, 0.8))
+	for sp in counts:
+		var s := GameData.species(sp)
+		var resale := int(roundf(float(s["price"]) * float(GameData.get_const("COST")["animalResale"])))
+		var g: Array = s["group"]
+		_add_row("%s x%d\n(likes groups of %d to %d)" % [s["name"], counts[sp], int(g[0]), int(g[1])], "Sell %s" % sim.money_text(resale), false, _on_sell.bind(e["id"], sp))
+	_add_text("Add animals", 16, Color(1, 0.9, 0.5))
+	var for_sale := sim.species_for_sale(e)
+	if for_sale.is_empty():
+		_add_text("Partner parks don't sell anything that fits here. Try a vivarium or an open exhibit.", 13, Color(0.8, 0.8, 0.8))
+	for s in for_sale:
+		var problem := sim.buy_problem(e, s["id"])
+		var fits := int(floor(sim.exhibit_free(e) / float(s["space"])))
+		var note := "Room for %d more." % fits if fits > 0 else "No room left for one of these."
+		var g: Array = s["group"]
+		_add_row("%s (%s)\n%d m² each, groups of %d to %d. %s" % [s["name"], s["period"], int(s["space"]), int(g[0]), int(g[1]), note], sim.money_text(int(s["price"])), problem != "", _on_buy.bind(e["id"], s["id"]))
+
+func _on_buy(exhibit_id: String, sp: String) -> void:
+	var problem := sim.buy_animal(exhibit_id, sp)
+	if problem != "":
+		_set_status(problem, true, 2500)
+	else:
+		_set_status("Bought a %s." % GameData.species(sp)["name"], false, 2000)
+
+func _on_sell(exhibit_id: String, sp: String) -> void:
+	sim.sell_animal(exhibit_id, sp)
