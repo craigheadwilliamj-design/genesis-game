@@ -24,6 +24,7 @@ func _init() -> void:
 	var other := SimCore.new()
 	check("save round trip", other.load_game("user://smoke_save.json") and other.state["day"] == 2)
 	geometry_parity()
+	path_tests()
 	quit(1 if fails > 0 else 0)
 
 # geometry.gd must give the same answers as js/geometry.js (cases made by tools/geometry_cases.js)
@@ -83,3 +84,19 @@ func same(a, b) -> bool:
 	if (a is float or a is int) and (b is float or b is int):
 		return absf(float(a) - float(b)) < 1e-6
 	return a == b
+
+func path_tests() -> void:
+	var sim := SimCore.new()
+	check("path cost (100 m footpath)", sim.path_cost([[0, 0], [100, 0]], "") == 1500)
+	check("path cost (100 m wide path)", sim.path_cost([[0, 0], [100, 0]], "wide") == 3000)
+	check("path too short", sim.path_problem([[10, 10], [11, 10]], "") == "Too short.")
+	check("path outside the plot", sim.path_problem([[400, 10], [500, 10]], "") == "Keep it inside the park boundary.")
+	check("path needs two points", sim.path_problem([[10, 10]], "") == "Needs at least 2 points.")
+	check("path ok", sim.path_problem([[205, 235], [205, 100]], "") == "")
+	var m0: int = sim.state["money"]
+	check("add path", sim.add_path([[205, 235], [205, 100]], "", [null, null]) == "" and sim.state["paths"].size() == 2 and m0 - sim.state["money"] == 2025)
+	check("path has no type field when plain", not sim.state["paths"][1].has("type"))
+	sim.add_path([[100, 300], [205, 270]], "service", [null, {"type": "seg", "kind": "path", "id": "p-main"}])
+	check("junction added to the path it lands on", sim.state["paths"][0]["points"].size() == 3 and sim.state["paths"][2]["type"] == "service")
+	sim.state["money"] = 10
+	check("can't afford", sim.add_path([[0, 0], [100, 0]], "", [null, null]).begins_with("Costs $1,500."))
