@@ -1,4 +1,7 @@
 # Draws pixel-art plants to sprites/plants/<LAND key>.png (3/4 view, trunk base at the bottom middle, light from the top left).
+# References (searched, not drawn from photos): Peltaspermum = umbrella seed discs with pendant ovules (Townrow 1960); its leaves are Lepidopteris, bipinnate
+# with small pinnules; Comia = once-pinnate narrow simple pinnules (Mamay et al. 2009, its overall shape is a guess); Callistophyton = thin
+# scrambling/climbing stem branching from the leaf axils with fern-like leaves (Pennsylvanian, not Permian).
 # Usage: python3 -I tools/pixelplants.py [outdir]   Currently: the three Permian scrubland plants.
 import sys, random, math
 from PIL import Image
@@ -52,55 +55,49 @@ def frond(cv, g, base, tip, bend, leaflets, ll, rnd):
     cv.line(base[0], base[1], pts[1][0], pts[1][1], g[2])
 
 def peltate(cv, x, y, r, rnd):
-    # A seed-bearing umbrella disc on a stalk: the mark of Peltaspermum
-    cv.line(x, y, x, y + r + 2, SEED[0])
-    cv.disc(x, y, r, max(1, r*.55), SEED[1])
-    for i in range(int(r*2)): cv.set(x - r + 1 + i, y - 1, SEED[2]) if i % 2 == 0 and r > 1.5 else None
-    cv.set(x - r*.5, y - 1, SEED[2]); cv.set(x + r, y, SEED[0])
+    # Peltaspermum seed organ: an umbrella disc on a stalk with ovules hanging from its underside
+    cv.line(x, y, x, y + r + 4, SEED[0])
+    cv.disc(x, y, r, max(1, r*.5), SEED[1])
+    cv.set(x - r*.5, y - 1, SEED[2]); cv.set(x - r*.2, y - 1, SEED[2]); cv.set(x + r, y, SEED[0])
+    for i in range(-int(r) + 1, int(r)):
+        if i % 2 == 0 or r > 2.5: cv.line(x + i, y + 1, x + i, y + 2 + (i % 3 == 0), SEED[0])
 
-def peltaspermum():   # small: a low tuft of short fronds, a few seed discs
-    rnd = random.Random(11); g = ramp("#A8AE62"); cv = Canvas(40, 36); bx, by = 20, 33
-    for d in (-1, 1, -.5, .5, 0):   # back fronds first, so the front ones overlap
-        pass
-    cv.disc(bx, by - 7, 9, 4, g[0]); cv.disc(bx, by - 8, 7, 3, g[1])
-    angles = [(-15, 12, -4), (13, 11, 4), (-9, 17, -2), (7, 16, 3), (-3, 20, 0)]
-    for tx, ty, b in angles: frond(cv, g, (bx + tx*.15, by), (bx + tx, by - ty), (b*2, -3), 5, 5, rnd)
-    for x, y in ((12, 21), (28, 22)): peltate(cv, x, y, 2, rnd)
+def stalks(cv, x0, y0, x1, y1, c):
+    cv.line(x0, y0, x1, y1, c)
+
+def peltaspermum():   # small: a few fine bipinnate Lepidopteris fronds, with branched stalks carrying seed discs
+    rnd = random.Random(11); g = ramp("#A8AE62"); cv = Canvas(44, 40); bx, by = 22, 37
+    cv.disc(bx, by - 3, 6, 2, g[0])
+    for tx, ty, b in ((-19, 8, -4), (19, 9, 4), (-12, 15, -3), (11, 16, 3), (-2, 18, -1)):
+        frond(cv, g, (bx + tx*.1, by - 2), (bx + tx, by - 2 - ty), (b*2, -2), 8, 3.2, rnd)
+    for sx, sy, dx, dy in ((15, 22, 9, 6), (-14, 24, -9, 8)):   # a branched stalk off each side, ending in a disc
+        cv.line(bx, by - 2, bx + dx*.9, by - 2 - dy*3, SEED[0]); cv.line(bx + dx*.9, by - 2 - dy*3, bx + dx, by - 2 - dy*3 - 1, SEED[0])
+    peltate(cv, bx + 9, by - 2 - 6*3 - 1, 3, rnd); peltate(cv, bx - 9, by - 2 - 8*3 - 1, 3, rnd)
     cv.set(bx, by, TRUNK[1]); cv.set(bx - 1, by, TRUNK[0]); cv.set(bx + 1, by, TRUNK[0])
     return cv.image(g[0])
 
-def comia():   # medium: an arching mound of long fronds off a short stem, seed discs among them
-    rnd = random.Random(23); g = ramp("#8E9654"); cv = Canvas(56, 52); bx, by = 28, 49
-    for h in (3, 4):   # short stem
-        pass
-    cv.line(bx, by, bx, by - 6, TRUNK[1]); cv.line(bx-1, by, bx-1, by - 5, TRUNK[0]); cv.line(bx+1, by, bx+1, by - 5, TRUNK[2])
-    top = (bx, by - 6)
-    cv.disc(bx, by - 12, 12, 7, g[0]); cv.disc(bx - 1, by - 13, 9, 5, g[1])
-    fr = [(-23, 8, -9), (23, 9, 9), (-17, 21, -6), (17, 22, 6), (-8, 28, -3), (9, 30, 3), (0, 32, 0)]
-    fr.sort(key=lambda f: -abs(f[0]))   # sides first, middle on top
-    for tx, ty, b in fr: frond(cv, g, top, (bx + tx, top[1] - ty + abs(tx)*.35), (b, -7), 7, 7, rnd)
-    for x, y in ((14, 28), (42, 29), (28, 10)): peltate(cv, x, y, 3, rnd)
+def comia():   # medium: once-pinnate fronds with narrow separate pinnules, fanned wide and low off a short stem
+    rnd = random.Random(23); g = ramp("#8E9654"); cv = Canvas(64, 46); bx, by = 32, 43
+    cv.line(bx, by, bx, by - 5, TRUNK[1]); cv.line(bx-1, by, bx-1, by - 4, TRUNK[0]); cv.line(bx+1, by, bx+1, by - 4, TRUNK[2])
+    top = (bx, by - 5)
+    fr = [(-29, 3, -3), (29, 4, 3), (-24, 13, -8), (25, 14, 8), (-14, 21, -5), (15, 22, 5), (0, 24, 0)]   # (tip dx, tip rise, bend)
+    fr.sort(key=lambda f: -abs(f[0]))
+    for tx, ty, b in fr: frond(cv, g, top, (bx + tx, top[1] - ty), (b, -5), 6, 6.5, rnd)
     return cv.image(g[0])
 
-def callistophyton():   # large: a slim climbing trunk carrying a loose crown of drooping fronds
-    rnd = random.Random(37); g = ramp("#747E48"); cv = Canvas(76, 100); bx, by = 38, 97
-    path = [(bx, by), (bx - 1, by - 14), (bx + 2, by - 28), (bx, by - 42), (bx - 2, by - 54)]
-    for (x0, y0), (x1, y1) in zip(path, path[1:]):
-        for dx, c in ((-1, TRUNK[0]), (0, TRUNK[1]), (1, TRUNK[2])): cv.line(x0 + dx, y0, x1 + dx, y1, c)
-    for y in range(by - 52, by, 5): cv.set(bx + (y % 3) - 1, y, TRUNK[0])   # leaf scars
+def callistophyton():   # large: a thin scrambling stem that branches from the leaf axils and carries fern-like leaves; no trunk, no crown
+    rnd = random.Random(37); g = ramp("#747E48"); cv = Canvas(72, 96); bx, by = 30, 93
+    pts = [(bx, by), (bx - 2, by - 12), (bx + 3, by - 24), (bx + 8, by - 36), (bx + 5, by - 48), (bx + 10, by - 60), (bx + 14, by - 72), (bx + 12, by - 84)]
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        cv.line(x0, y0, x1, y1, TRUNK[1]); cv.line(x0 - 1, y0, x1 - 1, y1, TRUNK[0])
     for x in range(bx - 3, bx + 4): cv.set(x, by, TRUNK[0])
-    cv.line(bx - 4, by, bx - 1, by - 2, TRUNK[1]); cv.line(bx + 4, by, bx + 1, by - 2, TRUNK[1])   # root flare
-    for ox, oy, n in ((-1, 54, 0), (2, 42, 1)):   # lower fronds hang from the trunk
-        pass
-    # (tip dx, tip dy up, bend): crown fronds from the top, then lower ones that droop down the trunk
-    crown = (bx - 2, by - 54)
-    cv.disc(crown[0], crown[1] - 2, 17, 8, g[0]); cv.disc(crown[0] - 1, crown[1] - 3, 13, 6, g[1])
-    fr = [(-34, -6, -14, 16), (34, -4, 14, 16), (-28, 10, -12, 14), (28, 12, 12, 14), (-16, 22, -7, 12), (17, 24, 7, 12), (-4, 26, -2, 12), (5, 27, 2, 12)]
-    fr.sort(key=lambda f: -abs(f[0]))
-    for tx, ty, b, n in fr: frond(cv, g, crown, (crown[0] + tx, crown[1] - ty + abs(tx)*.55), (b*.4, -9), n//2 + 1, 9, rnd)
-    for sx, sy, tx, ty in ((-1, 42, -22, 24), (2, 32, 24, 16)):   # lower drooping fronds
-        base = (bx + sx, by - sy); frond(cv, g, base, (base[0] + tx, base[1] + ty), (tx*.3, -8), 6, 7, rnd)
-    for x, y in ((14, 36), (62, 38), (34, 22), (50, 52)): peltate(cv, x, y, 3, rnd)
+    # side shoots from the axils: (node, tip dx, tip dy), each carrying a leaf at the end
+    sh = [(1, -16, -4), (2, 17, -6), (3, -18, -10), (4, 18, -6), (5, -15, -14), (6, 17, -10)]
+    for i, dx, dy in sh:
+        x0, y0 = pts[i]; x1, y1 = x0 + dx*.5, y0 + dy*.5
+        cv.line(x0, y0, x1, y1 - 2, TRUNK[1])
+        frond(cv, g, (x1, y1 - 2), (x0 + dx, y0 + dy + 8), (dx*.15, -9), 7, 7, rnd)   # leaf droops from the shoot tip
+    frond(cv, g, pts[-1], (pts[-1][0] + 6, pts[-1][1] - 10), (4, -3), 4, 5, rnd)   # young leaf at the growing tip
     return cv.image(g[0])
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
