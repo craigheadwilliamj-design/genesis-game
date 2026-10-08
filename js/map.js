@@ -670,6 +670,58 @@ function hidden34(x, y){
   return false;
 }
 
+// Flat pixel style (the art direction: flat fills, a small palette, no outlines, shapes snapped to a pixel grid), tried first on the Genesis restroom.
+// Light is from the left, so left-facing walls and roof faces are the lightest and right-facing the darkest; the front is the base tone.
+const FLAT34 = {px:ROCK_MPP, wall:["#E6DECB", "#D9CFBB", "#BDB29B"], plinth:"#A39A86", eave:"#8E8778", door:"#2E3A33", doorEdge:"#46584E",
+  roof:["#2F5C42", "#254A35", "#1B3526"], seam:"#14281C", ridge:"#10261A", gold:"#C9A24B", vent:"#6F6B61", ventHi:"#B3AEA1"};
+const flatSnap34 = ([x, y]) => [Math.round(x / FLAT34.px) * FLAT34.px, Math.round(y * TILT / FLAT34.px) * FLAT34.px / TILT];   // a pixel is square on screen after the squash
+const flatPts34 = pts => pts.map(flatSnap34).map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+const flatPoly34 = (pts, fill, ln = "", decor = false) => `<polygon points="${flatPts34(pts)}" fill="${fill}" shape-rendering="crispEdges" ${ln}${decor ? ` pointer-events="none"` : ""}/>`;
+const flatLine34 = (a, b, c, w) => `<path d="M${flatSnap34(a).map(v => v.toFixed(2)).join(" ")}L${flatSnap34(b).map(v => v.toFixed(2)).join(" ")}" stroke="${c}" stroke-width="${w}" fill="none" shape-rendering="crispEdges" pointer-events="none"/>`;
+// a quad on the wall of footprint edge i, from f0 to f1 along it and h0 to h1 up
+const flatQuad34 = (P, i, f0, f1, h0, h1, fill) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, "", true);
+function flatWalls34(P, h1, ln){
+  const front = [...Array(P.length).keys()].filter(i => norm34(P, i)[1] > .05); let s = "";
+  for(const i of front){ const a = P[i], b = P[(i+1) % P.length], nx = norm34(P, i)[0];
+    s += flatPoly34([lift34(0)(a), lift34(0)(b), lift34(h1)(b), lift34(h1)(a)], FLAT34.wall[nx < -.3 ? 0 : nx > .3 ? 2 : 1], ln);
+    s += flatQuad34(P, i, 0, 1, 0, .5, FLAT34.plinth) + flatQuad34(P, i, 0, 1, h1 - .24, h1, FLAT34.eave); }   // a plinth, and the shade under the eave
+  return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
+}
+// letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
+const FLAT_FONT34 = {W:["X...X", "X...X", "X.X.X", "XX.XX", "X...X"], C:[".XXX", "X...", "X...", "X...", ".XXX"]};
+function flatText34(Q, L, f, h, str, fill){
+  const px = FLAT34.px / L, cols = [...str].reduce((n, ch) => n + FLAT_FONT34[ch][0].length + 1, -1); let c0 = f - cols * px / 2, s = "";
+  for(const ch of str){ const g = FLAT_FONT34[ch]; g.forEach((row, r) => [...row].forEach((v, c) => { if(v === "X") s += Q(c0 + c * px, c0 + (c + 1) * px, h + (4 - r) * FLAT34.px, h + (5 - r) * FLAT34.px, fill); })); c0 += (g[0].length + 1) * px; }
+  return s;
+}
+function flatWc34(P, i, S, col){
+  const L = edgeLen34(P, i), dw = Math.min(1.1, L * .12) / L, e = FLAT34.px / L, fl = P[(i+1) % P.length][0] < P[i][0]; let s = "";   // fl: the edge runs right to left on screen, so mirror along it
+  const Q = (f0, f1, h0, h1, fill) => flatQuad34(P, i, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
+  s += Q(.05, .95, S.wall - 1.05, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - .95, "WC", FLAT34.wall[0]);   // the type-colored band with WC on it
+  for(const [f, right] of [[.3, true], [.7, false]]){   // two doors, a lit edge on the left, a gold handle on the inner side
+    const fh = right ? f + dw / 2 - 2.5 * e : f - dw / 2 + 1.5 * e;
+    s += Q(f - dw / 2, f + dw / 2, 0, 2.1, FLAT34.door) + Q(f - dw / 2, f - dw / 2 + e, 0, 2.1, FLAT34.doorEdge) + Q(fh, fh + e, .95, 1.35, FLAT34.gold); }
+  s += Q(.5 - 1.6 * e, .5 + 1.6 * e, 1.25, 2.05, FLAT34.door);   // a louvred vent between them
+  for(const h of [1.45, 1.7, 1.95]) s += Q(.5 - 1.6 * e, .5 + 1.6 * e, h, h + FLAT34.px * .9, FLAT34.wall[1]);
+  return s;
+}
+function flatRoof34(P, wall, rise, ln){
+  const [cx, cy] = centroid(P), eave = P.map(lift34(wall)), n = P.length, e0 = edgeLen34(P, 0), e1 = edgeLen34(P, 1);
+  const a0 = [(P[1][0] - P[0][0])/e0, (P[1][1] - P[0][1])/e0], a1 = [(P[2][0] - P[1][0])/e1, (P[2][1] - P[1][1])/e1];
+  const [ux, uy] = e0 >= e1 ? a0 : a1, half = Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), up = lift34(wall + rise);
+  const ridge = [up([cx - ux*half, cy - uy*half]), up([cx + ux*half, cy + uy*half])], near = p => (p[0] - cx)*ux + (p[1] - cy)*uy < 0 ? ridge[0] : ridge[1];
+  const faces = [...Array(n).keys()].map(i => { const a = eave[i], b = eave[(i+1) % n], ra = near(P[i]), rb = near(P[(i+1) % n]);
+    return {i, a, b, ra, rb, pts:ra === rb ? [a, b, ra] : [a, b, rb, ra], y:(P[i][1] + P[(i+1) % n][1]) / 2}; }).sort((f, g) => f.y - g.y);
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0])*t, p[1] + (q[1] - p[1])*t]; let s = "";
+  for(const f of faces){ const nx = norm34(P, f.i)[0], tone = FLAT34.roof[nx < -.3 ? 0 : nx > .3 ? 2 : 1];
+    s += flatPoly34(f.pts, tone, ln);
+    const len = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]), k = Math.max(2, Math.round(len / .75));   // standing seams, eave to ridge
+    for(let j = 1; j < k; j++){ const t = j / k; s += flatLine34(lerp(f.a, f.b, t), lerp(f.ra, f.rb, t), FLAT34.seam, FLAT34.px); }
+    if(norm34(P, f.i)[1] > .05) s += flatLine34(f.a, f.b, FLAT34.gold, FLAT34.px); }   // a thin gold line along the front eave
+  s += flatLine34(ridge[0], ridge[1], FLAT34.ridge, FLAT34.px * 3) + flatLine34(ridge[0], ridge[1], FLAT34.gold, FLAT34.px);   // a dark ridge cap with a gold line on it
+  const [vx, vy] = lerp(ridge[0], ridge[1], .32), vh = .95 / TILT;   // a plumbing vent on the ridge
+  return s + flatPoly34([[vx - FLAT34.px, vy], [vx + FLAT34.px, vy], [vx + FLAT34.px, vy - vh], [vx - FLAT34.px, vy - vh]], FLAT34.vent, "", true) + flatPoly34([[vx - FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh - FLAT34.px / TILT], [vx - FLAT34.px * 2, vy - vh - FLAT34.px / TILT]], FLAT34.ventHi, "", true);
+}
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
   const edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? T.edge : "var(--bad)";
@@ -706,11 +758,13 @@ function building34(bl, t, on, dead, reach, inv){
   }
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
-  const w = walls34(P, 0, S.wall, S.wallCol || WALL34, line), i = w.main;
+  const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
+  const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), i = w.main;
   s += w.s;
   if(i >= 0){
     const L = edgeLen34(P, i);
-    if(S.front === "wc"){
+    if(flat) s += flatWc34(P, i, S, col);
+    else if(S.front === "wc"){
       const dw = Math.min(1.1, L*.12) / L;
       for(const f of [.3, .7]) s += quad34(P, i, f - dw/2, f + dw/2, 0, 2.1, DARK34);
       s += quad34(P, i, .05, .95, S.wall - .45, S.wall - .15, col);
@@ -752,6 +806,7 @@ function building34(bl, t, on, dead, reach, inv){
     if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
       s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
   }
+  if(flat) return s + flatRoof34(P, S.wall, S.rise, ln);
   return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)));
 }
 
