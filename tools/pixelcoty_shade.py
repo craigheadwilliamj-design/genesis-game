@@ -19,29 +19,44 @@ REV = {v: k for k, v in ALL.items()}
 EYE, PUPIL, NARIS, SPECK = (255, 255, 255), (0, 0, 0), (14, 17, 25), (97, 151, 162)
 # the standing head in canvas coordinates: row -> (first x, last x) of the skull; every frame draws it moved by its own offset (its rust stripe ends at (86, 36) standing)
 HEAD = {35: (89, 91), 36: (87, 93), 37: (87, 95), 38: (87, 96), 39: (87, 96), 40: (87, 95), 41: (87, 94), 42: (87, 92)}
-SPECKS = {1: [(11, 1)], 2: [(10, -2), (12, 0), (11, 1)], 3: [(8, -4), (10, -2), (12, 0), (11, 1)]}   # the idle strip's drips, relative to the end of the rust stripe
+# The idle strip has 8 frames: 0 stands, 1 to 3 dip and blow a bubble (eyes shut, the bubble grows), 4 the bubble pops (a spray of drops, eyes snap open, still crouched), 5 it is surprised
+# (the body is back up, the head recoils up and back, wide eyes with a small pupil, mouth open, a few drops falling), 6 it settles (head a touch high, mouth shut), 7 stands.
+# Each frame's eye, mouth and head shift are set here by index (the walk and standing pictures just use an open eye and a shut mouth); drops are relative to the end of the rust stripe.
+IDLE_EXPR = {1: ("shut", "closed", (0, 0)), 2: ("shut", "closed", (0, 0)), 3: ("shut", "closed", (0, 0)), 4: ("open", "closed", (0, 0)),
+             5: ("wide", "open", (-1, -1)), 6: ("open", "closed", (0, -1))}
+SPECKS = {1: [(11, 1)], 2: [(10, -2), (12, 0), (11, 1)], 3: [(8, -4), (10, -2), (12, 0), (11, 1)],
+          4: [(8, -5), (11, -6), (13, -3), (14, 1), (12, 4), (9, 3), (11, -1)], 5: [(12, -2), (13, 2), (12, 6)]}   # the bubble's drops: forming, then popped and flying out, then falling
 
 def reshape_head(grid, idle_frame=None):
     h, w = len(grid), len(grid[0])
     rust = [(x, y) for y in range(h) for x in range(w) if grid[y][x] == "rust"]
     ax = max(x for x, y in rust); ay = min(y for x, y in rust if x == ax); dx, dy = ax - 86, ay - 36
-    open_eye = any(c == EYE for row in grid for c in row)
-    for y in range(35 + dy, 42 + dy):   # clear the old head and every speck, keeping the neck, the rust and the throat
+    eye, mouth, (ox, oy) = IDLE_EXPR.get(idle_frame, ("open", "closed", (0, 0)))
+    for y in range(33 + dy, 44 + dy):   # clear the old head and every speck, keeping the neck, the rust and the throat
         for x in range(87 + dx, w):
             if grid[y][x] in ("body", NARIS, EYE, PUPIL, SPECK): grid[y][x] = None
     for y in range(h):
         for x in range(w):
             if grid[y][x] == SPECK: grid[y][x] = None
+    sx, sy = dx + ox, dy + oy
     for y, (x0, x1) in HEAD.items():
         for x in range(x0, x1 + 1):
-            if grid[y + dy][x + dx] in (None, "body"): grid[y + dy][x + dx] = "body"
-    def put(x, y, c): grid[y + dy][x + dx] = c
-    if open_eye:
-        put(90, 37, EYE); put(91, 37, EYE); put(90, 38, EYE); put(91, 38, PUPIL)   # a large orbit set high, a pupil low and forward
-    else: put(90, 38, NARIS); put(91, 38, NARIS)                                    # shut, it is a dark dash
-    for x, y in ((94, 37), (95, 37), (95, 38)): put(x, y, NARIS)                            # the big nostril near the front of the snout
-    for x in range(91, 96): put(x, 40, NARIS)                                              # the mouth line, the upper jaw overhanging the chin
-    for rx, ry in SPECKS.get(idle_frame, []): grid[ay + ry][ax + rx] = SPECK
+            if grid[y + sy][x + sx] in (None, "body"): grid[y + sy][x + sx] = "body"
+    def put(x, y, c): grid[y + sy][x + sx] = c
+    if eye == "open": put(90, 37, EYE); put(91, 37, EYE); put(90, 38, EYE); put(91, 38, PUPIL)   # a large orbit set high, a pupil low and forward
+    elif eye == "wide":   # surprised: the orbit opens a third column and the pupil shrinks to a dot, high in the white
+        for x in (90, 91, 92):
+            for y in (37, 38): put(x, y, EYE)
+        put(91, 37, PUPIL)
+    else: put(90, 38, NARIS); put(91, 38, NARIS)                                                  # shut, it is a dark dash
+    for x, y in ((94, 37), (95, 37), (95, 38)): put(x, y, NARIS)                                  # the big nostril near the front of the snout
+    if mouth == "open":
+        for x in range(91, 96): put(x, 40, NARIS)
+        for x in range(92, 95): put(x, 41, NARIS)                                                  # the jaw drops a row
+    else:
+        for x in range(91, 96): put(x, 40, NARIS)                                                  # the mouth line, the upper jaw overhanging the chin
+    for rx, ry in SPECKS.get(idle_frame, []):
+        if 0 <= ay + ry < h and 0 <= ax + rx < w: grid[ay + ry][ax + rx] = SPECK
     return grid
 
 def classify(im):
@@ -83,7 +98,12 @@ def shade(grid):
     return out
 
 def process(path):
-    im = Image.open(path).convert("RGBA"); n = im.width // W; idle = path.endswith("idle.png"); out = Image.new("RGBA", im.size, (0, 0, 0, 0)); changed = total = 0
+    im = Image.open(path).convert("RGBA"); n = im.width // W; idle = path.endswith("idle.png")
+    if idle and n == 6:   # the first run adds the pop, surprise and settle frames: copies of the crouch and of the standing picture, which the head pass then redraws
+        fr6 = [im.crop((i * W, 0, (i + 1) * W, im.height)) for i in range(6)]; im = Image.new("RGBA", (8 * W, im.height), (0, 0, 0, 0))
+        for i, f in enumerate(fr6[:5] + [fr6[5], fr6[5], fr6[5]]): im.paste(f, (i * W, 0))
+        n = 8
+    out = Image.new("RGBA", im.size, (0, 0, 0, 0)); changed = total = 0
     for i in range(n):
         fr = im.crop((i * W, 0, (i + 1) * W, im.height)); grid = reshape_head(classify(fr), i if idle else None); res = shade(grid)
         for y in range(fr.height):
