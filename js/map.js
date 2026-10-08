@@ -911,7 +911,7 @@ function pixelSprites(){
 }
 pixelSprites();
 function spriteSvg(sp, h){
-  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
   return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${S.src || `sprites/${sp}.png`}" style="image-rendering:pixelated" ${box}${f >= 0 && n ? ` display="none"` : ""}/>`
     + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${(!h.viv && S.walkSrc) || `sprites/${sp}-${kind}.png`}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }

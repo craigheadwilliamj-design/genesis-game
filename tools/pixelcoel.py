@@ -3,7 +3,7 @@
 import sys
 from PIL import Image
 from collections import Counter
-F = 2                       # shrink factor: 100x75 -> 50x38
+F = 1                       # 1 keeps every source pixel (100x75), 2 halves it
 KEYS = "abcdefghijklmnop"
 def load(path, n):
     im = Image.open(path).convert("RGBA"); w = im.width // n
@@ -28,13 +28,11 @@ grids = [shrink(f) for f in frames]
 # one shared palette: the most used colors, everything else snaps to the nearest
 use = Counter(c for _, _, g in grids for c in g.values())
 pal = [c for c, _ in use.most_common(len(KEYS))]
+print(len(use), "source colors")
 def near(c): return min(range(len(pal)), key=lambda i: sum((a-b)**2 for a, b in zip(pal[i], c)))
 rows = []
 for W, H, g in grids:
     rows.append(["".join(KEYS[near(g[(x, y)])] if (x, y) in g else "." for x in range(W)) for y in range(H)])
-# the downscale loses or recolors the eye, so pin it: black on every frame
-for fr, (ex, ey) in zip(rows, [(41, 11), (41, 12), (41, 12)]):
-    fr[ey] = fr[ey][:ex] + KEYS[near((0, 0, 0))] + fr[ey][ex+1:]
 js = "// Coded pixel Coelophysis, built by tools/pixelcoel.py: PIXEL_ART.coel = {pal, frames: [stand, walk1, walk2]}, one letter per pixel ('.' is clear).\nconst PIXEL_ART = {coel: {\n  pal: {" + ", ".join(f'{KEYS[i]}:"#%02x%02x%02x"' % c for i, c in enumerate(pal)) + "},\n  frames: [\n" + ",\n".join("    [\n" + ",\n".join(f'      "{r}"' for r in fr) + "\n    ]" for fr in rows) + "\n  ]\n}};\n"
 open(sys.argv[1] if len(sys.argv) > 1 else "js/pixelart.js", "w").write(js)
 print(len(pal), "colors", grids[0][:2])
