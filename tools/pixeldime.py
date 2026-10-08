@@ -23,8 +23,9 @@ NEAR, FAR, BELLY = key((97, 111, 34)), key((67, 75, 22)), key((178, 165, 66))
 def passing(legs):
     g = [list(r) for r in rows[1]]
     for y in (58, 59):                                  # belly line straight across, then the legs go over it
-        for x in range(38, 86):
+        for x in range(38, 75):
             if g[y][x] in (NEAR, FAR) or rows[2][y][x] == BELLY: g[y][x] = BELLY if (y == 59 or g[y][x] == NEAR) else g[y][x]
+    for y in range(57, 60): g[y][79:95] = rows[2][y][79:95]   # clean chest: no leftover far-leg pixels from walk1
     for y in range(60, 66):
         for x in range(36, 95): g[y][x] = "."
     for ch, y, x0, w in legs:
@@ -32,13 +33,13 @@ def passing(legs):
     return ["".join(r) for r in g]
 # (leg, row, first column, width): far legs first so near legs draw over them
 passA = [("f",60,48,2),("f",61,48,5),                   # rear far swings forward, lifted
-         ("f",60,80,2),("f",61,80,2),("f",62,79,5),     # front far planted
+         ("f",58,80,2),("f",59,80,2),("f",60,80,2),("f",61,81,2),("f",62,81,4),   # front far planted
          ("n",58,49,4),("n",59,48,4),("n",60,48,3),("n",61,48,3),("n",62,48,3),("n",63,48,5),   # rear near planted
-         ("n",58,76,4),("n",59,76,4),("n",60,77,3),("n",61,78,3),("n",62,79,5)]                 # front near swings forward, lifted
+         ("n",60,76,3),("n",61,77,4)]                                                           # front near swings forward, lifted
 passB = [("f",60,47,2),("f",61,47,2),("f",62,47,5),     # rear far planted
-         ("f",60,78,3),("f",61,79,5),                   # front far swings forward, lifted
+         ("f",57,82,1),("f",58,80,4),("f",59,81,3),("f",60,82,4),("f",61,84,3),   # front far swings forward, lifted
          ("n",58,50,4),("n",59,49,4),("n",60,50,3),("n",61,51,3),("n",62,52,5),                 # rear near swings forward, lifted
-         ("n",58,76,4),("n",59,76,4),("n",60,76,3),("n",61,76,3),("n",62,76,3),("n",63,76,5)]   # front near planted
+         ("n",60,76,3),("n",61,77,3),("n",62,77,3),("n",63,77,5)]                               # front near planted
 rows = [rows[0], rows[1], passing(passA), rows[2], passing(passB)]
 block = "// Coded pixel Dimetrodon, built by tools/pixeldime.py: PIXEL_ART.dime = {pal, frames: [stand, walk1, pass, walk2, pass]}.\nPIXEL_ART.dime = {\n  pal: {" + ", ".join(f'{KEYS[i]}:"#%02x%02x%02x"' % c for i, c in enumerate(pal)) + "},\n  frames: [\n" + ",\n".join("    [\n" + ",\n".join(f'      "{r}"' for r in fr) + "\n    ]" for fr in rows) + "\n  ]\n};\n"
 path = sys.argv[1] if len(sys.argv) > 1 else "js/pixelart.js"
