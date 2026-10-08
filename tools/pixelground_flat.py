@@ -1,5 +1,5 @@
-# Draws the seamless scrubland ground tiles in the Dimetrodon's flat, simple style (tools/pixelground.py is the older dithered version): sprites/ground/scrubland-<exhibit|park>.png,
-# laid over the biome color (BIOMES.scrubland.color / .park), 0.125 m per pixel. Flat, stair-stepped patches of slightly warmer and paler soil (no dithering), short horizontal
+# Draws the seamless scrubland ground tiles in the Dimetrodon's flat, simple style (tools/pixelground.py is the older dithered version): sprites/ground/scrubland.png (one tile for exhibits and the park),
+# laid over the biome color (BIOMES.scrubland.color, the same as .park), 0.125 m per pixel. Flat, stair-stepped patches of slightly warmer and paler soil (no dithering), short horizontal
 # hardpan dashes in loose rows, little two-tone pebbles and a few small clusters of sandstone and dark stones, each lit on its top row and shaded on its bottom row.
 # Nothing modern, so it suits any era. Every feature is small and nothing is long, so the tile doesn't show its repeat; features wrap over the edges. Light is from the top left.
 # Usage: python3 -I tools/pixelground_flat.py [outdir]
@@ -9,7 +9,7 @@ from PIL import Image
 def hexc(h): return tuple(int(h[i:i+2], 16) for i in (1, 3, 5))
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
-SAND = {"exhibit": hexc("#BFA96C"), "park": hexc("#C8BC8A")}   # the biome colors in data.js; the patches are mixed from them so the tile sits on its floor
+SAND = hexc("#BFA96C")   # BIOMES.scrubland.color in data.js, and its park color too: one floor for exhibits and the park
 RED = [mix((178, 84, 24), WHITE, .3), (178, 84, 24), mix((178, 84, 24), BLACK, .25)]   # sandstone, top / body / base: the rocks' flat red
 DARK = [(110, 102, 94), (82, 76, 72), (58, 53, 50)]   # dark stones, same three rows
 
@@ -57,6 +57,5 @@ def tile(base, size, seed, clusters, dashes, pebbles, cell=11, warm=.6, pale=.32
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
 os.makedirs(out, exist_ok=True)
-# the exhibit floor repeats every 18 m (144 px); the park ground every 32 m (256 px), a little sparser
-for name, im in (("scrubland-exhibit", tile(SAND["exhibit"], 144, 7, 3, 34, 20)), ("scrubland-park", tile(SAND["park"], 256, 8, 8, 100, 56, cell=13, warm=.64, pale=.28))):
-    im.save(f"{out}/{name}.png"); print(name, im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
+im = tile(SAND, 144, 7, 3, 34, 20)   # repeats every 18 m (144 px), under both exhibits (#b-scrubland) and the park (#p-scrubland)
+im.save(f"{out}/scrubland.png"); print("scrubland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
