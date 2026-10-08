@@ -19,7 +19,7 @@ BELLY = [hexc(c) for c in ("#8C6E52", "#B8946C", "#DDBF94", "#EBD3AE", "#F6E6C8"
 SAIL  = [hexc(c) for c in ("#4E250A", "#7E3E10", "#A85A1E", "#C7762E", "#E0944A")]
 SPOT  = [hexc(c) for c in ("#8A5A18", "#B87A22", "#E3A63A", "#F2C65C", "#FAE08A")]
 OUTLN = {"g": hexc("#1C2214"), "b": hexc("#4A3524"), "s": hexc("#3A1A06")}
-EYE, PUPIL, TOOTH, NOSE, MOUTH = hexc("#C98A2A"), hexc("#0A0A06"), hexc("#F1EBD0"), hexc("#1C2214"), hexc("#E8A33A")
+EYE, PUPIL, TOOTH, NOSE, MOUTH, CLAW = hexc("#C98A2A"), hexc("#0A0A06"), hexc("#F1EBD0"), hexc("#1C2214"), hexc("#E8A33A"), hexc("#E4DCBC")
 
 def smin(a, b, k):
     h = np.maximum(k - np.abs(a - b), 0) / k; return np.minimum(a, b) - h * h * k * .25
@@ -66,15 +66,22 @@ def parts(P, pz):
     # legs: short and sprawling, elbows out; shoulder, elbow, wrist, then a foot with three toes
     for name, xs, side in (("FR", 18.5, 1), ("FL", 18.5, -1), ("HR", -17, 1), ("HL", -17, -1)):
         fx, lift = pz[name]; sh = (xs, 9.8 + bob, side * 8.2); el = (xs + fx * .45 + (-2.5 if xs > 0 else 2.5), 5.4 + lift * .55, side * 14.2)
-        wr = (xs + fx * .9, 2.8 + lift, side * 15.0); ft = (xs + fx * .9 + 2.6, 1.1 + lift, side * 15.4)
-        d1 = capsule(P, sh, el, 3.5, 2.6); d2 = capsule(P, el, wr, 2.4, 1.9); d3 = ellipsoid(P, ft, (4.4, 1.4, 2.6))
-        for tz in (-1.6, 0, 1.6): d3 = smin(d3, capsule(P, (ft[0] + 2, ft[1], ft[2] + tz * 1.1), (ft[0] + 7.4, ft[1] - .1, ft[2] + tz * 1.8), 1.0, .6), .8)
-        d = smin(smin(d1, d2, 1.5), d3, 1.5); D["leg" + name] = d; body = smin(body, d1, 3)
+        wr = (xs + fx * .9, 3.4 + lift, side * 15.0); ft = (xs + fx * .9 + 3.2, 1.3 + lift, side * 15.6)
+        d1 = capsule(P, sh, el, 3.5, 2.6); d2 = capsule(P, el, wr, 2.4, 1.8); pad = ellipsoid(P, ft, (4.6, 1.5, 3.0))
+        # four splayed toes reaching forward, each with a pale claw on the tip
+        toes = None
+        for k, tz in enumerate((-2.4, -.8, .8, 2.4)):
+            tip = (ft[0] + 8.8, ft[1] - .15, ft[2] + tz * 1.6); t = capsule(P, (ft[0] + 1.5, ft[1], ft[2] + tz * .7), tip, 1.25, .85)
+            toes = t if toes is None else np.minimum(toes, t); D["claw%s%d" % (name, k)] = sphere(P, (tip[0] + .5, tip[1] - .05, tip[2]), .95)
+        d = smin(smin(d1, d2, 1.5), smin(pad, toes, .6), 1.2); D["leg" + name] = smin(d1, d2, 1.5); D["toe" + name] = smin(pad, toes, .6); body = smin(body, d1, 3)
+        body = np.minimum(body, d) if False else body
+        legs_all = d if name == "FR" else np.minimum(legs_all, d)
     # the sail: a thin fan standing on the back, wide and tall, reaching low at the tail end
     x, y, z = P[:, 0], P[:, 1], P[:, 2]; yb = spine_y(x, bob)
     D["sail"] = np.maximum(np.maximum(np.maximum((y - (yb + sail_h(x))) * .7, (yb - 1.5) - y), np.abs(z - sw * .3) - 1.25), np.abs(x - SAIL_X) - SAIL_W + .2)
     D["eye"] = sphere(P, (36.2, 24.0 + bob, hz + 7.4), 1.8); D["nose"] = sphere(P, (46.2, 16.8 + bob, hz + hd * .7 + 2.6), .85)
-    total = np.minimum(np.minimum(body, D["sail"]), np.minimum(D["eye"], D["nose"]))
+    claws = np.minimum.reduce([v for k, v in D.items() if k.startswith("claw")])
+    total = np.minimum(np.minimum(np.minimum(body, legs_all), claws), np.minimum(np.minimum(D["sail"], D["eye"]), D["nose"]))
     return total, D
 
 def to_local(Pc):
@@ -105,6 +112,7 @@ def render(pz, ox, oy):
         r, c = divmod(i, W); w = who[i]; b = BAYER[r % 4, c % 4] - .5
         if w == "eye": img[r, c] = EYE + (255,); mat[r, c] = "g"; continue
         if w == "nose": img[r, c] = NOSE + (255,); mat[r, c] = "g"; continue
+        if w.startswith("claw"): img[r, c] = CLAW + (255,); mat[r, c] = "g"; continue
         if w == "sail":
             a = math.atan2(yl[i] - 6, xl[i] - SAIL_X); rr = math.hypot(yl[i] - 6, xl[i] - SAIL_X); s = a / (math.pi / 24); fs = s - math.floor(s)
             rb = (rr - 11) / 7.2; fr = rb - math.floor(rb); k = math.floor(rb); ph = (s + (.5 if k % 2 else 0)) % 1.0
@@ -116,7 +124,7 @@ def render(pz, ox, oy):
             if w in ("jaw", "snout", "skull") and abs(D["snout"][i] - D["jaw"][i]) < 1.2 and xl[i] > 35 and nv[i, 0] > -.2 and nyl[i] > -.5:
                 img[r, c] = (TOOTH if int(xl[i] * .8) % 2 == 0 and xl[i] < 47 else MOUTH) + (255,); mat[r, c] = "g"; continue
             under = nyl[i] < -.2 and w in ("torso", "chest", "hips", "tail", "neck", "jaw", "skull", "snout")
-            leg = w.startswith("leg"); ramp = BELLY if under else GREEN; mat[r, c] = "b" if under else "g"
+            leg = w.startswith(("leg", "toe")); ramp = BELLY if under else GREEN; mat[r, c] = "b" if under else "g"
             idx = .8 + lit[i] * 3.0 - (.7 if leg else 0) - (1 - min(1, max(0, (yl[i] - 2) / 9))) * .7 + b * .4
             if not under:   # the coat: dark blotches on the back, bars down the flank, rings on the tail
                 if w == "tail" and math.sin(xl[i] * .85) > .35: idx -= 1.3
