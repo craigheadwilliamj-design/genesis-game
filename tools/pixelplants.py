@@ -164,6 +164,7 @@ def pagiophyllum():   # large: a shrubby conifer, a slim trunk with ascending br
     return cv.image(g[0])
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("per-scrubland-small", peltaspermum), ("per-scrubland-medium", comia), ("per-scrubland-large", callistophyton),
+# per-scrubland-large is now drawn by tools/pixelplant_flat.py in the flat style, so it is left out here (callistophyton() is the older shaded version)
+for key, fn in (("per-scrubland-small", peltaspermum), ("per-scrubland-medium", comia),
                 ("tri-scrubland-small", lepidopteris), ("tri-scrubland-medium", scytophyllum), ("tri-scrubland-large", pagiophyllum)):
     im = fn(); im.save(f"{out}/{key}.png"); print(key, im.size)
