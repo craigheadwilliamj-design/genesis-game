@@ -63,7 +63,6 @@ function habitatOf(e){
   const old = clamp((groveM2.mesozoic + groveM2.paleozoic) / a / HAB.groveFull, 0, 1);
   return {waterM2:wet, waterShare:wet / a, wet:clamp(wet / a / HAB.waterFull + (BIOMES[biomeOf(e)].wet || 0), 0, 1), rock:clamp(cover / (a / HAB.rockEvery), 0, 1), grove, groveM2, old};
 }
-// Grass underfoot: a Cenozoic planting, unless enough older groves give the grazers something else to eat
 // What one species wants from an exhibit, given its size and biome: water as a share of the floor, rock cover points, and square meters of plants
 function wantsOf(e, s){
   const a = area(e.points) || 1, l = likesOf(s), B = BIOMES[biomeOf(e)];
@@ -95,7 +94,13 @@ function speciesFit(e, s){
   const water = waterFit(h.water, w.water), rock = fitOf(h.rock, w.rock), plants = fitOf(h.plants, w.plants);
   return {w, h, water, rock, plants, sat:(l.water * water + l.rock * rock + pw * plants) / (l.water + l.rock + pw)};
 }
-const grassyFloor = e => habitatOf(e).old < 1;
+// How much of what an old plant-eater nibbles is grass it never evolved for, 0 to 1: Cenozoic plants in the exhibit (their share of all its plants, building up as they cover the floor), a grassland biome, or grass hay in place of Paleoflora
+function grassShare(e, s){
+  if(e.viv || foodType(s) !== "paleoflora") return 0;
+  if(e.grassFed || biomeOf(e) === "grassland") return 1;
+  const g = habitatOf(e).groveM2, wrong = g.cenozoic || 0, own = (g.mesozoic || 0) + (g.paleozoic || 0);
+  return wrong > 0 ? wrong / (wrong + own) * clamp(wrong / (area(e.points) || 1) / HAB.groveFull, 0, 1) : 0;
+}
 // Food units a day the animals browse off groves, for one food type. Older groves give Paleoflora, Cenozoic plants give plants.
 function browseRate(e, t){
   if(t !== "plants" && t !== "paleoflora") return 0;

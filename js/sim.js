@@ -399,12 +399,12 @@ function exhibitReport(e){
     const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(haveOf(e, s).plants > 0));
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === "cenozoic") ? FLORA.cenozoic.plants : "plants from their own time"}.`}); }
     else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. Plants from ${away.length === 1 ? "its" : "their"} own period would suit ${away.length === 1 ? "it" : "them"}.`}); }
-    // grass comes from a Cenozoic planting (unless older groves give them something else), or from plain plant food standing in for Paleoflora
-    const grassy = grassyFloor(e) || e.grassFed;
+    // old plant-eaters get sick on plants they never evolved for: Cenozoic planting, a grassland biome, or grass hay standing in for Paleoflora
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
-    const sick = grazers.filter(s => GRASS_INTOLERANT.includes(s.period)), picky = grazers.filter(s => s.period === "Cretaceous");
-    if(grassy && sick.length){ target += GRASS_HIT.intolerant; issues.push({bad:true, text:`Sick from eating grass. ${sick.map(s => s.name).join(", ")} never evolved to digest it. ${grassyFloor(e) ? "Replant with older flora from CERES, or plant cycad or lycopod groves" : "Feed them Paleoflora from CERES"}.`}); }
-    else if(grassy && picky.length){ target += GRASS_HIT.cretaceous; issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. Older flora or Paleoflora suits them better.`}); }
+    const sick = grazers.filter(s => grassSick(e, s) > 0), picky = grazers.filter(s => s.period === "Cretaceous" && grassShare(e, s) > 0);
+    const cure = e.grassFed ? "Feed them Paleoflora from CERES" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
+    if(sick.length){ target += GRASS_HIT.intolerant * Math.max(...sick.map(s => grassSick(e, s))); issues.push({bad:true, text:`Eating plants it never evolved for. ${sick.map(s => s.name).join(", ")} can't digest grass. ${cure}.`}); }
+    else if(picky.length){ target += GRASS_HIT.cretaceous * Math.max(...picky.map(s => grassShare(e, s))); issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. ${cure}.`}); }
   }
   // Dirt: a filthy exhibit makes animals miserable fast
   if(e.animals.length && (e.dirt || 0) > CLEAN.penaltyFrom){

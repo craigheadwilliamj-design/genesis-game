@@ -1142,12 +1142,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech.push("mesoplant");
     out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     out.treesNeedNoStock = landSpot(115, 115, "qua-tropical-large").ok;
-    const grassyBefore = grassyFloor(gx) && grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
+    // a bare exhibit isn't grass; a Cenozoic planting, a grassland biome or grass hay make old grazers sick, and own-era groves dilute it
+    const bareOk = grassSick(gx, grazer) === 0;
+    placeLand(gx, "qua-tropical-large", 150, 150); placeLand(gx, "qua-tropical-large", 150, 105);
+    const grassyBefore = bareOk && gx.land.length === 2 && grassSick(gx, grazer) > 0, shareBefore = grassSick(gx, grazer), groveTarget = exhibitReport(gx).target;
     state.ceres.pots["Jurassic-large"] = 3;
     for(const [x, y] of [[115, 115], [135, 115], [115, 135]]) placeLand(gx, "jur-tropical-large", x, y);
-    out.groveUsesStock = state.ceres.pots["Jurassic-large"] === 0 && gx.land.length === 3;
-    out.grovesStopGrass = grassyBefore && !grassyFloor(gx) && !grassSick(gx, grazer);
+    out.groveUsesStock = state.ceres.pots["Jurassic-large"] === 0 && gx.land.length === 5;
+    out.grovesStopGrass = grassyBefore && grassSick(gx, grazer) < shareBefore;
+    const bm = gx.biome; gx.biome = "grassland"; const onGrassland = grassSick(gx, grazer) === 1; gx.biome = bm;
+    gx.grassFed = true; const onHay = grassSick(gx, grazer) === 1; gx.grassFed = false;
+    out.grassFromBiomeAndHay = onGrassland && onHay;
     out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
+    gx.land = gx.land.filter(f => /^jur/.test(f.type));   // the Cenozoic plants come out again
+    out.oldGroveOnlyIsFine = grassSick(gx, grazer) === 0;
     // browsing: the stock drains slower, but keepers are still needed
     const pn = dailyNeed(gx).paleoflora, share = browseShare(gx, "paleoflora", pn);
     gx.stock = {paleoflora:100}; eatTick(60); const withGroves = 100 - gx.stock.paleoflora;
