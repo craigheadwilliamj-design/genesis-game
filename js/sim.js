@@ -152,6 +152,7 @@ function upgradeSave(s){
     if(s.buildings.some(b => b.type === type) && !s.science.tech.includes(id)) s.science.tech.push(id);
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
+  if(!s.staff.calls) s.staff.calls = [];
   if(!s.staff.vets) s.staff.vets = [];
   if(!s.staff.custodians) s.staff.custodians = [];
   if(!s.staff.guards) s.staff.guards = [];

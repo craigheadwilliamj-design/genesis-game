@@ -404,6 +404,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
     out.carryDeliveredNextDay = fed;
 
+    // Call keeper: the keeper drops a feed run, walks to the exhibit and mucks it out; unreachable exhibits are refused
+    { const e2 = state.exhibits[1]; c.route = []; c.wait = 0; c.plan = null; c.haul = null; c.job = "idle"; c.at = kGraph.anchors["b-kdock"]; setCarry(c, null); k.stamina = 100; e2.dirt = 12; state.staff.calls = [];
+      out.callKeeper = callKeeper(e2) === null && state.staff.calls.length === 1 && state.staff.calls[0].keeper === c.id && callKeeper(e2) === null && state.staff.calls.length === 1;
+      let n = 0; while(state.staff.calls.length && n++ < 400) keepersTick(1);
+      out.callKeeperArrives = !state.staff.calls.length && c.focusEx === e2.id && (c.job === "mucking" || (e2.dirt || 0) <= 2);
+      n = 0; while(c.job === "mucking" && n++ < 600) keepersTick(1);
+      out.callKeeperMucks = (e2.dirt || 0) <= 2;
+      c.focusEx = null; c.job = "idle"; c.route = []; c.cleanId = null; e2.dirt = 0; state.staff.calls = [];
+    }
+
     // food trays: a keeper with food left over walks inside the fence and fills them, and animals eat from them first
     { const e2 = state.exhibits[1], money0 = state.money; state.money = 1e6; e2.land = []; placeLand(e2, "traymd", 250, 180); placeLand(e2, "traysm", 270, 200);
       const tr0 = e2.land[0], tr1 = e2.land[1]; tr0.id = "l-tray0"; tr1.id = "l-tray1"; e2.stock = {meat:storeMax(e2, "meat")}; k.stamina = 100;
