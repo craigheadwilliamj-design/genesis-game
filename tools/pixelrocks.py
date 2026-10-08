@@ -1,5 +1,6 @@
 # Draws pixel-art rocks to sprites/rocks/<type>-<biome>-<n>.png in a false-3D 3/4 view: each rock is a stack of strata layers, each an extruded footprint seen from above
 # at an angle (K squashes ground depth), so you see a lit top face on every ledge, a front wall and a shaded right-hand side. Light is from the top left.
+# SUPERSEDED by tools/pixelrocks_flat.py (flat style); running this overwrites the new rocks with the older dithered, outlined ones.
 # Scrubland: red sandstone (like Snow Canyon, Utah), a pale cream stone and dark basalt. Usage: python3 -I tools/pixelrocks.py [outdir]
 import sys, os, random, math
 from PIL import Image, ImageDraw
