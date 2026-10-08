@@ -533,6 +533,13 @@ function plantSvg(f, t, edge, sw){
   }
   return s;
 }
+// A plant drawn from its picture (PLANT_SPRITES): a soft shadow, then the sprite standing on the spot, flipped by its seed so a grove isn't copies
+function plantSpriteSvg(f, t, S, dead){
+  const w = t.r * 2 * (S.size || 1), ht = w / S.ratio, flip = seedOf(f) & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + ht * .05 : f.y - ht / 2, n2 = v => v.toFixed(2);
+  return (up ? `<ellipse cx="${n2(f.x + w * .06)}" cy="${n2(f.y)}" rx="${n2(w * .38)}" ry="${n2(w * .12)}" fill="#1D2B22" fill-opacity=".2"/>` : "")
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/plants/${t.key}.png" style="image-rendering:pixelated" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/></g>`
+    + (dead ? `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>` : "");
+}
 // A statue: a stone plinth paved like its theme's paths, and a bronze disc with the animal's letter (the size of its dot on the map) or the person's initials
 function statueSvg(f, t, edge, dead){
   const T = themeOf(f), base = T.path.live, rim = dead ? edge : T.path.edge, x = f.x, y = f.y, r = t.r, p = r * .92, ns = `vector-effect="non-scaling-stroke"`;
@@ -686,7 +693,8 @@ function featSvg(f, biome, pick, isDead){
   } else if(t.look === "vmist"){
     // a shallow pool under the mister
     s += `<ellipse cx="${f.x}" cy="${f.y}" rx="${t.r}" ry="${t.r * .75}" fill="${t.color}" fill-opacity=".85" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x - t.r * .3}" cy="${f.y - t.r * .2}" rx="${t.r * .3}" ry="${t.r * .12}" fill="#BFE0EE" fill-opacity=".7"/>`;
-  } else if(t.flora) s += tilted() && !f.k && (t.look === "conifer" || treeLift(t)) ? tree34(f, t, edge, dead ? 3 : 1) : plantSvg(f, t, edge, dead ? 3 : 1);
+  } else if(t.flora && !f.k && PLANT_SPRITES[f.type]) s += plantSpriteSvg(f, {...t, key:f.type}, PLANT_SPRITES[f.type], dead);
+  else if(t.flora) s += tilted() && !f.k && (t.look === "conifer" || treeLift(t)) ? tree34(f, t, edge, dead ? 3 : 1) : plantSvg(f, t, edge, dead ? 3 : 1);
   else if(tilted() && !f.k) s += rock34(f, t, rockTone(BIOMES[f.biome] ? f.biome : biome, f.type), edge, dead ? 3 : 1.5);
   else {
     // a lumpy rock with a light and a dark face

@@ -1349,6 +1349,13 @@ const PLANT_TABLE = {
 const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
   scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"],
   tundra:["#A9B48A", "#8C9A70", "#6F7F5A"]};
+// Landscape plants drawn with a picture instead of code: sprites/plants/<LAND key>.png, 3/4 view with the base at the bottom middle.
+// ratio is width over height; size scales the width (2 x the plant's radius) so a tall plant isn't drawn too wide. Plants not listed keep their SVG.
+const PLANT_SPRITES = {
+  "per-scrubland-small":  {ratio:44/46, size:1.15},
+  "per-scrubland-medium": {ratio:64/46, size:1.1},
+  "per-scrubland-large":  {ratio:72/96, size:.85},
+};
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
 const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73", tundra:"#7F8780"};
