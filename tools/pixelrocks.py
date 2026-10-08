@@ -41,11 +41,16 @@ def render(seed, towers, ramp, bands=1.0, cracks=0, speckle=.05, light=1.0):
     W, H = int(math.ceil(maxx - minx)) + 8, int(math.ceil(front - top)) + 8; ox, oy = 4 - minx, H - 4 - front
     sx = lambda x: x + ox; sy = lambda y, z: y * K - z + oy
     img = [[None] * W for _ in range(H)]; kind = [[0] * W for _ in range(H)]
+    gw, gh = W // 3 + 3, H // 3 + 3; grid = [[rnd.random() for _ in range(gw)] for _ in range(gh)]
+    def vn(x, y):   # soft blotches about 3 pixels across
+        fx, fy = x / 3, y / 3; ix, iy = int(fx), int(fy); tx, ty = fx - ix, fy - iy
+        a = grid[iy][ix] * (1 - tx) + grid[iy][ix + 1] * tx; b = grid[iy + 1][ix] * (1 - tx) + grid[iy + 1][ix + 1] * tx
+        return a * (1 - ty) + b * ty
     def mask(poly):
         m = Image.new("L", (W, H), 0); ImageDraw.Draw(m).polygon(poly, fill=255); return m.load()
     def put(x, y, idx, k):
         idx += (BAYER[y % 4][x % 4] / 16 - .5) * .7 + (rnd.random() - .5) * speckle * 6
-        img[y][x] = ramp[max(0, min(4, int(round(idx))))]; kind[y][x] = k
+        img[y][x] = idx; kind[y][x] = k
     for T in layers:
         for ti, L in enumerate(T):
             pts, z0, z1 = L["pts"], L["z0"], L["z1"]; hl = z1 - z0; cxm = sum(p[0] for p in pts) / len(pts); cym = sum(p[1] for p in pts) / len(pts)
@@ -62,20 +67,27 @@ def render(seed, towers, ramp, bands=1.0, cracks=0, speckle=.05, light=1.0):
                         if not m[x, y]: continue
                         u = (x - q[0][0]) / (q[1][0] - q[0][0]) if abs(q[1][0] - q[0][0]) > .5 else .5
                         t = max(0, min(1, (q[0][1] + (q[1][1] - q[0][1]) * u - y) / hl))   # 0 at the foot of the layer, 1 at its top
-                        put(x, y, 1.9 + lit * 1.5 * light + L["shift"] * bands - (1 - t) * .5 + (.3 if t > .85 else 0), 1)
+                        put(x, y, 1.7 + lit * 2.5 * light + L["shift"] * bands - (1 - t) * .6 + (.3 if t > .85 else 0) - (x / W - .5) * 1.1, 1)
             cap = [(sx(x), sy(y, z1)) for x, y in pts]; m = mask(cap); xs = [p[0] for p in cap]; ys = [p[1] for p in cap]; last = ti == len(T) - 1
             for y in range(max(0, int(min(ys))), min(H, int(max(ys)) + 1)):
                 for x in range(max(0, int(min(xs))), min(W, int(max(xs)) + 1)):
-                    if m[x, y]: put(x, y, (3.5 if last else 3.0) + L["shift"] * .4 * bands - ((x - sum(xs) / len(xs)) / W * 1.2) - ((y - sum(ys) / len(ys)) / H * 1.2) * 0 + .15 * light, 2)
+                    if m[x, y]:
+                        r = rnd.random(); tex = (vn(x, y) - .5) * 1.7 - (1.1 if r < .05 else 0) + (.7 if .05 <= r < .09 else 0)   # patches, pits and light grit
+                        put(x, y, (3.4 if last else 2.9) + L["shift"] * .4 * bands - ((x - sum(xs) / len(xs)) / W * 2.2) + .15 * light + tex, 2)
+            if not last:   # the layer above throws a shadow onto this ledge, to its right and front
+                nxt = [(sx(x) + 2.5, sy(y, T[ti + 1]["z1"]) + 1.5) for x, y in T[ti + 1]["pts"]]; nm = mask(nxt)
+                for y in range(H):
+                    for x in range(W):
+                        if nm[x, y] and kind[y][x] == 2 and img[y][x] is not None: img[y][x] -= 1.0
     for _ in range(cracks):   # a jagged crack running down a wall
         x = rnd.randint(W // 4, 3 * W // 4); y = int(top * 0 + H * .25)
         while y < H - 4:
-            if 0 <= x < W and kind[y][x] == 1: img[y][x] = ramp[0]
+            if 0 <= x < W and kind[y][x] == 1: img[y][x] = 0
             y += 1; x += rnd.choice((-1, 0, 0, 1))
     out = Image.new("RGBA", (W, H), (0, 0, 0, 0)); px = out.load()
     for y in range(H):
         for x in range(W):
-            if img[y][x]: px[x, y] = img[y][x] + (255,)
+            if img[y][x] is not None: px[x, y] = ramp[max(0, min(4, int(round(img[y][x]))))] + (255,)
     o = Image.new("RGBA", (W, H), (0, 0, 0, 0)); op = o.load()
     for y in range(H):
         for x in range(W):
