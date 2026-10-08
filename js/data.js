@@ -391,7 +391,7 @@ const PERIOD_COLOR = {
 // walk is how many frames sprites/<id>-walk.png has, side by side, each the same size as the standing picture.
 // idle is how many frames sprites/<id>-idle.png has (same strip format) and ms how long each shows. A picture with both walks on the walk strip and plays idle while it holds still;
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
-const SPRITES = {coel:{ratio:100/75, walk:6, step:.15, size:1.4}, dime:{ratio:100/75, walk:4, step:.25}, tikt:{ratio:100/75, idle:2, ms:600}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180}};
+const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:6, ms:500}, coel:{ratio:100/75, walk:6, step:.15, size:1.4}, dime:{ratio:100/75, walk:4, step:.25}, tikt:{ratio:100/75, idle:2, ms:600}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
@@ -881,9 +881,9 @@ const PALEOFLORA = {
   storeDays:2,        // CERES holds this many days of production
 };
 const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
-// Herbivores from these periods never evolved to eat grass, and get sick on it
+// Herbivores from these periods never evolved to eat grass, and get sick on it (Cenozoic plants, a grassland biome or grass hay)
 const GRASS_INTOLERANT = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
-const GRASS_HIT = {intolerant:-15, cretaceous:-5};
+const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full grass share
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
@@ -1082,7 +1082,7 @@ const HEALTH = {
   hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
   dirtPer:25,          // every this many points of dirt above the unhappy line adds 1× more risk
   frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
-  grassSick:2,         // old plant-eaters eating grass get sick this much more
+  grassSick:2,         // old plant-eaters eating only plants they never evolved for get sick this much more (less for a share of it)
   territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
   attacked:.15,        // chance a day an animal is hurt by a species that preys on it
   illStart:20, injuryStart:25,       // how bad a new case starts (0 to 100)

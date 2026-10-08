@@ -145,8 +145,8 @@ function geneDone(c){
 
 /* ---------- who gets sick ---------- */
 
-// Old plant-eaters eating grass, from a Cenozoic planting (without older groves to browse instead) or grass hay
-function grassSick(e, s){ return foodType(s) === "paleoflora" && GRASS_INTOLERANT.includes(s.period) && (grassyFloor(e) || e.grassFed); }
+// Old plant-eaters eating plants they never evolved for (see grassShare), 0 to 1
+const grassSick = (e, s) => GRASS_INTOLERANT.includes(s.period) ? grassShare(e, s) : 0;
 const hungerShare = e => clamp((e.hungryMin || 0) / (CLOSE_MIN - OPEN_MIN), 0, 1);
 const medicated = (e, s) => !!e.medFedOk && canTreat(s);
 
@@ -157,7 +157,7 @@ function illChance(e, a){
   const hg = hungerShare(e); if(hg > .02){ p *= 1 + HEALTH.hungerMult * hg; why.push("hunger"); }
   const d = e.dirt || 0; if(d > CLEAN.penaltyFrom){ p *= 1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer; why.push("dirt"); }
   const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
-  if(grassSick(e, s)){ p *= HEALTH.grassSick; why.push("eating grass"); }
+  const gs = grassSick(e, s); if(gs > 0){ p *= 1 + (HEALTH.grassSick - 1) * gs; why.push("eating grass"); }
   if(thirsty(e, s)){ p *= HAB.dryIll; why.push("no water"); }
   const wx = weatherNow(), x = exposure(e);
   if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))){ p *= 1 + wx.ill * x; why.push("weather"); }
