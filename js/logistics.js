@@ -211,23 +211,33 @@ function dockOrders(b){
 }
 function dockTotals(){ const o = {}; for(const b of state.buildings) if(b.type === "dock") for(const [t, n] of Object.entries(dockOrders(b))) o[t] = (o[t] || 0) + n; return o; }
 // A delivery: top up each dock to its order. Partner parks pay while they're still feeding. Daytime trucks don't announce themselves.
+// Animal food comes first, in whole units. If it won't fit, the truck takes back guest goods the dock holds beyond their order.
 function dockDelivery(quiet){
   let spent = 0, units = 0;
   for(const b of state.buildings){
     if(b.type !== "dock" || !isReachable(b)) continue;
     const orders = dockOrders(b), short = {};
     for(const t of ORDER_GOODS) short[t] = Math.max(0, orders[t] - stockOf(b, t));
-    // when it won't all fit, each good gets its share of the room, so the last on the list isn't left out
-    const total = Object.values(short).reduce((s, n) => s + n, 0), fit = total > 0 ? Math.min(1, storeRoom(b, ORDER_GOODS[0]) / total) : 1;
-    for(const t of ORDER_GOODS){
+    let over = FEED_GOODS.reduce((s, t) => s + Math.ceil(short[t]), 0) - storeRoom(b, ORDER_GOODS[0]);
+    for(const t of GUEST_GOODS){
+      const back = over > 0 ? Math.min(Math.floor(stockOf(b, t) - orders[t]), Math.ceil(over)) : 0;
+      if(back < 1) continue;
+      takeGood(b, t, back); over -= back; short[t] = 0;
+      if(!freeFeeding()) spend(-Math.round(back * GUEST_GOOD_PRICE), "supplies");
+    }
+    const buy = (t, n) => {
       // partner parks only pay for animal food; stock for stands and shops goes on the supplies bill
       const price = freeFeeding() && !isGuestGood(t) ? 0 : unitPrice(t);
-      let n = Math.min(Math.floor(short[t] * fit), Math.floor(storeRoom(b, t)));
+      n = Math.min(n, Math.floor(storeRoom(b, t)));
       if(price) n = Math.min(n, Math.floor(Math.max(0, state.money) / price));
-      if(n < 1) continue;
+      if(n < 1) return;
       addGood(b, t, n); units += n;
       if(price){ spend(Math.round(n * price), isGuestGood(t) ? "supplies" : "feed"); spent += n * price; }
-    }
+    };
+    for(const t of FEED_GOODS) buy(t, Math.floor(short[t]));
+    // stands and shops share whatever room is left, so the last on the list isn't left out
+    const total = GUEST_GOODS.reduce((s, t) => s + short[t], 0), fit = total > 0 ? Math.min(1, storeRoom(b, ORDER_GOODS[0]) / total) : 1;
+    for(const t of GUEST_GOODS) buy(t, Math.floor(short[t] * fit));
   }
   if(units && !quiet) events.toast(`The dock took in ${units} units of food and stock${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
 }

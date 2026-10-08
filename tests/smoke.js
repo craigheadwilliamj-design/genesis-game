@@ -251,6 +251,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.partnerPays = state.money === m1 && stockOf(dock, "plants") > 0;
     // a rush order lands now at a markup
     dock.store = {}; const m2 = state.money; out.rushOrder = !rushOrder(dock, "meat") && stockOf(dock, "meat") === LOGI.rushLot && state.money < m2;
+    // a dock jammed with surplus merch still takes animal food: the truck takes the surplus back
+    dock.store = {merch:storeCap(dock) - 1, drinks:1}; const fed = parkDemand("plants") > 0;
+    dockDelivery();
+    out.dockFeedFirst = fed && stockOf(dock, "plants") >= dockOrders(dock).plants - 1 && stockOf(dock, "merch") < storeCap(dock) - 1;
     dock.store = {plants:12};
 
     // a keeper feeds the exhibit from the dock's stock, then a custodian restocks the station
