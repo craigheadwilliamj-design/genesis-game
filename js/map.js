@@ -996,9 +996,14 @@ function walkArea(h, e){
       : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : r * .9;
     if(R) obs.push({x:f.x, y:f.y, c:R + body});
   }
-  return {pts, obs, m};
+  // land animals keep out of the exhibit's water; swimmers and flyers ignore it
+  const sp = SPECIES_BY_ID[h.sp], wat = sp && !swims(sp) && !isFlyer(sp) ? waterOf(e).map(w => w.points) : [];
+  return {pts, obs, m, wat};
 }
-const inObstacle = (p, A) => A.obs.some(o => Math.hypot(p[0] - o.x, p[1] - o.y) < o.c);
+// Semi-aquatic animals (fish eaters and the like) wade in and swim; the rest stay on the bank
+const swims = s => !isFlyer(s) && likesOf(s).water >= .6;
+const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w));
+const inObstacle = (p, A) => A.obs.some(o => Math.hypot(p[0] - o.x, p[1] - o.y) < o.c) || inWater(p, A);
 // Is p somewhere an animal can stand: inside, off the fence, out of the rocks and trees?
 const standable = (p, A) => inPoly(p[0], p[1], A.pts) && distToEdge(p[0], p[1], A.pts) >= A.m && !inObstacle(p, A);
 // A spot by the fence moved in toward the middle until the animal fits there; solid also steps it out of any rock or tree it's in
@@ -1021,6 +1026,8 @@ function walkClear(a, b, A){
     if(Math.hypot(a[0] - o.x, a[1] - o.y) < o.c || Math.hypot(b[0] - o.x, b[1] - o.y) < o.c) continue;
     if(segProj(o.x, o.y, a, b).d < o.c) return false;
   }
+  // not across a pond (one it's standing in doesn't count, so it can wade out)
+  if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length])) return false;
   for(const t of [.25, .5, .75]) if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false;
   return true;
 }
@@ -1053,13 +1060,17 @@ function cornerNodes(pts, m = 0){
 function walkNodes(A){
   const out = cornerNodes(A.pts, A.m).filter(p => !inObstacle(p, A));
   for(const o of A.obs) for(let k = 0; k < 6; k++){ const a = k * Math.PI / 3 + .3, p = [o.x + Math.cos(a) * (o.c + .4), o.y + Math.sin(a) * (o.c + .4)]; if(standable(p, A)) out.push(p); }
+  for(const w of A.wat){   // spots just off each pond corner, pushed away from the middle
+    const c = centroid(w);
+    for(const q of w){ const d = dist(q, c) || 1; for(const k of [1, 2.5]){ const r = A.m + k, p = [q[0] + (q[0] - c[0]) / d * r, q[1] + (q[1] - c[1]) / d * r]; if(standable(p, A)){ out.push(p); break; } } }
+  }
   return out;
 }
 
 // Which waypoints see each other, worked out once per exhibit layout and body size, since every animal of a kind shares it
 const walkGraphCache = new Map();
 function walkGraph(A){
-  const key = JSON.stringify([A.pts, A.obs, A.m]); let g = walkGraphCache.get(key);
+  const key = JSON.stringify([A.pts, A.obs, A.m, A.wat]); let g = walkGraphCache.get(key);
   if(g) return g;
   const nodes = walkNodes(A), adj = nodes.map(() => []);
   for(let i = 0; i < nodes.length; i++) for(let j = i + 1; j < nodes.length; j++) if(walkClear(nodes[i], nodes[j], A)){ const w = dist(nodes[i], nodes[j]); adj[i].push([j, w]); adj[j].push([i, w]); }
@@ -1089,9 +1100,9 @@ function walkRoute(a, b, A){
 function animalWander(h, e){
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
-  const A = walkArea(h, e);
+  const A = walkArea(h, e), ws = swims(SPECIES_BY_ID[h.sp]) ? waterOf(e) : [];
   for(let i = 0; i < 8; i++){
-    const p = randomInside(e.points);
+    const p = ws.length && Math.random() < .5 ? randomInside(pickOne(ws).points) : randomInside(e.points);   // swimmers spend half their time in the water
     if(!standable(p, A)) continue;
     const r = walkRoute([h.x, h.y], p, A);
     if(r){ h.path = r; return; }
@@ -1136,6 +1147,11 @@ function actGoal(h, e, a){
       const ws = waterOf(e);
       if(!ws.length) return gateSpot(e);
       const w = nearestTo(h, ws, w => centroid(w.points)), v = nearestTo(h, w.points), c = centroid(w.points);
+      if(!swims(SPECIES_BY_ID[a.sp])){   // land animals drink from the bank: the nearest edge, one body back toward them
+        let q = null; for(let i = 0; i < w.points.length; i++){ const r = segProj(h.x, h.y, w.points[i], w.points[(i + 1) % w.points.length]); if(!q || r.d < q.d) q = r; }
+        const d = Math.hypot(h.x - q.x, h.y - q.y) || 1, back = (h.r || 1) + .6;
+        return [q.x + (h.x - q.x) / d * back, q.y + (h.y - q.y) / d * back];
+      }
       return [v[0] + (c[0] - v[0]) * .25, v[1] + (c[1] - v[1]) * .25];   // a step into the shallows
     }
     case "rest": {
@@ -1155,7 +1171,7 @@ function actGoal(h, e, a){
       return f ? featSpot(h, f) : null;
     }
     case "hunt": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null; }
-    case "play": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => toyFor(LAND[f.type], s) > 0).concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
+    case "play": { const s = SPECIES_BY_ID[a.sp], ws = waterOf(e); if(swims(s) && ws.length && Math.random() < .6) return centroid(pickOne(ws).points); const f = pickOne(land.filter(f => toyFor(LAND[f.type], s) > 0).concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
     case "social": {
       let mate = null, bd = Infinity;
       for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.sp === h.sp){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; mate = o; } }
@@ -1230,6 +1246,8 @@ function animateAnimals(dt){
     if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
+    // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto
+    if(h.swim !== undefined || swims(SPECIES_BY_ID[h.sp])){ const sw = waterOf(e).some(w => inPoly(h.x, h.y, w.points)); if(sw !== !!h.swim){ h.swim = sw; h.el.classList.toggle("swimming", sw); } }
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     if(idleOnly) idleFrame();
     else if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
