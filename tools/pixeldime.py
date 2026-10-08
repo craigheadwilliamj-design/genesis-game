@@ -36,7 +36,7 @@ passA = [("f",60,48,2),("f",61,48,5),                   # rear far swings forwar
          ("f",58,80,2),("f",59,80,2),("f",60,80,2),("f",61,81,2),("f",62,81,4),   # front far planted
          ("n",58,49,4),("n",59,48,4),("n",60,48,3),("n",61,48,3),("n",62,48,3),("n",63,48,5),   # rear near planted
          ("n",60,76,3),("n",61,77,4)]                                                           # front near swings forward, lifted
-passB = [("f",60,47,2),("f",61,47,2),("f",62,47,5),     # rear far planted
+passB = [("f",60,47,2),("f",61,47,2),("f",62,47,4),     # rear far planted
          ("f",57,82,1),("f",58,80,4),("f",59,81,3),("f",60,82,4),("f",61,84,3),   # front far swings forward, lifted
          ("n",58,50,4),("n",59,49,4),("n",60,50,3),("n",61,51,3),("n",62,52,5),                 # rear near swings forward, lifted
          ("n",60,76,3),("n",61,77,3),("n",62,77,3),("n",63,77,5)]                               # front near planted
