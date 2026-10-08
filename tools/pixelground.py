@@ -1,4 +1,5 @@
 # Draws seamless pixel-art ground tiles to sprites/ground/<biome>-<exhibit|park>.png, laid over the biome color (BIOMES[x].color / .park), 0.125 m per pixel.
+# SUPERSEDED by tools/pixelground_flat.py (flat style); running this writes the old two-tile files (scrubland-exhibit/park.png), which nothing uses any more.
 # Scrubland: red-ochre and pale sand patches (dithered), cracked hardpan, pebbles, short hardpan cracks and small clusters of sandstone and dark stones (nothing modern, so it suits any era), like the Utah reference.
 # The tiles wrap, so features near an edge continue on the other side. Usage: python3 -I tools/pixelground.py [outdir]
 import sys, os, random, math

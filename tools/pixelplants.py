@@ -4,7 +4,8 @@
 # scrambling/climbing stem branching from the leaf axils with fern-like leaves (Pennsylvanian, not Permian).
 # Triassic (searched): Lepidopteris = peltasperm seed fern, bipinnate leaves with a thick cuticle; Scytophyllum = Eurasian seed fern with lanceolate, undulate-toothed
 # pinnae and fishbone veins; Pagiophyllum = conifer shoots with tight spirally arranged scale leaves (whole-plant habit not confirmed, so drawn as a shrubby conifer).
-# Usage: python3 -I tools/pixelplants.py [outdir]   Currently: the Permian and Triassic scrubland plants.
+# SUPERSEDED: the Permian and Triassic scrubland plants are now drawn in the flat style by tools/pixelplants_flat.py. Running this overwrites them with the older shaded versions; kept for reference.
+# Usage: python3 -I tools/pixelplants.py [outdir]
 import sys, random, math
 from PIL import Image
 
