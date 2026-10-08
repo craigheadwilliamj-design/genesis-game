@@ -898,10 +898,22 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
+// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture, walkSrc the walk strip.
+function pixelSprites(){
+  for(const [id, art] of Object.entries(typeof PIXEL_ART === "undefined" ? {} : PIXEL_ART)){
+    const S = SPRITES[id]; if(!S) continue;
+    const W = art.frames[0][0].length, H = art.frames[0].length, walk = art.frames.slice(1);
+    const paint = fr => { const c = document.createElement("canvas"); c.width = W * fr.length; c.height = H; const g = c.getContext("2d");
+      fr.forEach((rows, i) => rows.forEach((row, y) => { for(let x = 0; x < W; x++){ const k = row[x]; if(k === ".") continue; g.fillStyle = art.pal[k]; g.fillRect(i * W + x, y, 1, 1); } })); return c.toDataURL(); };
+    S.src = paint([art.frames[0]]); S.ratio = W / H;
+    if(walk.length){ S.walkSrc = paint(walk); S.walk = walk.length; }
+  }
+}
+pixelSprites();
 function spriteSvg(sp, h){
-  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" ${box}${f >= 0 && n ? ` display="none"` : ""}/>`
-    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${S.src || `sprites/${sp}.png`}" style="image-rendering:pixelated" ${box}${f >= 0 && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${(!h.viv && S.walkSrc) || `sprites/${sp}-${kind}.png`}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // -1 stands, 0 and up is a walk frame
 function setPose(h, f){
@@ -1199,7 +1211,7 @@ function animateAnimals(dt){
     h.x += dx/d * step; h.y += dy/d * step;
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     const S = SPRITES[h.sp];
-    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * .5)) % S.walk); }
+    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
     if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     if(tilt) place34(h);
