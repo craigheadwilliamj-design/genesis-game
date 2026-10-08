@@ -1138,6 +1138,14 @@ function quietSpot(e){
   for(const p of cornerNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
   return best;
 }
+// A swimmer in a pond: the bank just past its nearest edge, to get out and dry off (null if it's not in one)
+function bankSpot(h, e){
+  const w = waterOf(e).find(w => inPoly(h.x, h.y, w.points)); if(!w) return null;
+  const c = centroid(w.points); let q = null;
+  for(let i = 0; i < w.points.length; i++){ const r = segProj(h.x, h.y, w.points[i], w.points[(i + 1) % w.points.length]); if(!q || r.d < q.d) q = r; }
+  const d = Math.hypot(q.x - c[0], q.y - c[1]) || 1, out = (h.r || 1) * 1.5 + 1;
+  return [q.x + (q.x - c[0]) / d * out, q.y + (q.y - c[1]) / d * out];
+}
 // Where the act takes it, or null to stay where it is
 function actGoal(h, e, a){
   const land = landOf(e).filter(f => LAND[f.type]), of = k => land.filter(f => LAND[f.type][k]);
@@ -1159,7 +1167,7 @@ function actGoal(h, e, a){
     }
     case "rest": {
       const f = nearestTo(h, of("slots").concat(of("flora")), f => [f.x, f.y]);
-      return f ? featSpot(h, f, !!LAND[f.type].slots) : null;
+      return f ? featSpot(h, f, !!LAND[f.type].slots) : bankSpot(h, e);   // with no shelter it rests on the bank, not afloat
     }
     case "hide": {
       const cover = of("hide").length ? of("hide") : of("slots").length ? of("slots") : of("flora").length ? of("flora") : of("cover");
