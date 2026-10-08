@@ -1,6 +1,6 @@
 # Adds shading and texture to Prionosuchus (sprites/prio.png, prio-walk.png, prio-idle.png, prio-swim.png) without touching its shape or its colors' hues (same idea as tools/pixelcoty_shade.py).
 # Every pixel keeps its place and stays opaque or clear; only fills inside the shapes change, to a lighter or darker shade of the same color (light from the top left): a lit edge along the back,
-# the snout and the tail's top, shadow under the belly and down the right side, rows of short dashes on the hide, ridges down the tail, scutes on the belly, and a lit edge on each leg.
+# the snout and the tail's top, shadow under the belly and down the right side, and a lit edge on each leg, kept to a few clean bands so the animal stays sleek.
 # Spots, eye, nostril and the swim strip's water are left exactly as they are. It reads shaded colors back to their base colors first, so running it twice gives the same result.
 # Usage: python3 -I tools/pixelprio_shade.py [dir]
 import sys
@@ -32,31 +32,18 @@ def shade(grid):
             c = grid[y][x]
             if c not in BASE: continue
             up, dn, lf, rt = g(x, y - 1), g(x, y + 1), g(x - 1, y), g(x + 1, y); n = c
-            ur = g(x + 1, y - 1)
             if c == "body":
-                if (up is None or up == "tail") and H(x, y, 4) != 0: n = "bodyhi"                                  # a lit edge along the back and the snout, broken up
-                elif lf is None and y % 2 == 0: n = "bodyhi"
-                elif dn in ("belly", None, "jaw") and (x + y) % 2 == 0: n = "bodylo"                              # shadow where the flank turns under, dithered
-                elif rt is None and y % 2 == 0: n = "bodylo"                                                      # the right edge (rump, snout tip) is in shade
-                elif y % 3 == 0 and (x + (y // 3) * 2) % 5 in (0, 1) and up == "body" and dn in ("body", "belly"): n = "bodylo"   # scale rows: short darker dashes, staggered
-                elif y % 3 == 1 and (x + (y // 3) * 2 + 3) % 5 == 0 and up == "body" and dn == "body": n = "bodyhi"   # and a lighter fleck beside each
+                if up in (None, "tail"): n = "bodyhi"                                                              # a clean lit edge along the back and the snout
+                elif dn in ("belly", None, "jaw") or rt is None: n = "bodylo"                                     # one solid band of shade where the flank turns under and down the right edge
             elif c == "tail":
-                if up is None and H(x, y, 3) != 0: n = "tailhi"                                                   # the tail's top catches the light
-                elif lf is None and y % 2 == 1: n = "tailhi"
-                elif dn in (None, "body", "bodylo") and (x + y) % 2 == 0: n = "taillo"                            # shade under the tail
-                elif rt in ("body", "bodyhi", "bodylo") and y % 2 == 0: n = "taillo"
-                elif (x + y) % 4 == 0 and up == "tail" and dn == "tail" and x % 2 == 0: n = "tailhi"              # ridges: short diagonal dashes down the tail
-                elif (x - y) % 6 == 0 and up == "tail": n = "taillo"                                              # with a groove beside each
+                if up is None: n = "tailhi"                                                                       # the tail's top catches the light
+                elif dn is None or (dn in ("body", "bodylo") and rt in ("body", "bodyhi", "bodylo")): n = "taillo"   # shade under the tail
             elif c == "belly":
-                if dn is None and (x + y) % 3 != 0: n = "bellylo"                                                 # the underside is in shadow
-                elif x % 3 == 0 and up in ("body", "bodylo", "bodyhi", "belly") and dn == "belly": n = "bellyhi"   # belly scutes: short light dashes
-                elif up in ("body", "bodylo", "bodyhi") and x % 2 == 1: n = "bellylo"                             # shadow where it meets the flank
+                if dn is None: n = "bellylo"                                                                      # the underside is in shadow
             elif c == "jaw":
-                if up is None and H(x, y, 3) == 0: n = "jawhi"                                                    # a lit edge on the long jaw
-                elif dn is None and x % 2 == 0: n = "jawlo"                                                       # its underside in shade
-                elif x % 6 == 2: n = "jawlo"                                                                      # and tooth gaps along the jaw line
+                if dn is None: n = "jawlo"                                                                        # the long jaw's underside in shade
             elif c == "leg":
-                if lf is None and y % 2 == 0: n = "leghi"                                                         # a lit left edge on each leg
+                if lf is None: n = "leghi"                                                                        # a lit left edge on each leg
                 elif rt is None: n = "leglo"                                                                      # the right side in shade
             if n != c: out[y][x] = n
     return out
