@@ -58,9 +58,9 @@ def foot(p):                           # ankle over the cycle: slide back while 
     return 47 + 15 * (u*u*(3 - 2*u)), 47 - 4 * math.sin(math.pi * u)
 W, H = grids[0][:2]
 stand = bare(grids[0][2], 38, 41)      # the original standing legs stay: only the bulge above them goes, and a short thigh joins them to the body
-for y in range(38, 41):
+for y in range(37, 41):   # from the belly row down, so the thigh covers the yellow line only where it is
     for x, c in ((55, FAR), (56, FAR), (57, FAR), (58, NEAR), (59, NEAR), (60, NEAR)): stand[(x, y)] = c
-walk = [pose(bare(grids[1][2], 39), math.floor(1 + math.cos(4*math.pi*k/WALK) + .5), 39, foot(k/WALK), foot((k/WALK + .5) % 1)) for k in range(WALK)]
+walk = [pose(bare(grids[1][2], 39), math.floor(1 + math.cos(4*math.pi*k/WALK) + .5), 38, foot(k/WALK), foot((k/WALK + .5) % 1)) for k in range(WALK)]
 grids = [(W, H, stand)] + [(W, H, g) for g in walk]
 # one shared palette: the most used colors, everything else snaps to the nearest
 use = Counter(c for _, _, g in grids for c in g.values())
