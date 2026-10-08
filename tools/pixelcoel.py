@@ -35,10 +35,10 @@ def line(g, a, b, col, wd):
     for i in range(n+1):
         x, y = round(a[0] + (b[0]-a[0])*i/n), round(a[1] + (b[1]-a[1])*i/n)
         for dx in range(wd): g[(x + dx - wd//2, y)] = col
-def bare(base, top):                   # the body without legs, belly line yellow across the rump
-    body = {k: v for k, v in base.items() if not (44 <= k[0] <= 63 and k[1] >= top)}
+def bare(base, top, low=99):           # the body without legs (rows top to low-1 only when low is set), belly line yellow across the rump
+    body = {k: v for k, v in base.items() if not (44 <= k[0] <= 63 and top <= k[1] < low)}
     for x in range(47, 64):
-        ys = [y for (xx, y) in body if xx == x and y < 45]
+        ys = [y for (xx, y) in body if xx == x and y < top]
         if ys: body[(x, max(ys))] = BELLY
     return body
 def leg(g, hip, ank, col):             # thigh, shin and a three-toe-wide foot, the knee bending forward
@@ -57,7 +57,9 @@ def foot(p):                           # ankle over the cycle: slide back while 
     u = (p - .6) / .4
     return 47 + 15 * (u*u*(3 - 2*u)), 47 - 4 * math.sin(math.pi * u)
 W, H = grids[0][:2]
-stand = pose(bare(grids[0][2], 38), 0, 38, (60, 47), (53, 47))
+stand = bare(grids[0][2], 38, 41)      # the original standing legs stay: only the bulge above them goes, and a short thigh joins them to the body
+for y in range(38, 41):
+    for x, c in ((55, FAR), (56, FAR), (57, FAR), (58, NEAR), (59, NEAR), (60, NEAR)): stand[(x, y)] = c
 walk = [pose(bare(grids[1][2], 39), math.floor(1 + math.cos(4*math.pi*k/WALK) + .5), 39, foot(k/WALK), foot((k/WALK + .5) % 1)) for k in range(WALK)]
 grids = [(W, H, stand)] + [(W, H, g) for g in walk]
 # one shared palette: the most used colors, everything else snaps to the nearest
