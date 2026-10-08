@@ -7,7 +7,7 @@ import sys, math, numpy as np
 from PIL import Image
 
 W, H = 170, 150                    # working canvas; the sprites are cropped to the union of their bounds
-ELEV, YAW = math.radians(30), math.radians(22)   # camera height above the ground plane; how far the animal turns toward the viewer
+ELEV, YAW = math.radians(14), math.radians(30)   # camera height above the ground plane; how far the animal turns toward the viewer
 LIGHT = np.array([-.62, .7, .32]); LIGHT /= np.linalg.norm(LIGHT)   # from the top left and a little toward the viewer (camera space: x right, y up, z toward viewer)
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]) / 16.0
 OUT = "/tmp/claude-0/-home-user-genesis-game/1dc99202-6460-592d-946c-173bd97ee53b/scratchpad/"
@@ -30,6 +30,7 @@ def capsule(P, a, b, r1, r2):
     return np.linalg.norm(pa - h[:, None] * ba, axis=1) - (r1 + (r2 - r1) * h)
 def sphere(P, c, r): return np.linalg.norm(P - np.array(c, float), axis=1) - r
 
+LIFT = 6.2   # how far the body rides above its old height, leaving a gap under the belly
 SAIL_H, SAIL_W, SAIL_X = 41.0, 24.6, -1.0   # height above the spine, half-width, and where it's centered along the back
 def spine_y(x, bob): return 12 + bob + 9.2 * np.sqrt(np.clip(1 - (x / 22) ** 2, 0, 1)) - 1.4
 def sail_h(x): return SAIL_H * np.sqrt(np.clip(1 - ((x - SAIL_X) / SAIL_W) ** 2, 0, 1)) ** .85
@@ -40,13 +41,13 @@ def pose_of(phase, walking):
         p %= 1.0
         if p < .5: return 7.0 - (p / .5) * 14.0, 0.0
         q = (p - .5) / .5; return -7.0 + q * 14.0, 3.6 * math.sin(math.pi * q)
-    if not walking: return {"FR": (0, 0), "HL": (0, 0), "FL": (0, 0), "HR": (0, 0), "sway": 0.0, "bob": 0.0, "head": 0.0}
+    if not walking: return {"FR": (4.5, 0), "HL": (6.5, 0), "FL": (-4.5, 0), "HR": (-4.5, 0), "sway": 0.0, "bob": 0.0, "head": 0.0}
     return {"FR": foot(phase), "HL": foot(phase), "FL": foot(phase + .5), "HR": foot(phase + .5),
             "sway": math.sin(2 * math.pi * phase), "bob": math.sin(4 * math.pi * phase), "head": -math.sin(2 * math.pi * phase)}
 
 def parts(P, pz):
     # every named piece of the animal in its own frame: x forward, y up, z toward its right. Returns the blended distance and a dict of piece distances.
-    sw, bob, hd = pz["sway"], pz["bob"] * .35, pz["head"]
+    sw, bob, hd = pz["sway"], pz["bob"] * .35 + LIFT, pz["head"]
     D = {}
     torso = ellipsoid(P, (0, 12 + bob, 0), (22, 9.6, 10.4)); D["torso"] = torso
     chest = ellipsoid(P, (12, 12.4 + bob, 0), (11, 10.2, 10.2)); D["chest"] = chest
@@ -65,8 +66,8 @@ def parts(P, pz):
     jaw = capsule(P, (31, 12.8 + bob, hz), (44, 12.4 + bob, hz + hd * .7), 4.2, 2.6); D["jaw"] = jaw; body = smin(body, jaw, 1.2)
     # legs: short and sprawling, elbows out; shoulder, elbow, wrist, then a foot with three toes
     for name, xs, side in (("FR", 18.5, 1), ("FL", 18.5, -1), ("HR", -17, 1), ("HL", -17, -1)):
-        fx, lift = pz[name]; sh = (xs, 9.8 + bob, side * 8.2); el = (xs + fx * .45 + (-2.5 if xs > 0 else 2.5), 5.4 + lift * .55, side * 14.2)
-        wr = (xs + fx * .9, 3.4 + lift, side * 15.0); ft = (xs + fx * .9 + 2.2, 1.3 + lift, side * 15.6)
+        fx, lift = pz[name]; zs = 1.0 if side > 0 else .58; sh = (xs, 9.8 + bob, side * 8.2); el = (xs + fx * .45 + (-2.5 if xs > 0 else 2.5), 6.2 + LIFT * .5 + lift * .55, side * 14.2 * zs)
+        wr = (xs + fx * .9, 3.6 + LIFT * .15 + lift, side * 15.0 * zs); ft = (xs + fx * .9 + 2.2, 1.3 + lift, side * 15.6 * zs)
         d1 = capsule(P, sh, el, 3.5, 2.6); d2 = capsule(P, el, wr, 2.4, 1.8); pad = ellipsoid(P, ft, (3.0, 1.4, 2.2))
         # four thin toes fanned out over the ground, long enough to leave gaps between them, each ending in a pale claw
         toes = None
@@ -107,7 +108,7 @@ def render(pz, ox, oy):
     lit = np.clip(nv @ LIGHT, 0, 1)
     names = list(D); M = np.stack([D[k] for k in names], 1); who = np.array(names)[np.argmin(M, 1)]
     img = np.zeros((H, W, 4), np.uint8); mat = np.full((H, W), "", object)
-    xl, yl, zl, nyl = Pl[:, 0], Pl[:, 1], Pl[:, 2], n[:, 1]; bob = pz["bob"] * .35
+    xl, yl, zl, nyl = Pl[:, 0], Pl[:, 1], Pl[:, 2], n[:, 1]; bob = pz["bob"] * .35 + LIFT
     for i in np.where(hit)[0]:
         r, c = divmod(i, W); w = who[i]; b = BAYER[r % 4, c % 4] - .5
         if w == "eye": img[r, c] = EYE + (255,); mat[r, c] = "g"; continue
