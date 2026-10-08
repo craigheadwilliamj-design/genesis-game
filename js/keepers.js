@@ -144,7 +144,7 @@ function buildKeeperGraph(){
   kGraph = {nodes, anchors};
   // point everyone at the new map (the old one is thrown away)
   for(const k of crew){ k.at = k.at ? (nodes.get(k.at.k) || null) : null; k.route = []; k.t = 0; rebaseAtv(k); if(k.job !== "resting" && k.job !== "sedating") k.job = "idle"; }
-  for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; rebaseAtv(m); if(m.job === "toFence" || m.job === "home"){ m.job = "idle"; m.target = null; } }
+  for(const m of mcrew){ m.at = m.at ? (nodes.get(m.at.k) || null) : null; m.route = []; m.t = 0; rebaseAtv(m); if(m.job === "toFence" || m.job === "home" || m.job === "toCall"){ m.job = "idle"; m.target = null; } }
   for(const c of gcrew){ c.at = c.at ? (nodes.get(c.at.k) || null) : null; c.route = []; c.t = 0; rebaseAtv(c); c.job = "idle"; }
   for(const c of ccrew){ c.at = c.at ? (nodes.get(c.at.k) || null) : null; c.route = []; c.t = 0; rebaseAtv(c); if(c.job.startsWith("to") || c.job === "home"){ c.job = "idle"; c.target = null; if(!c.carry) c.haul = null; } }
   for(const v of vcrew){ v.at = v.at ? (nodes.get(v.at.k) || null) : null; v.route = []; v.t = 0; rebaseAtv(v); if(!["darting", "treating", "checking"].includes(v.job)){ v.job = "idle"; if(v.loose) v.loose.vet = null; v.loose = null; v.patient = null; v.check = null; } }
@@ -317,38 +317,49 @@ function chase(c, l){
   return false;
 }
 
-/* ---------- calling a keeper to an exhibit ---------- */
+/* ---------- calling staff to an exhibit ---------- */
 
-// The Call keeper button: the nearest keeper who isn't mid-escape or carrying an animal drops everything and
-// goes to check the exhibit (feeds it first, mucks it out if it's dirty). If nobody can go yet, the next free keeper takes it.
-// state.staff.calls: {ex: exhibit id, keeper: keeper id or null}
+// The Call keeper / vet / mechanic buttons: the nearest worker of that kind who isn't mid-emergency drops their job and
+// goes to check the exhibit. If nobody can go yet, the next free one takes it. Escapes still come first.
+// state.staff.calls: {ex: exhibit id, keeper: worker id or null (any kind), kind: "keeper" (default), "vet" or "mech"}
+const CALLS = {
+  keeper:{word:"keeper",   staff:() => state.staff.keepers,   crew:() => crew,  anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
+  vet:   {word:"vet",      staff:() => state.staff.vets,      crew:() => vcrew, anchor:e => kGraph.anchors[e.id], busy:c => vetBusy(c),   take:(c, call) => takeVetCall(c, call)},
+  mech:  {word:"mechanic", staff:() => state.staff.mechanics, crew:() => mcrew, anchor:e => anchorFor(e),         busy:c => mechBusy(c), take:(c, call) => takeMechCall(c, call)},
+};
+const callKind = x => x.kind || "keeper";
 const callFor = c => state.staff.calls.find(x => x.keeper === c.id) || null;
 const callBusy = c => c.cargo || c.hunt || c.job === "filling" || c.job === "sedating" || c.job === "hunting" || c.job === "toSedated" || c.job === "returning"
   || (state.safety && state.safety.loose.some(l => l.keeper === c.id));
-function callProblem(e){
-  if(!state.staff.keepers.length) return "Hire a keeper first.";
+const vetBusy = c => c.loose || ["darting", "treating", "checking", "splicing", "hunting"].includes(c.job);
+const mechBusy = c => c.job === "inspecting" || c.job === "repairing";
+function callProblem(e, kind = "keeper"){
+  const K = CALLS[kind];
+  if(!K.staff().length) return `Hire a ${K.word} first.`;
+  if(kind === "mech"){ if(e.viv) return "Vivariums have no fence to inspect."; return anchorFor(e) ? null : "Mechanics can't reach the fence."; }
   if(keeperMoveProblem(e)) return keeperMoveProblem(e);
+  if(kind === "vet" && !e.animals.length) return "No animals here to check.";
   return null;
 }
-function callKeeper(e){
-  const why = callProblem(e); if(why) return why;
-  const calls = state.staff.calls;
-  if(calls.some(x => x.ex === e.id)) return null;
-  const call = {ex:e.id, keeper:null};
-  let best = null; const n = kGraph.anchors[e.id];
-  for(const c of crew){
-    if(!c.at || callFor(c) || callBusy(c)) continue;
+function callKeeper(e, kind = "keeper"){
+  const why = callProblem(e, kind); if(why) return why;
+  const K = CALLS[kind], calls = state.staff.calls;
+  if(calls.some(x => x.ex === e.id && callKind(x) === kind)) return null;
+  const call = {ex:e.id, keeper:null, kind};
+  let best = null; const n = K.anchor(e);
+  for(const c of K.crew()){
+    if(!c.at || callFor(c) || K.busy(c)) continue;
     const w = walkFrom(c.at, c); if(!w.dist.has(n)) continue;
     const d = w.dist.get(n) + (c.route.length ? 1 : 0);
     if(!best || d < best.d) best = {c, d};
   }
   if(best) call.keeper = best.c.id;
   calls.push(call);
-  const k = best && state.staff.keepers.find(x => x.id === best.c.id);
-  events.toast(k ? `${k.name} is on the way to ${e.name}.` : `Every keeper is tied up. The next one free will go to ${e.name}.`, k ? "good" : "");
+  const k = best && K.staff().find(x => x.id === best.c.id);
+  events.toast(k ? `${k.name} is on the way to ${e.name}.` : `Every ${K.word} is tied up. The next one free will go to ${e.name}.`, k ? "good" : "");
   return null;
 }
-function cancelCall(e){ state.staff.calls = state.staff.calls.filter(x => x.ex !== e.id); }
+function cancelCall(e, kind = "keeper"){ state.staff.calls = state.staff.calls.filter(x => !(x.ex === e.id && callKind(x) === kind)); }
 // A called keeper stops what they were doing (releasing any move or muck job they'd claimed) and heads over
 function takeCall(c, call){
   const t = c.move; if(t && !t.cargo){ t.keeper = null; c.move = null; }
@@ -356,18 +367,32 @@ function takeCall(c, call){
   c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
   if(!goTo(c, kGraph.anchors[call.ex], "toCall")) call.keeper = null;
 }
-// Hand unclaimed calls to a free keeper
-function callJob(c){
+// A called vet drops a trip to a patient or check-up and goes to look the exhibit over
+function takeVetCall(c, call){
+  c.patient = null; c.gene = null; c.check = null;
+  c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
+  if(!vetGo(c, kGraph.anchors[call.ex], "toCall")) call.keeper = null;
+}
+// A called mechanic walks over and inspects the fence now, and repairs it if it needs it
+function takeMechCall(c, call){
+  const e = state.exhibits.find(x => x.id === call.ex);
+  c.target = null; c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
+  const w = walkFrom(c.at, c), n = e && anchorFor(e);
+  if(!n || !w.dist.has(n)){ call.keeper = null; return; }
+  setRoute(c, w, n); c.job = "toCall";
+}
+// Hand unclaimed calls of this kind to a free worker
+function callJob(c, kind = "keeper"){
   const mine = callFor(c);
   if(mine) return mine;
-  const w = walkFrom(c.at, c);
-  const free = state.staff.calls.find(x => !x.keeper && kGraph.anchors[x.ex] && w.dist.has(kGraph.anchors[x.ex]));
+  const w = walkFrom(c.at, c), K = CALLS[kind];
+  const free = state.staff.calls.find(x => !x.keeper && callKind(x) === kind && K.anchor({id:x.ex}) && w.dist.has(K.anchor({id:x.ex})));
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
 function callsTidy(){
-  state.staff.calls = state.staff.calls.filter(x => state.exhibits.some(e => e.id === x.ex) && kGraph.anchors[x.ex]);
-  for(const x of state.staff.calls) if(x.keeper && !crew.some(c => c.id === x.keeper)) x.keeper = null;
+  state.staff.calls = state.staff.calls.filter(x => state.exhibits.some(e => e.id === x.ex) && CALLS[callKind(x)].anchor({id:x.ex}));
+  for(const x of state.staff.calls) if(x.keeper && !CALLS[callKind(x)].crew().some(c => c.id === x.keeper)) x.keeper = null;
 }
 
 /* ---------- moving animals between exhibits ---------- */
@@ -485,7 +510,7 @@ function decide(c, k){
   if(l && chase(c, l)) return;
   // can't chase it from here (no dart gun to fetch, no route): let another keeper try
   if(l && l.status === "loose" && l.keeper === c.id) l.keeper = null;
-  const call = callJob(c);
+  const call = callJob(c, "keeper");
   if(call && goTo(c, kGraph.anchors[call.ex], "toCall")) return;
   if(call){ call.keeper = null; c.job = "idle"; c.wait = 10; }
   const mv = moveJob(c);

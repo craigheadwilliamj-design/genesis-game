@@ -125,6 +125,12 @@ function mechanicGo(c, n, job){
 }
 
 function mechanicArrive(c){
+  if(c.job === "toCall"){
+    const call = callFor(c), e = call && state.exhibits.find(x => x.id === call.ex);
+    if(call) state.staff.calls = state.staff.calls.filter(x => x !== call);
+    if(e){ c.target = e.id; c.job = "inspecting"; c.work = MAINT.inspectMinutes; return; }
+    c.job = "idle"; return;
+  }
   const e = findTarget(c.target);
   if(c.job === "toFence" && e){ c.job = "inspecting"; c.work = MAINT.inspectMinutes; return; }
   c.job = "idle"; c.target = null;
@@ -138,6 +144,8 @@ function mechanicsTick(dtMin){
     if(!c.at){ const w = workshops()[0]; if(!w) continue; c.at = kGraph.anchors[w.id]; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
+      const call = c.job !== "toCall" ? callFor(c) : null;
+      if(call && !mechBusy(c) && c.t === 0){ takeMechCall(c, call); if(c.job === "toCall") continue; }
       const e = c.target && findTarget(c.target);
       if(c.job === "inspecting"){
         const w = Math.min(c.work, left); c.work -= w; left -= w;
@@ -171,6 +179,8 @@ function mechanicsTick(dtMin){
       }
       if(c.job !== "idle"){ mechanicArrive(c); continue; }
       if(c.wait > 0){ const w = Math.min(c.wait, left); c.wait -= w; left -= w; continue; }
+      const cj = callJob(c, "mech");
+      if(cj){ takeMechCall(c, cj); if(c.job === "toCall") continue; }
       const f = pickFence(c);
       if(f){ c.target = f.id; mechanicGo(c, anchorFor(f), "toFence"); }
       else { c.wait = 20; const w = workshops()[0]; if(w && kGraph.anchors[w.id] !== c.at) mechanicGo(c, kGraph.anchors[w.id], "home"); }
@@ -192,5 +202,5 @@ function hireMechanic(){
 function mechanicStatus(m){
   const c = mcrew.find(x => x.id === m.id); if(!c) return "Clocking in";
   const e = c.target && findTarget(c.target), n = e ? targetName(e) : "a fence";
-  return {toFence:`Walking to ${n}`, inspecting:`Inspecting ${n}`, repairing:`Repairing ${n}`, home:"Heading back to the workshop"}[c.job] || "Waiting for work";
+  return {toFence:`Walking to ${n}`, toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, inspecting:`Inspecting ${n}`, repairing:`Repairing ${n}`, home:"Heading back to the workshop"}[c.job] || "Waiting for work";
 }

@@ -412,6 +412,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       n = 0; while(c.job === "mucking" && n++ < 600) keepersTick(1);
       out.callKeeperMucks = (e2.dirt || 0) <= 2;
       c.focusEx = null; c.job = "idle"; c.route = []; c.cleanId = null; e2.dirt = 0; state.staff.calls = [];
+      // Call vet and Call mechanic: both go to the exhibit and check it, and each can be asked for separately
+      const keepV = state.staff.vets, keepM = state.staff.mechanics, fixA = kGraph.anchors["fix:" + e2.id];
+      kGraph.anchors["fix:" + e2.id] = kGraph.anchors[e2.id];
+      state.staff.vets = [{id:"vT", name:"Dr. T"}]; state.staff.mechanics = [{id:"mT", name:"T"}]; syncVets(); syncMechanics();
+      vcrew[0].at = kGraph.anchors["b-kdock"]; mcrew[0].at = kGraph.anchors["b-kdock"]; e2.vetCheck = -1; e2.inspected = null;
+      out.callNoStaff = (state.staff.vets = [], typeof callKeeper(e2, "vet") === "string") && (state.staff.vets = [{id:"vT", name:"Dr. T"}], true);
+      out.callVetMech = callKeeper(e2, "vet") === null && callKeeper(e2, "mech") === null && state.staff.calls.length === 2 && state.staff.calls.every(x => x.keeper);
+      n = 0; while(state.staff.calls.length && n++ < 600){ vetsTick(1); mechanicsTick(1); }
+      for(let i = 0; i < 60; i++){ vetsTick(1); mechanicsTick(1); }
+      out.callVetChecks = e2.vetCheck === state.day;
+      out.callMechInspects = !!e2.inspected && e2.inspected.day === state.day;
+      state.staff.vets = keepV; state.staff.mechanics = keepM; syncVets(); syncMechanics(); kGraph.anchors["fix:" + e2.id] = fixA; state.staff.calls = [];
     }
 
     // food trays: a keeper with food left over walks inside the fence and fills them, and animals eat from them first

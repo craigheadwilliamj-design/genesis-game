@@ -294,13 +294,13 @@ function vetHuntJob(c){
 // The worst known sick animal vets can reach: minor ones are treated where they stand,
 // the rest need a free PMC bed
 const vetZone = c => (state.staff.vets.find(v => v.id === c.id) || {}).zone;   // a vet in a zone only treats that zone's exhibits
-function pickPatient(c){
+function pickPatient(c, only){
   if(!dept("pmc")) return null;
   const vz = vetZone(c);
   const taken = new Set(vcrew.filter(x => x !== c && x.patient).map(x => x.patient.a)), beds = bedsFree() > 0;
   let best = null;
   for(const e of state.exhibits){
-    if(!kGraph.anchors[e.id] || (vz && e.zone !== vz)) continue;
+    if(!kGraph.anchors[e.id] || (vz && e.zone !== vz) || (only && e.id !== only)) continue;
     for(const a of e.animals){
       if(!noticed(a) || a.darted || taken.has(a.id)) continue;
       const field = fieldTreatable(a);
@@ -330,7 +330,11 @@ function vetDecide(c){
     if(vetGo(c, kGraph.nodes.get(l.next || l.at), "hunting")){ delete l.noVet; return; }
     l.vet = null; c.loose = null; l.noVet = true;   // keepers can try it with a dart gun
   }
-  const p = pickPatient(c);
+  // a vet the player called looks at that exhibit's sick animals first
+  const call = callJob(c, "vet");
+  if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
+  const fx = c.focusEx; c.focusEx = null;
+  const p = pickPatient(c, fx) || pickPatient(c);
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
   const g = pickGene(c);
   if(g){ c.gene = {e:g.e.id, a:g.a.id}; if(vetGo(c, kGraph.anchors[g.e.id], "toGene")) return; c.gene = null; }
@@ -348,6 +352,12 @@ function vetArrive(c){
     const [x, y] = keeperPos(c);
     if(lp && Math.hypot(lp[0] - x, lp[1] - y) < 10){ l.status = "darting"; c.job = "darting"; c.work = ESCAPE.sedateMinutes; return; }
     c.job = "idle"; c.wait = 1; return;   // it moved; chase it again (the wait keeps a vet already at the stop from re-planning forever)
+  }
+  if(c.job === "toCall"){
+    const call = callFor(c), e = call && state.exhibits.find(x => x.id === call.ex);
+    if(call) state.staff.calls = state.staff.calls.filter(x => x !== call);
+    if(e && kGraph.anchors[e.id] === c.at){ c.check = e.id; c.focusEx = e.id; c.job = "checking"; c.work = HEALTH.checkMinutes; return; }
+    c.job = "idle"; return;
   }
   if(c.job === "toPatient"){
     const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a);
@@ -421,6 +431,8 @@ function vetsTick(dtMin){
     if(!c.at){ const p = pmcs()[0]; if(!p) continue; c.at = kGraph.anchors[p.id]; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
+      const call = c.job !== "toCall" ? callFor(c) : null;
+      if(call && !vetBusy(c) && c.t === 0){ takeVetCall(c, call); if(c.job === "toCall") continue; }
       if(c.job === "darting" || c.job === "treating" || c.job === "checking" || c.job === "splicing"){
         const w = Math.min(c.work, left); c.work -= w; left -= w;
         if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone, splicing:geneDone})[c.job](c);
@@ -440,7 +452,7 @@ function vetsTick(dtMin){
   }
 }
 
-function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.gene = null; } }
+function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.gene = null; c.focusEx = null; } }
 
 function hireVet(){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center first.";
@@ -456,7 +468,7 @@ function vetStatus(v){
   const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.gene ? c.gene.e : c.check)), n = e ? e.name : "an exhibit";
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
-          toGene:`Heading to give genome therapy in ${n}`, splicing:`Giving genome therapy in ${n}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
+          toGene:`Heading to give genome therapy in ${n}`, splicing:`Giving genome therapy in ${n}`, toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
           darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC"}[c.job] || "Waiting for work";
 }
 
