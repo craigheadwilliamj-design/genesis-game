@@ -1,9 +1,8 @@
 # Adds shading to Tiktaalik (sprites/tikt.png, tikt-idle.png) without touching its shape or its colors' hues (same idea as tools/pixelprio_shade.py, kept sleek: a few clean bands, no speckle).
 # Every pixel keeps its place and stays opaque or clear; only fills inside the shapes change, to a lighter or darker shade of the same color (light from the top left): a lit edge along the back,
 # the head and the tail's top, shadow under the belly, the flank's underside and the right side, a lit left edge and shaded underside on the fins. The back stripe, eye and dark marks are left as they are.
-# It reads shaded colors back to their base colors first, so running it twice gives the same result. The game paints PIXEL_ART.tikt (js/pixelart.js) in place of tikt-idle.png, so the last step rewrites that block's idle frames from the shaded PNG (same pixels, a palette with the shades added).
-# Usage: python3 -I tools/pixeltikt_shade.py [dir] [pixelart.js]
-import sys, re
+# It reads shaded colors back to their base colors first, so running it twice gives the same result. Usage: python3 -I tools/pixeltikt_shade.py [dir]
+import sys
 from PIL import Image
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
@@ -66,27 +65,5 @@ def process(path):
         for x in range(im.width): assert out.getpixel((x, y))[3] == im.getpixel((x, y))[3], "the shape changed"
     out.save(path); print(path, f"{changed} of {total} pixels shaded ({100 * changed // max(total, 1)}%)")
 
-def sync_art(png, path):   # PIXEL_ART.tikt.idle = the strip's frames, one letter a pixel; letters of the old palette keep their places, new colors are added after them
-    src = open(path).read(); a = src.index("// Coded pixel Tiktaalik"); blk = src[a:]
-    pal = dict(re.findall(r'(\w):"(#[0-9a-fA-F]{6})"', blk.split("  idle: [", 1)[0])); keys = list(pal.values())
-    im = Image.open(png).convert("RGBA"); n = im.width // W; rows = []
-    for i in range(n):
-        fr = []
-        for y in range(im.height):
-            row = ""
-            for x in range(W):
-                r, g, b, al = im.getpixel((i * W + x, y))
-                if not al: row += "."; continue
-                hx = "#%02x%02x%02x" % (r, g, b)
-                if hx not in keys: keys.append(hx)
-                row += "abcdefghijklmnopqrstuvwxyz"[keys.index(hx)]
-            fr.append(row)
-        rows.append(fr)
-    head = ("// Coded pixel Tiktaalik, built by tools/pixeltikt.py and shaded by tools/pixeltikt_shade.py: PIXEL_ART.tikt = {pal, idle: [idle1, idle2]} (vivarium strip).\nPIXEL_ART.tikt = {\n  pal: {"
-            + ", ".join(f'{"abcdefghijklmnopqrstuvwxyz"[i]}:"{c}"' for i, c in enumerate(keys)) + "},\n  idle: [\n"
-            + ",\n".join("    [\n" + ",\n".join(f'      "{r}"' for r in fr) + "\n    ]" for fr in rows) + "\n  ]\n};\n")
-    open(path, "w").write(src[:a] + head); print(path, f"Tiktaalik idle rewritten, {len(keys)} colors")
-
 d = sys.argv[1] if len(sys.argv) > 1 else "sprites"
 for f in ("tikt", "tikt-idle"): process(f"{d}/{f}.png")
-sync_art(f"{d}/tikt-idle.png", sys.argv[2] if len(sys.argv) > 2 else "js/pixelart.js")

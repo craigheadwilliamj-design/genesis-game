@@ -957,24 +957,11 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
-// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture (a species with only an idle strip stands on its first frame), walkSrc the walk strip, idleSrc the vivarium strip (art.idle).
-function pixelSprites(){
-  for(const [id, art] of Object.entries(typeof PIXEL_ART === "undefined" ? {} : PIXEL_ART)){
-    const S = SPRITES[id]; if(!S) continue;
-    const first = art.frames ? art.frames[0] : art.idle[0], W = first[0].length, H = first.length, walk = art.frames ? art.frames.slice(1) : [];
-    const paint = fr => { const c = document.createElement("canvas"); c.width = W * fr.length; c.height = H; const g = c.getContext("2d");
-      fr.forEach((rows, i) => rows.forEach((row, y) => { for(let x = 0; x < W; x++){ const k = row[x]; if(k === ".") continue; g.fillStyle = art.pal[k]; g.fillRect(i * W + x, y, 1, 1); } })); return c.toDataURL(); };
-    S.src = paint([first]); S.ratio = W / H;
-    if(walk.length){ S.walkSrc = paint(walk); S.walk = walk.length; }
-    if(art.idle){ S.idleSrc = paint(art.idle); S.idle = art.idle.length; }
-  }
-}
-pixelSprites();
 function spriteSvg(sp, h){
   const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${S.src || `sprites/${sp}.png`}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
-    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${(swm ? S.swimSrc : idl ? S.idleSrc : S.walkSrc) || `sprites/${sp}-${kind}.png`}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
-    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 ? ` display="none"` : ""}><image href="${S.idleSrc || `sprites/${sp}-idle.png`}" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // -1 stands, 0 and up is a walk frame
 // -1 stands, 0 and up is a walk frame, -2 and down is an idle frame (-2 - n), for pictures that have both strips
