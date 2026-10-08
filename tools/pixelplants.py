@@ -56,23 +56,25 @@ def frond(cv, g, base, tip, bend, leaflets, ll, rnd):
 
 def peltate(cv, x, y, r, rnd):
     # Peltaspermum seed organ: an umbrella disc on a stalk with ovules hanging from its underside
-    cv.line(x, y, x, y + r + 4, SEED[0])
-    cv.disc(x, y, r, max(1, r*.5), SEED[1])
-    cv.set(x - r*.5, y - 1, SEED[2]); cv.set(x - r*.2, y - 1, SEED[2]); cv.set(x + r, y, SEED[0])
-    for i in range(-int(r) + 1, int(r)):
-        if i % 2 == 0 or r > 2.5: cv.line(x + i, y + 1, x + i, y + 2 + (i % 3 == 0), SEED[0])
+    cv.disc(x, y, r, max(1.5, r*.5), SEED[1])
+    cv.line(x - r + 1, y, x + r - 1, y, SEED[0])
+    for i in range(-r + 1, r, 2): cv.set(x + i - 1, y - 1, SEED[2])
+    for i in range(-r + 1, r, 2): cv.line(x + i, y + 2, x + i, y + 4 + (i % 4 == 0), SEED[0]); cv.set(x + i, y + 4 + (i % 4 == 0), SEED[2])
 
 def stalks(cv, x0, y0, x1, y1, c):
     cv.line(x0, y0, x1, y1, c)
 
 def peltaspermum():   # small: a few fine bipinnate Lepidopteris fronds, with branched stalks carrying seed discs
-    rnd = random.Random(11); g = ramp("#A8AE62"); cv = Canvas(44, 40); bx, by = 22, 37
+    rnd = random.Random(11); g = ramp("#A8AE62"); cv = Canvas(44, 46); bx, by = 22, 43
     cv.disc(bx, by - 3, 6, 2, g[0])
     for tx, ty, b in ((-19, 8, -4), (19, 9, 4), (-12, 15, -3), (11, 16, 3), (-2, 18, -1)):
         frond(cv, g, (bx + tx*.1, by - 2), (bx + tx, by - 2 - ty), (b*2, -2), 8, 3.2, rnd)
-    for sx, sy, dx, dy in ((15, 22, 9, 6), (-14, 24, -9, 8)):   # a branched stalk off each side, ending in a disc
-        cv.line(bx, by - 2, bx + dx*.9, by - 2 - dy*3, SEED[0]); cv.line(bx + dx*.9, by - 2 - dy*3, bx + dx, by - 2 - dy*3 - 1, SEED[0])
-    peltate(cv, bx + 9, by - 2 - 6*3 - 1, 3, rnd); peltate(cv, bx - 9, by - 2 - 8*3 - 1, 3, rnd)
+    for tx, ty in ((9, 27), (-8, 31)):   # a stalk curves up from the base and ends under a disc
+        n = ty
+        for i in range(n + 1):
+            t = i / n; x = bx + tx * (t ** 1.6); y = by - 2 - i
+            cv.set(x, y, SEED[0]); cv.set(x + 1, y, SEED[1])
+        peltate(cv, bx + tx, by - 2 - ty - 3, 4, rnd)
     cv.set(bx, by, TRUNK[1]); cv.set(bx - 1, by, TRUNK[0]); cv.set(bx + 1, by, TRUNK[0])
     return cv.image(g[0])
 
@@ -80,7 +82,7 @@ def comia():   # medium: once-pinnate fronds with narrow separate pinnules, fann
     rnd = random.Random(23); g = ramp("#8E9654"); cv = Canvas(64, 46); bx, by = 32, 43
     cv.line(bx, by, bx, by - 5, TRUNK[1]); cv.line(bx-1, by, bx-1, by - 4, TRUNK[0]); cv.line(bx+1, by, bx+1, by - 4, TRUNK[2])
     top = (bx, by - 5)
-    fr = [(-29, 3, -3), (29, 4, 3), (-24, 13, -8), (25, 14, 8), (-14, 21, -5), (15, 22, 5), (0, 24, 0)]   # (tip dx, tip rise, bend)
+    fr = [(-30, 2, -3), (30, 3, 3), (-26, 9, -7), (27, 10, 7), (-19, 15, -6), (20, 16, 6), (-10, 17, -3), (11, 18, 3)]   # (tip dx, tip rise, bend)
     fr.sort(key=lambda f: -abs(f[0]))
     for tx, ty, b in fr: frond(cv, g, top, (bx + tx, top[1] - ty), (b, -5), 6, 6.5, rnd)
     return cv.image(g[0])
