@@ -32,6 +32,9 @@ def near(c): return min(range(len(pal)), key=lambda i: sum((a-b)**2 for a, b in 
 rows = []
 for W, H, g in grids:
     rows.append(["".join(KEYS[near(g[(x, y)])] if (x, y) in g else "." for x in range(W)) for y in range(H)])
+# the downscale loses or recolors the eye, so pin it: black on every frame
+for fr, (ex, ey) in zip(rows, [(41, 11), (41, 12), (41, 12)]):
+    fr[ey] = fr[ey][:ex] + KEYS[near((0, 0, 0))] + fr[ey][ex+1:]
 js = "// Coded pixel Coelophysis, built by tools/pixelcoel.py: PIXEL_ART.coel = {pal, frames: [stand, walk1, walk2]}, one letter per pixel ('.' is clear).\nconst PIXEL_ART = {coel: {\n  pal: {" + ", ".join(f'{KEYS[i]}:"#%02x%02x%02x"' % c for i, c in enumerate(pal)) + "},\n  frames: [\n" + ",\n".join("    [\n" + ",\n".join(f'      "{r}"' for r in fr) + "\n    ]" for fr in rows) + "\n  ]\n}};\n"
 open(sys.argv[1] if len(sys.argv) > 1 else "js/pixelart.js", "w").write(js)
 print(len(pal), "colors", grids[0][:2])
