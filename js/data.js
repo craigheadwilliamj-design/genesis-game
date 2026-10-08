@@ -1359,6 +1359,15 @@ const PLANT_SPRITES = {
   "tri-scrubland-medium": {ratio:76/52, size:1.3},
   "tri-scrubland-large":  {ratio:64/92, size:.75},
 };
+// Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
+// and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
+const ROCK_MPP = .12;
+const ROCK_SPRITES = {
+  scrubland:{
+    boulder:[[70, 50], [52, 64], [80, 50], [62, 54]],
+    rock:[[42, 26], [32, 28], [36, 34], [28, 24], [34, 26], [32, 34]],
+  },
+};
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
 const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73", tundra:"#7F8780"};
