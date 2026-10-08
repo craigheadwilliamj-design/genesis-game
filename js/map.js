@@ -674,7 +674,7 @@ function hidden34(x, y){
 // Light is from the left, so left-facing walls and roof faces are the lightest and right-facing the darkest; the front is the base tone.
 const FLAT34 = {px:ROCK_MPP, wall:["#E6DECB", "#D9CFBB", "#BDB29B"], plinth:"#A39A86", eave:"#8E8778", door:"#2E3A33", doorEdge:"#46584E",
   roof:["#2F5C42", "#254A35", "#1B3526"], seam:"#14281C", ridge:"#10261A", gold:"#C9A24B", vent:"#6F6B61", ventHi:"#B3AEA1"};
-const flatSnap34 = ([x, y]) => [Math.round(x / FLAT34.px) * FLAT34.px, Math.round(y * TILT / FLAT34.px) * FLAT34.px / TILT];   // a pixel is square on screen after the squash
+const flatSnap34 = ([x, y]) => [Math.round(x / FLAT34.px + 1e-4) * FLAT34.px, Math.round(y * TILT / FLAT34.px + 1e-4) * FLAT34.px / TILT];   // a pixel is square on screen after the squash; the 1e-4 breaks exact half-pixel ties the same way every time, so no column is dropped or doubled
 const flatPts34 = pts => pts.map(flatSnap34).map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
 const flatPoly34 = (pts, fill, ln = "", decor = false) => `<polygon points="${flatPts34(pts)}" fill="${fill}" shape-rendering="crispEdges" ${ln}${decor ? ` pointer-events="none"` : ""}/>`;
 const flatLine34 = (a, b, c, w) => `<path d="M${flatSnap34(a).map(v => v.toFixed(2)).join(" ")}L${flatSnap34(b).map(v => v.toFixed(2)).join(" ")}" stroke="${c}" stroke-width="${w}" fill="none" shape-rendering="crispEdges" pointer-events="none"/>`;
@@ -688,19 +688,19 @@ function flatWalls34(P, h1, ln){
   return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
 }
 // letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
-const FLAT_FONT34 = {R:["XXX.", "X..X", "XXX.", "X.X.", "X..X"], E:["XXX", "X..", "XX.", "X..", "XXX"], S:[".XXX", "X...", ".XX.", "...X", "XXX."], T:["XXX", ".X.", ".X.", ".X.", ".X."],
-  O:[".XX.", "X..X", "X..X", "X..X", ".XX."], M:["X...X", "XX.XX", "X.X.X", "X...X", "X...X"]};
+const FLAT_FONT34 = {R:["##.", "#.#", "##.", "#.#", "#.#"], E:["###", "#..", "##.", "#..", "###"], S:["###", "#..", "###", "..#", "###"], T:["###", ".#.", ".#.", ".#.", ".#."],
+  O:["###", "#.#", "#.#", "#.#", "###"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"]};
 // door pictograms, 5 wide and 8 tall: a man and a woman
 const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
 function flatText34(Q, L, f, h, str, fill){
   const px = FLAT34.px / L, cols = [...str].reduce((n, ch) => n + FLAT_FONT34[ch][0].length + 1, -1); let c0 = f - cols * px / 2, s = "";
-  for(const ch of str){ const g = FLAT_FONT34[ch]; g.forEach((row, r) => [...row].forEach((v, c) => { if(v === "X") s += Q(c0 + c * px, c0 + (c + 1) * px, h + (4 - r) * FLAT34.px, h + (5 - r) * FLAT34.px, fill); })); c0 += (g[0].length + 1) * px; }
+  for(const ch of str){ const g = FLAT_FONT34[ch]; g.forEach((row, r) => [...row].forEach((v, c) => { if(v === "#") s += Q(c0 + c * px, c0 + (c + 1) * px, h + (4 - r) * FLAT34.px, h + (5 - r) * FLAT34.px, fill); })); c0 += (g[0].length + 1) * px; }
   return s;
 }
 function flatWc34(P, i, S, col){
   const L = edgeLen34(P, i), dw = Math.min(1.1, L * .12) / L, e = FLAT34.px / L, fl = P[(i+1) % P.length][0] < P[i][0]; let s = "";   // fl: the edge runs right to left on screen, so mirror along it
   const Q = (f0, f1, h0, h1, fill) => flatQuad34(P, i, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
-  s += Q(.05, .95, S.wall - 1.05, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - .95, "RESTROOMS", FLAT34.wall[0]);   // the type-colored band with the name on it
+  s += Q(.05, .95, S.wall - 1.2, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - 1.1, "RESTROOMS", FLAT34.wall[0]);   // the type-colored band with the name on it
   for(const [f, right, icon] of [[.3, true, "man"], [.7, false, "woman"]]){   // two doors with a lit left edge, a pictogram, and a gold handle on the inner side
     const fh = right ? f + dw / 2 - 2.5 * e : f - dw / 2 + 1.5 * e;
     s += Q(f - dw / 2, f + dw / 2, 0, 2.1, FLAT34.door) + Q(f - dw / 2, f - dw / 2 + e, 0, 2.1, FLAT34.doorEdge) + Q(fh, fh + e, .45, .85, FLAT34.gold);
