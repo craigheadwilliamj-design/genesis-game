@@ -66,15 +66,15 @@ def parts(P, pz):
     # legs: short and sprawling, elbows out; shoulder, elbow, wrist, then a foot with three toes
     for name, xs, side in (("FR", 18.5, 1), ("FL", 18.5, -1), ("HR", -17, 1), ("HL", -17, -1)):
         fx, lift = pz[name]; sh = (xs, 9.8 + bob, side * 8.2); el = (xs + fx * .45 + (-2.5 if xs > 0 else 2.5), 5.4 + lift * .55, side * 14.2)
-        wr = (xs + fx * .9, 3.4 + lift, side * 15.0); ft = (xs + fx * .9 + 3.2, 1.3 + lift, side * 15.6)
-        d1 = capsule(P, sh, el, 3.5, 2.6); d2 = capsule(P, el, wr, 2.4, 1.8); pad = ellipsoid(P, ft, (4.6, 1.5, 3.0))
-        # four splayed toes reaching forward, each with a pale claw on the tip
+        wr = (xs + fx * .9, 3.4 + lift, side * 15.0); ft = (xs + fx * .9 + 2.2, 1.3 + lift, side * 15.6)
+        d1 = capsule(P, sh, el, 3.5, 2.6); d2 = capsule(P, el, wr, 2.4, 1.8); pad = ellipsoid(P, ft, (3.0, 1.4, 2.2))
+        # four thin toes fanned out over the ground, long enough to leave gaps between them, each ending in a pale claw
         toes = None
-        for k, tz in enumerate((-2.4, -.8, .8, 2.4)):
-            tip = (ft[0] + 8.8, ft[1] - .15, ft[2] + tz * 1.6); t = capsule(P, (ft[0] + 1.5, ft[1], ft[2] + tz * .7), tip, 1.25, .85)
-            toes = t if toes is None else np.minimum(toes, t); D["claw%s%d" % (name, k)] = sphere(P, (tip[0] + .5, tip[1] - .05, tip[2]), .95)
-        d = smin(smin(d1, d2, 1.5), smin(pad, toes, .6), 1.2); D["leg" + name] = smin(d1, d2, 1.5); D["toe" + name] = smin(pad, toes, .6); body = smin(body, d1, 3)
-        body = np.minimum(body, d) if False else body
+        for k, ang in enumerate((-42, -15, 15, 42)):
+            a_ = math.radians(ang); L = 10.5 if k in (1, 2) else 8.8; dx, dz = math.cos(a_), math.sin(a_) * side
+            tip = (ft[0] + .8 + dx * L, ft[1] - .2, ft[2] + dz * L); t = capsule(P, (ft[0] + .8, ft[1], ft[2] + dz * .4), tip, 1.0, .65)
+            toes = t if toes is None else np.minimum(toes, t); D["claw%s%d" % (name, k)] = sphere(P, (tip[0] + dx * .5, tip[1] - .05, tip[2] + dz * .5), .8)
+        d = smin(smin(d1, d2, 1.5), pad, 1.2); d = np.minimum(d, toes); D["leg" + name] = smin(d1, d2, 1.5); D["toe" + name] = np.minimum(pad, toes); body = smin(body, d1, 3)
         legs_all = d if name == "FR" else np.minimum(legs_all, d)
     # the sail: a thin fan standing on the back, wide and tall, reaching low at the tail end
     x, y, z = P[:, 0], P[:, 1], P[:, 2]; yb = spine_y(x, bob)
