@@ -1,0 +1,60 @@
+# Draws seamless pixel-art ground tiles to sprites/ground/<biome>-<exhibit|park>.png, laid over the biome color (BIOMES[x].color / .park), 0.125 m per pixel.
+# Scrubland: red-ochre and pale sand patches (dithered), cracked hardpan, pebbles, dry grass tufts and the odd sage bush, like the Utah reference.
+# The tiles wrap, so features near an edge continue on the other side. Usage: python3 -I tools/pixelground.py [outdir]
+import sys, os, random, math
+from PIL import Image
+
+def hexc(h): return tuple(int(h[i:i+2], 16) for i in (1, 3, 5))
+OCHRE, OCHRE2 = hexc("#C99A62"), hexc("#B98456")
+PALE, SAND = hexc("#E0CC96"), hexc("#CDB77C")
+DARK, CRACK = hexc("#8A7448"), hexc("#7A6540")
+STONE = [hexc(c) for c in ("#6C6254", "#8F8472", "#B5AA94")]
+STRAW, OLIVE, OLIVE2 = hexc("#D9CC8A"), hexc("#8C8A52"), hexc("#6E6C3C")
+SAGE = [hexc(c) for c in ("#525C3A", "#78854F", "#A6B079")]
+BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
+
+def tile(size, seed, tufts, shrubs, cracks, pebbles, cell=30, oc=.58, pl=.3):
+    rnd = random.Random(seed); im = Image.new("RGBA", (size, size), (0, 0, 0, 0)); px = im.load()
+    put = lambda x, y, c: px.__setitem__((x % size, y % size), c + (255,))
+    g = max(4, size // cell); grid = [[rnd.random() for _ in range(g)] for _ in range(g)]   # periodic low-frequency noise: soft patches of soil color
+    def vn(x, y):
+        fx, fy = x / size * g, y / size * g; ix, iy = int(fx), int(fy); tx, ty = fx - ix, fy - iy
+        a = grid[iy % g][ix % g] * (1 - tx) + grid[iy % g][(ix + 1) % g] * tx; b = grid[(iy + 1) % g][ix % g] * (1 - tx) + grid[(iy + 1) % g][(ix + 1) % g] * tx
+        return a * (1 - ty) + b * ty
+    for y in range(size):
+        for x in range(size):
+            n, d = vn(x, y), BAYER[y % 4][x % 4] / 16
+            if n > oc and d < (n - oc) * 2.4: put(x, y, OCHRE2 if d < (n - oc) * .8 else OCHRE)   # warm red patches
+            elif n < pl and d < (pl - n) * 2.2: put(x, y, PALE)                                      # bleached sand
+            elif pl < n < .5 and d < .07: put(x, y, SAND)
+            elif rnd.random() < .006: put(x, y, DARK)                                                # grit
+    for _ in range(cracks):   # hardpan cracks: wandering one-pixel lines that fork now and then
+        x, y = rnd.randrange(size), rnd.randrange(size); dx, dy = rnd.choice((-1, 1)), rnd.choice((0, 1, 1))
+        for _ in range(rnd.randint(14, 34)):
+            put(x, y, CRACK); x += dx if rnd.random() < .7 else 0; y += dy if rnd.random() < .6 else rnd.choice((-1, 0, 1))
+            if rnd.random() < .12: dx = rnd.choice((-1, 1)); dy = rnd.choice((-1, 0, 1))
+    for _ in range(pebbles):   # little stones: a lit top-left pixel, a body, a dark base
+        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 3, 3, 4))
+        for i in range(w): put(x + i, y, STONE[1]); put(x + i, y + 1, STONE[0])
+        put(x, y - 1 + 1, STONE[2]); put(x + w, y + 1, DARK) if w > 2 else None
+    for _ in range(tufts):   # dry grass: a few leaning blades, straw and olive
+        x, y = rnd.randrange(size), rnd.randrange(size)
+        for i in range(rnd.randint(4, 6)):
+            lean = rnd.choice((-1, 0, 0, 1)) * (1 if i % 2 else -1); h = rnd.randint(3, 6); c = STRAW if i % 3 else OLIVE
+            for k in range(h): put(x + i - 2 + (lean * k) // 3, y - k, c if k < h - 1 else OLIVE2 if c == OLIVE else STRAW)
+        put(x, y + 1, OLIVE2); put(x + 2, y + 1, OLIVE2)
+    for _ in range(shrubs):   # sage: a dithered round bush, lit top left, dark underneath, with a shadow on the ground
+        x, y = rnd.randrange(size), rnd.randrange(size); r = rnd.choice((4, 5, 5, 6))
+        for yy in range(-r + 1, r // 2 + 1):
+            for xx in range(-r, r + 1):
+                if (xx / r) ** 2 + (yy / (r * .8)) ** 2 <= 1:
+                    lit = -(xx / r) * .5 - (yy / r) * .8 + (BAYER[(y + yy) % 4][(x + xx) % 4] / 16 - .5) * .9
+                    put(x + xx, y + yy, SAGE[0 if lit < -.05 else 2 if lit > .45 else 1])
+        for xx in range(-r + 1, r + 3): put(x + xx, y + r // 2 + 1, DARK)
+    return im
+
+out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
+os.makedirs(out, exist_ok=True)
+# the exhibit floor repeats every 18 m (144 px); the park ground every 32 m (256 px), a little sparser
+for name, im in (("scrubland-exhibit", tile(144, 7, 12, 3, 7, 18)), ("scrubland-park", tile(256, 8, 30, 8, 14, 44, cell=32, oc=.7, pl=.27))):
+    im.save(f"{out}/{name}.png"); print(name, im.size)
