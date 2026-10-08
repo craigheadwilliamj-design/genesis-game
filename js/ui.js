@@ -239,6 +239,8 @@ function exhibitHtml(e){
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
+  { const why = callProblem(e), called = state.staff.calls.find(x => x.ex === e.id), kk = called && called.keeper && state.staff.keepers.find(x => x.id === called.keeper);
+    h += `<div class="row" style="margin-top:6px">${called ? `<span class="status ok">${kk ? esc(kk.name) + " is on the way" : "Waiting for a free keeper"}</span><button class="btn" data-action="cancelCall">Cancel</button>` : `<button class="btn" data-action="callKeeper"${why ? ` disabled title="${esc(why)}"` : ""}>Call keeper</button><span class="meta">${why ? esc(why) : "Nearest keeper drops what they're doing to check here."}</span>`}</div>`; }
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until day ${state.staff.feedFrom}.` : ""}</div>`;
@@ -779,6 +781,8 @@ panelEl.addEventListener("click", e => {
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
+  if(a === "callKeeper" && it){ const why = callKeeper(it); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "cancelCall" && it){ cancelCall(it); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
     const an = it.animals.find(x => x.id === b.dataset.id);

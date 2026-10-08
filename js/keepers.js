@@ -60,7 +60,7 @@ const unitsPerDay = s => Math.max(1, Math.round(s.food / FOOD_UNIT_COST));
 let kGraph = null;     // {nodes: Map(key -> node), anchors: {id -> node}}
 let crew = [];         // keepers walking around right now (positions aren't saved)
 
-function freshStaff(){ return {keepers:[], mechanics:[], vets:[], custodians:[], guards:[], transfers:[], atvs:[], upgrades:[], feedFrom:7}; }
+function freshStaff(){ return {keepers:[], mechanics:[], vets:[], custodians:[], guards:[], transfers:[], calls:[], atvs:[], upgrades:[], feedFrom:7}; }
 
 /* ---------- what each exhibit needs ---------- */
 
@@ -317,6 +317,59 @@ function chase(c, l){
   return false;
 }
 
+/* ---------- calling a keeper to an exhibit ---------- */
+
+// The Call keeper button: the nearest keeper who isn't mid-escape or carrying an animal drops everything and
+// goes to check the exhibit (feeds it first, mucks it out if it's dirty). If nobody can go yet, the next free keeper takes it.
+// state.staff.calls: {ex: exhibit id, keeper: keeper id or null}
+const callFor = c => state.staff.calls.find(x => x.keeper === c.id) || null;
+const callBusy = c => c.cargo || c.hunt || c.job === "filling" || c.job === "sedating" || c.job === "hunting" || c.job === "toSedated" || c.job === "returning"
+  || (state.safety && state.safety.loose.some(l => l.keeper === c.id));
+function callProblem(e){
+  if(!state.staff.keepers.length) return "Hire a keeper first.";
+  if(keeperMoveProblem(e)) return keeperMoveProblem(e);
+  return null;
+}
+function callKeeper(e){
+  const why = callProblem(e); if(why) return why;
+  const calls = state.staff.calls;
+  if(calls.some(x => x.ex === e.id)) return null;
+  const call = {ex:e.id, keeper:null};
+  let best = null; const n = kGraph.anchors[e.id];
+  for(const c of crew){
+    if(!c.at || callFor(c) || callBusy(c)) continue;
+    const w = walkFrom(c.at, c); if(!w.dist.has(n)) continue;
+    const d = w.dist.get(n) + (c.route.length ? 1 : 0);
+    if(!best || d < best.d) best = {c, d};
+  }
+  if(best) call.keeper = best.c.id;
+  calls.push(call);
+  const k = best && state.staff.keepers.find(x => x.id === best.c.id);
+  events.toast(k ? `${k.name} is on the way to ${e.name}.` : `Every keeper is tied up. The next one free will go to ${e.name}.`, k ? "good" : "");
+  return null;
+}
+function cancelCall(e){ state.staff.calls = state.staff.calls.filter(x => x.ex !== e.id); }
+// A called keeper stops what they were doing (releasing any move or muck job they'd claimed) and heads over
+function takeCall(c, call){
+  const t = c.move; if(t && !t.cargo){ t.keeper = null; c.move = null; }
+  c.cleanId = null; c.plan = null; c.haul = c.carry && c.carry.dst ? c.haul : null;
+  c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
+  if(!goTo(c, kGraph.anchors[call.ex], "toCall")) call.keeper = null;
+}
+// Hand unclaimed calls to a free keeper
+function callJob(c){
+  const mine = callFor(c);
+  if(mine) return mine;
+  const w = walkFrom(c.at, c);
+  const free = state.staff.calls.find(x => !x.keeper && kGraph.anchors[x.ex] && w.dist.has(kGraph.anchors[x.ex]));
+  if(free){ free.keeper = c.id; return free; }
+  return null;
+}
+function callsTidy(){
+  state.staff.calls = state.staff.calls.filter(x => state.exhibits.some(e => e.id === x.ex) && kGraph.anchors[x.ex]);
+  for(const x of state.staff.calls) if(x.keeper && !crew.some(c => c.id === x.keeper)) x.keeper = null;
+}
+
 /* ---------- moving animals between exhibits ---------- */
 
 // Ask a keeper to move one animal: {id, animalId, sp, from, to}
@@ -432,6 +485,9 @@ function decide(c, k){
   if(l && chase(c, l)) return;
   // can't chase it from here (no dart gun to fetch, no route): let another keeper try
   if(l && l.status === "loose" && l.keeper === c.id) l.keeper = null;
+  const call = callJob(c);
+  if(call && goTo(c, kGraph.anchors[call.ex], "toCall")) return;
+  if(call){ call.keeper = null; c.job = "idle"; c.wait = 10; }
   const mv = moveJob(c);
   if(mv && mv.cargo && !c.cargo) c.cargo = mv.cargo;   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
@@ -454,8 +510,14 @@ function decide(c, k){
   const near = list => { let best = null; for(const b of list){ const n = kGraph.anchors[b.id]; if(n && w.dist.has(n) && (!best || w.dist.get(n) < best.d)) best = {b, n, d:w.dist.get(n)}; } return best; };
   // the neediest exhibit that a store can actually supply
   let job = null, st = null;
-  for(const j of shortages(k)){ if(j.ratio >= KEEPER.topUpBelow) continue; const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
   const feed = () => { c.plan = {exhibitId:job.e.id, type:job.t, src:st.b.id}; goTo(c, st.n, "toStation"); };
+  // an exhibit the player just called a keeper to gets fed before anything else
+  if(c.focusEx){
+    for(const j of shortages(k)){ if(j.e.id !== c.focusEx) continue; const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
+    if(job){ feed(); return; }
+    c.focusEx = null;
+  }
+  for(const j of shortages(k)){ if(j.ratio >= KEEPER.topUpBelow) continue; const s = near(sourcesFor(j.t, k)); if(s){ job = j; st = s; break; } }
   if(job && job.ratio < .3){ feed(); return; }
   // cleaning comes before routine feeding, but not before food that's running out
   const dirty = cleanJob(c, k);
@@ -482,6 +544,26 @@ function arrive(c, k){
     const t = c.move;
     if(t && c.cargo) dropOff(t, c.cargo);
     c.cargo = null; c.move = null; c.job = "idle"; c.wait = 0;
+    return;
+  }
+  if(c.job === "toCall"){
+    const call = callFor(c), e = call && state.exhibits.find(x => x.id === call.ex);
+    if(call) state.staff.calls = state.staff.calls.filter(x => x !== call);
+    c.job = "idle"; c.wait = 0;
+    if(!e) return;
+    k.stamina -= KEEPER.tirePerDelivery;
+    c.focusEx = e.id;
+    // hand over whatever food they're carrying that the exhibit is short of
+    if(c.carry && c.carry.amount > 0 && !c.carry.dst){
+      e.stock = e.stock || {};
+      const give = Math.min(roomFor(e, c.carry.type), c.carry.amount);
+      e.stock[c.carry.type] = (e.stock[c.carry.type] || 0) + give; c.carry.amount -= give;
+      noteFlow(null, e.id, give);
+      if(c.carry.amount <= 0.01) setCarry(c, null);
+      if(c.carry && startFilling(c, e)){ events.toast(`${k.name} checked ${e.name}.`, "good"); return; }
+    }
+    events.toast(`${k.name} checked ${e.name}.`, "good");
+    if((e.dirt || 0) > 2){ c.cleanId = e.id; c.cleanLow = false; c.job = "mucking"; }
     return;
   }
   if(c.job === "toClean"){ c.job = state.exhibits.some(x => x.id === c.cleanId) ? "mucking" : "idle"; return; }
@@ -568,11 +650,15 @@ function keepersTick(dtMin){
   if(!kGraph) return;
   syncCrew();
   syncAtvs();
+  callsTidy();
   for(const c of crew){
     const k = state.staff.keepers.find(x => x.id === c.id);
     if(!c.at){ const s = stations()[0]; if(!s) continue; c.at = kGraph.anchors[s.id]; c.job = "idle"; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 60){
+      // a call comes before anything but an escape: drop the job as soon as the keeper is standing on a node
+      const call = c.job !== "toCall" ? callFor(c) : null;
+      if(call && !callBusy(c) && c.t === 0){ takeCall(c, call); if(c.job === "toCall") continue; }
       if(c.job === "mucking"){
         const e = state.exhibits.find(x => x.id === c.cleanId);
         if(!e){ c.job = "idle"; c.cleanId = null; continue; }
@@ -644,7 +730,7 @@ function keepersNight(){
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
   // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to CERES
-  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; c.fill = null; } }
+  for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; c.fill = null; c.focusEx = null; } state.staff.calls = []; }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(){
@@ -667,7 +753,7 @@ function keeperStatus(k){
           toHaulSrc:`Heading to the ${hs ? BUILDINGS[hs.type].label.toLowerCase() : "store"} to restock the ${hb ? BUILDINGS[hb.type].label.toLowerCase() : "store"}`,
           toHaulDst:`Restocking the ${hv ? BUILDINGS[hv.type].label.toLowerCase() : "store"}${carry}`, toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`, filling:`Filling food trays in ${(state.exhibits.find(x => x.id === (c.fill && c.fill.e)) || {}).name || "an exhibit"}${carry}`,
           toClean:`Heading to muck out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`, mucking:`Mucking out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`,
-          toRest:"Going on break", resting:"On break", home:"Walking back to a station",
+          toCall:`Called to ${((state.exhibits.find(x => x.id === (callFor(c) || {}).ex)) || {name:"an exhibit"}).name}`, toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
           sedating:"Sedating an escaped animal", returning:"Bringing a sedated animal back", toSedated:`Collecting a darted ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
           toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
