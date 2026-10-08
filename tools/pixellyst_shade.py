@@ -1,6 +1,6 @@
-# Adds shading and texture to the Lystrosaurus (sprites/lyst-walk.png and lyst.png) without touching its shape or color scheme.
-# Every pixel keeps its place; only fills change, to a lighter or darker shade of the same hue (light from the top left): a lit edge along the back, head and legs,
-# shadow under the belly, down the right side of the haunch and on the feet, scale rows on the hide, a lit and a shaded edge on each stripe, and scutes on the belly.
+# Adds shading and texture to the Lystrosaurus (sprites/lyst-walk.png and lyst.png) without touching its shape or color scheme. It is a smooth, leathery dicynodont, so no scales:
+# a rounded dither from the lit back to the shaded belly (light from the top left), creased muscle outlines at the thigh and shoulder, wrinkles at the knees and ankles, toe gaps,
+# a sparse pebbly grain, soft stripes and a lit lip on the belly. Only fills change, to a lighter or darker shade of the same hue.
 # It reads shaded colors back to their base colors first, so a second run gives the same result. lyst.png is cut from the walk strip's second frame. Usage: python3 -I tools/pixellyst_shade.py [dir]
 import sys
 from PIL import Image
@@ -16,36 +16,49 @@ BODY = ("body", "bodyhi", "bodylo")
 def shade(grid):
     h, w = len(grid), len(grid[0]); g = lambda x, y: grid[y][x] if 0 <= x < w and 0 <= y < h else None
     out = [row[:] for row in grid]; changed = 0
+    def run_up(x, y):   # how many pixels of animal sit straight above
+        n = 0
+        while g(x, y - 1 - n) is not None: n += 1
+        return n
+    def run_dn(x, y):   # how many body or stripe pixels sit straight below
+        n = 0
+        while g(x, y + 1 + n) in ("body", "stripe"): n += 1
+        return n
+    def ring(x, y, cx, cy, r, x0, x1, y0, y1):   # a one pixel arc of a circle, for the muscle outlines
+        return x0 <= x <= x1 and y0 <= y <= y1 and abs(((x - cx) ** 2 + ((y - cy) * 1.15) ** 2) ** .5 - r) < .62
     for y in range(h):
         for x in range(w):
             c = grid[y][x]
             if c is None: continue
-            up, dn, lf, rt = g(x, y - 1), g(x, y + 1), g(x - 1, y), g(x + 1, y); n = c
-            if c == "body":
-                if up is None and H(x, y, 4) != 0: n = "bodyhi"                                        # a lit edge along the back and the top of the head, broken up
-                elif lf is None and H(x, y, 3) != 0: n = "bodyhi"                                      # lit left edges: snout-less rump, thigh and toes
-                elif dn is None and x % 2 == 0: n = "bodylo"                                           # the feet sit in shadow
-                elif dn in ("belly", None) and (x + y) % 2 == 0: n = "bodylo"                          # shadow where the body turns under, dithered
-                elif g(x, y + 2) in ("belly", None) and (x + y) % 3 == 0: n = "bodylo"                 # and a softer band above it
-                elif rt is None and H(x, y, 2) == 0: n = "bodylo"                                      # the right side of the legs and the face is in shade
-                elif rt == "dark" and y % 2 == 0: n = "bodylo"                                         # a shadow where a near leg meets a far one
-                elif y % 3 == 0 and (x + (y // 3) * 3) % 7 in (0, 1) and up in BODY and dn in BODY: n = "bodylo"      # scale rows: short dark dashes, staggered
-                elif y % 3 == 1 and (x + (y // 3) * 3 + 3) % 7 == 0 and up in BODY and dn in BODY: n = "bodyhi"       # and a light fleck between the rows
-                elif up == "stripe" and y % 2 == 1 and H(x, y, 3) == 0: n = "bodylo"                   # a soft shadow under each stripe
-            elif c == "stripe":
-                if up is None and H(x, y, 3) != 0: n = "stripehi"                                      # the stripes catch the light on the back
-                elif lf in BODY and (y % 2 == 0 or H(x, y, 2) == 0): n = "stripehi"                    # lit left edge of each stripe
-                elif rt in BODY and y % 2 == 1: n = "stripelo"                                         # shaded right edge
-                elif dn in BODY and (x + y) % 3 == 0: n = "stripelo"                                   # darker where it thins out
+            up, dn, lf, rt = g(x, y - 1), g(x, y + 1), g(x - 1, y), g(x + 1, y); n = c; t = run_up(x, y); bd = run_dn(x, y)
+            if c in ("body", "stripe"):
+                hi, lo = ("bodyhi", "bodylo") if c == "body" else ("stripehi", "stripelo")
+                torso = 28 <= y <= 43 and x <= 74
+                if t == 0 and H(x, y, 4) != 0: n = hi                                                  # the back and crown catch the light
+                elif t == 1 and (x + y) % 2 == 0: n = hi                                               # a dithered fall-off, so the hide reads round
+                elif t == 2 and H(x, y, 4) == 0: n = hi
+                elif lf is None and H(x, y, 3) != 0: n = hi                                            # lit left edges
+                elif c == "body" and torso and (ring(x, y, 21, 39, 13, 21, 40, 27, 47) or ring(x, y, 62, 40, 12, 49, 63, 30, 48)): n = "bodylo"   # the thigh and the shoulder, outlined by a skin crease
+                elif c == "body" and torso and (ring(x, y, 20, 38, 11, 9, 32, 26, 46) or ring(x, y, 61, 39, 10, 48, 62, 29, 47)) and H(x, y, 3) == 0: n = "bodyhi"   # and lit on the bulge inside it
+                elif c == "body" and 44 <= y <= 56 and y in (48, 52) and (x % 11) < 3 and H(x // 11, y, 2) == 0: n = "bodylo"   # wrinkles at the knees and ankles
+                elif c == "body" and 44 <= y <= 56 and y in (49, 53) and (x % 11) < 2 and H(x // 11, y - 1, 2) == 0: n = "bodyhi"   # with a lit lip below
+                elif c == "body" and y >= 54 and dn is None and x % 4 == 0: n = "bodylo"               # toe gaps
+                elif bd <= 1 and dn in ("belly", None): n = lo if (x + y) % 2 == 0 or dn is None else c  # shadow where the body turns under
+                elif bd == 2 and dn == "belly" and H(x, y, 3) == 0: n = lo
+                elif rt is None and H(x, y, 2) == 0: n = lo                                            # the right side is in shade
+                elif c == "body" and H(x, y, 17) == 0 and rt == "body": n = "bodylo"                   # fine pebbly grain: sparse pairs, not rows
+                elif c == "body" and H(x, y, 17) == 5 and rt == "body": n = "bodyhi"
+                elif c == "stripe" and rt in ("body", "bodylo") and y % 3 == 1: n = "stripelo"        # shaded right edge of a stripe
             elif c == "dark":
                 if up is None or up in BODY: n = "darkhi" if (x + y) % 2 == 0 else c                   # a lit top on the far legs
                 elif dn is None and x % 2 == 1: n = "darklo"                                           # and shadowed feet
-                elif rt is None or rt in BODY: n = "darklo" if y % 2 == 0 else c                       # the right side is in shade
+                elif rt is None and y % 2 == 0: n = "darklo"
             elif c == "belly":
-                if dn is None: n = "bellylo"                                                           # the underside is in shadow
-                elif x % 4 == 1 and up in BODY: n = "bellyhi"                                          # belly scutes: short light dashes
-                elif x % 4 == 3 and dn in BODY + ("bellylo",): n = "bellylo"                           # with a groove between them
-                elif up is None and x % 3 == 0: n = "bellyhi"
+                if dn is None: n = "bellylo"                                                           # the soft underside is in shadow
+                elif up in ("body", "bodyhi", "bodylo") and (x + y) % 3 != 0: n = "bellyhi"            # a lit lip where the flank rolls onto it
+                elif lf is None and H(x, y, 2) == 0: n = "bellyhi"
+                elif y > 45 and x % 7 == 3: n = "bellylo"                                              # one or two folds across the belly
+            elif c == "tusk" and H(x, y, 2) == 0: n = "tusk2"
             if n != c: out[y][x] = n; changed += 1
     return out, changed
 
