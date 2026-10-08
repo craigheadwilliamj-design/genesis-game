@@ -1211,7 +1211,7 @@ function animateAnimals(dt){
     h.x += dx/d * step; h.y += dy/d * step;
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     const S = SPRITES[h.sp];
-    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * .5)) % S.walk); }
+    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
     if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     if(tilt) place34(h);
