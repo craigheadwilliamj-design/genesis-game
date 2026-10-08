@@ -25,37 +25,41 @@ def shrink(fr):
     return W, H, out
 frames = [load("sprites/coel.png", 1)[0]] + load("sprites/coel-walk.png", 2)
 grids = [shrink(f) for f in frames]
-# Walk: the body of the first walk frame with its legs wiped, then both legs redrawn each frame (see walkFrames).
+# Standing and walking both: the body with its legs wiped, a yellow underbelly line run straight along the new bottom edge, then both legs
+# redrawn below it (see poses). The walk body is the first walk frame; the standing body is the standing picture.
 import math
 WALK = 6
-def walkFrames(W, H, base):
-    body = {k: v for k, v in base.items() if not (44 <= k[0] <= 63 and k[1] >= 39)}
-    FAR, NEAR = (107, 31, 8), (135, 39, 10)
-    def line(g, a, b, col, wd):
-        n = max(round(abs(b[0]-a[0])), round(abs(b[1]-a[1])), 1)
-        for i in range(n+1):
-            x, y = round(a[0] + (b[0]-a[0])*i/n), round(a[1] + (b[1]-a[1])*i/n)
-            for dx in range(wd): g[(x + dx - wd//2, y)] = col
-    def foot(p):                       # ankle position over the cycle: slide back while planted, lift and swing forward
-        if p < .6: return 62 - 15 * p / .6, 47
-        u = (p - .6) / .4
-        return 47 + 15 * (u*u*(3 - 2*u)), 47 - 4 * math.sin(math.pi * u)
-    out = []
-    for k in range(WALK):
-        p = k / WALK
-        b = math.floor(1 + math.cos(4*math.pi*p) + .5)   # body sinks when the feet are apart, rises as they pass
-        g = {(x, y + b): c for (x, y), c in body.items()}
-        hip = (57, 38 + b)
-        for ph, col in ((p + .5) % 1, FAR), (p, NEAR):
-            ax, ay = foot(ph)
-            dx, dy = ax - hip[0], ay - hip[1]; d = min(math.hypot(dx, dy), 9.9)
-            t = 5; a = math.acos(d / (2*t)); base_a = math.atan2(dy, dx)
-            kx, ky = hip[0] + t*math.cos(base_a - a), hip[1] + t*math.sin(base_a - a)   # knee swings forward
-            line(g, (hip[0], hip[1]-1), (kx, ky), col, 4); line(g, (kx, ky), (ax, ay), col, 2)
-            line(g, (ax, ay), (ax, 49), col, 2); line(g, (ax, 49), (ax + 3, 50), col, 2)
-        out.append((W, H, g))
-    return out
-grids = grids[:1] + walkFrames(*grids[1][:2], grids[1][2])
+FAR, NEAR, BELLY = (107, 31, 8), (135, 39, 10), (189, 180, 48)
+def line(g, a, b, col, wd):
+    n = max(round(abs(b[0]-a[0])), round(abs(b[1]-a[1])), 1)
+    for i in range(n+1):
+        x, y = round(a[0] + (b[0]-a[0])*i/n), round(a[1] + (b[1]-a[1])*i/n)
+        for dx in range(wd): g[(x + dx - wd//2, y)] = col
+def bare(base, top):                   # the body without legs, belly line yellow across the rump
+    body = {k: v for k, v in base.items() if not (44 <= k[0] <= 63 and k[1] >= top)}
+    for x in range(47, 64):
+        ys = [y for (xx, y) in body if xx == x and y < 45]
+        if ys: body[(x, max(ys))] = BELLY
+    return body
+def leg(g, hip, ank, col):             # thigh, shin and a three-toe-wide foot, the knee bending forward
+    dx, dy = ank[0] - hip[0], ank[1] - hip[1]; d = min(math.hypot(dx, dy), 9.9)
+    t = 5; a = math.acos(d / (2*t)); ba = math.atan2(dy, dx)
+    kn = (hip[0] + t*math.cos(ba - a), hip[1] + t*math.sin(ba - a))
+    line(g, hip, kn, col, 4); line(g, kn, ank, col, 2)
+    line(g, ank, (ank[0], 49), col, 2); line(g, (ank[0], 49), (ank[0] + 3, 50), col, 2)
+def pose(body, bob, hipY, near, far):
+    g = {(x, y + bob): c for (x, y), c in body.items()}
+    hip = (57, hipY + bob)
+    leg(g, hip, far, FAR); leg(g, hip, near, NEAR)
+    return g
+def foot(p):                           # ankle over the cycle: slide back while planted, lift and swing forward
+    if p < .6: return 62 - 15 * p / .6, 47
+    u = (p - .6) / .4
+    return 47 + 15 * (u*u*(3 - 2*u)), 47 - 4 * math.sin(math.pi * u)
+W, H = grids[0][:2]
+stand = pose(bare(grids[0][2], 38), 0, 38, (60, 47), (53, 47))
+walk = [pose(bare(grids[1][2], 39), math.floor(1 + math.cos(4*math.pi*k/WALK) + .5), 39, foot(k/WALK), foot((k/WALK + .5) % 1)) for k in range(WALK)]
+grids = [(W, H, stand)] + [(W, H, g) for g in walk]
 # one shared palette: the most used colors, everything else snaps to the nearest
 use = Counter(c for _, _, g in grids for c in g.values())
 pal = [c for c, _ in use.most_common(len(KEYS))]
