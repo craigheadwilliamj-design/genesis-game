@@ -898,14 +898,14 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
-// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture, walkSrc the walk strip, idleSrc the vivarium strip (art.idle).
+// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture (a species with only an idle strip stands on its first frame), walkSrc the walk strip, idleSrc the vivarium strip (art.idle).
 function pixelSprites(){
   for(const [id, art] of Object.entries(typeof PIXEL_ART === "undefined" ? {} : PIXEL_ART)){
     const S = SPRITES[id]; if(!S) continue;
-    const W = art.frames[0][0].length, H = art.frames[0].length, walk = art.frames.slice(1);
+    const first = art.frames ? art.frames[0] : art.idle[0], W = first[0].length, H = first.length, walk = art.frames ? art.frames.slice(1) : [];
     const paint = fr => { const c = document.createElement("canvas"); c.width = W * fr.length; c.height = H; const g = c.getContext("2d");
       fr.forEach((rows, i) => rows.forEach((row, y) => { for(let x = 0; x < W; x++){ const k = row[x]; if(k === ".") continue; g.fillStyle = art.pal[k]; g.fillRect(i * W + x, y, 1, 1); } })); return c.toDataURL(); };
-    S.src = paint([art.frames[0]]); S.ratio = W / H;
+    S.src = paint([first]); S.ratio = W / H;
     if(walk.length){ S.walkSrc = paint(walk); S.walk = walk.length; }
     if(art.idle){ S.idleSrc = paint(art.idle); S.idle = art.idle.length; }
   }
