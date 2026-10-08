@@ -1361,11 +1361,11 @@ const PLANT_SPRITES = {
 };
 // Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
-const ROCK_MPP = .12;
+const ROCK_MPP = .13;
 const ROCK_SPRITES = {
   scrubland:{
-    boulder:[[70, 50], [52, 64], [80, 50], [62, 54]],
-    rock:[[42, 26], [32, 28], [36, 34], [28, 24], [34, 26], [32, 34]],
+    boulder:[[68, 66], [37, 59], [74, 62], [57, 63]],
+    rock:[[44, 30], [33, 31], [31, 38], [29, 29], [33, 31], [38, 38]],
   },
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");

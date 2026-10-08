@@ -543,7 +543,7 @@ function plantSpriteSvg(f, t, S, dead){
 // A rock or boulder from its picture (ROCK_SPRITES): a soft shadow, then the stone sitting on its spot, one of the biome's shapes picked and flipped by its id
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
 function rockSpriteSvg(f, list, biome, dead){
-  const sd = seedOf(f), i = sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 3 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
+  const sd = seedOf(f), i = sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .08)}" cy="${n2(f.y + .1)}" rx="${n2(w * .46)}" ry="${n2(w * .13)}" fill="#1D2B22" fill-opacity=".22"/>` : "")
     + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/></g>`
     + (dead ? `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>` : "");
