@@ -898,31 +898,50 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
-// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture, walkSrc the walk strip.
+// Coded pixel pictures (PIXEL_ART in pixelart.js) are painted to canvases once and replace the PNGs: src is the standing picture (a species with only an idle strip stands on its first frame), walkSrc the walk strip, idleSrc the vivarium strip (art.idle).
 function pixelSprites(){
   for(const [id, art] of Object.entries(typeof PIXEL_ART === "undefined" ? {} : PIXEL_ART)){
     const S = SPRITES[id]; if(!S) continue;
-    const W = art.frames[0][0].length, H = art.frames[0].length, walk = art.frames.slice(1);
+    const first = art.frames ? art.frames[0] : art.idle[0], W = first[0].length, H = first.length, walk = art.frames ? art.frames.slice(1) : [];
     const paint = fr => { const c = document.createElement("canvas"); c.width = W * fr.length; c.height = H; const g = c.getContext("2d");
       fr.forEach((rows, i) => rows.forEach((row, y) => { for(let x = 0; x < W; x++){ const k = row[x]; if(k === ".") continue; g.fillStyle = art.pal[k]; g.fillRect(i * W + x, y, 1, 1); } })); return c.toDataURL(); };
-    S.src = paint([art.frames[0]]); S.ratio = W / H;
+    S.src = paint([first]); S.ratio = W / H;
     if(walk.length){ S.walkSrc = paint(walk); S.walk = walk.length; }
+    if(art.idle){ S.idleSrc = paint(art.idle); S.idle = art.idle.length; }
   }
 }
 pixelSprites();
 function spriteSvg(sp, h){
-  const S = SPRITES[sp], n = h.viv ? S.idle : S.walk, kind = h.viv ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${S.src || `sprites/${sp}.png`}" style="image-rendering:pixelated" ${box}${f >= 0 && n ? ` display="none"` : ""}/>`
-    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${(!h.viv && S.walkSrc) || `sprites/${sp}-${kind}.png`}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+  const S = SPRITES[sp], idl = h.viv || (!S.walk && S.idle), n = idl ? S.idle : S.walk, kind = idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${S.src || `sprites/${sp}.png`}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${(idl ? S.idleSrc : S.walkSrc) || `sprites/${sp}-${kind}.png`}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 ? ` display="none"` : ""}><image href="${S.idleSrc || `sprites/${sp}-idle.png`}" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // -1 stands, 0 and up is a walk frame
+// -1 stands, 0 and up is a walk frame, -2 and down is an idle frame (-2 - n), for pictures that have both strips
 function setPose(h, f){
   if(f === h.pose) return;
   h.pose = f;
-  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"); if(!st || !wk) return;
+  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"), id = h.el.querySelector(".id"); if(!st) return;
+  if(id){
+    id.setAttribute("display", "none");   // a walk-and-idle picture: the walk strip, the idle strip or the standing picture, one at a time
+    if(wk) wk.setAttribute("display", "none");
+    st.setAttribute("display", "none");
+    if(f <= -2){ const vb = id.getAttribute("viewBox").split(" "); vb[0] = -2 - f; id.setAttribute("viewBox", vb.join(" ")); id.removeAttribute("display"); }
+    else if(f >= 0 && wk){ const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" ")); wk.removeAttribute("display"); }
+    else st.removeAttribute("display");
+    return;
+  }
+  if(!wk) return;
   if(f < 0){ st.removeAttribute("display"); wk.setAttribute("display", "none"); return; }
   st.setAttribute("display", "none"); wk.removeAttribute("display");
   const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" "));
+}
+// what a picture shows while it holds still: its idle strip if it has one beside a walk strip, else the standing picture
+function restPose(h, S){
+  if(!(S && S.walk && S.idle)) return -1;
+  h.phase ??= Math.random() * S.idle;
+  return -2 - Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle;
 }
 
 // a vivarium animal stays put, so keep new ones a couple of bodies apart
@@ -1200,7 +1219,9 @@ function animateAnimals(dt){
       if(h.spr && S && S.idle){ h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); }
       continue;
     }
-    if(h.wait > 0){ h.wait -= dt; setPose(h, -1); continue; }
+    // an open-exhibit picture with an idle strip but no walk strip cycles the idle strip all the time, still or moving
+    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleFrame = () => { h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); };
+    if(h.wait > 0){ h.wait -= dt; if(idleOnly) idleFrame(); else setPose(h, restPose(h, S)); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
     const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
@@ -1210,8 +1231,8 @@ function animateAnimals(dt){
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
-    const S = SPRITES[h.sp];
-    if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
+    if(idleOnly) idleFrame();
+    else if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
     if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
     h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     if(tilt) place34(h);

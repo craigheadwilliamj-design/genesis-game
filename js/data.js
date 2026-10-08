@@ -389,7 +389,9 @@ const PERIOD_COLOR = {
 
 // Species drawn with a picture instead of a dot: sprites/<id>.png standing, side-on and facing right, with the width over the height.
 // walk is how many frames sprites/<id>-walk.png has, side by side, each the same size as the standing picture.
-const SPRITES = {coel:{ratio:100/75, walk:6, step:.15, size:1.4}, dime:{ratio:100/75, walk:4, step:.25}, tikt:{ratio:100/75, idle:2, ms:600}};
+// idle is how many frames sprites/<id>-idle.png has (same strip format) and ms how long each shows. A picture with both walks on the walk strip and plays idle while it holds still;
+// with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
+const SPRITES = {coel:{ratio:100/75, walk:6, step:.15, size:1.4}, dime:{ratio:100/75, walk:4, step:.25}, tikt:{ratio:100/75, idle:2, ms:600}, prio:{ratio:100/75, idle:5, ms:500}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
