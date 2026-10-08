@@ -688,7 +688,10 @@ function flatWalls34(P, h1, ln){
   return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
 }
 // letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
-const FLAT_FONT34 = {W:["X...X", "X...X", "X.X.X", "XX.XX", "X...X"], C:[".XXX", "X...", "X...", "X...", ".XXX"]};
+const FLAT_FONT34 = {R:["XXX.", "X..X", "XXX.", "X.X.", "X..X"], E:["XXX", "X..", "XX.", "X..", "XXX"], S:[".XXX", "X...", ".XX.", "...X", "XXX."], T:["XXX", ".X.", ".X.", ".X.", ".X."],
+  O:[".XX.", "X..X", "X..X", "X..X", ".XX."], M:["X...X", "XX.XX", "X.X.X", "X...X", "X...X"]};
+// door pictograms, 5 wide and 8 tall: a man and a woman
+const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
 function flatText34(Q, L, f, h, str, fill){
   const px = FLAT34.px / L, cols = [...str].reduce((n, ch) => n + FLAT_FONT34[ch][0].length + 1, -1); let c0 = f - cols * px / 2, s = "";
   for(const ch of str){ const g = FLAT_FONT34[ch]; g.forEach((row, r) => [...row].forEach((v, c) => { if(v === "X") s += Q(c0 + c * px, c0 + (c + 1) * px, h + (4 - r) * FLAT34.px, h + (5 - r) * FLAT34.px, fill); })); c0 += (g[0].length + 1) * px; }
@@ -697,10 +700,11 @@ function flatText34(Q, L, f, h, str, fill){
 function flatWc34(P, i, S, col){
   const L = edgeLen34(P, i), dw = Math.min(1.1, L * .12) / L, e = FLAT34.px / L, fl = P[(i+1) % P.length][0] < P[i][0]; let s = "";   // fl: the edge runs right to left on screen, so mirror along it
   const Q = (f0, f1, h0, h1, fill) => flatQuad34(P, i, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
-  s += Q(.05, .95, S.wall - 1.05, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - .95, "WC", FLAT34.wall[0]);   // the type-colored band with WC on it
-  for(const [f, right] of [[.3, true], [.7, false]]){   // two doors, a lit edge on the left, a gold handle on the inner side
+  s += Q(.05, .95, S.wall - 1.05, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - .95, "RESTROOMS", FLAT34.wall[0]);   // the type-colored band with the name on it
+  for(const [f, right, icon] of [[.3, true, "man"], [.7, false, "woman"]]){   // two doors with a lit left edge, a pictogram, and a gold handle on the inner side
     const fh = right ? f + dw / 2 - 2.5 * e : f - dw / 2 + 1.5 * e;
-    s += Q(f - dw / 2, f + dw / 2, 0, 2.1, FLAT34.door) + Q(f - dw / 2, f - dw / 2 + e, 0, 2.1, FLAT34.doorEdge) + Q(fh, fh + e, .95, 1.35, FLAT34.gold); }
+    s += Q(f - dw / 2, f + dw / 2, 0, 2.1, FLAT34.door) + Q(f - dw / 2, f - dw / 2 + e, 0, 2.1, FLAT34.doorEdge) + Q(fh, fh + e, .45, .85, FLAT34.gold);
+    FLAT_ICON34[icon].forEach((row, r) => [...row].forEach((v, c) => { if(v === "X") s += Q(f + (c - 2.5) * e, f + (c - 1.5) * e, 1.0 + (7 - r) * FLAT34.px, 1.0 + (8 - r) * FLAT34.px, FLAT34.wall[0]); })); }
   s += Q(.5 - 1.6 * e, .5 + 1.6 * e, 1.25, 2.05, FLAT34.door);   // a louvred vent between them
   for(const h of [1.45, 1.7, 1.95]) s += Q(.5 - 1.6 * e, .5 + 1.6 * e, h, h + FLAT34.px * .9, FLAT34.wall[1]);
   return s;
