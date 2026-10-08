@@ -1355,6 +1355,9 @@ const PLANT_SPRITES = {
   "per-scrubland-small":  {ratio:44/46, size:1.15},
   "per-scrubland-medium": {ratio:64/46, size:1.1},
   "per-scrubland-large":  {ratio:72/96, size:.85},
+  "tri-scrubland-small":  {ratio:54/40, size:1.42},
+  "tri-scrubland-medium": {ratio:76/52, size:1.3},
+  "tri-scrubland-large":  {ratio:64/92, size:.75},
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.

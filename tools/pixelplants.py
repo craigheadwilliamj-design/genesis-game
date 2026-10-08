@@ -2,15 +2,17 @@
 # References (searched, not drawn from photos): Peltaspermum = umbrella seed discs with pendant ovules (Townrow 1960); its leaves are Lepidopteris, bipinnate
 # with small pinnules; Comia = once-pinnate narrow simple pinnules (Mamay et al. 2009, its overall shape is a guess); Callistophyton = thin
 # scrambling/climbing stem branching from the leaf axils with fern-like leaves (Pennsylvanian, not Permian).
-# Usage: python3 -I tools/pixelplants.py [outdir]   Currently: the three Permian scrubland plants.
+# Triassic (searched): Lepidopteris = peltasperm seed fern, bipinnate leaves with a thick cuticle; Scytophyllum = Eurasian seed fern with lanceolate, undulate-toothed
+# pinnae and fishbone veins; Pagiophyllum = conifer shoots with tight spirally arranged scale leaves (whole-plant habit not confirmed, so drawn as a shrubby conifer).
+# Usage: python3 -I tools/pixelplants.py [outdir]   Currently: the Permian and Triassic scrubland plants.
 import sys, random, math
 from PIL import Image
 
 def mix(a, b, t): return tuple(round(x*(1-t) + y*t) for x, y in zip(a, b))
 def hexc(h): return tuple(int(h[i:i+2], 16) for i in (1, 3, 5))
 # Permian scrubland leaf green (PLANT_SHADE.scrubland mixed lightly with the Permian red), as a 5-tone ramp: dark to highlight
-def ramp(h):
-    b = mix(hexc(h), hexc("#F04028"), .07)
+def ramp(h, tint="#F04028"):
+    b = mix(hexc(h), hexc(tint), .07)
     return [mix(b, (0, 0, 0), .5), mix(b, (0, 0, 0), .25), b, mix(b, (255, 255, 255), .2), mix(b, (255, 255, 255), .38)]
 TRUNK = [hexc(c) for c in ("#3E2A18", "#5E4126", "#85603A")]
 SEED = [hexc(c) for c in ("#7A5424", "#B98B3E", "#E3C376")]
@@ -102,6 +104,66 @@ def callistophyton():   # large: a thin scrambling stem that branches from the l
     frond(cv, g, pts[-1], (pts[-1][0] + 6, pts[-1][1] - 10), (4, -3), 4, 5, rnd)   # young leaf at the growing tip
     return cv.image(g[0])
 
+PURPLE = "#812B92"   # Triassic period color
+def lens(cv, g, x0, y0, x1, y1, w, lit):
+    # a lanceolate leaflet: a lens shape along a line, with a light midrib
+    n = max(abs(x1-x0), abs(y1-y0)); n = max(int(n * 2), 2); dx, dy = x1-x0, y1-y0; d = math.hypot(dx, dy) or 1; nx, ny = -dy/d, dx/d
+    for i in range(n + 1):
+        t = i / n; hw = w * math.sin(math.pi * min(max(t, .08), .98)) ** .8; cx, cy = x0 + dx*t, y0 + dy*t
+        for k in range(-int(hw + .5), int(hw + .5) + 1):
+            side = k > 0; cv.set(cx + nx*k, cy + ny*k, g[3] if (lit and not side) or (not lit and side) and False else (g[2] if (k <= 0) == lit else g[1]))
+        cv.set(cx, cy, g[4] if lit else g[3])
+
+def broad_frond(cv, g, base, tip, bend, pairs, ll, lw, rnd):
+    # a once-pinnate frond with broad lanceolate pinnae (Scytophyllum)
+    ctrl = ((base[0]+tip[0])/2 + bend[0], (base[1]+tip[1])/2 + bend[1]); pts = [bez(base, ctrl, tip, i/pairs) for i in range(pairs + 1)]
+    cv.line(base[0], base[1], tip[0], tip[1], g[1]) if False else None
+    for i in range(1, pairs + 1): cv.line(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1], g[1])
+    for i in range(1, pairs + 1):
+        (x0, y0), (x1, y1) = pts[i-1], pts[i]; dx, dy = x1-x0, y1-y0; d = math.hypot(dx, dy) or 1; nx, ny = -dy/d, dx/d; L = ll * (1 - .6 * i/pairs)
+        for side in (1, -1):
+            lit = (nx*side) < 0 or (ny*side) < 0
+            lens(cv, g, x1, y1, x1 + (nx*side*.85 + dx/d*.5) * L, y1 + (ny*side*.85 + dy/d*.5) * L + .5, lw * (1 - .3 * i/pairs), lit)
+
+def lepidopteris():   # small: a compact tuft of fine bipinnate fronds from a short stem, no seed organs
+    rnd = random.Random(41); g = ramp("#A8AE62", PURPLE); cv = Canvas(54, 40); bx, by = 27, 37
+    cv.disc(bx, by - 3, 7, 2, g[0])
+    for tx, ty, b in ((-21, 4, -4), (21, 5, 4), (-16, 10, -4), (16, 11, 4), (-8, 14, -3), (8, 15, 3)):
+        frond(cv, g, (bx + tx*.1, by - 2), (bx + tx, by - 2 - ty), (b*2, -2), 9, 3.0, rnd)
+    cv.set(bx, by, TRUNK[1]); cv.set(bx - 1, by, TRUNK[0]); cv.set(bx + 1, by, TRUNK[0])
+    return cv.image(g[0])
+
+def scytophyllum():   # medium: a low shrub of once-pinnate fronds with broad toothed lanceolate pinnae
+    rnd = random.Random(53); g = ramp("#8E9654", PURPLE); cv = Canvas(76, 52); bx, by = 38, 49
+    cv.line(bx, by, bx, by - 6, TRUNK[1]); cv.line(bx-1, by, bx-1, by - 5, TRUNK[0]); cv.line(bx+1, by, bx+1, by - 5, TRUNK[2])
+    top = (bx, by - 6)
+    fr = [(-34, 3, -4), (34, 4, 4), (-27, 11, -7), (28, 12, 7), (-15, 16, -4), (16, 17, 4)]
+    fr.sort(key=lambda f: -abs(f[0]))
+    for tx, ty, b in fr: broad_frond(cv, g, top, (bx + tx, top[1] - ty), (b, -6), 5, 9, 1.3, rnd)
+    return cv.image(g[0])
+
+def scale_shoot(cv, g, x0, y0, x1, y1, th):
+    # a shoot of tight scale leaves: a thick band with a diamond pattern of alternating tones and a lit tip
+    n = int(max(abs(x1-x0), abs(y1-y0))) + 1; dx, dy = x1-x0, y1-y0; d = math.hypot(dx, dy) or 1; nx, ny = -dy/d, dx/d
+    for i in range(n + 1):
+        t = i / n; cx, cy = x0 + dx*t, y0 + dy*t; w = th * (1 - .55 * t)
+        for k in range(-int(w + .5), int(w + .5) + 1):
+            cv.set(cx + nx*k, cy + ny*k, g[3] if (i + k) % 3 == 0 and k <= 0 else g[2] if (i + (k > 0)) % 2 == 0 else g[1])
+    cv.set(x1, y1, g[4])
+
+def pagiophyllum():   # large: a shrubby conifer, a slim trunk with ascending branches of scale-leaf shoots
+    rnd = random.Random(67); g = ramp("#747E48", PURPLE); cv = Canvas(64, 92); bx, by = 32, 89
+    for dx, c in ((-1, TRUNK[0]), (0, TRUNK[1]), (1, TRUNK[2])): cv.line(bx + dx, by, bx + dx + 1, by - 52, c)
+    for x in range(bx - 3, bx + 4): cv.set(x, by, TRUNK[0])
+    cv.line(bx - 4, by, bx - 1, by - 2, TRUNK[1]); cv.line(bx + 4, by, bx + 1, by - 2, TRUNK[1])
+    # (side, height up the trunk, reach, rise): lower branches reach furthest and sweep up a little, so the whole thing is a loose cone
+    for side, h, rch, rise in ((-1, 9, 24, 8), (1, 13, 25, 9), (-1, 20, 21, 11), (1, 26, 19, 11), (-1, 32, 15, 11), (1, 37, 13, 11), (-1, 42, 9, 9), (1, 46, 8, 9)):
+        x0, y0 = bx + 1, by - h; scale_shoot(cv, g, x0, y0, x0 + side * rch, y0 - rise, 1.7)
+        if rch > 12: scale_shoot(cv, g, x0 + side * rch * .6, y0 - rise * .6, x0 + side * rch * .6 + side * 5, y0 - rise * .6 - 8, 1.3)   # a side twig
+    scale_shoot(cv, g, bx + 1, by - 50, bx + 1, by - 64, 1.8)   # leader
+    return cv.image(g[0])
+
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("per-scrubland-small", peltaspermum), ("per-scrubland-medium", comia), ("per-scrubland-large", callistophyton)):
+for key, fn in (("per-scrubland-small", peltaspermum), ("per-scrubland-medium", comia), ("per-scrubland-large", callistophyton),
+                ("tri-scrubland-small", lepidopteris), ("tri-scrubland-medium", scytophyllum), ("tri-scrubland-large", pagiophyllum)):
     im = fn(); im.save(f"{out}/{key}.png"); print(key, im.size)
