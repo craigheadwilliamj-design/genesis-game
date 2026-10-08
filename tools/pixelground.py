@@ -1,5 +1,5 @@
 # Draws seamless pixel-art ground tiles to sprites/ground/<biome>-<exhibit|park>.png, laid over the biome color (BIOMES[x].color / .park), 0.125 m per pixel.
-# Scrubland: red-ochre and pale sand patches (dithered), cracked hardpan, pebbles, dry grass tufts and the odd sage bush, like the Utah reference.
+# Scrubland: red-ochre and pale sand patches (dithered), cracked hardpan, pebbles, dry tufts and small clusters of sandstone and dark stones (nothing modern, so it suits any era), like the Utah reference.
 # The tiles wrap, so features near an edge continue on the other side. Usage: python3 -I tools/pixelground.py [outdir]
 import sys, os, random, math
 from PIL import Image
@@ -10,7 +10,7 @@ PALE, SAND = hexc("#E0CC96"), hexc("#CDB77C")
 DARK, CRACK = hexc("#8A7448"), hexc("#7A6540")
 STONE = [hexc(c) for c in ("#6C6254", "#8F8472", "#B5AA94")]
 STRAW, OLIVE, OLIVE2 = hexc("#D9CC8A"), hexc("#8C8A52"), hexc("#6E6C3C")
-SAGE = [hexc(c) for c in ("#525C3A", "#78854F", "#A6B079")]
+RED = [hexc(c) for c in ("#5E2B22", "#8F4128", "#BF5F34", "#DE8449")]   # the rocks' sandstone
 BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 def tile(size, seed, tufts, shrubs, cracks, pebbles, cell=30, oc=.58, pl=.3):
@@ -43,14 +43,16 @@ def tile(size, seed, tufts, shrubs, cracks, pebbles, cell=30, oc=.58, pl=.3):
             lean = rnd.choice((-1, 0, 0, 1)) * (1 if i % 2 else -1); h = rnd.randint(3, 6); c = STRAW if i % 3 else OLIVE
             for k in range(h): put(x + i - 2 + (lean * k) // 3, y - k, c if k < h - 1 else OLIVE2 if c == OLIVE else STRAW)
         put(x, y + 1, OLIVE2); put(x + 2, y + 1, OLIVE2)
-    for _ in range(shrubs):   # sage: a dithered round bush, lit top left, dark underneath, with a shadow on the ground
-        x, y = rnd.randrange(size), rnd.randrange(size); r = rnd.choice((4, 5, 5, 6))
-        for yy in range(-r + 1, r // 2 + 1):
-            for xx in range(-r, r + 1):
-                if (xx / r) ** 2 + (yy / (r * .8)) ** 2 <= 1:
-                    lit = -(xx / r) * .5 - (yy / r) * .8 + (BAYER[(y + yy) % 4][(x + xx) % 4] / 16 - .5) * .9
-                    put(x + xx, y + yy, SAGE[0 if lit < -.05 else 2 if lit > .45 else 1])
-        for xx in range(-r + 1, r + 3): put(x + xx, y + r // 2 + 1, DARK)
+    for _ in range(shrubs):   # a few small stones lying together: sandstone or dark, each lit top left with a dark base
+        x, y = rnd.randrange(size), rnd.randrange(size)
+        for _ in range(rnd.randint(2, 4)):
+            sx, sy = x + rnd.randint(-5, 5), y + rnd.randint(-2, 2); w, h = rnd.randint(3, 7), rnd.randint(2, 4); pal = RED if rnd.random() < .65 else [STONE[0], STONE[0], STONE[1], STONE[2]]
+            for yy in range(h):
+                for xx in range(w):
+                    if (xx == 0 or xx == w - 1) and (yy == 0 or yy == h - 1): continue   # round the corners
+                    lit = -(xx / w) * .5 - (yy / h) * .8 + 1.2 + (BAYER[(sy + yy) % 4][(sx + xx) % 4] / 16 - .5) * .6
+                    put(sx + xx, sy + yy, pal[max(0, min(3, int((lit + .75) * 2.1)))])
+            for xx in range(1, w + 2): put(sx + xx, sy + h, DARK)   # the foot, a little shadow
     return im
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
