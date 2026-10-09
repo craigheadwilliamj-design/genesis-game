@@ -465,8 +465,11 @@ function blobPath(x, y, r, seed, sharp){
 // Hit area for bulldozing: each piece can be picked out one by one
 const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(id)}" style="cursor:pointer"` : ` pointer-events="none"`;
 // One body of water, in an exhibit or out in the park
-function waterSvg(w, pick, isDead){
+// Biomes whose water is drawn from a pixel tile (sprites/water/<biome>.png, the #w-<biome> pattern in index.html); the rest are flat blue
+const WATER_TEX = {wetland:1};
+function waterSvg(w, pick, isDead, biome){
   const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  if(WATER_TEX[biome]) return `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="url(#w-${biome})" stroke="${dead ? "var(--bad)" : "#3F4A36"}" stroke-width="${dead ? 3 : .3}" stroke-linejoin="round"${dead ? ' vector-effect="non-scaling-stroke"' : ""}/></g>`;   // the muddy bank is a thin dark band on the shore
   return `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="${dead ? "var(--bad)" : "#2F6F9F"}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
     + `<polygon points="${pts}" fill="none" stroke="#7DB6DD" stroke-opacity=".7" stroke-width="2.5" stroke-linejoin="round" transform="translate(${centroid(w.points).map(c => c * .12).join(" ")}) scale(.88)"/></g>`;
 }
@@ -719,10 +722,10 @@ const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 function landSvg(e, pick, isDead){
   const feats = byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features go in their own group, where map.js slots the animals in among them by depth (place34)
-  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
+  return waterOf(e).map(w => waterSvg(w, pick, isDead, biomeOf(e))).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
-const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead)).join("");
+const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead, parkBiome())).join("");
 const decorSvg = (pick, isDead) => byDepth(decorOf()).map(f => featSvg(f, parkBiome(), pick, isDead)).join("");
 // A hedge: a dark base, the leafy body, and lighter clumps along the top (in meters, so it's as wide as a real hedge)
 const hedgeSvg = (tag, pts) => { const lj = `fill="none" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"`; return `<${tag} points="${pts}" stroke="#24461F" stroke-width="2.6" ${lj}/><${tag} points="${pts}" stroke="#4E8A3E" stroke-width="2" ${lj}/><${tag} points="${pts}" stroke="#6BA851" stroke-width="1.2" stroke-dasharray="0 1.6" ${lj}/>`; };
