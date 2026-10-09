@@ -891,7 +891,10 @@ function renderOverlay(){
   }
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
-    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+    // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
+    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
+    else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -1040,9 +1043,9 @@ function walkArea(h, e){
   const obs = [];
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
-    const r = t.r * (f.k || 1);
+    const r = t.r * (f.k || 1), fr = footR(t) * (f.k || 1);
     const R = t.flora ? (t.look === "conifer" || treeLift(t) ? r * .35 : 0)   // a tree's trunk; low plants are walked through
-      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : r * .9;
+      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : fr * .9;
     if(R) obs.push({x:f.x, y:f.y, c:R + body});
   }
   // land animals keep out of the exhibit's water; swimmers and flyers ignore it
@@ -2269,7 +2272,7 @@ function reshapeProblem(e, orig){
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, footR(LAND[f.type])))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;

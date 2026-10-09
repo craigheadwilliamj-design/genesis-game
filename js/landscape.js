@@ -40,6 +40,26 @@ const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : nu
 const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
 const potName = t => `${t.period || ERA_LABEL[t.flora]} ${t.size} plants`;
 
+// Footprint (t.fr, meters): the ground a sprite plant or rock takes up, measured from its picture (SPRITE_HIT, tools/spritehit.py) and never more than its radius t.r.
+// Crowding, fences, paths and animals use it; t.r still sizes the drawing and the habitat math. A plant's is half its base width (at least 40% of its crown for trees,
+// whose trunks are thin), a rock's is three quarters of its half width, averaged over the biomes' pictures.
+const footR = t => t.fr || t.r;
+for(const [k, S] of Object.entries(PLANT_SPRITES)){
+  const t = LAND[k], h = SPRITE_HIT[k]; if(!t || !h) continue;
+  const mpp = t.r * 2 * (S.size || 1) / h[0];
+  t.fr = Math.min(t.r, Math.max(.6, h[2] * mpp * .5, h[3] * mpp * .4));
+}
+for(const type of ["rock", "boulder"]){
+  const w = Object.keys(SPRITE_HIT).filter(k => k.startsWith(type + "-")).map(k => SPRITE_HIT[k][3] * ROCK_MPP * .75);
+  if(w.length && LAND[type]) LAND[type].fr = Math.min(LAND[type].r, w.reduce((a, b) => a + b) / w.length);
+}
+// The shape you tap on a sprite: its silhouette in rows 4 px tall, as one path in the sprite's own box (x, y its top left, k meters a pixel)
+const hitBands = new Map();
+function spriteHitPath(name, x, y, k){
+  let bands = hitBands.get(name); const h = SPRITE_HIT[name]; if(!h) return "";
+  if(!bands) hitBands.set(name, bands = h[4].split(",").map(b => b ? b.split("-").map(Number) : null));
+  return bands.map((b, i) => b ? `M${(x + b[0] * k).toFixed(2)} ${(y + i * 4 * k).toFixed(2)}h${((b[1] - b[0] + 1) * k).toFixed(2)}v${(4 * k).toFixed(2)}h${(-(b[1] - b[0] + 1) * k).toFixed(2)}z` : "").join("");
+}
 const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
 // The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome
 const biomeOf = e => BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
@@ -233,7 +253,7 @@ function waterProblem(pts, e, skip, cost){
   if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";
   if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
   if(waterOf(e).some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
-  if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && shapesOverlap(circlePts(f.x, f.y, LAND[f.type].r), pts))) return "It overlaps a rock, grove or shelter.";
+  if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && shapesOverlap(circlePts(f.x, f.y, footR(LAND[f.type])), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -249,7 +269,7 @@ function parkWaterProblem(pts, skip, cost){
   if(state.paths.some(p => !isBridge(p) && lineShapeDist(p.points, pts) < halfWidth(p))) return "It runs into a path. Only a wooden bridge can cross water.";
   if(parkWater().some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
   if(fenceLines().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
-  if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < LAND[f.type].r * .6))) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .6))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(inPoly(state.gate[0], state.gate[1], pts) || distToEdge(state.gate[0], state.gate[1], pts) < 9) return "Keep clear of the entrance.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -266,14 +286,14 @@ const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(
 // For an exhibit or building outline: water, plants, rocks and statues, and open fences
 function shapeHitsLandscape(pts){
   if(parkWater().some(w => shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts))) return "It's in the water.";
-  if(decorOf().some(f => LAND[f.type] && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < LAND[f.type].r * .8))) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .8))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(fenceLines().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   return null;
 }
 // For a path hw meters either side of its line. Only a bridge crosses water.
 function lineHitsLandscape(pts, hw, bridge){
   if(!bridge && parkWater().some(w => lineShapeDist(pts, w.points) < hw)) return "Paths can't cross water. Draw a wooden bridge over it.";
-  if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, pts) < hw + LAND[f.type].r * .5)) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, pts) < hw + footR(LAND[f.type]) * .5)) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(fenceLines().some(l => linesCross(l.points, pts) || lineLineDist(l.points, pts) < hw - .3)) return "It runs into a fence.";
   return null;
 }
@@ -291,7 +311,7 @@ function fenceProblem(pts, barrier, free){
   if(state.buildings.some(b => lineEntersShape(pts, b.points) || lineShapeDist(pts, b.points) < .3)) return "It runs into a building.";
   if(state.paths.some(p => linesCross(pts, p.points) || lineLineDist(pts, p.points) < halfWidth(p) - .3)) return "It runs into a path.";
   if(parkWater().some(w => lineShapeDist(pts, w.points) < .3)) return "It runs into water.";
-  if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, pts) < LAND[f.type].r * .8)) return "It runs into a plant, rock or statue.";
+  if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, pts) < footR(LAND[f.type]) * .8)) return "It runs into a plant, rock or statue.";
   const cost = fenceLineCost(pts, barrier);
   if(!free && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -394,13 +414,14 @@ function landProblem(e, key, x, y){
   if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at ORACLE first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(t.ceres && state.ceres.stock < t.ceres) return `Takes ${t.ceres} Paleoflora from CERES, which has ${Math.floor(state.ceres.stock)}.`;
-  if(!deepInside(x, y, e.points, t.r)) return "Keep it inside the fence.";
-  if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < t.r + LAND[f.type].r)) return "It overlaps something already there.";
-  const pts = circlePts(x, y, t.r);
+  const r = footR(t);
+  if(!deepInside(x, y, e.points, r)) return "Keep it inside the fence.";
+  if(landOf(e).some(f => Math.hypot(f.x - x, f.y - y) < r + footR(LAND[f.type]))) return "It overlaps something already there.";
+  const pts = circlePts(x, y, r);
   if(!t.wet && waterOf(e).some(w => shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts))) return "It's in the water.";
   if(t.aquatic && !waterOf(e).some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Place it in the exhibit's water.`;
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
-  if(e.gate && Math.hypot(e.gate[0] - x, e.gate[1] - y) < t.r + 3) return "Keep clear of the gate.";
+  if(e.gate && Math.hypot(e.gate[0] - x, e.gate[1] - y) < r + 3) return "Keep clear of the gate.";
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
@@ -420,14 +441,14 @@ function decorProblem(key, x, y){
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
-  const r = t.r;
+  const r = footR(t);
   if(!insidePlot(circlePts(x, y, r), true)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(o => distToEdge(x, y, o.points) < r)) return "Keep it clear of exhibit fences.";
   if(state.buildings.some(b => inPoly(x, y, b.points) || distToEdge(x, y, b.points) < r * .8)) return "It overlaps a building.";
   if(state.paths.some(p => lineDist(x, y, p.points) < halfWidth(p) + r * .5)) return "It's on a path.";
   if(Math.hypot(x - state.gate[0], y - state.gate[1]) < r + 9) return "Keep clear of the entrance.";
   if(fenceLines().some(l => lineDist(x, y, l.points) < r * .8)) return "It's on a fence.";
-  if(decorOf().some(f => LAND[f.type] && Math.hypot(f.x - x, f.y - y) < r + LAND[f.type].r)) return "It overlaps something already there.";
+  if(decorOf().some(f => LAND[f.type] && Math.hypot(f.x - x, f.y - y) < r + footR(LAND[f.type]))) return "It overlaps something already there.";
   const wet = parkWater().find(w => inPoly(x, y, w.points) || distToEdge(x, y, w.points) < r * .6);
   if(t.aquatic && !parkWater().some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Draw a pond first, then place it in the water.`;
   if(wet && !t.wet) return "It's in the water.";
@@ -575,20 +596,20 @@ function plantSvg(f, t, edge, sw){
   }
   return s;
 }
+// The tappable silhouette over a sprite (only when bulldozing can pick it); a doomed one is outlined in red along it
+const hitShape = (name, x, y, k, pick, dead) => pick || dead ? `<path d="${spriteHitPath(name, x, y, k)}" fill="${dead ? "var(--bad)" : "none"}" fill-opacity=".25" stroke="${dead ? "var(--bad)" : "none"}" stroke-width="2" vector-effect="non-scaling-stroke"${pick ? ` pointer-events="all"` : ` pointer-events="none"`}/>` : "";
 // A plant drawn from its picture (PLANT_SPRITES): a soft shadow, then the sprite standing on the spot, flipped by its seed so a grove isn't copies
-function plantSpriteSvg(f, t, S, dead){
+function plantSpriteSvg(f, t, S, dead, pick){
   const w = t.r * 2 * (S.size || 1), ht = w / S.ratio, flip = seedOf(f) & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + ht * .05 : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .06)}" cy="${n2(f.y)}" rx="${n2(w * .38)}" ry="${n2(w * .12)}" fill="#1D2B22" fill-opacity=".2"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/plants/${t.key}.png" style="image-rendering:pixelated" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/></g>`
-    + (dead ? `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>` : "");
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/plants/${t.key}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(t.key, x, y, w / SPRITE_HIT[t.key][0], pick, dead)}</g>`;
 }
 // A rock or boulder from its picture (ROCK_SPRITES): a soft shadow, then the stone sitting on its spot, one of the biome's shapes picked and flipped by its id
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
-function rockSpriteSvg(f, list, biome, dead){
+function rockSpriteSvg(f, list, biome, dead, pick){
   const sd = seedOf(f), i = sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .08)}" cy="${n2(f.y + .1)}" rx="${n2(w * .46)}" ry="${n2(w * .13)}" fill="#1D2B22" fill-opacity=".22"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/></g>`
-    + (dead ? `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>` : "");
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
 }
 // A statue: a stone plinth paved like its theme's paths, and a bronze disc with the animal's letter (the size of its dot on the map) or the person's initials
 function statueSvg(f, t, edge, dead){
@@ -743,9 +764,9 @@ function featSvg(f, biome, pick, isDead){
   } else if(t.look === "vmist"){
     // a shallow pool under the mister
     s += `<ellipse cx="${f.x}" cy="${f.y}" rx="${t.r}" ry="${t.r * .75}" fill="${t.color}" fill-opacity=".85" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x - t.r * .3}" cy="${f.y - t.r * .2}" rx="${t.r * .3}" ry="${t.r * .12}" fill="#BFE0EE" fill-opacity=".7"/>`;
-  } else if(t.flora && !f.k && PLANT_SPRITES[f.type]) s += plantSpriteSvg(f, {...t, key:f.type}, PLANT_SPRITES[f.type], dead);
+  } else if(t.flora && !f.k && PLANT_SPRITES[f.type]) s += plantSpriteSvg(f, {...t, key:f.type}, PLANT_SPRITES[f.type], dead, pick);
   else if(t.flora) s += tilted() && !f.k && (t.look === "conifer" || treeLift(t)) ? tree34(f, t, edge, dead ? 3 : 1) : plantSvg(f, t, edge, dead ? 3 : 1);
-  else if(!f.k && rockSprites(f, biome)) s += rockSpriteSvg(f, rockSprites(f, biome), biome, dead);
+  else if(!f.k && rockSprites(f, biome)) s += rockSpriteSvg(f, rockSprites(f, biome), biome, dead, pick);
   else if(tilted() && !f.k) s += rock34(f, t, rockTone(BIOMES[f.biome] ? f.biome : biome, f.type), edge, dead ? 3 : 1.5);
   else {
     // a lumpy rock with a light and a dark face
