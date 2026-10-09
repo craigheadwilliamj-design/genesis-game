@@ -57,14 +57,15 @@ def tile(base, size, seed, clusters, dashes, pebbles, cell=11, warm=.6, pale=.32
     return im
 
 MARSH = hexc("#6F9A7A")   # BIOMES.wetland.color in data.js, and its park color too: one floor for exhibits and the park
-def wetland_tile(base, size, seed, pools, dashes, pebbles, cell=12):
-    # Soggy ground in flat 2x2-block patches: darker mud, paler algae film and small shallow pools (a lit top row, a deeper base row, a pale ripple dash or two), silt dashes
-    # in loose rows and a few wet two-tone pebbles. Nothing modern, no plants; every feature is small and wraps over the edges.
+def wetland_tile(base, size, seed, pools, flecks, dashes, pebbles):
+    # Soggy ground built from many small, low-contrast details so no one feature stands out and the tile's repeat is hidden: a faint two-scale wash of damp and dry,
+    # lots of 1 to 3 px flecks of mud and algae, short silt dashes, tiny puddle glints and small shallow puddles (a lit top row, a base row), a few wet pebbles. Nothing modern, no plants.
     rnd = random.Random(seed); px = {}
     def put(x, y, c): px[(x % size, y % size)] = c
-    mud = mix(base, (104, 76, 46), .42); wet = mix(base, (70, 60, 40), .3); film = mix(base, (200, 210, 110), .16); silt = mix(base, BLACK, .3)
-    water = [mix((86, 140, 150), WHITE, .22), (86, 140, 150), mix((86, 140, 150), BLACK, .3)]   # shallow water, top / body / base
-    g = max(4, size // cell); grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .62), (g * 2 + 1, [[rnd.random() for _ in range(g * 2 + 1)] for _ in range(g * 2 + 1)], .38)]
+    mud = mix(base, (104, 76, 46), .24); wet = mix(base, (70, 60, 40), .16); film = mix(base, (200, 210, 110), .12); silt = mix(base, BLACK, .24); glint = mix(base, (190, 225, 225), .35)
+    fleck_mud = mix(base, (104, 76, 46), .4); fleck_film = mix(base, (205, 215, 120), .26)
+    water = [mix((86, 140, 150), WHITE, .2), (86, 140, 150), mix((86, 140, 150), BLACK, .28)]
+    g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]   # fine noise, 6 px cells
     def vn(x, y):
         v = 0
         for g, grid, wt in grids:
@@ -72,29 +73,31 @@ def wetland_tile(base, size, seed, pools, dashes, pebbles, cell=12):
             a = grid[iy % g][ix % g] * (1 - tx) + grid[iy % g][(ix + 1) % g] * tx; b = grid[(iy + 1) % g][ix % g] * (1 - tx) + grid[(iy + 1) % g][(ix + 1) % g] * tx
             v += wt * (a * (1 - ty) + b * ty)
         return v
-    step = 2
-    for by in range(0, size, step):
-        for bx in range(0, size, step):
-            n = vn(bx + 1, by + 1) + ((bx // step * 7 + by // step * 13) % 5 - 2) * .012
-            c = wet if n > .72 else mud if n > .64 else film if n < .26 else None
+    for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise, so patches are small and scattered
+        for bx in range(0, size, 2):
+            n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
+            c = wet if n > .68 else mud if n > .6 else film if n < .32 else None
             if c:
-                for dy in range(step):
-                    for dx in range(step): put(bx + dx, by + dy, c)
-    for _ in range(dashes):   # silt dashes, mostly horizontal, an odd step down at the end, loosely in rows
-        x = rnd.randrange(size); y = rnd.randrange(size // 4) * 4 + rnd.choice((0, 1)); n = rnd.randint(3, 6)
+                for dy in range(2):
+                    for dx in range(2): put(bx + dx, by + dy, c)
+    for _ in range(flecks):   # 1 to 3 px flecks, scattered evenly
+        x, y = rnd.randrange(size), rnd.randrange(size); c = fleck_mud if rnd.random() < .6 else fleck_film
+        put(x, y, c)
+        if rnd.random() < .5: put(x + 1, y, c)
+        if rnd.random() < .2: put(x, y + 1, c)
+    for _ in range(dashes):   # short silt dashes, 2 to 4 px
+        x = rnd.randrange(size); y = rnd.randrange(size // 3) * 3 + rnd.choice((0, 1)); n = rnd.randint(2, 4)
         for i in range(n): put(x + i, y, silt)
-        if rnd.random() < .3: put(x + n, y + 1, silt)
-    for _ in range(pools):   # a small shallow pool: a stair-stepped lozenge, lit top row, deeper base row, a ripple dash
-        x, y = rnd.randrange(size), rnd.randrange(size); w, h = rnd.randint(10, 18), rnd.randint(4, 6)
+    for _ in range(dashes // 2): x, y = rnd.randrange(size), rnd.randrange(size); put(x, y, glint); put(x + 1, y, glint)   # puddle glints
+    for _ in range(pools):   # small shallow puddles, 5 to 9 px wide
+        x, y = rnd.randrange(size), rnd.randrange(size); w, h = rnd.randint(5, 9), rnd.choice((3, 3, 4))
         for yy in range(h):
-            inset = 2 if yy in (0, h - 1) else 0   # flat ends: the top and base rows are shorter, so the edge steps in
+            inset = 1 if yy in (0, h - 1) else 0
             for xx in range(inset, w - inset): put(x + xx, y + yy, water[0] if yy == 0 else water[2] if yy == h - 1 else water[1])
-        for yy in range(2, h - 1, 2):   # pale ripple dashes in loose rows
-            for xx in range(2 + yy, w - 4, 6): put(x + xx, y + yy, water[0]); put(x + xx + 1, y + yy, water[0])
-        for xx in range(2, w + 1): put(x + xx, y + h, silt)   # the damp rim under it
-    for _ in range(pebbles):   # a wet pebble: lit top row, shaded base row
-        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 3, 3, 4)); pal = DARK if rnd.random() < .5 else [mix(base, WHITE, .3), mix(base, BLACK, .15), mix(base, BLACK, .38)]
-        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[1] if w > 2 and 0 < i < w - 1 else pal[2])
+        for xx in range(1, w + 1): put(x + xx, y + h, silt)
+    for _ in range(pebbles):
+        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 2, 3)); pal = DARK if rnd.random() < .5 else [mix(base, WHITE, .3), mix(base, BLACK, .15), mix(base, BLACK, .38)]
+        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[2])
         put(x + w, y + 1, silt)
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
@@ -104,5 +107,5 @@ out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
 os.makedirs(out, exist_ok=True)
 im = tile(SAND, 144, 7, 3, 34, 20)   # repeats every 18 m (144 px), under both exhibits (#b-scrubland) and the park (#p-scrubland)
 im.save(f"{out}/scrubland.png"); print("scrubland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
-im = wetland_tile(MARSH, 144, 11, 6, 26, 8)   # 18 m, under both exhibits (#b-wetland) and the park (#p-wetland)
+im = wetland_tile(MARSH, 144, 11, 14, 520, 90, 26)   # 18 m, under both exhibits (#b-wetland) and the park (#p-wetland)
 im.save(f"{out}/wetland.png"); print("wetland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
