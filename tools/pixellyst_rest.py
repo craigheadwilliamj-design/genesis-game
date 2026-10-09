@@ -7,6 +7,7 @@ from PIL import Image
 W, H = 100, 75
 LEG_Y, FOOT_Y = 46, 57            # the legs start at this row and stand on this one
 HEAD0, HEAD1 = 64, 86             # the head's sag ramps in across these columns
+HEAD_X = 76                       # the head starts here, and covers the far limbs when it lies down
 BODY, DARK = (115, 110, 32, 255), (67, 65, 20, 255)
 EYE = [(x, y) for x in (88, 89, 90) for y in (24, 25, 26)]   # the standing picture's eye, 3 by 3
 SOCKET = [(x, y) for x in (87, 88, 89, 90, 91) for y in (23, 24, 25, 26, 27) if (x, y) not in EYE]   # the dark ring around it
@@ -48,15 +49,19 @@ def frame(src, drop, sag, eye, lying):
             t = (y - (LEG_Y + drop)) / max(1, FOOT_Y - (LEG_Y + drop)); sy = round(LEG_Y + t * (FOOT_Y - LEG_Y))
             for x in range(W):
                 if sp[x, sy][3]: o[x, y] = sp[x, sy]
+    head = []
     for y in range(LEG_Y):   # the body above them drops straight down, the head sagging a little more
         for x in range(W):
             c = sp[x, y]
             if not c[3]: continue
             ny = y + drop + round(sag * smooth((x - HEAD0) / (HEAD1 - HEAD0)))
-            if 0 <= ny < H: o[x, ny] = c
-    if lying:   # far limbs first, then the near ones over them: hind feet folded forward under the belly, forelegs stretched out in front with the chin on them
-        limb(o, 38, 55, 52, 56, dark=True); limb(o, 30, 47, 53, 57, elbow=1)
-        limb(o, 64, 90, 51, 55, dark=True); limb(o, 58, 84, 52, 57, elbow=2)
+            if 0 <= ny < H:
+                o[x, ny] = c
+                if x >= HEAD_X: head.append((x, ny, c))
+    if lying:   # the far limbs first, then the head over them (it hides the far foreleg under the jaw), then the near limbs: hind feet folded forward under the belly, forelegs out in front with the chin on them
+        limb(o, 38, 55, 52, 56, dark=True); limb(o, 64, 90, 51, 55, dark=True)
+        for x, y, c in head: o[x, y] = c
+        limb(o, 30, 47, 53, 57, elbow=1); limb(o, 58, 84, 52, 57, elbow=2)
     return out
 
 def main(d):
