@@ -465,8 +465,45 @@ function blobPath(x, y, r, seed, sharp){
 // Hit area for bulldozing: each piece can be picked out one by one
 const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(id)}" style="cursor:pointer"` : ` pointer-events="none"`;
 // One body of water, in an exhibit or out in the park
-function waterSvg(w, pick, isDead){
+// Biomes whose water is drawn from a pixel tile (sprites/water/<biome>.png, the #w-<biome> pattern in index.html); the rest are flat blue
+const WATER_TEX = {wetland:1};
+// A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
+// centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.
+const waterMasks = new Map();
+function waterMask(points){
+  const key = points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); let m = waterMasks.get(key); if(m) return m;
+  const P = ROCK_MPP, ys = points.map(p => p[1]), r0 = Math.floor(Math.min(...ys) / P), r1 = Math.ceil(Math.max(...ys) / P), rows = new Map();
+  for(let r = r0; r <= r1; r++){
+    const cy = (r + .5) * P, xs = [];
+    for(let i = 0; i < points.length; i++){ const [ax, ay] = points[i], [bx, by] = points[(i + 1) % points.length]; if((ay <= cy) !== (by <= cy)) xs.push(ax + (cy - ay) / (by - ay) * (bx - ax)); }
+    xs.sort((p, q) => p - q); const runs = [];
+    for(let i = 0; i + 1 < xs.length; i += 2){ const a = Math.ceil(xs[i] / P - .5), b = Math.ceil(xs[i + 1] / P - .5); if(b > a) runs.push([a, b]); }
+    rows.set(r, runs);
+  }
+  const minus = (run, others) => { let out = [run]; for(const [oa, ob] of others) out = out.flatMap(([a, b]) => oa >= b || ob <= a ? [[a, b]] : [[a, Math.min(b, oa)], [Math.max(a, ob), b]].filter(([x, y]) => y > x)); return out; };
+  const rect = (a, b, r) => `M${(a * P).toFixed(3)} ${(r * P).toFixed(3)}h${((b - a) * P).toFixed(3)}v${P}h${(-(b - a) * P).toFixed(3)}z`;
+  const dilate = d => { const out = new Map(); for(let r = r0 - d; r <= r1 + d; r++){
+    const spans = []; for(let k = r - d; k <= r + d; k++) for(const [a, b] of rows.get(k) || []) spans.push([a - d, b + d]);
+    spans.sort((p, q) => p[0] - q[0]); const merged = []; for(const s of spans){ const t = merged[merged.length - 1]; if(t && s[0] <= t[1]) t[1] = Math.max(t[1], s[1]); else merged.push([...s]); }
+    out.set(r, merged); } return out; };
+  const paint = map => { let s = ""; for(const [r, runs] of map) for(const [a, b] of runs) s += rect(a, b, r); return s; };
+  let body = "", lit = "", dark = "";
+  for(const [r, runs] of rows) for(const run of runs){
+    const [a, b] = run; body += rect(a, b, r);
+    for(const [x, y] of minus(run, rows.get(r - 1) || [])) lit += rect(x, y, r);
+    for(const [x, y] of minus(run, rows.get(r + 1) || [])) dark += rect(x, y, r);
+    lit += rect(a, a + 1, r); dark += rect(b - 1, b, r);
+  }
+  m = {body, lit, dark, mud:paint(dilate(2)), damp:paint(dilate(3))}; waterMasks.set(key, m); if(waterMasks.size > 200) waterMasks.delete(waterMasks.keys().next().value);
+  return m;
+}
+function waterSvg(w, pick, isDead, biome){
   const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+  if(WATER_TEX[biome]){
+    const m = waterMask(w.points);
+    return `<g${pickAt(pick, "water", w.id)} shape-rendering="crispEdges"><path d="${m.damp}" fill="#6A8358"/><path d="${m.mud}" fill="#566648"/><path d="${m.body}" fill="url(#w-${biome})"/><path d="${m.lit}" fill="#7FAA9C"/><path d="${m.dark}" fill="#4A7872"/>`
+      + (dead ? `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : "") + `</g>`;
+  }
   return `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="${dead ? "var(--bad)" : "#2F6F9F"}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
     + `<polygon points="${pts}" fill="none" stroke="#7DB6DD" stroke-opacity=".7" stroke-width="2.5" stroke-linejoin="round" transform="translate(${centroid(w.points).map(c => c * .12).join(" ")}) scale(.88)"/></g>`;
 }
@@ -719,10 +756,10 @@ const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 function landSvg(e, pick, isDead){
   const feats = byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features go in their own group, where map.js slots the animals in among them by depth (place34)
-  return waterOf(e).map(w => waterSvg(w, pick, isDead)).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
+  return waterOf(e).map(w => waterSvg(w, pick, isDead, biomeOf(e))).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
-const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead)).join("");
+const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead, parkBiome())).join("");
 const decorSvg = (pick, isDead) => byDepth(decorOf()).map(f => featSvg(f, parkBiome(), pick, isDead)).join("");
 // A hedge: a dark base, the leafy body, and lighter clumps along the top (in meters, so it's as wide as a real hedge)
 const hedgeSvg = (tag, pts) => { const lj = `fill="none" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"`; return `<${tag} points="${pts}" stroke="#24461F" stroke-width="2.6" ${lj}/><${tag} points="${pts}" stroke="#4E8A3E" stroke-width="2" ${lj}/><${tag} points="${pts}" stroke="#6BA851" stroke-width="1.2" stroke-dasharray="0 1.6" ${lj}/>`; };
