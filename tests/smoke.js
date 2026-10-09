@@ -1119,7 +1119,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.decorIndexed = near.length > 0 && !!plaque;
       const pa = newParty(2); pa.at = plaque; const e0 = pa.edu || 0, mood0 = pa.mood; statueSeen(pa, bust.id); statueSeen(pa, bust.id);
       out.statueTeaches = pa.edu - e0 === DECOR.personLearn && pa.mood > mood0;
-      out.decorDraws = world.innerHTML.includes(LAND["q-white-oak"].color) && world.innerHTML.includes('data-kind="fence"') && world.innerHTML.includes("#9C6B33") && world.innerHTML.includes("url(#p-desert)");
+      out.decorDraws = world.innerHTML.includes("sprites/plants/q-white-oak.png") && world.innerHTML.includes('data-kind="fence"') && world.innerHTML.includes("#9C6B33") && world.innerHTML.includes("url(#p-desert)");
       removeItem("land", oak); removeItem("water", state.water[0]); removeItem("fence", hl);
       out.decorBulldoze = state.decor.length === 1 && state.water.length === 0 && state.fences.length === 1;
       // old saves get grassland and empty lists

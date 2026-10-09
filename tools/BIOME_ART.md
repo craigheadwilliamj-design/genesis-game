@@ -12,7 +12,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | scrubland | done | done | 24/24 | none exist | done |
 | desert | to do | to do | 0/27 | 0/4 | to do |
 | tropical | to do | to do | 0/27 | 0/6 | to do |
-| temperate | done | done | 0/27 | 0/7 | done |
+| temperate | done | done | 3/27 (Quaternary) | 7/7 | done |
 | boreal | to do | to do | 0/18 (Permian on) | 0/2 | to do |
 | grassland | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
 | tundra | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
