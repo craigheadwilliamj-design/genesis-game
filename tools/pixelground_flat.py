@@ -1,3 +1,4 @@
+# (The temperate tile, sprites/ground/temperate.png, is drawn by temperate_tile below: loam, moss crust and humus flecks, no grass or flowers, same rules.)
 # (The wetland tile, sprites/ground/wetland.png, is drawn by wetland_tile below: mud, algae and small shallow pools, same rules.)
 # Draws the seamless scrubland ground tiles in the Dimetrodon's flat, simple style (tools/pixelground.py is the older dithered version): sprites/ground/scrubland.png (one tile for exhibits and the park),
 # laid over the biome color (BIOMES.scrubland.color, the same as .park), 0.125 m per pixel. Flat, stair-stepped patches of slightly warmer and paler soil (no dithering), short horizontal
@@ -103,9 +104,50 @@ def wetland_tile(base, size, seed, pools, flecks, dashes, pebbles):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
+LOAM = hexc("#7DAA68")   # BIOMES.temperate.color in data.js, and its park color too: one floor for exhibits and the park
+def temperate_tile(base, size, seed, flecks, dashes, pebbles):
+    # Forest-floor loam built from many small, low-contrast details so the repeat is hidden: a faint two-scale wash of mossy green and damp brown humus, lots of 1 to 3 px flecks of humus
+    # and moss, short litter dashes, a few small pebbles (lit top row, shaded base). No grass, flowers or modern plants, so it suits any era from the Devonian on.
+    rnd = random.Random(seed); px = {}
+    def put(x, y, c): px[(x % size, y % size)] = c
+    moss = mix(base, (70, 140, 70), .2); humus = mix(base, (96, 84, 52), .26); damp = mix(base, BLACK, .1); litter = mix(base, (120, 96, 50), .5); dash = mix(base, BLACK, .26)
+    fleck_h = mix(base, (96, 84, 52), .45); fleck_m = mix(base, (150, 200, 100), .3)
+    g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
+    def vn(x, y):
+        v = 0
+        for g, grid, wt in grids:
+            fx, fy = x / size * g, y / size * g; ix, iy = int(fx), int(fy); tx, ty = fx - ix, fy - iy
+            a = grid[iy % g][ix % g] * (1 - tx) + grid[iy % g][(ix + 1) % g] * tx; b = grid[(iy + 1) % g][ix % g] * (1 - tx) + grid[(iy + 1) % g][(ix + 1) % g] * tx
+            v += wt * (a * (1 - ty) + b * ty)
+        return v
+    for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise
+        for bx in range(0, size, 2):
+            n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
+            c = humus if n > .72 else damp if n > .65 else moss if n < .3 else None
+            if c:
+                for dy in range(2):
+                    for dx in range(2): put(bx + dx, by + dy, c)
+    for _ in range(flecks):
+        x, y = rnd.randrange(size), rnd.randrange(size); c = fleck_h if rnd.random() < .55 else fleck_m
+        put(x, y, c)
+        if rnd.random() < .5: put(x + 1, y, c)
+        if rnd.random() < .2: put(x, y + 1, c)
+    for _ in range(dashes):   # short litter dashes, 2 to 4 px, some in a dried-leaf brown
+        x = rnd.randrange(size); y = rnd.randrange(size // 3) * 3 + rnd.choice((0, 1)); n = rnd.randint(2, 4); c = litter if rnd.random() < .4 else dash
+        for i in range(n): put(x + i, y, c)
+    for _ in range(pebbles):
+        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 2, 3)); pal = DARK if rnd.random() < .4 else [mix(base, WHITE, .3), mix(base, BLACK, .15), mix(base, BLACK, .38)]
+        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[2])
+        put(x + w, y + 1, dash)
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
+    return im
+
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
 os.makedirs(out, exist_ok=True)
 im = tile(SAND, 144, 7, 3, 34, 20)   # repeats every 18 m (144 px), under both exhibits (#b-scrubland) and the park (#p-scrubland)
 im.save(f"{out}/scrubland.png"); print("scrubland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
 im = wetland_tile(MARSH, 144, 11, 14, 520, 90, 26)   # 18 m, under both exhibits (#b-wetland) and the park (#p-wetland)
 im.save(f"{out}/wetland.png"); print("wetland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
+im = temperate_tile(LOAM, 144, 7, 520, 80, 22)   # 18 m, under both exhibits (#b-temperate) and the park (#p-temperate)
+im.save(f"{out}/temperate.png"); print("temperate", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
