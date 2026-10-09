@@ -96,6 +96,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <div class="row rigonly"><span>Parent</span><select id="pParent"></select></div>
    <div class="row rigonly"><span>Joint</span>x<input id="pPx" type="number">y<input id="pPy" type="number"></div>
    <div class="row rigonly"><span>Rest at</span>x<input id="pLx" type="number">y<input id="pLy" type="number"></div>
+   <div class="row rigonly"><span>Mirror</span><select id="pMirror" style="flex:1"></select></div>
    <div class="row rigonly"><span></span><label><input id="pFlip" type="checkbox"> Flip left/right</label></div>
    <div class="row rigonly"><span></span><button id="bDup">Duplicate</button><button id="bDel">Delete</button></div>
    <div class="row poseonly"><span>Rotate</span><input id="pR" type="range" min="-180" max="180" step="1" style="flex:1"><input id="pRn" type="number" step="0.5"></div>
@@ -123,6 +124,8 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <button id="fL">◀</button><button id="fR">▶</button>
    <button id="fDel">Delete</button>
    <label>Tween <input id="twN" type="number" min="1" max="30" value="2"></label><button id="bTween">Fill to next</button><button id="bTweenLoop">Fill to first</button>
+   <span class="sep"></span>
+   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button>
    <span class="sep"></span>
    <button id="bExport">Export strip</button><button id="bExportStand">Export standing</button>
   </div>
@@ -391,12 +394,16 @@ function fillProps(){
   $('#pFlip').checked = !!n.flip;
   const p = (frames()[cur] || {})[n.id] || {};
   set('#pR', p.r || 0); set('#pRn', Math.round((p.r || 0)*10)/10); set('#pDx', p.dx || 0); set('#pDy', p.dy || 0);
-  const sig = P.nodes.map(x => x.id + x.name).join('|') + '#' + n.id + n.parent;
+  const sig = P.nodes.map(x => x.id + x.name).join('|') + '#' + n.id + n.parent + n.mirror;
   if(sig !== parentSig){
     parentSig = sig; const s = $('#pParent'); s.innerHTML = '<option value="">(none: moves in the world)</option>';
     P.nodes.filter(x => x.id !== n.id && !isDesc(x.id, n.id)).forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; s.appendChild(o); });
     s.value = n.parent || '';
+    const ms = $('#pMirror'); ms.innerHTML = '<option value="">(none)</option>';
+    P.nodes.filter(x => x.id !== n.id).forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; ms.appendChild(o); });
+    ms.value = n.mirror || '';
   }
+  $('#bMirror').disabled = $('#bMirrorAll').disabled = !P.nodes.some(x => x.mirror);
 }
 function buildClips(){
   const s = $('#clipSel'); s.innerHTML = '';
@@ -465,14 +472,16 @@ function setParent(n, pid){
 function delNode(n){
   const m = nodeMap();
   P.nodes.forEach(c => { if(c.parent === n.id){ c.parent = n.parent; c.lx += n.lx; c.ly += n.ly; } });
+  P.nodes.forEach(x => { if(x.mirror === n.id) x.mirror = null; });
   P.nodes = P.nodes.filter(x => x !== n);
   P.clips.forEach(c => c.frames.forEach(f => delete f[n.id]));
   sel = null;
 }
 function dupNode(n){
-  const c = JSON.parse(JSON.stringify(n)); c.id = 'n' + (P.seq++); c.name = n.name + ' 2';
+  const c = JSON.parse(JSON.stringify(n)); c.id = 'n' + (P.seq++); c.name = n.name + ' 2'; c.mirror = null;
   P.nodes.splice(P.nodes.indexOf(n) + 1, 0, c);
   P.clips.forEach(cl => cl.frames.forEach(f => { if(f[n.id]) f[c.id] = Object.assign({}, f[n.id]); }));
+  if(!n.mirror) setMirror(n, c.id);
   sel = c.id;
 }
 function setPivotAt(wx, wy){
@@ -482,6 +491,20 @@ function setPivotAt(wx, wy){
   if(!du && !dv) return;
   n.px = u; n.py = v; n.lx += s*du; n.ly += dv;
   P.nodes.forEach(c => { if(c.parent === n.id){ c.lx -= s*du; c.ly -= dv; } });
+}
+function setMirror(n, id){
+  const m = nodeMap();
+  [n.id, id].forEach(k => { const x = m[k]; if(x && x.mirror && m[x.mirror]) m[x.mirror].mirror = null; if(x) x.mirror = null; });
+  if(id && m[id]){ n.mirror = id; m[id].mirror = n.id; }
+}
+function mirrorFrame(f){
+  const by = nodeMap(), Z = {r:0, dx:0, dy:0};
+  for(const a of P.nodes){
+    const b = a.mirror && by[a.mirror]; if(!b || a.id > b.id) continue;
+    const pa = f[a.id], pb = f[b.id];
+    if(pb) f[a.id] = Object.assign({}, Z, pb); else delete f[a.id];
+    if(pa) f[b.id] = Object.assign({}, Z, pa); else delete f[b.id];
+  }
 }
 function lerpPose(a, b, t){
   const out = {};
@@ -560,6 +583,7 @@ on('#pPx', 'change', withSel(n => { n.px = Math.round(+$('#pPx').value || 0); sa
 on('#pPy', 'change', withSel(n => { n.py = Math.round(+$('#pPy').value || 0); save(); }));
 on('#pLx', 'change', withSel(n => { n.lx = Math.round(+$('#pLx').value || 0); save(); }));
 on('#pLy', 'change', withSel(n => { n.ly = Math.round(+$('#pLy').value || 0); save(); }));
+on('#pMirror', 'change', withSel(n => { setMirror(n, $('#pMirror').value); save(); }));
 on('#pFlip', 'change', withSel(n => { n.flip = $('#pFlip').checked; save(); }));
 on('#bDup', 'click', withSel(n => { dupNode(n); save(); }));
 on('#bDel', 'click', withSel(async n => { if(await ask('Delete "' + n.name + '"? Parts attached to it move up to its parent.', {ok:'Delete'})){ delNode(n); save(); } }));
@@ -602,6 +626,8 @@ on('#fBlank', 'click', () => { frames().splice(cur + 1, 0, {}); cur++; if(mode =
 on('#fDel', 'click', () => { const fs = frames(); if(fs.length < 2) return; fs.splice(cur, 1); cur = Math.min(cur, fs.length - 1); save(true); });
 on('#fL', 'click', () => { const fs = frames(); if(cur > 0){ [fs[cur], fs[cur-1]] = [fs[cur-1], fs[cur]]; cur--; save(true); } });
 on('#fR', 'click', () => { const fs = frames(); if(cur < fs.length - 1){ [fs[cur], fs[cur+1]] = [fs[cur+1], fs[cur]]; cur++; save(true); } });
+on('#bMirror', 'click', () => { mirrorFrame(frames()[cur]); save(true); });
+on('#bMirrorAll', 'click', () => { frames().forEach(mirrorFrame); save(true); });
 on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else ask('This is the last frame. Use "Fill to first" to close the loop.', {info:true}); });
 on('#bTweenLoop', 'click', () => { if(frames().length > 1 || cur > 0) tween(0); });
 
