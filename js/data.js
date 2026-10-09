@@ -1340,9 +1340,9 @@ const PLANT_TABLE = {
     temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
   Paleogene:{tropical:"Lygodium|Nypa|Dipterocarpoxylon", wetland:"Azolla|Salvinia|Taxodium", temperate:"Zelkova|Quercus|Metasequoia",
     boreal:"Osmunda|Betula|Larix", scrubland:"Dodonaea|Acacia|Eucalyptus", desert:"Tamarix|Haloxylon|Prosopis"},
-  Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Musa|Ceiba", wetland:"Typha|Phragmites|Nyssa", scrubland:"Artemisia|Atriplex|Juniperus",
+  Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Musa|Ceiba", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Artemisia|Atriplex|Juniperus",
     temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Opuntia|Agave|Carnegiea", tundra:"Eriophorum|Empetrum|Salix arctica"},
-  Quaternary:{grassland:"Festuca|Bouteloua|Andropogon", tropical:"Philodendron|Euterpe|Swietenia", wetland:"Sphagnum|Carex|Salix", scrubland:"Salvia|Adenostoma|Arctostaphylos",
+  Quaternary:{grassland:"Festuca|Bouteloua|Andropogon", tropical:"Philodendron|Euterpe|Swietenia", wetland:"Peat Moss|Sedge|Willow", scrubland:"Salvia|Adenostoma|Arctostaphylos",
     temperate:"Trillium|Corylus|Tilia", boreal:"Cladonia|Ledum|Pinus", desert:"Larrea|Ferocactus|Joshua tree", tundra:"Saxifraga|Dryas|Betula nana"},
 };
 // Leaf colors by biome, small to large
