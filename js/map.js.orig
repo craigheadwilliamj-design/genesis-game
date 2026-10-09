@@ -9,10 +9,16 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), overlay = $("#overlay");
 const mapwrap = $("#mapwrap");
 
-const KMIN = 0.4, KMAX = 14;       // zoom limits, in screen pixels per meter
+const KMIN = 0.4, KMAX = 27.3;      // zoom limits, in screen pixels per meter
 let view = {k:2, tx:0, ty:0};
+// 3/4 view (prototype): the ground is squashed by TILT top to bottom, so it reads as seen at an angle
+const TILT = .7;
+let tilt = (() => { try { return localStorage.getItem("gp-tilt") !== "0"; } catch(e){ return true; } })();
+function tf(){ return tilt ? TILT : 1; }
+function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
+function upright(){ return tilt ? ` scale(1 ${(1/TILT).toFixed(4)})` : ""; }   // added to a sprite's transform so it isn't squashed
 let tool = "select";
-let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building", id}
+let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"building"|"guest", id}
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
 let rockBiome = null;               // biome tab a rock was picked from, so it's placed in that stone color (null: the exhibit's biome)
@@ -29,7 +35,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Trash bin", "Bench", "Picnic area", "Lamp post", "Camera", "Info sign", "No-feed sign"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Info sign", "No-feed"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
@@ -37,7 +43,7 @@ const SNAP_REACH = 6;              // meters past a path's edge where a new buil
 const GRID_STEP = 1;               // meters between grid-snap points
 let gridSnap = false;
 try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
-const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "zone" || t === "water";
+const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "bridge" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
@@ -46,7 +52,7 @@ let lastPtr = null;                 // where the pointer last was while placing,
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
-const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : PATH_HALF_WIDTH;
+const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
 // Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
 // so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
 function wideJoin(p){
@@ -86,9 +92,10 @@ function wideJoin(p){
 }
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "land" ? state.exhibits.flatMap(landOf) : kind === "water" ? state.exhibits.flatMap(waterOf) : null; }
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
+  : kind === "land" ? state.exhibits.flatMap(landOf).concat(decorOf()) : kind === "water" ? state.exhibits.flatMap(waterOf).concat(parkWater()) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
-function selItem(){ return sel ? findItem(sel.kind, sel.id) : null; }
+function selItem(){ return !sel ? null : sel.kind === "guest" ? parties.find(p => p.id === sel.id) || null : sel.kind === "staff" ? (staffById(sel.id) || {}).s || null : findItem(sel.kind, sel.id); }
 
 function exhibitColor(e){
   const counts = speciesCounts(e); let best = null, bn = 0;
@@ -108,7 +115,9 @@ function render(){
   const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
   let s = `<rect x="${PARCELS.xs[0]-3000}" y="${PARCELS.ys[0]-3000}" width="${PARCELS.xs[PARCELS.xs.length-1]-PARCELS.xs[0]+6000}" height="${PARCELS.ys[PARCELS.ys.length-1]-PARCELS.ys[0]+6000}" fill="url(#contours)"/>`;
   $("#plotClipPoly").setAttribute("d", rd);
-  s += `<path d="${rd}" fill="var(--grass)"/>`;
+  // the park's own ground: its biome's color and texture, dimmed a little at night (dark mode)
+  const pb = parkBiome();
+  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/><path d="${rd}" fill="var(--ground-shade)"/>`;
 
   // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
   if(k > 1.2 || gridSnap){
@@ -134,9 +143,13 @@ function render(){
     s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : ZT ? .04 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
-  // exhibits
+  // ponds and lakes out in the park, under everything built
+  s += parkWaterSvg(tool === "bulldoze", isDoomed);
+
+  // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  const tanks = [];
   for(const e of state.exhibits){
-    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points);
+    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
     if(e.viv){
@@ -148,12 +161,14 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[e.barrier || "wood"];
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
       s += `<polygon points="${pts}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
-      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      // a hedge row is drawn as a real hedge, as wide as it is
+      if(hedge && !tilt) s += hedgeSvg("polygon", pts);
+      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : hedge ? (reach ? "none" : "#24461F") : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       // a live electric fence has a dark zigzag over yellow; with no power it goes dull gray
       if(themeKey(e) === "genesis"){}   // Genesis shows power as amber lights on the posts, drawn below
       else if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -165,23 +180,34 @@ function render(){
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     // a themed exhibit gets a trim line just inside its fence
-    if(!e.viv || themeKey(e) !== "genesis") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    if((!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge") s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
-    if(e.barrier === "electric" && !e.viv && themeKey(e) === "genesis"){
+    // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
+    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
+    if(tilt) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, e.barrier || "wood", "back", fo34);
+    if(e.barrier === "electric" && !e.viv && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
       if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
       else s += `<polygon points="${pp}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFC25E" stroke-width="3.6" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFF1CC" stroke-width="1.4" stroke-dasharray="0 34" ${ns}/>`;
     }
-    if(!e.viv) s += landSvg(e, tool === "bulldoze", isDoomed);
+    // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
+    if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
+    if(tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;   // under the animals in the 3/4 view
+    s += landSvg(e, tool === "bulldoze", isDoomed);
+    if(tilt) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, e.barrier || "wood", "front", fo34);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
-    if((e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
+    if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
     if(e.gate){
       const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
       s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     s += `</g>`;
+    if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
   }
+
+  // open fences and hedge rows
+  for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
 
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
@@ -198,6 +224,17 @@ function render(){
       let body = `<polyline points="${pts}" stroke="#8C877D" stroke-width="${w}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="#5E4B38" stroke-width="${w}" stroke-dasharray="${.7} ${1.6}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="#2E2C29" stroke-width="${w * .72}" ${lj}/><polyline points="${pts}" stroke="#8C877D" stroke-width="${w * .46}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+      over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
+      continue;
+    }
+    if(isBridge(p)){
+      const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id), live = joined.has(p.id);
+      if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
+      // dark timber rails along both sides, then the deck, then the gaps between the planks as thin dashes across it
+      let body = `<polyline points="${pts}" stroke="#4A3220" stroke-width="${w + .9}" ${lj}/><polyline points="${pts}" stroke="#7A5634" stroke-width="${w + .3}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="${live ? "#B48A5A" : "#9C8468"}" stroke-width="${w - .5}" ${lj}/><polyline points="${pts}" stroke="#6E4E30" stroke-opacity=".7" stroke-width="${w - .5}" stroke-dasharray=".12 .88" ${lj}/>`;
+      if(!live) body += `<polyline points="${pts}" stroke="#4A3220" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
       body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
       over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
       continue;
@@ -227,7 +264,14 @@ function render(){
     }
     over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
   }
+  // Genesis buildings get a narrow pale gravel strip so they stand off the grass; all strips go in one pass under the paths and every roof, so none paints over a neighbor
+  for(const bl of state.buildings){
+    if(BUILDINGS[bl.type].prop || themeKey(bl) !== "genesis") continue;
+    s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
+  }
   s += clipDefs + under + over;
+  // plants, rocks and statues out in the park stand over the path edges
+  s += decorSvg(tool === "bulldoze", isDoomed);
 
   // entrance gate
   const [gx, gy] = state.gate;
@@ -244,16 +288,19 @@ function render(){
     s += `<g pointer-events="none">${cols.map((c, i) => d[i].length ? `<path d="${d[i].join("")}" stroke="${c}" stroke-width="${w}" stroke-linecap="square" fill="none"/>` : "").join("")}</g>`;
   }
 
-  // guest buildings
-  for(const bl of state.buildings){
+  // guest buildings, back to front in the 3/4 view so taller ones in front cover the ones behind
+  tanks.sort((a, b) => a.y - b.y);
+  for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : themeOf(bl).edge, full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
+      if(tilt){ s += prop34(bl, t, r, fill, edge, sw) + (isBroken(bl) ? `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") + `</g>`; continue; }
       if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
@@ -267,8 +314,7 @@ function render(){
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
     s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer">`;
-    // Genesis: a narrow pale gravel strip round the building, so it stands off the grass
-    if(themeKey(bl) === "genesis") s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
+    if(tilt && STAND34[bl.type]){ s += building34(bl, t, on, dead, reach, inv) + `</g>`; continue; }
     s += `<polygon points="${polyStr(bl.points)}" fill="${down ? "#6E2A26" : themeFill(bl, t.color)}" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : reach ? themeOf(bl).edge : "var(--bad)"}" stroke-width="${on || dead ? 3.5 : 1.5}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + themeBuildSvg(bl, polyStr(bl.points), polyStr(insetRect(bl.points, .86)));
     // departments show their name once there's room for it; smaller buildings show a letter
     if(t.dept && t.d * k >= 26) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
@@ -281,6 +327,7 @@ function render(){
     }
     s += `</g>`;
   }
+  for(const tk of tanks) s += tk.svg;
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
   if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
@@ -320,6 +367,7 @@ function render(){
     s += `<g data-kind="zone" data-id="${esc(z.id)}" style="cursor:pointer"><rect x="${zx - 34*inv}" y="${zy - 9*inv}" width="${68*inv}" height="${18*inv}" rx="${4*inv}" fill="${z.color}" fill-opacity="${on ? 1 : .85}" stroke="${on ? "var(--sel)" : "none"}" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" x="${zx}" y="${zy}" font-size="${fs}" style="fill:#fff">${esc(z.name.slice(0, 12))}</text></g>`;
   }
 
+  occ34 = tilt ? occluders34() : [];
   world.innerHTML = s;
   renderOverlay();
   syncAnimals();
@@ -327,6 +375,479 @@ function render(){
 }
 
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
+// Guest buildings standing up in the 3/4 view (prototype): front walls, a roof, and a shopfront.
+// A height of h meters is drawn h/TILT up the map, because the camera squashes north-south.
+const STAND34 = {
+  restroom:  {wall:3.4, rise:1.6, front:"wc"},
+  food:      {wall:3,   rise:1.3, front:"window", sign:"FOOD"},
+  shop:      {wall:3,   rise:1.3, front:"window", sign:"GIFTS"},
+  restaurant:{wall:4.2, rise:2.4, front:"glass",  sign:"RESTAURANT"},
+  megastore: {wall:4.2, rise:2.4, front:"glass",  sign:"GIFT SHOP"},
+  kiosk:     {wall:1.1, canopy:2.6, front:"cart"},
+  cart:      {wall:1.1, canopy:2.6, front:"cart"},
+  // labs: flat roofed blocks with ribbon windows, each with its own rooftop kit
+  oracle:    {wall:7,   rise:0, front:"lab"},
+  ghost:     {wall:8,   rise:0, front:"lab", top:"dome"},
+  tar:       {wall:7,   rise:0, front:"lab", top:"stacks"},
+  ceres:     {wall:5,   rise:0, front:"lab", glass:true},
+  pmc:       {wall:6,   rise:0, front:"lab", top:"cross"},
+  // hotels
+  lodge:     {wall:3.4, rise:3.2, front:"lodge", wallCol:"#8A6A48", roofCol:"#B08A4E"},
+  resort:    {wall:15,  rise:0, front:"resort", wallCol:"#EFE6D6"},
+  campground:{wall:0,   rise:1.8, front:"camp"},
+  // backstage: offices, garages, stores, sheds and barns
+  station:   {wall:4.5, rise:0, front:"lab"},
+  security:  {wall:4.5, rise:0, front:"lab", top:"antenna"},
+  breakroom: {wall:3.2, rise:1.4, front:"plain"},
+  closet:    {wall:3,   rise:1.2, front:"plain"},
+  toolshed:  {wall:3,   rise:1.6, front:"plain", gable:"ns"},
+  workshop:  {wall:5,   rise:0, front:"lab", doors:2, top:"stacks"},
+  generator: {wall:4.5, rise:0, front:"lab", doors:1, top:"stacks"},
+  depot:     {wall:5,   rise:0, front:"lab", doors:3},
+  warehouse: {wall:7,   rise:0, front:"lab", doors:2},
+  coldstore: {wall:5.5, rise:0, front:"lab", doors:1},
+  dock:      {wall:5.5, rise:0, front:"lab", doors:3, dock:true},
+  greenhouse:{wall:3.5, rise:0, front:"lab", glass:true},
+  insectary: {wall:4,   rise:0, front:"lab", glass:true, glassCol:"#C6D3A8"},
+  hatchery:  {wall:3.5, rise:0, front:"lab", top:"tanks"},
+  farm:      {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#9A3B2E", roofCol:"#6B6B66"},
+  // the rest of the guest side
+  edcenter:  {wall:5,   rise:2.6, front:"glass", sign:"EDUCATION"},
+  tramstop:  {wall:.9,  canopy:3.4, front:"tram"},
+  platform:  {wall:3,   canopy:4.1, front:"deck"},
+  ranch:     {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#7A4A32", roofCol:"#6B6B66"},
+};
+const WALL34 = "#D9CFBB", DARK34 = "#2E3A33", AWNING34 = "#F4F1E8";
+function lift34(h){ return ([x, y]) => [x, y - h / TILT]; }
+// light from the upper left: positive is lit, negative in shadow
+function lit34([nx, ny]){ return nx*-.55 + ny*-.83; }
+function shade34(pts, l){ return l > 0 ? `<polygon points="${polyStr(pts)}" fill="#fff" fill-opacity="${(l*.22).toFixed(2)}" pointer-events="none"/>` : `<polygon points="${polyStr(pts)}" fill="#000" fill-opacity="${(-l*.3).toFixed(2)}" pointer-events="none"/>`; }
+// outward normal of footprint edge i
+function norm34(P, i){
+  const n = P.length, [cx, cy] = centroid(P), [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1;
+  let nx = (by - ay)/L, ny = -(bx - ax)/L; if(nx*((ax+bx)/2 - cx) + ny*((ay+by)/2 - cy) < 0){ nx = -nx; ny = -ny; } return [nx, ny];
+}
+function edgeLen34(P, i){ const b = P[(i+1) % P.length]; return Math.hypot(b[0] - P[i][0], b[1] - P[i][1]); }
+// the walls facing the viewer, from h0 up to h1; returns the svg and the widest front edge
+function walls34(P, h0, h1, fill, line, extra = ""){
+  const front = [...Array(P.length).keys()].filter(i => norm34(P, i)[1] > .05);
+  let s = "";
+  for(const i of front){ const a = P[i], b = P[(i+1) % P.length], q = [lift34(h0)(a), lift34(h0)(b), lift34(h1)(b), lift34(h1)(a)];
+    s += `<polygon points="${polyStr(q)}" fill="${fill}" ${line} ${extra}/>` + shade34(q, lit34(norm34(P, i)) * .6); }
+  return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
+}
+// a point on footprint edge i, f of the way along, pushed out by `out` meters and lifted h
+function onEdge34(P, i, f, h, out = 0){ const a = P[i], b = P[(i+1) % P.length], [nx, ny] = norm34(P, i); return lift34(h)([a[0] + (b[0] - a[0])*f + nx*out, a[1] + (b[1] - a[1])*f + ny*out]); }
+function quad34(P, i, f0, f1, h0, h1, fill, more = ""){ return `<polygon points="${polyStr([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)])}" fill="${fill}" pointer-events="none" ${more}/>`; }
+// hip roof: the ridge runs along the long side, with 45 degree ends
+// gable: ends go straight up instead of sloping; "ns" also turns the ridge north-south so a gable end faces the viewer, filled with endFill
+function hipRoof34(P, wall, rise, fill, tex, line, gable, endFill){
+  const [cx, cy] = centroid(P), eave = P.map(lift34(wall)), n = P.length;
+  const e0 = edgeLen34(P, 0), e1 = edgeLen34(P, 1);
+  const a0 = [(P[1][0] - P[0][0])/e0, (P[1][1] - P[0][1])/e0], a1 = [(P[2][0] - P[1][0])/e1, (P[2][1] - P[1][1])/e1];
+  const first = gable === "ns" ? Math.abs(a0[1]) >= Math.abs(a1[1]) : e0 >= e1, [ux, uy] = first ? a0 : a1;
+  const half = gable ? (first ? e0 : e1) / 2 : Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), up = lift34(wall + rise);
+  const ridge = [up([cx - ux*half, cy - uy*half]), up([cx + ux*half, cy + uy*half])];
+  const near = p => (p[0] - cx)*ux + (p[1] - cy)*uy < 0 ? ridge[0] : ridge[1];
+  const faces = [...Array(n).keys()].map(i => { const a = eave[i], b = eave[(i+1) % n], ra = near(P[i]), rb = near(P[(i+1) % n]);
+    return {i, pts:ra === rb ? [a, b, ra] : [a, b, rb, ra], y:(P[i][1] + P[(i+1) % n][1]) / 2}; }).sort((f, g) => f.y - g.y);
+  let s = "";
+  for(const f of faces) s += `<polygon points="${polyStr(f.pts)}" fill="${endFill && f.pts.length === 3 ? endFill : fill}" ${line}/>` + (tex && !(endFill && f.pts.length === 3) ? `<polygon points="${polyStr(f.pts)}" fill="url(#t-${tex})" pointer-events="none"/>` : "") + shade34(f.pts, lit34(norm34(P, f.i)));
+  return s + `<path d="M${ridge[0].map(v => v.toFixed(2)).join(" ")}L${ridge[1].map(v => v.toFixed(2)).join(" ")}" stroke="#1D2B22" stroke-opacity=".5" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+}
+// a striped canopy over a 4 cornered footprint, stripes running front to back
+function stripes34(C, n, c1, c2, line){
+  const lerp = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
+  let s = `<polygon points="${polyStr(C)}" fill="${c2}" ${line}/>`;
+  for(let i = 0; i < n; i += 2) s += `<polygon points="${polyStr([lerp(C[0], C[1], i/n), lerp(C[0], C[1], (i+1)/n), lerp(C[3], C[2], (i+1)/n), lerp(C[3], C[2], i/n)])}" fill="${c1}" pointer-events="none"/>`;
+  return s;
+}
+function sign34(P, i, h, text, fs){ const [x, y] = onEdge34(P, i, .5, h); return `<text class="glyph" x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${fs.toFixed(2)}" letter-spacing=".06em" pointer-events="none">${text}</text>`; }
+
+// Fences standing up in the 3/4 view: posts and rails, bars, wires, glass, concrete or a hedge, by barrier.
+// which: "back" draws the far sides of an exhibit (before what's inside), "front" the near sides (after it), "all" an open fence line.
+// Solid walls on the near side are see-through, so they don't hide the animals.
+const FENCE34 = {
+  wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35]},
+  bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5},
+  electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true},
+  acrylic: {h:2.2, col:"#9FCFE0", solid:.4},
+  concrete:{h:3.6, col:"#B8B1A2", solid:1},
+  hedge:   {h:1.8, hedge:true},
+};
+function fence34(P, closed, kind, which, o = {}){
+  const F = FENCE34[kind] || FENCE34.wood, H = F.h, n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
+  const segs = [];
+  for(let i = 0; i < n; i++){ const a = P[i], b = P[(i+1) % P.length], ny = closed ? norm34(P, i)[1] : 0;
+    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue; segs.push({a, b, ny, y:(a[1] + b[1]) / 2}); }
+  segs.sort((p, q) => p.y - q.y);
+  const up = h => lift34(h), M = ([x, y]) => `M${n2(x)} ${n2(y)}`, Lto = ([x, y]) => `L${n2(x)} ${n2(y)}`, at = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
+  let s = "";
+  for(const {a, b, ny} of segs){
+    const q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
+    if(F.hedge){
+      s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
+      s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="#6BA851" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
+      if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
+      continue;
+    }
+    if(F.solid){
+      const op = F.solid * (front ? .55 : 1);
+      s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .4) : "");
+      s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
+      continue;
+    }
+    // posts, then rails (and bars or wires) between them
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), np = Math.max(1, Math.round(L / F.step));
+    let posts = "", rails = "", thin = "";
+    for(let k = 0; k <= np; k++){ const p = at(a, b, k / np); posts += M(p) + Lto(up(H + (F.wire ? .2 : 0))(p)); }
+    for(const h of F.rails) (F.wire ? (thin += M(up(h)(a)) + Lto(up(h)(b))) : (rails += M(up(h)(a)) + Lto(up(h)(b))));
+    if(F.bars){ const nb = Math.round(L / F.bars); for(let k = 1; k < nb; k++){ const p = at(a, b, k / nb); thin += M(up(.25)(p)) + Lto(up(2.5)(p)); } }
+    s += `<path d="${thin}" stroke="${F.col}" stroke-width="${F.wire ? .8 : 1}" stroke-opacity="${F.wire ? .8 : .9}" vector-effect="non-scaling-stroke" fill="none"/>`;
+    s += `<path d="${rails}" stroke="${F.col}" stroke-width="2" vector-effect="non-scaling-stroke" fill="none"/><path d="${posts}" stroke="${F.col}" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
+    if(hi) s += `<path d="${M(up(F.rails[F.rails.length - 1])(a))}${Lto(up(F.rails[F.rails.length - 1])(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
+    // the Genesis electric fence's amber post lights, dark when the power is out
+    if(F.wire && o.lights){ let d = ""; for(let k = 0; k <= np; k++) d += M(up(H + .2)(at(a, b, k / np))) + "h0.001";
+      s += o.powered === false ? `<path d="${d}" stroke="#2A2E2B" stroke-width="3.5" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>` : `<path d="${d}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/><path d="${d}" stroke="#FFC25E" stroke-width="3.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`; }
+  }
+  return `<g pointer-events="none">${s}</g>`;
+}
+// A vivarium in the 3/4 view: a glass tank in a steel frame. "back" draws the far panes (before what's inside),
+// "front" the near panes, the frame, the glass lid and its heat lamp, all see-through.
+function viv34(e, which, hi){
+  const P = e.points, V = VIVARIUMS[e.viv], H = V.d * .45, frame = hi || "#24414A", n2 = v => v.toFixed(2), up = lift34(H);
+  const fr = w => `stroke="${frame}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" fill="none"`;
+  let s = "", d = "";
+  for(let i = 0; i < P.length; i++){
+    const a = P[i], b = P[(i+1) % P.length], ny = norm34(P, i)[1];
+    if(which === "back" ? ny > .05 : ny <= .05) continue;
+    const q = [a, b, up(b), up(a)];
+    s += `<polygon points="${polyStr(q)}" fill="#A9D3DA" fill-opacity="${which === "back" ? .38 : .16}"/>`;
+    if(which === "front"){
+      // the substrate shows through the bottom of the glass, then a soft glare streak across the pane
+      const sub = [a, b, lift34(H * .18)(b), lift34(H * .18)(a)];
+      s += `<polygon points="${polyStr(sub)}" fill="#6B4F33" fill-opacity=".75"/><path d="M${n2(sub[3][0])} ${n2(sub[3][1])}L${n2(sub[2][0])} ${n2(sub[2][1])}" stroke="#8A6B47" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+      const g = f => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
+      s += `<polygon points="${polyStr([g(.12), g(.2), lift34(H)(g(.32)), lift34(H)(g(.24))])}" fill="#fff" fill-opacity=".22"/>`;
+      d += `M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}`;
+    }
+    d += `M${n2(up(a)[0])} ${n2(up(a)[1])}L${n2(up(b)[0])} ${n2(up(b)[1])}`;
+  }
+  // corner posts: the back ones behind, the front ones in front
+  const [, cy] = centroid(P);
+  for(const p of P) if(which === "back" ? p[1] <= cy : p[1] > cy) d += `M${n2(p[0])} ${n2(p[1])}L${n2(up(p)[0])} ${n2(up(p)[1])}`;
+  s += `<path d="${d}" ${fr(hi ? 3 : 2)}/>`;
+  if(which === "front"){
+    const L = P.map(up), [lx, ly] = centroid(L), r = Math.min(V.w, V.d) * .09;
+    s += `<polygon points="${polyStr(L)}" fill="#DDEFF2" fill-opacity=".12" ${fr(hi ? 3 : 1.5)}/>`;
+    s += `<circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * 2.2)}" fill="#FFC25E" fill-opacity=".18"/><rect x="${n2(lx - r)}" y="${n2(ly - r * .6)}" width="${n2(r * 2)}" height="${n2(r * 1.2)}" rx="${n2(r * .3)}" fill="#3A3A34"/><circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * .4)}" fill="#FFE2A0"/>`;
+  }
+  return `<g pointer-events="none">${s}</g>`;
+}
+// an upright cylinder standing at (x, y): stacks, bins
+function cyl34(x, y, r, h, fill, ln){
+  const top = y - h / TILT;
+  return `<rect x="${(x - r).toFixed(2)}" y="${top.toFixed(2)}" width="${(2*r).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx="${r.toFixed(2)}" ry="${(r*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${x.toFixed(2)}" cy="${top.toFixed(2)}" rx="${r.toFixed(2)}" ry="${(r*TILT).toFixed(2)}" fill="#3A3A34" ${ln}/>`;
+}
+// labs and the resort: a flat roofed block, windows floor by floor, the theme's roof art on top
+function block34(bl, t, S, P, col, line, inv){
+  const W = S.wall, wallCol = S.wallCol || WALL34, glass = "#3B5566", thin = `stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"`;
+  const gc = S.glassCol || "#9FCFC0", w = walls34(P, 0, W, S.glass ? gc : wallCol, line), main = w.main;
+  let s = w.s;
+  for(const i of [...Array(P.length).keys()].filter(j => norm34(P, j)[1] > .05)){
+    const L = edgeLen34(P, i);
+    if(S.glass){
+      // CERES: a concrete plinth under glass walls with frames every 2 meters
+      s += quad34(P, i, 0, 1, 0, 1.2, wallCol);
+      for(let k = 1; k < Math.round(L / 2); k++){ const a = onEdge34(P, i, k * 2 / L, 1.2), b = onEdge34(P, i, k * 2 / L, W); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#E8F0EC" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    } else if(S.front === "resort"){
+      // a balcony and a row of windows on every floor
+      for(let f = 0; f * 3.4 + 3 < W; f++){ const b = f * 3.4;
+        s += quad34(P, i, .04, .96, b + 1, b + 2.6, glass) + quad34(P, i, .04, .96, b + 2.2, b + 2.6, "#fff", `fill-opacity=".14"`);
+        if(f) s += `<polygon points="${polyStr([onEdge34(P, i, .03, b + .9), onEdge34(P, i, .97, b + .9), onEdge34(P, i, .97, b + .9, 1), onEdge34(P, i, .03, b + .9, 1)])}" fill="#fff" ${thin}/>`;
+        for(let k = 1; k < Math.round(L / 3.5); k++) s += quad34(P, i, k * 3.5 / L - .08 / L, k * 3.5 / L + .08 / L, b + 1, b + 2.6, wallCol); }
+      s += quad34(P, i, 0, 1, W - 1, W - .2, col);
+    } else if(S.doors){
+      // garages and stores: high windows, and on the front roll-up doors (raised to truck height at a dock)
+      s += quad34(P, i, .08, .92, W - 2.3, W - 1.5, glass) + quad34(P, i, 0, 1, W - 1, W - .25, col);
+      if(i === main){
+        const n = S.doors, dw = Math.min(3.4, L * .8 / n) / L, b = S.dock ? 1.2 : 0, top = Math.min(W - 1.3, b + 3.6);
+        for(let k = 0; k < n; k++){ const f = (k + .5) / n;
+          s += quad34(P, i, f - dw/2, f + dw/2, b, top, "#7C848A", thin);
+          for(let j = 1; j < 4; j++){ const h = b + (top - b) * j / 4, a = onEdge34(P, i, f - dw/2, h), c = onEdge34(P, i, f + dw/2, h); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${c[0].toFixed(2)} ${c[1].toFixed(2)}" stroke="#5E666C" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; } }
+        if(S.dock){ const ledge = [onEdge34(P, i, .03, 1.2), onEdge34(P, i, .97, 1.2), onEdge34(P, i, .97, 1.2, 1.6), onEdge34(P, i, .03, 1.2, 1.6)], face = [onEdge34(P, i, .03, 0, 1.6), onEdge34(P, i, .97, 0, 1.6), onEdge34(P, i, .97, 1.2, 1.6), onEdge34(P, i, .03, 1.2, 1.6)];
+          s += `<polygon points="${polyStr(ledge)}" fill="#B8B1A2" ${thin}/><polygon points="${polyStr(face)}" fill="#8E8778" ${thin}/>`; }
+      }
+    } else {
+      // ribbon windows, one band a floor, under the department's color band
+      for(let b = 0; b + 3 < W; b += 3.3) s += quad34(P, i, .05, .95, b + 1.1, b + 2.3, glass) + quad34(P, i, .05, .55, b + 1.9, b + 2.3, "#fff", `fill-opacity=".12"`);
+      s += quad34(P, i, 0, 1, W - 1, W - .25, col);
+    }
+    if(i !== main) continue;
+    // the way in: glass doors under a canopy, and the name on the band above
+    const dw = Math.min(1.6, L * .08) / L;
+    if(!S.doors){
+    s += quad34(P, i, .5 - dw, .5 + dw, 0, 2.6, S.front === "resort" ? "#2B2418" : "#22313A");
+    const cv = [onEdge34(P, i, .5 - dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3, 1.8), onEdge34(P, i, .5 - dw*1.6, 3, 1.8)];
+    s += `<polygon points="${polyStr(cv)}" fill="${S.front === "resort" ? col : wallCol}" ${thin}/>` + shade34(cv, .4);
+    }
+    if(S.top === "cross"){ const h = W - 2.6, cw = .35 / L; s += quad34(P, i, .5 - cw, .5 + cw, h - 1.3, h + .3, "#D9363E") + quad34(P, i, .5 - cw * 3.4, .5 + cw * 3.4, h - .75, h - .25, "#D9363E"); }
+    s += sign34(P, i, W - .62, esc(S.front === "resort" ? "RESORT" : (t.tag || t.label)), Math.min(.6, L * .04));
+    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
+      s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
+  }
+  // the roof: the same art as the flat map (rooftop units, the campus emblem), just lifted
+  const R = P.map(lift34(W)), [rx, ry] = centroid(R), k = 1/inv;
+  if(S.glass){
+    s += `<polygon points="${polyStr(R)}" fill="${S.glassCol || "#BFE3D9"}" fill-opacity=".92" ${line}/>`;
+    const L0 = edgeLen34(P, 0); for(let j = 1; j < Math.round(L0 / 2); j++){ const f = j * 2 / L0, a = [R[0][0] + (R[1][0] - R[0][0])*f, R[0][1] + (R[1][1] - R[0][1])*f], b = [R[3][0] + (R[2][0] - R[3][0])*f, R[3][1] + (R[2][1] - R[3][1])*f]; s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#E8F0EC" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    s += shade34(insetRect(R, .5), .6);
+  } else {
+    s += `<polygon points="${polyStr(R)}" fill="${col}" ${line}/>` + themeBuildSvg({...bl, points:R}, polyStr(R), polyStr(insetRect(R, .86)));
+    s += `<polygon points="${polyStr(insetRect(R, .96))}" fill="none" stroke="#1D2B22" stroke-opacity=".35" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
+  if(S.front === "resort"){ const pool = insetRect(R, .42).map(([x, y]) => [x + (R[1][0] - rx)*.3, y + (R[1][1] - ry)*.3]); s += `<polygon points="${polyStr(pool)}" fill="#5FB7D6" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+  const spot = f => [rx + (R[1][0] - rx)*f, ry + (R[1][1] - ry)*f], ln = `stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"`;
+  if(S.top === "dome"){ const [x, y] = spot(.5), r = Math.min(t.w, t.d) * .2;
+    s += `<path d="M${(x - r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${(r / TILT).toFixed(2)} 0 0 1 ${(x + r).toFixed(2)} ${y.toFixed(2)}A${r.toFixed(2)} ${(r*TILT).toFixed(2)} 0 0 1 ${(x - r).toFixed(2)} ${y.toFixed(2)}Z" fill="#DDE3E8" ${ln}/>`;
+    s += `<path d="M${(x - r*.55).toFixed(2)} ${(y - r*.5 / TILT).toFixed(2)}A${(r*.7).toFixed(2)} ${(r*.7 / TILT).toFixed(2)} 0 0 1 ${(x + r*.1).toFixed(2)} ${(y - r*.95 / TILT).toFixed(2)}" fill="none" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    s += `<path d="M${x.toFixed(2)} ${(y - r / TILT).toFixed(2)}v${(-r*.5 / TILT).toFixed(2)}" stroke="#3A3A34" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+  if(S.top === "antenna"){ const [x, y] = spot(.5), h = 5 / TILT; s += `<path d="M${x.toFixed(2)} ${y.toFixed(2)}v${(-h).toFixed(2)}M${(x - .9).toFixed(2)} ${(y - h*.6).toFixed(2)}h1.8M${(x - .6).toFixed(2)} ${(y - h*.85).toFixed(2)}h1.2" stroke="#3A3A34" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/><circle cx="${x.toFixed(2)}" cy="${(y - h).toFixed(2)}" r=".35" fill="#E5484D" pointer-events="none"/>`; }
+  if(S.top === "tanks") for(const f of [.15, .5, .85]){ const [x, y] = [rx + (R[1][0] - R[0][0])*(f - .5)*.8, ry + (R[2][1] - R[1][1])*.1]; s += cyl34(x, y, 1.5, 1.6, "#6E9BB5", ln); }
+  if(S.top === "stacks") for(const f of [.45, .7]){ const [x, y] = spot(f); s += cyl34(x, y, .9, 3.5, "#B9B4A8", ln); }
+  if(S.top === "cross"){ const [x, y] = spot(.55), a = 1.6, b = .5; s += `<path d="M${x - b} ${y - a}h${2*b}v${a - b}h${a - b}v${2*b}h${b - a}v${a - b}h${-2*b}v${b - a}h${b - a}v${-2*b}h${a - b}Z" fill="#D9363E" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+  // the name on the roof once there's room for it, like the flat map
+  if(t.d * k >= 26 && S.front !== "resort") s += `<text class="glyph" x="${rx.toFixed(2)}" y="${ry.toFixed(2)}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
+  return s;
+}
+// the dark flap on a tent's front gable
+function tentDoor34(Q){
+  const i = [...Array(4).keys()].reduce((m, j) => norm34(Q, j)[1] > norm34(Q, m)[1] ? j : m, 0);
+  return `<polygon points="${polyStr([onEdge34(Q, i, .3, 0), onEdge34(Q, i, .7, 0), onEdge34(Q, i, .5, 1.3)])}" fill="#2B2418" fill-opacity=".8" pointer-events="none"/>`;
+}
+// the campground: tents around a fire, on a dirt pitch
+function camp34(bl, P, col, line){
+  const [cx, cy] = centroid(P), U = [(P[1][0] - P[0][0])/2, (P[1][1] - P[0][1])/2], V = [(P[3][0] - P[0][0])/2, (P[3][1] - P[0][1])/2];
+  const at = (u, v) => [cx + U[0]*u + V[0]*v, cy + U[1]*u + V[1]*v], cols = [col, "#D9822B", "#3F7FB5", "#C9A24B", "#8C4F7D"], h = Math.round(rotLevel(bl) * 997);
+  const lu = Math.hypot(...U), lv = Math.hypot(...V), tl = 2.6, tw = 3.4;   // narrow across, long front to back, so the door faces the viewer
+  const tents = [[-.62, -.55], [0, -.6], [.62, -.55], [-.62, .5], [.62, .5]].map(([u, v], j) => {
+    const [x, y] = at(u, v), du = [U[0]/lu, U[1]/lu], dv = [V[0]/lv, V[1]/lv];
+    return {y, pts:[[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + du[0]*a*tl/2 + dv[0]*b*tw/2, y + du[1]*a*tl/2 + dv[1]*b*tw/2]), c:cols[(j + h) % cols.length]};
+  }).sort((a, b) => a.y - b.y);
+  let s = `<polygon points="${polyStr(insetRect(P, .97))}" fill="none" ${line}/>`;
+  const [fx, fy] = at(0, .25);
+  s += `<circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r="1" fill="#6E6A60"/><circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r=".6" fill="#E8742A"/><circle cx="${fx.toFixed(2)}" cy="${(fy - .2).toFixed(2)}" r=".3" fill="#FFD27A"/>`;
+  for(const tn of tents) s += `<polygon points="${polyStr(tn.pts.map(([x, y]) => [x + .35, y + .3]))}" fill="#1D2B22" fill-opacity=".2" pointer-events="none"/>` + hipRoof34(tn.pts, 0, 1.8, tn.c, null, line, true) + tentDoor34(tn.pts);
+  return s;
+}
+
+// Standing buildings hide the guests and staff walking behind them: each one's footprint swept up to its roof line.
+// Vivarium tanks count too. Open canopies, decks and camps are left out, since people stand under or on them.
+let occ34 = [];
+function occluders34(){
+  const out = [];
+  for(const bl of state.buildings){
+    const S = STAND34[bl.type];
+    if(!S || S.canopy || S.front === "deck" || S.front === "camp" || BUILDINGS[bl.type].prop) continue;
+    const P = bl.points, Q = P.map(lift34(S.wall + S.rise)), all = P.concat(Q);
+    out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
+  }
+  // vivarium tanks too
+  for(const e of state.exhibits){
+    if(!e.viv) continue;
+    const P = e.points, Q = P.map(lift34(VIVARIUMS[e.viv].d * .45)), all = P.concat(Q);
+    out.push({P, Q, x0:Math.min(...all.map(p => p[0])), x1:Math.max(...all.map(p => p[0])), y0:Math.min(...all.map(p => p[1])), y1:Math.max(...all.map(p => p[1]))});
+  }
+  return out;
+}
+// is this ground spot behind (or inside) a standing building in the 3/4 view
+function hidden34(x, y){
+  for(const o of occ34){
+    if(x < o.x0 || x > o.x1 || y < o.y0 || y > o.y1) continue;
+    if(inPoly(x, y, o.P) || inPoly(x, y, o.Q)) return true;
+    for(let i = 0, n = o.P.length; i < n; i++){ const j = (i+1) % n; if(inPoly(x, y, [o.P[i], o.P[j], o.Q[j], o.Q[i]])) return true; }
+  }
+  return false;
+}
+
+// Flat pixel style (the art direction: flat fills, a small palette, no outlines, shapes snapped to a pixel grid), tried first on the Genesis restroom.
+// Light is from the left, so left-facing walls and roof faces are the lightest and right-facing the darkest; the front is the base tone.
+const FLAT34 = {px:ROCK_MPP, wall:["#E6DECB", "#D9CFBB", "#BDB29B"], plinth:"#A39A86", eave:"#8E8778", door:"#2E3A33", doorEdge:"#46584E",
+  roof:["#2F5C42", "#254A35", "#1B3526"], seam:"#14281C", ridge:"#10261A", gold:"#C9A24B", vent:"#6F6B61", ventHi:"#B3AEA1"};
+const flatSnap34 = ([x, y]) => [Math.round(x / FLAT34.px + 1e-4) * FLAT34.px, Math.round(y * TILT / FLAT34.px + 1e-4) * FLAT34.px / TILT];   // a pixel is square on screen after the squash; the 1e-4 breaks exact half-pixel ties the same way every time, so no column is dropped or doubled
+const flatPts34 = pts => pts.map(flatSnap34).map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
+const flatPoly34 = (pts, fill, ln = "", decor = false) => `<polygon points="${flatPts34(pts)}" fill="${fill}" shape-rendering="crispEdges" ${ln}${decor ? ` pointer-events="none"` : ""}/>`;
+const flatLine34 = (a, b, c, w) => `<path d="M${flatSnap34(a).map(v => v.toFixed(2)).join(" ")}L${flatSnap34(b).map(v => v.toFixed(2)).join(" ")}" stroke="${c}" stroke-width="${w}" fill="none" shape-rendering="crispEdges" pointer-events="none"/>`;
+// a quad on the wall of footprint edge i, from f0 to f1 along it and h0 to h1 up
+const flatQuad34 = (P, i, f0, f1, h0, h1, fill) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, "", true);
+function flatWalls34(P, h1, ln){
+  const front = [...Array(P.length).keys()].filter(i => norm34(P, i)[1] > .05); let s = "";
+  for(const i of front){ const a = P[i], b = P[(i+1) % P.length], nx = norm34(P, i)[0];
+    s += flatPoly34([lift34(0)(a), lift34(0)(b), lift34(h1)(b), lift34(h1)(a)], FLAT34.wall[nx < -.3 ? 0 : nx > .3 ? 2 : 1], ln);
+    s += flatQuad34(P, i, 0, 1, 0, .5, FLAT34.plinth) + flatQuad34(P, i, 0, 1, h1 - .24, h1, FLAT34.eave); }   // a plinth, and the shade under the eave
+  return {s, main:front.reduce((m, i) => m < 0 || edgeLen34(P, i) > edgeLen34(P, m) ? i : m, -1)};
+}
+// letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
+const FLAT_FONT34 = {R:["##.", "#.#", "##.", "#.#", "#.#"], E:["###", "#..", "##.", "#..", "###"], S:["###", "#..", "###", "..#", "###"], T:["###", ".#.", ".#.", ".#.", ".#."],
+  O:["###", "#.#", "#.#", "#.#", "###"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"]};
+// door pictograms, 5 wide and 8 tall: a man and a woman
+const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
+function flatText34(Q, L, f, h, str, fill){
+  const px = FLAT34.px / L, cols = [...str].reduce((n, ch) => n + FLAT_FONT34[ch][0].length + 1, -1); let c0 = f - cols * px / 2, s = "";
+  for(const ch of str){ const g = FLAT_FONT34[ch]; g.forEach((row, r) => [...row].forEach((v, c) => { if(v === "#") s += Q(c0 + c * px, c0 + (c + 1) * px, h + (4 - r) * FLAT34.px, h + (5 - r) * FLAT34.px, fill); })); c0 += (g[0].length + 1) * px; }
+  return s;
+}
+function flatWc34(P, i, S, col){
+  const L = edgeLen34(P, i), dw = Math.min(1.1, L * .12) / L, e = FLAT34.px / L, fl = P[(i+1) % P.length][0] < P[i][0]; let s = "";   // fl: the edge runs right to left on screen, so mirror along it
+  const Q = (f0, f1, h0, h1, fill) => flatQuad34(P, i, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
+  s += Q(.05, .95, S.wall - 1.2, S.wall - .3, col) + flatText34(Q, L, .5, S.wall - 1.1, "RESTROOMS", FLAT34.wall[0]);   // the type-colored band with the name on it
+  for(const [f, right, icon] of [[.3, true, "man"], [.7, false, "woman"]]){   // two doors with a lit left edge, a pictogram, and a gold handle on the inner side
+    const fh = right ? f + dw / 2 - 2.5 * e : f - dw / 2 + 1.5 * e;
+    s += Q(f - dw / 2, f + dw / 2, 0, 2.1, FLAT34.door) + Q(f - dw / 2, f - dw / 2 + e, 0, 2.1, FLAT34.doorEdge) + Q(fh, fh + e, .45, .85, FLAT34.gold);
+    FLAT_ICON34[icon].forEach((row, r) => [...row].forEach((v, c) => { if(v === "X") s += Q(f + (c - 2.5) * e, f + (c - 1.5) * e, 1.0 + (7 - r) * FLAT34.px, 1.0 + (8 - r) * FLAT34.px, FLAT34.wall[0]); })); }
+  s += Q(.5 - 1.6 * e, .5 + 1.6 * e, 1.25, 2.05, FLAT34.door);   // a louvred vent between them
+  for(const h of [1.45, 1.7, 1.95]) s += Q(.5 - 1.6 * e, .5 + 1.6 * e, h, h + FLAT34.px * .9, FLAT34.wall[1]);
+  return s;
+}
+function flatRoof34(P, wall, rise, ln){
+  const [cx, cy] = centroid(P), eave = P.map(lift34(wall)), n = P.length, e0 = edgeLen34(P, 0), e1 = edgeLen34(P, 1);
+  const a0 = [(P[1][0] - P[0][0])/e0, (P[1][1] - P[0][1])/e0], a1 = [(P[2][0] - P[1][0])/e1, (P[2][1] - P[1][1])/e1];
+  const [ux, uy] = e0 >= e1 ? a0 : a1, half = Math.max(.4, (Math.max(e0, e1) - Math.min(e0, e1)) / 2), up = lift34(wall + rise);
+  const ridge = [up([cx - ux*half, cy - uy*half]), up([cx + ux*half, cy + uy*half])], near = p => (p[0] - cx)*ux + (p[1] - cy)*uy < 0 ? ridge[0] : ridge[1];
+  const faces = [...Array(n).keys()].map(i => { const a = eave[i], b = eave[(i+1) % n], ra = near(P[i]), rb = near(P[(i+1) % n]);
+    return {i, a, b, ra, rb, pts:ra === rb ? [a, b, ra] : [a, b, rb, ra], y:(P[i][1] + P[(i+1) % n][1]) / 2}; }).sort((f, g) => f.y - g.y);
+  const lerp = (p, q, t) => [p[0] + (q[0] - p[0])*t, p[1] + (q[1] - p[1])*t]; let s = "";
+  for(const f of faces){ const nx = norm34(P, f.i)[0], tone = FLAT34.roof[nx < -.3 ? 0 : nx > .3 ? 2 : 1];
+    s += flatPoly34(f.pts, tone, ln);
+    const len = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]), k = Math.max(2, Math.round(len / .75));   // standing seams, eave to ridge
+    for(let j = 1; j < k; j++){ const t = j / k; s += flatLine34(lerp(f.a, f.b, t), lerp(f.ra, f.rb, t), FLAT34.seam, FLAT34.px); }
+    if(norm34(P, f.i)[1] > .05) s += flatLine34(f.a, f.b, FLAT34.gold, FLAT34.px); }   // a thin gold line along the front eave
+  s += flatLine34(ridge[0], ridge[1], FLAT34.ridge, FLAT34.px * 3) + flatLine34(ridge[0], ridge[1], FLAT34.gold, FLAT34.px);   // a dark ridge cap with a gold line on it
+  const [vx, vy] = lerp(ridge[0], ridge[1], .32), vh = .95 / TILT;   // a plumbing vent on the ridge
+  return s + flatPoly34([[vx - FLAT34.px, vy], [vx + FLAT34.px, vy], [vx + FLAT34.px, vy - vh], [vx - FLAT34.px, vy - vh]], FLAT34.vent, "", true) + flatPoly34([[vx - FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh - FLAT34.px / TILT], [vx - FLAT34.px * 2, vy - vh - FLAT34.px / TILT]], FLAT34.ventHi, "", true);
+}
+function building34(bl, t, on, dead, reach, inv){
+  const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
+  const edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? T.edge : "var(--bad)";
+  const line = `stroke="${edge}" stroke-width="${on || dead ? 3.5 : 1.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
+  const top = S.canopy || S.wall + S.rise, sh = top * .22;
+  let s = `<polygon points="${polyStr(P.map(([x, y]) => [x + sh, y + sh*.8]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/><polygon points="${polyStr(P)}" fill="#8E8778"/>`;
+  if(S.front === "cart"){
+    // a cart: a colored counter under a striped canopy on four poles, on two wheels
+    const w = walls34(P, 0, S.wall, col, line), i = w.main, C = insetRect(P, 1.12).map(lift34(S.canopy));
+    s += w.s + `<polygon points="${polyStr(P.map(lift34(S.wall)))}" fill="${AWNING34}" ${line}/>`;
+    s += P.map((p, j) => { const a = lift34(S.wall)(p), b = C[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#3A3A34" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }).join("");
+    if(i >= 0) for(const f of [.22, .78]){ const [x, y] = onEdge34(P, i, f, .1); s += `<ellipse cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" rx=".42" ry="${(.42 / TILT).toFixed(2)}" fill="${DARK34}" pointer-events="none"/>`; }
+    return s + stripes34(C, 7, col, AWNING34, line);
+  }
+  if(S.front === "tram"){
+    // a raised platform under a flat canopy on posts, the name hung under the front edge; a worn out one goes dark red with a cross
+    const down = !tramWorking(bl), roof = down ? "#6E2A26" : col, w = walls34(P, 0, S.wall, "#B8B1A2", line), C = insetRect(P, 1.06).map(lift34(S.canopy)), i = w.main;
+    s += w.s + `<polygon points="${polyStr(P.map(lift34(S.wall)))}" fill="#CFC8B8" ${line}/>`;
+    s += P.map((p, j) => { const a = lift34(S.wall)(p), b = C[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#3A3A34" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }).join("");
+    s += `<polygon points="${polyStr(C)}" fill="${roof}" ${line}/>` + shade34(C, .35);
+    if(i >= 0) s += quad34(P, i, .3, .7, S.canopy - .7, S.canopy - .1, "#F1E6C8") + sign34(P, i, S.canopy - .4, "TRAM", .45).replace('class="glyph"', 'class="glyph" style="fill:#3A2A1A;stroke:none"');
+    if(down){ const [x, y] = centroid(C), r = Math.min(t.w, t.d) * .3; s += `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x + r} ${y - r}L${x - r} ${y + r}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    return s;
+  }
+  if(S.front === "deck"){
+    // a wooden deck on stilts with a rail all round, looking out over the animals (no shadow pad: it juts over the exhibit)
+    s = `<polygon points="${polyStr(P.map(([x, y]) => [x + .8, y + .7]))}" fill="#1D2B22" fill-opacity=".18" pointer-events="none"/>`;
+    const D = P.map(lift34(S.wall)), rail = P.map(lift34(S.wall + 1.1)), post = `stroke="#5A4128" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"`;
+    s += insetRect(P, .9).map(p => { const a = lift34(0)(p), b = lift34(S.wall)(p); return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
+    s += walls34(P, S.wall - .35, S.wall, col, line).s + `<polygon points="${polyStr(D)}" fill="${col}" ${line}/>` + shade34(D, .3);
+    for(let k = 1; k < 7; k++){ const f = k / 7, a = [D[0][0] + (D[1][0] - D[0][0])*f, D[0][1] + (D[1][1] - D[0][1])*f], b = [D[3][0] + (D[2][0] - D[3][0])*f, D[3][1] + (D[2][1] - D[3][1])*f]; s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#5A4128" stroke-opacity=".35" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+    s += P.map((p, j) => { const a = D[j], b = rail[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
+    return s + `<polygon points="${polyStr(rail)}" fill="none" stroke="#5A4128" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
+  if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
+  if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
+  const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
+  const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), i = w.main;
+  s += w.s;
+  if(i >= 0){
+    const L = edgeLen34(P, i);
+    if(flat) s += flatWc34(P, i, S, col);
+    else if(S.front === "wc"){
+      const dw = Math.min(1.1, L*.12) / L;
+      for(const f of [.3, .7]) s += quad34(P, i, f - dw/2, f + dw/2, 0, 2.1, DARK34);
+      s += quad34(P, i, .05, .95, S.wall - .45, S.wall - .15, col);
+      const [x, y] = onEdge34(P, i, .5, 1.6); s += `<text class="glyph" x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${Math.min(1.3, L*.15).toFixed(2)}" style="fill:#2E3A33;stroke:none" pointer-events="none">WC</text>`;
+    } else if(S.front === "window"){
+      // a serving window with a counter, under a striped awning
+      s += quad34(P, i, .18, .82, 1, 2.2, DARK34) + quad34(P, i, .16, .84, .92, 1.05, "#B9AE97");
+      const aw = [onEdge34(P, i, .14, 2.6), onEdge34(P, i, .86, 2.6), onEdge34(P, i, .86, 2.05, 1.2), onEdge34(P, i, .14, 2.05, 1.2)];
+      s += stripes34(aw, 9, col, AWNING34, `stroke="#1D2B22" stroke-opacity=".4" stroke-width="1" vector-effect="non-scaling-stroke"`);
+      s += quad34(P, i, .1, .9, S.wall - .05, S.wall - .55, col) + sign34(P, i, S.wall - .3, S.sign, .5);
+    } else if(S.front === "plain"){
+      // a door between two windows, and the name on the band above
+      s += quad34(P, i, .5 - .55/L, .5 + .55/L, 0, 2.1, DARK34);
+      for(const f of [.2, .8]) s += quad34(P, i, f - .6/L, f + .6/L, 1.1, 2.1, "#3B5566");
+      s += quad34(P, i, .06, .94, S.wall - .55, S.wall - .1, col) + sign34(P, i, S.wall - .32, esc(t.tag || t.label), .38);
+    } else if(S.front === "barn"){
+      // big double doors with white cross braces and a sign board over them
+      const dw = Math.min(2.4, L * .15) / L, b = `stroke="#F1E6C8" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"`, pt = (f, h) => onEdge34(P, i, f, h).map(v => v.toFixed(2)).join(" ");
+      s += quad34(P, i, .5 - dw, .5 + dw, 0, 3.2, "#5A2A20");
+      s += `<path d="M${pt(.5 - dw, 0)}L${pt(.5, 3.2)}M${pt(.5, 0)}L${pt(.5 - dw, 3.2)}M${pt(.5, 0)}L${pt(.5 + dw, 3.2)}M${pt(.5 + dw, 0)}L${pt(.5, 3.2)}M${pt(.5, 0)}L${pt(.5, 3.2)}" fill="none" ${b}/>`;
+      s += quad34(P, i, .5 - dw, .5 + dw, 0, 3.2, "none", b);
+      s += quad34(P, i, .5 - dw*.9, .5 + dw*.9, 3.35, 3.9, "#F1E6C8") + `<text class="glyph" x="${onEdge34(P, i, .5, 3.62)[0].toFixed(2)}" y="${onEdge34(P, i, .5, 3.62)[1].toFixed(2)}" font-size=".42" style="fill:#5A2A20;stroke:none" pointer-events="none">${esc(t.tag || t.label)}</text>`;
+    } else if(S.front === "lodge"){
+      // shuttered windows, a wide door, and a verandah on posts under a lean-to roof
+      for(const f of [.18, .34, .66, .82]){ const dw = .9 / L; s += quad34(P, i, f - dw, f + dw, 1, 2.3, "#2B2418") + quad34(P, i, f - dw*1.9, f - dw, 1, 2.3, col) + quad34(P, i, f + dw, f + dw*1.9, 1, 2.3, col); }
+      s += quad34(P, i, .5 - 1.2/L, .5 + 1.2/L, 0, 2.5, "#2B2418");
+      for(const f of [.04, .27, .5, .73, .96]){ const a = onEdge34(P, i, f, 0, 2.2), b = onEdge34(P, i, f, 2.7, 2.2); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#5A4128" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+      const v = [onEdge34(P, i, 0, 3.3), onEdge34(P, i, 1, 3.3), onEdge34(P, i, 1, 2.7, 2.4), onEdge34(P, i, 0, 2.7, 2.4)];
+      s += `<polygon points="${polyStr(v)}" fill="${S.roofCol || col}" ${line}/>` + shade34(v, .3);
+    } else if(S.front === "glass"){
+      // a glazed front with mullions and a double door, and the name on the fascia
+      s += quad34(P, i, .06, .94, .5, 3, "#3B5566");
+      const n = Math.max(3, Math.round(L / 2.6));
+      for(let k = 1; k < n; k++){ const a = onEdge34(P, i, .06 + .88*k/n, .5), b = onEdge34(P, i, .06 + .88*k/n, 3); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="${WALL34}" stroke-width="1.2" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
+      s += quad34(P, i, .06, .5, 2.2, 3, "#fff", `fill-opacity=".12"`);
+      const dw = 2.2 / L; s += quad34(P, i, .5 - dw/2, .5 + dw/2, 0, 2.5, DARK34);
+      s += quad34(P, i, .04, .96, S.wall - .1, S.wall - .9, col) + sign34(P, i, S.wall - .5, S.sign, .7);
+    }
+    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
+      s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
+  }
+  if(flat) return s + flatRoof34(P, S.wall, S.rise, ln);
+  return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)));
+}
+
+// Path props standing up in the 3/4 view: bins, lamps, cameras, signs, benches and picnic tables.
+// r is the prop's drawn radius, which never shrinks below a tappable size.
+function prop34(bl, t, r, fill, edge, sw){
+  const [cx, cy] = centroid(bl.points), up = h => cy - h / TILT, ln = `stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
+  const shadow = (rx, h) => `<ellipse cx="${(cx + h*.22).toFixed(2)}" cy="${(cy + h*.18).toFixed(2)}" rx="${rx.toFixed(2)}" ry="${(rx*.7).toFixed(2)}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
+  const pole = (h, w) => `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="#3A3A34" pointer-events="none"/>`;
+  const R = r * .75;
+  if(bl.type === "bin"){ const h = R * 1.6;
+    return shadow(R, h) + `<rect x="${(cx - R).toFixed(2)}" y="${up(h).toFixed(2)}" width="${(2*R).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${cy.toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="#1D2B22" ${ln}/>`; }
+  if(bl.type === "lamp" || bl.type === "camera"){ const h = R * 5, w = Math.max(.15, R*.25);
+    return shadow(R*.7, h*.3) + pole(h, w) + (bl.type === "lamp" ? `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.8).toFixed(2)}" ry="${(R*.8 / TILT).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.4).toFixed(2)}" ry="${(R*.4 / TILT).toFixed(2)}" fill="#FFF6C8" pointer-events="none"/>`}`
+      : `<rect x="${(cx - R*.9).toFixed(2)}" y="${up(h + R*.4).toFixed(2)}" width="${(R*1.8).toFixed(2)}" height="${(R*.9 / TILT).toFixed(2)}" rx="${(R*.2).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${(cx + R*.9).toFixed(2)}" cy="${up(h).toFixed(2)}" rx="${(R*.25).toFixed(2)}" ry="${(R*.25 / TILT).toFixed(2)}" fill="#E8F0FF" pointer-events="none"/>`}`); }
+  if(bl.type === "sign" || bl.type === "nofeed"){ const h = R * 3, w = Math.max(.12, R*.2), bw = R * 1.6, bh = R * 1.3;
+    return shadow(R*.6, h*.3) + pole(h, w) + `<rect x="${(cx - bw/2).toFixed(2)}" y="${up(h + bh*.5).toFixed(2)}" width="${bw.toFixed(2)}" height="${(bh / TILT).toFixed(2)}" rx="${(R*.15).toFixed(2)}" fill="${fill}" ${ln}/>` +
+      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h).toFixed(2)}" font-size="${(bh*.85).toFixed(2)}" pointer-events="none">${bl.type === "sign" ? "i" : "⊘"}</text>`); }
+  // benches and picnic tables: slats on thin legs, drawn back to front
+  const P = insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))), line = `${ln} stroke-linejoin="round"`, dark = "#3A3A34";
+  const [px, py] = centroid(P), U = [(P[1][0] - P[0][0])/2, (P[1][1] - P[0][1])/2], V = [(P[3][0] - P[0][0])/2, (P[3][1] - P[0][1])/2];
+  const [L, W] = Math.hypot(...U) >= Math.hypot(...V) ? [U, V] : [V, U], north = W[1] <= 0 ? 1 : -1;   // which way along the short axis is north
+  const box = (sl, sw, dw) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [px + L[0]*a*sl + W[0]*(b*sw + dw), py + L[1]*a*sl + W[1]*(b*sw + dw)]);
+  const slab = (Q, h0, h1) => walls34(Q, h0, h1, fill, line).s + `<polygon points="${polyStr(Q.map(lift34(h1)))}" fill="${fill}" ${line}/>` + shade34(Q.map(lift34(h1)), .5);
+  let out = `<polygon points="${polyStr(P.map(([x, y]) => [x + .25, y + .2]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
+  const leg = (f, d, h) => { const x = px + L[0]*f + W[0]*d, y = py + L[1]*f + W[1]*d; return `<path d="M${x.toFixed(2)} ${y.toFixed(2)}V${(y - h / TILT).toFixed(2)}" stroke="${dark}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; };
+  if(bl.type === "bench"){
+    // the backrest goes on the far side, so the seat faces the viewer
+    out += leg(-.85, 0, .42) + leg(.85, 0, .42) + slab(box(1, .38, north*.62), .5, .95) + slab(box(1, .55, -north*.2), .42, .5);
+    return out;
+  }
+  // picnic table: a bench each side and the top in between
+  out += slab(box(.9, .17, north*.78), .4, .47);
+  out += leg(-.8, 0, .72) + leg(.8, 0, .72) + slab(box(1, .42, 0), .72, .8);
+  return out + slab(box(.9, .17, -north*.78), .4, .47);
+}
+
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
 function parcelOverlay(){
@@ -369,8 +890,11 @@ function renderOverlay(){
     });
   }
   if(landGhost && landKey(tool)){
-    const t = LAND[landGhost.key], gfill = t.flora || t.slots ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : DEFAULT_BIOME), landGhost.key).fill;
-    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+    const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
+    // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
+    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
+    else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -411,10 +935,69 @@ function renderOverlay(){
   overlay.innerHTML = s;
 }
 
-function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k})`); }
+function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`); }
 
 /* ---------- animals wandering in their exhibits ---------- */
 const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
+
+// In the 3/4 view each animal sits among its exhibit's trees, rocks and shelters by depth, so what stands in front of it covers it,
+// and the near fence or glass (drawn after) covers them all. landscape.js puts the features in a data-z34 group, sorted north to south, each with its data-y.
+const depth34 = new Map();   // exhibit id -> {g, kids, ys}, rebuilt after every render
+function indexDepth34(){
+  depth34.clear(); if(!tilt) return;
+  for(const g of world.querySelectorAll("[data-z34]")){ const kids = [...g.children].filter(c => c.dataset.y !== undefined); depth34.set(g.dataset.z34, {g, kids, ys:kids.map(c => +c.dataset.y)}); }
+}
+function place34(h){
+  const z = tilt && depth34.get(h.exhibitId);
+  if(!z){ if(h.el.parentNode !== animalLayer) animalLayer.appendChild(h.el); h.slot = -1; return; }
+  let lo = 0, hi = z.ys.length; while(lo < hi){ const m = (lo + hi) >> 1; if(z.ys[m] <= h.y) lo = m + 1; else hi = m; }
+  if(h.el.parentNode === z.g && h.slot === lo) return;
+  h.slot = lo; z.g.insertBefore(h.el, z.kids[lo] || null);
+}
+
+// an animal stands on its spot in the 3/4 view: a dot on its lower edge, a picture on its feet (spriteSvg puts them half a dot down)
+function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (h.spr ? .5 : .85)).toFixed(2)})` : ""; }
+
+// A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
+// The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
+function spriteSvg(sp, h){
+  const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+}
+// -1 stands, 0 and up is a walk frame
+// -1 stands, 0 and up is a walk frame, -2 and down is an idle frame (-2 - n), for pictures that have both strips
+function setPose(h, f){
+  if(f === h.pose) return;
+  h.pose = f;
+  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"), id = h.el.querySelector(".id"); if(!st) return;
+  if(id){
+    id.setAttribute("display", "none");   // a walk-and-idle picture: the walk strip, the idle strip or the standing picture, one at a time
+    if(wk) wk.setAttribute("display", "none");
+    st.setAttribute("display", "none");
+    if(f <= -2){ const vb = id.getAttribute("viewBox").split(" "); vb[0] = -2 - f; id.setAttribute("viewBox", vb.join(" ")); id.removeAttribute("display"); }
+    else if(f >= 0 && wk){ const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" ")); wk.removeAttribute("display"); }
+    else st.removeAttribute("display");
+    return;
+  }
+  if(!wk) return;
+  if(f < 0){ st.removeAttribute("display"); wk.setAttribute("display", "none"); return; }
+  st.setAttribute("display", "none"); wk.removeAttribute("display");
+  const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" "));
+}
+// a swimmer in a pond keeps paddling, moving or not
+const swimmingPic = h => !!(h.swim && h.spr && SPRITES[h.sp] && SPRITES[h.sp].swim);
+function swimFrame(h, S){ h.phase ??= Math.random() * S.swim; return Math.floor(performance.now() / (S.swimMs || 200) + h.phase) % S.swim; }
+// what a picture shows while it holds still: its idle strip if it has one beside a walk strip, else the standing picture
+function restPose(h, S){
+  if(!(S && S.walk && S.idle)) return -1;
+  h.phase ??= Math.random() * S.idle;
+  return -2 - Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle;
+}
+
+// a vivarium animal stays put, so keep new ones a couple of bodies apart
+function cramped(h, p){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * 4) return true; return false; }
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
@@ -433,68 +1016,135 @@ function syncAnimals(){
         herd.set(a.id, h);
         animalLayer.appendChild(el);
       }
+      h.a = a;
       // vivarium animals stay small enough to fit inside the glass
-      const s = SPECIES_BY_ID[a.sp], r = e.viv ? Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv)) : Math.max(animalRadius(a.sp), 4*inv);
-      const showLetter = r * view.k >= 8;
-      // sick animals get a red ring
+      const s = SPECIES_BY_ID[a.sp], r = e.viv ? (SPRITES[a.sp] ? VIVARIUMS[e.viv].d / 7 : Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
+      const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
+      h.r = r; h.spr = sprite; h.viv = !!e.viv;
+      if(!h.placed){ h.placed = true; const A = walkArea(h, e); for(let i = 0; i < 20; i++){ const p = randomInside(e.points); if(standable(p, A) && !(e.viv && cramped(h, p))){ [h.x, h.y] = p; break; } } }   // a new animal starts somewhere it fits
+      // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
+      h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
-        `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
-        (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
-      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
+        (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
+        (sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
+        (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : ""));
+      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     }
   }
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
+  indexDepth34(); for(const h of herd.values()) place34(h);
 }
 
-// Can an animal walk straight from a to b without touching the fence? Samples the line, since L and U shaped exhibits cut corners.
-function walkClear(a, b, pts){
-  for(let i = 0; i < pts.length; i++) if(segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
-  const n = Math.max(2, Math.ceil(dist(a, b) / 1.5));
-  for(let i = 0; i <= n; i++){ const t = i/n; if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false; }
+// What an animal walks around: its fence, kept half a body's length off so it doesn't poke through, and the rocks, trees, caves and barns
+// standing in the exhibit (each a circle it keeps its feet out of)
+function walkArea(h, e){
+  const pts = e.points, c = centroid(pts), body = (h.r || 1) * .5;
+  const m = Math.min((h.r || 1) * 1.3, inPoly(c[0], c[1], pts) ? distToEdge(c[0], c[1], pts) * .5 : 1);
+  const obs = [];
+  for(const f of landOf(e)){
+    const t = LAND[f.type]; if(!t) continue;
+    const r = t.r * (f.k || 1), fr = footR(t) * (f.k || 1);
+    const R = t.flora ? (t.look === "conifer" || treeLift(t) ? r * .35 : 0)   // a tree's trunk; low plants are walked through
+      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : fr * .9;
+    if(R) obs.push({x:f.x, y:f.y, c:R + body});
+  }
+  // land animals keep out of the exhibit's water; swimmers and flyers ignore it
+  const sp = SPECIES_BY_ID[h.sp], wat = sp && !swims(sp) && !isFlyer(sp) ? waterOf(e).map(w => w.points) : [];
+  return {pts, obs, m, wat};
+}
+// Semi-aquatic animals (fish eaters and the like) wade in and swim; the rest stay on the bank
+const swims = s => !isFlyer(s) && likesOf(s).water >= .6;
+const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w));
+const inObstacle = (p, A) => A.obs.some(o => Math.hypot(p[0] - o.x, p[1] - o.y) < o.c) || inWater(p, A);
+// Is p somewhere an animal can stand: inside, off the fence, out of the rocks and trees?
+const standable = (p, A) => inPoly(p[0], p[1], A.pts) && distToEdge(p[0], p[1], A.pts) >= A.m && !inObstacle(p, A);
+// A spot by the fence moved in toward the middle until the animal fits there; solid also steps it out of any rock or tree it's in
+function offFence(p, A, solid){
+  const c = centroid(A.pts);
+  for(let k = 0, q = p; k < 12; k++, q = [q[0] + (c[0] - q[0]) * .15, q[1] + (c[1] - q[1]) * .15]){
+    if(!inPoly(q[0], q[1], A.pts)) break;
+    if(distToEdge(q[0], q[1], A.pts) >= A.m){ p = q; break; }
+  }
+  if(solid && inObstacle(p, A)) for(let r = 1; r <= 8; r++) for(let k = 0; k < 8; k++){ const q = [p[0] + Math.cos(k * Math.PI / 4) * r, p[1] + Math.sin(k * Math.PI / 4) * r]; if(standable(q, A)) return q; }
+  return p;
+}
+
+// Can an animal walk straight from a to b? Not across the fence or too close along it, and not through a rock or tree
+// (one it's standing in, or heading into, doesn't count). Checks a few points are inside too, in case it only touches a corner.
+function walkClear(a, b, A){
+  const pts = A.pts, need = Math.min(A.m, distToEdge(a[0], a[1], pts), distToEdge(b[0], b[1], pts)) * .9;
+  for(let i = 0; i < pts.length; i++) if(segSegDist(a, b, pts[i], pts[(i+1) % pts.length]) < need || segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
+  for(const o of A.obs){
+    if(Math.hypot(a[0] - o.x, a[1] - o.y) < o.c || Math.hypot(b[0] - o.x, b[1] - o.y) < o.c) continue;
+    if(segProj(o.x, o.y, a, b).d < o.c) return false;
+  }
+  // not across a pond (one it's standing in doesn't count, so it can wade out)
+  if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length])) return false;
+  for(const t of [.25, .5, .75]) if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false;
   return true;
 }
 
-// Every corner nudged a little way inward, so a route can bend around the inside corners of an irregular exhibit
+// Every corner nudged inward past the animal's margin, so a route can bend around the inside corners of an irregular exhibit
 const walkNodeCache = new Map();
-function walkNodes(pts){
-  const key = JSON.stringify(pts); let nodes = walkNodeCache.get(key);
+function cornerNodes(pts, m = 0){
+  const key = JSON.stringify(pts) + m.toFixed(1); let nodes = walkNodeCache.get(key);
   if(nodes) return nodes;
   nodes = [];
-  const n = pts.length, c = centroid(pts);
+  const n = pts.length;
   for(let i = 0; i < n; i++){
     const p = pts[i], a = pts[(i+n-1) % n], b = pts[(i+1) % n];
     const u = [(a[0]-p[0])/(dist(a,p)||1), (a[1]-p[1])/(dist(a,p)||1)], v = [(b[0]-p[0])/(dist(b,p)||1), (b[1]-p[1])/(dist(b,p)||1)];
     let bx = u[0] + v[0], by = u[1] + v[1], L = Math.hypot(bx, by);
     if(L < 1e-6){ bx = -u[1]; by = u[0]; L = 1; }
     bx /= L; by /= L;
-    for(const m of [1, 2.5]){   // bisector of the two edges, flipped if it points outside
-      let q = [p[0] + bx*m, p[1] + by*m];
-      if(!inPoly(q[0], q[1], pts)) q = [p[0] - bx*m, p[1] - by*m];
-      if(inPoly(q[0], q[1], pts) && distToEdge(q[0], q[1], pts) > .3){ nodes.push(q); break; }
+    for(const k of [1, 2.5, 4]){   // bisector of the two edges, flipped if it points outside
+      const d = m * 1.5 + k;
+      let q = [p[0] + bx*d, p[1] + by*d];
+      if(!inPoly(q[0], q[1], pts)) q = [p[0] - bx*d, p[1] - by*d];
+      if(inPoly(q[0], q[1], pts) && distToEdge(q[0], q[1], pts) > Math.max(.3, m)){ nodes.push(q); break; }
     }
   }
   if(walkNodeCache.size > 60) walkNodeCache.clear();
   walkNodeCache.set(key, nodes);
   return nodes;
 }
+// The corners, plus a ring of spots around each rock and tree to walk round it by
+function walkNodes(A){
+  const out = cornerNodes(A.pts, A.m).filter(p => !inObstacle(p, A));
+  for(const o of A.obs) for(let k = 0; k < 6; k++){ const a = k * Math.PI / 3 + .3, p = [o.x + Math.cos(a) * (o.c + .4), o.y + Math.sin(a) * (o.c + .4)]; if(standable(p, A)) out.push(p); }
+  for(const w of A.wat){   // spots just off each pond corner, pushed away from the middle
+    const c = centroid(w);
+    for(const q of w){ const d = dist(q, c) || 1; for(const k of [1, 2.5]){ const r = A.m + k, p = [q[0] + (q[0] - c[0]) / d * r, q[1] + (q[1] - c[1]) / d * r]; if(standable(p, A)){ out.push(p); break; } } }
+  }
+  return out;
+}
 
-// Waypoints from a to b that stay inside the exhibit, or null if there's no way
-function walkRoute(a, b, pts){
-  if(walkClear(a, b, pts)) return [b];
-  const nodes = walkNodes(pts), pos = [a, ...nodes, b], N = pos.length, d = new Array(N).fill(Infinity), prev = new Array(N).fill(-1), done = new Array(N).fill(false);
-  d[0] = 0;
+// Which waypoints see each other, worked out once per exhibit layout and body size, since every animal of a kind shares it
+const walkGraphCache = new Map();
+function walkGraph(A){
+  const key = JSON.stringify([A.pts, A.obs, A.m, A.wat]); let g = walkGraphCache.get(key);
+  if(g) return g;
+  const nodes = walkNodes(A), adj = nodes.map(() => []);
+  for(let i = 0; i < nodes.length; i++) for(let j = i + 1; j < nodes.length; j++) if(walkClear(nodes[i], nodes[j], A)){ const w = dist(nodes[i], nodes[j]); adj[i].push([j, w]); adj[j].push([i, w]); }
+  if(walkGraphCache.size > 40) walkGraphCache.clear();
+  walkGraphCache.set(key, g = {nodes, adj});
+  return g;
+}
+// Waypoints from a to b that stay inside the exhibit and around what stands in it, or null if there's no way
+function walkRoute(a, b, A){
+  if(walkClear(a, b, A)) return [b];
+  const {nodes, adj} = walkGraph(A), N = nodes.length, done = new Array(N).fill(false), prev = new Array(N).fill(-1);
+  const d = nodes.map(n => walkClear(a, n, A) ? dist(a, n) : Infinity);
+  let best = Infinity, last = -1;
   for(;;){
     let u = -1; for(let i = 0; i < N; i++) if(!done[i] && d[i] < Infinity && (u < 0 || d[i] < d[u])) u = i;
-    if(u < 0) return null;
-    if(u === N-1) break;
+    if(u < 0 || d[u] >= best) break;
     done[u] = true;
-    for(let v = 1; v < N; v++){
-      if(done[v]) continue;
-      const w = dist(pos[u], pos[v]); if(d[u] + w >= d[v] || !walkClear(pos[u], pos[v], pts)) continue;
-      d[v] = d[u] + w; prev[v] = u;
-    }
+    const tail = dist(nodes[u], b); if(d[u] + tail < best && walkClear(nodes[u], b, A)){ best = d[u] + tail; last = u; }
+    for(const [v, w] of adj[u]) if(!done[v] && d[u] + w < d[v]){ d[v] = d[u] + w; prev[v] = u; }
   }
-  const out = []; for(let i = N-1; i > 0; i = prev[i]) out.unshift(pos[i]);
+  if(last < 0) return null;
+  const out = [b]; for(let i = last; i >= 0; i = prev[i]) out.unshift(nodes[i]);
   return out;
 }
 
@@ -502,41 +1152,193 @@ function walkRoute(a, b, pts){
 function animalWander(h, e){
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
-  for(let i = 0; i < 6; i++){
-    const [x, y] = randomInside(e.points);
-    if(distToEdge(x, y, e.points) < .5) continue;
-    const r = walkRoute([h.x, h.y], [x, y], e.points);
+  const A = walkArea(h, e), ws = swims(SPECIES_BY_ID[h.sp]) ? waterOf(e) : [];
+  for(let i = 0; i < 8; i++){
+    const p = ws.length && Math.random() < .5 ? randomInside(pickOne(ws).points) : randomInside(e.points);   // swimmers spend half their time in the water
+    if(!standable(p, A)) continue;
+    const r = walkRoute([h.x, h.y], p, A);
     if(r){ h.path = r; return; }
   }
+}
+
+/* What each act looks like (behavior.js picks the act): where the animal heads, how fast, and whether it stays once there */
+const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1};
+const ACT_STAYS = new Set(["eat", "drink", "rest", "hide"]);
+// The edge of a land feature nearest the animal, or its middle for shelters it can walk into
+function featSpot(h, f, into){
+  const t = LAND[f.type];
+  if(into && (t.look === "cave" || t.look === "burrow")) return [f.x, f.y + t.r * .85 + (h.r || 1) * .6];   // at the mouth, which faces the viewer
+  const r = into ? 0 : t.r + (h.r || 1), dx = h.x - f.x, dy = h.y - f.y, d = Math.hypot(dx, dy) || 1;
+  return [f.x + dx / d * r, f.y + dy / d * r];
+}
+const nearestTo = (h, list, at = x => x) => { let b = null, bd = Infinity; for(const x of list){ const p = at(x), d = Math.hypot(p[0] - h.x, p[1] - h.y); if(d < bd){ bd = d; b = x; } } return b; };
+const pickOne = list => list.length ? list[Math.floor(Math.random() * list.length)] : null;
+// Just inside the keeper gate, where the trough and the food drop are
+function gateSpot(e){
+  if(!e.gate) return null;
+  const c = centroid(e.points), d = dist(e.gate, c) || 1, m = Math.min(3, d / 2);
+  const p = [e.gate[0] + (c[0] - e.gate[0]) / d * m, e.gate[1] + (c[1] - e.gate[1]) / d * m];
+  return inPoly(p[0], p[1], e.points) ? p : null;
+}
+// A spot as far from the guest paths as the exhibit allows
+function quietSpot(e){
+  const far = p => state.paths.reduce((m, q) => Math.min(m, lineDist(p[0], p[1], q.points)), 60);
+  let best = null, bd = -1;
+  for(const p of cornerNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
+  return best;
+}
+// A swimmer in a pond: the bank just past its nearest edge, to get out and dry off (null if it's not in one)
+function bankSpot(h, e){
+  const w = waterOf(e).find(w => inPoly(h.x, h.y, w.points)); if(!w) return null;
+  const c = centroid(w.points); let q = null;
+  for(let i = 0; i < w.points.length; i++){ const r = segProj(h.x, h.y, w.points[i], w.points[(i + 1) % w.points.length]); if(!q || r.d < q.d) q = r; }
+  const d = Math.hypot(q.x - c[0], q.y - c[1]) || 1, out = (h.r || 1) * 1.5 + 1;
+  return [q.x + (q.x - c[0]) / d * out, q.y + (q.y - c[1]) / d * out];
+}
+// Where the act takes it, or null to stay where it is
+function actGoal(h, e, a){
+  const land = landOf(e).filter(f => LAND[f.type]), of = k => land.filter(f => LAND[f.type][k]);
+  switch(a.act){
+    case "eat": {
+      const t = trays(e).filter(f => trayHas(f) > 0);
+      return t.length ? featSpot(h, nearestTo(h, t, f => [f.x, f.y])) : gateSpot(e);
+    }
+    case "drink": {
+      const ws = waterOf(e);
+      if(!ws.length) return gateSpot(e);
+      const w = nearestTo(h, ws, w => centroid(w.points)), v = nearestTo(h, w.points), c = centroid(w.points);
+      if(!swims(SPECIES_BY_ID[a.sp])){   // land animals drink from the bank: the nearest edge, one body back toward them
+        let q = null; for(let i = 0; i < w.points.length; i++){ const r = segProj(h.x, h.y, w.points[i], w.points[(i + 1) % w.points.length]); if(!q || r.d < q.d) q = r; }
+        const d = Math.hypot(h.x - q.x, h.y - q.y) || 1, back = (h.r || 1) + .6;
+        return [q.x + (h.x - q.x) / d * back, q.y + (h.y - q.y) / d * back];
+      }
+      return [v[0] + (c[0] - v[0]) * .25, v[1] + (c[1] - v[1]) * .25];   // a step into the shallows
+    }
+    case "rest": {
+      const f = nearestTo(h, of("slots").concat(of("flora")), f => [f.x, f.y]);
+      return f ? featSpot(h, f, !!LAND[f.type].slots) : bankSpot(h, e);   // with no shelter it rests on the bank, not afloat
+    }
+    case "hide": {
+      const cover = of("hide").length ? of("hide") : of("slots").length ? of("slots") : of("flora").length ? of("flora") : of("cover");
+      if(!cover.length) return quietSpot(e);
+      const far = f => state.paths.reduce((m, q) => Math.min(m, lineDist(f.x, f.y, q.points)), 60);
+      const f = cover.slice().sort((x, y) => far(y) - far(x))[0];
+      return featSpot(h, f, !!LAND[f.type].slots);
+    }
+    case "forage": {
+      // plant eaters browse groves and hay; bug eaters work the insect logs
+      const s = SPECIES_BY_ID[a.sp], f = pickOne(of("flora").concat(eats(s, "herbivore") ? of(foodType(s) === "paleoflora" ? "paleo" : "hay") : [], land.filter(f => f.type === "buglog" && toyFor(LAND[f.type], s) > 0)));
+      return f ? featSpot(h, f) : null;
+    }
+    case "hunt": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null; }
+    case "play": { const s = SPECIES_BY_ID[a.sp], ws = waterOf(e); if(swims(s) && ws.length && Math.random() < .6) return centroid(pickOne(ws).points); const f = pickOne(land.filter(f => toyFor(LAND[f.type], s) > 0).concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
+    case "social": {
+      let mate = null, bd = Infinity;
+      for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.sp === h.sp){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; mate = o; } }
+      if(!mate) return null;
+      const r = (h.r || 1) * 2.5, dx = h.x - mate.x, dy = h.y - mate.y, d = Math.hypot(dx, dy) || 1;
+      return [mate.x + dx / d * r, mate.y + dy / d * r];
+    }
+  }
+  return null;
+}
+// Pacing: back and forth along a short beat just inside the nearest stretch of fence
+function paceRoute(h, e){
+  const pts = e.points, A = walkArea(h, e), inset = e.viv ? .4 : (h.r || 1) + 1.5;
+  let best = null;
+  for(let i = 0; i < pts.length; i++){ const a = pts[i], b = pts[(i + 1) % pts.length], q = segProj(h.x, h.y, a, b); if(!best || q.d < best.q.d) best = {a, b, q}; }
+  const {a, b, q} = best, L = dist(a, b) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+  let nx = -uy, ny = ux;
+  if(!inPoly(q.x + nx * inset, q.y + ny * inset, pts)){ nx = -nx; ny = -ny; }
+  const beat = Math.min(clamp(L * .4, e.viv ? 1 : 3, 14), Math.max(0, L - inset * 2)), t0 = clamp(q.t * L - beat / 2, inset, Math.max(inset, L - beat - inset));
+  const p1 = [a[0] + ux * t0 + nx * inset, a[1] + uy * t0 + ny * inset], p2 = [p1[0] + ux * beat, p1[1] + uy * beat];
+  if(!inPoly(p1[0], p1[1], pts) || inObstacle(p1, A) || inObstacle(p2, A) || !walkClear(p1, p2, A)) return null;
+  const to = walkRoute([h.x, h.y], p1, A);
+  return to ? to.concat([p2, p1, p2, p1, p2, p1]) : null;
+}
+// Patrolling: a lap of the fence line, from the nearest corner
+function patrolRoute(h, e){
+  const A = walkArea(h, e), nodes = cornerNodes(e.points, A.m).filter(p => !inObstacle(p, A)); if(nodes.length < 3) return null;
+  const i0 = nodes.indexOf(nearestTo(h, nodes)), out = [];
+  let at = [h.x, h.y];
+  for(let k = 0; k <= nodes.length; k++){ const n = nodes[(i0 + k) % nodes.length], r = walkRoute(at, n, A); if(!r) break; out.push(...r); at = n; }
+  return out.length ? out : null;
+}
+function animalPlan(h, e){
+  const a = h.a;
+  if(!a || !a.act){ animalWander(h, e); return; }
+  h.key = JSON.stringify(e.points); h.path = [];
+  if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
+  if(a.act === "pace"){ const r = paceRoute(h, e); if(r){ h.path = r; return; } }
+  if(a.act === "patrol"){ const r = patrolRoute(h, e); if(r){ h.path = r; return; } }
+  // only a barn is walked into (featSpot sends it to the middle); every other spot steps clear of rocks and trees
+  const A = walkArea(h, e), aim = actGoal(h, e, a), barn = aim && landOf(e).some(f => LAND[f.type] && LAND[f.type].slots && !LAND[f.type].look && dist(aim, [f.x, f.y]) < .01);
+  const goal = aim && offFence(aim, A, !barn);
+  if(goal){
+    if(Math.hypot(goal[0] - h.x, goal[1] - h.y) < .5) return;
+    const r = inPoly(goal[0], goal[1], e.points) && walkRoute([h.x, h.y], goal, A);
+    if(r){ h.path = r; return; }
+  }
+  // nothing to head for: settle where it is, or mill about
+  if(!ACT_STAYS.has(a.act)) animalWander(h, e);
 }
 
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
-    if(h.wait > 0){ h.wait -= dt; continue; }
-    if(!h.path || h.key !== JSON.stringify(e.points)) animalWander(h, e);   // new animal, or the exhibit was reshaped
-    if(!h.path.length){ h.wait = 1 + Math.random()*3; h.path = null; continue; }
+    const act = h.a && h.a.act;
+    // a new act: drop what it was doing and head off at once
+    if(act !== h.act){ h.act = act; h.path = null; h.wait = Math.min(h.wait, Math.random() * .6); }
+    // vivarium animals don't walk: they stay on their spot and cycle an idle strip if their picture has one (else the standing picture or dot)
+    if(e.viv){
+      const S = SPRITES[h.sp];
+      if(h.spr && S && S.idle){ h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); }
+      continue;
+    }
+    // an open-exhibit picture with an idle strip but no walk strip cycles the idle strip all the time, still or moving
+    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleFrame = () => { h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); };
+    if(h.wait > 0){ h.wait -= dt; if(swimmingPic(h)) setPose(h, swimFrame(h, S)); else if(idleOnly) idleFrame(); else setPose(h, restPose(h, S)); continue; }
+    if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
+    // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
+    const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
+    if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
-    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = 1 + Math.random()*4; h.path = null; } continue; }
-    const step = Math.min(d, h.spd * 3 * dt);
+    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
+    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
-    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})`);
+    // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto
+    if(h.swim !== undefined || swims(SPECIES_BY_ID[h.sp])){ const sw = waterOf(e).some(w => inPoly(h.x, h.y, w.points)); if(sw !== !!h.swim){ h.swim = sw; h.el.classList.toggle("swimming", sw); const g = h.el.querySelector(".spr"); if(g && SPRITES[h.sp] && SPRITES[h.sp].swim){ h.pose = null; g.outerHTML = spriteSvg(h.sp, h); } } }
+    // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
+    if(swimmingPic(h)){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.swim); }
+    else if(idleOnly) idleFrame();
+    else if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
+    if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
+    h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+    if(tilt) place34(h);
   }
 }
 
 /* ---------- guests walking the paths ---------- */
-const SHIRTS = ["#C8452B", "#2F6E8F", "#E3B23C", "#F4F1E8"];
+// A party is a dot in its primary personality's color (or its mood's, when that's switched on)
+const PERS_KEYS = Object.keys(PERSONALITIES), PERS_INDEX = Object.fromEntries(PERS_KEYS.map((k, i) => [k, i]));
+const SHIRTS = PERS_KEYS.map(k => PERSONALITIES[k].color);
 const MOOD_SHIRTS = ["#3E9B4F", "#E3B23C", "#D9483B"];   // happy, so-so, unhappy
 const shirtPaths = SHIRTS.map(c => {
   const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  el.setAttribute("stroke", c); el.setAttribute("stroke-width", "5"); el.setAttribute("stroke-linecap", "round");
+  el.setAttribute("stroke", c); el.setAttribute("stroke-width", "6.5"); el.setAttribute("stroke-linecap", "round");
   el.setAttribute("vector-effect", "non-scaling-stroke"); el.setAttribute("fill", "none");
   guestLayer.appendChild(el); return el;
 });
 const outline = document.createElementNS("http://www.w3.org/2000/svg", "path");
-outline.setAttribute("stroke", "#1D2B22"); outline.setAttribute("stroke-width", "7"); outline.setAttribute("stroke-linecap", "round");
+outline.setAttribute("stroke", "#1D2B22"); outline.setAttribute("stroke-width", "8.5"); outline.setAttribute("stroke-linecap", "round");
 outline.setAttribute("vector-effect", "non-scaling-stroke"); outline.setAttribute("fill", "none"); outline.setAttribute("stroke-opacity", ".55");
 guestLayer.insertBefore(outline, guestLayer.firstChild);
+
+// A ring around the party whose panel is open
+const guestRing = document.createElementNS("http://www.w3.org/2000/svg", "g");
+guestRing.setAttribute("pointer-events", "none"); guestRing.style.display = "none";
+guestRing.innerHTML = `<circle r="8" fill="none" stroke="#fff" stroke-width="3" vector-effect="non-scaling-stroke"/><circle r="8" fill="none" stroke="#1D2B22" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+guestLayer.appendChild(guestRing);
 
 const nodeKey = p => Math.round(p[0]*4) + ":" + Math.round(p[1]*4);
 
@@ -554,11 +1356,26 @@ function drawParties(){
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
+    if(hidden34(x, y)) continue;
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : p.shirt].push(m); all.push(m);
+    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0].push(m); all.push(m);
   }
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
+  const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
+  if(at && !hidden34(at[0], at[1])){ guestRing.style.display = ""; guestRing.setAttribute("transform", `translate(${at[0].toFixed(2)} ${at[1].toFixed(2)})${upright()}`); }
+  else guestRing.style.display = "none";
+}
+// The party under a tap or click, if there is one (they're drawn as dots, so this is by distance on screen)
+function guestAt(cx, cy){
+  const w = toWorld(cx, cy);
+  let best = null, bd = 14;
+  for(const p of parties){
+    if(!p.at) continue;
+    const [x, y] = partyPos(p), d = Math.hypot((x - w.x) * view.k, (y - w.y) * ky());
+    if(d < bd && !hidden34(x, y)){ bd = d; best = p; }
+  }
+  return best;
 }
 
 /* ---------- trams: one car shuttles between the end stations of each stretch of track ---------- */
@@ -587,7 +1404,7 @@ function drawTrams(){
 }
 
 /* ---------- snapping new corners to things nearby ---------- */
-function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/view.k}; }
+function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/ky()}; }
 
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
@@ -598,7 +1415,7 @@ function snapAt(clientX, clientY, ev){
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
   // tram track only ever joins other tram track, and nothing else snaps to it
   const snapPaths = state.paths.filter(q => isTram(q) === !!(draw && draw.kind === "tram"));
-  if(draw && ["path", "wide", "service", "tram"].includes(draw.kind)){
+  if(draw && ["path", "wide", "service", "tram", "bridge"].includes(draw.kind)){
     let hit = null;
     for(const q of snapPaths) for(let i = 1; i < q.points.length; i++){
       const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
@@ -613,6 +1430,7 @@ function snapAt(clientX, clientY, ev){
   for(const [a, c] of edges){ tryV(a, "boundary", "boundary"); tryV(c, "boundary", "boundary"); }
   for(const q of snapPaths) q.points.forEach(v => tryV(v, "path", q.id));
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
+  if(draw && draw.kind === "exhibit") for(const l of fenceLines()) l.points.forEach(v => tryV(v, "fence", l.id));
   if(best) return best;
   // with grid snap on, land on the nearest grid point (and still join a path if that point sits on one)
   if(gridSnap){
@@ -685,6 +1503,7 @@ function exhibitProblem(pts){
   if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  const hit = shapeHitsLandscape(pts); if(hit) return hit;
   const fence = BARRIERS[fenceSel];
   if(fence.tech && !hasTech(fence.tech)) return `Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`;
   const cost = exhibitCost(pts, fenceSel);
@@ -699,6 +1518,7 @@ function pathProblem(pts, type){
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
   if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  const hit = lineHitsLandscape(pts, halfWidth({type}), type === "bridge"); if(hit) return hit;
   const cost = pathCost(pts, type);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -706,15 +1526,16 @@ function pathProblem(pts, type){
 
 /* ---------- drawing exhibits and paths ---------- */
 const DRAW_TEXT = {
-  exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it, or start and end on a neighbor's fence and tap the last corner again to share its wall."],
+  exhibit:["New exhibit", "Tap to drop fence corners. Tap the first corner to close it into an exhibit (give it a keeper gate after), or start and end on a neighbor's fence to share its wall. Tap the last corner again to leave it as an open fence."],
   path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
   tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
-  water:["New water", "Tap to drop shore corners inside an open exhibit. Tap the first corner again to fill it. Animals like water, and fish eaters need some."]
+  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."],
+  bridge:["New wooden bridge", "A footpath that can cross water. Start on a path or the entrance, run it over the water, then tap the last point again to finish."]
 };
-const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram") ? draw.kind : undefined;
+const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram" || draw.kind === "bridge") ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
@@ -731,7 +1552,13 @@ function setTool(t){
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(landKey(t)) showBar(`Place ${LAND[landKey(t)].one}`, "Tap inside an open exhibit, clear of any water. Animals feel at home among water and rocks, groves from their era, and shelter from bad weather.", `${money(LAND[landKey(t)].price)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(landKey(t)){
+    const L = LAND[landKey(t)];
+    showBar(`Place ${L.one}`, L.statue ? `Tap anywhere out in the park, clear of paths and fences. Guests stop to look${L.initials ? ", and learn a lot from the plaque" : ""}.${L.text ? " " + L.text : ""}`
+      : L.slots || L.tray ? "Tap inside an open exhibit, clear of any water. Barns, caves and canopies shelter the animals from bad weather."
+      : "Tap inside an open exhibit for the animals, or out in the park beside a path to cheer up the guests walking past. Animals feel at home among water, rocks and plants from their own period and biome.",
+      `${money(L.price)} each`, {undo:false, finish:false, cancel:"Done"});
+  }
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
@@ -753,7 +1580,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit or path to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or its water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
+    showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -774,7 +1601,7 @@ function startDraw(kind){
   draw = {kind, pts:[], snaps:[], hover:null, error:null};
   sel = null; ui.panel();
   const [t, hint] = DRAW_TEXT[kind];
-  showBar(kind === "exhibit" ? `New exhibit: ${BARRIERS[fenceSel].label.toLowerCase()}` : t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
+  showBar(kind === "exhibit" ? `New ${BARRIERS[fenceSel].label.toLowerCase()}` : t, hint, "", {undo:true, finish:true, cancel:"Cancel", finishText:kind === "exhibit" ? "Close exhibit" : null});
   updateDrawbar();
   const fence = BARRIERS[fenceSel];
   if(kind === "exhibit" && fence.tech && !hasTech(fence.tech)) setStat(`Research ${TECH.find(x => x.id === fence.tech).label.toLowerCase()} at ORACLE first.`, true);
@@ -788,13 +1615,17 @@ function updateDrawbar(){
   const all = drawPoints();
   let stat = "", err = null;
   if(draw.kind === "exhibit"){
-    const shape = closeAlong(all);
-    if(shape.length >= 3){ stat = `${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${BARRIERS[fenceSel].label.toLowerCase()}. ${money(exhibitCost(shape, fenceSel))}`; err = exhibitProblem(shape); }
+    // closed, it's an exhibit; tapping the last corner again leaves it as an open fence
+    const shape = closeAlong(all), name = BARRIERS[fenceSel].label.toLowerCase();
+    const openWhy = all.length >= 2 && shape === all ? fenceProblem(all, fenceSel) : "x", openText = `${Math.round(lineLength(all))} m of open ${name}, ${money(fenceLineCost(all, fenceSel))}`;
+    const exWhy = shape.length >= 3 ? exhibitProblem(shape) : "x";
+    if(!exWhy) stat = `Exhibit: ${fmtArea(area(shape))}, ${Math.round(perimeter(shape))} m of ${name}, ${money(exhibitCost(shape, fenceSel))}.${openWhy ? "" : ` Or tap the last corner again for ${openText}.`}`;
+    else if(!openWhy) stat = `Open fence: ${openText}. Tap the last corner again to build it.${shape.length >= 3 ? " " + exWhy : " Or keep going and close it into an exhibit."}`;
+    else if(all.length >= 2) err = shape.length >= 3 ? exWhy : openWhy;
   } else if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
   } else if(draw.kind === "water"){
-    if(all.length >= 3){ stat = `${fmtArea(area(all))} of water. ${money(waterCost(all))}`; err = waterProblem(all, waterHost(all), null, waterCost(all)); }
-    else if(all.length && !waterHost(all)) err = "Start it inside an open exhibit.";
+    if(all.length >= 3){ const h = waterHost(all); stat = `${fmtArea(area(all))} of water ${h ? "in " + h.name : "out in the park"}. ${money(waterCost(all))}`; err = waterProblem(all, h, null, waterCost(all)); }
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
@@ -877,7 +1708,7 @@ function finishDraw(){
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw("water"); render();
-    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host.name} for ${money(cost)}.`, "good");
+    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host ? host.name : "the park"} for ${money(cost)}.`, "good");
     return;
   }
   if(d.kind === "zone"){
@@ -900,28 +1731,42 @@ function finishDraw(){
     let n = 1; while(used.has(`Exhibit ${n}`)) n++;
     const e = {id:uid("e-"), name:`Exhibit ${n}`, points:pts, animals:[], happy:70, cond:100, inspected:{day:state.day, cond:100}};
     if(fenceSel !== "wood") e.barrier = fenceSel;
+    if(parkBiome() !== DEFAULT_BIOME) e.biome = parkBiome();   // new exhibits start out as the park's own ground
     autoZone(e);
     themeNew("exhibit", e);
     state.exhibits.push(e);
     afterChange();
     toolDone({kind:"exhibit", id:e.id});
-    ui.toast(`Built ${e.name} for ${money(cost)}.`);
+    ui.toast(`Built ${e.name} for ${money(cost)}.${e.gate ? "" : " Give it a keeper gate where a path meets the fence."}`);
   } else {
     d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
     const cost = pathCost(pts, type);
     spend(cost, "built");
-    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : "Path", points:pts};
+    const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : type === "bridge" ? "Wooden bridge" : "Path", points:pts};
     if(type) p.type = type;
-    if(type !== "service" && type !== "tram") themeNew("path", p);
+    if(type !== "service" && type !== "tram" && type !== "bridge") themeNew("path", p);
     state.paths.push(p);
     afterChange();
     // keep the tool going so you can draw the next one
     startDraw(d.kind);
     render();
     const joinedNow = type === "tram" || (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
-    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : "path";
+    const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : type === "bridge" ? "wooden bridge" : "path";
     ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
   }
+}
+
+// Tapping the last corner again leaves an exhibit's fence open: a fence line on its own, like a hedge row along a path
+function finishFence(){
+  if(!draw) return;
+  const pts = draw.pts.map(p => [p[0], p[1]]), why = fenceProblem(pts, fenceSel);
+  if(why){ setStat(why, true); return; }
+  const cost = fenceLineCost(pts, fenceSel);
+  addFenceLine(pts, fenceSel);
+  afterChange();
+  // keep the tool going so you can draw the next one
+  startDraw("exhibit"); render();
+  ui.toast(`Built ${Math.round(lineLength(pts))} m of ${BARRIERS[fenceSel].label.toLowerCase()} for ${money(cost)}.`, "good");
 }
 
 function toolDone(newSel){
@@ -933,8 +1778,8 @@ function drawTap(e){
   const sn = snapAt(e.clientX, e.clientY, e), k = view.k;
   const near = q => q && Math.hypot(q[0] - sn.x, q[1] - sn.y) * k < 14;
   if(isPoly(draw.kind) && draw.pts.length >= 3 && near(draw.pts[0])){ finishDraw(); return; }
-  // tapping the last corner again finishes an open shape that ends on a neighbor's fence
-  if(draw.kind === "exhibit" && draw.pts.length >= 2 && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
+  // tapping the last corner again closes a shape that ends on a neighbor's fence, or leaves the fence open
+  if(draw.kind === "exhibit" && draw.pts.length >= 2 && near(draw.pts[draw.pts.length-1])){ if(closeAlong(draw.pts) !== draw.pts) finishDraw(); else finishFence(); return; }
   if(!isPoly(draw.kind) && draw.pts.length && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
   draw.pts.push([sn.x, sn.y]); draw.snaps.push(sn.info);
   snapMark = null; updateDrawbar(); renderOverlay();
@@ -988,6 +1833,7 @@ function placeGhost(clientX, clientY){
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
   if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
+  if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
   const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
@@ -1084,6 +1930,7 @@ function gateTap(e){
 
 /* ---------- keepers on the map ---------- */
 const keeperEls = new Map();
+function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; }
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
   for(const c of crew){
@@ -1092,7 +1939,8 @@ function drawKeepers(){
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
     const nx = c.route[0];
-    const x = nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
+    const fp = fillPos(c);   // filling trays: inside the fence
+    const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
     const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
     const drive = onAtv(c), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}`;
     if(el.dataset.key !== key){
@@ -1102,7 +1950,7 @@ function drawKeepers(){
         `<circle r="${r}" fill="#2E6B3A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
         (food ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${food}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    walker34(el, x, y);
   }
   // mechanics: orange with a white wrench-dot
   for(const c of mcrew){
@@ -1117,7 +1965,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#C8642A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><circle r="${r*.35}" fill="#fff"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    walker34(el, x, y);
   }
   // vets: white with a red cross
   for(const c of vcrew){
@@ -1131,7 +1979,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#fff" stroke="#B0384F" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${-r*.55} 0H${r*.55}M0 ${-r*.55}V${r*.55}" stroke="#B0384F" stroke-width="${r*.35}"/>` +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    walker34(el, x, y);
   }
   // custodians: teal, with a square of whatever stock they're carrying
   for(const c of ccrew){
@@ -1146,7 +1994,7 @@ function drawKeepers(){
         (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    walker34(el, x, y);
   }
   // security guards: navy, with a white badge; a dashed ring while chasing
   for(const c of gcrew){
@@ -1160,7 +2008,7 @@ function drawKeepers(){
       el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
-    el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+    walker34(el, x, y);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
   for(const a of usableAtvs()){
@@ -1171,7 +2019,7 @@ function drawKeepers(){
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
     const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
     if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
-    el.setAttribute("transform", `translate(${n.x.toFixed(2)} ${n.y.toFixed(2)})`);
+    walker34(el, n.x, n.y);
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
 }
@@ -1189,7 +2037,7 @@ function drawLoose(){
     if(l.status === "carried"){ const c = crew.find(x => x.hunt === l); if(c && c.at) p = keeperPos(c); }
     if(!p) continue;
     const sp = SPECIES_BY_ID[l.sp], r = Math.max(2.5, 7*inv), pulse = 1 + .25 * Math.sin(performance.now() / 180);
-    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})">`;
+    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${upright()}">`;
     if(l.status === "loose") s += `<circle r="${r * 1.8 * pulse}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     s += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     s += `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text></g>`;
@@ -1221,6 +2069,7 @@ function findPlatformSpot(clientX, clientY){
   else if(!insidePlot(pts)) why = "Keep it inside the park boundary.";
   else if(state.exhibits.some(o => o !== e && shapesOverlap(pts, o.points))) why = "It overlaps another exhibit.";
   else if(state.buildings.some(o => shapesOverlap(pts, o.points))) why = "It overlaps a building.";
+  else if(shapeHitsLandscape(pts)) why = shapeHitsLandscape(pts);
   else if(!canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return {e, pts, x:x + nx*off, y:y + ny*off, ok:!why, why};
 }
@@ -1249,15 +2098,15 @@ function landPoint(ev){
 function landHover(ev){
   const key = landKey(tool), p = landPoint(ev);
   landGhost = {...landSpot(p.x, p.y, key), key};
-  setStat(landGhost.why || `${money(LAND[key].price)}. It goes in ${landGhost.e.name}.`, !landGhost.ok);
+  setStat(landGhost.why || `${money(LAND[key].price)}. It goes ${landGhost.e ? "in " + landGhost.e.name : "out in the park"}.`, !landGhost.ok);
   renderOverlay();
 }
 function landTap(ev){
   const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
   if(!g.ok){ setStat(g.why, true); return; }
-  placeLand(g.e, key, g.x, g.y, rockBiome);
+  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()));
   afterChange(); render();
-  ui.toast(`Added ${LAND[key].one} to ${g.e.name}.`, "good");
+  ui.toast(g.e ? `Added ${LAND[key].one} to ${g.e.name}.` : `Added ${LAND[key].one} to the park.`, "good");
 }
 
 /* ---------- bulldozing ---------- */
@@ -1290,8 +2139,8 @@ function removeItem(kind, it){
   const refund = refundFor(kind, it);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
-  if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)); if(o) o.land.splice(o.land.indexOf(it), 1); }
-  else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)); if(o) o.water.splice(o.water.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
+  if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
+  else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   if(kind === "zone") dropZone(it.id);
@@ -1303,11 +2152,11 @@ function removeItem(kind, it){
 }
 
 /* ---------- moving things ---------- */
-// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, and paths (not the entrance walk)
+// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, paths (not the entrance walk) and open fences
 function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
-  if(!it || !["exhibit", "path", "building"].includes(hit.kind)) return null;
+  if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
   if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   return it;
@@ -1321,16 +2170,22 @@ function moveProblem(kind, it){
     if(state.exhibits.some(e => e !== it && shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
     if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
     if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+    return shapeHitsLandscape(pts);
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
     else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+    return shapeHitsLandscape(pts);
+  } else if(kind === "fence"){
+    const keep = state.fences; state.fences = keep.filter(l => l !== it);
+    const why = fenceProblem(pts, it.barrier, true); state.fences = keep;
+    return why;
   } else {
     if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
     if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+    return lineHitsLandscape(pts, halfWidth(it), isBridge(it));
   }
-  return null;
 }
 // Everything that moves with the item: its own points, an exhibit's gate and platforms, and the animals wandering inside
 function moveBy(m, dx, dy){
@@ -1365,7 +2220,7 @@ function dropMove(m){
     for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.path = null; }
   }
   afterChange(); render();
-  const it = m.it, reach = m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it);
+  const it = m.it, reach = m.kind === "fence" || (m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it));
   ui.toast(reach ? "Moved." : "Moved, but it doesn't reach the entrance from there.", reach ? "" : "bad");
   setStat("");
 }
@@ -1375,6 +2230,7 @@ function dropMove(m){
 function reshapeables(){
   const out = [];
   for(const e of state.exhibits){ if(e.viv) continue; out.push({e, t:e}); for(const w of waterOf(e)) out.push({e, t:w, w}); }
+  for(const w of parkWater()) out.push({e:null, t:w, w});
   return out;
 }
 // Corners first (fences before water), then the + in the middle of each edge
@@ -1401,7 +2257,8 @@ function commitWaterReshape(e, w, orig){
   const diff = waterReshapeCost(w, orig);
   if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
   afterChange(); render();
-  ui.toast(diff > 0 ? `Reshaped the water in ${e.name} for ${money(diff)}.` : diff < 0 ? `Reshaped the water in ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped the water in ${e.name}.`);
+  const where = e ? `the water in ${e.name}` : "the water";
+  ui.toast(diff > 0 ? `Reshaped ${where} for ${money(diff)}.` : diff < 0 ? `Reshaped ${where}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${where}.`);
 }
 const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
 // Why this exhibit's new outline won't work, or null
@@ -1413,8 +2270,9 @@ function reshapeProblem(e, orig){
   if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, footR(LAND[f.type])))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
@@ -1447,20 +2305,20 @@ function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:
 function fit(){
   const {w, h} = svgSize(); if(!w || !h) return;
   const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:PARCELS.ys[PARCELS.ys.length-1]} : ownedBox(), pad = 40;
-  view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/(b.y1 - b.y0)), KMIN, KMAX);
+  view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/((b.y1 - b.y0)*tf())), KMIN, KMAX);
   view.tx = (w - (b.x1 - b.x0)*view.k)/2 - b.x0*view.k;
-  view.ty = (h - (b.y1 - b.y0)*view.k)/2 - b.y0*view.k;
+  view.ty = (h - (b.y1 - b.y0)*ky())/2 - b.y0*ky();
   render();
 }
 function zoomAt(mx, my, f){
-  const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/view.k;
-  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender();
+  const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/ky();
+  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender();
 }
 function centerOn(it){
   if(!it) return;
   const {w, h} = svgSize(), b = bbox(it.points);
-  const cx = (b.x0 + b.x1)/2, cy = (b.y0 + b.y1)/2 + (window.matchMedia("(max-width:760px)").matches ? h*.2/view.k : 0);
-  view.tx = w/2 - cx*view.k; view.ty = h/2 - cy*view.k; render();
+  const cx = (b.x0 + b.x1)/2, cy = (b.y0 + b.y1)/2 + (window.matchMedia("(max-width:760px)").matches ? h*.2/ky() : 0);
+  view.tx = w/2 - cx*view.k; view.ty = h/2 - cy*ky(); render();
 }
 
 /* ---------- picking things ---------- */
@@ -1485,7 +2343,7 @@ svg.addEventListener("pointerdown", e => {
   pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
   if(pointers.size === 2){
     drag = null; const [a, b] = [...pointers.values()];
-    pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
+    pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, ky:ky(), tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
     return;
   }
   if(pointers.size > 2) return;
@@ -1530,9 +2388,9 @@ svg.addEventListener("pointermove", e => {
   if(pinch && pointers.size === 2){
     const [a, b] = [...pointers.values()], d = Math.hypot(a.x-b.x, a.y-b.y) || 1;
     const r = svg.getBoundingClientRect(), k = clamp(pinch.k * d / pinch.d, KMIN, KMAX);
-    const wx = (pinch.mx - r.left - pinch.tx)/pinch.k, wy = (pinch.my - r.top - pinch.ty)/pinch.k;
+    const wx = (pinch.mx - r.left - pinch.tx)/pinch.k, wy = (pinch.my - r.top - pinch.ty)/pinch.ky;
     const mx = (a.x+b.x)/2 - r.left, my = (a.y+b.y)/2 - r.top;
-    view.k = k; view.tx = mx - wx*k; view.ty = my - wy*k; queueRender(); return;
+    view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender(); return;
   }
   if(drag && drag.zv !== undefined){
     const z = zedit && zoneById(zedit.id); if(!z) return;
@@ -1600,6 +2458,7 @@ function endPointer(e){
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
+  if(tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } }
   if(d.hit.kind) select(d.hit.kind, d.hit.id); else if(sel) select(null);
 }
 svg.addEventListener("pointerup", endPointer);
@@ -1646,6 +2505,13 @@ $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
+// flip the 3/4 view, keeping the middle of the screen where it is
+$("#ztilt").onclick = () => {
+  const {w, h} = svgSize(), wy = (h/2 - view.ty)/ky();
+  tilt = !tilt; try { localStorage.setItem("gp-tilt", tilt ? "1" : "0"); } catch(e){}
+  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt); applyTransform(); render(); syncAnimals();
+};
+$("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt);
 function setGridSnap(on){
   gridSnap = on;
   try{ localStorage.setItem("genesis-grid-snap", on ? "1" : "0"); }catch{}
