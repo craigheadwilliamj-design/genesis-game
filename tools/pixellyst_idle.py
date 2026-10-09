@@ -1,5 +1,5 @@
-# Builds the Lystrosaurus idle strip (sprites/lyst-idle.png, 12 frames of 100x75 side by side) from hand-posed reference pictures, tools/lyst-idle/2.webp to 6.webp:
-# frame 1 is the standing picture (sprites/lyst.png), 2 to 6 are the sniff and paw poses (head down, foreleg reaching and planting), and 7 to 12 play them back down to standing, so it loops.
+# Builds the Lystrosaurus idle strip (sprites/lyst-idle.png, 8 frames of 100x75 side by side) from hand-posed reference pictures, tools/lyst-idle/2.webp to 5.webp:
+# frame 1 is the standing picture (sprites/lyst.png), 2 to 5 are the sniff poses (head lowering, foreleg swinging down), and the last three play them back to standing, so it loops.
 # Each reference is a big picture on a 13.55 px grid, 75 rows tall, with soft edges at the new joints. Every cell is sampled to one color, snapped to the sprite's palette,
 # shaded with pixellyst_shade.py's rules (lined up with the standing picture, so the thigh and shoulder creases fall in the same places), then the whole animal is moved SHIFT pixels left
 # so the lowered snout stays inside the 100 px frame (the standing picture's snout stops at x 98, the poses reach x 101). Run pixellyst_shade.py first. Usage: python3 -I tools/pixellyst_idle.py [dir]
@@ -9,15 +9,8 @@ from PIL import Image
 W, H = 100, 75
 P, OX, OY = 13.55, 13.25, 13.5   # the references' pixel size and where the grid starts
 OFF, SHIFT = 22, 2               # grid column of the standing picture's x 0, and the move left
-ORDER = [0, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0]   # 0 is standing, 1 to 5 are references 2 to 6
+ORDER = [0, 1, 2, 3, 4, 3, 2, 1]   # 0 is standing, 1 to 4 are references 2 to 5
 PAL = [(115, 110, 32), (67, 65, 20), (89, 27, 27), (217, 189, 53), (167, 149, 48), (0, 0, 0), (235, 227, 136), (241, 236, 167), (177, 133, 14), (139, 139, 96)]
-# Hand fixes, in the finished frame's own coordinates: reference number -> spans (y, x0, x1, class), drawn in order after the region is cleared. Reference 6's soft, kinked foreleg turned
-# lumpy when sampled, so its limb from the chest down is redrawn as a clean tube (a bent elbow, a straight wrist, a flat planted paw) with the far leg's foot showing behind it.
-FIXES = {6: {"clear": (50, 45, 79, 60), "spans": (
-    [(y, 72, 80, "dark") for y in range(50, 57)] + [(57, 76, 81, "dark"), (58, 76, 81, "dark")] +
-    [(45, 58, 77, "body"), (46, 59, 77, "body"), (47, 60, 77, "body"), (48, 61, 76, "body"), (49, 62, 76, "body"), (50, 63, 76, "body"), (51, 64, 76, "body"), (52, 65, 75, "body"),
-     (53, 65, 75, "body"), (54, 65, 75, "body"), (55, 65, 76, "body"), (56, 64, 77, "body"), (57, 64, 78, "body"), (58, 64, 79, "body")] +
-    [(58, x, x, "tusk") for x in (73, 74, 76, 77)] + [(57, 81, 81, "claw")])}}
 here = os.path.dirname(os.path.abspath(__file__))
 spec = importlib.util.spec_from_file_location("lystshade", os.path.join(here, "pixellyst_shade.py")); ls = importlib.util.module_from_spec(spec); spec.loader.exec_module(ls)
 BASE = {v: k for k, v in ls.BASE.items()}; ALLC = {**ls.BASE, **ls.SHADE}
@@ -39,13 +32,6 @@ def pose(path):
     for (c, r), q in cl.items():
         x = c - OFF
         if 0 <= x < wd and r < H: grid[r][x] = "belly" if q == (167, 149, 48) else BASE[q]
-    fix = FIXES.get(int(os.path.basename(path).split(".")[0]))
-    if fix:
-        x0, y0, x1, y1 = fix["clear"]
-        for y in range(y0, y1 + 1):
-            for x in range(x0, x1 + 1): grid[y][x + SHIFT] = None
-        for y, a, b, k in fix["spans"]:
-            for x in range(a, b + 1): grid[y][x + SHIFT] = k
     res, _ = ls.shade(grid); out = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     for y in range(H):
         for x in range(wd):
@@ -55,7 +41,7 @@ def pose(path):
     return out
 
 def main(d):
-    frames = [Image.open(f"{d}/lyst.png").convert("RGBA")] + [pose(os.path.join(here, "lyst-idle", f"{n}.webp")) for n in range(2, 7)]
+    frames = [Image.open(f"{d}/lyst.png").convert("RGBA")] + [pose(os.path.join(here, "lyst-idle", f"{n}.webp")) for n in range(2, 6)]
     strip = Image.new("RGBA", (W * len(ORDER), H), (0, 0, 0, 0))
     for i, k in enumerate(ORDER): strip.paste(frames[k], (i * W, 0))
     strip.save(f"{d}/lyst-idle.png"); print(f"{d}/lyst-idle.png", len(ORDER), "frames")
