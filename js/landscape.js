@@ -466,7 +466,11 @@ function blobPath(x, y, r, seed, sharp){
 const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(id)}" style="cursor:pointer"` : ` pointer-events="none"`;
 // One body of water, in an exhibit or out in the park
 // Biomes whose water is drawn from a pixel tile (sprites/water/<biome>.png, the #w-<biome> pattern in index.html); the rest are flat blue
-const WATER_TEX = {wetland:1};
+// per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims
+const WATER_TEX = {
+  wetland:  {damp:"#6A8358", mud:"#566648", lit:"#7FAA9C", dark:"#4A7872"},
+  scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
+};
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.
 const waterMasks = new Map();
@@ -500,8 +504,8 @@ function waterMask(points){
 function waterSvg(w, pick, isDead, biome){
   const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
   if(WATER_TEX[biome]){
-    const m = waterMask(w.points);
-    return `<g${pickAt(pick, "water", w.id)} shape-rendering="crispEdges"><path d="${m.damp}" fill="#6A8358"/><path d="${m.mud}" fill="#566648"/><path d="${m.body}" fill="url(#w-${biome})"/><path d="${m.lit}" fill="#7FAA9C"/><path d="${m.dark}" fill="#4A7872"/>`
+    const m = waterMask(w.points), tx = WATER_TEX[biome];
+    return `<g${pickAt(pick, "water", w.id)} shape-rendering="crispEdges"><path d="${m.damp}" fill="${tx.damp}"/><path d="${m.mud}" fill="${tx.mud}"/><path d="${m.body}" fill="url(#w-${biome})"/><path d="${m.lit}" fill="${tx.lit}"/><path d="${m.dark}" fill="${tx.dark}"/>`
       + (dead ? `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : "") + `</g>`;
   }
   return `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="${dead ? "var(--bad)" : "#2F6F9F"}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
