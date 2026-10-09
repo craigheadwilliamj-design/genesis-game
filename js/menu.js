@@ -36,7 +36,7 @@ const BUILD_MENU = [
     {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it like a fence: tap the shore corners, then the first one again. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
     ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
-    {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
+    {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES. Out in the park, only Quaternary plants grow until ORACLE researches sterile prehistoric plants." : undefined})),
   ]},
@@ -143,9 +143,8 @@ function menuRow(it){
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.parkPlants){
-    const rows = PLANT_SIZES.slice().reverse().map(size => `<p class="snote">${size[0].toUpperCase() + size.slice(1)}</p>` + Object.keys(PARK_PLANTS[size]).map(name => { const k = Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name), t = LAND[k];
-      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}, ${esc(BIOMES[t.biome].label.toLowerCase())}${t.aquatic ? ", in water" : t.wet ? ", land or water" : ""}</span></span></button>`; }).join("")).join("");
-    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    const rows = PLANT_SIZES.slice().reverse().map(size => `<p class="snote">${size[0].toUpperCase() + size.slice(1)}</p>` + parkPlantKeys(size).map(k => plantRow(k, "biome")).join("")).join("");
+    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.statues){
     const keys = Object.keys(LAND).filter(k => LAND[k].statue), row = k => { const t = LAND[k], g = statueGrant(k);
@@ -154,10 +153,10 @@ function menuRow(it){
     return `<div class="sitem" data-open="statues"><button class="srow head" aria-expanded="false">${menuIcon("land-st-owen")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(keys)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.period){
-    const rows = Object.entries(PLANTS_OF[it.period]).map(([biome, keys]) => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + keys.map(k => { const t = LAND[k];
-      return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${t.size}</span></span></button>`; }).join("")).join("");
+    const quat = it.period === "Quaternary", biomes = quat ? Object.keys(BIOMES).filter(b => PLANTS_OF.Quaternary[b] || PARK_PLANTS_OF[b]) : Object.keys(PLANTS_OF[it.period]);
+    const rows = biomes.map(biome => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + (PLANTS_OF[it.period][biome] || []).concat(quat ? (PARK_PLANTS_OF[biome] || []).slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size)) : []).map(k => plantRow(k, "size")).join("")).join("");
     const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
-    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${Object.keys(PLANTS_OF[it.period]).length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
+    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   if(it.sub){
     const rows = it.sub.map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
@@ -166,6 +165,12 @@ function menuRow(it){
   const b = BUILDINGS[it.tool], price = it.price ? it.price() : money(b.price);
   return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
 }
+
+// A plant's row in the build menu. Park plants and Quaternary plants are listed in both the Park Plants and the Quaternary dropdowns (both grow in exhibits and out in the park).
+const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name)).concat(
+  Object.keys(PLANTS_OF.Quaternary).length ? Object.keys(PLANTS_OF.Quaternary).map(b => PLANTS_OF.Quaternary[b][PLANT_SIZES.indexOf(size)]) : []);
+const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in water" : t.wet ? ", land or water" : "", where = tail === "biome" ? esc(BIOMES[t.biome].label.toLowerCase()) : t.size;
+  return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
 
 function buildMenu(){
   const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.map(menuRow).join("")}</div></section>`).join("");

@@ -1338,7 +1338,7 @@ const PLANT_TABLE = {
     temperate:"Ginkgoites|Czekanowskia|Araucarites", desert:"Pachypteris|Hirmeriella|Cupressinocladus", boreal:"Phoenicopsis|Pityophyllum|Elatides"},
   Cretaceous:{tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
     temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
-  Paleogene:{tropical:"Lygodium|Nypa|Dipterocarpoxylon", wetland:"Azolla|Salvinia|Taxodium", temperate:"Zelkova|Quercus|Metasequoia",
+  Paleogene:{tropical:"Lygodium|Nypa|Dipterocarpoxylon", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
     boreal:"Osmunda|Betula|Larix", scrubland:"Dodonaea|Acacia|Eucalyptus", desert:"Tamarix|Haloxylon|Prosopis"},
   Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Musa|Ceiba", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Artemisia|Atriplex|Juniperus",
     temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Opuntia|Agave|Carnegiea", tundra:"Eriophorum|Empetrum|Salix arctica"},
