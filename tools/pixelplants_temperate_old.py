@@ -201,14 +201,16 @@ def archaeopteris():   # large: the first true tree, a tall straight trunk with 
     for k in range(3): lens(sp, bx, by - 78, bx + (k - 1) * 4, by - 90 + abs(k - 1) * 2, 1.4, teeth=False)
     return sp
 
-def neuropteris():   # small: a low sprawl of arching fronds, each a row of big rounded, heart-based pinnules
+def neuropteris():   # small: a low crown of arching fronds, each a clear feather of rounded, separate pinnules down a visible rachis
     sp = Sprite(44, 38, lf(.08)); bx, by = 22, 36
-    for ang, L in ((-1.25, 19), (-.7, 20), (-.15, 21), (.4, 21), (1.0, 20), (1.4, 17)):
-        ex, ey = bx + math.sin(ang) * L, by - 4 - math.cos(ang) * L * .8; cx, cy = bx + math.sin(ang) * L * .5, by - 8 - math.cos(ang) * L * .95
-        sp.line(bx, by, cx, cy, "stem"); sp.line(cx, cy, ex, ey, "stem")
-        for i, t in enumerate((.35, .55, .75, .95)):
-            px, py = bez((bx, by), (cx, cy), (ex, ey), t); sp.fill(px, py - 2, 2.6 - i * .2, 1.9, "leaf"); sp.fill(px, py + 2, 2.6 - i * .2, 1.9, "leaf")
-        sp.fill(ex, ey, 1.6, 1.3, "leaf")
+    for tip, ctrl in (((bx - 16, by - 11), (bx - 13, by - 29)), ((bx + 16, by - 11), (bx + 13, by - 29)), ((bx, by - 30), (bx, by - 20))):   # arching rachises, tips drooping out
+        n = 6
+        for i in range(2, n + 1):   # paired rounded pinnules down the rachis, each its own small oval, shrinking to the tip
+            t = i / n; px, py = bez((bx, by), ctrl, tip, t); tx, ty = tangent((bx, by), ctrl, tip, t); d = math.hypot(tx, ty) or 1; nx, ny = -ty / d, tx / d
+            r = 4.0 - 1.4 * t
+            for side in (-1, 1): sp.fill(px + nx * side * r * .8 + tx / d * 1.2, py + ny * side * r * .8 + ty / d * 1.2, r, r * .7, "leaf")
+        for i in range(0, 41):
+            px, py = bez((bx, by), ctrl, tip, i / 40); sp.put(px, py, "rib")
     for x in range(bx - 3, bx + 4): sp.put(x, by + 1, "stem")
     return sp
 
