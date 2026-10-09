@@ -163,7 +163,7 @@ def kidney(sp, x, y, side=1):   # a small kidney-shaped sporangium sitting on th
     sp.fill(x + side, y, 1.6, 1.2, "seed"); sp.put(x + side - 1, y - 1, "seedhi"); sp.put(x + side + 1, y + 1, "seedlo")
 
 def gosslingia():   # small: a few upright forked stems with kidney sporangia in a row down one side
-    sp = Sprite(40, 44, lf(.08)); bx, by = 20, 42
+    sp = Sprite(40, 44, lf(-.06)); bx, by = 20, 42
     for ang, L, x, top in ((-.5, 22, -6, 28), (.45, 24, 6, 32), (0, 30, 0, 38), (-.2, 16, -2, 22), (.25, 16, 3, 24)):
         x1, y1 = bx + x + math.sin(ang) * L, by - math.cos(ang) * L; sp.line(bx + x, by, x1, y1, "leaf", 1)
         for i in range(3, int(L) - 2, 4):
@@ -173,7 +173,7 @@ def gosslingia():   # small: a few upright forked stems with kidney sporangia in
     return sp
 
 def barinophyton():   # medium: an upright stem with paired side branches that curl up into fertile spikes
-    sp = Sprite(64, 56, lf(0)); bx, by = 32, 54
+    sp = Sprite(64, 56, lf(-.12)); bx, by = 32, 54
     stem(sp, [(bx, by + 1), (bx, by - 20), (bx, by - 44)], 1.6, 1.0)
     for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
     for h, L in ((8, 22), (18, 20), (28, 15), (36, 9)):
@@ -202,7 +202,7 @@ def archaeopteris():   # large: the first true tree, a tall straight trunk with 
     return sp
 
 def neuropteris():   # small: two rings of arching fronds, a darker back ring showing between the front ones, each a feather of rounded pinnules down a rachis
-    sp = Sprite(44, 38, lf(.08)); bx, by = 22, 36; bk = tones(mix(lf(.08), (0, 0, 0), .2)); sp.C.update(back=bk[0], backhi=bk[1], backlo=bk[2])
+    sp = Sprite(44, 38, lf(-.06)); bx, by = 22, 36; bk = tones(mix(lf(-.06), (0, 0, 0), .2)); sp.C.update(back=bk[0], backhi=bk[1], backlo=bk[2])
     back = (((bx - 19, by - 19), (bx - 8, by - 30), 3.0), ((bx + 19, by - 19), (bx + 8, by - 30), 3.0), ((bx - 8, by - 29), (bx - 6, by - 22), 2.8), ((bx + 8, by - 29), (bx + 6, by - 22), 2.8))
     front = (((bx - 16, by - 11), (bx - 13, by - 29), 4.0), ((bx + 16, by - 11), (bx + 13, by - 29), 4.0), ((bx, by - 30), (bx, by - 20), 4.0))
     for ring, key in ((back, "back"), (front, "leaf")):
@@ -218,7 +218,7 @@ def neuropteris():   # small: two rings of arching fronds, a darker back ring sh
     return sp
 
 def alethopteris():   # medium: a short trunk crowned by long arching fronds, each a comb of tongue-shaped pinnules
-    sp = Sprite(64, 58, lf(-.03)); bx, by = 32, 56
+    sp = Sprite(64, 58, lf(-.15)); bx, by = 32, 56
     stem(sp, [(bx, by + 1), (bx, by - 12), (bx, by - 20)], 3.2, 2.4)
     for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
     for y in range(by - 4, by - 20, -3): sp.put(bx - 1, y, "stemlo"); sp.put(bx + 1, y + 1, "stemlo")
@@ -239,7 +239,7 @@ def cordaites():   # large: a tall slender tree, bare straight trunk, tufts of l
     return sp
 
 def sphenobaiera():   # small: a rosette of wedge-shaped leaves, each forked at the tip, on a short stalk
-    sp = Sprite(44, 36, lf(.08)); bx, by = 22, 34
+    sp = Sprite(44, 36, lf(-.06)); bx, by = 22, 34
     for a in (-1.2, -.7, -.25, .25, .7, 1.2):
         L = 21 - abs(a) * 3; sx, sy = bx + math.sin(a) * L, by - 4 - math.cos(a) * L
         lens(sp, bx, by, sx, sy, 2.0, teeth=False)   # the wedge, narrow at the stalk, then forked into two lobes at the tip
@@ -248,7 +248,7 @@ def sphenobaiera():   # small: a rosette of wedge-shaped leaves, each forked at 
     return sp
 
 def rufloria():   # medium: a shrubby cordaitalean, a short stem under a crown of broad strap leaves with parallel veins
-    sp = Sprite(66, 54, lf(0)); bx, by = 33, 52
+    sp = Sprite(66, 54, lf(-.12)); bx, by = 33, 52
     stem(sp, [(bx, by + 1), (bx, by - 10), (bx, by - 18)], 2.8, 2.2)
     for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
     for ang, L in ((-1.3, 27), (-.95, 31), (-.55, 34), (-.2, 34), (.2, 34), (.55, 34), (.95, 31), (1.3, 27)):
