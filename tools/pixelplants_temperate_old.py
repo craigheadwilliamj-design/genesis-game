@@ -201,16 +201,19 @@ def archaeopteris():   # large: the first true tree, a tall straight trunk with 
     for k in range(3): lens(sp, bx, by - 78, bx + (k - 1) * 4, by - 90 + abs(k - 1) * 2, 1.4, teeth=False)
     return sp
 
-def neuropteris():   # small: a low crown of arching fronds, each a clear feather of rounded, separate pinnules down a visible rachis
-    sp = Sprite(44, 38, lf(.08)); bx, by = 22, 36
-    for tip, ctrl in (((bx - 16, by - 11), (bx - 13, by - 29)), ((bx + 16, by - 11), (bx + 13, by - 29)), ((bx, by - 30), (bx, by - 20))):   # arching rachises, tips drooping out
-        n = 6
-        for i in range(2, n + 1):   # paired rounded pinnules down the rachis, each its own small oval, shrinking to the tip
-            t = i / n; px, py = bez((bx, by), ctrl, tip, t); tx, ty = tangent((bx, by), ctrl, tip, t); d = math.hypot(tx, ty) or 1; nx, ny = -ty / d, tx / d
-            r = 4.0 - 1.4 * t
-            for side in (-1, 1): sp.fill(px + nx * side * r * .8 + tx / d * 1.2, py + ny * side * r * .8 + ty / d * 1.2, r, r * .7, "leaf")
-        for i in range(0, 41):
-            px, py = bez((bx, by), ctrl, tip, i / 40); sp.put(px, py, "rib")
+def neuropteris():   # small: two rings of arching fronds, a darker back ring showing between the front ones, each a feather of rounded pinnules down a rachis
+    sp = Sprite(44, 38, lf(.08)); bx, by = 22, 36; bk = tones(mix(lf(.08), (0, 0, 0), .2)); sp.C.update(back=bk[0], backhi=bk[1], backlo=bk[2])
+    back = (((bx - 19, by - 19), (bx - 8, by - 30), 3.0), ((bx + 19, by - 19), (bx + 8, by - 30), 3.0), ((bx - 8, by - 29), (bx - 6, by - 22), 2.8), ((bx + 8, by - 29), (bx + 6, by - 22), 2.8))
+    front = (((bx - 16, by - 11), (bx - 13, by - 29), 4.0), ((bx + 16, by - 11), (bx + 13, by - 29), 4.0), ((bx, by - 30), (bx, by - 20), 4.0))
+    for ring, key in ((back, "back"), (front, "leaf")):
+        for tip, ctrl, r0 in ring:   # arching rachises, tips drooping out
+            n = 6
+            for i in range(2, n + 1):   # paired rounded pinnules down the rachis, each its own small oval, shrinking to the tip
+                t = i / n; px, py = bez((bx, by), ctrl, tip, t); tx, ty = tangent((bx, by), ctrl, tip, t); d = math.hypot(tx, ty) or 1; nx, ny = -ty / d, tx / d
+                r = r0 - 1.4 * t
+                for side in (-1, 1): sp.fill(px + nx * side * r * .8 + tx / d * 1.2, py + ny * side * r * .8 + ty / d * 1.2, r, r * .7, key)
+            for i in range(0, 41):
+                px, py = bez((bx, by), ctrl, tip, i / 40); sp.put(px, py, "rib")
     for x in range(bx - 3, bx + 4): sp.put(x, by + 1, "stem")
     return sp
 
