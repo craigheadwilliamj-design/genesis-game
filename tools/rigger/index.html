@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sprite Rigger</title>
+<style>
+:root{--bg:#14171b;--panel:#1d2228;--panel2:#262c34;--line:#3a424d;--ink:#e6e9ee;--dim:#98a2b0;--acc:#f0a030;--acc2:#5cc8a0;--bad:#e5604d}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#e9ecef;--panel:#fff;--panel2:#f1f3f5;--line:#ccd2d9;--ink:#1c2128;--dim:#5b6573;--acc:#c9740a;--acc2:#0e8a68;--bad:#c23b28}}
+:root[data-theme=light]{--bg:#e9ecef;--panel:#fff;--panel2:#f1f3f5;--line:#ccd2d9;--ink:#1c2128;--dim:#5b6573;--acc:#c9740a;--acc2:#0e8a68;--bad:#c23b28}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.35 system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 9px;cursor:pointer}
+button:hover{border-color:var(--dim)}
+button.on{background:var(--acc);border-color:var(--acc);color:#111}
+button:disabled{opacity:.4;cursor:default}
+input[type=text],input[type=number],select{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:4px 6px;min-width:0}
+input[type=number]{width:62px}
+label{display:flex;align-items:center;gap:6px}
+#app{display:grid;height:100%;grid-template-columns:1fr 290px;grid-template-rows:auto 1fr auto;grid-template-areas:"top top" "stage side" "tl side"}
+#top{grid-area:top;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+#top .grp{display:flex;gap:4px;align-items:center}
+#top .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+#stage{grid-area:stage;position:relative;overflow:hidden;min-height:200px}
+#cv{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+#hint{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;color:var(--dim);pointer-events:none;padding:24px}
+#tools{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:4px}
+#tools button{width:78px;text-align:left}
+#zoomb{position:absolute;right:8px;top:8px;display:flex;gap:4px;align-items:center}
+#status{position:absolute;left:8px;bottom:6px;color:var(--dim);font-size:12px;pointer-events:none}
+#side{grid-area:side;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:8px;display:flex;flex-direction:column;gap:10px}
+h3{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
+#parts{display:flex;flex-direction:column;gap:2px;max-height:34vh;overflow:auto}
+.part{display:flex;align-items:center;gap:4px;padding:3px 5px;border-radius:5px;border:1px solid transparent;cursor:pointer}
+.part:hover{background:var(--panel2)}
+.part.sel{background:var(--panel2);border-color:var(--acc)}
+.part .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.part button{padding:0 5px;border:0;background:none;color:var(--dim)}
+.part button:hover{color:var(--ink)}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.row>span{width:54px;color:var(--dim)}
+body[data-mode=rig] .poseonly,body[data-mode=pose] .rigonly{display:none!important}
+#tl{grid-area:tl;background:var(--panel);border-top:1px solid var(--line);padding:6px 10px}
+#tlbar{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-bottom:6px}
+#strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.fr{flex:none;border:2px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer;text-align:center;font-size:11px;color:var(--dim);padding:2px}
+.fr.sel{border-color:var(--acc);color:var(--ink)}
+.fr canvas{display:block;image-rendering:pixelated;background:repeating-conic-gradient(#0000 0 25%,#8883 0 50%) 0 0/8px 8px}
+dialog{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;max-width:min(94vw,900px)}
+dialog::backdrop{background:#0008}
+#exImg{max-width:100%;image-rendering:pixelated;background:repeating-conic-gradient(#0000 0 25%,#8883 0 50%) 0 0/12px 12px;border:1px solid var(--line)}
+code{background:var(--bg);padding:2px 5px;border-radius:4px}
+.dim{color:var(--dim)}
+@media (max-width:820px){
+ #app{grid-template-columns:1fr;grid-template-rows:auto 60vh auto auto;grid-template-areas:"top" "stage" "tl" "side";height:auto;min-height:100%}
+ #side{border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body data-mode="rig">
+<div id="app">
+ <div id="top">
+  <div class="grp"><button id="bRig" class="on">Rig</button><button id="bPose">Pose</button></div>
+  <div class="sep"></div>
+  <div class="grp"><button id="bAdd">Add parts…</button><button id="bRef">Reference…</button>
+   <input id="fileParts" type="file" accept="image/*" multiple hidden><input id="fileRef" type="file" accept="image/*" hidden><input id="fileProj" type="file" accept=".json,application/json" hidden></div>
+  <div class="sep"></div>
+  <div class="grp"><button id="bUndo">Undo</button><button id="bRedo">Redo</button></div>
+  <div class="sep"></div>
+  <div class="grp"><label>Name <input id="pjName" type="text" size="8" value="critter"></label>
+   <label>Cell <input id="cellW" type="number" min="8" max="1024"> × <input id="cellH" type="number" min="8" max="1024"></label>
+   <label>Ground <input id="ground" type="number" min="0" max="1024"></label></div>
+  <div class="sep"></div>
+  <div class="grp"><button id="bSave">Save project</button><button id="bLoad">Load project</button></div>
+ </div>
+
+ <div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hint"><div><b>Drop your part PNGs here</b><br>Head, body, tail, each leg segment… one image each.<br>Then use <b>Rig</b> to assemble them and set joints, and <b>Pose</b> to animate.</div></div>
+  <div id="tools"></div>
+  <div id="zoomb"><button id="zOut">−</button><span id="zLbl" class="dim"></span><button id="zIn">+</button><button id="zFit">Fit</button></div>
+  <div id="status"></div>
+ </div>
+
+ <div id="side">
+  <div>
+   <h3>Parts <span class="dim" style="text-transform:none;letter-spacing:0">(top = drawn last)</span></h3>
+   <div id="parts"></div>
+  </div>
+  <div id="props" hidden>
+   <h3>Selected part</h3>
+   <div class="row"><span>Name</span><input id="pName" type="text" size="14"></div>
+   <div class="row rigonly"><span>Parent</span><select id="pParent"></select></div>
+   <div class="row rigonly"><span>Joint</span>x<input id="pPx" type="number">y<input id="pPy" type="number"></div>
+   <div class="row rigonly"><span>Rest at</span>x<input id="pLx" type="number">y<input id="pLy" type="number"></div>
+   <div class="row rigonly"><span></span><label><input id="pFlip" type="checkbox"> Flip left/right</label></div>
+   <div class="row rigonly"><span></span><button id="bDup">Duplicate</button><button id="bDel">Delete</button></div>
+   <div class="row poseonly"><span>Rotate</span><input id="pR" type="range" min="-180" max="180" step="1" style="flex:1"><input id="pRn" type="number" step="0.5"></div>
+   <div class="row poseonly"><span>Shift</span>x<input id="pDx" type="number" step="1">y<input id="pDy" type="number" step="1"></div>
+   <div class="row poseonly"><span></span><button id="bResetPart">Reset this part</button></div>
+  </div>
+  <div class="dim" style="font-size:12px">
+   <b>Rig:</b> drag parts into place, set each joint (where it pivots) with the Joint tool, and pick a parent so limbs follow the body.<br>
+   <b>Pose:</b> drag a part to rotate it about its joint (Shift snaps 5°). Arrow keys nudge. Duplicate a frame, change the pose, repeat.<br>
+   Keys: R rotate · M move · J joint · H pan · ,/. frames · Space play · Ctrl+Z undo
+  </div>
+ </div>
+
+ <div id="tl">
+  <div id="tlbar">
+   <div class="grp"><select id="clipSel"></select><button id="bClipNew" title="New animation">+</button><button id="bClipRen" title="Rename">Rename</button><button id="bClipDel" title="Delete animation">×</button></div>
+   <button id="bPlay">Play</button>
+   <label>fps <input id="fps" type="number" min="1" max="60"></label>
+   <label><input id="pingpong" type="checkbox"> Ping-pong</label>
+   <label><input id="onion" type="checkbox" checked> Onion skin</label>
+   <label><input id="snap" type="checkbox" checked> Whole pixels</label>
+   <span class="sep"></span>
+   <button id="fAdd" title="Copy this frame after it">+ Frame</button>
+   <button id="fBlank">+ Rest frame</button>
+   <button id="fL">◀</button><button id="fR">▶</button>
+   <button id="fDel">Delete</button>
+   <label>Tween <input id="twN" type="number" min="1" max="30" value="2"></label><button id="bTween">Fill to next</button><button id="bTweenLoop">Fill to first</button>
+   <span class="sep"></span>
+   <button id="bExport">Export strip</button><button id="bExportStand">Export standing</button>
+  </div>
+  <div id="strip"></div>
+ </div>
+</div>
+
+<dialog id="dlg">
+ <div style="display:flex;flex-direction:column;gap:8px">
+  <div id="exInfo"></div>
+  <div style="overflow:auto"><img id="exImg" alt="export"></div>
+  <div class="row"><a id="exDl"><button>Download PNG</button></a><button id="exClose">Close</button><span class="dim" style="width:auto;flex:1;min-width:200px">If the download is blocked here, long-press or right-click the picture and save it.</span></div>
+ </div>
+</dialog>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const I = [1,0,0,1,0,0];
+const mul = (m,n) => [m[0]*n[0]+m[2]*n[1], m[1]*n[0]+m[3]*n[1], m[0]*n[2]+m[2]*n[3], m[1]*n[2]+m[3]*n[3], m[0]*n[4]+m[2]*n[5]+m[4], m[1]*n[4]+m[3]*n[5]+m[5]];
+const trans = (x,y) => [1,0,0,1,x,y];
+const rot = d => { const r = d*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return [c,s,-s,c,0,0]; };
+const apply = (m,x,y) => [m[0]*x+m[2]*y+m[4], m[1]*x+m[3]*y+m[5]];
+function inv(m){ const det = m[0]*m[3]-m[1]*m[2]; if(!det) return I; const a = m[3]/det, b = -m[1]/det, c = -m[2]/det, d = m[0]/det; return [a,b,c,d, -(a*m[4]+c*m[5]), -(b*m[4]+d*m[5])]; }
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+// ---------- project ----------
+function blank(){ return {name:'critter', cell:{w:100,h:75}, ground:68, seq:1, assets:{}, nodes:[], ref:null, clips:[{name:'walk', fps:8, frames:[{}]}]}; }
+let P = blank();
+let ci = 0, cur = 0, sel = null, mode = 'rig', tool = 'move', playing = false, showRef = true;
+let view = {z:4, x:20, y:20};
+const imgs = {}, hits = {};
+let undo = [], redo = [], lastSnap = '';
+
+const clip = () => P.clips[ci];
+const frames = () => clip().frames;
+const nodeMap = () => { const m = {}; P.nodes.forEach(n => m[n.id] = n); return m; };
+const nodeOf = id => P.nodes.find(n => n.id === id);
+function restPos(n, m = nodeMap()){ let x = 0, y = 0, g = 0; while(n && g++ < 60){ x += n.lx; y += n.ly; n = n.parent ? m[n.parent] : null; } return [x,y]; }
+function depth(n){ const m = nodeMap(); let d = 0; while(n.parent && m[n.parent] && d < 40){ n = m[n.parent]; d++; } return d; }
+function isDesc(id, anc){ const m = nodeMap(); let n = m[id], g = 0; while(n && g++ < 60){ if(n.id === anc) return true; n = n.parent ? m[n.parent] : null; } return false; }
+const curPose = () => mode === 'rig' ? {} : (frames()[cur] || {});
+
+// ---------- assets ----------
+function loadAsset(id, url){
+  return new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => {
+      imgs[id] = im; P.assets[id] = url;
+      const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+      hits[id] = x.getImageData(0, 0, im.width, im.height).data;
+      res(im);
+    };
+    im.onerror = () => rej(new Error('bad image'));
+    im.src = url;
+  });
+}
+const readURL = f => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+
+async function addFiles(files){
+  for(const f of files){
+    if(!/^image\//.test(f.type)) continue;
+    const aid = 'a' + (P.seq++);
+    const im = await loadAsset(aid, await readURL(f));
+    const id = 'n' + (P.seq++);
+    P.nodes.push({id, name:f.name.replace(/\.[^.]+$/, ''), asset:aid, px:Math.round(im.width/2), py:Math.round(im.height/2), parent:null,
+      lx:Math.round(P.cell.w/2), ly:Math.round(P.cell.h/2), flip:false, hidden:false});
+    sel = id;
+  }
+  setMode('rig'); save(true);
+}
+async function setRef(file){
+  const aid = 'a' + (P.seq++);
+  await loadAsset(aid, await readURL(file));
+  P.ref = aid; showRef = true; setMode('rig'); save(true);
+}
+
+// ---------- transforms and drawing ----------
+function worlds(pose){
+  const out = {}, by = nodeMap();
+  const get = n => {
+    if(out[n.id]) return out[n.id];
+    out[n.id] = I;   // cycle guard
+    const p = pose[n.id] || {};
+    const pm = n.parent && by[n.parent] ? get(by[n.parent]) : I;
+    return out[n.id] = mul(pm, mul(trans(n.lx + (p.dx||0), n.ly + (p.dy||0)), rot(p.r||0)));
+  };
+  P.nodes.forEach(get);
+  return out;
+}
+const drawM = (n, m) => n.flip ? mul(m, [-1,0,0,1,0,0]) : m;
+
+function drawPose(ctx, pose, alpha, snap){
+  const W = worlds(pose);
+  ctx.imageSmoothingEnabled = false;
+  const a = ctx.globalAlpha; ctx.globalAlpha = a * alpha;
+  for(const n of P.nodes){
+    if(n.hidden || !imgs[n.asset]) continue;
+    let m = drawM(n, W[n.id]).slice();
+    if(snap){ m[4] = Math.round(m[4]); m[5] = Math.round(m[5]); }
+    ctx.save(); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    ctx.drawImage(imgs[n.asset], -n.px, -n.py);
+    ctx.restore();
+  }
+  ctx.globalAlpha = a;
+}
+
+function pickAt(wx, wy){
+  const W = worlds(curPose());
+  for(let i = P.nodes.length - 1; i >= 0; i--){
+    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset]) continue;
+    const [x,y] = apply(inv(drawM(n, W[n.id])), wx, wy);
+    const u = Math.floor(x + n.px), v = Math.floor(y + n.py), im = imgs[n.asset];
+    if(u < 0 || v < 0 || u >= im.width || v >= im.height) continue;
+    if(hits[n.asset][(v*im.width + u)*4 + 3] > 16) return n;
+  }
+  return null;
+}
+
+// ---------- view ----------
+const cv = $('#cv'), ctx = cv.getContext('2d');
+const toWorld = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left - view.x)/view.z, (e.clientY - r.top - view.y)/view.z]; };
+function resize(){ const r = cv.getBoundingClientRect(); cv.width = Math.max(1, r.width|0); cv.height = Math.max(1, r.height|0); draw(); }
+function fit(){
+  const r = cv.getBoundingClientRect();
+  view.z = clamp(Math.floor(Math.min((r.width - 110)/P.cell.w, (r.height - 40)/P.cell.h)), 1, 16) || 1;
+  view.x = Math.round((r.width - P.cell.w*view.z)/2 + 30); view.y = Math.round((r.height - P.cell.h*view.z)/2);
+  draw();
+}
+const ZOOMS = [1,2,3,4,5,6,8,10,12,16];
+function zoomTo(z, cx, cy){
+  const r = cv.getBoundingClientRect(); cx = cx ?? r.width/2; cy = cy ?? r.height/2;
+  const wx = (cx - view.x)/view.z, wy = (cy - view.y)/view.z;
+  view.z = z; view.x = Math.round(cx - wx*z); view.y = Math.round(cy - wy*z); draw();
+}
+function zoomStep(dir, cx, cy){
+  let i = ZOOMS.findIndex(z => z >= view.z); if(i < 0) i = ZOOMS.length - 1;
+  zoomTo(ZOOMS[clamp(i + dir, 0, ZOOMS.length - 1)], cx, cy);
+}
+
+function draw(){
+  const w = cv.width, h = cv.height, z = view.z;
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg') || '#14171b'; ctx.fillRect(0,0,w,h);
+  ctx.setTransform(z,0,0,z,view.x,view.y); ctx.imageSmoothingEnabled = false;
+  // cell
+  ctx.fillStyle = 'rgba(128,140,155,.16)'; ctx.fillRect(0, 0, P.cell.w, P.cell.h);
+  const lw = 1/z;
+  if(mode === 'rig' && P.ref && showRef && imgs[P.ref]){ ctx.globalAlpha = .4; ctx.drawImage(imgs[P.ref], 0, 0); ctx.globalAlpha = 1; }
+  const snap = $('#snap').checked, pose = curPose();
+  if(mode === 'pose' && $('#onion').checked && !playing){
+    const fs = frames();
+    if(fs.length > 1){
+      const p = fs[(cur - 1 + fs.length) % fs.length], n = fs[(cur + 1) % fs.length];
+      ctx.globalAlpha = 1; drawPose(ctx, p, .22, snap); drawPose(ctx, n, .22, snap);
+    }
+  }
+  drawPose(ctx, pose, 1, snap);
+  // cell border + ground line
+  ctx.lineWidth = lw; ctx.strokeStyle = 'rgba(240,160,48,.8)'; ctx.strokeRect(0, 0, P.cell.w, P.cell.h);
+  ctx.strokeStyle = 'rgba(92,200,160,.7)'; ctx.setLineDash([4*lw, 3*lw]);
+  ctx.beginPath(); ctx.moveTo(0, P.ground + .5); ctx.lineTo(P.cell.w, P.ground + .5); ctx.stroke(); ctx.setLineDash([]);
+  // skeleton
+  const W = worlds(pose), by = nodeMap();
+  for(const n of P.nodes){
+    if(n.hidden) continue;
+    const m = W[n.id], s = n.id === sel;
+    if(n.parent && by[n.parent]){
+      const pm = W[n.parent];
+      ctx.strokeStyle = s ? '#f0a030' : 'rgba(255,255,255,.45)'; ctx.lineWidth = (s ? 1.5 : 1)*lw;
+      ctx.beginPath(); ctx.moveTo(pm[4], pm[5]); ctx.lineTo(m[4], m[5]); ctx.stroke();
+    }
+  }
+  for(const n of P.nodes){
+    if(n.hidden) continue;
+    const m = W[n.id], s = n.id === sel, r = (s ? 3.5 : 2.5)/z;
+    ctx.fillStyle = s ? '#f0a030' : '#5cc8a0'; ctx.strokeStyle = '#000'; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.arc(m[4], m[5], r, 0, 7); ctx.fill(); ctx.stroke();
+  }
+  if(sel && by[sel] && mode === 'pose'){
+    const m = W[sel]; ctx.strokeStyle = 'rgba(240,160,48,.6)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(m[4], m[5], 14, 0, 7); ctx.stroke();
+  }
+  $('#hint').style.display = P.nodes.length ? 'none' : 'flex';
+  $('#zLbl').textContent = view.z + '×';
+  thumb(cur);
+}
+
+// ---------- timeline ----------
+const TH = 54;
+function frameCanvas(pose, h){
+  const s = h/P.cell.h, c = document.createElement('canvas');
+  c.width = Math.round(P.cell.w*s); c.height = h; c.style.width = c.width + 'px'; c.style.height = h + 'px';
+  paintThumb(c, pose, s); return c;
+}
+function paintThumb(c, pose, s){
+  const x = c.getContext('2d'); x.setTransform(1,0,0,1,0,0); x.clearRect(0,0,c.width,c.height);
+  x.setTransform(s,0,0,s,0,0); x.beginPath(); x.rect(0,0,P.cell.w,P.cell.h); x.clip(); drawPose(x, pose, 1, $('#snap').checked);
+}
+function thumb(i){
+  const el = $('#strip').children[i]; if(!el) return;
+  const c = el.querySelector('canvas'); if(c) paintThumb(c, frames()[i], c.height/P.cell.h);
+}
+function buildStrip(){
+  const st = $('#strip'); st.innerHTML = '';
+  frames().forEach((f, i) => {
+    const d = document.createElement('div'); d.className = 'fr' + (i === cur ? ' sel' : '');
+    d.appendChild(frameCanvas(f, TH));
+    const t = document.createElement('div'); t.textContent = i + 1; d.appendChild(t);
+    d.onclick = () => { if(playing) return; cur = i; if(mode === 'rig') setMode('pose'); syncStrip(); fillProps(); draw(); };
+    st.appendChild(d);
+  });
+}
+function syncStrip(){ [...$('#strip').children].forEach((el, i) => el.classList.toggle('sel', i === cur)); const e = $('#strip').children[cur]; if(e) e.scrollIntoView({block:'nearest', inline:'nearest'}); }
+
+// ---------- panels ----------
+function buildParts(){
+  const box = $('#parts'); box.innerHTML = '';
+  for(let i = P.nodes.length - 1; i >= 0; i--){
+    const n = P.nodes[i];
+    const d = document.createElement('div'); d.className = 'part' + (n.id === sel ? ' sel' : '');
+    d.style.paddingLeft = (5 + depth(n)*12) + 'px';
+    const eye = document.createElement('button'); eye.textContent = n.hidden ? '○' : '●'; eye.title = 'Show or hide';
+    eye.onclick = ev => { ev.stopPropagation(); n.hidden = !n.hidden; save(); };
+    const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = n.name;
+    const up = document.createElement('button'); up.textContent = '▲'; up.title = 'Draw later (in front)';
+    up.onclick = ev => { ev.stopPropagation(); if(i < P.nodes.length - 1){ [P.nodes[i], P.nodes[i+1]] = [P.nodes[i+1], P.nodes[i]]; save(); } };
+    const dn = document.createElement('button'); dn.textContent = '▼'; dn.title = 'Draw earlier (behind)';
+    dn.onclick = ev => { ev.stopPropagation(); if(i > 0){ [P.nodes[i], P.nodes[i-1]] = [P.nodes[i-1], P.nodes[i]]; save(); } };
+    d.append(eye, nm, up, dn);
+    d.onclick = () => { sel = n.id; buildParts(); fillProps(); draw(); };
+    box.appendChild(d);
+  }
+}
+let parentSig = '';
+function fillProps(){
+  const n = sel && nodeOf(sel); $('#props').hidden = !n; if(!n) return;
+  const set = (id, v) => { const e = $(id); if(document.activeElement !== e) e.value = v; };
+  set('#pName', n.name); set('#pPx', n.px); set('#pPy', n.py); set('#pLx', n.lx); set('#pLy', n.ly);
+  $('#pFlip').checked = !!n.flip;
+  const p = (frames()[cur] || {})[n.id] || {};
+  set('#pR', p.r || 0); set('#pRn', Math.round((p.r || 0)*10)/10); set('#pDx', p.dx || 0); set('#pDy', p.dy || 0);
+  const sig = P.nodes.map(x => x.id + x.name).join('|') + '#' + n.id + n.parent;
+  if(sig !== parentSig){
+    parentSig = sig; const s = $('#pParent'); s.innerHTML = '<option value="">(none: moves in the world)</option>';
+    P.nodes.filter(x => x.id !== n.id && !isDesc(x.id, n.id)).forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; s.appendChild(o); });
+    s.value = n.parent || '';
+  }
+}
+function buildClips(){
+  const s = $('#clipSel'); s.innerHTML = '';
+  P.clips.forEach((c, i) => { const o = document.createElement('option'); o.value = i; o.textContent = c.name + ' (' + c.frames.length + ')'; s.appendChild(o); });
+  s.value = ci; $('#fps').value = clip().fps;
+}
+function buildTools(){
+  const defs = mode === 'rig' ? [['move','Move','M'],['pivot','Joint','J'],['pan','Pan','H']] : [['rotate','Rotate','R'],['move','Move','M'],['pan','Pan','H']];
+  const box = $('#tools'); box.innerHTML = '';
+  if(!defs.some(d => d[0] === tool)) tool = defs[0][0];
+  defs.forEach(([id, label, key]) => { const b = document.createElement('button'); b.textContent = label + '  ' + key; b.className = tool === id ? 'on' : ''; b.onclick = () => { tool = id; buildTools(); }; box.appendChild(b); });
+}
+function setMode(m){
+  if(playing) stop();
+  mode = m; document.body.dataset.mode = m;
+  $('#bRig').classList.toggle('on', m === 'rig'); $('#bPose').classList.toggle('on', m === 'pose');
+  tool = m === 'rig' ? 'move' : 'rotate'; buildTools(); fillProps(); draw();
+}
+function ui(){
+  $('#cellW').value = P.cell.w; $('#cellH').value = P.cell.h; $('#ground').value = P.ground; $('#pjName').value = P.name;
+  buildParts(); buildClips(); buildStrip(); buildTools(); fillProps(); draw();
+  $('#bUndo').disabled = !undo.length; $('#bRedo').disabled = !redo.length;
+}
+
+// ---------- history and saving ----------
+const snapshot = () => JSON.stringify({name:P.name, cell:P.cell, ground:P.ground, nodes:P.nodes, clips:P.clips, ref:P.ref, ci, cur, sel});
+function save(rebuild){
+  const s = snapshot();
+  if(s !== lastSnap){ if(lastSnap) undo.push(lastSnap); if(undo.length > 100) undo.shift(); redo = []; lastSnap = s; autosave(); }
+  if(rebuild !== false) ui();
+}
+function restore(s){
+  const o = JSON.parse(s); Object.assign(P, {name:o.name, cell:o.cell, ground:o.ground, nodes:o.nodes, clips:o.clips, ref:o.ref});
+  ci = clamp(o.ci, 0, P.clips.length - 1); cur = clamp(o.cur, 0, frames().length - 1); sel = o.sel && nodeOf(o.sel) ? o.sel : null;
+  lastSnap = s; autosave(); ui();
+}
+function doUndo(){ if(!undo.length) return; redo.push(lastSnap); restore(undo.pop()); }
+function doRedo(){ if(!redo.length) return; undo.push(lastSnap); restore(redo.pop()); }
+function pruned(){
+  const used = new Set(P.nodes.map(n => n.asset)); if(P.ref) used.add(P.ref);
+  const assets = {}; used.forEach(a => { if(P.assets[a]) assets[a] = P.assets[a]; });
+  return Object.assign({}, P, {assets});
+}
+let saveTimer = 0;
+function autosave(){ clearTimeout(saveTimer); saveTimer = setTimeout(() => { try{ localStorage.setItem('sprite-rigger', JSON.stringify(pruned())); }catch(e){} }, 400); }
+async function openProject(o){
+  if(!o || !o.nodes || !o.clips) throw new Error('not a rigger project');
+  const np = Object.assign(blank(), o, {assets:{}});
+  for(const a in o.assets || {}) await loadAsset(a, o.assets[a]);
+  Object.assign(P, np); P.assets = o.assets || {};
+  ci = 0; cur = 0; sel = null; undo = []; redo = []; lastSnap = '';
+  fit(); mode = 'rig'; setMode('rig'); save(true);
+}
+
+// ---------- editing actions ----------
+function setPose(id, patch){
+  const f = frames()[cur]; f[id] = Object.assign({r:0, dx:0, dy:0}, f[id], patch);
+}
+function setParent(n, pid){
+  const m = nodeMap(), [wx, wy] = restPos(n, m);
+  if(pid && (pid === n.id || isDesc(pid, n.id))) return;
+  n.parent = pid || null;
+  const [px, py] = n.parent ? restPos(m[n.parent], m) : [0, 0];
+  n.lx = wx - px; n.ly = wy - py;
+}
+function delNode(n){
+  const m = nodeMap();
+  P.nodes.forEach(c => { if(c.parent === n.id){ c.parent = n.parent; c.lx += n.lx; c.ly += n.ly; } });
+  P.nodes = P.nodes.filter(x => x !== n);
+  P.clips.forEach(c => c.frames.forEach(f => delete f[n.id]));
+  sel = null;
+}
+function dupNode(n){
+  const c = JSON.parse(JSON.stringify(n)); c.id = 'n' + (P.seq++); c.name = n.name + ' 2';
+  P.nodes.splice(P.nodes.indexOf(n) + 1, 0, c);
+  P.clips.forEach(cl => cl.frames.forEach(f => { if(f[n.id]) f[c.id] = Object.assign({}, f[n.id]); }));
+  sel = c.id;
+}
+function setPivotAt(wx, wy){
+  const n = sel && nodeOf(sel); if(!n) return;
+  const W = worlds({}), [x, y] = apply(inv(drawM(n, W[n.id])), wx, wy);
+  const u = Math.round(x + n.px), v = Math.round(y + n.py), du = u - n.px, dv = v - n.py, s = n.flip ? -1 : 1;
+  if(!du && !dv) return;
+  n.px = u; n.py = v; n.lx += s*du; n.ly += dv;
+  P.nodes.forEach(c => { if(c.parent === n.id){ c.lx -= s*du; c.ly -= dv; } });
+}
+function lerpPose(a, b, t){
+  const out = {};
+  P.nodes.forEach(n => {
+    const p = a[n.id] || {}, q = b[n.id] || {}, L = (k) => (p[k]||0) + ((q[k]||0) - (p[k]||0))*t;
+    out[n.id] = {r:Math.round(L('r')*10)/10, dx:Math.round(L('dx')*10)/10, dy:Math.round(L('dy')*10)/10};
+  });
+  return out;
+}
+function tween(toIdx){
+  const n = clamp(parseInt($('#twN').value) || 1, 1, 30), fs = frames(), a = fs[cur], b = fs[toIdx];
+  const add = []; for(let k = 1; k <= n; k++) add.push(lerpPose(a, b, k/(n + 1)));
+  fs.splice(cur + 1, 0, ...add); cur = cur + 1; save(true);
+}
+
+// ---------- pointer ----------
+let drag = null, spaceDown = false;
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomStep(e.deltaY < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); }, {passive:false});
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  if(tool === 'pan' || e.button === 1 || e.button === 2 || spaceDown){ drag = {t:'pan', sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y}; return; }
+  if(playing) return;
+  const [wx, wy] = toWorld(e);
+  if(mode === 'rig' && tool === 'pivot'){ if(sel){ setPivotAt(wx, wy); draw(); drag = {t:'pivot'}; fillProps(); } return; }
+  const hit = pickAt(wx, wy); if(hit && hit.id !== sel){ sel = hit.id; buildParts(); fillProps(); }
+  const n = sel && nodeOf(sel); if(!n){ draw(); return; }
+  if(mode === 'rig'){
+    drag = {t:'rigmove', wx, wy, lx:n.lx, ly:n.ly};
+  }else{
+    const W = worlds(curPose()), m = W[n.id], p = (frames()[cur][n.id]) || {};
+    const move = tool === 'move' || e.altKey;
+    if(move) drag = {t:'posemove', wx, wy, dx:p.dx||0, dy:p.dy||0, pm: n.parent ? W[n.parent] : I};
+    else drag = {t:'rotate', a0:Math.atan2(wy - m[5], wx - m[4]), r0:p.r || 0, cx:m[4], cy:m[5]};
+  }
+  draw();
+});
+cv.addEventListener('pointermove', e => {
+  const [wx, wy] = toWorld(e);
+  $('#status').textContent = Math.floor(wx) + ', ' + Math.floor(wy);
+  if(!drag) return;
+  const n = sel && nodeOf(sel);
+  if(drag.t === 'pan'){ view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; draw(); return; }
+  if(drag.t === 'pivot'){ setPivotAt(wx, wy); draw(); fillProps(); return; }
+  if(!n) return;
+  if(drag.t === 'rigmove'){ n.lx = Math.round(drag.lx + wx - drag.wx); n.ly = Math.round(drag.ly + wy - drag.wy); }
+  else if(drag.t === 'posemove'){
+    const Dx = wx - drag.wx, Dy = wy - drag.wy, m = drag.pm;
+    const lx = m[0]*Dx + m[1]*Dy, ly = m[2]*Dx + m[3]*Dy, q = $('#snap').checked ? 1 : 10;
+    setPose(n.id, {dx:Math.round((drag.dx + lx)*q)/q, dy:Math.round((drag.dy + ly)*q)/q});
+  }else if(drag.t === 'rotate'){
+    let r = drag.r0 + (Math.atan2(wy - drag.cy, wx - drag.cx) - drag.a0)*180/Math.PI;
+    r = ((r + 180) % 360 + 360) % 360 - 180;
+    r = e.shiftKey ? Math.round(r/5)*5 : Math.round(r*2)/2;
+    setPose(n.id, {r});
+  }
+  fillProps(); draw();
+});
+const endDrag = () => { if(!drag) return; const t = drag.t; drag = null; if(t !== 'pan') save(false), buildStrip(), buildParts(), fillProps(), draw(); };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+
+// ---------- property inputs ----------
+const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
+const withSel = fn => () => { const n = sel && nodeOf(sel); if(n) fn(n); };
+on('#pName', 'input', withSel(n => { n.name = $('#pName').value || 'part'; buildParts(); }));
+on('#pName', 'change', () => save());
+on('#pParent', 'change', withSel(n => { setParent(n, $('#pParent').value); save(); }));
+on('#pPx', 'change', withSel(n => { n.px = Math.round(+$('#pPx').value || 0); save(); }));
+on('#pPy', 'change', withSel(n => { n.py = Math.round(+$('#pPy').value || 0); save(); }));
+on('#pLx', 'change', withSel(n => { n.lx = Math.round(+$('#pLx').value || 0); save(); }));
+on('#pLy', 'change', withSel(n => { n.ly = Math.round(+$('#pLy').value || 0); save(); }));
+on('#pFlip', 'change', withSel(n => { n.flip = $('#pFlip').checked; save(); }));
+on('#bDup', 'click', withSel(n => { dupNode(n); save(); }));
+on('#bDel', 'click', withSel(n => { if(confirm('Delete "' + n.name + '"? Parts attached to it move up to its parent.')){ delNode(n); save(); } }));
+const rInput = v => withSel(n => { setPose(n.id, {r:clamp(+v() || 0, -360, 360)}); fillProps(); draw(); })();
+on('#pR', 'input', () => rInput(() => $('#pR').value)); on('#pR', 'change', () => { save(); buildStrip(); });
+on('#pRn', 'input', () => rInput(() => $('#pRn').value)); on('#pRn', 'change', () => { save(); buildStrip(); });
+on('#pDx', 'change', withSel(n => { setPose(n.id, {dx:+$('#pDx').value || 0}); save(); }));
+on('#pDy', 'change', withSel(n => { setPose(n.id, {dy:+$('#pDy').value || 0}); save(); }));
+on('#bResetPart', 'click', withSel(n => { delete frames()[cur][n.id]; save(); }));
+
+// ---------- top bar ----------
+on('#bRig', 'click', () => setMode('rig')); on('#bPose', 'click', () => setMode('pose'));
+on('#bAdd', 'click', () => $('#fileParts').click()); on('#fileParts', 'change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+on('#bRef', 'click', () => $('#fileRef').click()); on('#fileRef', 'change', e => { if(e.target.files[0]) setRef(e.target.files[0]); e.target.value = ''; });
+on('#bUndo', 'click', doUndo); on('#bRedo', 'click', doRedo);
+on('#pjName', 'change', () => { P.name = $('#pjName').value.trim().replace(/[^\w-]+/g, '-') || 'critter'; save(); });
+on('#cellW', 'change', () => { P.cell.w = clamp(+$('#cellW').value || 100, 8, 1024); save(); fit(); });
+on('#cellH', 'change', () => { P.cell.h = clamp(+$('#cellH').value || 75, 8, 1024); P.ground = Math.min(P.ground, P.cell.h); save(); fit(); });
+on('#ground', 'change', () => { P.ground = clamp(+$('#ground').value || 0, 0, P.cell.h); save(); });
+on('#zIn', 'click', () => zoomStep(1)); on('#zOut', 'click', () => zoomStep(-1)); on('#zFit', 'click', fit);
+on('#snap', 'change', () => { buildStrip(); draw(); }); on('#onion', 'change', draw);
+
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+on('#bSave', 'click', () => download(new Blob([JSON.stringify(pruned())], {type:'application/json'}), P.name + '-rig.json'));
+on('#bLoad', 'click', () => $('#fileProj').click());
+on('#fileProj', 'change', async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; try{ await openProject(JSON.parse(await f.text())); }catch(err){ alert('Could not open that project: ' + err.message); } });
+
+// ---------- clips and frames ----------
+on('#clipSel', 'change', () => { ci = +$('#clipSel').value; cur = 0; ui(); });
+on('#bClipNew', 'click', () => { const nm = prompt('Name for the new animation (walk, idle, swim…)', 'idle'); if(!nm) return; P.clips.push({name:nm.trim(), fps:8, frames:[{}]}); ci = P.clips.length - 1; cur = 0; setMode('pose'); save(true); });
+on('#bClipRen', 'click', () => { const nm = prompt('Rename animation', clip().name); if(nm){ clip().name = nm.trim(); save(true); } });
+on('#bClipDel', 'click', () => { if(P.clips.length < 2){ alert('Keep at least one animation.'); return; } if(confirm('Delete the "' + clip().name + '" animation?')){ P.clips.splice(ci, 1); ci = 0; cur = 0; save(true); } });
+on('#fps', 'change', () => { clip().fps = clamp(+$('#fps').value || 8, 1, 60); save(false); });
+on('#fAdd', 'click', () => { const fs = frames(); fs.splice(cur + 1, 0, JSON.parse(JSON.stringify(fs[cur]))); cur++; if(mode === 'rig') setMode('pose'); save(true); });
+on('#fBlank', 'click', () => { frames().splice(cur + 1, 0, {}); cur++; if(mode === 'rig') setMode('pose'); save(true); });
+on('#fDel', 'click', () => { const fs = frames(); if(fs.length < 2) return; fs.splice(cur, 1); cur = Math.min(cur, fs.length - 1); save(true); });
+on('#fL', 'click', () => { const fs = frames(); if(cur > 0){ [fs[cur], fs[cur-1]] = [fs[cur-1], fs[cur]]; cur--; save(true); } });
+on('#fR', 'click', () => { const fs = frames(); if(cur < fs.length - 1){ [fs[cur], fs[cur+1]] = [fs[cur+1], fs[cur]]; cur++; save(true); } });
+on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else alert('This is the last frame. Use "Fill to first" to close the loop.'); });
+on('#bTweenLoop', 'click', () => { if(frames().length > 1 || cur > 0) tween(0); });
+
+// ---------- playback ----------
+let playT = 0, playAcc = 0, playStep = 0;
+function seq(){ const n = frames().length; const s = [...Array(n).keys()]; if($('#pingpong').checked) for(let i = n - 2; i > 0; i--) s.push(i); return s; }
+function play(){ if(!frames().length) return; if(mode === 'rig') setMode('pose'); playing = true; playAcc = 0; playStep = Math.max(0, seq().indexOf(cur)); playT = performance.now(); $('#bPlay').textContent = 'Stop'; $('#bPlay').classList.add('on'); requestAnimationFrame(tickPlay); }
+function stop(){ playing = false; $('#bPlay').textContent = 'Play'; $('#bPlay').classList.remove('on'); syncStrip(); fillProps(); draw(); }
+function tickPlay(t){
+  if(!playing) return;
+  playAcc += t - playT; playT = t; const step = 1000/clip().fps;
+  if(playAcc >= step){ playAcc %= step; const s = seq(); playStep = (playStep + 1) % s.length; cur = s[playStep]; syncStrip(); draw(); }
+  requestAnimationFrame(tickPlay);
+}
+on('#bPlay', 'click', () => playing ? stop() : play());
+
+// ---------- export ----------
+function stripCanvas(cl){
+  const n = cl.frames.length, w = P.cell.w, h = P.cell.h, c = document.createElement('canvas');
+  c.width = w*n; c.height = h; const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+  const snap = $('#snap').checked;
+  cl.frames.forEach((f, i) => { x.save(); x.translate(i*w, 0); x.beginPath(); x.rect(0, 0, w, h); x.clip(); drawPose(x, f, 1, snap); x.restore(); });
+  return c;
+}
+function showExport(canvas, file, note){
+  $('#exInfo').innerHTML = '<b>' + esc(file) + '</b> · ' + canvas.width + '×' + canvas.height + ' px<br><span class="dim">' + note + '</span>';
+  $('#exImg').src = canvas.toDataURL('image/png');
+  canvas.toBlob(b => { const a = $('#exDl'); if(a._u) URL.revokeObjectURL(a._u); a._u = URL.createObjectURL(b); a.href = a._u; a.download = file; });
+  $('#dlg').showModal();
+}
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+on('#bExport', 'click', () => {
+  const cl = clip(), n = cl.frames.length, key = cl.name.replace(/\W+/g, '');
+  showExport(stripCanvas(cl), P.name + '-' + cl.name + '.png',
+    'Put it in <code>sprites/</code>. In <code>SPRITES</code> use <code>ratio:' + P.cell.w + '/' + P.cell.h + '</code> and <code>' + esc(key) + ':' + n + '</code> (frame count). ' + n + ' frame' + (n > 1 ? 's' : '') + ' at ' + cl.fps + ' fps.');
+});
+on('#bExportStand', 'click', () => {
+  const c = stripCanvas({frames:[{}]});
+  showExport(c, P.name + '.png', 'The rest pose, one frame: the standing picture.');
+});
+on('#exClose', 'click', () => $('#dlg').close());
+
+// ---------- keys and drops ----------
+document.addEventListener('keydown', e => {
+  const t = e.target.tagName; if(t === 'INPUT' || t === 'SELECT' || t === 'TEXTAREA') return;
+  if(e.code === 'Space'){ e.preventDefault(); spaceDown = true; if(!e.repeat) playing ? stop() : play(); return; }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z'){ e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){ e.preventDefault(); doRedo(); return; }
+  const k = e.key.toLowerCase();
+  if(k === 'r' && mode === 'pose'){ tool = 'rotate'; buildTools(); }
+  else if(k === 'm'){ tool = 'move'; buildTools(); }
+  else if(k === 'j' && mode === 'rig'){ tool = 'pivot'; buildTools(); }
+  else if(k === 'h'){ tool = 'pan'; buildTools(); }
+  else if(k === ',' || k === '.'){ const fs = frames(); cur = (cur + (k === '.' ? 1 : -1) + fs.length) % fs.length; if(mode === 'rig') setMode('pose'); syncStrip(); fillProps(); draw(); }
+  else if(e.key.startsWith('Arrow') && sel && !playing){
+    e.preventDefault(); const n = nodeOf(sel), dx = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0, dy = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+    if(mode === 'rig'){ n.lx += dx; n.ly += dy; }
+    else{ const f = frames()[cur][n.id] || {}, W = worlds(curPose()), m = n.parent ? W[n.parent] : I;
+      setPose(n.id, {dx:(f.dx||0) + m[0]*dx + m[1]*dy, dy:(f.dy||0) + m[2]*dx + m[3]*dy}); }
+    save(false); fillProps(); draw(); thumb(cur);
+  }
+});
+document.addEventListener('keyup', e => { if(e.code === 'Space') spaceDown = false; });
+['dragover', 'drop'].forEach(ev => $('#stage').addEventListener(ev, e => { e.preventDefault(); if(ev === 'drop') addFiles([...e.dataTransfer.files]); }));
+window.addEventListener('resize', resize);
+
+// ---------- start ----------
+(async function start(){
+  try{ const s = localStorage.getItem('sprite-rigger'); if(s){ const o = JSON.parse(s); if(o.nodes && o.clips){ for(const a in o.assets || {}) await loadAsset(a, o.assets[a]); Object.assign(P, o); P.assets = o.assets || {}; } } }catch(e){}
+  resize(); fit(); setMode('rig'); lastSnap = snapshot(); ui();
+})();
+</script>
+</body>
+</html>
