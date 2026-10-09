@@ -1385,6 +1385,12 @@ const PLANT_SPRITES = {
   "qua-wetland-small":      {ratio:44/28, size:1.27},
   "qua-wetland-medium":     {ratio:64/50, size:1.05},
   "qua-wetland-large":      {ratio:72/92, size:0.83},
+  "q-bald-cypress":         {ratio:64/92, size:0.74},
+  "q-weeping-willow":       {ratio:72/92, size:0.83},
+  "q-mangrove":             {ratio:64/56, size:1.05},
+  "q-cattails":             {ratio:44/46, size:1.27},
+  "q-water-lily":           {ratio:48/26, size:1.38},
+  "q-cypress-knees":        {ratio:40/34, size:1.15},
 };
 // Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.

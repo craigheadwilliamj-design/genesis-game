@@ -7,6 +7,7 @@
 #   tri-wetland-medium  Cladophlebis: a broad crown of arching fern fronds with wide pinnae
 #   tri-wetland-large   Heidiphyllum: a conifer with a trunk and branches ending in tufts of long strap leaves
 #   dev-/car-/jur-/cre-/pal-/neo-/qua-wetland-*  the other periods, drawn in the same way (species named in PLANT_TABLE in data.js)
+#   q-<name>             the wetland Park Plants (PARK_PLANTS in data.js): Bald Cypress, Weeping Willow, Mangrove, Cattails, Water Lily, Cypress Knees
 # Usage: python3 -I tools/pixelplants_wetland.py [outdir]
 import sys, math
 from PIL import Image
@@ -379,6 +380,74 @@ def salix():   # large: a willow, a forked leaning trunk under a canopy and long
         blade(sp, bx + x0, by - y0, bx + x0 + side * 2, by - y0 + 34 - abs(x0) * .3, 1.2, bowx=side * 3, bowy=0)
     return sp
 
+PINK = tones((236, 170, 190))   # water lily blossom: base, lit, shaded
+
+def q_bald_cypress():   # large: a modern bald cypress, a fluted flared trunk with knees and tiers of feathery sprays, a touch of autumn gold
+    sp = Sprite(64, 92, mix(FERN, (150, 150, 50), .3)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 16), (bx, by - 66)], 4.6, 1.4)
+    for x in range(bx - 8, bx + 9): sp.put(x, by + 1, "stem")
+    for y in range(by - 4, by - 30, -3): sp.put(bx - 2, y, "stemlo"); sp.put(bx + 2, y, "stemlo")   # flutes
+    for kx, kh in ((-15, 8), (-11, 5), (-18, 4), (12, 7), (16, 4), (9, 3)): sp.fill(bx + kx, by - kh // 2, 1.4, kh / 2 + 1, "stem")
+    for h in range(16, 70, 8):
+        r = 28 * (1 - h / 92)
+        for side in (-1, 1): spray(sp, bx, by - h, side, r, -2, 1.3); spray(sp, bx, by - h - 3, side, r * .6, 0, 1.2)
+        for d in (-2, 2): blade(sp, bx + d, by - h, bx + d * 1.5, by - h + 11, 1.4)
+    for k in range(3): blade(sp, bx, by - 68, bx + (k - 1) * 3, by - 80, 1.2)
+    for x, y in ((14, 40), (46, 30), (24, 22), (40, 54), (20, 62)): sp.put(x, y, "seed"); sp.put(x + 1, y, "seedhi")   # a few gold sprays
+    return sp
+
+def q_weeping_willow():   # large: a broad willow, thick leaning limbs and a full curtain of strands to the ground
+    sp = Sprite(72, 92, mix(FERN, (170, 170, 60), .3)); bx, by = 36, 90
+    stem(sp, [(bx, by + 1), (bx - 1, by - 18), (bx - 2, by - 34)], 4.2, 2.6)
+    for x in range(bx - 7, bx + 8): sp.put(x, by + 1, "stem")
+    for lx in (-14, -4, 9, 16): stem(sp, [(bx - 2, by - 32), (bx + lx, by - 52)], 1.8, 1.2)
+    for cx, cy, rx, ry in ((-13, 54, 13, 7), (12, 55, 13, 7), (0, 62, 16, 8), (-3, 52, 10, 5)): sp.fill(bx + cx, by - cy, rx, ry, "leaf")
+    for x0, y0, side in ((-26, 54, -1), (-22, 52, -1), (-18, 50, -1), (-14, 49, -1), (-10, 49, -1), (-5, 52, -1), (-1, 52, 1), (4, 50, 1), (9, 49, 1), (13, 49, 1), (17, 50, 1), (21, 52, 1), (25, 54, 1), (-8, 60, -1), (0, 62, 1), (8, 60, 1), (-18, 58, -1), (18, 58, 1)):
+        blade(sp, bx + x0, by - y0, bx + x0 + side * 2, by - y0 + 36 - abs(x0) * .4, 1.2, bowx=side * 3)
+    return sp
+
+def q_mangrove():   # medium: a dense glossy dome on arching prop roots that wade into the water
+    sp = Sprite(64, 56, mix(FERN, (0, 0, 0), .06)); bx, by = 32, 54
+    for tx, hh in ((-24, 20), (-17, 18), (-9, 15), (9, 15), (17, 18), (24, 20)):
+        pts = [bez((bx + tx * .15, by - hh), (bx + tx * .7, by - hh - 5), (bx + tx, by), t / 6) for t in range(7)]
+        stem(sp, pts, 1.6, 1.2)
+    stem(sp, [(bx, by + 1), (bx, by - 30)], 2.8, 2.2)
+    for cx, cy, rx, ry in sorted(((-14, 31, 13, 8), (14, 31, 13, 8), (0, 37, 17, 9), (-8, 41, 11, 6), (9, 41, 11, 6)), key=lambda c: c[1]):
+        sp.fill(bx + cx, by - cy, rx, ry, "leaf")
+        for y in range(int(by - cy - ry), int(by - cy + ry) + 1):
+            for x in range(int(bx + cx - rx), int(bx + cx + rx) + 1):
+                if sp.get(x, y) == "leaf" and y > by - cy + ry * .35 and (x + y // 2) % 3 == 0: sp.put(x, y, "leaflo")
+        for x in range(int(bx + cx - rx * .6), int(bx + cx + rx * .3), 4): sp.put(x, int(by - cy - ry * .45), "leafhi")   # glossy highlights
+    return sp
+
+def q_cattails():   # small: a dense clump of blades, three brown heads
+    sp = Sprite(44, 46, mix(FERN, (255, 255, 255), .08)); bx, by = 22, 44
+    for tx, h in ((-15, 26), (-11, 32), (-7, 36), (-2, 42), (3, 40), (8, 35), (12, 31), (16, 25), (-4, 28), (6, 29)): blade(sp, bx + tx * .2, by, bx + tx, by - h, 1.6, bowx=tx * .25, bowy=-2)
+    for tx, h in ((-5, 37), (2, 32), (9, 28)):
+        sp.line(bx + tx * .5, by, bx + tx, by - h, "stem", 0); sp.fill(bx + tx, by - h - 3, 1.8, 4.4, "stem"); sp.put(bx + tx, by - h - 8, "stemlo")
+    return sp
+
+def q_water_lily():   # small: flat round pads with a notch and ribs, two pink blossoms
+    sp = Sprite(48, 26, mix(FERN, (255, 255, 255), .08)); sp.C.update(pink=PINK[0], pinkhi=PINK[1], pinklo=PINK[2])
+    for x, y, rx, ry in ((13, 20, 11, 3.8), (35, 19, 10, 3.5), (24, 23, 8, 2.6), (44, 23, 4, 1.8)):
+        sp.fill(x, y, rx, ry, "leaf")
+        for k in (-.7, 0, .7): sp.line(x, y, x + k * rx * .8, y + abs(k) * ry * .5, "rib", 0)
+        for dx in (1, 2, 3): sp.put(x + int(rx) - dx, y, None)   # the notch
+    for x, y in ((19, 13), (37, 11)):
+        for dx, dy, c in ((0, -3, "pinkhi"), (-1, -2, "pinkhi"), (1, -2, "pink"), (-2, -1, "pinkhi"), (-1, -1, "pink"), (0, -1, "pink"), (1, -1, "pink"), (2, -1, "pink"),
+                          (-3, 0, "pink"), (-2, 0, "pink"), (-1, 0, "seed"), (0, 0, "seedhi"), (1, 0, "seed"), (2, 0, "pink"), (3, 0, "pinklo"),
+                          (-2, 1, "pinklo"), (-1, 1, "pink"), (0, 1, "pink"), (1, 1, "pinklo"), (2, 1, "pinklo")): sp.put(x + dx, y + dy, c)
+        sp.put(x, y + 2, "leaflo"); sp.put(x, y + 3, "leaflo")
+    return sp
+
+def q_cypress_knees():   # small: five knobbly woody knees apart from each other, rounded tops, a little moss between them
+    sp = Sprite(40, 34, mix(FERN, (255, 255, 255), .1)); bx, by = 20, 32
+    for kx, kh, lean in ((-15, 10, 1), (-8, 18, 1), (0, 24, 0), (8, 15, -1), (15, 9, -1)):
+        stem(sp, [(bx + kx, by + 1), (bx + kx + lean, by - kh * .5), (bx + kx + lean * 2, by - kh)], 3.2, 1.8)
+        sp.fill(bx + kx + lean * 2, by - kh, 1.8, 1.4, "stem"); sp.put(bx + kx + lean * 2 - 1, by - kh - 1, "stemhi")
+    for x in range(bx - 17, bx + 18, 3): sp.put(x, by + 1, "leaf"); sp.put(x + 1, by + 1, "leaf")
+    return sp
+
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
 REG = [("dev-wetland-small", rhynia), ("dev-wetland-medium", aglaophyton), ("dev-wetland-large", pseudosporochnus),
        ("car-wetland-small", asterophyllites), ("car-wetland-medium", medullosa), ("car-wetland-large", sigillaria),
@@ -387,6 +456,8 @@ REG += [("cre-wetland-small", archaefructus), ("cre-wetland-medium", nelumbites)
         ("pal-wetland-small", azolla), ("pal-wetland-medium", salvinia), ("pal-wetland-large", taxodium),
         ("neo-wetland-small", typha), ("neo-wetland-medium", phragmites), ("neo-wetland-large", nyssa),
         ("qua-wetland-small", sphagnum), ("qua-wetland-medium", carex), ("qua-wetland-large", salix)]
+REG += [("q-bald-cypress", q_bald_cypress), ("q-weeping-willow", q_weeping_willow), ("q-mangrove", q_mangrove),
+        ("q-cattails", q_cattails), ("q-water-lily", q_water_lily), ("q-cypress-knees", q_cypress_knees)]
 for key, fn in [("per-wetland-small", annularia), ("per-wetland-medium", pecopteris), ("per-wetland-large", arthropitys),
                 ("tri-wetland-small", equisetites), ("tri-wetland-medium", cladophlebis), ("tri-wetland-large", heidiphyllum)] + REG:
     fn().save(f"{out}/{key}.png")
