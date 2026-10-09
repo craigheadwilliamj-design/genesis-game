@@ -329,6 +329,9 @@ function draw(){
     ctx.fillStyle = s ? '#f0a030' : '#5cc8a0'; ctx.strokeStyle = '#000'; ctx.lineWidth = lw;
     ctx.beginPath(); ctx.arc(m[4], m[5], r, 0, 7); ctx.fill(); ctx.stroke();
   }
+  const box = (n, col, dash) => { if(!n || n.hidden || !imgs[n.asset]) return; const im = imgs[n.asset]; ctx.save(); ctx.transform(...drawM(n, W[n.id])); ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.setLineDash(dash ? [3*lw, 3*lw] : []); ctx.strokeRect(-n.px, -n.py, im.width, im.height); ctx.restore(); };
+  if(!drag || !drag.armed){ if(hoverId && hoverId !== sel) box(by[hoverId], 'rgba(255,255,255,.7)', true); }
+  if(sel) box(by[sel], 'rgba(240,160,48,.75)', false);
   if(sel && by[sel] && mode === 'pose'){
     const k = knobPos(W[sel]); ctx.strokeStyle = 'rgba(240,160,48,.6)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(k.cx, k.cy, k.len, 0, 7); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(k.cx, k.cy); ctx.lineTo(k.x, k.y); ctx.strokeStyle = '#f0a030'; ctx.lineWidth = 1.5*lw; ctx.stroke();
@@ -542,39 +545,77 @@ function tween(toIdx){
 let drag = null, spaceDown = false;
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); zoomStep(e.deltaY < 0 ? 1 : -1, e.clientX - r.left, e.clientY - r.top); }, {passive:false});
+// parts under a point, topmost first: exact pixel hits, else any part with an opaque pixel within a few screen pixels
+function partsAt(wx, wy){
+  const W = worlds(curPose()), exact = [], near = [], tol = 10/view.z;
+  const test = (n, x0, y0) => {
+    const [x, y] = apply(inv(drawM(n, W[n.id])), x0, y0), u = Math.floor(x + n.px), v = Math.floor(y + n.py), im = imgs[n.asset];
+    return u >= 0 && v >= 0 && u < im.width && v < im.height && hits[n.asset][(v*im.width + u)*4 + 3] > 16;
+  };
+  for(let i = P.nodes.length - 1; i >= 0; i--){
+    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset]) continue;
+    if(test(n, wx, wy)){ exact.push(n); continue; }
+    let ok = false;
+    for(const r of [tol/2, tol]){ for(let k = 0; k < 8 && !ok; k++){ const t = k*Math.PI/4; ok = test(n, wx + Math.cos(t)*r, wy + Math.sin(t)*r); } if(ok) break; }
+    if(ok) near.push(n);
+  }
+  return exact.length ? exact : near;
+}
+let hoverId = null;
 cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId);
   if(tool === 'pan' || e.button === 1 || e.button === 2 || spaceDown){ drag = {t:'pan', sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y}; return; }
   if(playing) return;
-  const [wx, wy] = toWorld(e);
+  const [wx, wy] = toWorld(e), c0 = {cx0:e.clientX, cy0:e.clientY, armed:false};
   if(mode === 'rig' && tool === 'pivot'){ if(sel){ setPivotAt(wx, wy); draw(); drag = {t:'pivot'}; fillProps(); } return; }
+  // the rotation knob always wins
   if(mode === 'pose' && sel && nodeOf(sel)){
     const W0 = worlds(curPose()), k = knobPos(W0[sel]);
     if(Math.hypot(wx - k.x, wy - k.y)*view.z < 14){
       const p0 = frames()[cur][sel] || {};
-      drag = {t:'rotate', a0:Math.atan2(wy - k.cy, wx - k.cx), r0:p0.r || 0, cx:k.cx, cy:k.cy}; return;
+      drag = Object.assign({t:'rotate', a0:Math.atan2(wy - k.cy, wx - k.cx), r0:p0.r || 0, cx:k.cx, cy:k.cy, knob:true}, c0); return;
     }
   }
-  const hit = pickAt(wx, wy); if(hit && hit.id !== sel){ sel = hit.id; buildParts(); fillProps(); }
-  const n = sel && nodeOf(sel); if(!n){ draw(); return; }
+  // pick: keep the selected part if it is under the pointer; Alt cycles to the part beneath; else the topmost
+  const list = partsAt(wx, wy), at = list.findIndex(n => n.id === sel);
+  let pick = null;
+  if(e.altKey && list.length) pick = list[(at + 1) % list.length];
+  else if(at >= 0) pick = list[at];
+  else if(list.length) pick = list[0];
+  if(pick && pick.id !== sel){ sel = pick.id; buildParts(); fillProps(); }
+  const n = pick && nodeOf(sel);
+  if(!n){ draw(); return; }   // empty space: nothing to drag
   if(mode === 'rig'){
-    drag = {t:'rigmove', wx, wy, lx:n.lx, ly:n.ly};
+    drag = Object.assign({t:'rigmove', wx, wy, lx:n.lx, ly:n.ly}, c0);
   }else{
     const W = worlds(curPose()), m = W[n.id], p = (frames()[cur][n.id]) || {};
-    const move = tool === 'move' || e.altKey;
-    if(move) drag = {t:'posemove', wx, wy, dx:p.dx||0, dy:p.dy||0, pm: n.parent ? W[n.parent] : I};
-    else drag = {t:'rotate', a0:Math.atan2(wy - m[5], wx - m[4]), r0:p.r || 0, cx:m[4], cy:m[5]};
+    if(tool === 'move' || e.shiftKey) drag = Object.assign({t:'posemove', wx, wy, dx:p.dx||0, dy:p.dy||0, pm: n.parent ? W[n.parent] : I}, c0);
+    else drag = Object.assign({t:'rotate', a0:null, r0:p.r || 0, cx:m[4], cy:m[5]}, c0);
   }
   draw();
 });
 cv.addEventListener('pointermove', e => {
   const [wx, wy] = toWorld(e);
   $('#status').textContent = Math.floor(wx) + ', ' + Math.floor(wy);
-  if(!drag) return;
+  if(!drag){
+    if(playing || !P.nodes.length) return;
+    const list = partsAt(wx, wy), id = list.length ? (list.some(n => n.id === sel) ? sel : list[0].id) : null;
+    if(id !== hoverId){ hoverId = id; draw(); }
+    return;
+  }
   const n = sel && nodeOf(sel);
   if(drag.t === 'pan'){ view.x = drag.vx + e.clientX - drag.sx; view.y = drag.vy + e.clientY - drag.sy; draw(); return; }
   if(drag.t === 'pivot'){ setPivotAt(wx, wy); draw(); fillProps(); return; }
   if(!n) return;
+  // a press only becomes a drag after a few pixels, so a plain click never nudges anything
+  if(!drag.armed){
+    if(Math.hypot(e.clientX - drag.cx0, e.clientY - drag.cy0) < 4) return;
+    if(drag.t === 'rotate' && drag.a0 === null){   // grabbing the part body: wait until the pointer is clear of the joint
+      if(Math.hypot(wx - drag.cx, wy - drag.cy)*view.z < 24) return;
+      drag.a0 = Math.atan2(wy - drag.cy, wx - drag.cx);
+    }
+    drag.armed = true;
+  }
   if(drag.t === 'rigmove'){ n.lx = Math.round(drag.lx + wx - drag.wx); n.ly = Math.round(drag.ly + wy - drag.wy); }
   else if(drag.t === 'posemove'){
     const Dx = wx - drag.wx, Dy = wy - drag.wy, m = drag.pm;
