@@ -6,7 +6,7 @@ import sys
 from PIL import Image
 W = 100
 
-BASE = {"body": (115, 110, 32), "dark": (67, 65, 20), "stripe": (89, 27, 27), "belly": (217, 189, 53), "black": (0, 0, 0), "tusk": (235, 227, 136), "tusk2": (241, 236, 167)}
+BASE = {"body": (115, 110, 32), "dark": (67, 65, 20), "stripe": (89, 27, 27), "belly": (217, 189, 53), "black": (0, 0, 0), "tusk": (235, 227, 136), "tusk2": (241, 236, 167), "eye": (177, 133, 14), "claw": (139, 139, 96)}
 SHADE = {"bodyhi": (140, 134, 46), "bodylo": (95, 91, 26), "darkhi": (88, 85, 28), "darklo": (52, 50, 15), "stripehi": (118, 42, 38), "stripelo": (68, 19, 19),
          "bellyhi": (236, 214, 92), "bellylo": (167, 149, 48)}
 ROOT = {"bodyhi": "body", "bodylo": "body", "darkhi": "dark", "darklo": "dark", "stripehi": "stripe", "stripelo": "stripe", "bellyhi": "belly", "bellylo": "belly"}
@@ -84,4 +84,4 @@ def main(d):
     path = f"{d}/lyst-walk.png"; out = run(Image.open(path).convert("RGBA")); out.save(path)
     out.crop((W, 0, 2 * W, out.height)).save(f"{d}/lyst.png")
 
-main(sys.argv[1] if len(sys.argv) > 1 else "sprites")
+if __name__ == "__main__": main(sys.argv[1] if len(sys.argv) > 1 else "sprites")
