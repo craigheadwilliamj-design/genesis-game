@@ -28,6 +28,7 @@ label{display:flex;align-items:center;gap:6px}
 #tools{position:absolute;left:8px;top:8px;display:flex;flex-direction:column;gap:4px}
 #tools button{width:78px;text-align:left}
 #zoomb{position:absolute;right:8px;top:8px;display:flex;gap:4px;align-items:center}
+#modeNote{position:absolute;left:50%;top:8px;transform:translateX(-50%);padding:4px 10px;border-radius:6px;background:var(--panel);border:1px solid var(--line);color:var(--dim);font-size:12px;pointer-events:none;max-width:60%;text-align:center}
 #status{position:absolute;left:8px;bottom:6px;color:var(--dim);font-size:12px;pointer-events:none}
 #side{grid-area:side;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:8px;display:flex;flex-direction:column;gap:10px}
 h3{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
@@ -80,6 +81,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
   <div id="hint"><div><b>Drop your part PNGs here</b><br>Head, body, tail, each leg segment… one image each.<br>Then use <b>Rig</b> to assemble them and set joints, and <b>Pose</b> to animate.</div></div>
   <div id="tools"></div>
   <div id="zoomb"><button id="zOut">−</button><span id="zLbl" class="dim"></span><button id="zIn">+</button><button id="zFit">Fit</button></div>
+  <div id="modeNote"></div>
   <div id="status"></div>
  </div>
 
@@ -284,6 +286,7 @@ function zoomStep(dir, cx, cy){
   zoomTo(ZOOMS[clamp(i + dir, 0, ZOOMS.length - 1)], cx, cy);
 }
 
+function knobPos(m){ const len = Math.max(12, 28/view.z*2), a = Math.atan2(m[1], m[0]); return {cx:m[4], cy:m[5], len, x:m[4] + Math.cos(a)*len, y:m[5] + Math.sin(a)*len}; }
 function draw(){
   const w = cv.width, h = cv.height, z = view.z;
   ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,w,h);
@@ -324,8 +327,11 @@ function draw(){
     ctx.beginPath(); ctx.arc(m[4], m[5], r, 0, 7); ctx.fill(); ctx.stroke();
   }
   if(sel && by[sel] && mode === 'pose'){
-    const m = W[sel]; ctx.strokeStyle = 'rgba(240,160,48,.6)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(m[4], m[5], 14, 0, 7); ctx.stroke();
+    const k = knobPos(W[sel]); ctx.strokeStyle = 'rgba(240,160,48,.6)'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(k.cx, k.cy, k.len, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(k.cx, k.cy); ctx.lineTo(k.x, k.y); ctx.strokeStyle = '#f0a030'; ctx.lineWidth = 1.5*lw; ctx.stroke();
+    ctx.fillStyle = '#f0a030'; ctx.strokeStyle = '#000'; ctx.lineWidth = lw; ctx.beginPath(); ctx.arc(k.x, k.y, 5/z, 0, 7); ctx.fill(); ctx.stroke();
   }
+  $('#modeNote').textContent = mode === 'rig' ? 'Rig mode: place parts and set joints. Switch to Pose to rotate.' : (sel ? 'Pose mode: drag the orange knob (or the part) to rotate it about its joint' : 'Pose mode: click a part, then drag the orange knob to rotate it');
   $('#hint').style.display = P.nodes.length ? 'none' : 'flex';
   $('#zLbl').textContent = view.z + '×';
   thumb(cur);
@@ -501,6 +507,13 @@ cv.addEventListener('pointerdown', e => {
   if(playing) return;
   const [wx, wy] = toWorld(e);
   if(mode === 'rig' && tool === 'pivot'){ if(sel){ setPivotAt(wx, wy); draw(); drag = {t:'pivot'}; fillProps(); } return; }
+  if(mode === 'pose' && sel && nodeOf(sel)){
+    const W0 = worlds(curPose()), k = knobPos(W0[sel]);
+    if(Math.hypot(wx - k.x, wy - k.y)*view.z < 14){
+      const p0 = frames()[cur][sel] || {};
+      drag = {t:'rotate', a0:Math.atan2(wy - k.cy, wx - k.cx), r0:p0.r || 0, cx:k.cx, cy:k.cy}; return;
+    }
+  }
   const hit = pickAt(wx, wy); if(hit && hit.id !== sel){ sel = hit.id; buildParts(); fillProps(); }
   const n = sel && nodeOf(sel); if(!n){ draw(); return; }
   if(mode === 'rig'){
