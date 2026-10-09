@@ -1422,6 +1422,10 @@ const ROCK_SPRITES = {
     boulder:[[60, 54], [76, 53], [55, 46]],
     rock:[[43, 31], [30, 30], [39, 31], [29, 28], [41, 29]],
   },
+  temperate:{
+    boulder:[[59, 54], [73, 52], [33, 52], [56, 49]],
+    rock:[[42, 30], [35, 29], [36, 31], [30, 27], [41, 29]],
+  },
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
