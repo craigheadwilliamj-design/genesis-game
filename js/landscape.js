@@ -470,6 +470,7 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 const WATER_TEX = {
   wetland:  {damp:"#6A8358", mud:"#566648", lit:"#7FAA9C", dark:"#4A7872"},
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
+  temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.
