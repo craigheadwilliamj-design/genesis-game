@@ -6,6 +6,7 @@
 #   tri-wetland-small   Equisetites: a clump of jointed horsetail stalks with sheath rings, one cone
 #   tri-wetland-medium  Cladophlebis: a broad crown of arching fern fronds with wide pinnae
 #   tri-wetland-large   Heidiphyllum: a conifer with a trunk and branches ending in tufts of long strap leaves
+#   dev-/car-/jur-/cre-/pal-/neo-/qua-wetland-*  the other periods, drawn in the same way (species named in PLANT_TABLE in data.js)
 # Usage: python3 -I tools/pixelplants_wetland.py [outdir]
 import sys, math
 from PIL import Image
@@ -175,7 +176,217 @@ def heidiphyllum():   # large: a conifer, a slim trunk with branches ending in d
     for k in range(6): strap(sp, bx + 1, by - 59, bx + 1 + (k - 2.5) * 4.5, by - 59 - 14 + abs(k - 2.5) * 4, 1.5)   # the crown
     return sp
 
+
+def blade(sp, x0, y0, x1, y1, w, bowx=0, bowy=0):   # a long narrow leaf along a bent curve (grass, reed, strap), a lens in short runs with a rib
+    c = ((x0 + x1) / 2 + bowx, (y0 + y1) / 2 + bowy); n = max(3, int(math.hypot(x1 - x0, y1 - y0) / 4))
+    for i in range(n):
+        a = bez((x0, y0), c, (x1, y1), i / n); b = bez((x0, y0), c, (x1, y1), (i + 1) / n); lens(sp, *a, *b, w * (1 - .55 * i / n), teeth=False)
+
+def fork(sp, x, y, ang, L, depth, spor=True, r=0, split=.5, shrink=.76):   # a Y-forking bare stem, a sporangium capping each tip
+    x1, y1 = x + math.sin(ang) * L, y - math.cos(ang) * L; sp.line(x, y, x1, y1, "leaf", 1 if depth >= 1 else 0)   # thicker toward the base
+    if depth == 0:
+        if spor: sp.fill(x1, y1 - 1, 1.2, 1.8, "seed")
+        return
+    for d in (-1, 1): fork(sp, x1, y1, ang + d * split, L * shrink, depth - 1, spor, r, split, shrink)
+
+def needles(sp, x, y, n, L):   # a whorl of needle leaves seen from the side, swept upward
+    for i in range(n):
+        a = -1.3 + 2.6 * i / (n - 1); lens(sp, x, y, x + math.sin(a) * L, y - math.cos(a) * L * .8 - L * .15, .8, teeth=False)
+
+def scars(sp, bx, y0, y1, hw, step=4):   # a scaly trunk: rows of leaf-scar dashes, offset row to row
+    for k, y in enumerate(range(y0, y1, -step)):
+        for dx in range(-hw + 1 + (k % 2), hw, 2): sp.put(bx + dx, y, "stemlo")
+
+def rhynia():   # small: bare forked stalks, a sporangium on each tip
+    sp = Sprite(40, 44, mix(FERN, (255, 255, 255), .12)); bx, by = 20, 42
+    for ang, L in ((-.5, 12), (.45, 14), (-.1, 17), (.1, 10)): fork(sp, bx + ang * 5, by, ang * .5, L, 2, split=.45)
+    return sp
+
+def aglaophyton():   # medium: a low spreading mat of forked bare stems with round sporangia
+    sp = Sprite(64, 40, mix(FERN, (0, 0, 0), .02)); bx, by = 32, 38
+    for ang, L, x in ((-1.2, 12, -6), (1.15, 12, 6), (-.7, 13, -3), (.7, 14, 3), (-.25, 15, -1), (.2, 15, 1), (0, 11, 0)): fork(sp, bx + x, by, ang, L, 2, split=.55, shrink=.8)
+    return sp
+
+def pseudosporochnus():   # large: a slender trunk under a broom of repeatedly forked, leafless branchlets
+    sp = Sprite(64, 92, mix(FERN, (0, 0, 0), .12)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 30), (bx + 1, by - 52)], 2.4, 1.4)
+    for x in range(bx - 4, bx + 5): sp.put(x, by + 1, "stem")
+    for ang, h in ((-1.15, 46), (-.75, 52), (-.4, 56), (0, 58), (.4, 56), (.75, 52), (1.15, 46)):
+        y = by - h; x = bx + 1; fork(sp, x, y, ang, 12, 3, spor=False, split=.45, shrink=.82)
+    return sp
+
+def asterophyllites():   # small: a slender jointed stem with whorls of needle leaves swept upward
+    sp = Sprite(40, 46, mix(FERN, (255, 255, 255), .1)); bx, by = 20, 44
+    for h, L in ((7, 12), (15, 11), (23, 9), (31, 7), (38, 5)): needles(sp, bx, by - h, 7, L)
+    stem(sp, [(bx, by + 1), (bx, by - 42)], 1.6, 1.1)
+    for h in range(4, 42, 4): sp.put(bx, by - h, "stemlo")
+    return sp
+
+def medullosa():   # medium: a stout short trunk, a few big seed-fern fronds with large separate pinnules
+    sp = Sprite(64, 50, mix(FERN, (0, 0, 0), .06)); bx, by = 32, 48
+    stem(sp, [(bx, by + 1), (bx, by - 10)], 2.8, 2.2); top = (bx, by - 10)
+    for tx, ty, b in sorted(((-29, 2, -3), (29, 3, 3), (-22, 12, -6), (23, 13, 6), (-10, 19, -3), (11, 20, 3)), key=lambda f: -abs(f[0])):
+        tip = (bx + tx, top[1] - ty); frond(sp, top, ((top[0] + tip[0]) / 2 + b * .3, (top[1] + tip[1]) / 2 - 7), tip, 4.6, 6, .1)
+    return sp
+
+def sigillaria():   # large: an unbranched scaly trunk under a tuft of long strap leaves
+    sp = Sprite(64, 92, mix(FERN, (0, 0, 0), .14)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 30), (bx, by - 62)], 3.2, 2.4)
+    for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
+    scars(sp, bx, by - 3, by - 62, 3)
+    for k in sorted(range(13), key=lambda k: -abs(k - 6)):
+        t = (k - 6) / 6; blade(sp, bx, by - 63, bx + t * 21, by - 63 - 31 + abs(t) * 15, 2.1, bowx=t * 11, bowy=-5)
+    return sp
+
+def coniopteris():   # small: a tuft of fine, upright-arching fern fronds
+    sp = Sprite(54, 40, mix(FERN, (255, 255, 255), .14)); bx, by = 27, 38
+    for tx, ty, b in ((-23, 4, -8), (23, 5, 8), (-15, 16, -6), (15, 17, 6), (-6, 24, -2), (6, 25, 2), (0, 18, 0)):
+        base = (bx + tx * .08, by - 1); tip = (bx + tx, by - 1 - ty); frond(sp, base, ((base[0] + tip[0]) / 2 + b * .3, (base[1] + tip[1]) / 2 - 9), tip, 2.4, 10, .22, groove=False)
+    stem(sp, [(bx, by + 1), (bx, by - 2)], 1.9, 1.5)
+    return sp
+
+def todites():   # medium: a crown of broad arching fern fronds, upswept
+    sp = Sprite(70, 50, mix(FERN, (0, 0, 0), .04)); bx, by = 35, 48
+    stem(sp, [(bx, by + 1), (bx, by - 5)], 2.0, 1.6); top = (bx, by - 5)
+    for tx, ty, b in sorted(((-31, 6, -4), (31, 7, 4), (-24, 17, -6), (25, 18, 6), (-13, 25, -4), (14, 26, 4)), key=lambda f: -abs(f[0])):
+        tip = (bx + tx, top[1] - ty); frond(sp, top, ((top[0] + tip[0]) / 2 + b * .3, (top[1] + tip[1]) / 2 - 12), tip, 4.0, 8, .28)
+    return sp
+
+def matonidium():   # large: a tall tree-fern trunk, a crown of drooping fronds
+    sp = Sprite(70, 92, mix(FERN, (0, 0, 0), .14)); bx, by = 35, 90
+    stem(sp, [(bx, by + 1), (bx, by - 30), (bx, by - 54)], 3.0, 2.2)
+    for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
+    scars(sp, bx, by - 3, by - 54, 3, 3); top = (bx, by - 56)
+    for tx, ty, b in sorted(((-32, -6, -4), (32, -5, 4), (-26, 6, -5), (27, 7, 5), (-14, 14, -2), (15, 15, 2), (0, 16, 0)), key=lambda f: -abs(f[0])):
+        tip = (bx + tx, top[1] - ty); frond(sp, top, ((top[0] + tip[0]) / 2 + b, top[1] - 16), tip, 4.2, 8, .3)
+    return sp
+
+def disc(sp, x, y, rx, ry):   # a round floating-type leaf seen at a slant: a flat ellipse with ribs radiating from the stalk
+    sp.fill(x, y, rx, ry, "leaf")
+    for k in range(-3, 4): sp.line(x, y, x + k * rx / 3.4, y - abs(k) * ry / 7 + (ry * .55 if abs(k) == 3 else 0), "rib")
+
+def archaefructus():   # small: thin stems with finely divided leaves and little seed pods along the tips
+    sp = Sprite(44, 44, mix(FERN, (255, 255, 255), .12)); bx, by = 22, 43
+    for tx, top, lean in ((-12, 26, -3), (12, 29, 3), (-4, 36, -1), (5, 40, 1)):
+        x1, y1 = bx + tx + lean, by - top; sp.line(bx + tx * .15, by, x1, y1, "leaf", 1)
+        for h in range(6, top - 2, 6):
+            f = h / top; x = bx + tx * .15 + (x1 - bx - tx * .15) * f; y = by - h
+            for d in (-1, 1): lens(sp, x, y, x + d * 5, y - 3, .8, teeth=False); lens(sp, x + d * 5, y - 3, x + d * 8, y - 7, .7, teeth=False)
+        for k in range(3): sp.fill(x1 + (k - 1) * 1.2, y1 + k * 2, 1.1, 1.5, "seed")
+    for x in range(bx - 3, bx + 4): sp.put(x, by + 1, "stem")
+    return sp
+
+def nelumbites():   # medium: lotus-type round leaf discs on tall stalks, a bud
+    sp = Sprite(64, 50, mix(FERN, (0, 0, 0), .04)); bx, by = 32, 48
+    for tx, top, rx in sorted(((-22, 20, 9), (21, 24, 9), (-8, 34, 10), (9, 30, 8), (-1, 42, 8)), key=lambda f: -f[1]):
+        sp.line(bx + tx * .3, by, bx + tx, by - top, "leaf", 1); disc(sp, bx + tx, by - top - 1, rx + 2, (rx + 2) * .4)
+    sp.line(bx + 15, by, bx + 17, by - 36, "leaf", 1); sp.fill(bx + 17, by - 39, 2, 3.4, "seed"); sp.put(bx + 17, by - 42, "seedhi")
+    return sp
+
+def spray(sp, x, y, side, L, drop, w=1.3):   # a feathery drooping spray of scale-leaf shoots: a stem with short blades hanging off it
+    ex, ey = x + side * L, y + drop; sp.line(x, y, ex, ey, "leaf")
+    for t in (.3, .55, .8, 1.0): bx_, by_ = x + (ex - x) * t, y + (ey - y) * t; blade(sp, bx_, by_, bx_ + side * 2, by_ + 7 - 2 * t, w, bowx=side * 1)
+
+def glyptostrobus():   # large: a swamp conifer, a flared trunk and tiers of dense drooping sprays, knees at the foot
+    sp = Sprite(64, 92, mix(FERN, (255, 255, 255), .04)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 20), (bx, by - 60)], 3.8, 1.5)
+    for x in range(bx - 7, bx + 8): sp.put(x, by + 1, "stem")
+    for kx in (-12, -8, 9, 13): sp.fill(bx + kx, by - 2, 1.6, 3.4, "stem")   # knees
+    for h in range(14, 64, 6):
+        r = 24 * (1 - h / 80)
+        for side in (-1, 1): spray(sp, bx, by - h, side, r, -2, 1.3); spray(sp, bx, by - h + 3, side, r * .55, 1, 1.2)
+    spray(sp, bx, by - 62, 1, 3, -4, 1.2); spray(sp, bx, by - 62, -1, 3, -4, 1.2)
+    for h in range(14, 62, 5):
+        for d in (-2, 2): blade(sp, bx + d, by - h, bx + d * 1.5, by - h + 11, 1.4)   # a curtain in front of the trunk
+    return sp
+
+def azolla():   # small: a floating mat of tiny overlapping rosettes, rust-tinged
+    sp = Sprite(44, 20, mix(FERN, (255, 255, 255), .08)); sp.fill(22, 11, 20, 6, "leaf")
+    for x, y in ((8, 9), (15, 12), (22, 8), (28, 12), (34, 9), (12, 14), (24, 14), (18, 7), (31, 15), (6, 12)):
+        for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)): sp.put(x + dx, y + dy, "leafhi" if dx == dy == 0 else "leaf")
+    for x, y in ((11, 11), (20, 12), (27, 9), (33, 12), (16, 9)): sp.put(x, y, "seed"); sp.put(x + 1, y, "seedlo")
+    return sp
+
+def salvinia():   # medium: a floating mat of paired oval leaves with a pale midrib
+    sp = Sprite(60, 28, mix(FERN, (0, 0, 0), .02)); sp.fill(30, 15, 28, 8, "leaf")
+    for x, y in ((10, 11), (18, 15), (26, 10), (34, 15), (42, 11), (49, 15), (14, 19), (30, 20), (46, 19), (22, 13), (38, 12)):
+        for d in (-1, 1): sp.fill(x + d * 2.6, y, 2.6, 1.7, "leafhi"); sp.put(x + d * 2.6, y, "rib")
+    return sp
+
+def taxodium():   # large: a bald cypress, a flared trunk and knees, a tall tapering crown of long drooping sprays
+    sp = Sprite(64, 92, mix(FERN, (255, 255, 255), .02)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 18), (bx, by - 70)], 4.4, 1.4)
+    for x in range(bx - 8, bx + 9): sp.put(x, by + 1, "stem")
+    for kx, kh in ((-14, 7), (-10, 5), (-17, 4), (11, 6), (15, 4), (9, 3)): sp.fill(bx + kx, by - kh // 2, 1.4, kh / 2 + 1, "stem")   # knees
+    for h in range(18, 74, 7):
+        r = 26 * (1 - h / 96)
+        for side in (-1, 1): spray(sp, bx, by - h, side, r, -3, 1.2); spray(sp, bx, by - h - 3, side, r * .6, -1, 1.1)
+    for k in range(3): blade(sp, bx, by - 72, bx + (k - 1) * 3, by - 82, 1.2)
+    for h in range(20, 72, 6):
+        for d in (-2, 2): blade(sp, bx + d, by - h, bx + d * 1.5, by - h + 12, 1.4)   # a curtain in front of the trunk
+    return sp
+
+def typha():   # small: a clump of upright strap blades with two cigar-shaped brown heads
+    sp = Sprite(44, 46, mix(FERN, (255, 255, 255), .1)); bx, by = 22, 44
+    for tx, h in ((-14, 28), (-9, 34), (-4, 40), (2, 38), (8, 33), (14, 27), (0, 24)): blade(sp, bx + tx * .2, by, bx + tx, by - h, 1.5, bowx=tx * .25, bowy=-2)
+    for tx, h in ((-3, 36), (5, 30)):
+        sp.line(bx + tx * .5, by, bx + tx, by - h, "stem", 0); sp.fill(bx + tx, by - h - 3, 1.7, 4.2, "stem"); sp.put(bx + tx, by - h - 8, "stemlo")
+    return sp
+
+def phragmites():   # medium: a stand of tall arching reeds with feathery plumes
+    sp = Sprite(64, 56, mix(FERN, (0, 0, 0), .04)); bx, by = 32, 54
+    for tx, h in sorted(((-24, 24), (-18, 34), (-11, 42), (-4, 47), (3, 49), (10, 44), (17, 36), (24, 26), (-1, 30)), key=lambda f: f[1]):
+        blade(sp, bx + tx * .15, by, bx + tx, by - h, 1.5, bowx=tx * .2, bowy=-3)
+        if h > 33: sp.line(bx + tx, by - h, bx + tx, by - h - 1, "stem"); sp.fill(bx + tx + (1 if tx > 0 else -1), by - h - 3, 1.6, 3.8, "seedhi"); sp.put(bx + tx + (1 if tx > 0 else -1), by - h, "seedlo")
+    return sp
+
+def nyssa():   # large: a tupelo, a swollen trunk base under a rounded crown of leaf clumps
+    sp = Sprite(64, 92, mix(FERN, (0, 0, 0), .12)); bx, by = 32, 90
+    stem(sp, [(bx, by + 1), (bx, by - 20), (bx - 1, by - 40), (bx, by - 62)], 4.2, 1.8)
+    for x in range(bx - 7, bx + 8): sp.put(x, by + 1, "stem")
+    for cx, cy, rx, ry in sorted(((-18, 50, 12, 8), (18, 50, 12, 8), (-8, 62, 14, 9), (10, 62, 14, 9), (-20, 66, 9, 6), (20, 66, 9, 6), (0, 76, 14, 9), (-9, 79, 9, 7), (9, 79, 9, 7), (0, 66, 10, 7)), key=lambda c: c[1]):
+        sp.fill(bx + cx, by - cy, rx, ry, "leaf")
+        for y in range(int(by - cy - ry), int(by - cy + ry) + 1):   # the underside of each clump: rows of dark dashes
+            for x in range(int(bx + cx - rx), int(bx + cx + rx) + 1):
+                if sp.get(x, y) == "leaf" and y > by - cy + ry * .35 and (x + y // 2) % 3 == 0: sp.put(x, y, "leaflo")
+    return sp
+
+def sphagnum():   # small: a moss hummock, rows of short tufts, a few rusty capitula
+    sp = Sprite(44, 28, mix(FERN, (255, 255, 255), .22)); sp.fill(22, 20, 20, 12, "leaf")
+    for y in range(26, 7, -1):
+        for x in range(2, 43):
+            if sp.get(x, y) == "leaf" and y > 24: sp.put(x, y, None)   # cut flat at the foot
+    for y in range(10, 25, 3):
+        for x in range(4 + (y // 3 % 2) * 2, 41, 4):
+            if sp.get(x, y) == "leaf": sp.put(x, y, "leafhi"); sp.put(x + 1, y, "leafhi")
+    for x, y in ((12, 13), (22, 10), (30, 14), (18, 19), (28, 20), (8, 20)): sp.put(x, y, "seed"); sp.put(x + 1, y, "seedlo")
+    return sp
+
+def carex():   # medium: a tussock of arching narrow blades, a few seed spikes
+    sp = Sprite(64, 50, mix(FERN, (0, 0, 0), .02)); bx, by = 32, 48
+    for tx, h in sorted(((-28, 14), (-24, 24), (-17, 34), (-9, 40), (0, 42), (9, 40), (17, 33), (24, 24), (28, 14), (-4, 30), (5, 32)), key=lambda f: f[1]):
+        blade(sp, bx + tx * .1, by, bx + tx, by - h, 1.2, bowx=tx * .1, bowy=-h * .55)
+    for tx, h in ((-6, 38), (7, 36), (14, 28)): sp.put(bx + tx, by - h, "stem"); sp.fill(bx + tx, by - h - 2, 1, 2.4, "seed")
+    return sp
+
+def salix():   # large: a willow, a forked leaning trunk under a canopy and long weeping strands
+    sp = Sprite(72, 92, mix(FERN, (0, 0, 0), .1)); bx, by = 36, 90
+    stem(sp, [(bx, by + 1), (bx - 1, by - 20), (bx - 2, by - 38)], 3.6, 2.2)
+    for x in range(bx - 6, bx + 7): sp.put(x, by + 1, "stem")
+    stem(sp, [(bx - 2, by - 36), (bx - 12, by - 52)], 1.8, 1.2); stem(sp, [(bx - 2, by - 36), (bx + 10, by - 54)], 1.8, 1.2)
+    for cx, cy, rx, ry in ((-12, 55, 12, 6), (11, 56, 12, 6), (0, 62, 14, 7)): sp.fill(bx + cx, by - cy, rx, ry, "leaf")
+    for x0, y0, side in ((-22, 55, -1), (-16, 52, -1), (-9, 50, -1), (-2, 52, 1), (5, 50, 1), (12, 51, 1), (19, 53, 1), (24, 56, 1), (-6, 60, -1), (2, 62, 1), (-17, 59, -1), (14, 60, 1)):
+        blade(sp, bx + x0, by - y0, bx + x0 + side * 2, by - y0 + 34 - abs(x0) * .3, 1.2, bowx=side * 3, bowy=0)
+    return sp
+
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("per-wetland-small", annularia), ("per-wetland-medium", pecopteris), ("per-wetland-large", arthropitys),
-                ("tri-wetland-small", equisetites), ("tri-wetland-medium", cladophlebis), ("tri-wetland-large", heidiphyllum)):
+REG = [("dev-wetland-small", rhynia), ("dev-wetland-medium", aglaophyton), ("dev-wetland-large", pseudosporochnus),
+       ("car-wetland-small", asterophyllites), ("car-wetland-medium", medullosa), ("car-wetland-large", sigillaria),
+       ("jur-wetland-small", coniopteris), ("jur-wetland-medium", todites), ("jur-wetland-large", matonidium)]
+REG += [("cre-wetland-small", archaefructus), ("cre-wetland-medium", nelumbites), ("cre-wetland-large", glyptostrobus),
+        ("pal-wetland-small", azolla), ("pal-wetland-medium", salvinia), ("pal-wetland-large", taxodium),
+        ("neo-wetland-small", typha), ("neo-wetland-medium", phragmites), ("neo-wetland-large", nyssa),
+        ("qua-wetland-small", sphagnum), ("qua-wetland-medium", carex), ("qua-wetland-large", salix)]
+for key, fn in [("per-wetland-small", annularia), ("per-wetland-medium", pecopteris), ("per-wetland-large", arthropitys),
+                ("tri-wetland-small", equisetites), ("tri-wetland-medium", cladophlebis), ("tri-wetland-large", heidiphyllum)] + REG:
     fn().save(f"{out}/{key}.png")
