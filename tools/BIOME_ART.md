@@ -1,6 +1,6 @@
 # Finishing the biome art: instructions
 
-Wetland is done and is the model: ground, rocks and boulders, all 27 landscape plants, the six Park Plants, and textured water with a pixel shoreline. Scrubland has ground, rocks and boulders, and six plants (Permian and Triassic). Everything else is still in the older vector or shaded style.
+Wetland is done and is the model: ground, rocks and boulders, all 27 landscape plants, the six Park Plants, and textured water with a pixel shoreline. Scrubland has ground, rocks and boulders, all 24 plants and water (it has no Park Plants). Everything else is still in the older vector or shaded style.
 
 This is a brief for whoever does the work (a person or a fresh Claude session). Read `CLAUDE.md` first (the **Art direction (locked)** section is the law), then this. Work one biome at a time and ship each as its own change.
 
@@ -9,7 +9,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | Biome | Ground | Rocks / boulders | Landscape plants | Park Plants | Water |
 |---|---|---|---|---|---|
 | wetland | done | done | 27/27 | 6/6 | done |
-| scrubland | done | done | 6/24 (Permian, Triassic done) | none exist | to do |
+| scrubland | done | done | 24/24 | none exist | done |
 | desert | to do | to do | 0/27 | 0/4 | to do |
 | tropical | to do | to do | 0/27 | 0/6 | to do |
 | temperate | done | to do | 0/27 | 0/7 | to do |
@@ -17,9 +17,9 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | grassland | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
 | tundra | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
 
-That is 129 landscape plants and 21 Park Plants in total, plus 6 grounds, 6 rock sets and 7 water tiles. A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
+That is 111 landscape plants and 21 Park Plants still to do, plus 6 grounds, 6 rock sets and 6 water tiles. A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
-Suggested order, easiest and most visible first: **grassland, tundra** (6 plants each, almost nothing else), then **scrubland** (finish its 18), **boreal**, **desert**, **temperate**, **tropical** last (most plants, the most to get wrong).
+Suggested order, easiest and most visible first: **grassland, tundra** (6 plants each, almost nothing else), then **boreal**, **desert**, **temperate**, **tropical** last (most plants, the most to get wrong).
 
 ## Per biome checklist
 
@@ -122,5 +122,5 @@ Biome notes for the common-name pass (a suggestion, adjust as you see fit): dese
 ## Known loose ends (not part of the brief, but you will notice them)
 
 - Wetland's Pecopteris and Cladophlebis are very similar; the Weeping Willow and Salix are close cousins on purpose.
-- The textured water's colors are fixed in `waterSvg` until the `WATER_TEX` change above.
+- The `WATER_TEX` change above is done (wetland and scrubland entries in `js/landscape.js`); a new biome adds an entry and a palette in `tools/pixelwater_flat.py`'s `PAL`.
 - Lystrosaurus `rest:7, restMs:260, holdMs:1400` is in `SPRITES` but there is no matching code in git; it lives in the published game. Someone should find where that work went.
