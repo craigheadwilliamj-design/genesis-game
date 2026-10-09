@@ -15,6 +15,10 @@ BASALT = ramp((82, 76, 72))    # dark lava
 SLATE = ramp((88, 108, 104))   # wet grey-green stone
 SILT = ramp((128, 112, 92))    # warm grey-brown, mud-stained
 MOSS = ramp((88, 108, 104)); MOSS["top"] = mix((97, 111, 34), (255, 255, 255), .14); MOSS["hi"] = mix(MOSS["hi"], (97, 111, 34), .35)   # slate with a moss-green cap, from the Dimetrodon's olive
+GREY = ramp((134, 138, 140))   # temperate: ROCK_STONE grey
+WARM = ramp((124, 116, 104))   # grey-brown, tannin stained
+MOSSY = ramp((134, 138, 140)); MOSSY["top"] = mix((84, 122, 70), (255, 255, 255), .12); MOSSY["hi"] = mix(MOSSY["hi"], (84, 122, 70), .3)   # grey with a moss cap
+LITTER = ramp((128, 130, 128)); LITTER["top"] = mix((140, 98, 52), (255, 255, 255), .1); LITTER["hi"] = mix(LITTER["hi"], (140, 98, 52), .25)   # grey with a leaf-litter cap
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -115,6 +119,15 @@ def shapes():
     S["rock-wetland-3"] = render(233, [(0, 0, 14, 10, 6, .14, [(5, 1, 0, 0), (4, .94, .3, 0), (4, .72, .6, 0)])], SILT)
     S["rock-wetland-4"] = render(234, [(0, 0, 10, 8, 5, .14, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], SLATE, bands=0)
     S["rock-wetland-5"] = render(235, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], SILT, bands=0)
+    S["boulder-temperate-1"] = render(141, [(0, 0, 27, 20, 7, .12, [(7, 1, 0, 0), (6, .96, .4, 0), (6, .91, .8, 0), (5, .8, 1.2, 0), (3, .58, 1.6, 0)])], GREY, cracks=1)
+    S["boulder-temperate-2"] = render(142, [(-15, 4, 17, 13, 6, .12, [(5, 1, 0, 0), (5, .94, .3, 0), (4, .84, .6, 0)]), (13, -4, 21, 15, 7, .1, [(6, 1, 0, 0), (6, .96, .4, 0), (5, .9, .8, 0), (5, .8, 1.2, 0), (3, .6, 1.5, 0)])], MOSSY)
+    S["boulder-temperate-3"] = render(143, [(0, 0, 13, 11, 6, .14, [(6, 1, 0, 0), (5, .97, .5, 0), (6, .92, 1, 0), (5, .86, 1.6, 0), (5, .76, 2.2, 0), (4, .6, 3, 0), (3, .42, 3.6, 0)])], WARM, cracks=1)
+    S["boulder-temperate-4"] = render(144, [(0, 0, 24, 18, 6, .14, [(6, 1, 0, 0), (6, .97, .5, 0), (5, .9, 1, 0), (4, .72, 1.6, 0)])], LITTER, cracks=1)
+    S["rock-temperate-1"] = render(241, [(0, 0, 17, 11, 7, .1, [(5, 1, 0, 0), (4, .88, .4, 0)])], GREY)
+    S["rock-temperate-2"] = render(242, [(0, 0, 12, 9, 6, .12, [(5, 1, 0, 0), (5, .9, .4, 0), (3, .65, .6, 0)])], MOSSY, bands=0)
+    S["rock-temperate-3"] = render(243, [(0, 0, 14, 10, 6, .14, [(5, 1, 0, 0), (4, .94, .3, 0), (4, .72, .6, 0)])], LITTER)
+    S["rock-temperate-4"] = render(244, [(0, 0, 11, 8, 5, .14, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], WARM, bands=0)
+    S["rock-temperate-5"] = render(245, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], GREY, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
