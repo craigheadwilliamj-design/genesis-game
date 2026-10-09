@@ -125,7 +125,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <button id="fDel">Delete</button>
    <label>Tween <input id="twN" type="number" min="1" max="30" value="2"></label><button id="bTween">Fill to next</button><button id="bTweenLoop">Fill to first</button>
    <span class="sep"></span>
-   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button>
+   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button><button id="bHalf" title="Animate the partner of the selected part (or of every pair, from the part drawn in front) as the same motion half a cycle later">Half-cycle partner</button>
    <span class="sep"></span>
    <button id="bExport">Export strip</button><button id="bExportStand">Export standing</button>
   </div>
@@ -403,7 +403,7 @@ function fillProps(){
     P.nodes.filter(x => x.id !== n.id).forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; ms.appendChild(o); });
     ms.value = n.mirror || '';
   }
-  $('#bMirror').disabled = $('#bMirrorAll').disabled = !P.nodes.some(x => x.mirror);
+  $('#bMirror').disabled = $('#bMirrorAll').disabled = $('#bHalf').disabled = !P.nodes.some(x => x.mirror);
 }
 function buildClips(){
   const s = $('#clipSel'); s.innerHTML = '';
@@ -505,6 +505,25 @@ function mirrorFrame(f){
     if(pb) f[a.id] = Object.assign({}, Z, pb); else delete f[a.id];
     if(pa) f[b.id] = Object.assign({}, Z, pa); else delete f[b.id];
   }
+}
+function halfCycle(){
+  const fs = frames(), N = fs.length, by = nodeMap(), done = new Set(), selN = sel && by[sel];
+  let count = 0;
+  for(const a of P.nodes){
+    const b = a.mirror && by[a.mirror]; if(!b || done.has(a.id) || done.has(b.id)) continue;
+    const hit = selN && (a === selN || b === selN);
+    if(selN && selN.mirror && !hit) continue;
+    const src = hit ? selN : (P.nodes.indexOf(a) > P.nodes.indexOf(b) ? a : b), dst = src === a ? b : a;
+    done.add(a.id); done.add(b.id);
+    const Z = {r:0, dx:0, dy:0}, from = fs.map(f => Object.assign({}, Z, f[src.id]));
+    fs.forEach((f, i) => {
+      const t = (i + N/2) % N, i0 = Math.floor(t) % N, i1 = (i0 + 1) % N, u = t - Math.floor(t), A = from[i0], B = from[i1], o = {};
+      for(const k of ['r', 'dx', 'dy']) o[k] = Math.round((A[k] + (B[k] - A[k])*u)*10)/10;
+      f[dst.id] = o;
+    });
+    count++;
+  }
+  return count;
 }
 function lerpPose(a, b, t){
   const out = {};
@@ -628,6 +647,10 @@ on('#fL', 'click', () => { const fs = frames(); if(cur > 0){ [fs[cur], fs[cur-1]
 on('#fR', 'click', () => { const fs = frames(); if(cur < fs.length - 1){ [fs[cur], fs[cur+1]] = [fs[cur+1], fs[cur]]; cur++; save(true); } });
 on('#bMirror', 'click', () => { mirrorFrame(frames()[cur]); save(true); });
 on('#bMirrorAll', 'click', () => { frames().forEach(mirrorFrame); save(true); });
+on('#bHalf', 'click', () => {
+  if(frames().length < 2){ ask('Pose at least two frames first. The partner copies the motion half a cycle later.', {info:true}); return; }
+  if(halfCycle()) save(true);
+});
 on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else ask('This is the last frame. Use "Fill to first" to close the loop.', {info:true}); });
 on('#bTweenLoop', 'click', () => { if(frames().length > 1 || cur > 0) tween(0); });
 
