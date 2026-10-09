@@ -403,7 +403,6 @@ function fillProps(){
     P.nodes.filter(x => x.id !== n.id).forEach(x => { const o = document.createElement('option'); o.value = x.id; o.textContent = x.name; ms.appendChild(o); });
     ms.value = n.mirror || '';
   }
-  $('#bMirror').disabled = $('#bMirrorAll').disabled = $('#bHalf').disabled = !P.nodes.some(x => x.mirror);
 }
 function buildClips(){
   const s = $('#clipSel'); s.innerHTML = '';
@@ -645,10 +644,14 @@ on('#fBlank', 'click', () => { frames().splice(cur + 1, 0, {}); cur++; if(mode =
 on('#fDel', 'click', () => { const fs = frames(); if(fs.length < 2) return; fs.splice(cur, 1); cur = Math.min(cur, fs.length - 1); save(true); });
 on('#fL', 'click', () => { const fs = frames(); if(cur > 0){ [fs[cur], fs[cur-1]] = [fs[cur-1], fs[cur]]; cur--; save(true); } });
 on('#fR', 'click', () => { const fs = frames(); if(cur < fs.length - 1){ [fs[cur], fs[cur+1]] = [fs[cur+1], fs[cur]]; cur++; save(true); } });
-on('#bMirror', 'click', () => { mirrorFrame(frames()[cur]); save(true); });
-on('#bMirrorAll', 'click', () => { frames().forEach(mirrorFrame); save(true); });
+const needPairs = () => ask('No mirrored pairs yet. Go to Rig mode, select a part (the near thigh, say) and pick its partner in the Mirror box in the right panel. Pair thigh with thigh, shin with shin, foot with foot. Duplicating a part pairs the copy for you.', {info:true});
+const hasPairs = () => P.nodes.some(n => n.mirror && nodeOf(n.mirror));
+on('#bMirror', 'click', () => { if(!hasPairs()) return needPairs(); if(mode === 'rig') setMode('pose'); mirrorFrame(frames()[cur]); save(true); });
+on('#bMirrorAll', 'click', () => { if(!hasPairs()) return needPairs(); if(mode === 'rig') setMode('pose'); frames().forEach(mirrorFrame); save(true); });
 on('#bHalf', 'click', () => {
+  if(!hasPairs()) return needPairs();
   if(frames().length < 2){ ask('Pose at least two frames first. The partner copies the motion half a cycle later.', {info:true}); return; }
+  if(mode === 'rig') setMode('pose');
   if(halfCycle()) save(true);
 });
 on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else ask('This is the last frame. Use "Fill to first" to close the loop.', {info:true}); });
