@@ -1,4 +1,4 @@
-# Draws the seamless swamp water tile in the Dimetrodon's flat, simple style: sprites/water/wetland.png, 144 px = 18 m (0.125 m a pixel, like the ground tiles), fully opaque,
+# Draws the seamless water tiles (wetland swamp, scrubland brackish pool) in the Dimetrodon's flat, simple style: sprites/water/wetland.png, 144 px = 18 m (0.125 m a pixel, like the ground tiles), fully opaque,
 # used as the #w-wetland pattern behind wetland water (waterSvg in landscape.js; index.html has the pattern). Dark tannin-green water built from small low-contrast details
 # so the repeat doesn't show: a fine two-tone wash of deeper and lighter water in 2x2 blocks, a few small patches of algal film, rows of short ripple dashes (a lit top pixel run
 # with a darker run under it), tiny sun glints, and silt flecks and little drifting twigs. Nothing modern, no plants. Light is from the top left. Features wrap over the edges.
@@ -8,13 +8,17 @@ from PIL import Image
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
 WHITE, BLACK = (255, 255, 255), (0, 0, 0)
-BASE = (62, 102, 98)   # swamp water
+# one palette per biome: base water, the wash's lighter tint, the film patches' (color, mix share), ripple and glint tints, silt flecks, drifting dashes
+PAL = {
+    "wetland":   dict(base=(62, 102, 98), lite=(150, 190, 170), film=((120, 150, 80), .6), ripple=(170, 215, 205), glint=(225, 245, 235), silt=(110, 92, 56), twig=(96, 72, 42)),   # swamp water, algal film, twigs
+    "scrubland": dict(base=(108, 134, 124), lite=(190, 205, 180), film=((226, 224, 200), .8), ripple=(206, 210, 180), glint=(246, 244, 226), silt=(128, 104, 68), twig=(214, 208, 180)),   # brackish pool, salt film, pale salt dashes
+}
 
-def tile(size, seed):
-    rnd = random.Random(seed); px = {}
+def tile(size, seed, pal):
+    BASE = pal["base"]; rnd = random.Random(seed); px = {}
     def put(x, y, c): px[(x % size, y % size)] = c
-    deep = mix(BASE, BLACK, .14); lite = mix(BASE, (150, 190, 170), .1); film = mix((120, 150, 80), BASE, .6); film_hi = mix(film, WHITE, .14)
-    ripple_hi = mix(BASE, (170, 215, 205), .38); ripple_lo = mix(BASE, BLACK, .3); glint = mix(BASE, (225, 245, 235), .7); silt = mix(BASE, (110, 92, 56), .5); twig = mix((96, 72, 42), BASE, .15)
+    deep = mix(BASE, BLACK, .14); lite = mix(BASE, pal["lite"], .1); film = mix(pal["film"][0], BASE, pal["film"][1]); film_hi = mix(film, WHITE, .14)
+    ripple_hi = mix(BASE, pal["ripple"], .38); ripple_lo = mix(BASE, BLACK, .3); glint = mix(BASE, pal["glint"], .7); silt = mix(BASE, pal["silt"], .5); twig = mix(pal["twig"], BASE, .15)
     g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
     def vn(x, y, grids=grids):
         v = 0
@@ -52,4 +56,5 @@ def tile(size, seed):
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/water"
 os.makedirs(out, exist_ok=True)
-im = tile(144, 5); im.save(f"{out}/wetland.png"); print("wetland", im.size, len({p[:3] for p in im.get_flattened_data()}), "colors")
+for name, seed in (("wetland", 5), ("scrubland", 11)):
+    im = tile(144, seed, PAL[name]); im.save(f"{out}/{name}.png"); print(name, im.size, len({p[:3] for p in im.get_flattened_data()}), "colors")
