@@ -1,3 +1,4 @@
+# (Wetland rocks, the wet slate, silt and mossy stones, are at the bottom of shapes(): lower and rounder than the scrubland strata, from the same render().)
 # Draws the scrubland rocks and boulders in the Dimetrodon's flat, simple style (the same stack of strata as tools/pixelrocks.py, which is the older dithered, outlined version):
 # every face is one flat tone (a lit top, a lit left wall, a base front wall, a shaded right wall, a darker band under each ledge), no outline, no dithering.
 # Detail is structured: a lighter silhouette edge at the top left, a darker one along the bottom and right, rows of short dashes on the walls, a few cracks.
@@ -11,6 +12,9 @@ def ramp(base): return {"top": mix(base, (255, 255, 255), .3), "hi": mix(base, (
 SAND = ramp((178, 84, 24))     # rust orange, from the Dimetrodon family
 PALE = ramp((205, 160, 118))   # pale cream stone
 BASALT = ramp((82, 76, 72))    # dark lava
+SLATE = ramp((88, 108, 104))   # wet grey-green stone
+SILT = ramp((128, 112, 92))    # warm grey-brown, mud-stained
+MOSS = ramp((88, 108, 104)); MOSS["top"] = mix((97, 111, 34), (255, 255, 255), .14); MOSS["hi"] = mix(MOSS["hi"], (97, 111, 34), .35)   # slate with a moss-green cap, from the Dimetrodon's olive
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -103,6 +107,14 @@ def shapes():
     S["rock-scrubland-4"] = render(224, [(0, 0, 11, 9, 6, .12, [(5, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], PALE)
     S["rock-scrubland-5"] = render(225, [(0, 0, 14, 10, 5, .18, [(7, 1, 0, 0), (5, .82, .6, 0)])], BASALT, bands=0)
     S["rock-scrubland-6"] = render(226, [(0, 0, 15, 11, 6, .12, [(5, 1, 0, 0), (4, .95, .2, 0), (5, .55, -3, -1), (4, .5, -3.5, -1), (2, .35, -3.5, -1)])], SAND)
+    S["boulder-wetland-1"] = render(131, [(0, 0, 28, 20, 7, .1, [(7, 1, 0, 0), (6, .96, .4, 0), (6, .9, .8, 0), (5, .78, 1.2, 0), (3, .55, 1.6, 0)])], SLATE, cracks=1)
+    S["boulder-wetland-2"] = render(132, [(-15, 4, 17, 13, 6, .12, [(5, 1, 0, 0), (5, .94, .3, 0), (4, .84, .6, 0)]), (13, -4, 21, 15, 7, .1, [(6, 1, 0, 0), (6, .96, .4, 0), (5, .9, .8, 0), (5, .8, 1.2, 0), (3, .6, 1.5, 0)])], MOSS, cracks=0)
+    S["boulder-wetland-3"] = render(133, [(0, 0, 24, 17, 6, .14, [(6, 1, 0, 0), (6, .97, .5, 0), (5, .9, 1, 0), (4, .72, 1.6, 0)])], SILT, cracks=1)
+    S["rock-wetland-1"] = render(231, [(0, 0, 17, 11, 7, .1, [(5, 1, 0, 0), (4, .88, .4, 0)])], SLATE)
+    S["rock-wetland-2"] = render(232, [(0, 0, 12, 9, 6, .12, [(5, 1, 0, 0), (5, .9, .4, 0), (3, .65, .6, 0)])], MOSS, bands=0)
+    S["rock-wetland-3"] = render(233, [(0, 0, 14, 10, 6, .14, [(5, 1, 0, 0), (4, .94, .3, 0), (4, .72, .6, 0)])], SILT)
+    S["rock-wetland-4"] = render(234, [(0, 0, 10, 8, 5, .14, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], SLATE, bands=0)
+    S["rock-wetland-5"] = render(235, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], SILT, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"

@@ -1317,7 +1317,7 @@ const BIOMES = {
   tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", park:"#79AE6C", perSqM:1, rock:0.6, plants:0.12},
   grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", park:"#B7C995", perSqM:.3, rock:0.6, plants:0.03},
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", park:"#BFA96C", perSqM:.4, rock:1.3, plants:0.03},
-  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5E9C8E", park:"#93B9A0", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
+  wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DB36A", park:"#A3C483", perSqM:.6, rock:0.8, plants:0.08},
   boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", park:"#8FA694", perSqM:.8, rock:1, plants:0.08},
   tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#AEB9A2", park:"#CBD2C2", perSqM:.6, rock:1.4, plants:0.02},
@@ -1358,6 +1358,12 @@ const PLANT_SPRITES = {
   "tri-scrubland-small":  {ratio:54/40, size:1.42},
   "tri-scrubland-medium": {ratio:76/52, size:1.3},
   "tri-scrubland-large":  {ratio:64/92, size:.75},
+  "per-wetland-small":    {ratio:40/46, size:1.0},
+  "per-wetland-medium":   {ratio:64/50, size:1.1},
+  "per-wetland-large":    {ratio:64/92, size:.8},
+  "tri-wetland-small":    {ratio:44/44, size:1.2},
+  "tri-wetland-medium":   {ratio:72/50, size:1.3},
+  "tri-wetland-large":    {ratio:64/92, size:.78},
 };
 // Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
@@ -1366,6 +1372,10 @@ const ROCK_SPRITES = {
   scrubland:{
     boulder:[[68, 66], [37, 59], [74, 62], [57, 63]],
     rock:[[44, 30], [33, 31], [31, 38], [29, 29], [33, 31], [38, 38]],
+  },
+  wetland:{
+    boulder:[[60, 54], [76, 53], [55, 46]],
+    rock:[[43, 31], [30, 30], [39, 31], [29, 28], [41, 29]],
   },
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
