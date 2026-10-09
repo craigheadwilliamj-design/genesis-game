@@ -61,7 +61,7 @@ The Dimetrodon (`sprites/dime*.png`, shaded by `tools/pixeldime_shade.py`) is th
 - **Pixel size** is the same everywhere: 0.13 m a pixel.
 - **Ground tiles** wrap and repeat, so keep them free of large or distinctive features, and of anything from the wrong era or biome (no grass or sage in Permian scrubland).
 - **Check at game zoom and zoomed in.** A blurry screenshot hides bugs; reconstruct the drawn pixels (count them, or print them as ASCII) when something looks off.
-- **Status:** in this style so far: the Dimetrodon, the Cotylorhynchus (shading and a new head, own palette and body), the Permian and Triassic scrubland plants (all six), the scrubland rocks, boulders and ground, the wetland ground, rocks, boulders, all 27 plants and the six wetland Park Plants, the Genesis restroom. Still in the older shaded or outlined style: every other plant (the wetland ones are done), and every other building, fence and theme. New work follows this direction; redoing the old work is by request.
+- **Status:** in this style so far: the Dimetrodon, the Cotylorhynchus (shading and a new head, own palette and body), the Permian and Triassic scrubland plants (all six), the scrubland rocks, boulders and ground, the wetland ground, rocks, boulders, all 27 plants and the six wetland Park Plants, the Genesis restroom. Still in the older shaded or outlined style: every other plant (the wetland ones are done), and every other building, fence and theme. New work follows this direction; redoing the old work is by request. To finish the remaining biomes (ground, rocks, plants, Park Plants, water), follow `tools/BIOME_ART.md`.
 
 ## Rules
 - Escape user text with `esc()` before putting it in HTML. Toasts take plain text (textContent) unless the third `html` arg is used.
