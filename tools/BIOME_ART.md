@@ -10,7 +10,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 |---|---|---|---|---|---|
 | wetland | done | done | 27/27 | 6/6 | done |
 | scrubland | done | done | 24/24 | none exist | done |
-| desert | done | done | 0/27 | 0/4 | to do |
+| desert | done | done | 0/27 | 0/4 | done |
 | tropical | to do | to do | 0/27 | 0/6 | to do |
 | temperate | done | done | 27/27 | 7/7 | done |
 | boreal | to do | to do | 0/18 (Permian on) | 0/2 | to do |
