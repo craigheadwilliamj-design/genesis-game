@@ -1294,9 +1294,20 @@ function animalPlan(h, e){
   if(!ACT_STAYS.has(a.act)) animalWander(h, e);
 }
 
+// swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto (a species with a swim strip draws it in place of its walk picture or rig)
+function swimCheck(h, e){
+  if(h.swim === undefined && !swims(SPECIES_BY_ID[h.sp])) return;
+  const sw = waterOf(e).some(w => inPoly(h.x, h.y, w.points));
+  if(sw === !!h.swim) return;
+  h.swim = sw; h.el.classList.toggle("swimming", sw);
+  const g = h.el.querySelector(".spr");
+  if(g && SPRITES[h.sp] && SPRITES[h.sp].swim){ h.pose = null; g.outerHTML = spriteSvg(h.sp, h); }
+}
+
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
+    if(!e.viv) swimCheck(h, e);   // in a pond or not, even if it never moves (it may be napping where it spawned)
     // a clip that has started (the idle one, lying down) finishes first, whatever the animal's AI now wants, then it carries on
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
     const act = h.a && h.a.act;
@@ -1319,8 +1330,7 @@ function animateAnimals(dt){
     if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
-    // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto
-    if(h.swim !== undefined || swims(SPECIES_BY_ID[h.sp])){ const sw = waterOf(e).some(w => inPoly(h.x, h.y, w.points)); if(sw !== !!h.swim){ h.swim = sw; h.el.classList.toggle("swimming", sw); const g = h.el.querySelector(".spr"); if(g && SPRITES[h.sp] && SPRITES[h.sp].swim){ h.pose = null; g.outerHTML = spriteSvg(h.sp, h); } } }
+    swimCheck(h, e);
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     if(swimmingPic(h)){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.swim); }
     else if(idleOnly) idleFrame();
