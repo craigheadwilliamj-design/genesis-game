@@ -1,3 +1,4 @@
+# (The desert tile, sprites/ground/desert.png, is drawn by desert_tile below: dune sand with wind ripples, pebbles and sandstone chips, same rules.)
 # (The temperate tile, sprites/ground/temperate.png, is drawn by temperate_tile below: loam, moss crust and humus flecks, no grass or flowers, same rules.)
 # (The wetland tile, sprites/ground/wetland.png, is drawn by wetland_tile below: mud, algae and small shallow pools, same rules.)
 # Draws the seamless scrubland ground tiles in the Dimetrodon's flat, simple style (tools/pixelground.py is the older dithered version): sprites/ground/scrubland.png (one tile for exhibits and the park),
@@ -143,6 +144,49 @@ def temperate_tile(base, size, seed, flecks, dashes, pebbles):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
+SANDY = hexc("#DFC48A")   # BIOMES.desert.color in data.js, and its park color too: one floor for exhibits and the park
+def desert_tile(base, size, seed, flecks, ripples, pebbles, chips):
+    # Dune sand built from small, low-contrast details so the repeat is hidden: a faint two-scale wash of pale and warm sand, 1 to 3 px flecks, short wind ripples (a lit top row, a shaded
+    # row under and to the right), a few pebbles and tiny sandstone chips (lit top row, shaded base). No plants, so it suits any era.
+    rnd = random.Random(seed); px = {}
+    def put(x, y, c): px[(x % size, y % size)] = c
+    pale = mix(base, (250, 238, 200), .3); warm = mix(base, (190, 120, 60), .16); lit = mix(base, WHITE, .34); shade = mix(base, (150, 100, 50), .3)
+    fleck_d = mix(base, (150, 100, 50), .38); fleck_l = mix(base, WHITE, .4)
+    g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
+    def vn(x, y):
+        v = 0
+        for g, grid, wt in grids:
+            fx, fy = x / size * g, y / size * g; ix, iy = int(fx), int(fy); tx, ty = fx - ix, fy - iy
+            a = grid[iy % g][ix % g] * (1 - tx) + grid[iy % g][(ix + 1) % g] * tx; b = grid[(iy + 1) % g][ix % g] * (1 - tx) + grid[(iy + 1) % g][(ix + 1) % g] * tx
+            v += wt * (a * (1 - ty) + b * ty)
+        return v
+    for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise
+        for bx in range(0, size, 2):
+            n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
+            c = warm if n > .66 else pale if n < .34 else None
+            if c:
+                for dy in range(2):
+                    for dx in range(2): put(bx + dx, by + dy, c)
+    for _ in range(flecks):
+        x, y = rnd.randrange(size), rnd.randrange(size); c = fleck_d if rnd.random() < .6 else fleck_l
+        put(x, y, c)
+        if rnd.random() < .5: put(x + 1, y, c)
+    for _ in range(ripples):   # wind ripples: a short lit dash with a shaded one a row down, shifted a pixel right; loosely in rows
+        x = rnd.randrange(size); y = rnd.randrange(size // 4) * 4 + rnd.choice((0, 1)); n = rnd.randint(4, 8)
+        for i in range(n): put(x + i, y, lit)
+        for i in range(1, n): put(x + i + 1, y + 1, shade)
+    for _ in range(pebbles):
+        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 2, 3)); pal = DARK if rnd.random() < .4 else [mix(base, WHITE, .3), mix(base, BLACK, .15), mix(base, BLACK, .38)]
+        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[2])
+        put(x + w, y + 1, shade)
+    for _ in range(chips):   # tiny sandstone chips, red or cream
+        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 3, 3)); pal = RED if rnd.random() < .6 else [mix(base, WHITE, .5), mix(base, (200, 170, 110), .6), mix(base, (150, 110, 70), .7)]
+        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[2])
+        put(x + w, y + 1, shade)
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
+    return im
+
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
 os.makedirs(out, exist_ok=True)
 im = tile(SAND, 144, 7, 3, 34, 20)   # repeats every 18 m (144 px), under both exhibits (#b-scrubland) and the park (#p-scrubland)
@@ -151,3 +195,5 @@ im = wetland_tile(MARSH, 144, 11, 14, 520, 90, 26)   # 18 m, under both exhibits
 im.save(f"{out}/wetland.png"); print("wetland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
 im = temperate_tile(LOAM, 144, 7, 520, 80, 22)   # 18 m, under both exhibits (#b-temperate) and the park (#p-temperate)
 im.save(f"{out}/temperate.png"); print("temperate", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
+im = desert_tile(SANDY, 144, 5, 520, 70, 14, 10)   # 18 m, under both exhibits (#b-desert) and the park (#p-desert)
+im.save(f"{out}/desert.png"); print("desert", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")

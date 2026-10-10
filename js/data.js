@@ -1314,7 +1314,7 @@ const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepu
 //   plants   share of the floor animals want planted here (see HAB.plantMax)
 //   park     the open ground between the exhibits when the park is set in this biome (the pattern id is "p-" + the key)
 const BIOMES = {
-  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#E0C07A", park:"#DCC892", perSqM:.5, rock:1.6, plants:0.01},
+  desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#DFC48A", park:"#DFC48A", perSqM:.5, rock:1.6, plants:0.01},
   tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#3F9A5C", park:"#79AE6C", perSqM:1, rock:0.6, plants:0.12},
   grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", park:"#B7C995", perSqM:.3, rock:0.6, plants:0.03},
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", park:"#BFA96C", perSqM:.4, rock:1.3, plants:0.03},
