@@ -6,7 +6,7 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const fs = require('fs'), path = require('path');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
-const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8, splootF:80, splootDy:0, tuckH:58, tuckDy:-2, lie:4}, JSON.parse(process.argv[3] || '{}'));
+const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8, splootF:80, splootDy:0, tuckH:58, tuckDy:-2, lie:4, headR:-4, headDy:-3, splootDx:4}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
  const proj = JSON.parse(fs.readFileSync(path.join(here, 'prionosuchus-rig.json'), 'utf8'));
@@ -49,12 +49,12 @@ fs.mkdirSync(OUT, {recursive:true});
     const e = sm(i/9), pose = {};
     pose[ID.body] = {r:0, dx:0, dy:rd(K.lie*e)};
     pose[ID.tail] = {r:rd(11*e), dx:0, dy:0};
-    pose[ID.head] = {r:rd(1*e), dx:0, dy:0};
+    pose[ID.head] = {r:rd(K.headR*e), dx:0, dy:rd(K.headDy*e)};   // chin lifted, so the forelegs show under it
     pose[ID.jaw] = {r:0, dx:0, dy:0};
     for(const [lg, ft] of ID.legs){
       const front = lg === 'n36' || lg === 'n46';   // front legs stretch forward along the ground (a sploot), hind legs tuck back
       const a = front ? -K.splootF : K.tuckH;
-      pose[lg] = {r:rd(a*e), dx:0, dy:rd((front ? K.splootDy : K.tuckDy)*e)}; pose[ft] = {r:rd(-a*e), dx:0, dy:0};
+      pose[lg] = {r:rd(a*e), dx:rd((front ? K.splootDx : 0)*e), dy:rd((front ? K.splootDy : K.tuckDy)*e)}; pose[ft] = {r:rd(-a*e), dx:0, dy:0};
     }
     rest.push(pose);
   }
