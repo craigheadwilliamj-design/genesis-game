@@ -73,7 +73,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <label>Cell <input id="cellW" type="number" min="8" max="1024"> × <input id="cellH" type="number" min="8" max="1024"></label>
    <label>Ground <input id="ground" type="number" min="0" max="1024"></label></div>
   <div class="sep"></div>
-  <div class="grp"><button id="bSave">Save project</button><button id="bLoad">Load project</button></div>
+  <div class="grp"><button id="bNew" title="Clear every part and animation and start fresh">New project</button><button id="bSave">Save project</button><button id="bLoad">Load project</button></div>
  </div>
 
  <div id="stage">
@@ -681,6 +681,14 @@ async function download(blob, name){
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); return true;
 }
 on('#bSave', 'click', () => download(new Blob([JSON.stringify(pruned())], {type:'application/json'}), P.name + '-rig.json'));
+on('#bNew', 'click', async () => {
+  if(!(await ask('Start a new project? This clears every part and animation. Save project first to keep this one, or use Undo to bring it back.', {ok:'Clear it'}))) return;
+  if(playing) stop();
+  const keepAssets = P.assets, keepSeq = P.seq;   // the pictures stay in memory so Undo can bring the old project back; they are left out of the next save
+  Object.assign(P, blank()); P.assets = keepAssets; P.seq = keepSeq;
+  ci = 0; cur = 0; sel = null; drag = null; hoverId = null;
+  setMode('rig'); fit(); save(true);
+});
 on('#bLoad', 'click', () => $('#fileProj').click());
 on('#fileProj', 'change', async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; try{ await openProject(JSON.parse(await f.text())); }catch(err){ ask('Could not open that project: ' + err.message, {info:true}); } });
 
