@@ -573,18 +573,20 @@ cv.addEventListener('pointerdown', e => {
   // the rotation knob always wins
   if(mode === 'pose' && sel && nodeOf(sel)){
     const W0 = worlds(curPose()), k = knobPos(W0[sel]);
-    if(Math.hypot(wx - k.x, wy - k.y)*view.z < 14){
+    if(Math.hypot(wx - k.x, wy - k.y)*view.z < 7){
       const p0 = frames()[cur][sel] || {};
       drag = Object.assign({t:'rotate', a0:Math.atan2(wy - k.cy, wx - k.cx), r0:p0.r || 0, cx:k.cx, cy:k.cy, knob:true}, c0); return;
     }
   }
-  // pick: keep the selected part if it is under the pointer; Alt cycles to the part beneath; else the topmost
+  // pick: Alt cycles to the part beneath, else the topmost. If the selected part is under the pointer, a drag keeps working on it
+  // (so turning it never grabs a neighbor in front), and the topmost part is picked only if the press ends as a plain click.
   const list = partsAt(wx, wy), at = list.findIndex(n => n.id === sel);
-  let pick = null;
+  let pick = null, clickPick = null;
   if(e.altKey && list.length) pick = list[(at + 1) % list.length];
-  else if(at >= 0) pick = list[at];
+  else if(at >= 0){ pick = list[at]; clickPick = list[0]; }
   else if(list.length) pick = list[0];
   if(pick && pick.id !== sel){ sel = pick.id; buildParts(); fillProps(); }
+  c0.clickPick = clickPick;
   const n = pick && nodeOf(sel);
   if(!n){ draw(); return; }   // empty space: nothing to drag
   if(mode === 'rig'){
@@ -631,7 +633,13 @@ cv.addEventListener('pointermove', e => {
   }
   fillProps(); draw();
 });
-const endDrag = () => { if(!drag) return; const t = drag.t; drag = null; if(t !== 'pan') save(false), buildStrip(), buildParts(), fillProps(), draw(); };
+const endDrag = () => {
+  if(!drag) return;
+  const d = drag; drag = null;
+  if(d.t === 'pan') return;
+  if(!d.armed && d.clickPick && d.clickPick.id !== sel && nodeOf(d.clickPick.id)){ sel = d.clickPick.id; buildParts(); fillProps(); draw(); return; }   // a plain click picks what is on top
+  save(false), buildStrip(), buildParts(), fillProps(), draw();
+};
 cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
 
 // ---------- property inputs ----------
