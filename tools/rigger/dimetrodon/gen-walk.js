@@ -1,12 +1,12 @@
 // Rebuilds the Dimetrodon's walk clip from the rig in dimetrodon-rig.json (parts and joints by hand in the rigger); the idle clip is kept as it was.
-//   node tools/rigger/dimetrodon/gen-walk.js [OUT_DIR] ['{"S":9,"lift":2.4}']
+//   node tools/rigger/dimetrodon/gen-walk.js [OUT_DIR] ['{"S":7,"lift":2}']
 // Writes OUT_DIR/dimetrodon.json (the rig with the new walk), walk-sheet.png and walk.gif (OUT_DIR defaults to this folder).
 // Each leg is one short piece (hip joint, with a foot child), so the leg is aimed at where its ankle should be (no knee): stance ankles stay planted
 // and slide back under the body at one speed, swing ankles lift and reach forward. Diagonal-couplet walk: near front with far back, far front with near back, half a cycle apart.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const fs = require('fs'), path = require('path');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
-const K = Object.assign({N:8, S:9, ds:.7, lift:2.4, bob:.6, tail:3.5, head:1.5, hind:.08, fps:8}, JSON.parse(process.argv[3] || '{}'));
+const K = Object.assign({N:8, S:7, ds:.7, lift:2, bob:.6, tail:3.5, head:1.5, hind:.08, fps:8}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
  const proj = JSON.parse(fs.readFileSync(path.join(here, 'dimetrodon-rig.json'), 'utf8'));
