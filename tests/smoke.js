@@ -1481,6 +1481,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
       behaviorNight();
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
+      // midday naps: a fed plant eater lies down once in the nap hours for 30 to 80 minutes and stays down, none at night or outside the hours, and not every animal naps
+      const nx = {id:"bh3", name:"Nap", points:sq(200, 0, 80), animals:Array.from({length:20}, (_, i) => ({id:"bn" + i, sp:"plat"})), happy:70, cond:100, stock:{paleoflora:999, grass:999}};
+      state.exhibits = [nx]; state.day = 5; state.minute = 9 * 60; behaviorNight();
+      let before = 0, longest = {}; const napped = new Set();
+      for(let t = 9 * 60; t < 17 * 60; t += BEHAVIOR.step){
+        state.minute = t; for(const a of nx.animals) a.need.hunger = 20, a.need.thirst = 15, a.need.stress = 10;
+        behaviorTick(BEHAVIOR.step);
+        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(t < BEHAVIOR.nap.from * 60 - 1) before++; }
+      }
+      const lens = Object.values(longest);
+      out.behaviorNap = napped.size >= 3 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, 8 * 60) === 0 && napLull(SPECIES_BY_ID.plat, 13 * 60) > 0 && napLull(SPECIES_BY_ID.ornw, 13 * 60) === 0;
       // diet toys: a shank thrills a meat eater and bores a plant eater; hay feeds plant eaters; treats run out, frozen ones faster in a heat wave
       {
         const T = SPECIES_BY_ID.trex, H = SPECIES_BY_ID.tric, m = SPECIES_BY_ID.mamm;

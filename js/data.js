@@ -1270,6 +1270,7 @@ const BEHAVIOR = {
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
   escape:1.5,          // a stressed aggressive animal tries the fence up to this much more
+  nap:{from:11, to:15, chance:.03, hot:1.5, min:30, max:80},   // a midday nap: hours it can start (peaking halfway), the chance an animal lies down each step at the peak, hot days' boost, and how long it stays down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
 };
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
