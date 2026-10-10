@@ -1,15 +1,22 @@
 // Builds the Prionosuchus walk, idle and rest clips from the rig in prionosuchus-rig.json (parts and joints by hand in the rigger).
 //   node tools/rigger/prionosuchus/gen-clips.js [OUT_DIR] ['{"S":4.4,"lift":1.2}']
-// Writes OUT_DIR/prionosuchus.json (the rig with its clips; OUT_DIR defaults to this folder), <clip>-sheet.png and <clip>.gif for each clip.
+// Shades the parts first (tools/pixelprio_rig_shade.py; pass {"shade":false} to keep them flat). Writes OUT_DIR/prionosuchus.json (the rig with its clips; OUT_DIR defaults to this folder), <clip>-sheet.png and <clip>.gif for each clip.
 // The legs are one short piece each (a thigh part with a foot dash under it), so there is no IK: the leg swings about its hip, drops a
 // little to keep the stance foot on the ground, and lifts in the swing. Lateral-sequence walk: near hind, near front, far hind, far front, a quarter cycle apart.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
-const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8, splootF:80, splootDy:0, tuckH:58, tuckDy:-2, lie:4, headR:-4, headDy:-3, splootDx:4}, JSON.parse(process.argv[3] || '{}'));
+const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8, shade:true, splootF:80, splootDy:0, tuckH:58, tuckDy:-2, lie:4, headR:-4, headDy:-3, splootDx:4}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
- const proj = JSON.parse(fs.readFileSync(path.join(here, 'prionosuchus-rig.json'), 'utf8'));
+ // the rig's parts are flat base colors: shade them first (tools/pixelprio_rig_shade.py), so the clips, previews and game pictures carry the texture; "shade":false leaves them flat
+ let rigFile = path.join(here, 'prionosuchus-rig.json');
+ if(K.shade !== false){
+  const tmp = path.join(os.tmpdir(), 'prionosuchus-shaded-' + process.pid + '.json');
+  execFileSync('python3', ['-I', path.join(here, '..', '..', 'pixelprio_rig_shade.py'), rigFile, tmp], {stdio:'inherit'});
+  rigFile = tmp;
+ }
+ const proj = JSON.parse(fs.readFileSync(rigFile, 'utf8'));
  const b = await chromium.launch({executablePath:'/opt/pw-browsers/chromium', args:['--no-sandbox']});
  const p = await b.newPage({viewport:{width:1300, height:800}}); const errs = [];
  p.on('pageerror', e => errs.push(e.message));
