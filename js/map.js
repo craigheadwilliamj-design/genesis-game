@@ -1297,6 +1297,8 @@ function animalPlan(h, e){
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
+    // a clip that has started (the idle one, lying down) finishes first, whatever the animal's AI now wants, then it carries on
+    if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
     if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); }
