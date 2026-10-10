@@ -6,7 +6,7 @@
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const fs = require('fs'), path = require('path');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
-const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8}, JSON.parse(process.argv[3] || '{}'));
+const K = Object.assign({N:8, S:4.4, ds:.7, lift:1.2, bob:.45, tail:4.5, head:1.4, fps:8, splootF:80, splootDy:2, tuckH:58}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
  const proj = JSON.parse(fs.readFileSync(path.join(here, 'prionosuchus-rig.json'), 'utf8'));
@@ -43,7 +43,7 @@ fs.mkdirSync(OUT, {recursive:true});
   const gape = [0, 0, 5, 12, 18, 18, 14, 4, -1, 0, 0, 0], lifth = [0, -1, -3, -4, -4, -4, -3, -1, 1, 0, 0, 0], flick = [0, 0, 0, 0, 1, 3, 6, 5, 2, 0, 0, 0];
   const idle = gape.map((g, i) => ({[ID.jaw]:{r:g, dx:0, dy:0}, [ID.head]:{r:lifth[i], dx:0, dy:0}, [ID.tail]:{r:flick[i], dx:0, dy:0}}));
   idle[0] = {};
-  // ---- rest: it lowers onto its belly, legs tucked back, tail up off the ground, jaw a touch open ----
+  // ---- rest: it lowers onto its belly, hind legs tucked back and front legs stretched forward (a sploot), tail up off the ground, jaw a touch open ----
   const rest = [];
   for(let i = 0; i < 10; i++){
     const e = sm(i/9), pose = {};
@@ -51,7 +51,11 @@ fs.mkdirSync(OUT, {recursive:true});
     pose[ID.tail] = {r:rd(9*e), dx:0, dy:0};
     pose[ID.head] = {r:rd(2*e), dx:0, dy:0};
     pose[ID.jaw] = {r:rd(4*e), dx:0, dy:0};
-    for(const [lg, ft] of ID.legs){ pose[lg] = {r:rd(58*e), dx:0, dy:rd(-1*e)}; pose[ft] = {r:rd(-58*e), dx:0, dy:0}; }
+    for(const [lg, ft] of ID.legs){
+      const front = lg === 'n36' || lg === 'n46';   // front legs stretch forward along the ground (a sploot), hind legs tuck back
+      const a = front ? -K.splootF : K.tuckH;
+      pose[lg] = {r:rd(a*e), dx:0, dy:rd((front ? K.splootDy : -1)*e)}; pose[ft] = {r:rd(-a*e), dx:0, dy:0};
+    }
     rest.push(pose);
   }
   P.clips = [{name:'walk', fps:K.fps, frames:walk}, {name:'idle', fps:K.fps, frames:idle}, {name:'rest', fps:K.fps, frames:rest}];
