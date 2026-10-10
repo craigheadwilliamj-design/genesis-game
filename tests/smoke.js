@@ -1602,6 +1602,30 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const sc0 = state.science.crew.paleo; sciFireDialog("paleo"); document.getElementById("confirmNo").click(); out.sciFireAsks = state.science.crew.paleo === sc0;
       state.staff = JSON.parse(keep); state.money = mon; state.buildings.length = bs; officeTab = "office"; select(null); syncCrew(); syncCustodians(); recompute();
     }
+    // rigs: an animal drawn from parts (rigs.js), turned and shifted by a tweened pose, with the strips as the fallback
+    {
+      const R = rigOf("plat"), n = R ? R.parts.length : 0;
+      out.rigData = !!R && n === 13 && R.parts.every(p => p.img.startsWith("sprites/plat/") && p.p < n) && R.clips.walk.dense.length === 6 && R.clips.idle.dense.length === 18 && R.clips.idle.fps === 6;
+      const fake = {r:3, sp:"plat", stride:0, face:1, el:document.createElementNS("http://www.w3.org/2000/svg", "g")};
+      fake.el.innerHTML = rigSvg("plat", fake);
+      out.rigSvg = fake.el.querySelectorAll(".spr .rig image").length === n;
+      // at rest each part sits where its joints add up
+      const rest = new Float32Array(n * 3), m = new Float64Array(n * 6); rigMatrices(R, rest, m);
+      const at = i => { let x = 0, y = 0; for(let q = i; q >= 0; q = R.parts[q].p){ x += R.parts[q].x; y += R.parts[q].y; } return [x, y]; };
+      out.rigRest = R.parts.every((p, i) => { const [x, y] = at(i); return Math.abs(m[i*6] - 1) < 1e-9 && Math.abs(m[i*6 + 4] - x) < 1e-6 && Math.abs(m[i*6 + 5] - y) < 1e-6; });
+      // a turn carries the children with it: turn the root part 90 degrees and a child's offset swings from (x, y) to (-y, x)
+      const kid = R.parts.findIndex(p => p.p >= 0 && R.parts[p.p].p < 0), root = R.parts[kid].p, turned = new Float32Array(n * 3); turned[root*3] = 90; rigMatrices(R, turned, m);
+      const cx = R.parts[root].x + (-R.parts[kid].y), cy = R.parts[root].y + R.parts[kid].x;
+      out.rigTurn = Math.abs(m[root*6]) < 1e-6 && Math.abs(m[root*6 + 1] - 1) < 1e-6 && Math.abs(m[kid*6 + 4] - cx) < 1e-4 && Math.abs(m[kid*6 + 5] - cy) < 1e-4;
+      // loops wrap and tween: a whole cycle is the same pose, and halfway between two key poses is their average
+      const a = new Float32Array(n * 3), b = new Float32Array(n * 3), c = new Float32Array(n * 3), d = new Float32Array(n * 3), f1 = R.clips.walk.dense;
+      rigSample(R, "walk", 0, a); rigSample(R, "walk", 1, b); rigSample(R, "walk", .5 / 6, c); rigSample(R, "walk", 1 / 6, d);
+      out.rigLoop = a.every((v, i) => Math.abs(v - b[i]) < 1e-4 && Math.abs(v - f1[0][i]) < 1e-4) && d.every((v, i) => Math.abs(v - f1[1][i]) < 1e-4) && c.every((v, i) => Math.abs(v - (f1[0][i] + f1[1][i]) / 2) < 1e-3);
+      // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
+      setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
+      setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
+      out.rigToggle = offOk && !!rigOf("plat") && spriteSvg("plat", {r:3, face:1}).includes('class="rig"') && viv.includes("sprites/plat.png") && !viv.includes('class="rig"') && localStorage.getItem("genesis-rigs") === "1";
+    }
     return out;
   }));
 

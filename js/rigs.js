@@ -1,0 +1,91 @@
+/* =====================================================================
+   RIGS
+   Animals drawn from parts instead of a baked strip. A rig (RIGS[id], made from a rigger project by tools/rigtogame.py) is a list of
+   parts in draw order, each a cropped picture with a joint, a parent and a place in the parent's frame, plus the poses of a walk
+   loop and an idle loop. A pose is a turn r (degrees) and a shift dx, dy for each part. Every frame the pose is tweened between
+   its key poses, each part gets its world matrix, and the browser draws the part's picture turned at screen size, so details stay
+   whole at any zoom. Opt in per species with `rig:1` in SPRITES; with no rig (or in a vivarium) the old strips are used.
+   map.js calls rigSvg (the picture) from spriteSvg and rigStep (the motion) from animateAnimals.
+   ===================================================================== */
+
+let rigsOn = true;   // setRigs(false) draws the strips instead, to compare
+try{ if(localStorage.getItem("genesis-rigs") === "0") rigsOn = false; }catch{}
+const RIG_BLEND = .35;   // seconds to ease from walking to idling and back
+const RIGS = {};
+// rigs: one line a species, written by tools/rigtogame.py
+RIGS.plat = {"w":100,"h":75,"parts":[{"n":"PLATE_HIND_FOOT","img":"sprites/plat/plate-hind-foot.png","ix":-1,"iy":0,"iw":6,"ih":2,"p":1,"x":-8,"y":6,"f":0},{"n":"PLATE_HIND_LEG","img":"sprites/plat/plate-hind-leg.png","ix":-10,"iy":-2,"iw":11,"ih":8,"p":2,"x":2,"y":10,"f":0},{"n":"PLATE_HIND_THIGH","img":"sprites/plat/plate-hind-thigh.png","ix":-4,"iy":-3,"iw":9,"ih":13,"p":-1,"x":60,"y":50,"f":0},{"n":"PLATE_HIND_FOREARM","img":"sprites/plat/plate-hind-forearm.png","ix":-3,"iy":-2,"iw":5,"ih":13,"p":4,"x":10,"y":3,"f":0},{"n":"PLATE_BODY","img":"sprites/plat/plate-body.png","ix":-19,"iy":-7,"iw":36,"ih":13,"p":-1,"x":63,"y":49,"f":0},{"n":"PLATE_NECK","img":"sprites/plat/plate-neck.png","ix":0,"iy":-5,"iw":10,"ih":8,"p":4,"x":17,"y":-1,"f":0},{"n":"PLATE_JAW","img":"sprites/plat/plate-jaw.png","ix":-1,"iy":0,"iw":7,"ih":1,"p":7,"x":1,"y":1,"f":0},{"n":"PLATE_HEAD","img":"sprites/plat/plate-head.png","ix":0,"iy":-3,"iw":9,"ih":5,"p":5,"x":10,"y":-2,"f":0},{"n":"PLATE_TAIL","img":"sprites/plat/plate-tail.png","ix":-43,"iy":-5,"iw":45,"ih":12,"p":4,"x":-19,"y":-2,"f":0},{"n":"PLATE_NEAR_FOREARM","img":"sprites/plat/plate-near-forearm.png","ix":-3,"iy":-2,"iw":5,"ih":13,"p":4,"x":10,"y":3,"f":0},{"n":"PLATE_NEAR_LEG","img":"sprites/plat/plate-near-leg.png","ix":-10,"iy":-2,"iw":11,"ih":8,"p":12,"x":2,"y":10,"f":0},{"n":"PLATE_NEAR_FOOT","img":"sprites/plat/plate-near-foot.png","ix":-1,"iy":0,"iw":6,"ih":2,"p":10,"x":-8,"y":6,"f":0},{"n":"PLATE_NEAR_THIGH","img":"sprites/plat/plate-near-thigh.png","ix":-4,"iy":-3,"iw":9,"ih":13,"p":-1,"x":60,"y":50,"f":0}],"clips":{"walk":{"frames":[{"4":[0,0,0.9],"8":2.2,"5":-1.5,"7":1.5,"12":-33,"10":18.6,"11":14.4,"9":4.3,"2":12.2,"1":-4.7,"0":-7.5,"3":-4.3},{"4":[0,0,-0.5],"8":-1.1,"5":0.8,"7":-0.8,"12":-14.7,"10":4.8,"11":9.9,"2":0.4,"1":13.1,"0":-13.5},{"4":[0,0,-0.5],"8":-1.1,"5":0.7,"7":-0.7,"12":-0.1,"10":-3.2,"11":3.3,"9":-4.3,"2":-31.2,"1":27.8,"0":3.3,"3":4.3,"6":9},{"4":[0,0,0.9],"8":2.2,"5":-1.5,"7":1.5,"12":12.2,"10":-4.7,"11":-7.5,"9":-4.3,"2":-33,"1":18.6,"0":14.4,"3":4.3,"6":9},{"4":[0,0,-0.5],"8":-1.1,"5":0.8,"7":-0.8,"12":0.4,"10":13.1,"11":-13.5,"2":-14.7,"1":4.8,"0":9.9},{"4":[0,0,-0.5],"8":-1.1,"5":0.8,"7":-0.8,"12":-31.2,"10":27.8,"11":3.3,"9":4.3,"2":-0.1,"1":-3.2,"0":3.3,"3":-4.3}]},"idle":{"fps":6,"frames":[{"2":-25.5,"1":10,"0":16,"9":-20},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-10.5,"12":[11,0,-1],"5":-6.5,"7":5,"8":9.5,"6":5,"10":[-11,0,1],"9":6,"3":-6},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-24.5,"12":[11,0,-1],"5":-4.5,"7":16,"8":18,"6":4,"10":[-11,0,1],"9":-14,"3":-5},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-29.5,"12":[11,0,-1],"5":-16,"7":39,"8":25.5,"10":[-11,0,1],"9":-14,"3":-5},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-29.5,"12":[11,0,-1],"5":-33,"7":57,"8":25.5,"10":[-11,0,1],"9":15,"3":0.5,"6":14.5},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-29.5,"12":[11,0,-1],"5":-33,"7":57,"8":25.5,"10":[-11,0,1],"9":-22,"3":-7},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-29.5,"12":[11,0,-1],"5":-8.5,"7":57,"8":25.5,"10":[-11,0,1],"9":-38.5,"3":6},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-29.5,"12":[11,0,-1],"5":17,"7":57,"8":25.5,"10":[-11,0,1],"9":[-63.5,1,1],"3":14},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":34.5,"7":75.5,"8":25.5,"10":[-11,0,1],"9":[-63.5,1,1],"3":17},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":43,"7":84,"8":25.5,"10":[-11,0,1],"9":[-67,1,1],"3":17,"6":[0.5,0,-0.5]},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":43,"7":84,"8":25.5,"10":[-11,0,1],"9":[-54,1,1],"3":17,"6":[0,0,-0.5]},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":43,"7":84,"8":25.5,"10":[-11,0,1],"9":[-68,1,1],"3":17,"6":[0,0,-0.5]},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":43,"7":84,"8":25.5,"10":[-11,0,1],"9":[-57.5,1,1],"3":17,"6":[0,0,-0.5]},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-21,"12":[11,0,-1],"5":26,"7":49,"8":25.5,"10":[-11,0,1],"9":-42.5,"3":17,"6":[0,0,-0.5]},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-15,"12":[11,0,-1],"5":12.5,"8":25.5,"10":[-11,0,1],"9":-42.5,"3":7,"6":[0,0,-0.5],"7":25.5},{"2":[-26.5,0,-1],"1":[10,0,1],"0":16,"4":-11.5,"12":[11,0,-1],"5":12.5,"8":25.5,"10":[-11,0,1],"9":-42.5,"3":7,"6":[0,0,-0.5],"7":25.5},{"0":16,"1":[10,0,0.7],"2":[-26.2,0,-0.7],"3":4.7,"4":-7.7,"5":8.3,"6":[0,0,-0.3],"7":17,"8":17,"9":-35,"10":[-7.3,0,0.7],"12":[7.3,0,-0.7]},{"0":16,"1":[10,0,0.3],"2":[-25.8,0,-0.3],"3":2.3,"4":-3.8,"5":4.2,"6":[0,0,-0.2],"7":8.5,"8":8.5,"9":-27.5,"10":[-3.7,0,0.3],"12":[3.7,0,-0.3]}]}}};
+
+const rigOf = sp => (rigsOn && SPRITES[sp] && SPRITES[sp].rig && RIGS[sp]) ? rigPrep(RIGS[sp]) : null;
+
+// sparse frames ({part index: r or [r, dx, dy]}) become flat arrays of r, dx, dy for every part
+function rigPrep(R){
+  if(R.ready) return R;
+  const n = R.parts.length;
+  for(const c of Object.values(R.clips)) c.dense = c.frames.map(f => {
+    const a = new Float32Array(n * 3);
+    for(const k in f){ const v = f[k]; if(Array.isArray(v)){ a[k*3] = v[0]; a[k*3 + 1] = v[1]; a[k*3 + 2] = v[2]; } else a[k*3] = v; }
+    return a;
+  });
+  R.ready = true;
+  return R;
+}
+
+// the pose a loop has at a point in its cycle (0 to 1, wrapping), tweened between its two key poses
+function rigSample(R, clip, phase, out){
+  const fr = R.clips[clip].dense, N = fr.length, t = (((phase % 1) + 1) % 1) * N, i = Math.floor(t) % N, u = t - Math.floor(t), A = fr[i], B = fr[(i + 1) % N];
+  for(let k = 0; k < out.length; k++) out[k] = A[k] + (B[k] - A[k]) * u;
+}
+
+// each part's world matrix, [a, b, c, d, e, f] a part, from its parent's: parent * translate(x + dx, y + dy) * rotate(r)
+function rigMatrices(R, pose, m){
+  const parts = R.parts, done = new Uint8Array(parts.length);
+  const go = i => {
+    if(done[i]) return; done[i] = 1;
+    const p = parts[i]; let a = 1, b = 0, c = 0, d = 1, e = 0, f = 0;
+    if(p.p >= 0){ go(p.p); const o = p.p * 6; a = m[o]; b = m[o + 1]; c = m[o + 2]; d = m[o + 3]; e = m[o + 4]; f = m[o + 5]; }
+    const r = pose[i*3] * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r), tx = p.x + pose[i*3 + 1], ty = p.y + pose[i*3 + 2], o = i * 6;
+    m[o] = a*cs + c*sn; m[o + 1] = b*cs + d*sn; m[o + 2] = -a*sn + c*cs; m[o + 3] = -b*sn + d*cs; m[o + 4] = a*tx + c*ty + e; m[o + 5] = b*tx + d*ty + f;
+  };
+  for(let i = 0; i < parts.length; i++) go(i);
+}
+// a flipped part is mirrored about its joint, which its children don't share
+const rigTransform = (p, m, i) => { const o = i * 6, s = p.f ? -1 : 1; return `matrix(${(m[o]*s).toFixed(4)} ${(m[o + 1]*s).toFixed(4)} ${m[o + 2].toFixed(4)} ${m[o + 3].toFixed(4)} ${m[o + 4].toFixed(3)} ${m[o + 5].toFixed(3)})`; };
+
+const rigState = R => ({cur:new Float32Array(R.parts.length * 3), from:new Float32Array(R.parts.length * 3), tgt:new Float32Array(R.parts.length * 3),
+  mats:new Float64Array(R.parts.length * 6), mode:null, blend:1, idleT:Math.random(), last:performance.now()});
+
+// the animal's picture, the same size and footing as a strip's: its cell fits two and a half dots across, the feet a little below the middle
+function rigSvg(sp, h){
+  const R = rigOf(sp), S = SPRITES[sp], w = h.r * 2.5 * (S.size || 1), k = w / R.w, ht = R.h * k;
+  const g = h.rg ??= rigState(R);
+  rigMatrices(R, g.cur, g.mats);
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><g class="rig" transform="translate(${(-w/2).toFixed(2)} ${(h.r*.5 - ht).toFixed(2)}) scale(${k.toFixed(5)})">`
+    + R.parts.map((p, i) => `<image href="${p.img}" x="${p.ix}" y="${p.iy}" width="${p.iw}" height="${p.ih}" style="image-rendering:pixelated" transform="${rigTransform(p, g.mats, i)}"/>`).join("")
+    + `</g></g>`;
+}
+
+// one frame of motion: walking by how far it has gone, idling by the clock; a change of mode eases over RIG_BLEND seconds
+function rigStep(h, mode){
+  const R = rigOf(h.sp), g0 = h.el.querySelector(".rig"); if(!R || !g0) return;
+  const g = h.rg ??= rigState(R), now = performance.now(), dt = Math.min(.1, (now - g.last) / 1000); g.last = now;
+  const S = SPRITES[h.sp];
+  if(mode === "walk" && R.clips.walk) rigSample(R, "walk", (h.stride || 0) / (h.r * (S.step || .5) * R.clips.walk.dense.length), g.tgt);
+  else if(R.clips.idle){ g.idleT += dt * R.clips.idle.fps / R.clips.idle.dense.length; rigSample(R, "idle", g.idleT, g.tgt); mode = "idle"; }
+  else g.tgt.fill(0);
+  if(mode !== g.mode){ g.from.set(g.cur); g.blend = 0; g.mode = mode; }
+  if(g.blend < 1){
+    g.blend = Math.min(1, g.blend + dt / RIG_BLEND); const k = g.blend * g.blend * (3 - 2 * g.blend);
+    for(let i = 0; i < g.cur.length; i++) g.cur[i] = g.from[i] + (g.tgt[i] - g.from[i]) * k;
+  }else g.cur.set(g.tgt);
+  rigMatrices(R, g.cur, g.mats);
+  const kids = g0.children;
+  for(let i = 0; i < R.parts.length; i++) kids[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i));
+}
+
+// draw every animal again from rigs (true) or strips (false)
+function setRigs(on){
+  rigsOn = !!on;
+  try{ localStorage.setItem("genesis-rigs", rigsOn ? "1" : "0"); }catch{}
+  for(const h of herd.values()){ h.rg = null; h.pose = null; }
+  syncAnimals();
+}
