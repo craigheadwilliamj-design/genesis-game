@@ -891,7 +891,10 @@ function renderOverlay(){
   }
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
-    s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+    // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
+    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
+    else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -961,19 +964,22 @@ function spriteSvg(sp, h){
   const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
   return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
     + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
-    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 || f <= -100 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && !swm && S.walk && S.rest ? `<svg class="rs" ${box} viewBox="${Math.max(-100 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -100 ? ` display="none"` : ""}><image href="sprites/${sp}-rest.png" style="image-rendering:pixelated" width="${S.rest}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // -1 stands, 0 and up is a walk frame
 // -1 stands, 0 and up is a walk frame, -2 and down is an idle frame (-2 - n), for pictures that have both strips
 function setPose(h, f){
   if(f === h.pose) return;
   h.pose = f;
-  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"), id = h.el.querySelector(".id"); if(!st) return;
-  if(id){
-    id.setAttribute("display", "none");   // a walk-and-idle picture: the walk strip, the idle strip or the standing picture, one at a time
+  const st = h.el.querySelector(".st"), wk = h.el.querySelector(".wk"), id = h.el.querySelector(".id"), rs = h.el.querySelector(".rs"); if(!st) return;
+  if(id || rs){
+    if(id) id.setAttribute("display", "none");   // a walk-and-idle picture: the walk strip, the idle strip, the resting strip or the standing picture, one at a time
+    if(rs) rs.setAttribute("display", "none");
     if(wk) wk.setAttribute("display", "none");
     st.setAttribute("display", "none");
-    if(f <= -2){ const vb = id.getAttribute("viewBox").split(" "); vb[0] = -2 - f; id.setAttribute("viewBox", vb.join(" ")); id.removeAttribute("display"); }
+    if(f <= -100 && rs){ const vb = rs.getAttribute("viewBox").split(" "); vb[0] = -100 - f; rs.setAttribute("viewBox", vb.join(" ")); rs.removeAttribute("display"); }
+    else if(f <= -2 && id){ const vb = id.getAttribute("viewBox").split(" "); vb[0] = -2 - f; id.setAttribute("viewBox", vb.join(" ")); id.removeAttribute("display"); }
     else if(f >= 0 && wk){ const vb = wk.getAttribute("viewBox").split(" "); vb[0] = f; wk.setAttribute("viewBox", vb.join(" ")); wk.removeAttribute("display"); }
     else st.removeAttribute("display");
     return;
@@ -987,7 +993,14 @@ function setPose(h, f){
 const swimmingPic = h => !!(h.swim && h.spr && SPRITES[h.sp] && SPRITES[h.sp].swim);
 function swimFrame(h, S){ h.phase ??= Math.random() * S.swim; return Math.floor(performance.now() / (S.swimMs || 200) + h.phase) % S.swim; }
 // what a picture shows while it holds still: its idle strip if it has one beside a walk strip, else the standing picture
+// A picture with a resting strip (-100 and down is a resting frame, -100 - n) lies down while the animal rests: the first frames play once (a crouch, lying down, the eyes closing),
+// then the last two alternate slowly (a breath), from the moment it settles until its act changes (the stamp is cleared in animateAnimals).
 function restPose(h, S){
+  if(S && S.walk && S.rest && h.act === "rest"){
+    h.restAt ??= performance.now();
+    const ms = S.restMs || 300, k = S.rest - 2, t = performance.now() - h.restAt;
+    return -100 - (t < k * ms ? Math.floor(t / ms) : k + Math.floor((t - k * ms) / (S.holdMs || 1200)) % 2);
+  }
   if(!(S && S.walk && S.idle)) return -1;
   h.phase ??= Math.random() * S.idle;
   return -2 - Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle;
@@ -1040,9 +1053,9 @@ function walkArea(h, e){
   const obs = [];
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
-    const r = t.r * (f.k || 1);
+    const r = t.r * (f.k || 1), fr = footR(t) * (f.k || 1);
     const R = t.flora ? (t.look === "conifer" || treeLift(t) ? r * .35 : 0)   // a tree's trunk; low plants are walked through
-      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : r * .9;
+      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : fr * .9;
     if(R) obs.push({x:f.x, y:f.y, c:R + body});
   }
   // land animals keep out of the exhibit's water; swimmers and flyers ignore it
@@ -1285,7 +1298,7 @@ function animateAnimals(dt){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
-    if(act !== h.act){ h.act = act; h.path = null; h.wait = Math.min(h.wait, Math.random() * .6); }
+    if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); }
     // vivarium animals don't walk: they stay on their spot and cycle an idle strip if their picture has one (else the standing picture or dot)
     if(e.viv){
       const S = SPRITES[h.sp];
@@ -2269,7 +2282,7 @@ function reshapeProblem(e, orig){
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, LAND[f.type].r))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, footR(LAND[f.type])))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;
