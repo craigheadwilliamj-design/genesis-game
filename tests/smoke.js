@@ -1621,6 +1621,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const a = new Float32Array(n * 3), b = new Float32Array(n * 3), c = new Float32Array(n * 3), d = new Float32Array(n * 3), f1 = R.clips.walk.dense;
       rigSample(R, "walk", 0, a); rigSample(R, "walk", 1, b); rigSample(R, "walk", .5 / 6, c); rigSample(R, "walk", 1 / 6, d);
       out.rigLoop = a.every((v, i) => Math.abs(v - b[i]) < 1e-4 && Math.abs(v - f1[0][i]) < 1e-4) && d.every((v, i) => Math.abs(v - f1[1][i]) < 1e-4) && c.every((v, i) => Math.abs(v - (f1[0][i] + f1[1][i]) / 2) < 1e-3);
+      // resting plays the rest clip once and holds its last frame, and going back to idle lets go of it
+      const rg = fake.rg, last = R.clips.rest.dense[R.clips.rest.dense.length - 1], step = mode => { rg.last = performance.now() - 100; rigStep(fake, mode); };
+      for(let i = 0; i < 80; i++) step("rest");
+      const held = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
+      for(let i = 0; i < 80; i++) step("rest");
+      const still = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
+      for(let i = 0; i < 80; i++) step("idle");
+      out.rigRestHold = R.clips.rest.dense.length === 15 && held && still && rg.mode === "idle" && !last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
       // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});

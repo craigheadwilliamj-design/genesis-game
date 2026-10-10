@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Turn a rigger project (the Save project JSON from tools/rigger) into game files.
 
-    python3 tools/rigtogame.py PROJECT.json plat --walk walk --idle plat_idle
+    python3 tools/rigtogame.py PROJECT.json plat --walk walk --idle plat_idle --rest resting --rest-end 14
 
 writes `sprites/<id>/<part>.png`, one picture per part cropped to its pixels, and replaces the line
 `RIGS.<id> = ...;` in js/rigs.js with the parts (draw order, parent, joint, picture box) and the poses of the
-walk and idle clips. Then give the species `rig:1` in SPRITES (data.js). It can be run again; it overwrites.
+walk, idle and rest clips. Then give the species `rig:1` in SPRITES (data.js). It can be run again; it overwrites.
 
 Poses are sparse: a frame lists only the parts that are turned or shifted, as `index: r` or `index: [r, dx, dy]`
 (degrees, and pixels in the parent's frame), the same numbers as the rigger. A part not listed is at rest.
@@ -25,6 +25,8 @@ def main():
     ap.add_argument("project"); ap.add_argument("id")
     ap.add_argument("--walk", help="name of the walk clip (a loop; one cycle of the stride)")
     ap.add_argument("--idle", help="name of the idle clip (a loop played at its fps while the animal stands)")
+    ap.add_argument("--rest", help="name of the rest clip (played once when the animal settles to rest, then its last frame is held)")
+    ap.add_argument("--rest-end", type=int, help="index of the last frame to play of the rest clip (default: all); later frames, like getting up, are left out")
     ap.add_argument("--root", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."), help="the repo root")
     a = ap.parse_args()
     proj = json.load(open(a.project))
@@ -61,6 +63,9 @@ def main():
     clips = {}
     if a.walk: clips["walk"] = {"frames": frames(a.walk)[1]}
     if a.idle: fps, fr = frames(a.idle); clips["idle"] = {"fps": fps, "frames": fr}
+    if a.rest:
+        fps, fr = frames(a.rest)
+        clips["rest"] = {"fps": fps, "frames": fr[:a.rest_end + 1] if a.rest_end is not None else fr}
     rig = {"w": proj["cell"]["w"], "h": proj["cell"]["h"], "parts": parts, "clips": clips}
     line = f"RIGS.{a.id} = " + json.dumps(rig, separators=(",", ":")) + ";"
     path = os.path.join(a.root, "js", "rigs.js")
@@ -72,7 +77,7 @@ def main():
         if mark not in src: sys.exit("js/rigs.js has no marker line for the species data")
         src = src.replace(mark, mark + line + "\n", 1)
     open(path, "w").write(src)
-    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, idle {len(clips.get('idle', {}).get('frames', []))} frames, js/rigs.js updated")
+    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, idle {len(clips.get('idle', {}).get('frames', []))} frames, rest {len(clips.get('rest', {}).get('frames', []))} frames, js/rigs.js updated")
 
 if __name__ == "__main__":
     main()
