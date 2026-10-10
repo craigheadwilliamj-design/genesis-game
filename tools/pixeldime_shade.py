@@ -59,4 +59,5 @@ def main(d, files):
             for x in range(im.width): assert out.getpixel((x, y))[3] == im.getpixel((x, y))[3], "the shape changed"
         out.save(path); print(path, f"{chg} of {tot} pixels shaded ({100 * chg // max(tot, 1)}%)")
 
-main(sys.argv[1] if len(sys.argv) > 1 else "sprites", ("dime", "dime-walk"))
+if __name__ == "__main__":
+    main(sys.argv[1] if len(sys.argv) > 1 else "sprites", ("dime", "dime-walk"))

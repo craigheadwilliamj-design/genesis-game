@@ -19,6 +19,8 @@ GREY = ramp((134, 138, 140))   # temperate: ROCK_STONE grey
 WARM = ramp((124, 116, 104))   # grey-brown, tannin stained
 MOSSY = ramp((134, 138, 140)); MOSSY["top"] = mix((84, 122, 70), (255, 255, 255), .12); MOSSY["hi"] = mix(MOSSY["hi"], (84, 122, 70), .3)   # grey with a moss cap
 LITTER = ramp((128, 130, 128)); LITTER["top"] = mix((140, 98, 52), (255, 255, 255), .1); LITTER["hi"] = mix(LITTER["hi"], (140, 98, 52), .25)   # grey with a leaf-litter cap
+BUFF = ramp((190, 150, 108))   # desert: sandstone strata, buff / rust red / cream, from ROCK_STONE desert
+RUST = ramp((168, 88, 50)); CREAM = ramp((222, 198, 150)); VARNISH = ramp((92, 74, 64))
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -54,6 +56,7 @@ def render(seed, towers, pal, cracks=0, bands=1):
     for T in layers:
         for ti, L in enumerate(T):
             pts, z0, z1 = L["pts"], L["z0"], L["z1"]; cxm = sum(p[0] for p in pts) / len(pts); cym = sum(p[1] for p in pts) / len(pts); last = ti == len(T) - 1
+            P = pal[ti % len(pal)] if isinstance(pal, list) else pal   # a list of ramps colors the strata layer by layer (desert sandstone)
             quads = []
             for i in range(len(pts)):
                 (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % len(pts)]; ex, ey = x1 - x0, y1 - y0; d = math.hypot(ex, ey) or 1; nx, ny = ey / d, -ex / d
@@ -62,7 +65,7 @@ def render(seed, towers, pal, cracks=0, bands=1):
             for _, (x0, y0, x1, y1), nx, ny in sorted(quads):
                 q = [(sx(x0), sy(y0, z0)), (sx(x1), sy(y1, z0)), (sx(x1), sy(y1, z1)), (sx(x0), sy(y0, z1))]; m = mask(q)
                 lit = -(nx * LIGHT[0] + ny * LIGHT[1]); base = 0 if lit > .45 else 1 if lit > -.2 else 2
-                tone = min(3, max(0, base + L["shift"] * bands)); face = pal[WALL[tone]]; dash = pal[WALL[min(3, tone + 1)]]
+                tone = min(3, max(0, base + L["shift"] * bands)); face = P[WALL[tone]]; dash = P[WALL[min(3, tone + 1)]]
                 for y in range(max(0, int(min(p[1] for p in q))), min(H, int(max(p[1] for p in q)) + 1)):
                     for x in range(max(0, int(min(p[0] for p in q))), min(W, int(max(p[0] for p in q)) + 1)):
                         if not m[x, y]: continue
@@ -71,16 +74,16 @@ def render(seed, towers, pal, cracks=0, bands=1):
             cap = [(sx(x), sy(y, z1)) for x, y in pts]; m = mask(cap); xs = [p[0] for p in cap]; ys = [p[1] for p in cap]
             for y in range(max(0, int(min(ys))), min(H, int(max(ys)) + 1)):
                 for x in range(max(0, int(min(xs))), min(W, int(max(xs)) + 1)):
-                    if m[x, y]: g[y][x] = pal["top"]; kind[y][x] = 2
+                    if m[x, y]: g[y][x] = P["top"]; kind[y][x] = 2
             if not last:   # the layer above leaves a darker band on this ledge, to its right and front
                 nxt = [(sx(x) + 2, sy(y, T[ti + 1]["z1"]) + 1.5) for x, y in T[ti + 1]["pts"]]; nm = mask(nxt)
                 for y in range(H):
                     for x in range(W):
-                        if nm[x, y] and kind[y][x] == 2 and g[y][x] is not None: g[y][x] = mix(pal["top"], (0, 0, 0), .2)
+                        if nm[x, y] and kind[y][x] == 2 and g[y][x] is not None: g[y][x] = mix(P["top"], (0, 0, 0), .2)
     for _ in range(cracks):
         x = rnd.randint(W // 4, 3 * W // 4); y = int(H * .3)
         while y < H - 4:
-            if 0 <= x < W and kind[y][x] == 1: g[y][x] = pal["deep"]
+            if 0 <= x < W and kind[y][x] == 1: g[y][x] = (pal[0] if isinstance(pal, list) else pal)["deep"]
             y += 1; x += rnd.choice((-1, 0, 0, 1))
     for y in range(H):   # polygon corners can leave a lone pixel sticking out; drop any pixel with one filled neighbour or none
         for x in range(W):
@@ -128,6 +131,16 @@ def shapes():
     S["rock-temperate-3"] = render(243, [(0, 0, 14, 10, 6, .14, [(5, 1, 0, 0), (4, .94, .3, 0), (4, .72, .6, 0)])], LITTER)
     S["rock-temperate-4"] = render(244, [(0, 0, 11, 8, 5, .14, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], WARM, bands=0)
     S["rock-temperate-5"] = render(245, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], GREY, bands=0)
+    S["boulder-desert-1"] = render(151, [(0, 0, 30, 22, 6, .14, [(6, 1, 0, 0), (5, .97, .4, 0), (4, .94, .8, 0), (6, .9, 1.1, 0), (5, .84, 1.5, 0), (4, .72, 1.8, 0)])], [BUFF, RUST, CREAM, BUFF, RUST, CREAM], cracks=1)
+    S["boulder-desert-2"] = render(152, [(0, 0, 13, 11, 6, .16, [(6, 1, 0, 0), (5, .97, .6, 0), (6, .93, 1.2, 0), (5, .9, 1.8, 0), (6, .84, 2.6, 0), (5, .76, 3.5, 0), (4, .64, 4.5, 0), (4, .45, 5.5, 0)])], [RUST, CREAM, BUFF], cracks=1)
+    S["boulder-desert-3"] = render(153, [(-16, 5, 18, 14, 6, .14, [(6, 1, 0, 0), (5, .95, .3, 0), (5, .9, .6, 0), (4, .8, 1, 0)]), (14, -5, 22, 16, 6, .14, [(7, 1, 0, 0), (6, .97, .4, 0), (5, .93, .8, 0), (6, .88, 1.2, 0), (5, .8, 1.6, 0), (4, .65, 2, 0)])], [BUFF, CREAM, RUST], cracks=1)
+    S["boulder-desert-4"] = render(154, [(0, 0, 26, 20, 5, .2, [(10, 1, 0, 0), (9, .97, .6, 0), (8, .9, 1.2, 0), (6, .72, 2, 0)])], VARNISH, cracks=2, bands=0)
+    S["rock-desert-1"] = render(251, [(0, 0, 19, 12, 6, .14, [(5, 1, 0, 0), (4, .9, .5, 0)])], [BUFF, CREAM])
+    S["rock-desert-2"] = render(252, [(0, 0, 13, 10, 5, .14, [(6, 1, 0, 0), (5, .9, .4, 0), (3, .7, .6, 0)])], [RUST, BUFF, CREAM])
+    S["rock-desert-3"] = render(253, [(0, 0, 12, 10, 5, .16, [(7, 1, 0, 0), (6, .92, .5, 0), (5, .8, 1, 0), (3, .55, 1.5, 0)])], [BUFF, RUST, CREAM], cracks=1)
+    S["rock-desert-4"] = render(254, [(0, 0, 11, 9, 6, .12, [(5, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], CREAM)
+    S["rock-desert-5"] = render(255, [(0, 0, 14, 10, 5, .18, [(7, 1, 0, 0), (5, .82, .6, 0)])], VARNISH, bands=0)
+    S["rock-desert-6"] = render(256, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], [BUFF, RUST], bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
