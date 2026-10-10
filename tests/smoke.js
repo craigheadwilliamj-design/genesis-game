@@ -1661,6 +1661,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
       out.rigToggle = offOk && !!rigOf("plat") && spriteSvg("plat", {r:3, face:1}).includes('class="rig"') && viv.includes("sprites/plat.png") && !viv.includes('class="rig"') && localStorage.getItem("genesis-rigs") === "1";
+
+      // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) shows its swim strip, not the rig lying on the water, and goes back to the rig on the bank
+      const nap = {id:"e-nap", name:"Nap", animals:[{id:"nap1", sp:"prio", act:"rest"}], points:[[0,0],[60,0],[60,40],[0,40]], cond:100, water:[{id:"w-nap", points:[[5,5],[55,5],[55,35],[5,35]]}]};
+      state.exhibits.push(nap); syncAnimals();
+      const nh = herd.get("nap1"); nh.x = 30; nh.y = 20; nh.wait = 99; nh.placed = true; animateAnimals(.05);
+      const inWater = !!nh.swim && !nh.el.querySelector(".rig") && !!nh.el.querySelector(".wk");
+      nh.x = 2; nh.y = 20; animateAnimals(.05);
+      out.rigSwimNap = inWater && !nh.swim && !!nh.el.querySelector(".rig") && !nh.el.querySelector(".wk");
+      state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
     return out;
   }));
