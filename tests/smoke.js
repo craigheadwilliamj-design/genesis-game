@@ -1672,11 +1672,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ghostParts = nh.el.querySelectorAll(".rig-ghost image").length === RS.parts.length && nh.el.querySelectorAll(".rig image").length === RS.parts.length;
       for(let i = 0; i < 12; i++){ nh.rg.last = performance.now() - 100; animateAnimals(.05); }   // it sinks to the waterline over the blend time
       const rect = nh.el.querySelector("#" + nh.cid + "a rect"), sunk = rect && Math.abs(+rect.getAttribute("height") - (RS.clips.swim.wl + 20)) < .01;
-      const foamAt = () => +nh.el.querySelector(".rig-foam").getAttribute("opacity");
-      const nstep = m => { nh.rg.last = performance.now() - 100; nh.stride = (nh.stride || 0) + 1; rigStep(nh, m); };
-      for(let i = 0; i < 20; i++) nstep("walk"); const foamSwim = foamAt();
-      for(let i = 0; i < 40; i++) nstep("idle"); const foamFloat = foamAt();
-      out.rigFoam = foamSwim > .9 && foamFloat < .1 && nh.rg.mode === "float";   // a bow wave and wake while it swims, gone when it floats
       nh.x = 2; nh.y = 20; animateAnimals(.05);
       out.rigSwimNap = inWater && ghostParts && !!sunk && !nh.swim && !!nh.el.querySelector(".rig") && !nh.el.querySelector(".rig-ghost") && !nh.el.querySelector(".wk");
       // with rigs off a swimmer keeps its swim strip

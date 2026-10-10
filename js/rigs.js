@@ -57,7 +57,7 @@ function rigMatrices(R, pose, m){
 const rigTransform = (p, m, i) => { const o = i * 6, s = p.f ? -1 : 1; return `matrix(${(m[o]*s).toFixed(4)} ${(m[o + 1]*s).toFixed(4)} ${m[o + 2].toFixed(4)} ${m[o + 3].toFixed(4)} ${m[o + 4].toFixed(3)} ${m[o + 5].toFixed(3)})`; };
 
 const rigState = R => ({cur:new Float32Array(R.parts.length * 3), from:new Float32Array(R.parts.length * 3), tgt:new Float32Array(R.parts.length * 3),
-  mats:new Float64Array(R.parts.length * 6), mode:null, blend:1, idleT:1, gap:RIG_IDLE.gap[0], restT:0, lock:false, last:performance.now(), wlk:0, swimT:0, wk:0, drift:0});
+  mats:new Float64Array(R.parts.length * 6), mode:null, blend:1, idleT:1, gap:RIG_IDLE.gap[0], restT:0, lock:false, last:performance.now(), wlk:0, swimT:0});
 
 // the animal's picture, the same size and footing as a strip's: its cell fits two and a half dots across, the feet a little below the middle
 // In water a rig with a swim clip is clipped at its waterline (C.wl, a cell row): the part above shows, the part below is a faint ghost, and a ripple line (the exhibit's water colors) sits on the line.
@@ -67,26 +67,6 @@ const rigWl = (R, g) => { const top = R.h + 10, k = g.wlk * g.wlk * (3 - 2 * g.w
 function rigWater(h){
   const e = state.exhibits.find(x => x.id === h.exhibitId), tx = e && WATER_TEX[biomeOf(e)];
   return tx ? {lit:tx.lit, dark:tx.dark} : {lit:"#9CCBE8", dark:"#2F6F9F"};
-}
-// how far the rig reaches in x at rest (the tail tip to the snout tip, in cell pixels), for the bow wave and the wake
-function rigExt(R){
-  if(R.ext) return R.ext;
-  const m = new Float64Array(R.parts.length * 6); rigMatrices(R, new Float32Array(R.parts.length * 3), m);
-  let a = 1e9, b = -1e9; R.parts.forEach((p, i) => { a = Math.min(a, m[i*6 + 4] + p.ix); b = Math.max(b, m[i*6 + 4] + p.ix + p.iw); });
-  return R.ext = [a, b];
-}
-// foam and ripples relative to the waterline (y 0): a hump and spray ahead of the snout, rings spreading ahead of it, and a wake trailing the tail; they fade in as it swims (g.wk)
-function rigFoam(R, wc){
-  const [xt, xs] = rigExt(R), f = rigLighten(wc.lit), r = (x, y, w, c, o = 1) => `<rect x="${x.toFixed(1)}" y="${y}" width="${w}" height="1" fill="${c}"${o < 1 ? ` opacity="${o}"` : ""}/>`, d = (x, y, len, c, o, dash) => `<path d="M${x.toFixed(1)} ${y}h${len}" stroke="${c}" stroke-opacity="${o}" stroke-width="1" stroke-dasharray="${dash}"/>`;
-  return r(xs - 2, -2, 4, f) + r(xs, -3, 3, f) + r(xs + 2, -1, 5, f) + r(xs + 6, -1, 3, f, .75) + r(xs + 8, 0, 4, wc.lit, .8)
-    + `<rect class="sp1" x="${(xs + 2).toFixed(1)}" y="-5" width="1" height="1" fill="${f}"/><rect class="sp2" x="${(xs + 5).toFixed(1)}" y="-4" width="1" height="1" fill="${f}"/><rect class="sp1" x="${(xs + 8).toFixed(1)}" y="-3" width="1" height="1" fill="${f}"/>`
-    + d(xs + 3, 1.5, 9, f, .95, "4 1") + d(xs + 5, 2.5, 12, wc.lit, .75, "5 2") + d(xs + 8, 3.5, 14, wc.lit, .5, "3 3")
-    + r(xt - 1, -1, 3, f, .9) + r(xt - 4, 0, 4, f, .8) + d(xt + 3, .5, -10, f, .9, "3 2") + d(xt, 1.5, -15, wc.lit, .75, "4 3") + d(xt - 3, 2.5, -19, wc.lit, .5, "2 4");
-}
-// a color mixed toward white (the foam is the water's lit color, whitened)
-function rigLighten(hex, t = .55){
-  const n = parseInt(hex.slice(1), 16), c = [n >> 16 & 255, n >> 8 & 255, n & 255].map(v => Math.round(v + (255 - v) * t));
-  return "#" + c.map(v => v.toString(16).padStart(2, "0")).join("");
 }
 function rigSvg(sp, h){
   const R = rigOf(sp), S = SPRITES[sp], w = h.r * 2.5 * (S.size || 1), k = w / R.w, ht = R.h * k;
@@ -99,7 +79,7 @@ function rigSvg(sp, h){
     + `<g class="rig-ghost" transform="${tf}" clip-path="url(#${id}b)" opacity=".3">${parts()}</g>`
     + `<g class="rig" transform="${tf}" clip-path="url(#${id}a)">${parts()}</g>`
     + `<g class="rig-wake" transform="${tf}" fill="none" shape-rendering="crispEdges" pointer-events="none"><path class="wk1" d="M${(R.w*.28).toFixed(1)} ${wl.toFixed(2)}H${(R.w*.98).toFixed(1)}" stroke="${wc.lit}" stroke-width="1" stroke-dasharray="6 3 2 4"/>`
-    + `<path class="wk2" d="M${(R.w*.3).toFixed(1)} ${(wl + 1).toFixed(2)}H${(R.w*.96).toFixed(1)}" stroke="${wc.dark}" stroke-width="1" stroke-opacity=".7" stroke-dasharray="3 5 7 3"/><g class="rig-foam" opacity="0" transform="translate(0 ${wl.toFixed(2)})">${rigFoam(R, wc)}</g></g></g>`;
+    + `<path class="wk2" d="M${(R.w*.3).toFixed(1)} ${(wl + 1).toFixed(2)}H${(R.w*.96).toFixed(1)}" stroke="${wc.dark}" stroke-width="1" stroke-opacity=".7" stroke-dasharray="3 5 7 3"/></g></g>`;
 }
 
 // one frame of motion: walking by how far it has gone, standing still it holds a calm stance and plays the idle clip once now and then, and resting plays once and holds (while one of those plays, g.lock is set and map.js leaves the animal alone until it's done); a change of mode eases over RIG_BLEND seconds
@@ -146,15 +126,8 @@ function rigStep(h, mode){
     g.wlk = Math.min(1, g.wlk + dt / RIG_BLEND); const wl = rigWl(R, g), id = h.cid;
     const ca = h.el.querySelector(`#${id}a rect`), cb = h.el.querySelector(`#${id}b rect`), w1 = h.el.querySelector(".wk1"), w2 = h.el.querySelector(".wk2");
     if(ca) ca.setAttribute("height", (wl + 20).toFixed(2)); if(cb) cb.setAttribute("y", wl.toFixed(2));
-    g.wk += ((mode === "swim" ? 1 : 0) - g.wk) * Math.min(1, dt * 5); g.drift += dt * (.25 + .75 * g.wk);   // the foam comes up as it swims and dies away as it floats; the ripples slide back faster the faster it goes
-    if(w1){ w1.setAttribute("d", w1.getAttribute("d").replace(/^(M[\d.]+ )[\d.-]+/, `$1${wl.toFixed(2)}`)); w1.setAttribute("stroke-dashoffset", (g.drift * 11 % 15).toFixed(1)); }
-    if(w2){ w2.setAttribute("d", w2.getAttribute("d").replace(/^(M[\d.]+ )[\d.-]+/, `$1${(wl + 1).toFixed(2)}`)); w2.setAttribute("stroke-dashoffset", (-g.drift * 8 % 18).toFixed(1)); }
-    const fm = h.el.querySelector(".rig-foam");
-    if(fm){
-      fm.setAttribute("transform", `translate(0 ${wl.toFixed(2)})`); fm.setAttribute("opacity", Math.min(1, g.wk * g.wlk).toFixed(2));
-      const s1 = fm.querySelector(".sp1"), s2 = fm.querySelector(".sp2"); if(s1) s1.setAttribute("opacity", Math.sin(now / 110) > -.2 ? 1 : 0); if(s2) s2.setAttribute("opacity", Math.sin(now / 150 + 2) > -.2 ? 1 : 0);   // the spray flickers
-      for(const [i, p] of [...fm.querySelectorAll("path")].entries()) p.setAttribute("stroke-dashoffset", ((i < 3 ? g.drift * 6 : -g.drift * 7) * (1 + i % 3 * .3) % 12).toFixed(1));
-    }
+    if(w1){ w1.setAttribute("d", w1.getAttribute("d").replace(/^(M[\d.]+ )[\d.-]+/, `$1${wl.toFixed(2)}`)); w1.setAttribute("stroke-dashoffset", (now / 90 % 15).toFixed(1)); }
+    if(w2){ w2.setAttribute("d", w2.getAttribute("d").replace(/^(M[\d.]+ )[\d.-]+/, `$1${(wl + 1).toFixed(2)}`)); w2.setAttribute("stroke-dashoffset", (-now / 130 % 18).toFixed(1)); }
   }
 }
 
