@@ -1481,6 +1481,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
       behaviorNight();
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
+      // midday naps: a fed plant eater lies down once in the nap hours for 30 to 80 minutes and stays down, none at night or outside the hours, and not every animal naps
+      const nx = {id:"bh3", name:"Nap", points:sq(200, 0, 80), animals:Array.from({length:20}, (_, i) => ({id:"bn" + i, sp:"plat"})), happy:70, cond:100, stock:{paleoflora:999, grass:999}};
+      state.exhibits = [nx]; state.day = 5; state.minute = 9 * 60; behaviorNight();
+      let before = 0, longest = {}; const napped = new Set();
+      for(let t = 9 * 60; t < 22 * 60; t += BEHAVIOR.step){
+        state.minute = t; for(const a of nx.animals) a.need.hunger = 20, a.need.thirst = 15, a.need.stress = 10;
+        behaviorTick(BEHAVIOR.step);
+        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(t < BEHAVIOR.nap.from * 60 - 1) before++; }
+      }
+      const lens = Object.values(longest);
+      out.behaviorNap = napped.size >= 6 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, 8 * 60) === 0 && napLull(SPECIES_BY_ID.plat, 13 * 60) > 0 && napLull(SPECIES_BY_ID.ornw, 13 * 60) === 0;
       // diet toys: a shank thrills a meat eater and bores a plant eater; hay feeds plant eaters; treats run out, frozen ones faster in a heat wave
       {
         const T = SPECIES_BY_ID.trex, H = SPECIES_BY_ID.tric, m = SPECIES_BY_ID.mamm;
@@ -1629,6 +1640,23 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const still = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
       for(let i = 0; i < 80; i++) step("idle");
       out.rigRestHold = R.clips.rest.dense.length === 15 && held && still && rg.mode === "idle" && !last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
+      // standing still holds the idle clip's first frame; the clip plays when the animal stops (by chance) or after a while of standing, and once it starts it finishes (lock) and goes back to holding
+      const f2 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f2.el.innerHTML = rigSvg("plat", f2);
+      const g2 = f2.rg, base = R.clips.idle.dense[0], near = v => base.every((b, i) => Math.abs(b - v[i]) < 1e-3), tick2 = (f = f2) => { f.rg.last = performance.now() - 100; rigStep(f, "idle"); }, keepChance = RIG_IDLE.chance;
+      RIG_IDLE.chance = 0; for(let i = 0; i < 20; i++) tick2();
+      const holds = near(g2.cur) && g2.idleT >= 1 && !g2.lock;
+      g2.gap = 0; tick2(); const started = g2.lock && g2.idleT < 1;
+      f2.act = "rest"; let locked = 0, moved = 0; for(let i = 0; i < 30; i++){ tick2(); if(g2.lock) locked++; if(!near(g2.cur)) moved++; }
+      const done = !g2.lock && near(g2.cur) && g2.idleT >= 1;
+      // stopping can start it at once, and eating never does
+      RIG_IDLE.chance = 1; const f3 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f3.el.innerHTML = rigSvg("plat", f3); tick2(f3);
+      const atStop = f3.rg.lock; f3.rg.mode = "walk"; f3.rg.idleT = 1; f3.rg.lock = false; f3.act = "eat"; tick2(f3);
+      RIG_IDLE.chance = keepChance;
+      out.rigIdleHold = holds && started && locked > 10 && locked < 30 && moved > 10 && done && atStop && !f3.rg.lock;
+      // lying down finishes before it lets go
+      const f4 = {r:3, sp:"plat", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f4.el.innerHTML = rigSvg("plat", f4);
+      const rs = () => { f4.rg.last = performance.now() - 100; rigStep(f4, "rest"); }; rs(); const lockedRest = f4.rg.lock; for(let i = 0; i < 80; i++) rs();
+      out.rigRestLock = lockedRest && !f4.rg.lock;
       // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});

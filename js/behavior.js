@@ -42,6 +42,18 @@ function awake(s, min = state.minute){
   // diurnal: a nap in the heat of a hot afternoon
   return state.weather && state.weather.today === "hot" && h >= 12 && h < 15 ? .55 : 1;
 }
+// How ready an awake animal is for a nap: 0 outside midday, up to 1 halfway through the nap hours, more in a heat wave
+function napLull(s, min = state.minute){
+  const h = min / 60, N = BEHAVIOR.nap;
+  if(awake(s, min) <= .7 || h < N.from || h >= N.to) return 0;
+  return Math.min(1, Math.sin(Math.PI * (h - N.from) / (N.to - N.from)) * (state.weather && state.weather.today === "hot" ? N.hot : 1));
+}
+// a steady 0 to 1 for an animal at this step, so the same park gives the same naps (and tests don't wobble)
+function napRoll(a, k, daily){
+  let x = 0; for(const c of String(a.id) + "|" + state.day + "|" + (daily ? "" : state.minute) + "|" + k) x = (x * 31 + c.charCodeAt(0)) >>> 0;
+  x ^= x >>> 15; x = Math.imul(x, 0x2c1b3c6d) >>> 0; x ^= x >>> 12;
+  return (x >>> 0) / 4294967296;
+}
 // Meat, fish and bug eaters hunt their food; plant eaters forage
 const isHunter = s => ["meat", "fish", "insects"].includes(foodType(s));
 
@@ -129,6 +141,16 @@ function stressTarget(e, a, s, ctx, why){
 function pickAct(e, a, s, ctx){
   const n = needsOf(a), T = traitsOf(s), B = BEHAVIOR, aw = awake(s), food = foodOk(e, s, ctx);
   const mates = (ctx.counts.get(s.id) || 1) - 1, want = matesWanted(s), floor = thirstFloor(s, ctx), cur = a.act, since = a.actFor || 0;
+  // a midday nap, like a second idle: now and then a settled animal lies down for a spell on most days, once a day, and stays down (it heads for shelter or trees: actGoal)
+  if(cur === "rest" && a.napFor){
+    if(since < a.napFor && n.hunger < 92 && n.thirst < 92 && n.stress < 50) return "rest";
+    a.napFor = 0;
+  }
+  const lull = napLull(s);
+  if(lull > 0 && cur !== "rest" && a.napDay !== state.day && napRoll(a, 3, true) < B.nap.share && n.hunger < 55 && n.thirst < floor + 45 && n.stress < 35 && napRoll(a, 1) < B.nap.chance * lull){
+    a.napDay = state.day; a.napFor = Math.round((B.nap.min + napRoll(a, 2) * (B.nap.max - B.nap.min)) / B.step) * B.step;
+    return "rest";
+  }
   // finish what it started, unless the need is met
   const met = {eat:n.hunger < 8, forage:n.hunger < 8, hunt:false, drink:n.thirst <= floor + 3, social:n.lonely < 8, play:n.bored < 8, hide:n.stress < 20, rest:aw > .7};
   if(cur && since < B.minAct && !met[cur] && cur !== "pace") return cur;
