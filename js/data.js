@@ -1449,6 +1449,10 @@ const PLANT_SPRITES = {
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
 const ROCK_MPP = .13;
 const ROCK_SPRITES = {
+  desert:{
+    boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
+    rock:[[43, 31], [33, 32], [32, 39], [31, 29], [34, 32], [40, 29]],
+  },
   scrubland:{
     boulder:[[68, 66], [37, 59], [74, 62], [57, 63]],
     rock:[[44, 30], [33, 31], [31, 38], [29, 29], [33, 31], [38, 38]],
