@@ -1640,6 +1640,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const still = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
       for(let i = 0; i < 80; i++) step("idle");
       out.rigRestHold = R.clips.rest.dense.length === 15 && held && still && rg.mode === "idle" && !last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
+      // standing still holds the idle clip's first frame, plays the clip once every so often, and goes back to holding
+      const f2 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f2.el.innerHTML = rigSvg("plat", f2);
+      const g2 = f2.rg, base = R.clips.idle.dense[0], near = v => base.every((b, i) => Math.abs(b - v[i]) < 1e-3), tick2 = () => { g2.last = performance.now() - 100; rigStep(f2, "idle"); };
+      g2.gap = 99; for(let i = 0; i < 20; i++) tick2();
+      const holds = near(g2.cur) && g2.idleT >= 1;
+      g2.gap = 0; let moved = 0; for(let i = 0; i < 30; i++){ tick2(); if(!near(g2.cur)) moved++; }
+      for(let i = 0; i < 6; i++) tick2();
+      f2.act = "eat"; g2.gap = 0; for(let i = 0; i < 10; i++) tick2();
+      out.rigIdleHold = holds && moved > 10 && near(g2.cur) && g2.idleT >= 1 && g2.gap === 0;
       // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
