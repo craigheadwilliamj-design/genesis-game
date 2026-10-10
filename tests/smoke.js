@@ -1662,13 +1662,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
       out.rigToggle = offOk && !!rigOf("plat") && spriteSvg("plat", {r:3, face:1}).includes('class="rig"') && viv.includes("sprites/plat.png") && !viv.includes('class="rig"') && localStorage.getItem("genesis-rigs") === "1";
 
-      // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) shows its swim strip, not the rig lying on the water, and goes back to the rig on the bank
-      const nap = {id:"e-nap", name:"Nap", animals:[{id:"nap1", sp:"prio", act:"rest"}], points:[[0,0],[60,0],[60,40],[0,40]], cond:100, water:[{id:"w-nap", points:[[5,5],[55,5],[55,35],[5,35]]}]};
+      // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) is drawn in the water (its rig clipped at the waterline, a ghost below, ripples on it), not lying on top of it, and goes back to a plain rig on the bank
+      const RS = rigOf("prio");
+      out.rigSwimData = !!RS && rigSwims("prio") && RS.clips.swim.wl > 30 && RS.clips.swim.dense.length === 8 && RS.clips.swim.fps === 6;
+      const nap = {id:"e-nap", name:"Nap", animals:[{id:"nap1", sp:"prio", act:"rest"}], points:[[0,0],[60,0],[60,40],[0,40]], cond:100, biome:"wetland", water:[{id:"w-nap", points:[[5,5],[55,5],[55,35],[5,35]]}]};
       state.exhibits.push(nap); syncAnimals();
-      const nh = herd.get("nap1"); nh.x = 30; nh.y = 20; nh.wait = 99; nh.placed = true; animateAnimals(.05);
-      const inWater = !!nh.swim && !nh.el.querySelector(".rig") && !!nh.el.querySelector(".wk");
+      const nh = herd.get("nap1"); nh.x = 30; nh.y = 20; nh.wait = 99; nh.placed = true; animateAnimals(.05); nh.rg.last = performance.now() - 100; animateAnimals(.05);
+      const inWater = !!nh.swim && !!nh.el.querySelector(".rig") && !!nh.el.querySelector(".rig-ghost") && !!nh.el.querySelector(".rig-wake") && !nh.el.querySelector(".wk") && nh.rg.mode === "float";
+      const ghostParts = nh.el.querySelectorAll(".rig-ghost image").length === RS.parts.length && nh.el.querySelectorAll(".rig image").length === RS.parts.length;
+      for(let i = 0; i < 12; i++){ nh.rg.last = performance.now() - 100; animateAnimals(.05); }   // it sinks to the waterline over the blend time
+      const rect = nh.el.querySelector("#" + nh.cid + "a rect"), sunk = rect && Math.abs(+rect.getAttribute("height") - (RS.clips.swim.wl + 20)) < .01;
       nh.x = 2; nh.y = 20; animateAnimals(.05);
-      out.rigSwimNap = inWater && !nh.swim && !!nh.el.querySelector(".rig") && !nh.el.querySelector(".wk");
+      out.rigSwimNap = inWater && ghostParts && !!sunk && !nh.swim && !!nh.el.querySelector(".rig") && !nh.el.querySelector(".rig-ghost") && !nh.el.querySelector(".wk");
+      // with rigs off a swimmer keeps its swim strip
+      setRigs(false); const swStrip = spriteSvg("prio", {r:3, face:1, swim:true}); setRigs(true);
+      out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
     return out;
