@@ -1,6 +1,6 @@
 # Draws the desert Park Plants (Mesquite, Sagebrush, Prickly Pear, Agave) in the Dimetrodon's flat, simple style (helpers copied from tools/pixelplants_desert_ceno.py, because -I scripts can't import each other).
-# These are the tidy garden versions of the landscape plants, with a touch of the PARK_PLANTS accent color: a neat rounded mesquite with golden catkins, a silver sagebrush mound with yellow spikes,
-# broad prickly pear paddles with big pink blossoms, and a compact agave with cream-edged blades. Sprites are sprites/plants/q-<name>.png.
+# These are the tidy garden versions of the landscape plants, with a touch of the PARK_PLANTS accent color: a neat rounded mesquite with golden catkins, a silver sagebrush mound of overlapping tufts with yellow plumes,
+# broad prickly pear paddles (each shaded against the ones it overlaps) with big pink blossoms, and a compact agave with cream-edged blades. Sprites are sprites/plants/q-<name>.png.
 # Usage: python3 -I tools/pixelplants_desert_park.py [outdir]
 import sys, math
 from PIL import Image
@@ -188,26 +188,38 @@ def q_mesquite():   # medium: a neat rounded mesquite shrub, a short forked trun
     for cx, cy in ((-18, 24), (-4, 32), (10, 30), (22, 24), (4, 22)): sp.line(bx + cx, by - cy, bx + cx + 1, by - cy + 5, "bloom"); sp.put(bx + cx, by - cy - 1, "bloomhi")
     return sp
 
-def q_sagebrush():   # small: a rounded silver-green mound of small wedge leaves, upright pale yellow flower spikes
-    sp = Sprite(48, 40, (0, 0, 0)); g = (150, 166, 142); sp.C.update(leaf=g, leafhi=mix(g, (255, 255, 255), .25), leaflo=mix(g, (0, 0, 0), .3), rib=mix(g, (255, 255, 255), .5)); bloom(sp, (226, 212, 120)); bx, by = 24, 38
-    for x in range(bx - 4, bx + 5): sp.put(x, by + 1, "stem")
-    for cx, cy, rx, ry in ((bx, by - 10, 17, 9), (bx - 10, by - 12, 9, 7), (bx + 10, by - 12, 9, 7), (bx, by - 17, 11, 7)): sp.fill(cx, cy, rx, ry, "leaf")
-    for k in range(30):   # tiny wedge leaves: short dark ticks in rows over the mound
-        x = bx - 16 + (k * 7) % 33; y = by - 20 + (k * 5) % 17
-        if sp.get(x, y) == "leaf": sp.put(x, y, "leaflo"); sp.put(x + 1, y + 1, "leaflo")
-    for x0, L in ((-12, 16), (-5, 20), (2, 22), (9, 19), (15, 14)):
-        sp.line(bx + x0, by - 18, bx + x0 + (1 if x0 > 0 else -1), by - 18 - L, "leaf")
-        for k in range(0, L, 3): sp.fill(bx + x0 + (1 if x0 > 0 else -1) * k / L * 2, by - 18 - L + k, 1.0, 1.4, "bloom")
-    return sp
-
-def q_prickly_pear():   # small: broad rounded paddles in a clump, big pink blossoms on the rims
-    sp = Sprite(48, 44, (0, 0, 0)); sp.C.update(leaf=CACTUS, leafhi=mix(CACTUS, (255, 255, 255), .22), leaflo=mix(CACTUS, (0, 0, 0), .32), rib=(232, 226, 190)); bloom(sp, (226, 80, 122)); bx, by = 24, 42
-    pads = ((bx - 1, by - 9, 12, 8.5), (bx - 12, by - 22, 8.5, 7.5), (bx + 11, by - 21, 9, 8), (bx - 3, by - 28, 8, 7))
-    for cx, cy, rx, ry in pads: sp.fill(cx, cy, rx, ry, "leaf")
-    for cx, cy, rx, ry in pads:
+def pad(sp, cx, cy, rx, ry, spines=True):
+    # one paddle, laid over what is already drawn: it casts a dark shadow down and right onto the paddles behind it and has a lit rim on its top-left edge where it overlaps them
+    inside = lambda x, y: ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1
+    area = [(x, y) for y in range(int(cy - ry) - 1, int(cy + ry) + 2) for x in range(int(cx - rx) - 1, int(cx + rx) + 2) if inside(x, y)]
+    for x, y in area:   # the shadow: this paddle's shape shifted 2 right and 2 down, only where a paddle is already drawn
+        for dx, dy in ((2, 2), (3, 2), (2, 3), (3, 3)):
+            if not inside(x + dx, y + dy) and sp.get(x + dx, y + dy) in ("leaf", "leafhi", "leaflo"): sp.put(x + dx, y + dy, "leaflo")
+    behind = {(x, y) for x, y in area if sp.get(x, y) in ("leaf", "leafhi", "leaflo")}
+    for x, y in area: sp.put(x, y, "leaf")
+    for x, y in area:   # the lit rim along the top and left edge of this paddle, where it covers another
+        if (x, y) in behind and (not inside(x - 1, y) or not inside(x, y - 1)): sp.put(x, y, "leafhi")
+    if spines:
         for k in range(-int(rx) + 3, int(rx) - 2, 4):
             for j in (-1, 1): sp.put(cx + k + (j > 0) * 2, cy + j * ry * .45, "rib")
-    for cx, cy in ((bx - 12, by - 31), (bx + 12, by - 30), (bx - 3, by - 36), (bx + 1, by - 17)):
+
+def q_sagebrush():   # small: a low rounded mound of overlapping silver-green tufts (each shaded against the ones behind), a few woody stems at the base, slim yellow flower plumes poking up
+    sp = Sprite(48, 40, (0, 0, 0)); g = (146, 164, 138); sp.C.update(leaf=g, leafhi=mix(g, (255, 255, 255), .28), leaflo=mix(g, (0, 0, 0), .24)); bloom(sp, (228, 212, 112)); bx, by = 24, 37
+    for x0 in (-8, -3, 2, 7): sp.line(bx + x0, by + 1, bx + x0, by - 3, "stem")   # woody stems, hidden behind the tufts but for their feet
+    for x in range(bx - 14, bx + 15): sp.put(x, by + 1, "leaflo") if abs(x - bx) % 3 else None   # a dashed shadow under the mound
+    tufts = ((-6, 22, 5.5, 4.5), (4, 21, 5.5, 4.5), (-12, 25, 5.5, 4.5), (11, 25, 5.5, 4.5), (-16, 29, 5, 4), (16, 29, 5, 4), (-8, 29, 6, 5), (3, 29, 6.5, 5), (-2, 33, 6, 5), (-13, 33, 5.5, 4.5), (13, 33, 5.5, 4.5), (-6, 36, 6, 4.5), (5, 36, 6, 4.5), (0, 36, 5, 4))   # (dx, height of the centre above the ground, rx, ry), back (high) to front (low)
+    for dx, h, rx, ry in tufts: pad(sp, bx + dx, by - h + 17, rx, ry, spines=False)
+    for tx, th in ((-11, 31), (-3, 36), (5, 35), (13, 30)):   # flower plumes rising from the top of the mound
+        lean = 1 if tx > 0 else -1; x0, y0 = bx + tx, by - th + 17
+        sp.line(x0, y0, x0 + lean, y0 - 7, "leaf")
+        for k in range(4): sp.fill(x0 + lean * (k * .3) + (k % 2 - .5), y0 - 2 - k * 1.7, 1.1, 1.0, "bloom")
+    return sp
+
+def q_prickly_pear():   # small: broad rounded paddles that overlap, each casting a shadow on the ones behind; big pink blossoms on the rims
+    sp = Sprite(48, 44, (0, 0, 0)); sp.C.update(leaf=CACTUS, leafhi=mix(CACTUS, (255, 255, 255), .3), leaflo=mix(CACTUS, (0, 0, 0), .4), rib=(232, 226, 190)); bloom(sp, (226, 80, 122)); bx, by = 24, 42
+    for cx, cy, rx, ry in ((bx - 2, by - 28, 8.5, 7.5), (bx - 11, by - 21, 8.5, 7.5), (bx + 11, by - 20, 9, 8), (bx, by - 9, 13, 9.5)):   # back to front: the top paddle, the two side ones, the big base one in front
+        pad(sp, cx, cy, rx, ry)
+    for cx, cy in ((bx - 2, by - 36), (bx - 12, by - 29), (bx + 12, by - 28), (bx + 1, by - 17)):
         sp.fill(cx, cy, 2.6, 2.0, "bloom"); sp.put(cx - 1, cy - 1, "bloomhi"); sp.put(cx + 1, cy + 1, "bloomlo"); sp.put(cx, cy, "seed")
     return sp
 
