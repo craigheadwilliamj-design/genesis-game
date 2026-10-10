@@ -5,7 +5,7 @@
 # to a rib, so a shaded project is marked ("shaded") and this refuses to run on it again: shade a fresh flat one (gen-walk.js makes it and runs this itself).
 # Order: node tools/rigger/dimetrodon/gen-walk.js (it shades), then rigtogame.py:
 #     python3 tools/pixeldime_rig_shade.py [PROJECT.json]
-#     python3 tools/rigtogame.py tools/rigger/dimetrodon/dimetrodon.json dime --walk walk --idle idle
+#     python3 tools/rigtogame.py tools/rigger/dimetrodon/dimetrodon.json dime --walk walk --idle idle --rest rest
 import sys, os, io, json, base64
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
