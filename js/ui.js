@@ -217,7 +217,7 @@ function exhibitHtml(e){
     if(cur === "electric") h += `<div class="row" style="margin-top:6px"><span class="status ${e.powered === false ? "no" : "ok"}">${e.powered === false ? "No power" : "Powered"}</span><span class="meta">Draws ${Math.round(fenceDraw(e))} kW. Park supply ${Math.round(powerSupply())} of ${Math.round(powerDemand())} kW needed.${generators().length ? "" : " Build a generator."}</span></div>`;
     const kc = knownCond(e), since = daysSinceInspect(e);
     h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(kc, kc >= 60 ? "var(--good)" : kc >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(kc)}%</span></div>`;
-    h += `<div class="meta">${isBreached(e) ? "<b style='color:var(--bad)'>Broken.</b> Animals can walk out until a mechanic repairs it. " : ""}${since >= 99 ? "Never inspected." : since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago${since >= MAINT.inspectEvery ? ", overdue" : ""}.`} Wears about ${wearPerDay(e).toFixed(1)}% a day${wearPerDay(e) > barrierOf(e).wear + .01 ? ", partly from animals attacking it" : ""}.</div>`;
+    h += `<div class="meta">${e.open ? "<b style='color:var(--bad)'>There's a gap in the fence.</b> Animals can walk out until you close it. " : isBreached(e) ? "<b style='color:var(--bad)'>Broken.</b> Animals can walk out until a mechanic repairs it. " : ""}${since >= 99 ? "Never inspected." : since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago${since >= MAINT.inspectEvery ? ", overdue" : ""}.`} Wears about ${wearPerDay(e).toFixed(1)}% a day${wearPerDay(e) > barrierOf(e).wear + .01 ? ", partly from animals attacking it" : ""}.</div>`;
     h += `<div class="meta" style="margin-top:4px">${cur === "concrete" ? "Concrete hides the animals, so guests enjoy this exhibit much less. A viewing platform fixes that." : cur === "acrylic" ? "Guests love seeing through acrylic." : ""} Changing walls has no refund.</div>`;
     h += `<div class="row" style="margin-top:8px">`;
     h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
@@ -856,7 +856,7 @@ panelEl.addEventListener("change", ev => {
   const e = selItem(), key = ev.target.value; if(!e) return;
   const b = BARRIERS[key], cost = upgradeCost(e, key);
   if((b.tech && !hasTech(b.tech)) || !canAfford(cost)){ ui.toast(!canAfford(cost) ? `That costs ${money(cost)}.` : "Research it at ORACLE first.", "bad"); ui.panel(); return; }
-  spend(cost, "built"); e.barrier = key;
+  spend(cost, "built"); if(e.grid) refenceExhibit(e, key); else e.barrier = key;
   ui.toast(`${e.name} now has ${b.label.toLowerCase()}${cost ? ` (${money(cost)})` : ""}.`);
   afterChange(); render();
 });

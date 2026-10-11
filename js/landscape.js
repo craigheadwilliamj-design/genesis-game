@@ -21,6 +21,8 @@ const waterOf = e => e.water || [];
 const decorOf = () => state.decor || [];
 const parkWater = () => state.water || [];
 const fenceLines = () => state.fences || [];
+// Every fence out in the park that isn't an exhibit's: the old fence lines plus loose grid fence (js/fences.js), as {points, barrier}
+const parkFences = () => fenceLines().concat(looseRuns().map(r => ({points:r.pts, barrier:r.b})));
 const parkBiome = () => BIOMES[state.biome] ? state.biome : DEFAULT_PARK_BIOME;
 // Distance from a point to an open line, and whether two open lines cross or how close they come
 const lineDist = (x, y, line) => { let m = Infinity; for(let i = 1; i < line.length; i++) m = Math.min(m, segProj(x, y, line[i-1], line[i]).d); return line.length === 1 ? Math.hypot(x - line[0][0], y - line[0][1]) : m; };
@@ -268,7 +270,7 @@ function parkWaterProblem(pts, skip, cost){
   if(state.buildings.some(b => shapesOverlap(pts, b.points) || shapesOverlap(b.points, pts))) return "It runs into a building.";
   if(state.paths.some(p => !isBridge(p) && lineShapeDist(p.points, pts) < halfWidth(p))) return "It runs into a path. Only a wooden bridge can cross water.";
   if(parkWater().some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
-  if(fenceLines().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
+  if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .6))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(inPoly(state.gate[0], state.gate[1], pts) || distToEdge(state.gate[0], state.gate[1], pts) < 9) return "Keep clear of the entrance.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -287,14 +289,14 @@ const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(
 function shapeHitsLandscape(pts){
   if(parkWater().some(w => shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts))) return "It's in the water.";
   if(decorOf().some(f => LAND[f.type] && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .8))) return "It runs into a plant, rock or statue. Bulldoze it first.";
-  if(fenceLines().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
+  if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   return null;
 }
 // For a path hw meters either side of its line. Only a bridge crosses water.
 function lineHitsLandscape(pts, hw, bridge){
   if(!bridge && parkWater().some(w => lineShapeDist(pts, w.points) < hw)) return "Paths can't cross water. Draw a wooden bridge over it.";
   if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, pts) < hw + footR(LAND[f.type]) * .5)) return "It runs into a plant, rock or statue. Bulldoze it first.";
-  if(fenceLines().some(l => linesCross(l.points, pts) || lineLineDist(l.points, pts) < hw - .3)) return "It runs into a fence.";
+  if(parkFences().some(l => linesCross(l.points, pts) || lineLineDist(l.points, pts) < hw - .3)) return "It runs into a fence.";
   return null;
 }
 
@@ -334,7 +336,7 @@ function decorPts(f){
 function indexDecor(nodes){
   const items = decorOf().filter(f => LAND[f.type]).map(f => ({x:f.x, y:f.y, r:0, v:decorPts(f), st:LAND[f.type].statue ? f.id : null}));
   for(const w of parkWater()){ const [x, y] = centroid(w.points), a = area(w.points); items.push({x, y, r:Math.sqrt(a / Math.PI), v:a / DECOR.waterPer}); }
-  for(const l of fenceLines()){
+  for(const l of parkFences()){
     if(!(BARRIERS[l.barrier] || {}).hedge) continue;
     for(let i = 1; i < l.points.length; i++){
       const a = l.points[i-1], b = l.points[i], n = Math.max(1, Math.round(dist(a, b) / 10));
@@ -447,7 +449,7 @@ function decorProblem(key, x, y){
   if(state.buildings.some(b => inPoly(x, y, b.points) || distToEdge(x, y, b.points) < r * .8)) return "It overlaps a building.";
   if(state.paths.some(p => lineDist(x, y, p.points) < halfWidth(p) + r * .5)) return "It's on a path.";
   if(Math.hypot(x - state.gate[0], y - state.gate[1]) < r + 9) return "Keep clear of the entrance.";
-  if(fenceLines().some(l => lineDist(x, y, l.points) < r * .8)) return "It's on a fence.";
+  if(parkFences().some(l => lineDist(x, y, l.points) < r * .8)) return "It's on a fence.";
   if(decorOf().some(f => LAND[f.type] && Math.hypot(f.x - x, f.y - y) < r + footR(LAND[f.type]))) return "It overlaps something already there.";
   const wet = parkWater().find(w => inPoly(x, y, w.points) || distToEdge(x, y, w.points) < r * .6);
   if(t.aquatic && !parkWater().some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Draw a pond first, then place it in the water.`;

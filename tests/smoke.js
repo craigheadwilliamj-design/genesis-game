@@ -1072,7 +1072,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // park landscaping: plants, rocks, statues and water out in the park, open fences and hedge rows, wooden bridges, and guests who enjoy them
     {
-      const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, money:state.money, tech:state.science.tech.slice(), done:state.goalsDone.slice(), zones:state.zones};
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, money:state.money, tech:state.science.tech.slice(), done:state.goalsDone.slice(), zones:state.zones};
       state.exhibits = []; state.buildings = []; state.zones = []; state.decor = []; state.water = []; state.fences = []; state.money = 1e6;
       state.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-l", points:[[205,235],[100,235]]}];
       recompute();
@@ -1097,7 +1097,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.parkWaterOk = waterHost(pond) === null && waterProblem(pond, null, null, waterCost(pond)) === null;
       addWater(null, pond);
       out.parkWaterBlocksPath = /bridge/.test(pathProblem([[100,235],[75,235],[75,170]]) || "") && pathProblem([[100,235],[75,235],[75,170]], "bridge") === null && pathCost([[0,0],[10,0]], "bridge") === 10 * BRIDGE.perMeter;
-      out.parkWaterBlocksBuilding = /water/.test(shapeHitsLandscape(rectPts(75, 190, 6, 6, 0)) || "") && !!exhibitProblem([[50,170],[100,170],[100,215],[50,215]]);
+      out.parkWaterBlocksBuilding = /water/.test(shapeHitsLandscape(rectPts(75, 190, 6, 6, 0)) || "") && /water/.test(planPieces(pieceLine([50,190],[100,190]).keys, "wood").why || "");
       out.lilyNeedsWater = /only grows in water/.test(landSpot(110, 150, "q-water-lily").why || "") && landSpot(75, 190, "q-water-lily").ok && landSpot(75, 190, "q-cattails").ok && !landSpot(75, 190, "q-white-oak").ok;
       // open fences and hedge rows
       const hedgeLine = [[110,250],[180,250]];
@@ -1105,13 +1105,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const m0 = state.money, hl = addFenceLine(hedgeLine, "hedge");
       out.fenceOpenBuilt = state.fences.length === 1 && state.money === m0 - fenceLineCost(hedgeLine, "hedge") && refundFor("fence", hl) === Math.round(fenceLineCost(hedgeLine, "hedge") * COST.refundShare);
       out.fenceBlocksPath = !!pathProblem([[150,235],[150,270]]);
-      // the fence tool leaves a fence open when you tap the last corner again, and still closes exhibits (on the park's own biome)
+      // the fence tool lays loose fence on the grid, and a closed loop of it becomes an exhibit (on the park's own biome)
       state.biome = "desert";
-      fenceSel = "hedge"; setTool("exhibit"); draw.pts = [[110,270],[180,270]]; finishFence();
-      out.fenceToolOpen = state.fences.length === 2 && state.fences[1].barrier === "hedge" && tool === "exhibit";
-      draw.pts = [[230,150],[280,150],[280,200],[230,200]]; finishDraw();
+      fenceSel = "hedge"; setTool("exhibit");
+      const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
+      out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
+      for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       const ne = state.exhibits[state.exhibits.length - 1];
-      out.fenceToolCloses = !!ne && ne.barrier === "hedge" && biomeOf(ne) === "desert";
+      out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
       // guests enjoy the gardens and read the plaques
       recompute(); buildGuestGraph(); render();
@@ -1121,13 +1122,65 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.statueTeaches = pa.edu - e0 === DECOR.personLearn && pa.mood > mood0;
       out.decorDraws = world.innerHTML.includes("sprites/plants/q-white-oak.png") && world.innerHTML.includes('data-kind="fence"') && world.innerHTML.includes("#9C6B33") && world.innerHTML.includes("url(#p-desert)");
       removeItem("land", oak); removeItem("water", state.water[0]); removeItem("fence", hl);
-      out.decorBulldoze = state.decor.length === 1 && state.water.length === 0 && state.fences.length === 1;
+      out.decorBulldoze = state.decor.length === 1 && state.water.length === 0 && state.fences.length === 0;
       // old saves get grassland and empty lists
       const ob = JSON.parse(JSON.stringify(newPark())); delete ob.biome; delete ob.decor; delete ob.water; delete ob.fences; upgradeSave(ob);
       out.parkBiomeOldSave = ob.biome === DEFAULT_PARK_BIOME && Array.isArray(ob.decor) && Array.isArray(ob.water) && Array.isArray(ob.fences);
       state.biome = DEFAULT_PARK_BIOME;
-      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, money:keep.money, zones:keep.zones});
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
       state.science.tech = keep.tech; state.goalsDone = keep.done; recompute(); buildGuestGraph(); render();
+    }
+
+    // fence on the grid: pieces a meter long, loops become exhibits, gaps breach them, walls split and merge them
+    {
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, money:state.money, tech:state.science.tech.slice(), zones:state.zones};
+      Object.assign(state, {exhibits:[], buildings:[], decor:[], water:[], fences:[], fenceGrid:{}, money:1e6, zones:[]});
+      const L = (a, b, t = "wood") => layPieces(pieceLine(a, b).keys, t), box = (x0, y0, x1, y1, t) => { L([x0,y0],[x1,y0],t); L([x1,y0],[x1,y1],t); L([x1,y1],[x0,y1],t); L([x0,y1],[x0,y0],t); };
+      out.fencePieceLine = pieceLine([0,0],[5,0]).keys.length === 5 && pieceLine([0,0],[3,3]).keys.every(k => k.endsWith(",d")) && pieceLine([0,0],[-3,3]).keys.every(k => k.endsWith(",a"));
+      const m0 = state.money; L([240,100],[260,100]);
+      out.fencePieceCost = Object.keys(state.fenceGrid).length === 20 && state.money === m0 - 20 * fenceRate("wood") && state.exhibits.length === 0;
+      L([260,100],[260,115]); L([260,115],[240,115]); L([240,115],[240,100]);
+      const ge = state.exhibits[0];
+      out.fenceLoopExhibit = state.exhibits.length === 1 && ge.grid && area(ge.points) === 300 && ge.points.length === 4 && !ge.open;
+      const gsp = SPECIES.find(x => !x.viv); ge.animals.push({id:"a-g1", sp:gsp.id, age:1, q:1});
+      // a wall across splits it; the animals stay in the bigger part
+      L([250,100],[250,115]);
+      out.fenceSplit = state.exhibits.length === 2 && state.exhibits.every(e => area(e.points) === 150) && ge.animals.length === 1;
+      // lifting the wall merges them back
+      liftPieces(pieceLine([250,100],[250,115]).keys);
+      out.fenceMerge = state.exhibits.length === 1 && state.exhibits[0] === ge && area(ge.points) === 300 && ge.animals.length === 1;
+      // a gap breaches it until it's closed again
+      liftPieces(["245,115,h"]);
+      out.fenceGap = !!ge.open && isBreached(ge) && effectiveStrength(ge) === 0 && /gap/.test(escapeRisk(ge, gsp) || "") && looseRuns().length > 0;
+      L([245,115],[246,115]);
+      out.fenceClosedAgain = !ge.open && !isBreached(ge) && area(ge.points) === 300;
+      // mixed fence: the weakest piece is what holds, and the panel's picker refences it all
+      sc.tech.push("bars", "concrete"); L([240,100],[250,100], "concrete");
+      out.fenceWeakest = ge.barrier === undefined && ge.points.length === 5;
+      refenceExhibit(ge, "concrete");
+      out.fenceRefence = ge.barrier === "concrete" && ge.points.length === 4;
+      // diagonal pens; diagonals can't cross; paths, nested pens and fenced-in paths are refused
+      L([280,100],[286,106]); L([286,106],[280,112]); L([280,112],[274,106]); L([274,106],[280,100]);
+      const de = state.exhibits.find(e => e !== ge);
+      out.fenceDiagonal = !!de && area(de.points) === 72 && de.points.length === 4;
+      out.fenceNoCross = /cross/.test(planPieces(["290,100,d", "290,100,a"], "wood").why || "") && /path/.test(planPieces(pieceLine([200,240],[210,240]).keys, "wood").why || "");
+      out.fenceNoNest = /share a wall/.test(planPieces([...pieceLine([244,104],[247,104]).keys, ...pieceLine([247,104],[247,107]).keys, ...pieceLine([247,107],[244,107]).keys, ...pieceLine([244,107],[244,104]).keys], "wood").why || "");
+      state.paths = state.paths.concat([{id:"p-fz", name:"Path", points:[[322,120],[326,120]]}]);
+      out.fenceNoPathInside = /fence in a path/.test(planPieces([...pieceLine([310,110],[340,110]).keys, ...pieceLine([340,110],[340,130]).keys, ...pieceLine([340,130],[310,130]).keys, ...pieceLine([310,130],[310,110]).keys], "wood").why || "");
+      // a small loop is just a pen, not an exhibit
+      L([300,100],[305,100]); L([305,100],[305,105]); L([305,105],[300,105]); L([300,105],[300,100]);
+      out.fenceSmallPen = state.exhibits.length === 2;
+      // bulldozing an exhibit lifts the fence it doesn't share, and refunds it
+      const before = Object.keys(state.fenceGrid).length, r = refundFor("exhibit", de);
+      const mb = state.money; removeItem("exhibit", de);
+      out.fenceBulldoze = Object.keys(state.fenceGrid).length === before - 24 && state.money === mb + r && r > 0 && !state.exhibits.includes(de);
+      // the move tool leaves grid exhibits alone; saves keep the pieces
+      out.fenceNoMove = moveTarget({kind:"exhibit", id:ge.id}) === null;
+      const ob = JSON.parse(JSON.stringify(state)); delete ob.fenceGrid;
+      out.fenceSave = Object.keys(upgradeSave(ob).fenceGrid).length === 0 && Object.keys(upgradeSave(JSON.parse(JSON.stringify(state))).fenceGrid).length === Object.keys(state.fenceGrid).length;
+      render(); out.fenceDraws = !!world.querySelector(`[data-id="${ge.id}"]`);
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
+      state.science.tech = keep.tech; setTool("select"); recompute(); buildGuestGraph(); render();
     }
 
     // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier

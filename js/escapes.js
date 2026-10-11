@@ -15,7 +15,7 @@ const nowAbs = () => state.day * 1440 + state.minute;
 function freshSafety(){ return {deaths:0, escapesFrom:1, loose:[]}; }
 
 function barrierOf(e){ return BARRIERS[e.barrier || "wood"]; }
-function isBreached(e){ return !e.viv && condOf(e) <= 0; }
+function isBreached(e){ return !e.viv && (condOf(e) <= 0 || !!e.open); }
 
 // The weakest barrier the animal needs, for advice
 function barrierNeeded(s){
@@ -29,6 +29,7 @@ function escapeRisk(e, s){
   if(e.viv) return null;
   if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out. It needs aviary netting.`;
   if(e.moat) return null;
+  if(e.open) return `There's a gap in the fence. ${s.name} can walk right out until it's closed.`;
   const b = barrierOf(e), str = escapeStrength(s);
   if(str > b.strength) return `${s.name} can break through ${b.label.toLowerCase()} (strength ${b.strength}, it needs ${str}). Use ${barrierNeeded(s)} or a moat.`;
   if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return `The electric fence has no power, so it's just wire. ${s.name} can push through. Build or repair generators.`;
