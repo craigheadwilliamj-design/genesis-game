@@ -11,7 +11,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | wetland | done | done | 27/27 | 6/6 | done |
 | scrubland | done | done | 24/24 | none exist | done |
 | desert | done | done | 27/27 | 4/4 | done |
-| tropical | done | done | 18/27 (Devonian to Cretaceous) | 6/6 | done |
+| tropical | done | done | 27/27 | 6/6 | done |
 | temperate | done | done | 27/27 | 7/7 | done |
 | boreal | to do | to do | 0/18 (Permian on) | 0/2 | to do |
 | grassland | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
