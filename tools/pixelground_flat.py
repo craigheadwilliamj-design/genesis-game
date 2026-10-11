@@ -194,9 +194,9 @@ def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
     # short rows of leaf litter, a few diagonal twigs (a lit pixel up-left of each shaded one), and a few damp pebbles. No grass, flowers or modern plants, so it suits any era from the Devonian on.
     rnd = random.Random(seed); px = {}
     def put(x, y, c): px[(x % size, y % size)] = c
-    deep = mix(base, (10, 50, 35), .35); humus = mix(base, (105, 68, 38), .55); brown2 = mix(base, (140, 92, 48), .6); damp = mix(base, BLACK, .14); lush = mix(base, (110, 190, 100), .16)
+    deep = mix(base, (10, 50, 35), .35); humus = mix(base, (105, 68, 38), .55); brown2 = mix(base, (140, 92, 48), .6); night = mix(base, (3, 24, 12), .8); night2 = mix(base, (6, 34, 18), .6); damp = mix(base, BLACK, .14); lush = mix(base, (110, 190, 100), .16)
     litter = mix(base, (165, 100, 48), .7); leafs = [mix(base, (170, 110, 50), .75), mix(base, (130, 80, 40), .7), mix(base, (190, 140, 60), .6), mix(base, (95, 62, 36), .6)]; dash = mix(base, BLACK, .3); lit = mix(base, (190, 220, 130), .35)
-    fleck_h = mix(base, (140, 90, 45), .7); fleck_d = mix(base, BLACK, .26); fleck_l = mix(base, (170, 225, 120), .38)
+    fleck_h = mix(base, (140, 90, 45), .7); fleck_d = mix(base, (3, 24, 12), .75); fleck_l = mix(base, (170, 225, 120), .38)
     g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
     def vn(x, y):
         v = 0
@@ -208,7 +208,7 @@ def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
     for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise
         for bx in range(0, size, 2):
             n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
-            c = brown2 if n > .86 else humus if n > .62 else deep if n > .54 else lush if n < .24 else damp if n < .32 else None
+            c = brown2 if n > .86 else humus if n > .62 else night if n > .58 else deep if n > .54 else night2 if n < .17 else lush if n < .24 else damp if n < .32 else None
             if c:
                 for dy in range(2):
                     for dx in range(2): put(bx + dx, by + dy, c)
