@@ -78,12 +78,12 @@ def broken():
     s = Sec(); post(s, cap=False)
     # post: cap sheared off, rusted at the foot
     s.put(0, 1, S["lo"]); s.put(1, 3, S["deep"]); s.put(0, 6, R["mid"]); s.put(1, 7, R["lo"])
-    for y in range(12, H - 2): s.put(1, y, R["lo"])
-    for y in (14, 17): s.put(0, y, R["mid"])
+    for y in range(14, H - 2): s.put(1, y, R["lo"])
+    for y in (17,): s.put(0, y, R["mid"])
     s.put(0, 15, R["hi"])
     # the end bars next to the post stay up, torn off short
-    for y in range(4, 18): s.put(4, y, S["mid"] if y % 4 else R["mid"])
-    for y in range(3, 18): s.put(20, y, S["mid"] if y % 4 else R["mid"])
+    for y in range(4, 18): s.put(4, y, R["mid"] if y in (9, 16) else S["mid"])
+    for y in range(3, 18): s.put(20, y, R["mid"] if y in (7, 14) else S["mid"])
     s.put(4, 4, S["hi"]); s.put(5, 3, S["lo"]); s.put(20, 3, S["hi"]); s.put(19, 2, S["lo"])
     # top rail: torn off in the middle, each end hanging from its bar and drooping toward the ground
     for x in (2, 3, 4, 5): s.put(x, TOP, S["hi"]); s.put(x, TOP + 1, S["lo"])
@@ -91,14 +91,14 @@ def broken():
     for x in (19, 20, 21, 22): s.put(x, TOP + 1, S["hi"]); s.put(x, TOP + 2, S["lo"])
     s.put(18, TOP + 2, R["lo"]); s.put(17, TOP + 3, R["mid"]); s.put(17, TOP + 4, R["deep"]); s.put(18, TOP + 3, R["deep"])
     # bottom rail: kept at the ends, bent down and out through the middle
-    for x in (2, 3, 4, 5): s.put(x, BOT, R["mid"] if x % 2 else S["hi"]); s.put(x, BOT + 1, S["lo"])
-    for x in (18, 19, 20, 21, 22): s.put(x, BOT, R["mid"] if x % 2 else S["hi"]); s.put(x, BOT + 1, S["lo"])
+    for x in (2, 3, 4, 5): s.put(x, BOT, R["mid"] if x == 3 else S["hi"]); s.put(x, BOT + 1, S["lo"])
+    for x in (18, 19, 20, 21, 22): s.put(x, BOT, R["mid"] if x == 21 else S["hi"]); s.put(x, BOT + 1, S["lo"])
     # the heap: bars and rails trodden flat into the dirt across the gap, a few ends sticking up, rust on the broken edges
     for x in range(6, 18): s.put(x, 19, S["deep"])
     for x, y in ((6, 16), (7, 17), (8, 16), (9, 17), (10, 15), (11, 16), (12, 17), (13, 16), (14, 15), (15, 16), (16, 17), (17, 16)): s.put(x, y, S["hi"])
     for x, y in ((6, 17), (7, 18), (8, 17), (9, 18), (10, 16), (11, 17), (12, 18), (13, 17), (14, 16), (15, 17), (16, 18), (17, 17)): s.put(x, y, S["lo"])
-    for x, y in ((8, 18), (11, 18), (13, 18), (16, 19), (6, 18), (15, 18)): s.put(x, y, R["mid"])
-    for x, y in ((9, 16), (12, 16), (7, 16), (15, 15), (10, 17), (14, 17)): s.put(x, y, R["mid"] if (x + y) % 2 else R["lo"])
+    for x, y in ((8, 18), (13, 18), (16, 19)): s.put(x, y, R["mid"])
+    for x, y in ((9, 16), (12, 16), (14, 17)): s.put(x, y, R["mid"] if (x + y) % 2 else R["lo"])
     for x, y in ((10, 14), (14, 14), (7, 15)): s.put(x, y, S["hi"])
     s.put(10, 15, R["lo"]); s.put(14, 15, R["lo"])
     return s
