@@ -66,30 +66,27 @@ def degrading():
     return s
 
 def broken():
-    s = base(post_cap=False); S = STEEL; R = RUST
-    # post: snapped cap leaves a ragged top, steel mostly kept, rust only at the foot and in a few flakes
-    s.put(0, 1, S["lo"]); s.clear(1, 1); s.put(1, 2, S["deep"])
-    for y in range(12, H - 2): s.put(1, y, R["lo"])
-    for y in (14, 16): s.put(0, y, R["mid"])
-    s.put(0, 15, R["hi"]); s.put(0, 7, R["mid"]); s.put(1, 8, R["lo"])
-    s.put(2, H - 2, R["deep"]); s.clear(2, H - 1)
-    # left bar snapped off at the middle: a short stub above the top rail, then a gap, then the lower half with a torn end
-    for y in range(4, 9): s.clear(3, y)
-    s.put(3, 9, R["lo"]); s.put(3, 10, S["mid"]); s.put(3, 12, R["mid"]); s.put(3, 15, R["mid"])
-    # right bar bent out of line: pushed over a pixel through the middle, and a gap where it has sheared at the top
-    for y in range(1, 4): s.clear(6, y)
-    s.put(6, 4, R["lo"])
-    for y in (7, 8, 9, 10): s.clear(6, y); s.put(7, y, S["lo"])
-    s.put(7, 7, S["mid"]); s.put(7, 10, R["mid"]); s.put(6, 11, R["lo"]); s.put(6, 5, S["mid"]); s.put(6, 6, S["mid"])
-    s.put(6, 14, R["mid"]); s.put(6, 17, R["mid"])
-    # top rail: torn through the middle, the right end drooping on its last bar
-    for x in (4, 5): s.clear(x, 2); s.clear(x, 3)
-    s.put(4, 3, R["lo"]); s.put(4, 4, R["deep"])
-    s.put(3, 2, R["mid"]); s.put(3, 3, R["lo"])
-    for x in (6, 7): s.clear(x, 2); s.clear(x, 3)
-    s.put(6, 4, S["hi"]); s.put(7, 4, S["hi"]); s.put(6, 5, S["lo"]); s.put(7, 5, R["lo"])
-    # bottom rail: bent down at the right and eaten through at one pixel
-    s.put(7, 15, R["mid"]); s.put(7, 16, R["lo"]); s.clear(5, 15); s.put(5, 16, R["deep"]); s.put(4, 16, R["mid"])
+    # a hole an animal went through, or a fence left at 0%: the section is open from the post to the next one, bars trampled flat
+    S = STEEL; R = RUST; s = Sec()
+    # post still stands, cap sheared off and leaning bits rusted; its right side is torn where the rails ripped out
+    for y in range(2, H): s.put(0, y, S["hi"]); s.put(1, y, S["lo"])
+    s.put(0, 1, S["lo"]); s.put(1, 3, S["deep"]); s.put(0, 6, R["mid"]); s.put(1, 7, R["lo"])
+    for y in (12, 13, 14, 15, 16): s.put(1, y, R["lo"])
+    s.put(0, 14, R["mid"]); s.put(0, 15, R["hi"]); s.put(0, 17, R["mid"])
+    for x in (0, 1, 2): s.put(x, H - 2, S["mid"]); s.put(x, H - 1, S["deep"])
+    s.put(2, H - 2, R["lo"])
+    # top rail ripped off the post and hanging by its end, drooping down the post's side
+    s.put(2, 2, S["hi"]); s.put(3, 2, S["hi"]); s.put(2, 3, S["lo"]); s.put(3, 3, R["lo"]); s.put(3, 4, R["deep"]); s.put(2, 4, R["mid"]); s.put(2, 5, R["lo"])
+    # snapped bar stubs standing out of the ground, ends jagged
+    s.put(3, 13, R["lo"]); s.put(3, 14, S["mid"]); s.put(3, 15, R["mid"]); s.put(3, 16, S["lo"]); s.put(3, 17, S["lo"])
+    s.put(6, 15, S["mid"]); s.put(6, 16, R["mid"]); s.put(6, 17, S["lo"])
+    # bottom rail bent down and out and lying across the gap, with a bar folded flat beside it
+    for x, y in ((4, 16), (5, 17), (6, 18), (7, 18)): s.put(x, y, S["lo"])
+    s.put(4, 15, S["hi"]); s.put(5, 16, R["mid"]); s.put(6, 17, S["hi"]); s.put(7, 17, R["lo"])
+    for x, y in ((4, 18), (5, 18)): s.put(x, y, R["deep"])
+    s.put(7, 19, S["deep"]); s.put(5, 19, S["deep"])
+    # the far end of the rail, torn off at the next post's side, and a bent bar tip sticking out of the heap
+    s.put(7, 14, S["hi"]); s.put(7, 15, R["mid"]); s.put(7, 16, R["lo"])
     return s
 
 if __name__ == "__main__":
