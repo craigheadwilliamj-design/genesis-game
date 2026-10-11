@@ -188,7 +188,7 @@ def desert_tile(base, size, seed, flecks, ripples, pebbles, chips):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
-JUNGLE = hexc("#2F7549")   # BIOMES.tropical.color in data.js, and its park color too: one floor for exhibits and the park
+JUNGLE = hexc("#17692F")   # BIOMES.tropical.color in data.js, and its park color too: one floor for exhibits and the park
 def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
     # Humid forest floor built from small, low-contrast details so the repeat is hidden: a faint two-scale wash of deep wet green and rich red-brown humus, lots of 1 to 3 px flecks,
     # short rows of leaf litter, a few diagonal twigs (a lit pixel up-left of each shaded one), and a few damp pebbles. No grass, flowers or modern plants, so it suits any era from the Devonian on.
