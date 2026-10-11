@@ -188,15 +188,15 @@ def desert_tile(base, size, seed, flecks, ripples, pebbles, chips):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
-JUNGLE = hexc("#4C9A5A")   # BIOMES.tropical.color in data.js, and its park color too: one floor for exhibits and the park
+JUNGLE = hexc("#2F7549")   # BIOMES.tropical.color in data.js, and its park color too: one floor for exhibits and the park
 def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
     # Humid forest floor built from small, low-contrast details so the repeat is hidden: a faint two-scale wash of deep wet green and rich red-brown humus, lots of 1 to 3 px flecks,
     # short rows of leaf litter, a few diagonal twigs (a lit pixel up-left of each shaded one), and a few damp pebbles. No grass, flowers or modern plants, so it suits any era from the Devonian on.
     rnd = random.Random(seed); px = {}
     def put(x, y, c): px[(x % size, y % size)] = c
-    deep = mix(base, (20, 80, 50), .3); humus = mix(base, (110, 70, 40), .3); damp = mix(base, BLACK, .14); lush = mix(base, (110, 190, 100), .16)
-    litter = mix(base, (150, 90, 45), .55); dash = mix(base, BLACK, .3); lit = mix(base, (190, 220, 130), .35)
-    fleck_h = mix(base, (110, 70, 40), .5); fleck_d = mix(base, BLACK, .26); fleck_l = mix(base, (170, 225, 120), .38)
+    deep = mix(base, (10, 50, 35), .35); humus = mix(base, (105, 68, 38), .55); brown2 = mix(base, (140, 92, 48), .6); damp = mix(base, BLACK, .14); lush = mix(base, (110, 190, 100), .16)
+    litter = mix(base, (165, 100, 48), .7); leafs = [mix(base, (170, 110, 50), .75), mix(base, (130, 80, 40), .7), mix(base, (190, 140, 60), .6), mix(base, (95, 62, 36), .6)]; dash = mix(base, BLACK, .3); lit = mix(base, (190, 220, 130), .35)
+    fleck_h = mix(base, (140, 90, 45), .7); fleck_d = mix(base, BLACK, .26); fleck_l = mix(base, (170, 225, 120), .38)
     g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
     def vn(x, y):
         v = 0
@@ -208,7 +208,7 @@ def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
     for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise
         for bx in range(0, size, 2):
             n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
-            c = humus if n > .72 else deep if n > .64 else lush if n < .28 else damp if n < .34 else None
+            c = brown2 if n > .86 else humus if n > .62 else deep if n > .54 else lush if n < .24 else damp if n < .32 else None
             if c:
                 for dy in range(2):
                     for dx in range(2): put(bx + dx, by + dy, c)
@@ -221,6 +221,9 @@ def tropical_tile(base, size, seed, flecks, dashes, twigs, pebbles):
         x = rnd.randrange(size); y = rnd.randrange(size // 3) * 3 + rnd.choice((0, 1)); n = rnd.randint(2, 4); c = litter if rnd.random() < .6 else dash
         for i in range(n): put(x + i, y, c)
         if n > 2 and c == litter: put(x, y, mix(litter, WHITE, .2))
+    for _ in range(dashes // 2):   # fallen brown leaves: 3 x 2 px lens, lit top row, shaded bottom, in several browns
+        x, y = rnd.randrange(size), rnd.randrange(size); c = rnd.choice(leafs); lo = mix(c, BLACK, .3); hi = mix(c, WHITE, .2)
+        put(x + 1, y, hi); put(x + 2, y, c); put(x, y + 1, c); put(x + 1, y + 1, lo); put(x + 2, y + 1, lo)
     for _ in range(twigs):   # fallen twigs: 3 to 4 px on the down-right diagonal, shaded, with a lit top-left pixel
         x, y = rnd.randrange(size), rnd.randrange(size); n = rnd.randint(3, 4)
         for i in range(n): put(x + i, y + i, dash)
@@ -243,5 +246,5 @@ im = temperate_tile(LOAM, 144, 7, 520, 80, 22)   # 18 m, under both exhibits (#b
 im.save(f"{out}/temperate.png"); print("temperate", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
 im = desert_tile(SANDY, 144, 5, 520, 70, 14, 10)   # 18 m, under both exhibits (#b-desert) and the park (#p-desert)
 im.save(f"{out}/desert.png"); print("desert", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
-im = tropical_tile(JUNGLE, 144, 9, 560, 90, 14, 12)   # 18 m, under both exhibits (#b-tropical) and the park (#p-tropical)
+im = tropical_tile(JUNGLE, 144, 9, 560, 110, 14, 12)   # 18 m, under both exhibits (#b-tropical) and the park (#p-tropical)
 im.save(f"{out}/tropical.png"); print("tropical", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
