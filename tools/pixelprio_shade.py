@@ -86,5 +86,6 @@ def process(path):
             assert out.getpixel((x, y))[3] == im.getpixel((x, y))[3], "the shape changed"
     out.save(path); print(path, f"{changed} of {total} pixels shaded ({100 * changed // max(total, 1)}%)")
 
-d = sys.argv[1] if len(sys.argv) > 1 else "sprites"
-for f in ("prio", "prio-walk", "prio-idle", "prio-swim"): process(f"{d}/{f}.png")
+if __name__ == "__main__":   # (tools/pixelprio_rig_shade.py imports the rules from here)
+    d = sys.argv[1] if len(sys.argv) > 1 else "sprites"
+    for f in ("prio", "prio-walk", "prio-idle", "prio-swim"): process(f"{d}/{f}.png")

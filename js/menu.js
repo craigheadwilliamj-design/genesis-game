@@ -175,7 +175,6 @@ const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in wat
 function buildMenu(){
   const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.map(menuRow).join("")}</div></section>`).join("");
   const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>
-    <button class="srow" id="gridBtn" aria-pressed="false" title="Snap corners and buildings to a 1 m grid (G). Hold Alt to place freely.">${menuIcon("grid")}<span class="tl"><b>Grid snapping</b><span class="price">Off. Press G</span></span></button>
     <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
   $("#sideMenu").innerHTML = `<div class="sidebar-top"><button class="sidetab" id="sideTab" aria-expanded="false" aria-controls="sideBody">${menuIcon("path").replace("ticon", "ticon tab")}<span class="tl"><b>Build</b></span></button>
     <button class="sidetab sel" data-tool="select" aria-pressed="true" title="Look around and pick things (Esc)">${menuIcon("select")}<span class="tl"><b>Select</b></span></button>

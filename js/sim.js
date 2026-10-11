@@ -122,7 +122,7 @@ function newPark(){
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
-    exhibits:[], decor:[], water:[], fences:[],
+    exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
@@ -135,6 +135,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(!s.fenceGrid) s.fenceGrid = {};
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }
@@ -534,6 +535,7 @@ function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "ser
 // An open fence line: the fence alone, by the meter
 const fenceLineCost = (pts, barrier) => Math.round(lineLength(pts) * fenceRate(barrier || "wood"));
 function refundFor(kind, item){
+  if(kind === "exhibit" && item.grid) return Math.round((area(item.points) * COST.landPerSqM + ownPieceCost(item)) * COST.refundShare) + landRefund(item);
   if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);

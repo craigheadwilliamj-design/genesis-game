@@ -16,7 +16,7 @@ function daysSinceInspect(e){ return e.inspected ? state.day - e.inspected.day :
 
 // A worn fence holds less. A broken one holds nothing.
 function effectiveStrength(e){
-  const c = condOf(e);
+  const c = e.open ? 0 : condOf(e);
   return c <= 0 ? 0 : baseStrength(e) * (.4 + .6 * c / 100);
 }
 

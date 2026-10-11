@@ -391,7 +391,7 @@ const PERIOD_COLOR = {
 // walk is how many frames sprites/<id>-walk.png has, side by side, each the same size as the standing picture.
 // idle is how many frames sprites/<id>-idle.png has (same strip format) and ms how long each shows. A picture with both walks on the walk strip and plays idle while it holds still;
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
-const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ratio:100/75, walk:6, step:.15, size:1.4}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:2, ms:600}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04}};
+const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ratio:100/75, walk:6, step:.15, size:1.4}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:2, ms:600}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
 const STARTER_POOLS = {
@@ -829,6 +829,11 @@ const BARRIERS = {
   acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
   concrete: {label:"Concrete wall",     strength:140, perMeter:90,  view:.45,  tech:"concrete", color:"#9A958C"},
 };
+
+// Fence laid piece by piece on the 1 m grid (js/fences.js)
+//   minArea     smallest fenced-off region that becomes an exhibit (m²)
+//   keepShare   an exhibit keeps a region holding at least this share of its old ground
+const FENCE_GRID = {minArea:60, keepShare:.25};
 
 // What a new fence costs to build, per meter: the base fence plus the barrier's own cost
 const fenceRate = key => COST.fencePerMeter + BARRIERS[key].perMeter;
