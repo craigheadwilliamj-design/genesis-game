@@ -41,8 +41,6 @@ const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes
 let fenceSel = "wood";             // fence type the next exhibit is built with
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
-let gridSnap = false;
-try{ gridSnap = localStorage.getItem("genesis-grid-snap") === "1"; }catch{}
 const isDrawTool = t => t === "exhibit" || t === "path" || t === "service" || t === "wide" || t === "tram" || t === "bridge" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
@@ -119,16 +117,14 @@ function render(){
   const pb = parkBiome();
   s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/><path d="${rd}" fill="var(--ground-shade)"/>`;
 
-  // grid: 10 m squares, darker every 50 m. With grid snap on and room to see them, 5 m squares.
-  if(k > 1.2 || gridSnap){
-    const st = gridSnap && k > 7 ? GRID_STEP : gridSnap && k > 2.5 ? 5 : 10;
-    let dMin = "", dMaj = "";
-    // zoomed in on the 1 m grid, every 5 m line is the darker one
-    const maj = st === 1 ? 5 : 50;
-    for(let x = Math.floor(b.x0/st)*st; x <= b.x1; x += st){ const d = `M${x} ${b.y0}V${b.y1}`; if(x % maj === 0) dMaj += d; else dMin += d; }
-    for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
-    s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
-  }
+  // grid: 10 m squares, darker every 50 m. Closer in, 5 m squares, then the 1 m snap grid.
+  const st = k > 7 ? GRID_STEP : k > 2.5 ? 5 : 10;
+  let dMin = "", dMaj = "";
+  // zoomed in on the 1 m grid, every 5 m line is the darker one
+  const maj = st === 1 ? 5 : 50;
+  for(let x = Math.floor(b.x0/st)*st; x <= b.x1; x += st){ const d = `M${x} ${b.y0}V${b.y1}`; if(x % maj === 0) dMaj += d; else dMin += d; }
+  for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
+  s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   const bd = ownedEdges().map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
   s += `<path d="${bd}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
 
@@ -1432,9 +1428,8 @@ function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx -
 
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
-  if(ev && ev.altKey) return {x:p.x, y:p.y, info:null};
   // water stays clear of fences and paths, so it only snaps to the grid
-  if(draw && draw.kind === "water") return gridSnap ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}} : {x:p.x, y:p.y, info:null};
+  if(draw && draw.kind === "water") return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
   const R = 12 / view.k;
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
   // tram track only ever joins other tram track, and nothing else snaps to it
@@ -1456,23 +1451,12 @@ function snapAt(clientX, clientY, ev){
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
   if(draw && draw.kind === "exhibit") for(const l of fenceLines()) l.points.forEach(v => tryV(v, "fence", l.id));
   if(best) return best;
-  // with grid snap on, land on the nearest grid point (and still join a path if that point sits on one)
-  if(gridSnap){
-    const g = [Math.round(p.x / GRID_STEP) * GRID_STEP, Math.round(p.y / GRID_STEP) * GRID_STEP];
-    let info = {type:"grid"};
-    for(const q of snapPaths) for(let i = 1; i < q.points.length; i++)
-      if(segProj(g[0], g[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
-    return {x:g[0], y:g[1], info};
-  }
-  bd = R * .8;
-  const tryS = (pts, closed, kind, id) => {
-    const n = pts.length, segs = closed ? n : n-1;
-    for(let i = 0; i < segs; i++){ const r = segProj(p.x, p.y, pts[i], pts[(i+1) % n]); if(r.d < bd){ bd = r.d; best = {x:r.x, y:r.y, info:{type:"seg", kind, id}}; } }
-  };
-  for(const q of snapPaths) tryS(q.points, false, "path", q.id);
-  for(const q of state.exhibits) tryS(q.points, true, "exhibit", q.id);
-  for(const [a, c] of edges){ const r = segProj(p.x, p.y, a, c); if(r.d < bd){ bd = r.d; best = {x:r.x, y:r.y, info:{type:"seg", kind:"boundary", id:"boundary"}}; } }
-  return best || {x:p.x, y:p.y, info:null};
+  // otherwise land on the nearest grid point (and still join a path if that point sits on one)
+  const g = [Math.round(p.x / GRID_STEP) * GRID_STEP, Math.round(p.y / GRID_STEP) * GRID_STEP];
+  let info = {type:"grid"};
+  for(const q of snapPaths) for(let i = 1; i < q.points.length; i++)
+    if(segProj(g[0], g[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
+  return {x:g[0], y:g[1], info};
 }
 
 // When a new path lands in the middle of another path, add a shared corner there so they really join
@@ -1831,7 +1815,7 @@ function placeGhost(clientX, clientY){
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
-  if(best && gridSnap){
+  if(best){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
     const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
     best.x = r.x; best.y = r.y;
@@ -1851,7 +1835,7 @@ function placeGhost(clientX, clientY){
     angle = Math.atan2(dy, dx);
   } else if(t.onPath) why = why || "Move it next to a path.";
   angle += rot * Math.PI/4;
-  if(!best && gridSnap){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
+  if(!best){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
   const pts = rectPts(x, y, t.w, t.d, angle);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
@@ -2086,7 +2070,7 @@ function findPlatformSpot(clientX, clientY){
   let nx = -(b[1]-a[1])/L, ny = (b[0]-a[0])/L;
   if((cx - r.x)*nx + (cy - r.y)*ny < 0){ nx = -nx; ny = -ny; }   // point the deck into the exhibit
   let x = r.x, y = r.y;
-  if(gridSnap){ const g = segProj(Math.round(x/GRID_STEP)*GRID_STEP, Math.round(y/GRID_STEP)*GRID_STEP, a, b); x = g.x; y = g.y; }
+  const g = segProj(Math.round(x/GRID_STEP)*GRID_STEP, Math.round(y/GRID_STEP)*GRID_STEP, a, b); x = g.x; y = g.y;
   const off = t.d/2 - 1.5, pts = rectPts(x + nx*off, y + ny*off, t.w, t.d, ang);
   let why = null;
   if(!hasTech("platform")) why = "Research viewing platforms at ORACLE first.";
@@ -2117,7 +2101,7 @@ function platformTap(ev){
 /* ---------- rocks, groves and shelters ---------- */
 function landPoint(ev){
   const p = toWorld(ev.clientX, ev.clientY);
-  return gridSnap && !ev.altKey ? {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP} : p;
+  return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP};
 }
 function landHover(ev){
   const key = landKey(tool), p = landPoint(ev);
@@ -2229,9 +2213,8 @@ function startMove(it, kind, e){
     water:kind === "exhibit" ? waterOf(it).map(w => ({w, pts:w.points.map(p => p.slice())})) : []};
 }
 function dragMove(m, e){
-  const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
-  let dx = w.x - m.wx, dy = w.y - m.wy;
-  if(g){ dx = Math.round(dx / g) * g; dy = Math.round(dy / g) * g; }
+  const w = toWorld(e.clientX, e.clientY), g = GRID_STEP;
+  const dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
   moveBy(m, dx, dy);
   const why = moveProblem(m.kind, m.it);
   m.why = why; setStat(why || "Let go to drop it here.", !!why);
@@ -2420,8 +2403,8 @@ svg.addEventListener("pointermove", e => {
     const z = zedit && zoneById(zedit.id); if(!z) return;
     if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
     drag.moved = true;
-    const w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
-    z.points[drag.zv] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const w = toWorld(e.clientX, e.clientY), g = GRID_STEP;
+    z.points[drag.zv] = [Math.round(w.x / g) * g, Math.round(w.y / g) * g];
     const why = zoneProblem(z.points);
     setStat(why || `${fmtArea(area(z.points))}`, !!why);
     queueRender(); return;
@@ -2430,8 +2413,8 @@ svg.addEventListener("pointermove", e => {
   if(drag.rv){
     if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
     drag.moved = true;
-    const r = drag.rv, w = toWorld(e.clientX, e.clientY), g = gridSnap && !e.altKey ? GRID_STEP : 0;
-    r.t.points[r.i] = g ? [Math.round(w.x / g) * g, Math.round(w.y / g) * g] : [w.x, w.y];
+    const r = drag.rv, w = toWorld(e.clientX, e.clientY), g = GRID_STEP;
+    r.t.points[r.i] = [Math.round(w.x / g) * g, Math.round(w.y / g) * g];
     const why = rvProblem(r);
     setStat(why || rvStat(r), !!why);
     queueRender(); return;
@@ -2536,15 +2519,7 @@ $("#ztilt").onclick = () => {
   view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt); applyTransform(); render(); syncAnimals();
 };
 $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt);
-function setGridSnap(on){
-  gridSnap = on;
-  try{ localStorage.setItem("genesis-grid-snap", on ? "1" : "0"); }catch{}
-  const b = $("#gridBtn"); b.setAttribute("aria-pressed", on); b.querySelector(".price").textContent = on ? "On, 1 m. Press G" : "Off. Press G";
-  if(state) render();
-}
-$("#gridBtn").onclick = () => setGridSnap(!gridSnap);
 $("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Green farms, blue stores, gold exhibits" : "Off"; render(); };
-setGridSnap(gridSnap);
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;
 $("#dCancel").onclick = cancelTool;
@@ -2558,7 +2533,6 @@ document.addEventListener("keydown", e => {
   }
   if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sel) select(null); }
   if(e.key === " "){ e.preventDefault(); setSpeed(speed ? 0 : (lastSpeed || 1)); }
-  if(e.key.toLowerCase() === "g" && !e.ctrlKey && !e.metaKey){ setGridSnap(!gridSnap); if(draw){ updateDrawbar(); renderOverlay(); } }
   if(e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey){ if(isBuildTool(tool)) rotateTool(); else if(tool === "move" && mvSel) rotateMoved(); }
   if(e.key === "1") setSpeed(1);
   if(e.key === "2") setSpeed(2);
