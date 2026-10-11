@@ -1,3 +1,4 @@
+# (Rebuilt to be seen 3/4: each stone is rings of a rounded dome with a vertical front wall, so it shows a lit top and a shaded front like the other biomes, but with a smooth lopsided outline instead of stepped tiers.)
 # Draws the tropical rocks and boulders: sprites/rocks/{boulder,rock}-tropical-<n>.png, in the same flat style as tools/pixelrocks_flat.py but NOT built from stacked polygon tiers, which made every
 # stone look like a stepped cake. Each stone here is a rounded, lopsided lump: an outline from a few low harmonics (so every stone is its own shape), a flatter bottom, a domed height field with
 # smooth bumps, and flat tone bands cut from the light (top-left): top / hi / mid / lo / deep, no outline, no dithering. Structured detail only: rows of short dashes on the shaded bands, a few
@@ -6,7 +7,7 @@
 # Deterministic (fixed seeds). The script prints each picture's [width, height]: put them in ROCK_SPRITES.tropical in js/data.js in the same order.
 # Usage: python3 -I tools/pixelrocks_tropical.py [outdir]
 import sys, os, random, math
-from PIL import Image
+from PIL import Image, ImageDraw
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
 def ramp(base): return {"top": mix(base, (255, 255, 255), .3), "hi": mix(base, (255, 255, 255), .1), "mid": base, "lo": mix(base, (0, 0, 0), .22), "deep": mix(base, (0, 0, 0), .4)}
@@ -27,58 +28,99 @@ def noise2(rnd, size, g):   # smooth value noise, returns f(x, y) over a size[0]
         return a * (1 - ty) + b * ty
     return f
 
-def stone(seed, w, h, pal, lump=.16, squash=0., moss=0., cracks=0, pits=2, bumps=.1, lean=0.):
-    # w x h is the stone's size in pixels; lump how uneven the outline is; squash flattens the base; moss 0 to 1 how much of the up-facing side is moss; lean shifts the peak sideways (-1 to 1)
-    rnd = random.Random(seed); W, H = w + 8, h + 8; cx, cy = W / 2, H / 2 + 1
-    harm = [(k, lump / (k - 1) ** 1.1 * rnd.uniform(.5, 1.3), rnd.random() * 6.283) for k in range(2, 6)]
-    big = noise2(rnd, (W, H), 4); small = noise2(rnd, (W, H), 9); mossn = noise2(rnd, (W, H), 5)
-    hf = [[0.0] * W for _ in range(H)]; inside = [[False] * W for _ in range(H)]
-    for y in range(H):
-        for x in range(W):
-            dx = (x + .5 - cx) / (w / 2); dy = (y + .5 - cy) / (h / 2)
-            p = 2.0 if dy < 0 else 2.0 + 1.6 * (1 - squash * .3)   # a squarer, flatter base
-            r = (abs(dx) ** p + abs(dy) ** p) ** (1 / p); th = math.atan2(dy, dx)
-            R = 1 + sum(a * math.cos(k * th + ph) for k, a, ph in harm)
-            d = r / R
-            if d < 1:
-                inside[y][x] = True; t = max(0, 1 - d * d)
-                hf[y][x] = (t ** .55) * (1 + bumps * (big(x, y) - .5) * 4 + bumps * .6 * (small(x, y) - .5) * 4) + lean * dx * .25 * t
-    sc = h * .45   # height in pixels, so the slopes read
-    g = [[None] * W for _ in range(H)]; band = [[2] * W for _ in range(H)]
-    for y in range(H):
-        for x in range(W):
-            if not inside[y][x]: continue
-            hx0 = hf[y][x - 1] if x and inside[y][x - 1] else hf[y][x]; hx1 = hf[y][x + 1] if x < W - 1 and inside[y][x + 1] else hf[y][x]
-            hy0 = hf[y - 1][x] if y and inside[y - 1][x] else hf[y][x]; hy1 = hf[y + 1][x] if y < H - 1 and inside[y + 1][x] else hf[y][x]
-            gx, gy = (hx1 - hx0) / 2 * sc, (hy1 - hy0) / 2 * sc; nl = math.sqrt(gx * gx + gy * gy + 1); nx, ny, nz = -gx / nl, -gy / nl, 1 / nl
-            s = nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2]
-            k = 0 if s > .86 else 1 if s > .68 else 2 if s > .46 else 3 if s > .24 else 4
+K = .62   # ground depth to screen height, the 3/4 view (the same as tools/pixelrocks_flat.py)
+LT = (-.5, .3, .81); _l = math.sqrt(sum(c * c for c in LT)); LT = tuple(c / _l for c in LT)   # light in ground x, ground y (toward the viewer), up: top left, and a little from the front
+VIEW = (0, .62, .78)
+
+def stone(seed, w, d, H, pal, lump=.12, moss=0., cracks=0, pits=2, wob=.05, lean=0., m=12, n=36, rim=.0):
+    # A rounded, lopsided stone seen 3/4: w wide and d deep on the ground, H tall, built from m rings of a rounded dome (an outline of n points from a few low harmonics, each ring a little
+    # different so it is lumpy, and sliding sideways by lean) so it has a real front wall, a rounded shoulder and a lit top. lump: how uneven the outline is; wob: how much each ring drifts;
+    # moss: how much of the up-facing side is moss (0 to 1); rim: 0 to 1 lifts a vertical foot of wall (a flatter, blockier base).
+    rnd = random.Random(seed)
+    harm = [(k, lump / (k - 1) ** 1.1 * rnd.uniform(.6, 1.3), rnd.random() * 6.283) for k in range(2, 6)]
+    drift = [(k, wob / (k - 1) * rnd.uniform(.5, 1.2), rnd.random() * 6.283, rnd.uniform(-.5, .5)) for k in range(2, 5)]
+    chip = [(k, .028 * rnd.uniform(.6, 1.2), rnd.random() * 6.283, rnd.uniform(1.5, 4)) for k in range(6, 10)]   # small lumps and notches that shift with height
+    ang = [i * 6.283 / n for i in range(n)]
+    def ring(s, t):   # t 0 (rim) to 1 (top): the outline at scale s, drifting with height
+        pts = []
+        for a in ang:
+            R = 1 + sum(c * math.cos(k * a + ph) for k, c, ph in harm) + t * sum(c * math.cos(k * a + ph + sh * 3) for k, c, ph, sh in drift) + sum(c * math.cos(k * a + ph + t * sh) for k, c, ph, sh in chip)
+            pts.append((math.cos(a) * w / 2 * R * s + lean * t * w * .22, math.sin(a) * d / 2 * R * s))
+        return pts
+    prof = []   # (scale, height, tilt of the surface from vertical) per ring, a quarter ellipse with a short vertical foot
+    foot = rim * H * .18
+    for j in range(m + 1):
+        ph = j / m * math.pi / 2; prof.append((math.cos(ph) ** 1.15, foot + (H - foot) * math.sin(ph) ** .5, ph))
+    rings = [ring(sc, j / m) for j, (sc, z, ph) in enumerate(prof)]
+    allp = [(x, y, z) for pts, (sc, z, ph) in zip(rings, prof) for x, y in pts]
+    minx, maxx = min(p[0] for p in allp), max(p[0] for p in allp); front = max(p[1] for p in allp) * K; top = min(p[1] * K - p[2] for p in allp)
+    W, Ht = int(math.ceil(maxx - minx)) + 8, int(math.ceil(front - top + foot)) + 8; ox, oy = 4 - minx, Ht - 4 - front
+    sx = lambda x: x + ox; sy = lambda y, z: y * K - z + oy
+    big = noise2(rnd, (W, Ht), 5); mossn = noise2(rnd, (W, Ht), 6)
+    g = [[None] * W for _ in range(Ht)]; band = [[2] * W for _ in range(Ht)]
+    def mask(poly):
+        im = Image.new("L", (W, Ht), 0); ImageDraw.Draw(im).polygon(poly, fill=255); return im.load()
+    def paint(poly, k, P):
+        mk = mask(poly); xs = [p[0] for p in poly]; ys = [p[1] for p in poly]
+        for y in range(max(0, int(min(ys))), min(Ht, int(max(ys)) + 1)):
+            for x in range(max(0, int(min(xs))), min(W, int(max(xs)) + 1)):
+                if mk[x, y]: g[y][x] = P[KEYS[k]]; band[y][x] = k
+    if foot:   # the vertical foot first: a wall from the ground up to the first ring
+        pass
+    cxm = 0; cym = 0
+    for j in range(m):
+        (s0, z0, p0), (s1, z1, p1) = prof[j], prof[j + 1]; pm = (p0 + p1) / 2; A, B = rings[j], rings[j + 1]
+        quads = []
+        for i in range(n):
+            i2 = (i + 1) % n; mx = (A[i][0] + A[i2][0]) / 2; my = (A[i][1] + A[i2][1]) / 2
+            ex, ey = A[i2][0] - A[i][0], A[i2][1] - A[i][1]; dl = math.hypot(ex, ey) or 1; nx, ny = ey / dl, -ex / dl
+            if nx * mx + ny * my < 0: nx, ny = -nx, -ny
+            c, sn = math.cos(pm) ** .6, math.sin(pm) ** 1.6   # a steeper shoulder than a sphere
+            nv = math.sqrt((nx * c) ** 2 + (ny * c) ** 2 + sn * sn); N = (nx * c / nv, ny * c / nv, sn / nv)
+            if N[0] * VIEW[0] + N[1] * VIEW[1] + N[2] * VIEW[2] <= 0: continue   # turned away from the viewer
+            lit = N[0] * LT[0] + N[1] * LT[1] + N[2] * LT[2]
+            quads.append((my, i, lit))
+        for my, i, lit in sorted(quads):
+            i2 = (i + 1) % n
+            q = [(sx(A[i][0]), sy(A[i][1], z0)), (sx(A[i2][0]), sy(A[i2][1], z0)), (sx(B[i2][0]), sy(B[i2][1], z1)), (sx(B[i][0]), sy(B[i][1], z1))]
+            k = 0 if lit > .76 else 1 if lit > .56 else 2 if lit > .26 else 3 if lit > -.05 else 4
+            qx = sum(p[0] for p in q) / 4; qy = sum(p[1] for p in q) / 4
+            if k >= 1 and lit > .3: k = max(0, k - (1 if big(qx, qy) > .62 else 0)) if k > 1 else k   # blotches of lit stone
             P = pal
-            if moss and k <= 1 and mossn(x, y) + (cy - y) / H * .5 > 1 - moss: P = MOSS   # moss only on the up-facing side
-            g[y][x] = P[KEYS[k]]; band[y][x] = k
-            if k in (2, 3) and y % 4 == 2 and (x + (y // 4) * 3) % 7 < 3: g[y][x] = P[KEYS[k + 1]]   # rows of short dashes on the shaded bands
-    for _ in range(cracks):   # a crack: a short wandering line down from near the top
-        x = rnd.randint(W // 4, 3 * W // 4); y = int(H * rnd.uniform(.2, .4)); n = rnd.randint(h // 4, h // 2)
-        for _ in range(n):
-            if 0 <= y < H and 0 <= x < W and g[y][x] is not None and band[y][x] >= 2: g[y][x] = pal["deep"]
+            if moss and k <= 1 and j >= m * .6 and mossn(qx, qy) > .95 - moss * 1.2: P = MOSS   # moss only up on the shoulder and top
+            paint(q, k, P)
+    cap = [(sx(x), sy(y, prof[m][1])) for x, y in rings[m]]; paint(cap, 0, pal)   # the flat top
+    if moss:
+        mk = mask(cap)
+        for y in range(Ht):
+            for x in range(W):
+                if mk[x, y] and mossn(x, y) > .85 - moss * 1.2: g[y][x] = MOSS["top"] if mossn(x, y) > .8 else MOSS["hi"]
+    Ht_ = Ht
+    for y in range(Ht):   # rows of short dashes on the shaded bands
+        for x in range(W):
+            if g[y][x] is not None and band[y][x] in (2, 3) and y % 4 == 2 and (x + (y // 4) * 3) % 7 < 3: g[y][x] = pal[KEYS[band[y][x] + 1]] if g[y][x] in (pal["mid"], pal["lo"]) else g[y][x]
+    for _ in range(cracks):   # a crack: a short wandering line down the front
+        x = rnd.randint(W // 3, 2 * W // 3); y = int(Ht * rnd.uniform(.35, .5)); n_ = rnd.randint(Ht // 5, Ht // 3)
+        for _ in range(n_):
+            if 0 <= y < Ht and 0 <= x < W and g[y][x] is not None and band[y][x] >= 2: g[y][x] = pal["deep"]
             y += 1; x += rnd.choice((-1, 0, 0, 1))
     for _ in range(pits):   # pits: a dark pixel pair with a lit one above
-        x, y = rnd.randint(W // 5, 4 * W // 5), rnd.randint(H // 3, 3 * H // 4)
-        if 0 < y < H - 1 and x + 1 < W and g[y][x] is not None and g[y][x + 1] is not None and g[y - 1][x] is not None and band[y][x] in (2, 3):
+        x, y = rnd.randint(W // 5, 4 * W // 5), rnd.randint(Ht // 2, 3 * Ht // 4)
+        if 0 < y < Ht - 1 and x + 1 < W and g[y][x] is not None and g[y][x + 1] is not None and g[y - 1][x] is not None and band[y][x] in (2, 3):
             g[y][x] = pal["deep"]; g[y][x + 1] = pal["deep"]; g[y - 1][x] = pal["hi"]
-    for y in range(H):   # drop lone pixels
+    for y in range(Ht):   # drop lone pixels
         for x in range(W):
-            if g[y][x] is not None and sum(1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= x + dx < W and 0 <= y + dy < H and g[y + dy][x + dx] is not None) <= 1: g[y][x] = None
+            if g[y][x] is not None and sum(1 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= x + dx < W and 0 <= y + dy < Ht and g[y + dy][x + dx] is not None) <= 1: g[y][x] = None
     out = [r[:] for r in g]   # silhouette edge: lighter on the top and left, darker on the bottom and right
-    for y in range(H):
+    for y in range(Ht):
         for x in range(W):
             c = g[y][x]
             if c is None: continue
-            up = g[y - 1][x] if y else None; dn = g[y + 1][x] if y < H - 1 else None; lf = g[y][x - 1] if x else None; rt = g[y][x + 1] if x < W - 1 else None
+            up = g[y - 1][x] if y else None; dn = g[y + 1][x] if y < Ht - 1 else None; lf = g[y][x - 1] if x else None; rt = g[y][x + 1] if x < W - 1 else None
             if dn is None or (rt is None and y % 2 == 0): out[y][x] = mix(c, (0, 0, 0), .3)
             elif up is None or (lf is None and y % 2 == 0): out[y][x] = mix(c, (255, 255, 255), .16)
-    im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    for y in range(H):
+    im = Image.new("RGBA", (W, Ht), (0, 0, 0, 0))
+    for y in range(Ht):
         for x in range(W):
             if out[y][x]: im.putpixel((x, y), out[y][x] + (255,))
     return crop(im)
@@ -95,16 +137,16 @@ def cluster(parts):
 
 def shapes():
     S = {}
-    S["boulder-tropical-1"] = stone(301, 58, 48, RIVER, lump=0.15, squash=.5, moss=.55, cracks=1, bumps=.14, lean=-.6)                        # big lopsided river stone with a moss cap
-    S["boulder-tropical-2"] = stone(302, 38, 46, VOLCANIC, lump=0.20, squash=.2, cracks=2, bumps=.16, lean=.5)                              # tall knuckle of dark lava, leaning right
-    S["boulder-tropical-3"] = cluster([(stone(303, 46, 38, SLATE, lump=0.17, moss=.35, cracks=1, bumps=.14), 24, 44), (stone(304, 34, 30, TANNIN, lump=0.18, bumps=.12, lean=-.4), 0, 50)])   # two stones leaning together
-    S["boulder-tropical-4"] = stone(305, 64, 30, TANNIN, lump=0.17, squash=.8, moss=.4, cracks=1, bumps=.1, lean=.3)                        # low, wide, flattened boulder
-    S["rock-tropical-1"] = stone(311, 30, 22, RIVER, lump=0.18, squash=.4, bumps=.12, lean=-.3)
-    S["rock-tropical-2"] = stone(312, 24, 24, VOLCANIC, lump=0.21, bumps=.16, lean=.4, pits=1)
-    S["rock-tropical-3"] = stone(313, 34, 20, SLATE, lump=0.17, squash=.6, moss=.5, bumps=.1)
-    S["rock-tropical-4"] = stone(314, 22, 17, TANNIN, lump=0.22, bumps=.14, lean=-.5, pits=1)
-    S["rock-tropical-5"] = cluster([(stone(315, 22, 18, RIVER, lump=0.20, bumps=.12), 0, 24), (stone(316, 18, 14, VOLCANIC, lump=0.22, bumps=.12), 17, 24), (stone(317, 11, 9, TANNIN, lump=0.22, bumps=.1, pits=0), 11, 28)])   # a small scatter
-    S["rock-tropical-6"] = stone(318, 28, 26, SLATE, lump=0.22, squash=.2, moss=.3, bumps=.18, lean=.4, cracks=1)
+    S["boulder-tropical-1"] = stone(301, 58, 40, 26, RIVER, lump=0.21, moss=.5, cracks=1, wob=0.11, lean=-.5)                       # big lopsided river stone, moss on top
+    S["boulder-tropical-2"] = stone(302, 34, 28, 44, VOLCANIC, lump=0.24, cracks=2, wob=0.16, lean=.6, rim=.6)                       # tall knuckle of dark lava, leaning right
+    S["boulder-tropical-3"] = cluster([(stone(303, 42, 30, 30, SLATE, lump=0.21, moss=.35, cracks=1, wob=0.13), 22, 44), (stone(304, 32, 24, 22, TANNIN, lump=0.24, wob=0.11, lean=-.4), 0, 50)])   # two stones leaning together
+    S["boulder-tropical-4"] = stone(305, 62, 34, 16, TANNIN, lump=0.22, moss=.4, cracks=1, wob=0.09, lean=.3)                        # low, wide, flattened boulder
+    S["rock-tropical-1"] = stone(311, 30, 20, 13, RIVER, lump=0.22, wob=0.09, lean=-.3)
+    S["rock-tropical-2"] = stone(312, 22, 18, 17, VOLCANIC, lump=0.27, wob=0.14, lean=.4, pits=1)
+    S["rock-tropical-3"] = stone(313, 32, 20, 10, SLATE, lump=0.21, moss=.5, wob=0.09)
+    S["rock-tropical-4"] = stone(314, 20, 14, 11, TANNIN, lump=0.30, wob=0.13, lean=-.5, pits=1)
+    S["rock-tropical-5"] = cluster([(stone(315, 20, 14, 12, RIVER, lump=0.27, wob=0.11), 0, 24), (stone(316, 16, 12, 10, VOLCANIC, lump=0.30, wob=0.11), 16, 24), (stone(317, 10, 8, 6, TANNIN, lump=0.30, wob=0.09, pits=0), 10, 29)])   # a small scatter
+    S["rock-tropical-6"] = stone(318, 26, 18, 18, SLATE, lump=0.30, moss=.3, wob=0.16, lean=.4, cracks=1)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
