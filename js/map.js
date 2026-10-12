@@ -481,7 +481,7 @@ const FENCE34 = {
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true, sprite:"electric"},
   acrylic: {h:2.2, col:"#9FCFE0", solid:.4, sprite:"acrylic"},
   concrete:{h:3.6, col:"#B8B1A2", solid:1},
-  hedge:   {h:1.8, hedge:true},
+  hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
 const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_LOOK.worn ? "degrading" : "pristine";
@@ -515,6 +515,7 @@ const FENCE_EDGE = {
   bars:{steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
   electric:{steel:{hi:"#8A929B", mid:"#5A6068", lo:"#41464C", deep:"#2E3236"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
   acrylic:{steel:{hi:"#EBF8FCD7", mid:"#9FCFE099", lo:"#62A0B8A0", deep:"#52666E"}, rust:{hi:"#F0EDCC", mid:"#D6D0A0B4", lo:"#B8B07A", deep:"#80784C"}, frame:{hi:"#C5CCD3", mid:"#A8B0B8", lo:"#7E858C", deep:"#60666C"}},   // a see-through pane (alpha in the colors) with an aluminium frame at the posts
+  hedge:{steel:{hi:"#6BA851", mid:"#4E8A3E", lo:"#3A6C2E", deep:"#24461F"}, rust:{hi:"#BAB85C", mid:"#929642", lo:"#707034", deep:"#4A4226"}},   // leaves; rust is dry, browning leaves
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
@@ -526,7 +527,12 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
   const posts = []; for(let y = ya; y < yb + .01; y += S.w * px) posts.push(y);
   if(yb - posts[posts.length - 1] > .05) posts.push(yb);   // and a post at the near end
   let s = "";
-  if(look === "broken"){
+  if(S.leafy){
+    // a hedge seen end-on is a leafy column five pixels wide and as tall as the hedge: dry colors and a lower top when worn, a low heap of litter when broken
+    const P = look === "degrading" || look === "broken" ? R : C, xl = x0 - px, hh = look === "broken" ? 3 : S.h - (look === "degrading" ? 1 : 0), yt = ya - hh * py;
+    s += rect(xl, yt, 5 * px, yb - yt, P.mid) + rect(xl, yt, px, yb - yt, P.hi) + rect(xl + 4 * px, yt, px, yb - yt, P.lo) + rect(xl, yt, 5 * px, py, P.hi) + rect(xl, yb - 2 * py, 5 * px, py, P.lo) + rect(xl, yb - py, 5 * px, py, P.deep);
+    for(let y = yt + 2 * py, k = 0; y < yb - 3 * py; y += 3 * py, k++) s += rect(xl + (k * 2 % 3 + 1) * px, y, px, py, P.hi) + rect(xl + ((k * 2 + 1) % 3 + 1) * px, y + 1.5 * py, px, py, P.lo);
+  } else if(look === "broken"){
     // the heap is three pixels high all along; each post is a snapped stub, rusted at the top
     s += rect(x0, ya - 3 * py, 3 * px, yb - ya + 3 * py, C.lo) + rect(x0, ya - 3 * py, px, yb - ya + 3 * py, C.mid) + rect(x0 + 2 * px, ya - 3 * py, px, yb - ya + 3 * py, C.deep);
     posts.forEach((y, i) => { const h = (7 + i % 3 * 2) * py; s += rect(x0, y - h, px, h, C.hi) + rect(x0 + px, y - h, px, h, C.lo) + rect(x0, y - h, 2 * px, py, R.mid) + rect(x0 + px, y - h * .5, px, 2 * py, R.lo); });
@@ -598,7 +604,7 @@ function fence34(P, closed, kinds, which, o = {}){
   let s = "";
   for(const {i, a, b, ny, kind} of segs){
     const F = FENCE34[kind] || FENCE34.wood, H = F.h, q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
-    if(F.hedge){
+    if(F.hedge && !F.sprite){
       s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="#6BA851" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
