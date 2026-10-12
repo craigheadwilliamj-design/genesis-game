@@ -64,10 +64,17 @@ function wideJoin(p){
       if(o === p || isService(o) || isTram(o)) continue;
       for(let j = 1; j < o.points.length; j++){
         const r = segProj(E[0], E[1], o.points[j-1], o.points[j]), hw = halfWidth(o);
-        if(r.d < 1.5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};   // joined, by the same 1.5 m rule the game uses
+        if(r.d < 1.5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw, o, j};   // joined, by the same 1.5 m rule the game uses
       }
     }
     if(!best) continue;
+    // only cut where the other path runs on through the join (a T): at its own end, or at a bend, there is nothing to cut against
+    { const o = best.o, a = best.a, b = best.b, ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey) || 1;
+      const straight = (u, v) => (u[0]*v[0] + u[1]*v[1]) / ((Math.hypot(...u) * Math.hypot(...v)) || 1) > .98;
+      const through = best.t > .001 && best.t < .999
+        || best.t <= .001 && best.j >= 2 && straight([a[0] - o.points[best.j-2][0], a[1] - o.points[best.j-2][1]], [ex, ey])
+        || best.t >= .999 && best.j < o.points.length - 1 && straight([ex, ey], [o.points[best.j+1][0] - b[0], o.points[best.j+1][1] - b[1]]);
+      if(!through) continue; }
     const ux = best.b[0] - best.a[0], uy = best.b[1] - best.a[1], L = Math.hypot(ux, uy) || 1, tx = ux/L, ty = uy/L;
     let mx = -ty, my = tx;                                          // normal pointing to the wide path's side
     if((prev[0] - best.x)*mx + (prev[1] - best.y)*my < 0){ mx = -mx; my = -my; }
@@ -75,7 +82,7 @@ function wideJoin(p){
     if(Math.abs(dn) < .2){                                          // running along it, not into it: a narrower path carrying on in line gets a taper
       const ox = dx/dl, oy = dy/dl;
       const ahead = Math.max((best.a[0] - E[0])*ox + (best.a[1] - E[1])*oy, (best.b[0] - E[0])*ox + (best.b[1] - E[1])*oy);
-      if(best.hw < WIDE_PATH.halfWidth && ahead > 1){
+      if(isWide(p) && best.hw < WIDE_PATH.halfWidth && ahead > 1){
         const T = Math.min(2*(WIDE_PATH.halfWidth - best.hw), ahead), W = WIDE_PATH.halfWidth, nx = -oy, ny = ox;
         const cx = E[0] + ox*T + nx*((best.x - E[0])*nx + (best.y - E[1])*ny), cy = E[1] + oy*T + ny*((best.x - E[0])*nx + (best.y - E[1])*ny);
         tapers.push([[E[0] + nx*W, E[1] + ny*W], [cx + nx*best.hw, cy + ny*best.hw], [cx - nx*best.hw, cy - ny*best.hw], [E[0] - nx*W, E[1] - ny*W]]);
@@ -111,27 +118,52 @@ function queueRender(){ if(!rq) rq = requestAnimationFrame(() => { rq = 0; rende
 function polyStr(pts){ return pts.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); }
 // A line stroked with a pattern. Chromium clips a pattern stroke to a box a little wider than the line's own bounds, so a straight vertical or horizontal line (a box with no width) only got its pattern
 // on one side. Two zero-length subpaths pad the bounds out (they draw nothing with butt caps), and a round-ended line gets its end caps as circles.
-function texLine(pts, w, fillOf, round){   // fillOf: one fill for the whole line, or a function of the run's index when each run has its own pattern (Genesis slabs)
+let texClipN = 0;
+function texLine(pts, w, fillOf, round, miter){   // fillOf: one fill for the whole line, or a function (run start, run end) when each straight run has its own pattern (Genesis slabs)
   const pad = q => { const xs = q.map(p => p[0]), ys = q.map(p => p[1]), x0 = Math.min(...xs) - 3, x1 = Math.max(...xs) + 3, y0 = Math.min(...ys) - 3, y1 = Math.max(...ys) + 3; return `M${x0} ${y0}L${x0} ${y0}M${x1} ${y1}L${x1} ${y1}`; };
   const line = (q, f) => `<path d="M${q.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join("L")}${pad(q)}" stroke="${f}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
   const dot = (q, f) => `<circle cx="${q[0].toFixed(2)}" cy="${q[1].toFixed(2)}" r="${w/2}" fill="${f}"/>`;
-  if(typeof fillOf === "string"){
+  const ends = Array.isArray(round) ? round : [!!round, !!round];   // which ends are round (a joined end is flat)
+  if(typeof fillOf === "string" && !miter){
     let s = line(pts, fillOf);
-    if(round) s += dot(pts[0], fillOf) + dot(pts[pts.length - 1], fillOf);
+    if(ends[0]) s += dot(pts[0], fillOf);
+    if(ends[1]) s += dot(pts[pts.length - 1], fillOf);
     return s;
   }
-  // each run gets its own pattern; the corners and round ends are discs
+  // straight stretches are one run each (so the pattern carries on unbroken past a vertex that doesn't turn); at a corner the two runs run on past it
+  // and are each cut along the miter line, so every part of the corner has exactly one pattern
+  const unit = (a, b) => { const l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+  const runs = []; let st = 0;
+  for(let i = 1; i < pts.length - 1; i++){
+    const d0 = unit(pts[i-1], pts[i]), d1 = unit(pts[i], pts[i+1]);
+    if(Math.abs(d0[0]*d1[1] - d0[1]*d1[0]) > .001 || d0[0]*d1[0] + d0[1]*d1[1] < 0){ runs.push([st, i]); st = i; }
+  }
+  runs.push([st, pts.length - 1]);
+  const fo = (a, b) => typeof fillOf === "function" ? fillOf(a, b) : fillOf;
+  const keep = (V, dPrev, dNext, side) => {   // a half-plane at corner V on the mitre line: side 1 keeps the next run's side, -1 the previous run's
+    let b = [dNext[0] - dPrev[0], dNext[1] - dPrev[1]]; const bl = Math.hypot(b[0], b[1]); if(bl < 1e-6) return null;
+    b = [b[0] / bl, b[1] / bl]; let nb = [-b[1], b[0]]; if(nb[0]*dNext[0] + nb[1]*dNext[1] < 0) nb = [-nb[0], -nb[1]]; nb = [nb[0] * side, nb[1] * side];
+    const B = 1e3, P = [[V[0] + b[0]*B, V[1] + b[1]*B], [V[0] - b[0]*B, V[1] - b[1]*B], [V[0] - b[0]*B + nb[0]*B, V[1] - b[1]*B + nb[1]*B], [V[0] + b[0]*B + nb[0]*B, V[1] + b[1]*B + nb[1]*B]];
+    const id = "tc" + texClipN++; return {id, def:`<clipPath id="${id}"><polygon points="${polyStr(P)}"/></clipPath>`};
+  };
   let s = "";
-  for(let i = 0; i < pts.length - 1; i++) s += line([pts[i], pts[i+1]], fillOf(i));
-  for(let i = 1; i < pts.length - 1; i++) s += dot(pts[i], fillOf(i));
-  if(round) s += dot(pts[0], fillOf(0)) + dot(pts[pts.length - 1], fillOf(pts.length - 2));
+  runs.forEach(([i, j], k) => {
+    const A = pts[i], Bp = pts[j], u = unit(A, Bp), ext = w / 2, hasPrev = k > 0, hasNext = k < runs.length - 1;
+    const q = [hasPrev ? [A[0] - u[0]*ext, A[1] - u[1]*ext] : A, hasNext ? [Bp[0] + u[0]*ext, Bp[1] + u[1]*ext] : Bp];
+    let el = line(q, fo(A, Bp)), defs = "";
+    if(hasPrev){ const c = keep(A, unit(pts[runs[k-1][0]], A), u, 1); if(c){ defs += c.def; el = `<g clip-path="url(#${c.id})">${el}</g>`; } }
+    if(hasNext){ const c = keep(Bp, u, unit(Bp, pts[runs[k+1][1]]), -1); if(c){ defs += c.def; el = `<g clip-path="url(#${c.id})">${el}</g>`; } }
+    s += defs + el;
+  });
+  if(ends[0]) s += dot(pts[0], fo(pts[runs[0][0]], pts[runs[0][1]]));
+  if(ends[1]) s += dot(pts[pts.length - 1], fo(pts[runs[runs.length - 1][0]], pts[runs[runs.length - 1][1]]));
   return s;
 }
 // The Genesis pixel kerb along a line (a points string): a world-width strip of `kw` m, with a 1 px lit line offset to the top left and a shaded one to the bottom right (light is from the top left),
 // the green face, and a 1 px dark joint every `step` m (kerb stones) with a lit pixel after each joint, laid as dashes across the whole stroke.
 function kerbStack(pl, kw, K, cap){
-  const o = ROCK_MPP, lj = `stroke-linejoin="round" stroke-linecap="${cap}" fill="none"`;
-  const dash = (c, off) => `<polyline points="${pl}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
+  const o = ROCK_MPP, lj = `stroke-linejoin="miter" stroke-linecap="${cap}" fill="none"`;
+  const dash = (c, off) => `<polyline points="${pl}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="miter" stroke-linecap="butt" fill="none"/>`;
   return `<polyline points="${pl}" transform="translate(${-o} ${-o})" stroke="${K.lit}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" transform="translate(${o} ${o})" stroke="${K.shade}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" stroke="${K.c}" stroke-width="${kw}" ${lj}/>` + dash(K.joint, 0) + dash(K.chip, -o);
 }
 // Genesis slabs: a pattern per run with its origin on the run's first point, so a joint always sits on the centerline (slab tiles are in sprites/paths/). ctx collects the <pattern> defs.
@@ -282,14 +314,22 @@ function render(){
       continue;
     }
     const svc = isService(p), PT = themeOf(p).path;
-    const wj = isWide(p) ? wideJoin(p) : null, lp = wj ? wj.pts : p.points, pts = polyStr(lp), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const pix = !svc && !!PT.kerbPix;   // Genesis pixel paths: every end is flat, and a free end of a footpath gets a round cap of its own, so a joined end never bulges past the path it meets
+    const wj = isWide(p) || pix ? wideJoin(p) : null, lp = wj ? wj.pts : p.points, pts = polyStr(lp), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const freeEnd = end => { const E0 = p.points[end ? p.points.length - 1 : 0]; return !state.paths.some(o => o !== p && !isService(o) && !isTram(o) && lineDist(E0[0], E0[1], o.points) < 1.5); };
     const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
-    const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
+    const lj = `stroke-linejoin="${pix ? "miter" : "round"}" stroke-linecap="${isWide(p) || pix ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
     if(!svc && PT.kerbPix){   // a pixel kerb: a world-width strip, with a 1 px lit line offset to the top left and a shaded one to the bottom right (light is from the top left)
       const K = PT.kerbPix;
-      under += cut(kerbStack(pts, w + 2*K.w, K, lj.includes('linecap="round"') ? "round" : "butt"));
+      under += cut(kerbStack(pts, w + 2*K.w, K, "butt"));
+      if(!isWide(p)) for(const end of [0, 1]){   // a footpath's free end: a half-round kerb
+        if(!freeEnd(end)) continue;
+        const E = lp[end ? lp.length - 1 : 0], q = lp[end ? lp.length - 2 : 1], ang = Math.atan2(E[1] - q[1], E[0] - q[0]), arc = [];
+        for(let i = 0; i <= 12; i++){ const a = ang - Math.PI/2 + Math.PI*i/12; arc.push([E[0] + Math.cos(a)*w/2, E[1] + Math.sin(a)*w/2]); }
+        under += kerbStack(polyStr(arc), 2*K.w, K, "butt");
+      }
       // a wide path's free end is flat, so it gets a kerb across it, a little wider than the path so it closes the corners
       if(isWide(p)) for(const end of [0, 1]){
         const E = lp[end ? lp.length - 1 : 0], q = lp[end ? lp.length - 2 : 1], E0 = p.points[end ? p.points.length - 1 : 0];   // E0 is where it was drawn to (a joined end is run on past it)
@@ -301,8 +341,9 @@ function render(){
     under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
-    const rnd = !isWide(p);
-    if(!svc && texFill(p)) body += texLine(lp, w, PT.slab ? k => slabFill(p, lp[k], lp[k+1], PT.slab) : texFill(p), rnd);
+    const rnd = isWide(p) ? false : pix ? [freeEnd(0), freeEnd(1)] : true;
+    if(pix && !isWide(p)) for(const end of [0, 1]) if(rnd[end]){ const E = lp[end ? lp.length - 1 : 0]; body += `<circle cx="${E[0].toFixed(2)}" cy="${E[1].toFixed(2)}" r="${w/2}" fill="${live ? PT.live : PT.dead}"/>`; }
+    if(!svc && texFill(p)) body += texLine(lp, w, PT.slab ? (a, b) => slabFill(p, a, b, PT.slab) : texFill(p), rnd, pix);
     // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
     if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? texLine(lp, w * .4, texFill(p), rnd) : "");
     // painted center line (thin and faded so paths don't read as a parking lot)
@@ -1081,28 +1122,15 @@ function renderOverlay(){
     const poly = isPoly(draw.kind);
     let all = draw.hover ? draw.pts.concat([draw.hover]) : draw.pts;
     const err = draw.error;
-    const col = err ? "var(--bad)" : "var(--sel)";
+    const col = poly ? (err ? "var(--bad)" : "var(--sel)") : (err ? "#E5484D" : "#4CD964");   // a path ghost is green, or red when it can't go there, like the fence ghost
     if(poly && all.length >= 3) s += `<polygon points="${polyStr(all)}" fill="${col}" fill-opacity=".18" stroke="none"/>`;
     // the band is as wide as the path will be (same width and end caps as a built one)
     if(!poly && all.length >= 2){ const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), (ty === "service" ? 2.5 : 3)*inv); s += `<polyline points="${polyStr(all)}" stroke="${col}" stroke-opacity=".35" stroke-width="${pw}" stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"/>`; }
-    // a preview in the theme the thing will be built in (zone or brush)
-    const pk = all.length >= 2 && !err && (draw.kind === "path" || draw.kind === "wide") ? themeFor("path", {points:all, type:drawType()}) || "genesis" : null;   // no theme picked means Genesis
-    if(pk){
-      const pt = {theme:pk}, T = THEMES[pk];
-      { const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), 3*inv), pl = polyStr(all), lj = `stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"`;
-        const PT = T.path;
-        if(PT.kerbPix && PT.slab){   // Genesis: the pixel kerb and the slabs, laid per run like a built one
-          const ctx = {ids:{}, defs:"", n:0, pre:"pv"}, fake = {type:ty}, round = ty !== "wide";
-          const surf = texLine(all, pw, k => slabPattern(ctx, fake, all[k], all[k+1], PT.slab), round);
-          s += `<defs>${ctx.defs}</defs><g opacity=".8">${kerbStack(pl, pw + 2*PT.kerbPix.w, PT.kerbPix, round ? "round" : "butt")}<polyline points="${pl}" stroke="${PT.live}" stroke-width="${pw}" ${lj}/>${surf}</g>`;
-        } else
-        s += `<g opacity=".8"><polyline points="${pl}" stroke="${T.path.edge}" stroke-width="${pw + 1.6*inv}" ${lj}/><polyline points="${pl}" stroke="${T.path.live}" stroke-width="${pw}" ${lj}/>${texFill(pt) ? `<polyline points="${pl}" stroke="${texFill(pt)}" stroke-width="${pw}" ${lj}/>` : ""}</g>`; }
-    }
-    if(all.length >= 2) s += `<polyline points="${polyStr(all)}" fill="none" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    if(all.length >= 2) s += `<polyline points="${polyStr(all)}" fill="none" stroke="${col}" stroke-width="${poly ? 2.5 : 1.4}"${poly ? "" : ` stroke-dasharray="${5*inv} ${3*inv}"`} vector-effect="non-scaling-stroke"/>`;
     if(poly && all.length >= 3) s += `<line x1="${all[all.length-1][0]}" y1="${all[all.length-1][1]}" x2="${all[0][0]}" y2="${all[0][1]}" stroke="${col}" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
     draw.pts.forEach((p, i) => {
       const first = poly && i === 0 && draw.pts.length >= 3;
-      s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(first ? 7 : 4.5)*inv}" fill="${first ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+      s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(first ? 7 : 4.5)*inv}" fill="${first ? "var(--sel)" : "#fff"}" stroke="${poly ? "var(--sel)" : col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     });
   }
   if(fdrag){
