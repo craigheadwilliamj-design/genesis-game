@@ -485,7 +485,7 @@ const FENCE34 = {
 const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_LOOK.worn ? "degrading" : "pristine";
 // One side of a fence drawn from its pictures (FENCE_SPRITES): 3 m sections laid along the side, the last one cut short, then a post at the far end.
 // Each is stood up the way fence34 stands a wall (a pixel is ROCK_MPP across and ROCK_MPP / TILT up the map, so it is square on screen), turned along the side as a shear.
-// Returns null for a side running mostly north-south, which is seen edge-on: the caller draws posts and rails for it instead.
+// Returns null for a side running mostly north-south, which is seen edge-on: the caller draws fenceEdgeSvg for it instead.
 function fenceSpriteSvg(kind, a, b, cond){
   const S = FENCE_SPRITES[kind], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if(L < .05 || Math.abs(b[0] - a[0]) / L < FENCE_LOOK.minRun) return null;
@@ -496,6 +496,33 @@ function fenceSpriteSvg(kind, a, b, cond){
   let s = "";
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
   return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
+}
+// A bar fence side seen edge-on (running mostly north-south) is a thin slab, so it is drawn as a column FENCE_LOOK.edge pixels wide and as tall as the fence, in the pictures' colors:
+// lit left, base middle, shaded right, with a cap across it and a footing at every post (3 m apart, the pictures' spacing). Rust blocks when degrading; a low trampled heap with post stubs when broken.
+const FENCE_EDGE = {
+  steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"},
+  rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"},
+};
+function fenceEdgeSvg(kind, a, b, cond, hi){
+  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE.steel, R = FENCE_EDGE.rust, n2 = v => v.toFixed(2);
+  const x0 = Math.round(((a[0] + b[0]) / 2 - FENCE_LOOK.edge * px / 2) / px) * px, ya = Math.min(a[1], b[1]), yb = Math.max(a[1], b[1]);
+  const rect = (x, y, w, h, fill) => `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}" fill="${fill}" shape-rendering="crispEdges"/>`;
+  const posts = []; for(let y = ya; y < yb + .01; y += S.w * px) posts.push(y);
+  if(yb - posts[posts.length - 1] > .05) posts.push(yb);   // and a post at the near end
+  let s = "";
+  if(look === "broken"){
+    // the heap is three pixels high all along; each post is a snapped stub, rusted at the top
+    s += rect(x0, ya - 3 * py, 3 * px, yb - ya + 3 * py, C.lo) + rect(x0, ya - 3 * py, px, yb - ya + 3 * py, C.mid) + rect(x0 + 2 * px, ya - 3 * py, px, yb - ya + 3 * py, C.deep);
+    posts.forEach((y, i) => { const h = (7 + i % 3 * 2) * py; s += rect(x0, y - h, px, h, C.hi) + rect(x0 + px, y - h, px, h, C.lo) + rect(x0, y - h, 2 * px, py, R.mid) + rect(x0 + px, y - h * .5, px, 2 * py, R.lo); });
+    for(let y = ya + 1.1; y < yb; y += 2.3) s += rect(x0 + (Math.round(y) % 2) * px, y - 3 * py, px, 2 * py, R.mid);
+  } else {
+    const top = ya - FENCE_SPRITES[kind].h * py;
+    s += rect(x0, top, px, yb - top, C.hi) + rect(x0 + px, top, px, yb - top, C.mid) + rect(x0 + 2 * px, top, px, yb - top, C.lo);
+    for(const y of posts) s += rect(x0, y - FENCE_SPRITES[kind].h * py, 3 * px, py, C.hi) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
+    if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
+  }
+  if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+  return s;
 }
 // kind is one fence for every side, or a list with one kind a side (a grid exhibit's pieces)
 // o: hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), lights/powered (electric posts)
@@ -521,23 +548,15 @@ function fence34(P, closed, kinds, which, o = {}){
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
-    // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on falls through to the drawn posts and rails
-    const look = F.sprite ? fenceState(o.cond) : "pristine", pic = F.sprite && fenceSpriteSvg(F.sprite, a, b, o.cond);
-    if(pic){
-      s += pic;
+    // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on is a column instead
+    if(F.sprite){
+      s += fenceSpriteSvg(F.sprite, a, b, o.cond) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi);
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
     // posts, then rails (and bars or wires) between them
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), np = Math.max(1, Math.round(L / F.step)), col = look === "degrading" ? "#8F6B4A" : F.col;
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), np = Math.max(1, Math.round(L / F.step)), col = F.col;
     let posts = "", rails = "", thin = "";
-    if(look === "broken"){
-      // trampled: only stubs of posts and a rusted line along the ground
-      for(let k = 0; k <= np; k++){ const p = at(a, b, k / np); posts += M(p) + Lto(up(.5)(p)); }
-      s += `<path d="${M(a)}${Lto(b)}" stroke="#8E4A12" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/><path d="${posts}" stroke="${F.col}" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
-      if(hi) s += `<path d="${M(a)}${Lto(b)}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
-      continue;
-    }
     for(let k = 0; k <= np; k++){ const p = at(a, b, k / np); posts += M(p) + Lto(up(H + (F.wire ? .2 : 0))(p)); }
     for(const h of F.rails) (F.wire ? (thin += M(up(h)(a)) + Lto(up(h)(b))) : (rails += M(up(h)(a)) + Lto(up(h)(b))));
     if(F.bars){ const nb = Math.round(L / F.bars); for(let k = 1; k < nb; k++){ const p = at(a, b, k / nb); thin += M(up(.25)(p)) + Lto(up(2.5)(p)); } }
