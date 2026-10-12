@@ -828,6 +828,8 @@ const BARRIERS = {
   electric: {label:"Electrified fence", strength:65,  perMeter:60,  view:.95,  tech:"electric", color:"#D8B04A"},
   acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
   concrete: {label:"Concrete wall",     strength:140, perMeter:90,  view:.45,  tech:"concrete", color:"#9A958C"},
+  brick:    {label:"Brick wall",        strength:100, perMeter:55,  view:.8,   tech:"masonry",  color:"#AC5234"},
+  stone:    {label:"Stone wall",        strength:115, perMeter:75,  view:.75,  tech:"masonry",  color:"#9C9488"},
 };
 
 // Fence laid piece by piece on the 1 m grid (js/fences.js)
@@ -847,13 +849,15 @@ Object.assign(BARRIERS.bars,     {wear:2.0, repair:10});
 Object.assign(BARRIERS.electric, {wear:2.5, repair:14});
 Object.assign(BARRIERS.acrylic,  {wear:1.5, repair:25});
 Object.assign(BARRIERS.concrete, {wear:1.0, repair:12});
+Object.assign(BARRIERS.brick,    {wear:1.2, repair:14});   // brick and stone are tough and moderately tall: between acrylic and concrete, and a good look
+Object.assign(BARRIERS.stone,    {wear:.8,  repair:16});
 
-// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py and pixelfence_concrete.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
-// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge and concrete. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
+// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py, pixelfence_concrete.py and pixelfence_masonry.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
+// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge, concrete, brick and stone. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
 //   worn     below this condition (percent) the fence shows its rusted picture; at 0 it is broken, trampled flat
 //   minRun   a side that runs mostly north-south is seen edge-on, so it is drawn as a column when less than this share of its length runs across the screen
 //   edge     how many pixels wide that column is
-const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
+const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, brick:{w:23, h:17, gate:true}, stone:{w:23, h:20, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
 // A keeper gate swings open when a keeper, vet or mechanic is within `reach` meters: `speed` is how much of its swing (0 shut, 1 open) it covers a second, shown in `frames` pictures (<kind>-gate.png, then -1, -2, -3).
 const GATE_OPEN = {reach:3, speed:3, frames:4};
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};
@@ -1022,6 +1026,7 @@ const TECH = [
   {id:"bars",     group:"barrier", label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
   {id:"electric", group:"barrier", label:"Electrified fence", points:18, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
   {id:"concrete", group:"barrier", label:"Concrete walls",    points:20, text:"Strength 140. Holds anything, but guests can barely see in."},
+  {id:"masonry",  group:"barrier", label:"Masonry walls",     points:12, text:"Brick (strength 100) and stone (strength 115) walls. Tough, only moderately tall, and guests can still see over them. Mostly a good look."},
   {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:40, text:"Strength 85. Clear walls that guests love looking through."},
   {id:"aviary",   group:"barrier", label:"Aviary netting",    points:35, text:"Carbon fiber and steel mesh over an exhibit, so flying animals can't escape."},
   {id:"catchnet", group:"barrier", label:"Catch netting",     points:25, text:"Netting along an exhibit's fence that catches 95% of the trash guests throw in. It catches less as the fence wears."},

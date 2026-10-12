@@ -159,7 +159,7 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
@@ -481,6 +481,8 @@ const FENCE34 = {
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true, sprite:"electric"},
   acrylic: {h:2.2, col:"#9FCFE0", solid:.4, sprite:"acrylic"},
   concrete:{h:3.6, col:"#B8B1A2", solid:1, sprite:"concrete"},
+  brick:   {h:2.2, col:"#AC5234", solid:1, sprite:"brick"},
+  stone:   {h:2.6, col:"#9C9488", solid:1, sprite:"stone"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -517,6 +519,8 @@ const FENCE_EDGE = {
   acrylic:{steel:{hi:"#EBF8FCD7", mid:"#9FCFE099", lo:"#62A0B8A0", deep:"#52666E"}, rust:{hi:"#F0EDCC", mid:"#D6D0A0B4", lo:"#B8B07A", deep:"#80784C"}, frame:{hi:"#C5CCD3", mid:"#A8B0B8", lo:"#7E858C", deep:"#60666C"}},   // a see-through pane (alpha in the colors) with an aluminium frame at the posts
   hedge:{steel:{hi:"#6BA851", mid:"#4E8A3E", lo:"#3A6C2E", deep:"#24461F"}, rust:{hi:"#BAB85C", mid:"#929642", lo:"#707034", deep:"#4A4226"}},   // leaves; rust is dry, browning leaves
   concrete:{steel:{hi:"#D6D0C2", mid:"#B8B1A2", lo:"#8E8778", deep:"#6A6458"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},   // rust is rebar showing through
+  brick:{steel:{hi:"#C77A62", mid:"#AC5234", lo:"#7F3D27", deep:"#5C2A1B"}, rust:{hi:"#C7C0A8", mid:"#8E8A5A", lo:"#616138", deep:"#42421F"}},   // rust is moss and crumbling mortar
+  stone:{steel:{hi:"#B5AEA2", mid:"#9C9488", lo:"#736C61", deep:"#4A453D"}, rust:{hi:"#A4B060", mid:"#616F22", lo:"#46501A", deep:"#2E3410"}},   // rust is moss
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).

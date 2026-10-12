@@ -1762,6 +1762,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const fc = (cond, a, b, gate) => fence34([a, b], false, "concrete", "all", {cond, gate});
       out.concreteFence = fc(100, [0, 0], [7, 0]).includes("concrete-pristine.png") && fc(30, [0, 0], [7, 0]).includes("concrete-degrading.png") && fc(0, [0, 0], [7, 0]).includes("concrete-broken.png") && !fc(100, [0, 0], [7, 0]).includes("<polygon")
         && fc(100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:2}).includes("concrete-gate-2.png") && !fc(100, [0, 0], [0, 7]).includes("<image") && fc(100, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.steel.mid) && !fc(100, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.rust.mid) && fc(30, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.rust.mid);
+      // brick and stone: between acrylic and concrete in strength, their own pictures and gates, and an edge-on slab
+      const fm = (k, cond, a, b, gate) => fence34([a, b], false, k, "all", {cond, gate});
+      out.masonryFence = ["brick", "stone"].every(k => BARRIERS[k].strength > BARRIERS.acrylic.strength && BARRIERS[k].strength < BARRIERS.concrete.strength && BARRIERS[k].tech === "masonry" && TECH.some(t => t.id === "masonry")
+        && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png") && !fm(k, 100, [0, 0], [7, 0]).includes("<polygon")
+        && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:1}).includes(k + "-gate-1.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
       // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave
       const gh = document.createElementNS("http://www.w3.org/2000/svg", "svg"); gh.innerHTML = fg(100, [0, 0], [7, 0]); document.body.appendChild(gh);
       const gex = {id:"gt", gate:[3.5, 0]}; state.exhibits.push(gex);
