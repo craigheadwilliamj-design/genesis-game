@@ -1952,14 +1952,14 @@ const THEMES = {
     eave:{c:"#14281C", w:1.8},
     emblem:["oracle", "ghost", "tar", "ceres"],
     // dark green steel rail: two rails with a small gold cap on each post. Dangerous animals get a tall steel panel wall on a concrete base with a gold band along the top.
-    bord:{band:"#CBC5B4", c:"#1F3D2B", w:5, trim:[{c:"#C9A24B", w:1}],
+    bord:{c:"#1F3D2B", w:5, trim:[{c:"#C9A24B", w:1}],
       more:[{c:"#CBC5B4", w:1.5}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}],
       by:{
-        bars:{band:"#CBC5B4", c:"#1F3D2B", w:5,
+        bars:{c:"#1F3D2B", w:5,
           more:[{c:"#CBC5B4", w:1.5}, {c:"#3F6B52", w:1, dash:"1 3"}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}]},
-        acrylic:{band:"#CBC5B4", c:"#1F3D2B", w:5,
+        acrylic:{c:"#1F3D2B", w:5,
           more:[{c:"#D5ECE6", w:2.2}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}]}},
-      strong:{band:"#CBC5B4", base:{c:"#A8A396", w:13, c2:"#7D7869", dash2:"3 5"}, c:"#2E3A36", w:7,
+      strong:{base:{c:"#A8A396", w:13, c2:"#7D7869", dash2:"3 5"}, c:"#2E3A36", w:7,
         more:[{c:"#1F3D2B", w:5}, {c:"#10261A", w:7, dash:".8 15"}, {c:"#C9A24B", w:1.7, dash:"11 4"}]}},
     unlock:{hint:"Where you start.", check:() => true}},
   gilded: {label:"Gilded Age", ground:"#7FA36A", tex:"gilded", ptex:"gilded-cobble", btex:"gilded-roof", gtex:"gilded-lawn", blurb:"Cobblestones, slate roofs, wrought iron and brass. 1800s paleontology, retro paleoart.",

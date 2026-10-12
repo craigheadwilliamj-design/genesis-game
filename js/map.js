@@ -183,8 +183,8 @@ function render(){
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
-    // a themed exhibit gets a trim line just inside its fence
-    if((!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    // a themed exhibit gets a trim line just inside its fence (flat view only: in 3/4 the fence stands up and draws itself)
+    if(!tilt && (!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
     const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
@@ -919,6 +919,24 @@ function parcelOverlay(){
   }
   return s;
 }
+// The construction ghost of fence being laid (or lifted): in 3/4 a translucent wall as tall as the fence will stand, with a post line at every piece; flat, a wide band. Green when it can go down, red when it can't.
+function fenceGhostSvg(keys, kind, bad, inv){
+  if(!keys.length) return "";
+  const c = bad ? "#E5484D" : "#4CD964", n2 = v => v.toFixed(2), H = (FENCE34[kind] || FENCE34.wood).h;
+  const dash = `stroke-dasharray="${5*inv} ${3*inv}"`, ln = `stroke="${c}" stroke-width="1.4" ${dash} vector-effect="non-scaling-stroke"`;
+  let s = `<g pointer-events="none" stroke-linejoin="round">`;
+  for(const k of keys){
+    const [a, b] = pieceEnds(k);
+    if(tilt){
+      const ta = lift34(H)(a), tb = lift34(H)(b);
+      s += `<polygon points="${polyStr([a, b, tb, ta])}" fill="${c}" fill-opacity=".3" ${ln}/>`;
+      s += `<line x1="${n2(a[0])}" y1="${n2(a[1])}" x2="${n2(ta[0])}" y2="${n2(ta[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
+    } else s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-opacity=".35" stroke-width="${Math.max(10, 1.2 * view.k)}" stroke-linecap="butt" vector-effect="non-scaling-stroke"/>`;
+  }
+  const last = pieceEnds(keys[keys.length - 1])[1];
+  if(tilt){ const tl = lift34(H)(last); s += `<line x1="${n2(last[0])}" y1="${n2(last[1])}" x2="${n2(tl[0])}" y2="${n2(tl[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`; }
+  return s + `</g>`;
+}
 function renderOverlay(){
   const inv = 1/view.k;
   let s = tool === "parcels" ? parcelOverlay() : "";
@@ -945,8 +963,10 @@ function renderOverlay(){
     });
   }
   if(fdrag){
-    const col = fdrag.lift ? "var(--bad)" : fdrag.why ? "var(--bad)" : "var(--sel)";
-    for(const k of fenceDragKeys()){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
+    const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
+    const keys = fenceDragKeys();
+    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv);
+    for(const k of keys){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
     s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
@@ -966,7 +986,7 @@ function renderOverlay(){
     s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
     s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
   }
-  if(gateGhost){
+  if(gateGhost && !gateGhost.loose){
     const gr = Math.max(1.6, 5*inv);
     s += `<rect x="${gateGhost.x-gr}" y="${gateGhost.y-gr}" width="${gr*2}" height="${gr*2}" fill="${gateGhost.ok ? "#D8B04A" : "var(--bad)"}" fill-opacity=".8" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
@@ -1610,13 +1630,13 @@ function setTool(t){
     updateZoneEditBar();
   }
   else if(t === "parcels"){ parcelSel = null; fit(); updateParcelBar(); }
-  else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, or drag along a fence to lift it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -1920,35 +1940,47 @@ function placeBuilding(e){
 
 /* ---------- keeper gates ---------- */
 let gateGhost = null;
-// Find the exhibit fence nearest the pointer, and whether a gate there would work
+// Find the exhibit fence (or the fence of a closed pen with no exhibit yet) nearest the pointer, and whether a gate there would work
 function findGateSpot(clientX, clientY){
   const p = toWorld(clientX, clientY); let best = null;
-  for(const e of state.exhibits){
-    if(e.viv) continue;
-    for(let i = 0; i < e.points.length; i++){
-      const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]);
-      if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {e, x:r.x, y:r.y, d:r.d};
-    }
+  const near = (host, pts) => { for(let i = 0; i < pts.length; i++){
+    const r = segProj(p.x, p.y, pts[i], pts[(i+1) % pts.length]);
+    if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {...host, x:r.x, y:r.y, d:r.d};
+  } };
+  for(const e of state.exhibits) if(!e.viv) near({e}, e.points);
+  for(const f of penFaces()) near({pen:f}, f.pts);
+  if(!best){
+    // loose fence that doesn't close a loop: say so
+    const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
+    return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
   }
-  if(!best) return null;
-  const old = best.e.gate; best.e.gate = [best.x, best.y];
-  const chk = gateCheck(best.e); best.e.gate = old;
+  const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
+  const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
+}
+// A gate on a pen also buys the ground it fences in
+const penCost = f => GATE_COST + Math.round(newGround([f]) * COST.landPerSqM);
+// A grid exhibit's gate under the pointer (bulldoze takes it out, and the exhibit with it)
+function gateNear(cx, cy){
+  const w = toWorld(cx, cy);
+  return state.exhibits.find(e => e.grid && e.gate && Math.hypot(e.gate[0] - w.x, e.gate[1] - w.y) * view.k < 14) || null;
 }
 function gateHover(e){
   gateGhost = findGateSpot(e.clientX, e.clientY);
-  setStat(gateGhost ? (gateGhost.ok ? `${money(GATE_COST)}. ${gateGhost.why}` : gateGhost.why) : "Point at an exhibit's fence.", gateGhost && !gateGhost.ok);
+  setStat(gateGhost ? (gateGhost.ok ? `${money(gateGhost.pen ? penCost(gateGhost.pen) : GATE_COST)}. ${gateGhost.why}` : gateGhost.why) : "Point at an exhibit's fence, or a closed pen.", gateGhost && !gateGhost.ok);
   renderOverlay();
 }
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
-  if(!g){ setStat("Tap right on an exhibit's fence.", true); return; }
-  const cost = g.e.gate ? 0 : GATE_COST;
-  if(!canAfford(cost)){ setStat(`A gate costs ${money(cost)}.`, true); return; }
+  if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
+  if(g.loose){ setStat(g.why, true); return; }
+  const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
+  if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
-  g.e.gate = [g.x, g.y];
+  const ex = g.pen ? adoptPen(g.pen, [g.x, g.y]) : g.e;
+  if(!g.pen) ex.gate = [g.x, g.y];
   afterChange(); render();
-  ui.toast(`${cost ? "Built" : "Moved"} the gate on ${g.e.name}. ${g.why}`, g.ok ? "" : "bad");
+  ui.toast(`${g.pen ? `Made ${ex.name}, ${fmtArea(area(ex.points))}, with a gate` : `${cost ? "Built" : "Moved"} the gate on ${ex.name}`}. ${g.why}`, g.ok ? "" : "bad");
 }
 
 /* ---------- keepers on the map ---------- */
@@ -2135,6 +2167,7 @@ function landTap(ev){
 /* ---------- bulldozing ---------- */
 function bulldozeTap(kind, id){
   if(!kind){ doomed = null; setStat(""); render(); return; }
+  if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
   const it = findItem(kind, id);
   if(!it) return;
   if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
@@ -2158,8 +2191,17 @@ function confirmExhibitRemoval(e){
   }, "No");
 }
 
-function removeItem(kind, it){
-  const refund = refundFor(kind, it), lift = kind === "exhibit" && it.grid ? ownPieces(it) : [];
+// Without its gate a fenced pen stops being an exhibit: the animals and contents go, the fence stays
+function confirmGateRemoval(e){
+  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will sell all animals in it and everything inside, but the fence stays. Are you sure?`, "Yes", () => {
+    if(!findItem("exhibit", e.id)) return;
+    removeItem("exhibit", e, {keepFence:true}); doomed = null; setStat("");
+  }, "No");
+}
+
+function removeItem(kind, it, opts = {}){
+  const lift = kind === "exhibit" && it.grid && !opts.keepFence ? ownPieces(it) : [];
+  const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
@@ -2396,6 +2438,8 @@ svg.addEventListener("pointerdown", e => {
   }
   if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
   if(tool === "exhibit" || tool === "bulldoze"){
+    const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
+    if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
     const w = toWorld(e.clientX, e.clientY), first = tool === "bulldoze" ? pieceNear(w.x, w.y, Math.max(.6, 10 / view.k)) : null;
     if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
@@ -2414,7 +2458,8 @@ svg.addEventListener("pointermove", e => {
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
-      const w = toWorld(e.clientX, e.clientY), k = pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
+      const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
+      if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
       if(k !== fhover){ fhover = k; renderOverlay(); }
       const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }

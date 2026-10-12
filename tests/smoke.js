@@ -1105,12 +1105,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const m0 = state.money, hl = addFenceLine(hedgeLine, "hedge");
       out.fenceOpenBuilt = state.fences.length === 1 && state.money === m0 - fenceLineCost(hedgeLine, "hedge") && refundFor("fence", hl) === Math.round(fenceLineCost(hedgeLine, "hedge") * COST.refundShare);
       out.fenceBlocksPath = !!pathProblem([[150,235],[150,270]]);
-      // the fence tool lays loose fence on the grid, and a closed loop of it becomes an exhibit (on the park's own biome)
+      // the fence tool lays loose fence on the grid, and a closed loop of it becomes an exhibit once it has a gate (on the park's own biome)
       state.biome = "desert";
       fenceSel = "hedge"; setTool("exhibit");
       const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
       out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
+      out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
+      const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
       const ne = state.exhibits[state.exhibits.length - 1];
       out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
@@ -1140,11 +1142,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const m0 = state.money; L([240,100],[260,100]);
       out.fencePieceCost = Object.keys(state.fenceGrid).length === 20 && state.money === m0 - 20 * fenceRate("wood") && state.exhibits.length === 0;
       L([260,100],[260,115]); L([260,115],[240,115]); L([240,115],[240,100]);
+      const gatePens = () => penFaces().map(f => adoptPen(f, f.pts[0].slice()));
+      out.fenceLoopNeedsGate = state.exhibits.length === 0 && penFaces().length === 1 && Math.abs(newGround(penFaces()) - 300) < 1;
+      gatePens();
       const ge = state.exhibits[0];
       out.fenceLoopExhibit = state.exhibits.length === 1 && ge.grid && area(ge.points) === 300 && ge.points.length === 4 && !ge.open;
       const gsp = SPECIES.find(x => !x.viv); ge.animals.push({id:"a-g1", sp:gsp.id, age:1, q:1});
       // a wall across splits it; the animals stay in the bigger part
-      L([250,100],[250,115]);
+      L([250,100],[250,115]); gatePens();
       out.fenceSplit = state.exhibits.length === 2 && state.exhibits.every(e => area(e.points) === 150) && ge.animals.length === 1;
       // lifting the wall merges them back
       liftPieces(pieceLine([250,100],[250,115]).keys);
@@ -1161,6 +1166,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceRefence = ge.barrier === "concrete" && ge.points.length === 4;
       // diagonal pens; diagonals can't cross; paths, nested pens and fenced-in paths are refused
       L([280,100],[286,106]); L([286,106],[280,112]); L([280,112],[274,106]); L([274,106],[280,100]);
+      gatePens();
       const de = state.exhibits.find(e => e !== ge);
       out.fenceDiagonal = !!de && area(de.points) === 72 && de.points.length === 4;
       out.fenceNoCross = /cross/.test(planPieces(["290,100,d", "290,100,a"], "wood").why || "") && /path/.test(planPieces(pieceLine([200,240],[210,240]).keys, "wood").why || "");
@@ -1174,6 +1180,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const before = Object.keys(state.fenceGrid).length, r = refundFor("exhibit", de);
       const mb = state.money; removeItem("exhibit", de);
       out.fenceBulldoze = Object.keys(state.fenceGrid).length === before - 24 && state.money === mb + r && r > 0 && !state.exhibits.includes(de);
+      // taking out the gate un-makes the exhibit but leaves its fence: it goes back to a pen
+      L([320,100],[340,100]); L([340,100],[340,115]); L([340,115],[320,115]); L([320,115],[320,100]); gatePens();
+      const ge2 = state.exhibits.find(e => e !== ge), np = Object.keys(state.fenceGrid).length, mg = state.money;
+      removeItem("exhibit", ge2, {keepFence:true});
+      out.fenceGateRemoval = !state.exhibits.includes(ge2) && Object.keys(state.fenceGrid).length === np && penFaces().length === 1 && state.money > mg;
       // the move tool leaves grid exhibits alone; saves keep the pieces
       out.fenceNoMove = moveTarget({kind:"exhibit", id:ge.id}) === null;
       const ob = JSON.parse(JSON.stringify(state)); delete ob.fenceGrid;
@@ -1486,7 +1497,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute();
     out.themeMatchedBonus = derived.themes["e-t"].ok && derived.appeal > appealMixed && themeFitShare(e0) === 1;
     out.themeFitHappier = exhibitReport(e0).target > (e0.theme = "genesis", exhibitReport(e0).target);
-    e0.theme = "volcanic"; render();
+    e0.theme = "volcanic"; const tl0 = tilt; tilt = false; render(); tilt = tl0;   // the exhibit rail is flat-view only
     out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live) && world.innerHTML.includes(THEMES.volcanic.accent);
     state.themes.brush = "volcanic"; state.money = 1e6;
     const bp = {id:"p-n", points:[[260,300],[300,300]]}; themeNew("path", bp);

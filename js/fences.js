@@ -179,7 +179,7 @@ function planPieces(keys, barrier){
   // the regions it closes off must be clear; and any loop it leaves floating inside another (which leaves the outer one's shape alone) is refused too
   const was = new Set(fenceFaces(P).map(f => f.key)), after = fenceFaces(trial), made = after.filter(f => !was.has(f.key) || f.nested || !f.simple);
   for(const f of made){ const why = faceProblem(f); if(why) return {...out, why}; }
-  out.cost = Math.round(todo.reduce((s, k) => s + pieceCost(k, barrier), 0) + newGround(made) * COST.landPerSqM);
+  out.cost = Math.round(todo.reduce((s, k) => s + pieceCost(k, barrier), 0));   // the ground is paid for when a gate makes the pen an exhibit
   if(!canAfford(out.cost)) out.why = `Costs ${money(out.cost)}. You have ${money(state.money)}.`;
   return out;
 }
@@ -191,7 +191,10 @@ function layPieces(keys, barrier){
   if(plan.why) return null;
   spend(plan.cost, "built");
   for(const k of plan.todo) fencePieces()[k] = barrier === "wood" ? {} : {b:barrier};
-  return {cost:plan.cost, n:plan.todo.length, notes:syncFenceExhibits()};
+  const before = new Set(penFaces().map(f => f.key)), notes = syncFenceExhibits();
+  const made = penFaces().filter(f => !before.has(f.key));
+  if(made.length) notes.push(`Closed off ${fmtArea(made[0].area)}. Put a gate on its fence to make it an exhibit.`);
+  return {cost:plan.cost, n:plan.todo.length, notes};
 }
 function liftPieces(keys){
   const P = fencePieces(), gone = keys.filter(k => P[k]);
@@ -203,8 +206,9 @@ function liftPieces(keys){
 
 /* ---------- loops into exhibits ---------- */
 // Match the fenced regions to the grid exhibits after the fence changed: an exhibit takes the region that
-// holds the most of its old ground (at least FENCE_GRID.keepShare of it). A region nobody takes becomes a new
-// exhibit; an exhibit whose ground went to another merges into it; one with no region left is open.
+// holds the most of its old ground (at least FENCE_GRID.keepShare of it). A region nobody takes stays a plain pen
+// until a gate goes on it (penFaces, adoptPen); an exhibit whose ground went to another merges into it; one with
+// no region left is open, and stays an exhibit until its gate is removed.
 // Returns plain-text notes on what changed.
 function syncFenceExhibits(){
   const faces = fenceFaces().filter(f => f.simple && !f.nested), grid = gridExhibits(), notes = [];
@@ -227,15 +231,27 @@ function syncFenceExhibits(){
     if(e){
       if(e.open){ delete e.open; notes.push(`${e.name}'s fence is closed again.`); }
       e.points = f.pts;
-    } else if(f.area >= FENCE_GRID.minArea){
-      e = newGridExhibit(f.pts);
-      notes.push(`Fenced off ${e.name}, ${fmtArea(f.area)}.${e.gate ? "" : " Give it a keeper gate where a path meets the fence."}`);
-    } else return;
+    } else return;   // a closed pen with no exhibit waits for a gate (penFaces)
     const bar = weakestOf(loopPieces(e.points));
     if(bar === "wood") delete e.barrier; else e.barrier = bar;
   });
   rehomeContents(notes);
   return notes;
+}
+// Closed regions big enough to be an exhibit that no grid exhibit holds yet: a gate on one makes it an exhibit
+function penFaces(){
+  const grid = gridExhibits();
+  return fenceFaces().filter(f => {
+    if(!f.simple || f.nested || f.area < FENCE_GRID.minArea) return false;
+    const [q] = faceSamples(f.pts);
+    return q && !grid.some(e => inPoly(q[0], q[1], e.points));
+  });
+}
+// A gate on a pen turns it into an exhibit
+function adoptPen(f, gate){
+  const e = newGridExhibit(f.pts); e.gate = gate;
+  const bar = weakestOf(loopPieces(e.points)); if(bar !== "wood") e.barrier = bar;
+  return e;
 }
 function newGridExhibit(pts){
   const used = new Set(state.exhibits.map(x => x.name));
