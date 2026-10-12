@@ -1,7 +1,8 @@
 # Draws the metal bar fence as three 3 m sections in the Dimetrodon's flat style: pristine, degrading (rust in streaks, one bar sagging) and broken (a trampled hole: the middle flattened into the dirt).
 # Pixels are 0.13 m (ROCK_MPP), so a 3 m section is 23 px wide and the 2.6 m fence (FENCE34.bars.h) is 20 px tall, side-on, the post on the left edge so sections tile end to end.
 # Flat fills, no outline, light from the top left: a lit left edge and top, shadow under rails and on the right of the post.
-# Usage: python3 -I tools/pixelfence_bars.py [outdir] [sheet.png]   (default sprites/fence; the optional sheet is a x16 view of one section a state with a gap between)
+# The keeper gate (bars-gate.png, same size) never wears or breaks, so it has no worn states: one 3 m section with a heavy post at each end, a double leaf in a frame, and a gold latch plate (the gate marker's #D8B04A). Frames -1, -2, -3 swing it open for a keeper going through: each leaf shortens toward its hinge post, and the latch goes.
+# Usage: python3 -I tools/pixelfence_bars.py [outdir] [sheet.png]   (default sprites/fence; the optional sheet is a x16 view of every picture, fence on the top row and gate under it)
 import sys, os
 from PIL import Image
 
@@ -12,7 +13,8 @@ def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
 def ramp(base): return {"hi": mix(base, (255, 255, 255), .28), "mid": base, "lo": mix(base, (0, 0, 0), .24), "deep": mix(base, (0, 0, 0), .42)}
 STEEL = ramp((126, 133, 140))   # FENCE34.bars colour #7E858C
 RUST = ramp((178, 78, 0))       # the Dimetrodon's rust orange
-S, R = STEEL, RUST
+GOLD = ramp((216, 176, 74))     # the gate marker colour #D8B04A
+S, R, G = STEEL, RUST, GOLD
 
 class Sec:
     def __init__(s): s.px = {}
@@ -103,15 +105,54 @@ def broken():
     s.put(10, 15, R["lo"]); s.put(14, 15, R["lo"])
     return s
 
+# ---- the keeper gate: posts at x 0..2 and 20..22, a double leaf between with a split at x 10/11
+LEAF = (5, 8, 14, 17)   # bars of the two leaves
+def gpost(s, x0, cap=True):
+    for y in range(1, H - 2): s.put(x0, y, S["hi"]); s.put(x0 + 1, y, S["mid"]); s.put(x0 + 2, y, S["lo"])
+    if cap: s.put(x0, 0, S["hi"]); s.put(x0 + 1, 0, G["hi"]); s.put(x0 + 2, 0, S["mid"]); s.put(x0 + 1, 1, G["mid"])   # a gold ball on top
+    for x in (0, 1, 2): s.put(x0 + x, H - 2, S["mid"] if x < 2 else S["lo"]); s.put(x0 + x, H - 1, S["deep"])
+
+def gate_base(sc=1.0):
+    # sc is how far across the leaves still reach: 1 is shut, less is swung open (a leaf turning away from us shortens toward its hinge post)
+    s = Sec(); gpost(s, 0); gpost(s, 20)
+    fl = lambda x: 3 + round((x - 3) * sc)      # left leaf, hinged at x 3
+    fr = lambda x: 19 - round((19 - x) * sc)    # right leaf, hinged at x 19
+    for xs, f in ((LEAF[:2], fl), (LEAF[2:], fr)):
+        for x in xs:
+            for y in range(1, 18): s.put(f(x), y, S["mid"])
+            s.put(f(x), 1, S["hi"])
+    # the frame: a rail top and bottom across each leaf, stiles at the hinges and the free ends
+    for y0 in (3, 14):
+        for x in range(3, fl(10) + 1): s.put(x, y0, S["hi"]); s.put(x, y0 + 1, S["lo"])
+        for x in range(fr(11), 20): s.put(x, y0, S["hi"]); s.put(x, y0 + 1, S["lo"])
+    for y in range(3, 16):
+        s.put(3, y, S["mid"]); s.put(fl(10), y, S["lo"]); s.put(fr(11), y, S["hi"]); s.put(19, y, S["lo"])
+    for x, y in ((3, 5), (3, 13), (19, 5), (19, 13)): s.put(x, y, S["deep"])   # hinge pins
+    if sc == 1.0:
+        # the latch plate on the split, with its keyhole
+        for x in (10, 11):
+            s.put(x, 8, G["hi"]); s.put(x, 9, G["mid"]); s.put(x, 10, G["lo"])
+        s.put(11, 9, G["deep"])
+    return s
+
+def gate(sc=1.0):
+    s = gate_base(sc)
+    if sc == 1.0:
+        for i, x in enumerate(LEAF): s.put(x, 7 + (i % 2) * 3, S["hi"]); s.put(x, 11 - (i % 2) * 2, S["hi"])
+    s.put(0, 6, S["hi"]); s.put(0, 12, S["hi"]); s.put(20, 6, S["hi"]); s.put(20, 12, S["hi"])
+    return s
+
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/fence"
     sheet_path = sys.argv[2] if len(sys.argv) > 2 else None
     os.makedirs(out, exist_ok=True)
     states = {"pristine": pristine(), "degrading": degrading(), "broken": broken()}
+    gates = {"": gate(1.0), "-1": gate(.66), "-2": gate(.33), "-3": gate(.1)}
     z, gap = 16, 4
-    sheet = Image.new("RGBA", ((len(states) * (W + gap) + gap) * z, (H + gap) * z), (176, 190, 150, 255))   # on a park-green ground
-    for i, (name, sec) in enumerate(states.items()):
-        im = sec.img(); im.save(f"{out}/bars-{name}.png")
-        sheet.alpha_composite(im.resize((W * z, H * z), Image.NEAREST), ((gap + i * (W + gap)) * z, gap // 2 * z))
-        print(name, im.size)
+    sheet = Image.new("RGBA", ((max(len(states), len(gates)) * (W + gap) + gap) * z, (2 * (H + gap) + gap // 2) * z), (176, 190, 150, 255))   # on a park-green ground
+    for row, (pre, group) in enumerate((("bars-", states), ("bars-gate", gates))):
+        for i, (name, sec) in enumerate(group.items()):
+            im = sec.img(); im.save(f"{out}/{pre}{name}.png")
+            sheet.alpha_composite(im.resize((W * z, H * z), Image.NEAREST), ((gap + i * (W + gap)) * z, (gap // 2 + row * (H + gap)) * z))
+            print(pre + name, im.size)
     if sheet_path: sheet.save(sheet_path)
