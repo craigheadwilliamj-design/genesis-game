@@ -109,6 +109,15 @@ let rq = 0;
 function queueRender(){ if(!rq) rq = requestAnimationFrame(() => { rq = 0; render(); }); }
 
 function polyStr(pts){ return pts.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); }
+// A line stroked with a pattern. Chromium clips a pattern stroke to a box a little wider than the line's own bounds, so a straight vertical or horizontal line (a box with no width) only got its pattern
+// on one side. Two zero-length subpaths pad the bounds out (they draw nothing with butt caps), and a round-ended line gets its end caps as circles.
+function texLine(pts, w, fill, round){
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs) - 3, x1 = Math.max(...xs) + 3, y0 = Math.min(...ys) - 3, y1 = Math.max(...ys) + 3;
+  const d = "M" + pts.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join("L") + `M${x0} ${y0}L${x0} ${y0}M${x1} ${y1}L${x1} ${y1}`;
+  let s = `<path d="${d}" stroke="${fill}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
+  if(round) for(const q of [pts[0], pts[pts.length - 1]]) s += `<circle cx="${q[0].toFixed(2)}" cy="${q[1].toFixed(2)}" r="${w/2}" fill="${fill}"/>`;
+  return s;
+}
 
 function render(){
   const k = view.k, inv = 1/k;
@@ -262,9 +271,10 @@ function render(){
     under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
-    if(!svc && texFill(p)) body += `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w}" ${lj}/>`;
+    const rnd = !isWide(p), lp = wj ? wj.pts : p.points;
+    if(!svc && texFill(p)) body += texLine(lp, w, texFill(p), rnd);
     // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
-    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w * .4}" ${lj}/>` : "");
+    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? texLine(lp, w * .4, texFill(p), rnd) : "");
     // painted center line (thin and faded so paths don't read as a parking lot)
     if(!svc && PT.center) body += `<polyline points="${pts}" stroke="${PT.center.c}" stroke-opacity="${PT.center.o}" stroke-width="${PT.center.w*inv}" stroke-dasharray="${PT.center.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-opacity=".5" stroke-width="${.7*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
