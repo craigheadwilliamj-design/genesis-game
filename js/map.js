@@ -967,7 +967,8 @@ function renderOverlay(){
     const keys = fenceDragKeys();
     s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv);
     for(const k of keys){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
-    s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    if(fdrag.box) s += `<rect x="${Math.min(fdrag.a[0], fdrag.b[0])}" y="${Math.min(fdrag.a[1], fdrag.b[1])}" width="${Math.abs(fdrag.b[0] - fdrag.a[0])}" height="${Math.abs(fdrag.b[1] - fdrag.a[1])}" fill="var(--bad)" fill-opacity=".12" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+    else s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
@@ -1636,7 +1637,7 @@ function setTool(t){
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), drag along a fence to lift what you sweep over, or drag a box over empty ground to lift all the fence in it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -1795,6 +1796,20 @@ function fenceDragKeys(){
   if(!fdrag) return [];
   const keys = fdrag.lift ? [] : pieceLine(fdrag.a, fdrag.b).keys;
   return fdrag.lift ? [...fdrag.swept].filter(k => fencePieces()[k]) : keys;
+}
+// Does the segment p-q touch the box with corners a and b? (Liang-Barsky clip)
+function segHitsRect(p, q, a, b){
+  const lo = [Math.min(a[0], b[0]), Math.min(a[1], b[1])], hi = [Math.max(a[0], b[0]), Math.max(a[1], b[1])];
+  let t0 = 0, t1 = 1;
+  for(let i = 0; i < 2; i++){
+    const d = q[i] - p[i];
+    for(const [pp, qq] of [[-d, p[i] - lo[i]], [d, hi[i] - p[i]]]){
+      if(pp === 0){ if(qq < 0) return false; continue; }
+      const r = qq / pp;
+      if(pp < 0){ if(r > t1) return false; if(r > t0) t0 = r; } else { if(r < t0) return false; if(r < t1) t1 = r; }
+    }
+  }
+  return true;
 }
 function fenceDragStat(){
   const keys = fenceDragKeys();
@@ -2441,6 +2456,10 @@ svg.addEventListener("pointerdown", e => {
     const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
     if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
     const w = toWorld(e.clientX, e.clientY), first = tool === "bulldoze" ? pieceNear(w.x, w.y, Math.max(.6, 10 / view.k)) : null;
+    if(tool === "bulldoze" && !first && !itemAt(e.target).kind){   // empty ground: drag a box over fence to lift it
+      fdrag = {a:[w.x, w.y], b:[w.x, w.y], lift:true, box:true, swept:new Set(), last:w}; fhover = null;
+      drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return;
+    }
     if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
@@ -2486,6 +2505,13 @@ svg.addEventListener("pointermove", e => {
   }
   if(!drag) return;
   if(drag.fd){
+    if(fdrag.box){
+      if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
+      drag.moved = true;
+      const w = toWorld(e.clientX, e.clientY); fdrag.b = [w.x, w.y];
+      fdrag.swept = new Set(Object.keys(fencePieces()).filter(k => { const [p, q] = pieceEnds(k); return segHitsRect(p, q, fdrag.a, fdrag.b); }));
+      fenceDragStat(); renderOverlay(); return;
+    }
     if(fdrag.lift){
       // sweep: every piece the pointer passes over joins the lift
       drag.moved = true;
