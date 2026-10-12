@@ -479,7 +479,7 @@ const FENCE34 = {
   wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35], sprite:"wood"},
   bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5, sprite:"bars"},
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true, sprite:"electric"},
-  acrylic: {h:2.2, col:"#9FCFE0", solid:.4},
+  acrylic: {h:2.2, col:"#9FCFE0", solid:.4, sprite:"acrylic"},
   concrete:{h:3.6, col:"#B8B1A2", solid:1},
   hedge:   {h:1.8, hedge:true},
 };
@@ -514,12 +514,13 @@ const FENCE_LAMP = {on:"#FFC25E", dim:"#A5732A", off:"#2A2E2B"};   // an electri
 const FENCE_EDGE = {
   bars:{steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
   electric:{steel:{hi:"#8A929B", mid:"#5A6068", lo:"#41464C", deep:"#2E3236"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
+  acrylic:{steel:{hi:"#EBF8FCD7", mid:"#9FCFE099", lo:"#62A0B8A0", deep:"#52666E"}, rust:{hi:"#F0EDCC", mid:"#D6D0A0B4", lo:"#B8B07A", deep:"#80784C"}, frame:{hi:"#C5CCD3", mid:"#A8B0B8", lo:"#7E858C", deep:"#60666C"}},   // a see-through pane (alpha in the colors) with an aluminium frame at the posts
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
 const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
 function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
-  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE[kind].steel, R = FENCE_EDGE[kind].rust, n2 = v => v.toFixed(2);
+  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE[kind].steel, R = FENCE_EDGE[kind].rust, FR = FENCE_EDGE[kind].frame || C, n2 = v => v.toFixed(2);
   const x0 = Math.round(((a[0] + b[0]) / 2 - FENCE_LOOK.edge * px / 2) / px) * px, ya = Math.min(a[1], b[1]), yb = Math.max(a[1], b[1]);
   const rect = (x, y, w, h, fill) => `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}" fill="${fill}" shape-rendering="crispEdges"/>`;
   const posts = []; for(let y = ya; y < yb + .01; y += S.w * px) posts.push(y);
@@ -538,7 +539,7 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
       const lamp = powered === false ? FENCE_LAMP.off : look === "degrading" ? FENCE_LAMP.dim : FENCE_LAMP.on;
       for(const y of posts) s += rect(x0, y - (S.h - 2) * py, 3 * px, (S.h - 2) * py, C.mid) + rect(x0, y - (S.h - 2) * py, px, (S.h - 2) * py, C.hi) + rect(x0 + 2 * px, y - (S.h - 2) * py, px, (S.h - 2) * py, C.lo) + rect(x0 + px * .5, y - S.h * py, 2 * px, 2 * py, lamp);
     } else s += rect(x0, top, px, yb - top, C.hi) + rect(x0 + px, top, px, yb - top, C.mid) + rect(x0 + 2 * px, top, px, yb - top, C.lo);
-    for(const y of posts) s += (wires ? "" : rect(x0, y - S.h * py, 3 * px, py, C.hi)) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
+    for(const y of posts) s += (wires ? "" : rect(x0, y - S.h * py, 3 * px, py, FR.hi)) + rect(x0, y - 2 * py, 3 * px, py, FR.mid) + rect(x0, y - py, 3 * px, py, FR.deep);
     if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
   }
   if(gate){
@@ -603,7 +604,7 @@ function fence34(P, closed, kinds, which, o = {}){
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
-    if(F.solid){
+    if(F.solid && !F.sprite){
       const op = F.solid * (front ? .55 : 1);
       s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .4) : "");
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
