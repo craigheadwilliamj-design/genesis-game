@@ -127,6 +127,13 @@ function texLine(pts, w, fillOf, round){   // fillOf: one fill for the whole lin
   if(round) s += dot(pts[0], fillOf(0)) + dot(pts[pts.length - 1], fillOf(pts.length - 2));
   return s;
 }
+// The Genesis pixel kerb along a line (a points string): a world-width strip of `kw` m, with a 1 px lit line offset to the top left and a shaded one to the bottom right (light is from the top left),
+// the green face, and a 1 px dark joint every `step` m (kerb stones) with a lit pixel after each joint, laid as dashes across the whole stroke.
+function kerbStack(pl, kw, K, cap){
+  const o = ROCK_MPP, lj = `stroke-linejoin="round" stroke-linecap="${cap}" fill="none"`;
+  const dash = (c, off) => `<polyline points="${pl}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
+  return `<polyline points="${pl}" transform="translate(${-o} ${-o})" stroke="${K.lit}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" transform="translate(${o} ${o})" stroke="${K.shade}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" stroke="${K.c}" stroke-width="${kw}" ${lj}/>` + dash(K.joint, 0) + dash(K.chip, -o);
+}
 const isDiagRun = (a, b) => { const dx = Math.abs(b[0] - a[0]), dy = Math.abs(b[1] - a[1]); return dx > .01 && Math.abs(dx - dy) < .01; };
 
 function render(){
@@ -274,21 +281,26 @@ function render(){
       continue;
     }
     const svc = isService(p), PT = themeOf(p).path;
-    const wj = isWide(p) ? wideJoin(p) : null, pts = polyStr(wj ? wj.pts : p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const wj = isWide(p) ? wideJoin(p) : null, lp = wj ? wj.pts : p.points, pts = polyStr(lp), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
     const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
     const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
     if(!svc && PT.kerbPix){   // a pixel kerb: a world-width strip, with a 1 px lit line offset to the top left and a shaded one to the bottom right (light is from the top left)
-      const K = PT.kerbPix, kw = w + 2*K.w, o = ROCK_MPP;
-      // the face is flat green, with a 1 px dark joint every `step` m (kerb stones) and a lit pixel after each joint, laid as dashes across the whole stroke
-      const dash = (c, off) => `<polyline points="${pts}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
-      under += cut(`<polyline points="${pts}" transform="translate(${-o} ${-o})" stroke="${K.lit}" stroke-width="${kw}" ${lj}/><polyline points="${pts}" transform="translate(${o} ${o})" stroke="${K.shade}" stroke-width="${kw}" ${lj}/><polyline points="${pts}" stroke="${K.c}" stroke-width="${kw}" ${lj}/>` + dash(K.joint, 0) + dash(K.chip, -o));
+      const K = PT.kerbPix;
+      under += cut(kerbStack(pts, w + 2*K.w, K, lj.includes('linecap="round"') ? "round" : "butt"));
+      // a wide path's free end is flat, so it gets a kerb across it, a little wider than the path so it closes the corners
+      if(isWide(p)) for(const end of [0, 1]){
+        const E = lp[end ? lp.length - 1 : 0], q = lp[end ? lp.length - 2 : 1], E0 = p.points[end ? p.points.length - 1 : 0];   // E0 is where it was drawn to (a joined end is run on past it)
+        if(Math.hypot(E0[0] - state.gate[0], E0[1] - state.gate[1]) < 4 || state.paths.some(o => o !== p && !isService(o) && !isTram(o) && lineDist(E0[0], E0[1], o.points) < 1.5)) continue;
+        const dl = Math.hypot(E[0] - q[0], E[1] - q[1]) || 1, nx = -(E[1] - q[1]) / dl, ny = (E[0] - q[0]) / dl, r = halfWidth(p) + K.w;
+        under += kerbStack(polyStr([[E[0] + nx*r, E[1] + ny*r], [E[0] - nx*r, E[1] - ny*r]]), 2*K.w, K, "butt");
+      }
     } else
     under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
-    const rnd = !isWide(p), lp = wj ? wj.pts : p.points;
+    const rnd = !isWide(p);
     if(!svc && texFill(p)) body += texLine(lp, w, PT.slab ? k => slabFill(p, lp[k], lp[k+1], PT.slab) : texFill(p), rnd);
     // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
     if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? texLine(lp, w * .4, texFill(p), rnd) : "");
@@ -301,8 +313,10 @@ function render(){
     // a taper where the path steps down to a narrower one: edge below, surface above
     let tp = "";
     for(const t of wj ? wj.tapers : []){
-      under += `<polygon points="${polyStr(t)}" fill="${PT.edge}" stroke="${PT.edge}" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
-      tp += `<polygon points="${polyStr(t)}" fill="${live ? PT.live : PT.dead}"/>` + (!svc && texFill(p) ? `<polygon points="${polyStr(t)}" fill="${texFill(p)}"/>` : "");
+      if(!svc && PT.kerbPix) under += kerbStack(polyStr([t[0], t[1]]), 2*PT.kerbPix.w, PT.kerbPix, "round") + kerbStack(polyStr([t[3], t[2]]), 2*PT.kerbPix.w, PT.kerbPix, "round");   // kerb on the two slanted sides only
+      else under += `<polygon points="${polyStr(t)}" fill="${PT.edge}" stroke="${PT.edge}" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
+      const tf = !svc && PT.slab ? slabFill(p, [(t[0][0] + t[3][0]) / 2, (t[0][1] + t[3][1]) / 2], [(t[1][0] + t[2][0]) / 2, (t[1][1] + t[2][1]) / 2], PT.slab) : !svc && texFill(p);
+      tp += `<polygon points="${polyStr(t)}" fill="${live ? PT.live : PT.dead}"/>` + (tf ? `<polygon points="${polyStr(t)}" fill="${tf}"/>` : "");
     }
     over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
   }
