@@ -95,8 +95,6 @@ function themeAppeal(e, z){ return (z && z.ok ? THEME.appeal : 0) + THEME.fitApp
 /* ---------- drawing: texture and borders (SVG strings used by map.js) ---------- */
 // paths use `ptex`, buildings and props `btex`, the zone ground `gtex`, and the border band `tex`
 const texFill = it => { const T = themeOf(it), x = T.ptex || T.tex; return x ? `url(#t-${x})` : null; };
-// the pattern for 45° runs, when the theme has one (its slabs are drawn turned a quarter turn)
-const texFillD = it => { const x = themeOf(it).ptexd; return x ? `url(#t-${x})` : null; };
 const bldTex = T => T.btex || T.tex;
 const groundTex = T => T.gtex || T.tex;
 // one stroked outline (polygon or polyline)

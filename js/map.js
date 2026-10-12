@@ -111,21 +111,20 @@ function queueRender(){ if(!rq) rq = requestAnimationFrame(() => { rq = 0; rende
 function polyStr(pts){ return pts.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); }
 // A line stroked with a pattern. Chromium clips a pattern stroke to a box a little wider than the line's own bounds, so a straight vertical or horizontal line (a box with no width) only got its pattern
 // on one side. Two zero-length subpaths pad the bounds out (they draw nothing with butt caps), and a round-ended line gets its end caps as circles.
-function texLine(pts, w, fill, round, diag){
+function texLine(pts, w, fillOf, round){   // fillOf: one fill for the whole line, or a function of the run's index when each run has its own pattern (Genesis slabs)
   const pad = q => { const xs = q.map(p => p[0]), ys = q.map(p => p[1]), x0 = Math.min(...xs) - 3, x1 = Math.max(...xs) + 3, y0 = Math.min(...ys) - 3, y1 = Math.max(...ys) + 3; return `M${x0} ${y0}L${x0} ${y0}M${x1} ${y1}L${x1} ${y1}`; };
   const line = (q, f) => `<path d="M${q.map(p => p[0].toFixed(2) + " " + p[1].toFixed(2)).join("L")}${pad(q)}" stroke="${f}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
   const dot = (q, f) => `<circle cx="${q[0].toFixed(2)}" cy="${q[1].toFixed(2)}" r="${w/2}" fill="${f}"/>`;
-  if(!diag || !pts.some((a, i) => i && isDiagRun(pts[i-1], a))){   // one stroke
-    let s = line(pts, fill);
-    if(round) s += dot(pts[0], fill) + dot(pts[pts.length - 1], fill);
+  if(typeof fillOf === "string"){
+    let s = line(pts, fillOf);
+    if(round) s += dot(pts[0], fillOf) + dot(pts[pts.length - 1], fillOf);
     return s;
   }
-  // a theme with a turned pattern for 45° runs: each run gets the pattern that goes with its direction, and the corners and round ends are discs
-  const of = i => isDiagRun(pts[i], pts[i+1]) ? diag : fill;
+  // each run gets its own pattern; the corners and round ends are discs
   let s = "";
-  for(let i = 0; i < pts.length - 1; i++) s += line([pts[i], pts[i+1]], of(i));
-  for(let i = 1; i < pts.length - 1; i++) s += dot(pts[i], of(i));
-  if(round) s += dot(pts[0], of(0)) + dot(pts[pts.length - 1], of(pts.length - 2));
+  for(let i = 0; i < pts.length - 1; i++) s += line([pts[i], pts[i+1]], fillOf(i));
+  for(let i = 1; i < pts.length - 1; i++) s += dot(pts[i], fillOf(i));
+  if(round) s += dot(pts[0], fillOf(0)) + dot(pts[pts.length - 1], fillOf(pts.length - 2));
   return s;
 }
 const isDiagRun = (a, b) => { const dx = Math.abs(b[0] - a[0]), dy = Math.abs(b[1] - a[1]); return dx > .01 && Math.abs(dx - dy) < .01; };
@@ -240,6 +239,13 @@ function render(){
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "", clipDefs = "", wjN = 0;
+  // Genesis slabs: a pattern per run with its origin on the run's first point, so a joint always sits on the centerline (slab tiles are in sprites/paths/)
+  const slabIds = {};
+  const slabFill = (p, a, b, SL) => {
+    const dg = isDiagRun(a, b), T = SL[isWide(p) ? (dg ? "wideDiag" : "wide") : (dg ? "diag" : "ortho")], key = T[0] + a[0] + "," + a[1];
+    if(!slabIds[key]){ const id = `sl${wjN++}`; slabIds[key] = id; clipDefs += `<pattern id="${id}" width="${T[1]}" height="${T[1]}" patternUnits="userSpaceOnUse" patternTransform="translate(${a[0]} ${a[1]})"><image href="sprites/paths/${T[0]}" width="${T[1]}" height="${T[1]}" style="image-rendering:pixelated"/></pattern>`; }
+    return `url(#${slabIds[key]})`;
+  };
   // staff roads go first, so a guest path always lays over them where they meet
   // tram track goes under everything, then staff roads
   const pathRank = p => isTram(p) ? 2 : isService(p) ? 1 : 0;
@@ -283,11 +289,12 @@ function render(){
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
     const rnd = !isWide(p), lp = wj ? wj.pts : p.points;
-    if(!svc && texFill(p)) body += texLine(lp, w, texFill(p), rnd, texFillD(p));
+    if(!svc && texFill(p)) body += texLine(lp, w, PT.slab ? k => slabFill(p, lp[k], lp[k+1], PT.slab) : texFill(p), rnd);
     // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
-    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? texLine(lp, w * .4, texFill(p), rnd, texFillD(p)) : "");
+    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? texLine(lp, w * .4, texFill(p), rnd) : "");
     // painted center line (thin and faded so paths don't read as a parking lot)
     if(!svc && PT.center) body += `<polyline points="${pts}" stroke="${PT.center.c}" stroke-opacity="${PT.center.o}" stroke-width="${PT.center.w*inv}" stroke-dasharray="${PT.center.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;
+    if(!svc && PT.spine && isWide(p)) body += `<polyline points="${pts}" stroke="${PT.spine.c}" stroke-width="${PT.spine.w}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;   // a thin matte gold line down the promenade
     if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-opacity=".5" stroke-width="${.7*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
     if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
     body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
