@@ -1798,6 +1798,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
+    {   // new path points run straight or at 45° on the 1 m grid from the last point (like fence), and a join on another path lands on the grid
+      const tw = toWorld, drawBak = draw; toWorld = (x, y) => ({x, y});
+      const [gx, gy] = state.gate, pathsBak = state.paths; state.paths = [{id:"pa", points:[[gx, gy - 20], [gx, gy - 60]]}];
+      draw = {kind:"path", pts:[[gx, gy - 40]], snaps:[], hover:null};
+      const a = snapAt(gx + 13.2, gy - 35.7), d = snapAt(gx + 7.4, gy - 47.1);
+      draw.pts = []; const f = snapAt(gx + .4, gy - 33.4);
+      out.pathLattice = a.x === gx + 13 && a.y === gy - 40 && d.x === gx + 7 && d.y === gy - 47 && f.x === gx && f.y === gy - 33 && f.info.type === "seg";
+      toWorld = tw; draw = drawBak; state.paths = pathsBak;
+    }
     return out;
   }));
 

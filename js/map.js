@@ -1616,7 +1616,7 @@ function drawTrams(){
 /* ---------- snapping new corners to things nearby ---------- */
 function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx - r.left - view.tx)/view.k, y:(cy - r.top - view.ty)/ky()}; }
 
-function snapAt(clientX, clientY, ev){
+function snapRaw(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
   // water stays clear of fences and paths, so it only snaps to the grid
   if(draw && draw.kind === "water") return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
@@ -1646,6 +1646,39 @@ function snapAt(clientX, clientY, ev){
   for(const q of snapPaths) for(let i = 1; i < q.points.length; i++)
     if(segProj(g[0], g[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
   return {x:g[0], y:g[1], info};
+}
+
+// Footpaths, roads, tram track and bridges are laid like fence: every run goes straight along one of the eight directions (45° steps) from the last point, on the 1 m grid.
+// Joining another path lands on a grid point along it, and only if that point is on one of those eight lines from the last one.
+const PATH_KINDS = ["path", "wide", "service", "tram", "bridge"];
+function gridAlong(q, x, y){   // the nearest grid point on the path's own line, or null when its run isn't straight or 45° (an older save)
+  for(let i = 1; i < q.points.length; i++){
+    const a = q.points[i-1], b = q.points[i], dx = b[0] - a[0], dy = b[1] - a[1];
+    if(segProj(x, y, a, b).d > .05) continue;
+    let r = null;
+    if(Math.abs(dx) < 1e-6) r = [a[0], Math.round(y / GRID_STEP) * GRID_STEP];
+    else if(Math.abs(dy) < 1e-6) r = [Math.round(x / GRID_STEP) * GRID_STEP, a[1]];
+    else if(Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-6){ const gx = Math.round(x / GRID_STEP) * GRID_STEP; r = [gx, a[1] + (gx - a[0]) * dy / dx]; }
+    return r && segProj(r[0], r[1], a, b).d < .05 ? r : null;
+  }
+  return null;
+}
+function snapAt(clientX, clientY, ev){
+  const sn = snapRaw(clientX, clientY, ev);
+  if(!draw || !PATH_KINDS.includes(draw.kind)) return sn;
+  const q = sn.info && sn.info.type === "seg" ? findItem("path", sn.info.id) : null, g = q ? gridAlong(q, sn.x, sn.y) : null;
+  if(g) sn.x = g[0], sn.y = g[1];
+  const last = draw.pts[draw.pts.length - 1];
+  if(!last) return sn;
+  let dx = sn.x - last[0], dy = sn.y - last[1];
+  if((!dx || !dy || Math.abs(Math.abs(dx) - Math.abs(dy)) < 1e-6) && (!sn.info || sn.info.type !== "seg" || g)) return sn;   // already on one of the eight lines
+  const o = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), ux = Math.round(Math.cos(o * Math.PI / 4)), uy = Math.round(Math.sin(o * Math.PI / 4));
+  const n = Math.round((ux && uy ? (Math.abs(dx) + Math.abs(dy)) / 2 : ux ? Math.abs(dx) : Math.abs(dy)) / GRID_STEP) * GRID_STEP;
+  const e = [last[0] + ux * n, last[1] + uy * n];
+  let info = {type:"grid"};
+  for(const q of state.paths.filter(q => isTram(q) === (draw.kind === "tram")))
+    for(let i = 1; i < q.points.length; i++) if(segProj(e[0], e[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
+  return {x:e[0], y:e[1], info};
 }
 
 // When a new path lands in the middle of another path, add a shared corner there so they really join
@@ -1684,7 +1717,7 @@ function pathProblem(pts, type){
 
 /* ---------- drawing exhibits and paths ---------- */
 const DRAW_TEXT = {
-  path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
+  path:["New path", "Tap to add points. Start on the entrance or another path. Runs go straight or at 45° on the 1 m grid, like fence. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
   service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
