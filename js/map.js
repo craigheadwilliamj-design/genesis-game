@@ -134,6 +134,12 @@ function kerbStack(pl, kw, K, cap){
   const dash = (c, off) => `<polyline points="${pl}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
   return `<polyline points="${pl}" transform="translate(${-o} ${-o})" stroke="${K.lit}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" transform="translate(${o} ${o})" stroke="${K.shade}" stroke-width="${kw}" ${lj}/><polyline points="${pl}" stroke="${K.c}" stroke-width="${kw}" ${lj}/>` + dash(K.joint, 0) + dash(K.chip, -o);
 }
+// Genesis slabs: a pattern per run with its origin on the run's first point, so a joint always sits on the centerline (slab tiles are in sprites/paths/). ctx collects the <pattern> defs.
+function slabPattern(ctx, p, a, b, SL){
+  const dg = isDiagRun(a, b), T = SL[isWide(p) ? (dg ? "wideDiag" : "wide") : (dg ? "diag" : "ortho")], key = T[0] + a[0] + "," + a[1];
+  if(!ctx.ids[key]){ const id = ctx.pre + ctx.n++; ctx.ids[key] = id; ctx.defs += `<pattern id="${id}" width="${T[1]}" height="${T[1]}" patternUnits="userSpaceOnUse" patternTransform="translate(${a[0]} ${a[1]})"><image href="sprites/paths/${T[0]}" width="${T[1]}" height="${T[1]}" style="image-rendering:pixelated"/></pattern>`; }
+  return `url(#${ctx.ids[key]})`;
+}
 const isDiagRun = (a, b) => { const dx = Math.abs(b[0] - a[0]), dy = Math.abs(b[1] - a[1]); return dx > .01 && Math.abs(dx - dy) < .01; };
 
 function render(){
@@ -246,13 +252,8 @@ function render(){
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "", clipDefs = "", wjN = 0;
-  // Genesis slabs: a pattern per run with its origin on the run's first point, so a joint always sits on the centerline (slab tiles are in sprites/paths/)
-  const slabIds = {};
-  const slabFill = (p, a, b, SL) => {
-    const dg = isDiagRun(a, b), T = SL[isWide(p) ? (dg ? "wideDiag" : "wide") : (dg ? "diag" : "ortho")], key = T[0] + a[0] + "," + a[1];
-    if(!slabIds[key]){ const id = `sl${wjN++}`; slabIds[key] = id; clipDefs += `<pattern id="${id}" width="${T[1]}" height="${T[1]}" patternUnits="userSpaceOnUse" patternTransform="translate(${a[0]} ${a[1]})"><image href="sprites/paths/${T[0]}" width="${T[1]}" height="${T[1]}" style="image-rendering:pixelated"/></pattern>`; }
-    return `url(#${slabIds[key]})`;
-  };
+  const slabCtx = {ids:{}, defs:"", n:0, pre:"sl"};
+  const slabFill = (p, a, b, SL) => slabPattern(slabCtx, p, a, b, SL);
   // staff roads go first, so a guest path always lays over them where they meet
   // tram track goes under everything, then staff roads
   const pathRank = p => isTram(p) ? 2 : isService(p) ? 1 : 0;
@@ -325,7 +326,7 @@ function render(){
     if(BUILDINGS[bl.type].prop || themeKey(bl) !== "genesis") continue;
     s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
   }
-  s += clipDefs + under + over;
+  s += clipDefs + slabCtx.defs + under + over;
   // plants, rocks and statues out in the park stand over the path edges
   s += decorSvg(tool === "bulldoze", isDoomed);
 
@@ -1085,10 +1086,16 @@ function renderOverlay(){
     // the band is as wide as the path will be (same width and end caps as a built one)
     if(!poly && all.length >= 2){ const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), (ty === "service" ? 2.5 : 3)*inv); s += `<polyline points="${polyStr(all)}" stroke="${col}" stroke-opacity=".35" stroke-width="${pw}" stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"/>`; }
     // a preview in the theme the thing will be built in (zone or brush)
-    const pk = all.length >= 2 && !err && (draw.kind === "path" || draw.kind === "wide") ? themeFor("path", {points:all, type:drawType()}) : null;
+    const pk = all.length >= 2 && !err && (draw.kind === "path" || draw.kind === "wide") ? themeFor("path", {points:all, type:drawType()}) || "genesis" : null;   // no theme picked means Genesis
     if(pk){
       const pt = {theme:pk}, T = THEMES[pk];
       { const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), 3*inv), pl = polyStr(all), lj = `stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"`;
+        const PT = T.path;
+        if(PT.kerbPix && PT.slab){   // Genesis: the pixel kerb and the slabs, laid per run like a built one
+          const ctx = {ids:{}, defs:"", n:0, pre:"pv"}, fake = {type:ty}, round = ty !== "wide";
+          const surf = texLine(all, pw, k => slabPattern(ctx, fake, all[k], all[k+1], PT.slab), round);
+          s += `<defs>${ctx.defs}</defs><g opacity=".8">${kerbStack(pl, pw + 2*PT.kerbPix.w, PT.kerbPix, round ? "round" : "butt")}<polyline points="${pl}" stroke="${PT.live}" stroke-width="${pw}" ${lj}/>${surf}</g>`;
+        } else
         s += `<g opacity=".8"><polyline points="${pl}" stroke="${T.path.edge}" stroke-width="${pw + 1.6*inv}" ${lj}/><polyline points="${pl}" stroke="${T.path.live}" stroke-width="${pw}" ${lj}/>${texFill(pt) ? `<polyline points="${pl}" stroke="${texFill(pt)}" stroke-width="${pw}" ${lj}/>` : ""}</g>`; }
     }
     if(all.length >= 2) s += `<polyline points="${polyStr(all)}" fill="none" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
