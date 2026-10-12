@@ -1243,7 +1243,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
-    // animals count plants from their own period in full and other periods' plants of the biome at HAB.offEra, and want none where their period had no plants in the biome
+    // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
     px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
     const wrongPeriod = haveOf(px, jurSp).plants, anyPeriod = haveOf(px).plants, offEra = Math.min(Math.PI * 25, wantsOf(px, jurSp).plants * HAB.offEra);
