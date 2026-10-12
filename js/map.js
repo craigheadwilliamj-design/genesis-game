@@ -476,12 +476,12 @@ function sign34(P, i, h, text, fs){ const [x, y] = onEdge34(P, i, .5, h); return
 // which: "back" draws the far sides of an exhibit (before what's inside), "front" the near sides (after it), "all" an open fence line.
 // Solid walls on the near side are see-through, so they don't hide the animals.
 const FENCE34 = {
-  wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35]},
+  wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35], sprite:"wood"},
   bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5, sprite:"bars"},
-  electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true},
-  acrylic: {h:2.2, col:"#9FCFE0", solid:.4},
-  concrete:{h:3.6, col:"#B8B1A2", solid:1},
-  hedge:   {h:1.8, hedge:true},
+  electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true, sprite:"electric"},
+  acrylic: {h:2.2, col:"#9FCFE0", solid:.4, sprite:"acrylic"},
+  concrete:{h:3.6, col:"#B8B1A2", solid:1, sprite:"concrete"},
+  hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
 const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_LOOK.worn ? "degrading" : "pristine";
@@ -489,11 +489,11 @@ const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_L
 // Each is stood up the way fence34 stands a wall (a pixel is ROCK_MPP across and ROCK_MPP / TILT up the map, so it is square on screen), turned along the side as a shear.
 // Returns null for a side running mostly north-south, which is seen edge-on: the caller draws fenceEdgeSvg for it instead.
 // gate: the keeper gate on this side, if it has one ({p: its point, id: the exhibit, f: how far open, a frame number}): a gate picture (a section wide) is set into the fence there.
-function fenceSpriteSvg(kind, a, b, cond, gate){
+function fenceSpriteSvg(kind, a, b, cond, gate, powered){
   const S = FENCE_SPRITES[kind], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if(L < .05 || Math.abs(b[0] - a[0]) / L < FENCE_LOOK.minRun) return null;
   if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
-  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st = fenceState(cond), Lp = L / ROCK_MPP;
+  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st0 = fenceState(cond), off = !!FENCE_SPRITES[kind].power && powered === false, st = off && st0 !== "broken" ? st0 + "-off" : st0, Lp = L / ROCK_MPP;
   // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
   const put = (at, w, pic = st, attr = "") => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image ${attr}href="sprites/fence/${kind}-${pic}.png" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
   let s = "";
@@ -502,43 +502,59 @@ function fenceSpriteSvg(kind, a, b, cond, gate){
     const gw = Math.min(S.w, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
     for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
     for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
-    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" data-f="${gate.f}" `);
+    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `);
   }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
   return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
 }
 // A bar fence side seen edge-on (running mostly north-south) is a thin slab, so it is drawn as a column FENCE_LOOK.edge pixels wide and as tall as the fence, in the pictures' colors:
 // lit left, base middle, shaded right, with a cap across it and a footing at every post (3 m apart, the pictures' spacing). Rust blocks when degrading; a low trampled heap with post stubs when broken.
+// steel is the kind's own material and rust its worn look (silvered wood for the wood fence); the pictures' colors
+const FENCE_LAMP = {on:"#FFC25E", dim:"#A5732A", off:"#2A2E2B"};   // an electric fence post lamp: lit, worn, or with no power
 const FENCE_EDGE = {
-  steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"},
-  rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"},
+  bars:{steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
+  electric:{steel:{hi:"#8A929B", mid:"#5A6068", lo:"#41464C", deep:"#2E3236"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
+  acrylic:{steel:{hi:"#EBF8FCD7", mid:"#9FCFE099", lo:"#62A0B8A0", deep:"#52666E"}, rust:{hi:"#F0EDCC", mid:"#D6D0A0B4", lo:"#B8B07A", deep:"#80784C"}, frame:{hi:"#C5CCD3", mid:"#A8B0B8", lo:"#7E858C", deep:"#60666C"}},   // a see-through pane (alpha in the colors) with an aluminium frame at the posts
+  hedge:{steel:{hi:"#6BA851", mid:"#4E8A3E", lo:"#3A6C2E", deep:"#24461F"}, rust:{hi:"#BAB85C", mid:"#929642", lo:"#707034", deep:"#4A4226"}},   // leaves; rust is dry, browning leaves
+  concrete:{steel:{hi:"#D6D0C2", mid:"#B8B1A2", lo:"#8E8778", deep:"#6A6458"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},   // rust is rebar showing through
+  wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
 const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
-function fenceEdgeSvg(kind, a, b, cond, hi, gate){
-  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE.steel, R = FENCE_EDGE.rust, n2 = v => v.toFixed(2);
+function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
+  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE[kind].steel, R = FENCE_EDGE[kind].rust, FR = FENCE_EDGE[kind].frame || C, n2 = v => v.toFixed(2);
   const x0 = Math.round(((a[0] + b[0]) / 2 - FENCE_LOOK.edge * px / 2) / px) * px, ya = Math.min(a[1], b[1]), yb = Math.max(a[1], b[1]);
   const rect = (x, y, w, h, fill) => `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}" fill="${fill}" shape-rendering="crispEdges"/>`;
   const posts = []; for(let y = ya; y < yb + .01; y += S.w * px) posts.push(y);
   if(yb - posts[posts.length - 1] > .05) posts.push(yb);   // and a post at the near end
   let s = "";
-  if(look === "broken"){
+  if(S.leafy){
+    // a hedge seen end-on is a leafy column five pixels wide and as tall as the hedge: dry colors and a lower top when worn, a low heap of litter when broken
+    const P = look === "degrading" || look === "broken" ? R : C, xl = x0 - px, hh = look === "broken" ? 3 : S.h - (look === "degrading" ? 1 : 0), yt = ya - hh * py;
+    s += rect(xl, yt, 5 * px, yb - yt, P.mid) + rect(xl, yt, px, yb - yt, P.hi) + rect(xl + 4 * px, yt, px, yb - yt, P.lo) + rect(xl, yt, 5 * px, py, P.hi) + rect(xl, yb - 2 * py, 5 * px, py, P.lo) + rect(xl, yb - py, 5 * px, py, P.deep);
+    for(let y = yt + 2 * py, k = 0; y < yb - 3 * py; y += 3 * py, k++) s += rect(xl + (k * 2 % 3 + 1) * px, y, px, py, P.hi) + rect(xl + ((k * 2 + 1) % 3 + 1) * px, y + 1.5 * py, px, py, P.lo);
+  } else if(look === "broken"){
     // the heap is three pixels high all along; each post is a snapped stub, rusted at the top
     s += rect(x0, ya - 3 * py, 3 * px, yb - ya + 3 * py, C.lo) + rect(x0, ya - 3 * py, px, yb - ya + 3 * py, C.mid) + rect(x0 + 2 * px, ya - 3 * py, px, yb - ya + 3 * py, C.deep);
     posts.forEach((y, i) => { const h = (7 + i % 3 * 2) * py; s += rect(x0, y - h, px, h, C.hi) + rect(x0 + px, y - h, px, h, C.lo) + rect(x0, y - h, 2 * px, py, R.mid) + rect(x0 + px, y - h * .5, px, 2 * py, R.lo); });
     for(let y = ya + 1.1; y < yb; y += 2.3) s += rect(x0 + (Math.round(y) % 2) * px, y - 3 * py, px, 2 * py, R.mid);
   } else {
-    const top = ya - FENCE_SPRITES[kind].h * py;
-    s += rect(x0, top, px, yb - top, C.hi) + rect(x0 + px, top, px, yb - top, C.mid) + rect(x0 + 2 * px, top, px, yb - top, C.lo);
-    for(const y of posts) s += rect(x0, y - FENCE_SPRITES[kind].h * py, 3 * px, py, C.hi) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
+    const top = ya - FENCE_SPRITES[kind].h * py, wires = FENCE_SPRITES[kind].wires;
+    if(wires){
+      // wire fence seen end-on: each wire is a thin line down the middle (shifted up by its height), with a post column and its lamp at every post
+      for(const w of wires) s += rect(x0 + px, ya - w * py, px, yb - ya + py, powered === false ? C.mid : C.hi);
+      const lamp = powered === false ? FENCE_LAMP.off : look === "degrading" ? FENCE_LAMP.dim : FENCE_LAMP.on;
+      for(const y of posts) s += rect(x0, y - (S.h - 2) * py, 3 * px, (S.h - 2) * py, C.mid) + rect(x0, y - (S.h - 2) * py, px, (S.h - 2) * py, C.hi) + rect(x0 + 2 * px, y - (S.h - 2) * py, px, (S.h - 2) * py, C.lo) + rect(x0 + px * .5, y - S.h * py, 2 * px, 2 * py, lamp);
+    } else s += rect(x0, top, px, yb - top, C.hi) + rect(x0 + px, top, px, yb - top, C.mid) + rect(x0 + 2 * px, top, px, yb - top, C.lo);
+    for(const y of posts) s += (wires ? "" : rect(x0, y - S.h * py, 3 * px, py, FR.hi)) + rect(x0, y - 2 * py, 3 * px, py, FR.mid) + rect(x0, y - py, 3 * px, py, FR.deep);
     if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
   }
   if(gate){
     const y1 = Math.min(yb, Math.max(ya, gate.p[1] - S.w * px / 2) + S.w * px), y0 = Math.max(ya, y1 - S.w * px), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
     for(const y of [y0, y1]) s += rect(x0, y - h, 3 * px, py, C.hi) + rect(x0 + px, y - h - py, px, py, au.hi) + rect(x0 + px, y - h, px, py, au.mid) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
     // shut: a latch on the split. Open (drawGates swaps them): a leaf swung out from each post.
-    const swung = gate.f >= 2, latch = rect(x0 + px, ym - 10 * py, px, 3 * py, au.mid) + rect(x0 + px, ym - 10 * py, px, py, au.hi) + rect(x0 + px, ym - 8 * py, px, py, au.lo);
-    const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - 14 * py, 4 * px, 10 * py, C.mid) + rect(x0 + 3 * px, y - 14 * py, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - 14 * py, px, 10 * py, C.lo)).join("");
+    const swung = gate.f >= 2, latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
+    const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - h * .7, 4 * px, h * .5, C.mid) + rect(x0 + 3 * px, y - h * .7, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - h * .7, px, h * .5, C.lo)).join("");
     s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
   }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
@@ -567,7 +583,7 @@ function drawGates(now){
     if(el.dataset.f === String(f)) continue;
     el.dataset.f = f;
     if(el.dataset.edge){ el.querySelector("[data-gc]").setAttribute("display", f >= 2 ? "none" : ""); el.querySelector("[data-go]").setAttribute("display", f >= 2 ? "" : "none"); }
-    else el.setAttribute("href", `sprites/fence/${el.dataset.pic}-gate${f ? "-" + f : ""}.png`);
+    else el.setAttribute("href", `sprites/fence/${el.dataset.pic}-gate${el.dataset.off ? "-off" : ""}${f ? "-" + f : ""}.png`);
   }
 }
 function gateSide34(e, kinds){
@@ -589,22 +605,22 @@ function fence34(P, closed, kinds, which, o = {}){
   let s = "";
   for(const {i, a, b, ny, kind} of segs){
     const F = FENCE34[kind] || FENCE34.wood, H = F.h, q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
-    if(F.hedge){
+    if(F.hedge && !F.sprite){
       s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="#6BA851" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
-    if(F.solid){
+    if(F.solid && !F.sprite){
       const op = F.solid * (front ? .55 : 1);
       s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .4) : "");
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
-    // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on is a column instead
+    // a fence with pictures (bars, wood) stands as them, by the exhibit's condition; a side seen edge-on is a column instead
     if(F.sprite){
       const gp = o.gate && o.gate.i === i ? o.gate : null;
-      s += fenceSpriteSvg(F.sprite, a, b, o.cond, gp) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi, gp);
+      s += fenceSpriteSvg(F.sprite, a, b, o.cond, gp, o.powered) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi, gp, o.powered);
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
