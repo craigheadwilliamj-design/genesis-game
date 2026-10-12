@@ -97,11 +97,14 @@ function wantsOf(e, s){
 // Plants from another biome don't count for anything and make animals unhappy
 const plantHere = (t, e) => t.biome === biomeOf(e);
 const plantSuits = (t, s) => t.period === s.period;
-// What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters. With a species, only plants from its own period count.
+// What the exhibit has to give: water share (wetland counts for some), rock cover, plant square meters. With a species, its own period's plants count in full and other periods' plants of the biome fill up to HAB.offEra of what it wants.
 function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
+  let own = 0, off = 0;
+  for(const f of land){ const t = LAND[f.type]; if(t.flora && plantHere(t, e)) { if(!s || plantSuits(t, s)) own += landM2(f); else off += landM2(f); } }
+  if(s) off = Math.min(off, wantsOf(e, s).plants * HAB.offEra);   // other periods' plants fill at most a share of what it wants
   return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
-    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && plantHere(LAND[f.type], e) ? (!s || plantSuits(LAND[f.type], s) ? landM2(f) : landM2(f) * HAB.offEra) : 0), 0))};
+    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(own + off)};
 }
 // How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
 function waterFit(have, want){
