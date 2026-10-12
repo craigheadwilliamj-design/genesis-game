@@ -398,7 +398,7 @@ const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ra
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
   b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
-  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat"]},
+  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "dino", "aepy", "dodo", "sdel"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
