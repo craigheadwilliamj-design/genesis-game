@@ -18,9 +18,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   const checks = await page.evaluate(() => {
     const out = {};
     document.querySelector("#introGo").click(); setSpeed(0);
-    // Paths are tiles now (js/tiles.js), but most checks below lay out buildings around the old line at x=205, so they start from that line. The lines are plain data the rest of the game reads.
-    window.legacyWalk = () => { state.tiles = {}; state.gate = [205, 305]; state.paths = [{id:"p-main", name:"Main walk", points:[[205, 305], [205, 235]], fixed:true}]; recompute(); buildGuestGraph(); buildKeeperGraph(); };
-    legacyWalk();
     // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
     PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
     window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;
@@ -120,7 +117,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // Paleo-medicine end to end, on a fresh park: dart, carry to the PMC, treat, carry home; then an escape
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
-    startWith(newPark(), false); legacyWalk(); setSpeed(0);
+    startWith(newPark(), false); setSpeed(0);
     // no surprise illnesses or injuries from the nightly rolls; this block sets up its own cases
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
@@ -232,7 +229,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // Logistics: dock orders, stores, spoilage, hauling, zones, production
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
-    startWith(newPark(), false); legacyWalk(); setSpeed(0);
+    startWith(newPark(), false); setSpeed(0);
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99; state.health.from = 999;
     const H = Math.PI / 2;
@@ -373,7 +370,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // A keeper fetches food from a dock far out on a service road, with a break room near the station
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
-    startWith(newPark(), false); legacyWalk(); setSpeed(0);
+    startWith(newPark(), false); setSpeed(0);
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.staff.feedFrom = 0; state.safety.escapesFrom = 999; state.health.from = 999;
     state.paths.push({id:"p-k1", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
@@ -458,7 +455,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // Guests: parties walk to food and restrooms, pay where they're served, and their mood sets guest comfort
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
-    startWith(newPark(), false); legacyWalk(); setSpeed(0);
+    startWith(newPark(), false); setSpeed(0);
     state.money = 1e6; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
     state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
     const ex = (id, pts, sp, n) => state.exhibits.push({id, name:id, points:pts, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100});
@@ -883,7 +880,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // Science: research, trips, clones, and growing all run on park minutes, not days
   Object.assign(checks, await page.evaluate(() => {
     const out = {};
-    startWith(newPark(), false); legacyWalk(); setSpeed(0);
+    startWith(newPark(), false); setSpeed(0);
     events.toast = () => {};
     state.money = 1e7; state.day = 3; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
     const H = Math.PI / 2;
@@ -1099,7 +1096,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const pond = [[60,180],[90,180],[90,200],[60,200]];
       out.parkWaterOk = waterHost(pond) === null && waterProblem(pond, null, null, waterCost(pond)) === null;
       addWater(null, pond);
-      out.parkWaterBlocksPath = /bridge/.test(tileProblem(15, 38, "foot") || "") && tileProblem(15, 38, "bridge") === null && tileCost("bridge") === TILE * BRIDGE.perMeter;
+      out.parkWaterBlocksPath = /bridge/.test(pathProblem([[100,235],[75,235],[75,170]]) || "") && pathProblem([[100,235],[75,235],[75,170]], "bridge") === null && pathCost([[0,0],[10,0]], "bridge") === 10 * BRIDGE.perMeter;
       out.parkWaterBlocksBuilding = /water/.test(shapeHitsLandscape(rectPts(75, 190, 6, 6, 0)) || "") && /water/.test(planPieces(pieceLine([50,190],[100,190]).keys, "wood").why || "");
       out.lilyNeedsWater = /only grows in water/.test(landSpot(110, 150, "q-water-lily").why || "") && landSpot(75, 190, "q-water-lily").ok && landSpot(75, 190, "q-cattails").ok && !landSpot(75, 190, "q-white-oak").ok;
       // open fences and hedge rows
@@ -1107,13 +1104,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceOpenOk = fenceProblem(hedgeLine, "hedge") === null && BARRIERS.hedge.strength < BARRIERS.wood.strength;
       const m0 = state.money, hl = addFenceLine(hedgeLine, "hedge");
       out.fenceOpenBuilt = state.fences.length === 1 && state.money === m0 - fenceLineCost(hedgeLine, "hedge") && refundFor("fence", hl) === Math.round(fenceLineCost(hedgeLine, "hedge") * COST.refundShare);
-      const fl2 = addFenceLine([[150,247],[158,247]], "hedge");   // a fence through a tile blocks it, one along its edge doesn't
-      out.fenceBlocksPath = !!tileProblem(30, 49, "foot") && tileProblem(30, 50, "foot") === null; state.fences.splice(state.fences.indexOf(fl2), 1); state.money += fenceLineCost([[150,247],[158,247]], "hedge");
+      out.fenceBlocksPath = !!pathProblem([[150,235],[150,270]]);
       // the fence tool lays loose fence on the grid, and a closed loop of it becomes an exhibit once it has a gate (on the park's own biome)
       state.biome = "desert";
       fenceSel = "hedge"; setTool("exhibit");
       const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
-      out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit";
+      out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
       const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
@@ -1343,7 +1339,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       return {n, mult:(a.room && a.room.get(b)) || 1, crowd:GUEST.crowd};
     };
     const plain = crowdedOn(), wide = crowdedOn("wide");
-    out.widePathRoom = !!plain && !!wide && plain.mult === 1 && wide.mult === WIDE_PATH.crowdMult && tileCost("wide") === TILE * WIDE_PATH.perMeter;
+    out.widePathRoom = !!plain && !!wide && plain.mult === 1 && wide.mult === WIDE_PATH.crowdMult && pathCost([[0,0],[10,0]], "wide") === 10 * WIDE_PATH.perMeter;
     // a wide path drawn over a plain one gives the plain stretch under it the room too, and a lone party on a short stretch isn't packed
     state.paths = [{id:"p-n", points:[[200,300],[260,300]]}, {id:"p-gate", points:[[200,300],[200,300.5]]}, {id:"p-o", type:"wide", points:[[200.5,300],[259,300]]}];
     recompute(); buildGuestGraph();
@@ -1366,19 +1362,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*ky()); const flush = ghost;
     out.rotateFlush = false;
     if(flush.ok){ const fb = {id:"b-flush", type:"food", points:flush.pts}; state.buildings.push(fb); setTool("move"); mvSel = fb.id; rotateMoved(); out.rotateFlush = Math.abs(Math.atan2(fb.points[1][1] - fb.points[0][1], fb.points[1][0] - fb.points[0][0]) - flush.angle) > .5 && !moveProblem("building", fb); }
-    // path tiles join their neighbours whatever the kind, and a gap keeps them apart
-    state.tiles = {}; layTiles([[40,60]], "foot"); layTiles([[41,60]], "wide"); layTiles([[44,60]], "foot"); recompute();
-    out.pathEdgeSnaps = derived.joined.has(tilePath["40,60"]);
-    out.pathFarNoSnap = !derived.joined.has(tilePath["44,60"]);
-    out.wideShortNotJoined = state.paths.some(p => p.type === "wide");
-    out.wideOnCenterJoined = derived.joined.has(tilePath["41,60"]);
-    state.tiles = {};
+    // drawing a path onto the edge of another snaps to its centerline, so they join
+    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}]; recompute();
+    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*ky()];
+    const sn = snapAt(...cl(250, 297.5));   // on the edge of the 5 m path, 2.5 m off its centerline
+    out.pathEdgeSnaps = Math.abs(sn.y - 300) < .01 && sn.info && sn.info.type === "seg";
+    const farSn = snapAt(...cl(250, 290));  // well clear of it
+    out.pathFarNoSnap = Math.abs(farSn.y - 290) < .5 || !!farSn.info === false;
+    setTool("select");
+    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}, {id:"p-w", type:"wide", points:[[250,240],[250,297.5]]}]; recompute();
+    out.wideShortNotJoined = !derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 0;
+    state.paths[2].points[1] = [250, 300]; recompute();
+    out.wideOnCenterJoined = derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 1;
     setTool("select"); state.paths = savedPaths; recompute();
 
     // tram: track is drawn like a path, guests ride it between stations, and nobody walks it
     const trSaved = {paths:state.paths, buildings:state.buildings, tech:state.science.tech.slice(), money:state.money, fares:state.today.fares};
     state.science.tech = state.science.tech.filter(t => t !== "transit"); state.money = 1e6; state.today.fares = 0;
-    out.tramNeedsTech = (tileProblem(20, 20, "tram") || "").includes("Research") && tileProblem(20, 20, "foot") === null && tileCost("tram") === TILE * TRAM.perMeter;
+    out.tramNeedsTech = (pathProblem([[100,100],[200,100]], "tram") || "").includes("Research") && pathProblem([[100,100],[200,100]], "path") === null && pathCost([[0,0],[100,0]], "tram") === 100 * TRAM.perMeter;
     state.science.tech.push("transit");
     state.gate = [200,300];
     const stn = (id, x) => ({id, type:"tramstop", points:[[x-5,303],[x+5,303],[x+5,308],[x-5,308]]});
@@ -1439,8 +1440,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // drawn like a path, and a car runs on it
     render(); drawTrams();
     out.tramDrawn = world.innerHTML.includes("#5E4B38") && $("#tramLayer").children.length === 1 && tramStops(state.paths[2]).stops.length === 2;
-    // tram track only joins tram track; everything else walkable joins
-    out.tramSnaps = !tilesLink({k:"tram"}, {k:"foot"}) && tilesLink({k:"foot"}, {k:"service"}) && tilesLink({k:"tram"}, {k:"tram"});
+    // the track only snaps to other track, and footpaths don't snap onto it
+    setTool("tram"); const trc = svg.getBoundingClientRect(), trcl = (x, y) => [trc.left + view.tx + x*view.k, trc.top + view.ty + y*ky()];
+    const trsn = snapAt(...trcl(300, 300)); setTool("path"); const trsn2 = snapAt(...trcl(300, 312)); setTool("select");
+    out.tramSnaps = !(trsn.info && trsn.info.id === "p-tr") && !(trsn2.info && trsn2.info.id === "p-rail");
     // no stations, no ride; and the same trip is a long walk
     state.buildings = [loo]; recompute(); buildGuestGraph();
     const walkOnly = walkD();
@@ -1455,19 +1458,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     Object.assign(state, {paths:trSaved.paths, buildings:trSaved.buildings, money:trSaved.money}); state.science.tech = trSaved.tech; state.today.fares = trSaved.fares;
     recompute(); buildGuestGraph(); buildKeeperGraph(); render(); drawTrams();
 
-    // the path tool: a drag lays a run of tiles, each costs the same, and the Bulldoze drag lifts them back
-    { const tsave = state.tiles, psave = state.paths; state.tiles = {}; syncPaths(); state.money = 1e6; setTool("path"); const m0t = state.money;
-      tdrag = {a:[40,59], b:[40,57], k:"foot", lift:false, swept:new Set()}; tileDragEnd();
-      out.tileLay = Object.keys(state.tiles).length === 3 && state.money === m0t - 3 * tileCost("foot") && state.paths.length === 1 && state.paths[0].tiles.length === 3;
-      setTool("bulldoze"); tdrag = {a:[40,58], b:[40,58], lift:true, swept:new Set(["40,58"]), last:{x:0, y:0}}; tileDragEnd();
-      out.tileLift = Object.keys(state.tiles).length === 2 && state.paths.length === 2 && state.money === m0t - 3 * tileCost("foot") + Math.round(tileCost("foot") * COST.refundShare);
-      setTool("select"); state.tiles = tsave; state.paths = psave; recompute(); buildGuestGraph(); }
+    // the path preview band is as wide as the path it will become
+    const bandW = kind => { setTool(kind); draw.pts = [[300,300]]; draw.hover = [340,300]; renderOverlay(); const m = $("#overlay").innerHTML.match(/stroke-opacity="\.35" stroke-width="([\d.]+)"/); setTool("select"); return m && +m[1]; };
+    out.pathBandWidth = bandW("path") === 2*PATH_HALF_WIDTH && bandW("wide") === 2*WIDE_PATH.halfWidth && bandW("service") === 2*SERVICE_ROAD.halfWidth;
 
     // themes: old saves get defaults, themes unlock by play, a matched area draws more, animals that suit a theme are happier
     const old = JSON.parse(JSON.stringify(state)); delete old.themes; upgradeSave(old);
     out.themesDefault = old.themes.brush === "genesis" && old.themes.have.length === 1;
     // the Range theme was renamed Homestead: old saves move over
-    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; delete rg.tiles; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", theme:"western", points:[[0, 20], [9, 20]]}]; upgradeSave(rg);
+    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
     out.themeRangeRenamed = rg.paths[0].theme === "homestead" && rg.themes.brush === "homestead" && rg.themes.have.includes("homestead") && !THEMES.range;
     out.themeWesternRenamed = rg.paths[1].theme === "mesa" && rg.themes.have.includes("mesa") && !rg.themes.have.includes("western") && !THEMES.western;
     // the Classic theme became Japanese Garden: old saves move over
@@ -1799,11 +1798,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
-    {   // a diagonal drag lays a staircase of tiles that stay joined, and old line saves become tiles
-      const stair = tileLine([0, 0], [3, 3]);
-      out.tileStairs = stair.length === 7 && stair.every((c, i) => !i || Math.abs(c[0] - stair[i-1][0]) + Math.abs(c[1] - stair[i-1][1]) === 1);
-      const conv = tilesFromPaths([{id:"o", points:[[2, 2], [22, 2], [22, 22]]}]);
-      out.tilesFromLines = Object.keys(conv).length === 9;
+    {   // a save from the reverted tile-path build keeps its paths as tiles; they become lines again, joined to the entrance
+      const tsave = JSON.parse(JSON.stringify(newPark())); tsave.paths = []; tsave.gate = [202.5, 305];
+      tsave.tiles = {}; for(let i = 0; i < 6; i++) tsave.tiles["40," + (60 - i)] = {k:"foot", fixed:i < 3}; tsave.tiles["41,55"] = {k:"foot"}; tsave.tiles["42,55"] = {k:"service"};
+      startWith(tsave, false); setSpeed(0);
+      out.tilesBecomeLines = state.paths.length >= 6 && state.paths.some(p => p.type === "service") && state.paths.some(p => p.fixed) && derived.joined.size >= 5 && derived.joinedAll.size > derived.joined.size;
     }
     return out;
   }));

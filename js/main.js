@@ -111,7 +111,7 @@ function saveSoon(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 20
 async function saveNow(){
   clearTimeout(saveTimer);
   state.savedAt = Date.now();
-  const json = JSON.stringify(state, function(k, v){ return this === state && k === "paths" ? [] : v; });   // the lines are made from the tiles on load (tiles.js), so they aren't saved
+  const json = JSON.stringify(state);
   try{ localStorage.setItem(SAVE_KEY, json); }catch{}
   if(db && playerId){
     try{ await db.doc(`data/users/${playerId}/game`).set({json, savedAt:state.savedAt}); saveInfo("Saved to your account."); }

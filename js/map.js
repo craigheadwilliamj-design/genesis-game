@@ -43,7 +43,7 @@ const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes
 let fenceSel = "wood";             // fence type the next exhibit is built with
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
-const isDrawTool = t => t === "zone" || t === "water";
+const isDrawTool = t => t === "path" || t === "service" || t === "wide" || t === "tram" || t === "bridge" || t === "zone" || t === "water";
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
@@ -53,6 +53,43 @@ let mvSel = null;                   // building picked with the Move tool, the o
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
+// Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
+// so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
+function wideJoin(p){
+  const pts = p.points.map(q => q.slice()), clips = [], tapers = [];
+  for(const end of [0, 1]){
+    const i = end ? pts.length - 1 : 0, prev = pts[end ? i - 1 : 1], E = pts[i];
+    let best = null;
+    for(const o of state.paths){
+      if(o === p || isService(o) || isTram(o)) continue;
+      for(let j = 1; j < o.points.length; j++){
+        const r = segProj(E[0], E[1], o.points[j-1], o.points[j]), hw = halfWidth(o);
+        if(r.d < 1.5 && (!best || r.d < best.d)) best = {...r, a:o.points[j-1], b:o.points[j], hw};   // joined, by the same 1.5 m rule the game uses
+      }
+    }
+    if(!best) continue;
+    const ux = best.b[0] - best.a[0], uy = best.b[1] - best.a[1], L = Math.hypot(ux, uy) || 1, tx = ux/L, ty = uy/L;
+    let mx = -ty, my = tx;                                          // normal pointing to the wide path's side
+    if((prev[0] - best.x)*mx + (prev[1] - best.y)*my < 0){ mx = -mx; my = -my; }
+    const dx = E[0] - prev[0], dy = E[1] - prev[1], dl = Math.hypot(dx, dy) || 1, dn = (dx*mx + dy*my) / dl;
+    if(Math.abs(dn) < .2){                                          // running along it, not into it: a narrower path carrying on in line gets a taper
+      const ox = dx/dl, oy = dy/dl;
+      const ahead = Math.max((best.a[0] - E[0])*ox + (best.a[1] - E[1])*oy, (best.b[0] - E[0])*ox + (best.b[1] - E[1])*oy);
+      if(best.hw < WIDE_PATH.halfWidth && ahead > 1){
+        const T = Math.min(2*(WIDE_PATH.halfWidth - best.hw), ahead), W = WIDE_PATH.halfWidth, nx = -oy, ny = ox;
+        const cx = E[0] + ox*T + nx*((best.x - E[0])*nx + (best.y - E[1])*ny), cy = E[1] + oy*T + ny*((best.x - E[0])*nx + (best.y - E[1])*ny);
+        tapers.push([[E[0] + nx*W, E[1] + ny*W], [cx + nx*best.hw, cy + ny*best.hw], [cx - nx*best.hw, cy - ny*best.hw], [E[0] - nx*W, E[1] - ny*W]]);
+      }
+      continue;
+    }
+    // how far past the end to run it to reach the far edge
+    const gap = (E[0] - best.x)*mx + (E[1] - best.y)*my + best.hw;
+    const t = -gap / dn;
+    if(t > 0) pts[i] = [E[0] + dx/dl*Math.min(t, 40), E[1] + dy/dl*Math.min(t, 40)];
+    clips.push({bx:best.x - mx*best.hw, by:best.y - my*best.hw, tx, ty, mx, my});
+  }
+  return {pts, clips, tapers};
+}
 
 /* ---------- looking things up ---------- */
 function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
@@ -180,14 +217,67 @@ function render(){
   for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
   for(const r of looseRuns()) s += fenceRunSvg(r.pts, r.b, false);
 
-  // paths: tiles on the 5 m grid (tilemap.js). Kerbs and surfaces go under the building strips and every roof
+  // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
+  let under = "", over = "", clipDefs = "", wjN = 0;
+  // staff roads go first, so a guest path always lays over them where they meet
+  // tram track goes under everything, then staff roads
+  const pathRank = p => isTram(p) ? 2 : isService(p) ? 1 : 0;
+  for(const p of [...state.paths].sort((a, b) => pathRank(b) - pathRank(a))){
+    if(isTram(p)){
+      const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id);
+      if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
+      // gravel bed, then the ties as short dashes across it, then two rails: a dark band with a bed-colored band laid back over it
+      under += `<polyline points="${pts}" stroke="#4A4742" stroke-width="${w + 1.2*inv}" ${lj}/>`;
+      let body = `<polyline points="${pts}" stroke="#8C877D" stroke-width="${w}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="#5E4B38" stroke-width="${w}" stroke-dasharray="${.7} ${1.6}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="#2E2C29" stroke-width="${w * .72}" ${lj}/><polyline points="${pts}" stroke="#8C877D" stroke-width="${w * .46}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+      over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
+      continue;
+    }
+    if(isBridge(p)){
+      const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id), live = joined.has(p.id);
+      if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
+      // dark timber rails along both sides, then the deck, then the gaps between the planks as thin dashes across it
+      let body = `<polyline points="${pts}" stroke="#4A3220" stroke-width="${w + .9}" ${lj}/><polyline points="${pts}" stroke="#7A5634" stroke-width="${w + .3}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="${live ? "#B48A5A" : "#9C8468"}" stroke-width="${w - .5}" ${lj}/><polyline points="${pts}" stroke="#6E4E30" stroke-opacity=".7" stroke-width="${w - .5}" stroke-dasharray=".12 .88" ${lj}/>`;
+      if(!live) body += `<polyline points="${pts}" stroke="#4A3220" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
+      body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+      over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}</g>`;
+      continue;
+    }
+    const svc = isService(p), PT = themeOf(p).path;
+    const wj = isWide(p) ? wideJoin(p) : null, pts = polyStr(wj ? wj.pts : p.points), w = Math.max(2*halfWidth(p), (svc ? 2.5 : 3)*inv);
+    const cut = str => { if(!wj) return str; for(const c of wj.clips){ const id = `wj${wjN++}`, B = 1e4; clipDefs += `<clipPath id="${id}"><polygon points="${[[-1,0],[1,0],[1,1],[-1,1]].map(([a, b]) => `${c.bx + c.tx*B*a + c.mx*B*b},${c.by + c.ty*B*a + c.my*B*b}`).join(" ")}"/></clipPath>`; str = `<g clip-path="url(#${id})">${str}</g>`; } return str; };
+    const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
+    const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
+    if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
+    under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
+    if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
+    let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
+    if(!svc && texFill(p)) body += `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w}" ${lj}/>`;
+    // wheel ruts: a darker band, then the crown down the middle laid back over it, leaving two worn tracks
+    if(!svc && PT.ruts) body += `<polyline points="${pts}" stroke="${PT.ruts.c}" stroke-opacity="${PT.ruts.o}" stroke-width="${w * .66}" ${lj}/><polyline points="${pts}" stroke="${live ? PT.live : PT.dead}" stroke-width="${w * .4}" ${lj}/>` + (texFill(p) ? `<polyline points="${pts}" stroke="${texFill(p)}" stroke-width="${w * .4}" ${lj}/>` : "");
+    // painted center line (thin and faded so paths don't read as a parking lot)
+    if(!svc && PT.center) body += `<polyline points="${pts}" stroke="${PT.center.c}" stroke-opacity="${PT.center.o}" stroke-width="${PT.center.w*inv}" stroke-dasharray="${PT.center.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`;
+    if(svc) body += `<polyline points="${pts}" stroke="#E6E2D6" stroke-opacity=".5" stroke-width="${.7*inv}" stroke-dasharray="${5*inv} ${5*inv}" ${lj}/>`;
+    if(!live) body += `<polyline points="${pts}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
+    body += `<polyline points="${pts}" stroke="transparent" stroke-width="${Math.max(w, 14*inv)}" ${lj}/>`;
+    // a taper where the path steps down to a narrower one: edge below, surface above
+    let tp = "";
+    for(const t of wj ? wj.tapers : []){
+      under += `<polygon points="${polyStr(t)}" fill="${PT.edge}" stroke="${PT.edge}" stroke-width="${1.6*inv}" stroke-linejoin="round"/>`;
+      tp += `<polygon points="${polyStr(t)}" fill="${live ? PT.live : PT.dead}"/>` + (!svc && texFill(p) ? `<polygon points="${polyStr(t)}" fill="${texFill(p)}"/>` : "");
+    }
+    over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
+  }
   // Genesis buildings get a narrow pale gravel strip so they stand off the grass; all strips go in one pass under the paths and every roof, so none paints over a neighbor
   for(const bl of state.buildings){
     if(BUILDINGS[bl.type].prop || themeKey(bl) !== "genesis") continue;
     s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
   }
-  s += tilesSvg(joined, joinedAll, isSel, isDoomed);
+  s += clipDefs + under + over;
   // plants, rocks and statues out in the park stand over the path edges
   s += decorSvg(tool === "bulldoze", isDoomed);
 
@@ -944,6 +1034,15 @@ function renderOverlay(){
     const err = draw.error;
     const col = err ? "var(--bad)" : "var(--sel)";
     if(poly && all.length >= 3) s += `<polygon points="${polyStr(all)}" fill="${col}" fill-opacity=".18" stroke="none"/>`;
+    // the band is as wide as the path will be (same width and end caps as a built one)
+    if(!poly && all.length >= 2){ const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), (ty === "service" ? 2.5 : 3)*inv); s += `<polyline points="${polyStr(all)}" stroke="${col}" stroke-opacity=".35" stroke-width="${pw}" stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"/>`; }
+    // a preview in the theme the thing will be built in (zone or brush)
+    const pk = all.length >= 2 && !err && (draw.kind === "path" || draw.kind === "wide") ? themeFor("path", {points:all, type:drawType()}) : null;
+    if(pk){
+      const pt = {theme:pk}, T = THEMES[pk];
+      { const ty = drawType(), pw = Math.max(2*halfWidth({type:ty}), 3*inv), pl = polyStr(all), lj = `stroke-linecap="${ty === "wide" ? "butt" : "round"}" stroke-linejoin="round" fill="none"`;
+        s += `<g opacity=".8"><polyline points="${pl}" stroke="${T.path.edge}" stroke-width="${pw + 1.6*inv}" ${lj}/><polyline points="${pl}" stroke="${T.path.live}" stroke-width="${pw}" ${lj}/>${texFill(pt) ? `<polyline points="${pl}" stroke="${texFill(pt)}" stroke-width="${pw}" ${lj}/>` : ""}</g>`; }
+    }
     if(all.length >= 2) s += `<polyline points="${polyStr(all)}" fill="none" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     if(poly && all.length >= 3) s += `<line x1="${all[all.length-1][0]}" y1="${all[all.length-1][1]}" x2="${all[0][0]}" y2="${all[0][1]}" stroke="${col}" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/>`;
     draw.pts.forEach((p, i) => {
@@ -951,7 +1050,6 @@ function renderOverlay(){
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(first ? 7 : 4.5)*inv}" fill="${first ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     });
   }
-  s += tileOverlaySvg(inv);
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
     const keys = fenceDragKeys();
@@ -1507,15 +1605,40 @@ function snapAt(clientX, clientY, ev){
   // water stays clear of fences and paths, so it only snaps to the grid
   if(draw && draw.kind === "water") return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
   const R = 12 / view.k;
+  // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
+  // tram track only ever joins other tram track, and nothing else snaps to it
+  const snapPaths = state.paths.filter(q => isTram(q) === !!(draw && draw.kind === "tram"));
+  if(draw && ["path", "wide", "service", "tram", "bridge"].includes(draw.kind)){
+    let hit = null;
+    for(const q of snapPaths) for(let i = 1; i < q.points.length; i++){
+      const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
+      if(r.d <= Math.max(halfWidth(q), R * .8) && !snapPaths.some(o => o.points.some(v => Math.hypot(p.x - v[0], p.y - v[1]) < R)) && (!hit || r.d < hit.d)) hit = {x:r.x, y:r.y, d:r.d, id:q.id};
+    }
+    if(hit) return {x:hit.x, y:hit.y, info:{type:"seg", kind:"path", id:hit.id}};
+  }
   let best = null, bd = R;
   const tryV = (v, kind, id) => { const d = Math.hypot(p.x - v[0], p.y - v[1]); if(d < bd){ bd = d; best = {x:v[0], y:v[1], info:{type:"vertex", kind, id}}; } };
   tryV(state.gate, "gate", "gate");
   const edges = ownedEdges();
   for(const [a, c] of edges){ tryV(a, "boundary", "boundary"); tryV(c, "boundary", "boundary"); }
+  for(const q of snapPaths) q.points.forEach(v => tryV(v, "path", q.id));
   for(const q of state.exhibits) q.points.forEach(v => tryV(v, "exhibit", q.id));
   if(best) return best;
-  // otherwise land on the nearest grid point
-  return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
+  // otherwise land on the nearest grid point (and still join a path if that point sits on one)
+  const g = [Math.round(p.x / GRID_STEP) * GRID_STEP, Math.round(p.y / GRID_STEP) * GRID_STEP];
+  let info = {type:"grid"};
+  for(const q of snapPaths) for(let i = 1; i < q.points.length; i++)
+    if(segProj(g[0], g[1], q.points[i-1], q.points[i]).d < .05) info = {type:"seg", kind:"path", id:q.id};
+  return {x:g[0], y:g[1], info};
+}
+
+// When a new path lands in the middle of another path, add a shared corner there so they really join
+function insertJunction(pathId, x, y){
+  const q = findItem("path", pathId); if(!q) return;
+  if(q.points.some(v => Math.hypot(v[0]-x, v[1]-y) < .05)) return;
+  for(let i = 0; i < q.points.length - 1; i++){
+    if(segProj(x, y, q.points[i], q.points[i+1]).d < .05){ q.points.splice(i+1, 0, [x, y]); return; }
+  }
 }
 
 /* ---------- checking whether something can be built ---------- */
@@ -1530,16 +1653,35 @@ function insidePlot(pts, closed){
   return true;
 }
 
+function pathProblem(pts, type){
+  if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`;
+  if(pts.length < 2) return "Needs at least 2 points.";
+  if(lineLength(pts) < 2) return "Too short.";
+  if(!insidePlot(pts)) return "Keep it inside the park boundary.";
+  if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
+  if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  const hit = lineHitsLandscape(pts, halfWidth({type}), type === "bridge"); if(hit) return hit;
+  const cost = pathCost(pts, type);
+  if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
+  return null;
+}
+
 /* ---------- drawing exhibits and paths ---------- */
 const DRAW_TEXT = {
+  path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
-  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."]
+  wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
+  service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
+  tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
+  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."],
+  bridge:["New wooden bridge", "A footpath that can cross water. Start on a path or the entrance, run it over the water, then tap the last point again to finish."]
 };
+const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram" || draw.kind === "bridge") ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; fdrag = null; fhover = null; tdrag = null; thover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; fdrag = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -1550,7 +1692,6 @@ function setTool(t){
   }
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
-  else if(isPathTool(t)) tileBar();
   else if(t === "exhibit") fenceBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(landKey(t)){
@@ -1604,6 +1745,7 @@ function startDraw(kind){
   const [t, hint] = DRAW_TEXT[kind];
   showBar(t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
   updateDrawbar();
+  if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -1616,11 +1758,13 @@ function updateDrawbar(){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
   } else if(draw.kind === "water"){
     if(all.length >= 3){ const h = waterHost(all); stat = `${fmtArea(area(all))} of water ${h ? "in " + h.name : "out in the park"}. ${money(waterCost(all))}`; err = waterProblem(all, h, null, waterCost(all)); }
+  } else if(all.length >= 2){
+    stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
   draw.error = err;
   setStat(err || stat, !!err);
   $("#dUndo").disabled = !draw.pts.length;
-  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "water" ? !waterProblem(draw.pts, waterHost(draw.pts), null, waterCost(draw.pts)) : false;
+  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "water" ? !waterProblem(draw.pts, waterHost(draw.pts), null, waterCost(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
   $("#dFinish").disabled = !ready;
 }
 
@@ -1685,10 +1829,10 @@ function finishDraw(){
   if(tool === "zoneedit"){ finishZoneEdit(); return; }
   if(tool === "move"){ rotateMoved(); return; }
   if(!draw) return;
-  const d = draw;
+  const d = draw, type = drawType();
   const pts = d.pts.map(p => [p[0], p[1]]);
   const host = d.kind === "water" ? waterHost(pts) : null;
-  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "water" ? waterProblem(pts, host, null, waterCost(pts)) : null;
+  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "water" ? waterProblem(pts, host, null, waterCost(pts)) : pathProblem(pts, type);
   if(problem){ setStat(problem, true); return; }
   if(d.kind === "water"){
     const cost = waterCost(pts);
@@ -1712,6 +1856,20 @@ function finishDraw(){
     ui.toast(`${z.name}: ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"} and ${m.stores.length} building${m.stores.length === 1 ? "" : "s"} inside. Assign keepers to it from its panel.`);
     return;
   }
+  d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
+  const cost = pathCost(pts, type);
+  spend(cost, "built");
+  const p = {id:uid("p-"), name:type === "service" ? "Service road" : type === "wide" ? "Wide path" : type === "tram" ? "Tram track" : type === "bridge" ? "Wooden bridge" : "Path", points:pts};
+  if(type) p.type = type;
+  if(type !== "service" && type !== "tram" && type !== "bridge") themeNew("path", p);
+  state.paths.push(p);
+  afterChange();
+  // keep the tool going so you can draw the next one
+  startDraw(d.kind);
+  render();
+  const joinedNow = type === "tram" || (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
+  const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : type === "bridge" ? "wooden bridge" : "path";
+  ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
@@ -1768,6 +1926,7 @@ function drawTap(e){
   const sn = snapAt(e.clientX, e.clientY, e), k = view.k;
   const near = q => q && Math.hypot(q[0] - sn.x, q[1] - sn.y) * k < 14;
   if(isPoly(draw.kind) && draw.pts.length >= 3 && near(draw.pts[0])){ finishDraw(); return; }
+  if(!isPoly(draw.kind) && draw.pts.length && near(draw.pts[draw.pts.length-1])){ finishDraw(); return; }
   draw.pts.push([sn.x, sn.y]); draw.snaps.push(sn.info);
   snapMark = null; updateDrawbar(); renderOverlay();
 }
@@ -1819,7 +1978,7 @@ function placeGhost(clientX, clientY){
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
-  if(!why && !t.onPath && (tilesHit(pts) || state.paths.some(q => lineEntersShape(q.points, pts)))) why = "It sits on a path.";
+  if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
@@ -2144,11 +2303,6 @@ function confirmGateRemoval(e){
 }
 
 function removeItem(kind, it, opts = {}){
-  if(kind === "path"){   // a whole line of tiles (the Bulldoze tool lifts them one at a time instead)
-    const refund = refundFor(kind, it); earn(refund, "sold");
-    for(const k of it.tiles) if(!(state.tiles[k] || {}).fixed) delete state.tiles[k];
-    syncPaths(); sel = null; afterChange(); render(); ui.panel(); return;
-  }
   const lift = kind === "exhibit" && it.grid && !opts.keepFence ? ownPieces(it) : [];
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
@@ -2172,7 +2326,6 @@ function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
   if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
-  if(hit.kind === "path"){ setStat("Paths are laid tile by tile. Lift the tiles with Bulldoze and lay them where you want them.", true); return null; }
   if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   if(it.grid){ setStat("A fenced exhibit stays where its fence is. Lift the fence with Bulldoze and lay it again.", true); return null; }
@@ -2186,13 +2339,13 @@ function moveProblem(kind, it){
   if(kind === "exhibit"){
     if(state.exhibits.some(e => e !== it && shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
     if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
-    if(tilesHit(pts) || state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+    if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
     return shapeHitsLandscape(pts);
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
-    else if(tilesHit(pts) || state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+    else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
     const keep = state.fences; state.fences = keep.filter(l => l !== it);
@@ -2285,7 +2438,7 @@ function reshapeProblem(e, orig){
   if(area(pts) < 60) return "Too small. Exhibits need at least 60 m².";
   if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
   if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
-  if(tilesHit(pts) || state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
+  if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
   if(landOf(e).some(f => !deepInside(f.x, f.y, pts, footR(LAND[f.type])))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
@@ -2360,7 +2513,7 @@ svg.addEventListener("pointerdown", e => {
   // the middle or right button always pans, whatever the tool
   if(e.button > 0){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, pan:true, hit:{kind:null, id:null}}; return; }
   if(pointers.size === 2){
-    drag = null; if(fdrag){ fdrag = null; renderOverlay(); } if(tdrag){ tdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
+    drag = null; if(fdrag){ fdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
     pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, ky:ky(), tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
     return;
   }
@@ -2387,14 +2540,10 @@ svg.addEventListener("pointerdown", e => {
     if(it){ mvSel = hit.kind === "building" ? it.id : null; updateMoveBar(); drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; render(); return; }
   }
   if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
-  if(isPathTool(tool)){ tileDragStart(e); drag = {td:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return; }
   if(tool === "exhibit" || tool === "bulldoze"){
     const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
     if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
     const w = toWorld(e.clientX, e.clientY), first = tool === "bulldoze" ? pieceNear(w.x, w.y, Math.max(.6, 10 / view.k)) : null;
-    if(tool === "bulldoze" && !first && itemAt(e.target).kind === "path"){   // a path tile: lift it, and any more the drag sweeps over
-      tileDragStart(e); drag = {td:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return;
-    }
     if(tool === "bulldoze" && !first && !itemAt(e.target).kind){   // empty ground: drag a box over fence to lift it
       fdrag = {a:[w.x, w.y], b:[w.x, w.y], lift:true, box:true, swept:new Set(), last:w}; fhover = null;
       drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return;
@@ -2414,15 +2563,12 @@ svg.addEventListener("pointermove", e => {
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
-    else if(isPathTool(tool)) tileHover(e);
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
       const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
       if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
       if(k !== fhover){ fhover = k; renderOverlay(); }
-      const h = k ? {kind:null} : itemAt(e.target), onTile = h.kind === "path", nh = h.kind && !onTile ? h : null;
-      if(onTile){ tileHover(e); setStat(state.tiles[tileKey(...thover)] && state.tiles[tileKey(...thover)].fixed ? "The main walk can't be lifted." : "Tap to lift this tile. Drag to lift a run.", false); }
-      else if(thover){ thover = null; renderOverlay(); }
+      const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }
     }
     return;
@@ -2446,7 +2592,6 @@ svg.addEventListener("pointermove", e => {
     queueRender(); return;
   }
   if(!drag) return;
-  if(drag.td){ drag.moved = true; tileDragMove(e); return; }
   if(drag.fd){
     if(fdrag.box){
       if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
@@ -2494,7 +2639,6 @@ function endPointer(e){
   if(!drag) return;
   const d = drag; drag = null;
   if(d.fd){ if(fdrag) endFenceDrag(); return; }
-  if(d.td){ if(tdrag) tileDragEnd(); return; }
   if(d.pan){ if(d.moved) render(); return; }
   if(d.mv){ if(d.moved) dropMove(d.mv); return; }
   if(d.rv){
@@ -2536,7 +2680,7 @@ svg.addEventListener("pointerleave", () => {
   if(draw && draw.hover){ draw.hover = null; snapMark = null; updateDrawbar(); renderOverlay(); }
   if(ghost || landGhost){ ghost = null; landGhost = null; renderOverlay(); }
   if(hoverItem){ hoverItem = null; queueRender(); }
-  if(fhover || thover || (snapMark && !draw)){ fhover = null; thover = null; snapMark = null; renderOverlay(); }
+  if(fhover || (snapMark && !draw)){ fhover = null; snapMark = null; renderOverlay(); }
 });
 svg.addEventListener("contextmenu", e => e.preventDefault());
 svg.addEventListener("wheel", e => {

@@ -9,11 +9,11 @@
 const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay", "pbale"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
-    {label:"Guest Paths", tool:"path", price:() => `${money(tileCost("foot"))}/tile`, note:"Drag to lay 5 m tiles, straight or at 45°. They join up on their own."},
-    {label:"Promenade", tool:"wide", price:() => `${money(tileCost("wide"))}/tile`, note:"Roomy paving. Holds twice the crowd before guests feel packed. Use it where the walk is busy."},
-    {label:"Wooden Bridges", tool:"bridge", price:() => `${money(tileCost("bridge"))}/tile`, note:"The only path that crosses water. Lay it like a path, from one bank over to the other."},
-    {label:"Staff Paths", tool:"service", price:() => `${money(tileCost("service"))}/tile`, note:"Staff paths always layer under guest paths where they meet."},
-    {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(tileCost("tram"))}/tile`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
+    {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
+    {label:"Wide Paths", tool:"wide", price:() => `${money(WIDE_PATH.perMeter)}/m`, note:"10 m wide. Holds twice the crowd before guests feel packed. Use it where the walk is busy."},
+    {label:"Wooden Bridges", tool:"bridge", price:() => `${money(BRIDGE.perMeter)}/m`, note:"The only path that crosses water. Draw it like a path, from one bank over to the other."},
+    {label:"Staff Paths", tool:"service", price:() => `${money(SERVICE_ROAD.perMeter)}/m`, note:"Staff paths always layer under guest paths where they meet."},
+    {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(TRAM.perMeter)}/m`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
     {label:"Bins", tool:"bin"},
     {label:"Benches", tool:"bench"},
     {label:"Picnic Areas", tool:"picnic"},

@@ -116,27 +116,37 @@ function freshCeres(){ return {stock:0, meds:0, pots:{}, beds:[], auto:{cenozoic
 function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
-  const s = {
+  return {
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
-    gate:[202.5,305],
+    gate:[205,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    tiles:Object.fromEntries(Array.from({length:14}, (_, i) => [tileKey(40, 47 + i), {k:"foot", fixed:true}])), paths:[],   // the main walk: a column of path tiles up from the entrance (the lines in paths are made from the tiles, see tiles.js)
+    paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
-  syncPaths(s);
-  return s;
 }
 
 // Bring older saves up to date with anything added since
+// A save made while paths were tiles (that build was reverted) keeps its paths only as `tiles` {"cx,cy": {k, t, fixed}}, 5 m squares. Turn them back into lines: one through each pair of
+// neighbouring tile centers, and a loose end runs on to the edge of its tile.
+function linesFromTiles(T){
+  const out = [], xy = k => k.split(",").map(Number), ctr = ([x, y]) => [x * 5 + 2.5, y * 5 + 2.5];
+  const line = (key, id, a, b) => { const t = T[key], p = {id:"pt-" + id, name:t.fixed ? "Main walk" : "Path", points:[a, b]}; if(t.k === "wide" || t.k === "service" || t.k === "tram" || t.k === "bridge") p.type = t.k; if(t.t) p.theme = t.t; if(t.fixed) p.fixed = true; out.push(p); };
+  for(const key of Object.keys(T)){
+    const [x, y] = xy(key), c = ctr([x, y]), has = (dx, dy) => !!T[(x + dx) + "," + (y + dy)], n = [[1, 0], [0, 1], [-1, 0], [0, -1]].filter(([dx, dy]) => has(dx, dy));
+    for(const [dx, dy] of [[1, 0], [0, 1]]) if(has(dx, dy)) line(key, key + ">" + dx + dy, c, ctr([x + dx, y + dy]));
+    if(n.length === 0) line(key, key, [c[0] - 2.5, c[1]], [c[0] + 2.5, c[1]]);
+    else if(n.length === 1) line(key, key + "e", c, [c[0] - n[0][0] * 2.5, c[1] - n[0][1] * 2.5]);
+  }
+  return out;
+}
+
 function upgradeSave(s){
-  // paths used to be free-form lines; they are tiles now, and the lines are made from them (tiles.js)
-  if(!s.tiles) s.tiles = tilesFromPaths(s.paths || []);
-  syncPaths(s);
+  if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
@@ -192,8 +202,6 @@ function upgradeSave(s){
   // renamed themes: Range is now Homestead, Western is now Mesa, Classic is now Japanese Garden
   const renamed = {range:"homestead", western:"mesa", classic:"japanese"}, rn = k => renamed[k] || k;
   for(const it of [...s.paths, ...s.buildings, ...s.exhibits, ...(s.zones || [])]) if(renamed[it.theme]) it.theme = rn(it.theme);
-  for(const t of Object.values(s.tiles)) if(renamed[t.t]) t.t = rn(t.t);
-  syncPaths(s);
   s.themes.have = s.themes.have.map(rn);
   s.themes.brush = rn(s.themes.brush);
   // parks from before weather get 3 fair days to build shelters
@@ -354,7 +362,7 @@ function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(
 function connectedPathIds(guestsOnly){
   const usable = state.paths.filter(p => !isTram(p) && !(guestsOnly && isService(p)));
   const joined = new Set(), queue = [];
-  for(const p of usable) if(p.points.some(v => dist(v, state.gate) < 4)){ joined.add(p.id); queue.push(p); }
+  for(const p of usable) if(p.points.some(v => dist(v, state.gate) < 2)){ joined.add(p.id); queue.push(p); }
   const touches = (p, q) => p.points.some(v => q.points.some((w,i) => i>0 && segProj(v[0], v[1], q.points[i-1], w).d < 1.5));
   while(queue.length){
     const p = queue.shift();
@@ -546,7 +554,7 @@ function refundFor(kind, item){
   if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);
-  if(kind === "path") return Math.round((item.tiles ? tilesCost(item) : pathCost(item.points, item.type)) * COST.refundShare);
+  if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "fence") return Math.round(fenceLineCost(item.points, item.barrier) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
   return 0;
@@ -602,7 +610,7 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const p of state.paths) upkeep += (p.tiles ? p.tiles.length * TILE : lineLength(p.points)) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
+  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;

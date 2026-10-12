@@ -136,7 +136,7 @@ function pieceSpotProblem(k, with_ = new Set()){
     if(landOf(e).some(f => LAND[f.type] && lineDist(f.x, f.y, seg) < footR(LAND[f.type]) * .8)) return `It runs into something in ${e.name}. Bulldoze it first.`;
   }
   if(state.buildings.some(b => !b.exhibitId && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
-  if(tilesHitSeg(seg[0], seg[1]) || state.paths.some(p => linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) return "It runs into a path.";
+  if(state.paths.some(p => linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) return "It runs into a path.";
   if(parkWater().some(w => lineShapeDist(seg, w.points) < .3)) return "It runs into water.";
   if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, seg) < footR(LAND[f.type]) * .8)) return "It runs into a plant, rock or statue.";
   if(fenceLines().some(l => linesCross(l.points, seg))) return "It runs into a fence.";
@@ -147,7 +147,7 @@ function pieceSpotProblem(k, with_ = new Set()){
 function faceProblem(f){
   if(!f.simple || f.nested) return "A pen inside another one has to share a wall with it.";
   const P = f.raw, inside = p => inPoly(p[0], p[1], P);
-  if(tilesInside(P) || state.paths.some(p => p.points.some(inside))) return "That would fence in a path.";
+  if(state.paths.some(p => p.points.some(inside))) return "That would fence in a path.";
   if(state.buildings.some(b => !b.exhibitId && inside(centroid(b.points)))) return "That would fence in a building.";
   if(state.exhibits.some(e => !e.grid && inside(e.points[0]))) return "That would fence in another exhibit.";
   if(parkWater().some(w => inside(w.points[0]))) return "That would fence in park water.";
