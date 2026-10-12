@@ -183,8 +183,8 @@ function render(){
       // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
       else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
-    // a themed exhibit gets a trim line just inside its fence
-    if((!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    // a themed exhibit gets a trim line just inside its fence (flat view only: in 3/4 the fence stands up and draws itself)
+    if(!tilt && (!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
     const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
