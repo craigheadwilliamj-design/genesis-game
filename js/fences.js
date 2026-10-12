@@ -316,7 +316,7 @@ function fenceRunSvg(pts, b, themed){
   const B = BARRIERS[b] || BARRIERS.wood, p = polyStr(pts), ns = `fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(tilted()) return fence34(pts, false, B.hedge ? "hedge" : b, "all");
   if(B.hedge) return hedgeSvg("polyline", p);
-  const col = themed ? B.color : "#26402F", w = {wood:2, bars:2.5, electric:2.5, acrylic:3, concrete:4.5}[b] || 2;
+  const col = themed ? B.color : "#26402F", w = {wood:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, concrete:4.5}[b] || 2;
   let s = `<polyline points="${p}" stroke="${col}" stroke-width="${w}" ${ns}/><polyline points="${p}" stroke="${B.color}" stroke-width="${w + 2.5}" stroke-dasharray="0 16" ${ns}/>`;
   if(b === "electric") s += `<polyline points="${p}" stroke="#1D2B22" stroke-width="1" stroke-dasharray="3 5" ${ns}/>`;
   if(b === "bars") s += `<polyline points="${p}" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" ${ns}/>`;
