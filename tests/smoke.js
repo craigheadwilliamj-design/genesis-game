@@ -1717,10 +1717,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
       // bar fence pictures: broken at 0 condition, rusted below FENCE_LOOK.worn, pristine otherwise (and for loose fence with no condition)
       out.fenceState = fenceState(100) === "pristine" && fenceState(FENCE_LOOK.worn) === "pristine" && fenceState(FENCE_LOOK.worn - 1) === "degrading" && fenceState(.1) === "degrading" && fenceState(0) === "broken" && fenceState(undefined) === "pristine";
-      // an east-west side is 3 m pictures laid along it (7 m: 3 sections, the last cut short, plus a post at the end); a north-south side is seen edge-on and keeps its drawn posts and rails; other fences are untouched
+      // an east-west side is 3 m pictures laid along it (7 m: 3 sections, the last cut short, plus a post at the end); a north-south side is seen edge-on and is a column (steel, rust blocks when worn, a low heap with post stubs when broken); other fences are untouched
       const fb = (cond, a, b, kind = "bars") => fence34([a, b], false, kind, "all", {cond}), ew = fb(100, [0, 0], [7, 0]), nsd = fb(100, [0, 0], [0, 7]);
       out.fenceSprite = (ew.match(/<image /g) || []).length === 4 && ew.includes("bars-pristine.png") && fb(30, [0, 0], [7, 0]).includes("bars-degrading.png") && fb(0, [0, 0], [7, 0]).includes("bars-broken.png")
-        && !nsd.includes("<image") && nsd.includes("<path") && !fb(0, [0, 0], [0, 7]).includes("<image") && fb(0, [0, 0], [0, 7]).includes("#8E4A12") && !fb(0, [0, 0], [7, 0], "wood").includes("<image") && fb(50, [0, 0], [7, 0], "electric") === fb(100, [0, 0], [7, 0], "electric");
+        && !nsd.includes("<image") && nsd.includes("<rect") && nsd.includes(FENCE_EDGE.steel.hi) && !nsd.includes(FENCE_EDGE.rust.mid) && fb(30, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && fb(0, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && !fb(0, [0, 0], [0, 7]).includes("<image")
+        && /height="[\d.]+"/.test(nsd) && nsd.match(/<rect /g).length > fb(0, [0, 0], [0, 7]).match(/<rect /g).length * .3 && !fb(0, [0, 0], [7, 0], "wood").includes("<image") && fb(50, [0, 0], [7, 0], "electric") === fb(100, [0, 0], [7, 0], "electric");
 
       // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) is drawn in the water (its rig clipped at the waterline, a ghost below, ripples on it), not lying on top of it, and goes back to a plain rig on the bank
       const RS = rigOf("prio");
