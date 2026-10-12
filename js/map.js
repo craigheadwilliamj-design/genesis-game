@@ -986,7 +986,7 @@ function renderOverlay(){
     s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
     s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
   }
-  if(gateGhost){
+  if(gateGhost && !gateGhost.loose){
     const gr = Math.max(1.6, 5*inv);
     s += `<rect x="${gateGhost.x-gr}" y="${gateGhost.y-gr}" width="${gr*2}" height="${gr*2}" fill="${gateGhost.ok ? "#D8B04A" : "var(--bad)"}" fill-opacity=".8" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
@@ -1949,7 +1949,11 @@ function findGateSpot(clientX, clientY){
   } };
   for(const e of state.exhibits) if(!e.viv) near({e}, e.points);
   for(const f of penFaces()) near({pen:f}, f.pts);
-  if(!best) return null;
+  if(!best){
+    // loose fence that doesn't close a loop: say so
+    const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
+    return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
+  }
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
@@ -1969,6 +1973,7 @@ function gateHover(e){
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
   if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
+  if(g.loose){ setStat(g.why, true); return; }
   const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
   if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
