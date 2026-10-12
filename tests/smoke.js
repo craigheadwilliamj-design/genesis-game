@@ -1486,7 +1486,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute();
     out.themeMatchedBonus = derived.themes["e-t"].ok && derived.appeal > appealMixed && themeFitShare(e0) === 1;
     out.themeFitHappier = exhibitReport(e0).target > (e0.theme = "genesis", exhibitReport(e0).target);
-    e0.theme = "volcanic"; render();
+    e0.theme = "volcanic"; const tl0 = tilt; tilt = false; render(); tilt = tl0;   // the exhibit rail is flat-view only
     out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live) && world.innerHTML.includes(THEMES.volcanic.accent);
     state.themes.brush = "volcanic"; state.money = 1e6;
     const bp = {id:"p-n", points:[[260,300],[300,300]]}; themeNew("path", bp);
