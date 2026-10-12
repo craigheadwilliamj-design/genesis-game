@@ -1254,7 +1254,7 @@ const HAB = {
   waterMax:.1,     // share of the floor an animal that loves water (likes 1) wants under water; less keen animals want proportionally less
   waterBand:.2,    // no penalty within this share either side of what an animal wants
   rockBase:1,      // rocks a 500 m² exhibit of grassland wants for an animal with middling taste (likes .4); scaled by biome and by how much it likes rocks
-  offEra:.25,      // how much a plant of the right biome but another period counts toward an animal's plants
+  offEra:1/3,      // other periods' plants of the right biome can fill this share of the plant cover an animal wants
   plantWeight:.4,  // how much plants weigh against water and rocks when an animal is satisfied
   meatPlants:.5,   // meat eaters want this share of the plants that plant eaters do
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
