@@ -1942,7 +1942,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 //            glass: [a skylight spec per class, or null]: {at, n, gap, min}, a block of glass panes (`at` scales it down from the roof, `n` splits it along the long side with `gap` between, `min` is the smallest building area in m²)
 //   tier     optional {min, next, at: [scales], light, shadow, drop}: rectangular buildings over `min` square meters get stepped upper stories (one per scale; each more needs `next` times the area)
 //   sod      optional {tex, max}: buildings up to `max` square meters get this roof pattern instead of `btex` (a list of patterns: each building keeps one)
-//   ptex/btex  optional patterns for paths / buildings and props instead of `tex`
+//   ptex/btex  optional patterns for paths / buildings and props instead of `tex` (ptexd: the path pattern for 45° runs, whose slabs are turned with them)
 //   tex      the texture pattern (`#t-<id>` in index.html) laid over paths, buildings, the border band and the zone ground
 //   gtex     optional pattern for the zone ground instead of `tex`
 //   bord     the border drawn just inside an exhibit's fence and around buildings:
@@ -1955,7 +1955,7 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
-  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
+  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", ptexd:"genesis-concrete-d", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
     // warm gray concrete between dark green curbs
     path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", kerbPix:{w:.5, c:"#2B5640", joint:"#1B3A29", chip:"#3E7253", lit:"#5C9A72", shade:"#14281C", step:1.3}},
