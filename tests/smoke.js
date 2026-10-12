@@ -1734,10 +1734,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && !nsd.includes("<image") && nsd.includes("<rect") && nsd.includes(FENCE_EDGE.steel.hi) && !nsd.includes(FENCE_EDGE.rust.mid) && fb(30, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && fb(0, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && !fb(0, [0, 0], [0, 7]).includes("<image")
         && /height="[\d.]+"/.test(nsd) && nsd.match(/<rect /g).length > fb(0, [0, 0], [0, 7]).match(/<rect /g).length * .3 && !fb(0, [0, 0], [7, 0], "wood").includes("<image") && fb(50, [0, 0], [7, 0], "electric") === fb(100, [0, 0], [7, 0], "electric");
 
-      // a bar fence's keeper gate is one picture that never wears (same at 100, 30 and 0 condition), set into its side; north-south it is posts and a latch; other fences ignore it
-      const fg = (cond, a, b, kind = "bars") => fence34([a, b], false, kind, "all", {cond, gate:{i:0, p:[3.5, 0]}});
+      // a bar fence's keeper gate never wears (same picture at 100, 30 and 0 condition), set into its side, and swings open in frames 1 to 3; north-south it is posts, a latch and (open) leaves; other fences ignore it
+      const fg = (cond, a, b, kind = "bars", f = 0) => fence34([a, b], false, kind, "all", {cond, gate:{i:0, p:[3.5, 0], id:"gt", f}});
       out.fenceGate = fg(100, [0, 0], [7, 0]).includes("bars-gate.png") && fg(0, [0, 0], [7, 0]).includes("bars-gate.png") && fg(30, [0, 0], [7, 0]).includes("bars-gate.png") && !fg(30, [0, 0], [7, 0]).includes("gate-degrading")
-        && !fg(0, [0, 0], [0, 7]).includes("<image") && fg(0, [0, 0], [0, 7]).includes(GATE_GOLD.mid) && !fb(100, [0, 0], [7, 0]).includes("bars-gate") && fg(100, [0, 0], [7, 0], "wood") === fb(100, [0, 0], [7, 0], "wood");
+        && fg(100, [0, 0], [7, 0], "bars", 2).includes('bars-gate-2.png') && fg(100, [0, 0], [7, 0]).includes('data-gate="gt"')
+        && !fg(0, [0, 0], [0, 7]).includes("<image") && fg(0, [0, 0], [0, 7]).includes(GATE_GOLD.mid) && fg(0, [0, 0], [0, 7], "bars", 3).includes("<g data-go >") && fg(0, [0, 0], [0, 7]).includes('<g data-go display="none">')
+        && !fb(100, [0, 0], [7, 0]).includes("bars-gate") && fg(100, [0, 0], [7, 0], "wood") === fb(100, [0, 0], [7, 0], "wood");
+      // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave
+      const gh = document.createElementNS("http://www.w3.org/2000/svg", "svg"); gh.innerHTML = fg(100, [0, 0], [7, 0]); document.body.appendChild(gh);
+      const gex = {id:"gt", gate:[3.5, 0]}; state.exhibits.push(gex);
+      const keeperBak = crew, posBak = staffPos; crew = [{at:true}]; staffPos = () => [3.5, 1];
+      let gt = gateT; for(let i = 0; i < 12; i++) drawGates(gt += 50);
+      const openHref = gh.querySelector("image[data-gate]").getAttribute("href");
+      staffPos = () => [30, 30]; for(let i = 0; i < 12; i++) drawGates(gt += 50);
+      const shutHref = gh.querySelector("image[data-gate]").getAttribute("href");
+      out.gateOpens = openHref.endsWith("bars-gate-3.png") && shutHref.endsWith("bars-gate.png") && gateFrameOf("gt") === 0;
+      crew = keeperBak; staffPos = posBak; state.exhibits.pop(); gh.remove(); delete gateOpen.gt;
 
       // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) is drawn in the water (its rig clipped at the waterline, a ghost below, ripples on it), not lying on top of it, and goes back to a plain rig on the bank
       const RS = rigOf("prio");

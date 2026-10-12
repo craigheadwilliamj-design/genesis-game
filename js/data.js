@@ -854,6 +854,8 @@ Object.assign(BARRIERS.concrete, {wear:1.0, repair:12});
 //   minRun   a side that runs mostly north-south is seen edge-on, so it is drawn as a column when less than this share of its length runs across the screen
 //   edge     how many pixels wide that column is
 const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}};
+// A keeper gate swings open when a keeper, vet or mechanic is within `reach` meters: `speed` is how much of its swing (0 shut, 1 open) it covers a second, shown in `frames` pictures (<kind>-gate.png, then -1, -2, -3).
+const GATE_OPEN = {reach:3, speed:3, frames:4};
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};
 
 // Clever animals that test and attack their fences, like predators do

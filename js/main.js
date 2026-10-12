@@ -95,6 +95,7 @@ function step(now){
   if(sel && sel.kind === "staff") staffLive();
   drawTrams();
   drawKeepers();
+  drawGates(now);
   drawStaffRing();
   drawLoose();
   ui.hud();
