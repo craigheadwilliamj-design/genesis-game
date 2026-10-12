@@ -919,6 +919,24 @@ function parcelOverlay(){
   }
   return s;
 }
+// The construction ghost of fence being laid (or lifted): in 3/4 a translucent wall as tall as the fence will stand, with a post line at every piece; flat, a wide band. Green when it can go down, red when it can't.
+function fenceGhostSvg(keys, kind, bad, inv){
+  if(!keys.length) return "";
+  const c = bad ? "#E5484D" : "#4CD964", n2 = v => v.toFixed(2), H = (FENCE34[kind] || FENCE34.wood).h;
+  const dash = `stroke-dasharray="${5*inv} ${3*inv}"`, ln = `stroke="${c}" stroke-width="1.4" ${dash} vector-effect="non-scaling-stroke"`;
+  let s = `<g pointer-events="none" stroke-linejoin="round">`;
+  for(const k of keys){
+    const [a, b] = pieceEnds(k);
+    if(tilt){
+      const ta = lift34(H)(a), tb = lift34(H)(b);
+      s += `<polygon points="${polyStr([a, b, tb, ta])}" fill="${c}" fill-opacity=".3" ${ln}/>`;
+      s += `<line x1="${n2(a[0])}" y1="${n2(a[1])}" x2="${n2(ta[0])}" y2="${n2(ta[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
+    } else s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-opacity=".35" stroke-width="${Math.max(10, 1.2 * view.k)}" stroke-linecap="butt" vector-effect="non-scaling-stroke"/>`;
+  }
+  const last = pieceEnds(keys[keys.length - 1])[1];
+  if(tilt){ const tl = lift34(H)(last); s += `<line x1="${n2(last[0])}" y1="${n2(last[1])}" x2="${n2(tl[0])}" y2="${n2(tl[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`; }
+  return s + `</g>`;
+}
 function renderOverlay(){
   const inv = 1/view.k;
   let s = tool === "parcels" ? parcelOverlay() : "";
@@ -945,8 +963,10 @@ function renderOverlay(){
     });
   }
   if(fdrag){
-    const col = fdrag.lift ? "var(--bad)" : fdrag.why ? "var(--bad)" : "var(--sel)";
-    for(const k of fenceDragKeys()){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
+    const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
+    const keys = fenceDragKeys();
+    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv);
+    for(const k of keys){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
     s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
