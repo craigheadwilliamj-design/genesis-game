@@ -1139,6 +1139,18 @@ function spriteSvg(sp, h){
     + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 || f <= -100 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
     + (!idl && !swm && S.walk && S.rest ? `<svg class="rs" ${box} viewBox="${Math.max(-100 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -100 ? ` display="none"` : ""}><image href="sprites/${sp}-rest.png" style="image-rendering:pixelated" width="${S.rest}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
+// A picture's idle frame in a vivarium (or an idle-only picture): its idle strip loops at `ms`. With `dyn` (a list of [first frame, count]), only the first `base` frames loop,
+// and every `dynGap` seconds (min, max) one of the dyn clips plays once at `dynMs` a frame, a small movement (the Tiktaalik's look-around and push-up), then it settles back.
+function idleFrame(h, S){
+  const now = performance.now(), nb = S.base || S.idle; h.phase ??= Math.random() * nb;
+  if(S.dyn){
+    const gap = () => now + 1000 * (S.dynGap[0] + Math.random() * (S.dynGap[1] - S.dynGap[0]));
+    h.dynAt ??= gap();
+    if(h.dynClip){ const [s, n] = S.dyn[h.dynClip - 1], k = Math.floor((now - h.dynT) / (S.dynMs || 150)); if(k < n) return s + k; h.dynClip = 0; h.dynAt = gap(); }
+    else if(now >= h.dynAt){ h.dynClip = (h.dynLast = ((h.dynLast ?? Math.floor(Math.random() * S.dyn.length)) + 1) % S.dyn.length) + 1; h.dynT = now; return S.dyn[h.dynClip - 1][0]; }   // the clips take turns
+  }
+  return Math.floor(now / (S.ms || 250) + h.phase) % nb;
+}
 // -1 stands, 0 and up is a walk frame
 // -1 stands, 0 and up is a walk frame, -2 and down is an idle frame (-2 - n), for pictures that have both strips
 function setPose(h, f){
@@ -1487,12 +1499,12 @@ function animateAnimals(dt){
     // vivarium animals don't walk: they stay on their spot and cycle an idle strip if their picture has one (else the standing picture or dot)
     if(e.viv){
       const S = SPRITES[h.sp];
-      if(h.spr && S && S.idle){ h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); }
+      if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
       continue;
     }
     // an open-exhibit picture with an idle strip but no walk strip cycles the idle strip all the time, still or moving
-    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleFrame = () => { h.phase ??= Math.random() * S.idle; setPose(h, Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle); };
-    if(h.wait > 0){ h.wait -= dt; if(swimmingPic(h)) setPose(h, swimFrame(h, S)); else if(idleOnly) idleFrame(); else if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle"); else setPose(h, restPose(h, S)); continue; }
+    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleOnlyFrame = () => setPose(h, idleFrame(h, S));
+    if(h.wait > 0){ h.wait -= dt; if(swimmingPic(h)) setPose(h, swimFrame(h, S)); else if(idleOnly) idleOnlyFrame(); else if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle"); else setPose(h, restPose(h, S)); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
     const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
@@ -1504,7 +1516,7 @@ function animateAnimals(dt){
     swimCheck(h, e);
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     if(swimmingPic(h)){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.swim); }
-    else if(idleOnly) idleFrame();
+    else if(idleOnly) idleOnlyFrame();
     else if(h.spr && rigOf(h.sp)){ h.stride = (h.stride || 0) + step; rigStep(h, "walk"); }
     else if(S && S.walk){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.walk); }
     if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
