@@ -138,21 +138,41 @@ function tileEdges(keys, T){
   }
   return out;
 }
-const edgePath = edges => edges.map(g => `M${g.a[0]} ${g.a[1]}L${g.b[0]} ${g.b[1]}`).join("");
-// The Genesis kerb: a strip K m wide outside each exposed edge (stretched past a convex corner to fill it), a lit 1 px line offset top-left and a shaded one bottom-right,
-// the green face, then a 1 px dark joint and a lit pixel every `step` m, kept in step across tiles by the world position
-function kerbStrips(edges, K){
-  const o = ROCK_MPP, lines = edges.map(g => {
-    const [nx, ny] = TILE_DIRS[g.d], horiz = ny !== 0, k = K.w;
-    let ax = g.a[0] + nx * k / 2, ay = g.a[1] + ny * k / 2, bx = g.b[0] + nx * k / 2, by = g.b[1] + ny * k / 2;
-    if(!g.lo){ if(horiz) ax -= k; else ay -= k; }
-    if(!g.hi){ if(horiz) bx += k; else by += k; }
-    return {ax, ay, bx, by, from:horiz ? ax : ay};
-  });
-  const L = (c, ex = "") => `<g stroke="${c}" stroke-width="${K.w}" stroke-linecap="butt" fill="none"${ex}>` + lines.map(l => `<line x1="${l.ax}" y1="${l.ay}" x2="${l.bx}" y2="${l.by}"/>`).join("") + "</g>";
-  const J = (c, off) => `<g stroke="${c}" stroke-width="${K.w}" stroke-linecap="butt" fill="none">` + lines.map(l => `<line x1="${l.ax}" y1="${l.ay}" x2="${l.bx}" y2="${l.by}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${(((l.from % K.step) + K.step) % K.step) + off}"/>`).join("") + "</g>";
-  return L(K.lit, ` transform="translate(${-o} ${-o})"`) + L(K.shade, ` transform="translate(${o} ${o})"`) + L(K.c) + J(K.joint, 0) + J(K.chip, -o);
+// The outline of a set of tile edges (from tileEdges) as closed loops of corner points, walked clockwise so the tiles are on the right. Where two corners of one outline touch, the loop turns right
+// first, so they stay separate loops.
+function tileLoops(edges){
+  const dirs = edges.map(g => g.d < 2 ? [g.a, g.b] : [g.b, g.a]), by = new Map(), used = new Set(), loops = [];
+  dirs.forEach((e, i) => { const k = e[0][0] + "," + e[0][1]; if(!by.has(k)) by.set(k, []); by.get(k).push(i); });
+  for(let i = 0; i < dirs.length; i++){
+    if(used.has(i)) continue;
+    const pts = []; let cur = i;
+    while(cur !== undefined && !used.has(cur)){
+      used.add(cur); const [p, q] = dirs[cur]; pts.push(p);
+      const outs = (by.get(q[0] + "," + q[1]) || []).filter(j => !used.has(j));
+      if(!outs.length) break;
+      let best = outs[0], bs = -Infinity;
+      for(const j of outs){ const [a, b] = dirs[j], cross = (q[0] - p[0]) * (b[1] - a[1]) - (q[1] - p[1]) * (b[0] - a[0]); if(cross > bs){ bs = cross; best = j; } }
+      cur = best;
+    }
+    if(pts.length < 3) continue;
+    const out = pts.filter((q, k) => { const a = pts[(k - 1 + pts.length) % pts.length], b = pts[(k + 1) % pts.length]; return (q[0] - a[0]) * (b[1] - q[1]) - (q[1] - a[1]) * (b[0] - q[0]) !== 0; });   // only the corners
+    if(out.length >= 3) loops.push(out);
+  }
+  return loops;
 }
+// Stair steps become 45° lines: at a corner whose two edges are both one tile long, cut through the middles of those edges (the convex corner is trimmed and the notch beside it filled,
+// so a diagonal keeps its width). A lone tile and the long runs of a straight path are left square.
+function smoothLoop(pts){
+  const n = pts.length; if(n <= 4) return pts;
+  const L = pts.map((q, i) => Math.hypot(pts[(i + 1) % n][0] - q[0], pts[(i + 1) % n][1] - q[1])), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out = [];
+  pts.forEach((q, i) => {
+    if(Math.abs(L[(i - 1 + n) % n] - TILE) < .01 && Math.abs(L[i] - TILE) < .01) out.push(mid(pts[(i - 1 + n) % n], q), mid(q, pts[(i + 1) % n]));
+    else out.push(q);
+  });
+  return out.filter((q, i) => { const a = out[(i - 1 + out.length) % out.length]; return Math.abs(q[0] - a[0]) > 1e-6 || Math.abs(q[1] - a[1]) > 1e-6; });
+}
+const loopPath = loops => loops.map(l => "M" + l.map(q => q[0] + " " + q[1]).join("L") + "Z").join("");
+let tileClipN = 0;
 
 function tilesSvg(joined, joinedAll, isSel, isDoomed){
   // lines with no tiles behind them (a save from a mod, or a test that lays lines by hand) are drawn as the tiles they would be
@@ -185,27 +205,33 @@ function tilesSvg(joined, joinedAll, isSel, isDoomed){
       road += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${body}${hit}</g>`;
     }
   }
-  // footpaths and promenades: the tiles themselves
-  const byTheme = {};
+  // footpaths and promenades: the tiles, drawn as one outline per theme. The outline is the tiles' edge with stair steps smoothed to 45°; it is the kerb, the clip for the surface, and the shape of the ground
+  const groups = {};
   for(const p of state.paths){
     if(p.type && p.type !== "wide") continue;
-    const key = themeKey(p), PT = THEMES[key].path, live = joined.has(p.id), wide = p.type === "wide";
-    const tiles = p.tiles || Object.keys(tilesFromPaths([p]));
-    const rects = tiles.map(k => { const [cx, cy] = tileXY(k); return `M${cx*TILE} ${cy*TILE}h${TILE}v${TILE}h${-TILE}z`; }).join("");
-    const tex = wide && PT.wideTex ? `url(#t-${PT.wideTex})` : texFill(p);
-    surf += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer"><path d="${rects}" fill="${live ? PT.live : PT.dead}"/>${tex ? `<path d="${rects}" fill="${tex}"/>` : ""}</g>`;
-    const eg = tileEdges(tiles, T);
-    if(isSel("path", p.id)) edges += `<path d="${edgePath(eg)}" stroke="var(--sel)" stroke-width="${5*inv}" ${lj}/>`;
-    (byTheme[key] ||= []).push(...eg);
-    if(!live) edges += `<path d="${edgePath(eg)}" stroke="${PT.edge}" stroke-width="${1.2*inv}" stroke-dasharray="${4*inv} ${4*inv}" ${lj}/>`;
+    const key = themeKey(p), tiles = p.tiles || Object.keys(tilesFromPaths([p]));
+    const g = groups[key] ||= {PT:THEMES[key].path, chains:[], edges:new Map()};
+    g.chains.push({p, tiles, live:joined.has(p.id), wide:p.type === "wide"});
+    for(const e of tileEdges(tiles, T)) g.edges.set(e.d + ":" + e.a, e);
   }
-  for(const [key, eg] of Object.entries(byTheme)){
-    const PT = THEMES[key].path;
-    if(PT.kerbPix) kerbs += kerbStrips(eg, PT.kerbPix);
-    else {
-      kerbs += `<path d="${edgePath(eg)}" stroke="${PT.edge}" stroke-width="${1.6*inv}" ${lj}/>`;
-      if(PT.kerb) kerbs += `<path d="${edgePath(eg)}" stroke="${PT.kerb.c}" stroke-width="${1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj}/>`;
+  const rects = ks => ks.map(k => { const [cx, cy] = tileXY(k); return `M${cx*TILE} ${cy*TILE}h${TILE}v${TILE}h${-TILE}z`; }).join("");
+  for(const [key, g] of Object.entries(groups)){
+    const PT = g.PT, d = loopPath(tileLoops([...g.edges.values()]).map(smoothLoop)), id = "tc" + tileClipN++, o = ROCK_MPP;
+    const wideKs = g.chains.filter(c => c.wide).flatMap(c => c.tiles), deadKs = g.chains.filter(c => !c.live).flatMap(c => c.tiles), selKs = g.chains.filter(c => isSel("path", c.p.id)).flatMap(c => c.tiles);
+    const foot = texFill({theme:key}), wideTex = PT.wideTex ? `url(#t-${PT.wideTex})` : null;
+    if(PT.kerbPix){   // the Genesis kerb along the outline: a lit 1 px line offset top-left, a shaded one bottom-right, the green face, then a joint and a lit pixel every `step` m
+      const K = PT.kerbPix, st = (c, ex = "") => `<path d="${d}" stroke="${c}" stroke-width="${2*K.w}" ${lj}${ex}/>`, dash = (c, off) => st(c, ` stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}"`);
+      kerbs += st(K.lit, ` transform="translate(${-o} ${-o})"`) + st(K.shade, ` transform="translate(${o} ${o})"`) + st(K.c) + dash(K.joint, 0) + dash(K.chip, -o);
+    } else {
+      kerbs += `<path d="${d}" stroke="${PT.edge}" stroke-width="${1.6*inv}" ${lj}/>`;
+      if(PT.kerb) kerbs += `<path d="${d}" stroke="${PT.kerb.c}" stroke-width="${1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj}/>`;
     }
+    surf += `<clipPath id="${id}"><path d="${d}" clip-rule="evenodd"/></clipPath><g clip-path="url(#${id})"><path d="${d}" fill="${PT.live}" fill-rule="evenodd"/>`
+      + (deadKs.length ? `<path d="${rects(deadKs)}" fill="${PT.dead}"/>` : "")
+      + (foot ? `<path d="${d}${wideKs.length && wideTex ? rects(wideKs) : ""}" fill="${foot}" fill-rule="evenodd"/>` : "")
+      + (wideKs.length && wideTex ? `<path d="${rects(wideKs)}" fill="${wideTex}"/>` : "")
+      + (selKs.length ? `<path d="${rects(selKs)}" fill="var(--sel)" fill-opacity=".35"/>` : "") + `</g>`;
+    for(const c of g.chains) surf += `<g data-kind="path" data-id="${esc(c.p.id)}" style="cursor:pointer"><path d="${rects(c.tiles)}" fill="transparent"/></g>`;
   }
   return tram + road + kerbs + surf + edges;
 }
