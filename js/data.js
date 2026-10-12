@@ -848,12 +848,12 @@ Object.assign(BARRIERS.electric, {wear:2.5, repair:14});
 Object.assign(BARRIERS.acrylic,  {wear:1.5, repair:25});
 Object.assign(BARRIERS.concrete, {wear:1.0, repair:12});
 
-// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py and pixelfence_hedge.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
-// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Bars, wood, electric, acrylic and hedge so far. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
+// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py and pixelfence_concrete.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
+// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge and concrete. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
 //   worn     below this condition (percent) the fence shows its rusted picture; at 0 it is broken, trampled flat
 //   minRun   a side that runs mostly north-south is seen edge-on, so it is drawn as a column when less than this share of its length runs across the screen
 //   edge     how many pixels wide that column is
-const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
+const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
 // A keeper gate swings open when a keeper, vet or mechanic is within `reach` meters: `speed` is how much of its swing (0 shut, 1 open) it covers a second, shown in `frames` pictures (<kind>-gate.png, then -1, -2, -3).
 const GATE_OPEN = {reach:3, speed:3, frames:4};
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};

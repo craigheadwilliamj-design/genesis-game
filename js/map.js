@@ -480,7 +480,7 @@ const FENCE34 = {
   bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5, sprite:"bars"},
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true, sprite:"electric"},
   acrylic: {h:2.2, col:"#9FCFE0", solid:.4, sprite:"acrylic"},
-  concrete:{h:3.6, col:"#B8B1A2", solid:1},
+  concrete:{h:3.6, col:"#B8B1A2", solid:1, sprite:"concrete"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -516,6 +516,7 @@ const FENCE_EDGE = {
   electric:{steel:{hi:"#8A929B", mid:"#5A6068", lo:"#41464C", deep:"#2E3236"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
   acrylic:{steel:{hi:"#EBF8FCD7", mid:"#9FCFE099", lo:"#62A0B8A0", deep:"#52666E"}, rust:{hi:"#F0EDCC", mid:"#D6D0A0B4", lo:"#B8B07A", deep:"#80784C"}, frame:{hi:"#C5CCD3", mid:"#A8B0B8", lo:"#7E858C", deep:"#60666C"}},   // a see-through pane (alpha in the colors) with an aluminium frame at the posts
   hedge:{steel:{hi:"#6BA851", mid:"#4E8A3E", lo:"#3A6C2E", deep:"#24461F"}, rust:{hi:"#BAB85C", mid:"#929642", lo:"#707034", deep:"#4A4226"}},   // leaves; rust is dry, browning leaves
+  concrete:{steel:{hi:"#D6D0C2", mid:"#B8B1A2", lo:"#8E8778", deep:"#6A6458"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},   // rust is rebar showing through
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).

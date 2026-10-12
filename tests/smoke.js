@@ -1732,14 +1732,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const fb = (cond, a, b, kind = "bars") => fence34([a, b], false, kind, "all", {cond}), ew = fb(100, [0, 0], [7, 0]), nsd = fb(100, [0, 0], [0, 7]);
       out.fenceSprite = (ew.match(/<image /g) || []).length === 4 && ew.includes("bars-pristine.png") && fb(30, [0, 0], [7, 0]).includes("bars-degrading.png") && fb(0, [0, 0], [7, 0]).includes("bars-broken.png")
         && !nsd.includes("<image") && nsd.includes("<rect") && nsd.includes(FENCE_EDGE.bars.steel.hi) && !nsd.includes(FENCE_EDGE.bars.rust.mid) && fb(30, [0, 0], [0, 7]).includes(FENCE_EDGE.bars.rust.mid) && fb(0, [0, 0], [0, 7]).includes(FENCE_EDGE.bars.rust.mid) && !fb(0, [0, 0], [0, 7]).includes("<image")
-        && /height="[\d.]+"/.test(nsd) && nsd.match(/<rect /g).length > fb(0, [0, 0], [0, 7]).match(/<rect /g).length * .3 && !fb(0, [0, 0], [7, 0], "concrete").includes("<image") && fb(50, [0, 0], [7, 0], "concrete") === fb(100, [0, 0], [7, 0], "concrete");
+        && /height="[\d.]+"/.test(nsd) && nsd.match(/<rect /g).length > fb(0, [0, 0], [0, 7]).match(/<rect /g).length * .3 && fb(50, [0, 0], [7, 0], "concrete").includes("concrete-degrading.png");
 
       // a bar fence's keeper gate never wears (same picture at 100, 30 and 0 condition), set into its side, and swings open in frames 1 to 3; north-south it is posts, a latch and (open) leaves; other fences ignore it
       const fg = (cond, a, b, kind = "bars", f = 0) => fence34([a, b], false, kind, "all", {cond, gate:{i:0, p:[3.5, 0], id:"gt", f}});
       out.fenceGate = fg(100, [0, 0], [7, 0]).includes("bars-gate.png") && fg(0, [0, 0], [7, 0]).includes("bars-gate.png") && fg(30, [0, 0], [7, 0]).includes("bars-gate.png") && !fg(30, [0, 0], [7, 0]).includes("gate-degrading")
         && fg(100, [0, 0], [7, 0], "bars", 2).includes('bars-gate-2.png') && fg(100, [0, 0], [7, 0]).includes('data-gate="gt"')
         && !fg(0, [0, 0], [0, 7]).includes("<image") && fg(0, [0, 0], [0, 7]).includes(GATE_GOLD.mid) && fg(0, [0, 0], [0, 7], "bars", 3).includes("<g data-go >") && fg(0, [0, 0], [0, 7]).includes('<g data-go display="none">')
-        && !fb(100, [0, 0], [7, 0]).includes("bars-gate") && fg(100, [0, 0], [7, 0], "concrete") === fb(100, [0, 0], [7, 0], "concrete");
+        && !fb(100, [0, 0], [7, 0]).includes("bars-gate");
       // the wood fence has its own pictures (same states and gate frames) and its own edge-on colors
       out.woodFence = fb(100, [0, 0], [7, 0], "wood").includes("wood-pristine.png") && fb(30, [0, 0], [7, 0], "wood").includes("wood-degrading.png") && fb(0, [0, 0], [7, 0], "wood").includes("wood-broken.png") && !fb(100, [0, 0], [7, 0], "wood").includes("bars-")
         && fg(100, [0, 0], [7, 0], "wood", 2).includes("wood-gate-2.png") && fb(100, [0, 0], [0, 7], "wood").includes(FENCE_EDGE.wood.steel.hi) && fb(30, [0, 0], [0, 7], "wood").includes(FENCE_EDGE.wood.rust.mid);
@@ -1758,6 +1758,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.hedgeFence = fh(100, [0, 0], [7, 0]).includes("hedge-pristine.png") && fh(30, [0, 0], [7, 0]).includes("hedge-degrading.png") && fh(0, [0, 0], [7, 0]).includes("hedge-broken.png") && !fh(100, [0, 0], [7, 0]).includes("<polygon")
         && fh(100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:1}).includes("hedge-gate-1.png") && !fh(100, [0, 0], [0, 7]).includes("<image") && fh(100, [0, 0], [0, 7]).includes(FENCE_EDGE.hedge.steel.mid) && !fh(100, [0, 0], [0, 7]).includes(FENCE_EDGE.hedge.rust.mid)
         && fh(30, [0, 0], [0, 7]).includes(FENCE_EDGE.hedge.rust.mid) && fh(0, [0, 0], [0, 7]).includes(FENCE_EDGE.hedge.rust.mid);
+      // the concrete wall: its own pictures and gate (not the old grey polygon), and an edge-on slab with rust blocks when worn
+      const fc = (cond, a, b, gate) => fence34([a, b], false, "concrete", "all", {cond, gate});
+      out.concreteFence = fc(100, [0, 0], [7, 0]).includes("concrete-pristine.png") && fc(30, [0, 0], [7, 0]).includes("concrete-degrading.png") && fc(0, [0, 0], [7, 0]).includes("concrete-broken.png") && !fc(100, [0, 0], [7, 0]).includes("<polygon")
+        && fc(100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:2}).includes("concrete-gate-2.png") && !fc(100, [0, 0], [0, 7]).includes("<image") && fc(100, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.steel.mid) && !fc(100, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.rust.mid) && fc(30, [0, 0], [0, 7]).includes(FENCE_EDGE.concrete.rust.mid);
       // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave
       const gh = document.createElementNS("http://www.w3.org/2000/svg", "svg"); gh.innerHTML = fg(100, [0, 0], [7, 0]); document.body.appendChild(gh);
       const gex = {id:"gt", gate:[3.5, 0]}; state.exhibits.push(gex);
