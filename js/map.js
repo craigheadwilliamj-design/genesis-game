@@ -1793,8 +1793,8 @@ function fenceBar(stat){
 // The pieces the current drag covers
 function fenceDragKeys(){
   if(!fdrag) return [];
-  const keys = pieceLine(fdrag.a, fdrag.b).keys;
-  return fdrag.lift ? (keys.length ? keys.filter(k => fencePieces()[k]) : [fdrag.first]) : keys;
+  const keys = fdrag.lift ? [] : pieceLine(fdrag.a, fdrag.b).keys;
+  return fdrag.lift ? [...fdrag.swept].filter(k => fencePieces()[k]) : keys;
 }
 function fenceDragStat(){
   const keys = fenceDragKeys();
@@ -2441,7 +2441,7 @@ svg.addEventListener("pointerdown", e => {
     const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
     if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
     const w = toWorld(e.clientX, e.clientY), first = tool === "bulldoze" ? pieceNear(w.x, w.y, Math.max(.6, 10 / view.k)) : null;
-    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
+    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
@@ -2486,6 +2486,16 @@ svg.addEventListener("pointermove", e => {
   }
   if(!drag) return;
   if(drag.fd){
+    if(fdrag.lift){
+      // sweep: every piece the pointer passes over joins the lift
+      drag.moved = true;
+      const w = toWorld(e.clientX, e.clientY), l = fdrag.last, r = Math.max(.6, 10 / view.k);
+      const n = Math.max(1, Math.ceil(Math.hypot(w.x - l.x, w.y - l.y) / .25)), before = fdrag.swept.size;
+      for(let i = 1; i <= n; i++){ const k = pieceNear(l.x + (w.x - l.x) * i / n, l.y + (w.y - l.y) * i / n, r); if(k) fdrag.swept.add(k); }
+      fdrag.last = w;
+      if(fdrag.swept.size !== before){ fenceDragStat(); renderOverlay(); }
+      return;
+    }
     const g = gridAt(e); drag.moved = true;
     if(g[0] !== fdrag.b[0] || g[1] !== fdrag.b[1]){ fdrag.b = g; fenceDragStat(); renderOverlay(); }
     return;
