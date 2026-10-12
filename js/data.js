@@ -848,12 +848,12 @@ Object.assign(BARRIERS.electric, {wear:2.5, repair:14});
 Object.assign(BARRIERS.acrylic,  {wear:1.5, repair:25});
 Object.assign(BARRIERS.concrete, {wear:1.0, repair:12});
 
-// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py).
+// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
 // One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Only bars so far.
 //   worn     below this condition (percent) the fence shows its rusted picture; at 0 it is broken, trampled flat
 //   minRun   a side that runs mostly north-south is seen edge-on, so it is drawn as a column when less than this share of its length runs across the screen
 //   edge     how many pixels wide that column is
-const FENCE_SPRITES = {bars:{w:23, h:20}};
+const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}};
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};
 
 // Clever animals that test and attack their fences, like predators do

@@ -1734,6 +1734,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && !nsd.includes("<image") && nsd.includes("<rect") && nsd.includes(FENCE_EDGE.steel.hi) && !nsd.includes(FENCE_EDGE.rust.mid) && fb(30, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && fb(0, [0, 0], [0, 7]).includes(FENCE_EDGE.rust.mid) && !fb(0, [0, 0], [0, 7]).includes("<image")
         && /height="[\d.]+"/.test(nsd) && nsd.match(/<rect /g).length > fb(0, [0, 0], [0, 7]).match(/<rect /g).length * .3 && !fb(0, [0, 0], [7, 0], "wood").includes("<image") && fb(50, [0, 0], [7, 0], "electric") === fb(100, [0, 0], [7, 0], "electric");
 
+      // a bar fence's keeper gate is one picture that never wears (same at 100, 30 and 0 condition), set into its side; north-south it is posts and a latch; other fences ignore it
+      const fg = (cond, a, b, kind = "bars") => fence34([a, b], false, kind, "all", {cond, gate:{i:0, p:[3.5, 0]}});
+      out.fenceGate = fg(100, [0, 0], [7, 0]).includes("bars-gate.png") && fg(0, [0, 0], [7, 0]).includes("bars-gate.png") && fg(30, [0, 0], [7, 0]).includes("bars-gate.png") && !fg(30, [0, 0], [7, 0]).includes("gate-degrading")
+        && !fg(0, [0, 0], [0, 7]).includes("<image") && fg(0, [0, 0], [0, 7]).includes(GATE_GOLD.mid) && !fb(100, [0, 0], [7, 0]).includes("bars-gate") && fg(100, [0, 0], [7, 0], "wood") === fb(100, [0, 0], [7, 0], "wood");
+
       // a rigged swimmer napping in a pond it never left (spawned there, or water drawn under it) is drawn in the water (its rig clipped at the waterline, a ghost below, ripples on it), not lying on top of it, and goes back to a plain rig on the bank
       const RS = rigOf("prio");
       out.rigSwimData = !!RS && rigSwims("prio") && RS.clips.swim.wl > 30 && RS.clips.swim.dense.length === 8 && RS.clips.swim.fps === 6;

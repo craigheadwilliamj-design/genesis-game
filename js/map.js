@@ -189,6 +189,8 @@ function render(){
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
     const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
     const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
+    const gi = tilt ? gateSide34(e, kinds34) : -1;
+    if(gi >= 0) fo34.gate = {i:gi, p:e.gate};
     if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, kinds34, "back", fo34);
     if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
@@ -203,9 +205,9 @@ function render(){
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
-    if(e.gate){
+    if(e.gate){   // a gate with its own picture only shows the marker when it has a problem
       const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
-      s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      if(gi < 0 || !ok) s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     }
     s += `</g>`;
     if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
@@ -486,14 +488,22 @@ const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_L
 // One side of a fence drawn from its pictures (FENCE_SPRITES): 3 m sections laid along the side, the last one cut short, then a post at the far end.
 // Each is stood up the way fence34 stands a wall (a pixel is ROCK_MPP across and ROCK_MPP / TILT up the map, so it is square on screen), turned along the side as a shear.
 // Returns null for a side running mostly north-south, which is seen edge-on: the caller draws fenceEdgeSvg for it instead.
-function fenceSpriteSvg(kind, a, b, cond){
+// gate: the keeper gate's point on this side, if it has one: a gate picture (a section wide) is set into the fence there.
+function fenceSpriteSvg(kind, a, b, cond, gate){
   const S = FENCE_SPRITES[kind], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if(L < .05 || Math.abs(b[0] - a[0]) / L < FENCE_LOOK.minRun) return null;
   if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
-  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), href = `sprites/fence/${kind}-${fenceState(cond)}.png`, Lp = L / ROCK_MPP;
+  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st = fenceState(cond), Lp = L / ROCK_MPP;
   // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
-  const put = (at, w) => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image href="${href}" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
+  const put = (at, w, pic = st) => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image href="sprites/fence/${kind}-${pic}.png" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
   let s = "";
+  if(gate){
+    // the fence runs up to the gate's left post and starts again under its right one; the gate goes on top
+    const gw = Math.min(S.w, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate[0] - a[0]) * dx + (gate[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
+    for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
+    for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
+    return s + put(Lp - 3, 3) + put(g0, gw, "gate");
+  }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
   return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
 }
@@ -503,7 +513,9 @@ const FENCE_EDGE = {
   steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"},
   rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"},
 };
-function fenceEdgeSvg(kind, a, b, cond, hi){
+// gate: the keeper gate's point on this side, if it has one: a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
+const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
+function fenceEdgeSvg(kind, a, b, cond, hi, gate){
   const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE.steel, R = FENCE_EDGE.rust, n2 = v => v.toFixed(2);
   const x0 = Math.round(((a[0] + b[0]) / 2 - FENCE_LOOK.edge * px / 2) / px) * px, ya = Math.min(a[1], b[1]), yb = Math.max(a[1], b[1]);
   const rect = (x, y, w, h, fill) => `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}" fill="${fill}" shape-rendering="crispEdges"/>`;
@@ -521,20 +533,33 @@ function fenceEdgeSvg(kind, a, b, cond, hi){
     for(const y of posts) s += rect(x0, y - FENCE_SPRITES[kind].h * py, 3 * px, py, C.hi) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
     if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
   }
+  if(gate){
+    const y1 = Math.min(yb, Math.max(ya, gate[1] - S.w * px / 2) + S.w * px), y0 = Math.max(ya, y1 - S.w * px), au = GATE_GOLD, h = S.h * py;
+    for(const y of [y0, y1]) s += rect(x0, y - h, 3 * px, py, C.hi) + rect(x0 + px, y - h - py, px, py, au.hi) + rect(x0 + px, y - h, px, py, au.mid) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
+    s += rect(x0 + px, (y0 + y1) / 2 - 10 * py, px, 3 * py, au.mid) + rect(x0 + px, (y0 + y1) / 2 - 10 * py, px, py, au.hi) + rect(x0 + px, (y0 + y1) / 2 - 8 * py, px, py, au.lo);
+  }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
   return s;
 }
+// The side of a closed exhibit its keeper gate sits on, if that side's fence has a gate picture (else -1: the gate stays a gold marker)
+function gateSide34(e, kinds){
+  if(!e.gate || e.open || e.viv) return -1;
+  const P = e.points; let best = -1, bd = Infinity;
+  for(let i = 0; i < P.length; i++){ const d = segProj(e.gate[0], e.gate[1], P[i], P[(i + 1) % P.length]).d; if(d < bd){ bd = d; best = i; } }
+  const F = FENCE34[Array.isArray(kinds) ? kinds[best] : kinds];
+  return F && F.sprite && FENCE_SPRITES[F.sprite].gate ? best : -1;
+}
 // kind is one fence for every side, or a list with one kind a side (a grid exhibit's pieces)
-// o: hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), lights/powered (electric posts)
+// o: hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), gate ({i: side, p: point}), lights/powered (electric posts)
 function fence34(P, closed, kinds, which, o = {}){
   const n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
   const segs = [];
   for(let i = 0; i < n; i++){ const a = P[i], b = P[(i+1) % P.length], ny = closed ? norm34(P, i)[1] : 0;
-    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue; segs.push({a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
+    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue; segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
   segs.sort((p, q) => p.y - q.y);
   const up = h => lift34(h), M = ([x, y]) => `M${n2(x)} ${n2(y)}`, Lto = ([x, y]) => `L${n2(x)} ${n2(y)}`, at = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
   let s = "";
-  for(const {a, b, ny, kind} of segs){
+  for(const {i, a, b, ny, kind} of segs){
     const F = FENCE34[kind] || FENCE34.wood, H = F.h, q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
     if(F.hedge){
       s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
@@ -550,7 +575,8 @@ function fence34(P, closed, kinds, which, o = {}){
     }
     // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on is a column instead
     if(F.sprite){
-      s += fenceSpriteSvg(F.sprite, a, b, o.cond) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi);
+      const gp = o.gate && o.gate.i === i ? o.gate.p : null;
+      s += fenceSpriteSvg(F.sprite, a, b, o.cond, gp) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi, gp);
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
