@@ -1610,13 +1610,13 @@ function setTool(t){
     updateZoneEditBar();
   }
   else if(t === "parcels"){ parcelSel = null; fit(); updateParcelBar(); }
-  else if(t === "gate") showBar("Place a keeper gate", "Tap an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, or drag along a fence to lift it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -1920,35 +1920,42 @@ function placeBuilding(e){
 
 /* ---------- keeper gates ---------- */
 let gateGhost = null;
-// Find the exhibit fence nearest the pointer, and whether a gate there would work
+// Find the exhibit fence (or the fence of a closed pen with no exhibit yet) nearest the pointer, and whether a gate there would work
 function findGateSpot(clientX, clientY){
   const p = toWorld(clientX, clientY); let best = null;
-  for(const e of state.exhibits){
-    if(e.viv) continue;
-    for(let i = 0; i < e.points.length; i++){
-      const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]);
-      if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {e, x:r.x, y:r.y, d:r.d};
-    }
-  }
+  const near = (host, pts) => { for(let i = 0; i < pts.length; i++){
+    const r = segProj(p.x, p.y, pts[i], pts[(i+1) % pts.length]);
+    if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {...host, x:r.x, y:r.y, d:r.d};
+  } };
+  for(const e of state.exhibits) if(!e.viv) near({e}, e.points);
+  for(const f of penFaces()) near({pen:f}, f.pts);
   if(!best) return null;
-  const old = best.e.gate; best.e.gate = [best.x, best.y];
-  const chk = gateCheck(best.e); best.e.gate = old;
+  const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
+  const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
+}
+// A gate on a pen also buys the ground it fences in
+const penCost = f => GATE_COST + Math.round(newGround([f]) * COST.landPerSqM);
+// A grid exhibit's gate under the pointer (bulldoze takes it out, and the exhibit with it)
+function gateNear(cx, cy){
+  const w = toWorld(cx, cy);
+  return state.exhibits.find(e => e.grid && e.gate && Math.hypot(e.gate[0] - w.x, e.gate[1] - w.y) * view.k < 14) || null;
 }
 function gateHover(e){
   gateGhost = findGateSpot(e.clientX, e.clientY);
-  setStat(gateGhost ? (gateGhost.ok ? `${money(GATE_COST)}. ${gateGhost.why}` : gateGhost.why) : "Point at an exhibit's fence.", gateGhost && !gateGhost.ok);
+  setStat(gateGhost ? (gateGhost.ok ? `${money(gateGhost.pen ? penCost(gateGhost.pen) : GATE_COST)}. ${gateGhost.why}` : gateGhost.why) : "Point at an exhibit's fence, or a closed pen.", gateGhost && !gateGhost.ok);
   renderOverlay();
 }
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
-  if(!g){ setStat("Tap right on an exhibit's fence.", true); return; }
-  const cost = g.e.gate ? 0 : GATE_COST;
-  if(!canAfford(cost)){ setStat(`A gate costs ${money(cost)}.`, true); return; }
+  if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
+  const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
+  if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
-  g.e.gate = [g.x, g.y];
+  const ex = g.pen ? adoptPen(g.pen, [g.x, g.y]) : g.e;
+  if(!g.pen) ex.gate = [g.x, g.y];
   afterChange(); render();
-  ui.toast(`${cost ? "Built" : "Moved"} the gate on ${g.e.name}. ${g.why}`, g.ok ? "" : "bad");
+  ui.toast(`${g.pen ? `Made ${ex.name}, ${fmtArea(area(ex.points))}, with a gate` : `${cost ? "Built" : "Moved"} the gate on ${ex.name}`}. ${g.why}`, g.ok ? "" : "bad");
 }
 
 /* ---------- keepers on the map ---------- */
@@ -2135,6 +2142,7 @@ function landTap(ev){
 /* ---------- bulldozing ---------- */
 function bulldozeTap(kind, id){
   if(!kind){ doomed = null; setStat(""); render(); return; }
+  if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
   const it = findItem(kind, id);
   if(!it) return;
   if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
@@ -2158,8 +2166,17 @@ function confirmExhibitRemoval(e){
   }, "No");
 }
 
-function removeItem(kind, it){
-  const refund = refundFor(kind, it), lift = kind === "exhibit" && it.grid ? ownPieces(it) : [];
+// Without its gate a fenced pen stops being an exhibit: the animals and contents go, the fence stays
+function confirmGateRemoval(e){
+  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will sell all animals in it and everything inside, but the fence stays. Are you sure?`, "Yes", () => {
+    if(!findItem("exhibit", e.id)) return;
+    removeItem("exhibit", e, {keepFence:true}); doomed = null; setStat("");
+  }, "No");
+}
+
+function removeItem(kind, it, opts = {}){
+  const lift = kind === "exhibit" && it.grid && !opts.keepFence ? ownPieces(it) : [];
+  const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
@@ -2396,6 +2413,8 @@ svg.addEventListener("pointerdown", e => {
   }
   if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
   if(tool === "exhibit" || tool === "bulldoze"){
+    const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
+    if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
     const w = toWorld(e.clientX, e.clientY), first = tool === "bulldoze" ? pieceNear(w.x, w.y, Math.max(.6, 10 / view.k)) : null;
     if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
@@ -2414,7 +2433,8 @@ svg.addEventListener("pointermove", e => {
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
-      const w = toWorld(e.clientX, e.clientY), k = pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
+      const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
+      if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
       if(k !== fhover){ fhover = k; renderOverlay(); }
       const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }
