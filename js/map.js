@@ -187,7 +187,7 @@ function render(){
     if((!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
-    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
+    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
     const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
     if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, kinds34, "back", fo34);
     if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
@@ -475,13 +475,30 @@ function sign34(P, i, h, text, fs){ const [x, y] = onEdge34(P, i, .5, h); return
 // Solid walls on the near side are see-through, so they don't hide the animals.
 const FENCE34 = {
   wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35]},
-  bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5},
+  bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5, sprite:"bars"},
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true},
   acrylic: {h:2.2, col:"#9FCFE0", solid:.4},
   concrete:{h:3.6, col:"#B8B1A2", solid:1},
   hedge:   {h:1.8, hedge:true},
 };
+// Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
+const fenceState = c => c == null ? "pristine" : c <= 0 ? "broken" : c < FENCE_LOOK.worn ? "degrading" : "pristine";
+// One side of a fence drawn from its pictures (FENCE_SPRITES): 3 m sections laid along the side, the last one cut short, then a post at the far end.
+// Each is stood up the way fence34 stands a wall (a pixel is ROCK_MPP across and ROCK_MPP / TILT up the map, so it is square on screen), turned along the side as a shear.
+// Returns null for a side running mostly north-south, which is seen edge-on: the caller draws posts and rails for it instead.
+function fenceSpriteSvg(kind, a, b, cond){
+  const S = FENCE_SPRITES[kind], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if(L < .05 || Math.abs(b[0] - a[0]) / L < FENCE_LOOK.minRun) return null;
+  if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
+  const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), href = `sprites/fence/${kind}-${fenceState(cond)}.png`, Lp = L / ROCK_MPP;
+  // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
+  const put = (at, w) => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image href="${href}" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
+  let s = "";
+  for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
+  return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
+}
 // kind is one fence for every side, or a list with one kind a side (a grid exhibit's pieces)
+// o: hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), lights/powered (electric posts)
 function fence34(P, closed, kinds, which, o = {}){
   const n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
   const segs = [];
@@ -504,14 +521,28 @@ function fence34(P, closed, kinds, which, o = {}){
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
+    // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on falls through to the drawn posts and rails
+    const look = F.sprite ? fenceState(o.cond) : "pristine", pic = F.sprite && fenceSpriteSvg(F.sprite, a, b, o.cond);
+    if(pic){
+      s += pic;
+      if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
+      continue;
+    }
     // posts, then rails (and bars or wires) between them
-    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), np = Math.max(1, Math.round(L / F.step));
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]), np = Math.max(1, Math.round(L / F.step)), col = look === "degrading" ? "#8F6B4A" : F.col;
     let posts = "", rails = "", thin = "";
+    if(look === "broken"){
+      // trampled: only stubs of posts and a rusted line along the ground
+      for(let k = 0; k <= np; k++){ const p = at(a, b, k / np); posts += M(p) + Lto(up(.5)(p)); }
+      s += `<path d="${M(a)}${Lto(b)}" stroke="#8E4A12" stroke-width="1.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/><path d="${posts}" stroke="${F.col}" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
+      if(hi) s += `<path d="${M(a)}${Lto(b)}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
+      continue;
+    }
     for(let k = 0; k <= np; k++){ const p = at(a, b, k / np); posts += M(p) + Lto(up(H + (F.wire ? .2 : 0))(p)); }
     for(const h of F.rails) (F.wire ? (thin += M(up(h)(a)) + Lto(up(h)(b))) : (rails += M(up(h)(a)) + Lto(up(h)(b))));
     if(F.bars){ const nb = Math.round(L / F.bars); for(let k = 1; k < nb; k++){ const p = at(a, b, k / nb); thin += M(up(.25)(p)) + Lto(up(2.5)(p)); } }
-    s += `<path d="${thin}" stroke="${F.col}" stroke-width="${F.wire ? .8 : 1}" stroke-opacity="${F.wire ? .8 : .9}" vector-effect="non-scaling-stroke" fill="none"/>`;
-    s += `<path d="${rails}" stroke="${F.col}" stroke-width="2" vector-effect="non-scaling-stroke" fill="none"/><path d="${posts}" stroke="${F.col}" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
+    s += `<path d="${thin}" stroke="${col}" stroke-width="${F.wire ? .8 : 1}" stroke-opacity="${F.wire ? .8 : .9}" vector-effect="non-scaling-stroke" fill="none"/>`;
+    s += `<path d="${rails}" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" fill="none"/><path d="${posts}" stroke="${col}" stroke-width="2.6" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
     if(hi) s += `<path d="${M(up(F.rails[F.rails.length - 1])(a))}${Lto(up(F.rails[F.rails.length - 1])(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
     // the Genesis electric fence's amber post lights, dark when the power is out
     if(F.wire && o.lights){ let d = ""; for(let k = 0; k <= np; k++) d += M(up(H + .2)(at(a, b, k / np))) + "h0.001";
