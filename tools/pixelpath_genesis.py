@@ -40,3 +40,4 @@ for _ in range(10):   # aggregate flecks: a dark pixel with a pale one under-rig
     x, y = rnd.randrange(N), rnd.randrange(N)
     if not im.getpixel((x, y))[3] and not im.getpixel(((x + 1) % N, (y + 1) % N))[3]: put(x, y, FLECK); put(x + 1, y + 1, LIT)
 im.save(sys.argv[1] if len(sys.argv) > 1 else "sprites/paths/genesis.png")
+

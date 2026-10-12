@@ -1958,7 +1958,7 @@ const THEMES = {
   genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
     // warm gray concrete between dark green curbs
-    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B"},
+    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", kerbPix:{w:.5, c:"#2B5640", joint:"#1B3A29", chip:"#3E7253", lit:"#5C9A72", shade:"#14281C", step:1.3}},
     bld:"#1F3D2B", mix:0, edge:"#14281C", accent:"#C9A24B", fee:0, fits:[],
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.

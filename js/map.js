@@ -253,6 +253,12 @@ function render(){
     const on = isSel("path", p.id), dead = isDoomed("path", p.id), live = (svc ? joinedAll : joined).has(p.id);
     const lj = `stroke-linejoin="round" stroke-linecap="${isWide(p) ? "butt" : "round"}" fill="none"`;   // wide paths end flat so they don't bulge past a join
     if(on || dead) under += cut(`<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`);
+    if(!svc && PT.kerbPix){   // a pixel kerb: a world-width strip, with a 1 px lit line offset to the top left and a shaded one to the bottom right (light is from the top left)
+      const K = PT.kerbPix, kw = w + 2*K.w, o = ROCK_MPP;
+      // the face is flat green, with a 1 px dark joint every `step` m (kerb stones) and a lit pixel after each joint, laid as dashes across the whole stroke
+      const dash = (c, off) => `<polyline points="${pts}" stroke="${c}" stroke-width="${kw}" stroke-dasharray="${o} ${K.step - o}" stroke-dashoffset="${off}" stroke-linejoin="round" stroke-linecap="butt" fill="none"/>`;
+      under += cut(`<polyline points="${pts}" transform="translate(${-o} ${-o})" stroke="${K.lit}" stroke-width="${kw}" ${lj}/><polyline points="${pts}" transform="translate(${o} ${o})" stroke="${K.shade}" stroke-width="${kw}" ${lj}/><polyline points="${pts}" stroke="${K.c}" stroke-width="${kw}" ${lj}/>` + dash(K.joint, 0) + dash(K.chip, -o));
+    } else
     under += cut(`<polyline points="${pts}" stroke="${svc ? "#26292C" : PT.edge}" stroke-width="${w + 1.6*inv}" ${lj}/>`);
     if(!svc && PT.kerb) under += cut(`<polyline points="${pts}" stroke="${PT.kerb.c}" stroke-width="${w + 1.6*inv}" stroke-dasharray="${PT.kerb.dash.split(" ").map(n => n*inv).join(" ")}" ${lj.replace('stroke-linecap="round"', 'stroke-linecap="butt"')}/>`);
     let body = `<polyline points="${pts}" stroke="${svc ? (live ? "#3A3E42" : "#5B5F63") : live ? PT.live : PT.dead}" stroke-width="${w}" ${lj}/>`;
