@@ -143,6 +143,7 @@ const SPECIES = [
   {id:"minm", name:"Minmi",          period:"Cretaceous", diet:["herbivore"], price:8000, food:70, space:300, group:[2,8], appeal:5, stars:1},
   {id:"gall", name:"Gallimimus",     period:"Cretaceous", diet:["omnivore"], price:9000, food:90, space:400, group:[3,10], appeal:6, stars:1.5},
   {id:"para", name:"Parasaurolophus", period:"Cretaceous", diet:["herbivore"], price:14000, food:180, space:900,  group:[3,10], appeal:8,  stars:2},
+  {id:"pach", name:"Pachycephalosaurus", period:"Cretaceous", diet:["herbivore"], price:11000, food:100, space:450, group:[2,6], appeal:7, stars:1.5},
   {id:"igua", name:"Iguanodon",      period:"Cretaceous", diet:["herbivore"], price:18000, food:240, space:1200, group:[3,10], appeal:10, stars:2},
   {id:"velo", name:"Velociraptor",   period:"Cretaceous", diet:["carnivore"], predator:true, price:15000, food:120, space:500,  group:[3,6],  appeal:11, stars:2.5},
   {id:"pter", name:"Pteranodon",     period:"Cretaceous", diet:["piscivore"], price:16000, food:120, space:800,  group:[3,10], appeal:11, stars:2.5},
@@ -209,6 +210,7 @@ const SPECIES = [
   {id:"sdel", name:"Sicilian Dwarf Elephant", period:"Quaternary", diet:["herbivore"], price:15000, food:28, space:40, group:[1,3], appeal:6, stars:1.5, viv:"L"},
   {id:"dire", name:"Dire wolf",      period:"Quaternary", diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
   {id:"macr", name:"Macrauchenia",   period:"Quaternary", diet:["herbivore"], price:13000, food:150, space:900, group:[2,6], appeal:8, stars:2},
+  {id:"mglo", name:"Megaloceros",    period:"Quaternary", diet:["herbivore"], price:13000, food:140, space:850, group:[2,6], appeal:8, stars:2},
   {id:"arct", name:"Arctodus",       period:"Quaternary", diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
   {id:"doed", name:"Doedicurus",     period:"Quaternary", diet:["herbivore"], price:18000, food:200, space:1100, group:[1,4], appeal:10, stars:2.5},
   {id:"mgth", name:"Megatherium",    period:"Quaternary", diet:["herbivore"], price:20000, food:260, space:1500, group:[1,4],  appeal:11, stars:2.5},
@@ -393,10 +395,12 @@ const PERIOD_COLOR = {
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
 const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ratio:100/75, walk:6, step:.15, size:1.4}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:2, ms:600}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}};
 
-// Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
+// Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
+// (appeal 6 to 8, so one herd actually draws a crowd while the rest of the starters barely do).
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
   b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
+  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "macr", "aepy", "mglo", "pach"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
@@ -1250,7 +1254,7 @@ const HAB = {
   waterMax:.1,     // share of the floor an animal that loves water (likes 1) wants under water; less keen animals want proportionally less
   waterBand:.2,    // no penalty within this share either side of what an animal wants
   rockBase:1,      // rocks a 500 m² exhibit of grassland wants for an animal with middling taste (likes .4); scaled by biome and by how much it likes rocks
-  offEra:.25,      // how much a plant of the right biome but another period counts toward an animal's plants
+  offEra:1/3,      // other periods' plants of the right biome can fill this share of the plant cover an animal wants
   plantWeight:.4,  // how much plants weigh against water and rocks when an animal is satisfied
   meatPlants:.5,   // meat eaters want this share of the plants that plant eaters do
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
@@ -1275,7 +1279,7 @@ const WEATHER = {
   },
 };
 // Ice age animals shrug off the cold
-const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast"];
+const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast", "mglo"];
 // Shelter slots one animal takes: bigger animals need more room
 const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 
@@ -1335,8 +1339,8 @@ const TRAITS = {
   social:{pair:["arge", "ornw", "kele", "aind"], herd:["tric", "mast"], pack:["daeo"]},
   temper:{
     curious:["proc", "gpit", "aind", "ples", "ornm", "gall", "ovir", "dodo", "sdel", "arch", "micr", "comp"],
-    skittish:["para", "macr", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
-    aggressive:["dino", "daeo", "arsi", "doed", "arct"],
+    skittish:["para", "macr", "mglo", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
+    aggressive:["pach", "dino", "daeo", "arsi", "doed", "arct"],
   },
 };
 const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepuscular", solitary:"solitary", pair:"lives in pairs", herd:"herd animal", pack:"pack animal", skittish:"skittish", curious:"curious", aggressive:"aggressive"};
@@ -1910,7 +1914,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland boreal",     macr:"grassland scrubland",
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
   smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
-  colm:"grassland temperate",
+  colm:"grassland temperate",  mglo:"grassland boreal",  pach:"temperate scrubland",
   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
   diic:"scrubland desert",    seym:"scrubland wetland",    plhy:"scrubland desert",     shar:"temperate wetland",

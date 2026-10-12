@@ -55,13 +55,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings = keepB; state.staff.atvs = keepA;
     out.atvPerDepot = two && one;
 
-    // every new park sells one species from pool A and two from pool B
-    let starterOk = true; const seenA = new Set();
+    // every new park sells one species from pool A, two from pool B and one mid-tier anchor from pool C
+    let starterOk = true; const seenA = new Set(), seenC = new Set();
     for(let i = 0; i < 60; i++){
-      const st = pickStarters(), a = st.filter(id => STARTER_POOLS.a.ids.includes(id)), b = st.filter(id => STARTER_POOLS.b.ids.includes(id));
-      starterOk = starterOk && st.length === 3 && a.length === 1 && b.length === 2 && new Set(st).size === 3; seenA.add(a[0]);
+      const st = pickStarters(), a = st.filter(id => STARTER_POOLS.a.ids.includes(id)), b = st.filter(id => STARTER_POOLS.b.ids.includes(id)), c = st.filter(id => STARTER_POOLS.c.ids.includes(id));
+      starterOk = starterOk && st.length === 4 && a.length === 1 && b.length === 2 && c.length === 1 && new Set(st).size === 4; seenA.add(a[0]); seenC.add(c[0]);
     }
-    out.starterPools = starterOk && seenA.size > 1;
+    out.starterPools = starterOk && seenA.size > 1 && seenC.size > 1;
     // the old slanted plot becomes the grid-aligned rectangle; new parks start with it
     const oldPlot = JSON.parse(JSON.stringify(state)); oldPlot.boundary = OLD_PLOT.map(p => p.slice());
     out.plotRectangle = JSON.stringify(upgradeSave(oldPlot).boundary) === JSON.stringify(PARK_PLOT) && JSON.stringify(newPark().boundary) === JSON.stringify(PARK_PLOT) &&
