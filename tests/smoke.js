@@ -1243,12 +1243,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
-    // animals only count plants from their own period, and want none where their period had no plants in the biome
+    // animals count plants from their own period in full and other periods' plants of the biome at HAB.offEra, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
     px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
-    const wrongPeriod = haveOf(px, jurSp).plants, anyPeriod = haveOf(px).plants;
+    const wrongPeriod = haveOf(px, jurSp).plants, anyPeriod = haveOf(px).plants, offEra = Math.round(Math.PI * 25 * HAB.offEra);
     px.land.push({id:"l-b", type:"jur-tropical-large", x:135, y:135});
-    out.plantsOwnPeriod = wrongPeriod === 0 && anyPeriod > 0 && haveOf(px, jurSp).plants === Math.round(Math.PI * 25) && speciesFit(px, jurSp).plants > 0;
+    out.plantsOwnPeriod = wrongPeriod === offEra && wrongPeriod > 0 && wrongPeriod < anyPeriod && haveOf(px, jurSp).plants === Math.round(Math.PI * 25 * (1 + HAB.offEra)) && speciesFit(px, jurSp).plants > 0;
     px.biome = "grassland";
     { const lys = SPECIES.find(s => s.id === "lyst"), ex = {id:"e-lys", name:"Lys", points:px.points, animals:[{id:"a-l", sp:"lyst", q:90}], land:[], biome:"scrubland"};
       const bad = () => exhibitReport(ex).issues.some(i => /another era/.test(i.text));
