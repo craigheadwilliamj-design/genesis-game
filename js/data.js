@@ -209,6 +209,7 @@ const SPECIES = [
   {id:"sdel", name:"Sicilian Dwarf Elephant", period:"Quaternary", diet:["herbivore"], price:15000, food:28, space:40, group:[1,3], appeal:6, stars:1.5, viv:"L"},
   {id:"dire", name:"Dire wolf",      period:"Quaternary", diet:["carnivore"], predator:true, price:11000, food:90,  space:500,  group:[3,8],  appeal:8,  stars:2},
   {id:"macr", name:"Macrauchenia",   period:"Quaternary", diet:["herbivore"], price:13000, food:150, space:900, group:[2,6], appeal:8, stars:2},
+  {id:"mglo", name:"Megaloceros",    period:"Quaternary", diet:["herbivore"], price:13000, food:140, space:850, group:[2,6], appeal:8, stars:2},
   {id:"arct", name:"Arctodus",       period:"Quaternary", diet:["omnivore","carnivore"], predator:true, price:17000, food:160, space:1000, group:[1,2],  appeal:11, stars:2.5},
   {id:"doed", name:"Doedicurus",     period:"Quaternary", diet:["herbivore"], price:18000, food:200, space:1100, group:[1,4], appeal:10, stars:2.5},
   {id:"mgth", name:"Megatherium",    period:"Quaternary", diet:["herbivore"], price:20000, food:260, space:1500, group:[1,4],  appeal:11, stars:2.5},
@@ -398,7 +399,7 @@ const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ra
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
   b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
-  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "dino", "aepy", "dodo", "sdel"]},
+  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "dino", "aepy", "dodo", "sdel", "mglo"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
@@ -1277,7 +1278,7 @@ const WEATHER = {
   },
 };
 // Ice age animals shrug off the cold
-const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast"];
+const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast", "mglo"];
 // Shelter slots one animal takes: bigger animals need more room
 const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 
@@ -1337,7 +1338,7 @@ const TRAITS = {
   social:{pair:["arge", "ornw", "kele", "aind"], herd:["tric", "mast"], pack:["daeo"]},
   temper:{
     curious:["proc", "gpit", "aind", "ples", "ornm", "gall", "ovir", "dodo", "sdel", "arch", "micr", "comp"],
-    skittish:["para", "macr", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
+    skittish:["para", "macr", "mglo", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
     aggressive:["dino", "daeo", "arsi", "doed", "arct"],
   },
 };
@@ -1912,7 +1913,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland boreal",     macr:"grassland scrubland",
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
   smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
-  colm:"grassland temperate",
+  colm:"grassland temperate",  mglo:"grassland boreal",
   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
   diic:"scrubland desert",    seym:"scrubland wetland",    plhy:"scrubland desert",     shar:"temperate wetland",
