@@ -216,6 +216,7 @@ function render(){
   // open fences and hedge rows
   for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
   for(const r of looseRuns()) s += fenceRunSvg(r.pts, r.b, false);
+  s += fenceJointsSvg(inv);
 
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
