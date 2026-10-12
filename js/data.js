@@ -143,6 +143,7 @@ const SPECIES = [
   {id:"minm", name:"Minmi",          period:"Cretaceous", diet:["herbivore"], price:8000, food:70, space:300, group:[2,8], appeal:5, stars:1},
   {id:"gall", name:"Gallimimus",     period:"Cretaceous", diet:["omnivore"], price:9000, food:90, space:400, group:[3,10], appeal:6, stars:1.5},
   {id:"para", name:"Parasaurolophus", period:"Cretaceous", diet:["herbivore"], price:14000, food:180, space:900,  group:[3,10], appeal:8,  stars:2},
+  {id:"pach", name:"Pachycephalosaurus", period:"Cretaceous", diet:["herbivore"], price:11000, food:100, space:450, group:[2,6], appeal:7, stars:1.5},
   {id:"igua", name:"Iguanodon",      period:"Cretaceous", diet:["herbivore"], price:18000, food:240, space:1200, group:[3,10], appeal:10, stars:2},
   {id:"velo", name:"Velociraptor",   period:"Cretaceous", diet:["carnivore"], predator:true, price:15000, food:120, space:500,  group:[3,6],  appeal:11, stars:2.5},
   {id:"pter", name:"Pteranodon",     period:"Cretaceous", diet:["piscivore"], price:16000, food:120, space:800,  group:[3,10], appeal:11, stars:2.5},
@@ -399,7 +400,7 @@ const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ra
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
   b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
-  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "macr", "aepy", "mglo"]},
+  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat", "gall", "para", "macr", "aepy", "mglo", "pach"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
@@ -1339,7 +1340,7 @@ const TRAITS = {
   temper:{
     curious:["proc", "gpit", "aind", "ples", "ornm", "gall", "ovir", "dodo", "sdel", "arch", "micr", "comp"],
     skittish:["para", "macr", "mglo", "aepy", "hyps", "dryo", "hete", "igua", "sifr", "hopl"],
-    aggressive:["dino", "daeo", "arsi", "doed", "arct"],
+    aggressive:["pach", "dino", "daeo", "arsi", "doed", "arct"],
   },
 };
 const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepuscular", solitary:"solitary", pair:"lives in pairs", herd:"herd animal", pack:"pack animal", skittish:"skittish", curious:"curious", aggressive:"aggressive"};
@@ -1913,7 +1914,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland boreal",     macr:"grassland scrubland",
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
   smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
-  colm:"grassland temperate",  mglo:"grassland boreal",
+  colm:"grassland temperate",  mglo:"grassland boreal",  pach:"temperate scrubland",
   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
   diic:"scrubland desert",    seym:"scrubland wetland",    plhy:"scrubland desert",     shar:"temperate wetland",
