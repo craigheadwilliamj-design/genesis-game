@@ -131,7 +131,22 @@ function newPark(){
 }
 
 // Bring older saves up to date with anything added since
+// A save made while paths were tiles (that build was reverted) keeps its paths only as `tiles` {"cx,cy": {k, t, fixed}}, 5 m squares. Turn them back into lines: one through each pair of
+// neighbouring tile centers, and a loose end runs on to the edge of its tile.
+function linesFromTiles(T){
+  const out = [], xy = k => k.split(",").map(Number), ctr = ([x, y]) => [x * 5 + 2.5, y * 5 + 2.5];
+  const line = (key, id, a, b) => { const t = T[key], p = {id:"pt-" + id, name:t.fixed ? "Main walk" : "Path", points:[a, b]}; if(t.k === "wide" || t.k === "service" || t.k === "tram" || t.k === "bridge") p.type = t.k; if(t.t) p.theme = t.t; if(t.fixed) p.fixed = true; out.push(p); };
+  for(const key of Object.keys(T)){
+    const [x, y] = xy(key), c = ctr([x, y]), has = (dx, dy) => !!T[(x + dx) + "," + (y + dy)], n = [[1, 0], [0, 1], [-1, 0], [0, -1]].filter(([dx, dy]) => has(dx, dy));
+    for(const [dx, dy] of [[1, 0], [0, 1]]) if(has(dx, dy)) line(key, key + ">" + dx + dy, c, ctr([x + dx, y + dy]));
+    if(n.length === 0) line(key, key, [c[0] - 2.5, c[1]], [c[0] + 2.5, c[1]]);
+    else if(n.length === 1) line(key, key + "e", c, [c[0] - n[0][0] * 2.5, c[1] - n[0][1] * 2.5]);
+  }
+  return out;
+}
+
 function upgradeSave(s){
+  if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
