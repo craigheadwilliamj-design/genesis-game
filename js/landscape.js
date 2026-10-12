@@ -101,7 +101,7 @@ const plantSuits = (t, s) => t.period === s.period;
 function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
   return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
-    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && plantHere(LAND[f.type], e) && (!s || plantSuits(LAND[f.type], s)) ? landM2(f) : 0), 0))};
+    rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(land.reduce((n, f) => n + (LAND[f.type].flora && plantHere(LAND[f.type], e) ? (!s || plantSuits(LAND[f.type], s) ? landM2(f) : landM2(f) * HAB.offEra) : 0), 0))};
 }
 // How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
 function waterFit(have, want){
