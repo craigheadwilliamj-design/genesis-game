@@ -447,7 +447,7 @@ function decorProblem(key, x, y){
   if(!insidePlot(circlePts(x, y, r), true)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(o => distToEdge(x, y, o.points) < r)) return "Keep it clear of exhibit fences.";
   if(state.buildings.some(b => inPoly(x, y, b.points) || distToEdge(x, y, b.points) < r * .8)) return "It overlaps a building.";
-  if(state.paths.some(p => lineDist(x, y, p.points) < halfWidth(p) + r * .5)) return "It's on a path.";
+  if(tilesHit([[x - r*.5, y - r*.5], [x + r*.5, y - r*.5], [x + r*.5, y + r*.5], [x - r*.5, y + r*.5]]) || state.paths.some(p => lineDist(x, y, p.points) < halfWidth(p) + r * .5)) return "It's on a path.";
   if(Math.hypot(x - state.gate[0], y - state.gate[1]) < r + 9) return "Keep clear of the entrance.";
   if(parkFences().some(l => lineDist(x, y, l.points) < r * .8)) return "It's on a fence.";
   if(decorOf().some(f => LAND[f.type] && Math.hypot(f.x - x, f.y - y) < r + footR(LAND[f.type]))) return "It overlaps something already there.";

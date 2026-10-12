@@ -172,6 +172,7 @@ panelEl.addEventListener("change", ev => {
   if(why){ ui.toast(why, "bad"); ui.panel(); return; }
   const fee = themeFee(kind, it, key);
   spend(fee, "built"); if(key === "genesis") delete it.theme; else it.theme = key;
+  if(kind === "path") pushThemesToTiles();
   ui.toast(`Now ${THEMES[key].label}${fee ? ` (${money(fee)})` : ""}.`, "good");
   afterChange(); render();
 });
@@ -708,19 +709,20 @@ function tramStopHtml(b){
 function tramTrackHtml(p){
   const stops = tramStops(p).stops.length;
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>Tram track</h2>`;
-  h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
+  h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${pathTiles(p)}</span></div>`;
   h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run, and stations wear faster with more track.</div>`;
   h += tramFareHtml();
   h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   return h;
 }
+const pathTiles = p => p.tiles ? `${p.tiles.length} tile${p.tiles.length === 1 ? "" : "s"}` : `${Math.round(lineLength(p.points))} m`;
 function pathHtml(p){
   if(isTram(p)) return tramTrackHtml(p);
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
-  h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Promenade" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
+  h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${pathTiles(p)}</span></div>`;
   if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like ORACLE, GHOST, and TAR can use it.</div>`;
-  if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
+  if(isWide(p)) h += `<div class="meta">Roomy paving. Holds twice the crowd before guests feel packed.</div>`;
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
   if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
   if(!svc && !isBridge(p)) h += themeHtml("path", p);

@@ -10,7 +10,7 @@ function mixHex(a, b, t){
 const themeFill = (it, base) => { const T = themeOf(it); return T.mix ? mixHex(base, T.bld, T.mix) : base; };
 
 const themeHave = key => !state.themes || state.themes.have.includes(key);
-const themeBase = (kind, it) => kind === "path" ? pathCost(it.points, it.type) : kind === "exhibit" ? (it.viv ? VIVARIUMS[it.viv].price : exhibitCost(it.points, it.barrier)) : BUILDINGS[it.type].price;
+const themeBase = (kind, it) => kind === "path" ? (it.tiles ? tilesCost(it) : pathCost(it.points, it.type)) : kind === "exhibit" ? (it.viv ? VIVARIUMS[it.viv].price : exhibitCost(it.points, it.barrier)) : BUILDINGS[it.type].price;
 const themeFee = (kind, it, key) => Math.round(themeBase(kind, it) * THEMES[key].fee);
 function themeProblem(kind, it, key){
   if(!THEMES[key]) return "Unknown theme.";
@@ -58,6 +58,7 @@ function restyleZone(z, key){
   const plan = zoneThemePlan(z, key), fee = zoneThemeFee(z, key);
   spend(fee, "built");
   for(const [, it] of plan) if(key === "genesis") delete it.theme; else it.theme = key;
+  if(plan.some(([k]) => k === "path")) pushThemesToTiles();
   return {n:plan.length, fee};
 }
 

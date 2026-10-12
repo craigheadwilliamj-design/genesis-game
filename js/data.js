@@ -1955,10 +1955,10 @@ const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
-  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
+  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-tile", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
     // warm gray concrete between dark green curbs
-    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", slab:{ortho:["genesis.png", 5.2], diag:["genesis-d.png", 3.64], wide:["genesis-wide.png", 5.2], wideDiag:["genesis-wide-d.png", 7.28]}, spine:{c:"#C9A24B", w:.13}, kerbPix:{w:.5, c:"#2B5640", joint:"#1B3A29", chip:"#3E7253", lit:"#5C9A72", shade:"#14281C", step:1.3}},
+    path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B", wideTex:"genesis-wide-tile", kerbPix:{w:.5, c:"#2B5640", joint:"#1B3A29", chip:"#3E7253", lit:"#5C9A72", shade:"#14281C", step:1.25}},
     bld:"#1F3D2B", mix:0, edge:"#14281C", accent:"#C9A24B", fee:0, fits:[],
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
@@ -2243,8 +2243,8 @@ THEMES.genesis.bord.by.concrete = THEMES.genesis.bord.strong;   // a plain concr
 const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
-const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
-const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:5, crowdMult:2};   // a 10 m promenade: twice the walkers before it feels packed
+const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:2.5};
+const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:2.5, crowdMult:2};   // promenade tiles: roomy paving that takes twice the walkers before it feels packed
 // Tram track is drawn like a path, but guests only get on and off at a tram station. The tram runs speedMult times faster than walking.
 const TRAM = {
   perMeter:25, upkeepPerMeter:0.3, halfWidth:1.5,
