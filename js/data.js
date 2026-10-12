@@ -393,10 +393,12 @@ const PERIOD_COLOR = {
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
 const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ratio:100/75, walk:6, step:.15, size:1.4}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:2, ms:600}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}};
 
-// Partner parks sell a few starter species. Each new park gets one from pool A and two from pool B.
+// Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
+// (appeal 6 to 8, so one herd actually draws a crowd while the rest of the starters barely do).
 const STARTER_POOLS = {
   a:{pick:1, ids:["arth", "mega", "pulm", "dcau", "comp"]},
   b:{pick:2, ids:["lyst", "dryo", "hyps", "ovir", "psit", "coel", "sile", "orni", "hete"]},
+  c:{pick:1, ids:["mosc", "scut", "este", "desm", "scel", "plat"]},
 };
 
 // Guest buildings. w and d are width and depth in meters.
