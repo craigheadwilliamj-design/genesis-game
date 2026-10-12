@@ -53,8 +53,8 @@ let mvSel = null;                   // building picked with the Move tool, the o
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
 const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
-// Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
-// so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
+// Where a wide path's flat end meets another guest path, run it through that path so the end has no wedge, and cut it flush at that path's near edge,
+// so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end (cut flush with the near edge of the path it joins).
 function wideJoin(p){
   const pts = p.points.map(q => q.slice()), clips = [], tapers = [];
   for(const end of [0, 1]){
@@ -86,7 +86,7 @@ function wideJoin(p){
     const gap = (E[0] - best.x)*mx + (E[1] - best.y)*my + best.hw;
     const t = -gap / dn;
     if(t > 0) pts[i] = [E[0] + dx/dl*Math.min(t, 40), E[1] + dy/dl*Math.min(t, 40)];
-    clips.push({bx:best.x - mx*best.hw, by:best.y - my*best.hw, tx, ty, mx, my});
+    clips.push({bx:best.x + mx*best.hw, by:best.y + my*best.hw, tx, ty, mx, my});   // cut at the near edge (the end still runs through to the far one so no wedge shows), so the path it joins keeps its own surface, slabs and center line
   }
   return {pts, clips, tapers};
 }
