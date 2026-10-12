@@ -476,7 +476,7 @@ function sign34(P, i, h, text, fs){ const [x, y] = onEdge34(P, i, .5, h); return
 // which: "back" draws the far sides of an exhibit (before what's inside), "front" the near sides (after it), "all" an open fence line.
 // Solid walls on the near side are see-through, so they don't hide the animals.
 const FENCE34 = {
-  wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35]},
+  wood:    {h:1.6, step:3,   col:"#7A5A38", rails:[.6, 1.35], sprite:"wood"},
   bars:    {h:2.6, step:2.5, col:"#7E858C", rails:[.25, 2.5], bars:.5, sprite:"bars"},
   electric:{h:3.2, step:4,   col:"#5A6068", rails:[.6, 1.2, 1.8, 2.4, 3], wire:true},
   acrylic: {h:2.2, col:"#9FCFE0", solid:.4},
@@ -509,14 +509,15 @@ function fenceSpriteSvg(kind, a, b, cond, gate){
 }
 // A bar fence side seen edge-on (running mostly north-south) is a thin slab, so it is drawn as a column FENCE_LOOK.edge pixels wide and as tall as the fence, in the pictures' colors:
 // lit left, base middle, shaded right, with a cap across it and a footing at every post (3 m apart, the pictures' spacing). Rust blocks when degrading; a low trampled heap with post stubs when broken.
+// steel is the kind's own material and rust its worn look (silvered wood for the wood fence); the pictures' colors
 const FENCE_EDGE = {
-  steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"},
-  rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"},
+  bars:{steel:{hi:"#A2A7AC", mid:"#7E858C", lo:"#60656A", deep:"#494D51"}, rust:{hi:"#C88047", mid:"#B24E00", lo:"#873B00", deep:"#5E2800"}},
+  wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
 const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
 function fenceEdgeSvg(kind, a, b, cond, hi, gate){
-  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE.steel, R = FENCE_EDGE.rust, n2 = v => v.toFixed(2);
+  const S = FENCE_SPRITES[kind], look = fenceState(cond), px = ROCK_MPP, py = px / TILT, C = FENCE_EDGE[kind].steel, R = FENCE_EDGE[kind].rust, n2 = v => v.toFixed(2);
   const x0 = Math.round(((a[0] + b[0]) / 2 - FENCE_LOOK.edge * px / 2) / px) * px, ya = Math.min(a[1], b[1]), yb = Math.max(a[1], b[1]);
   const rect = (x, y, w, h, fill) => `<rect x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}" fill="${fill}" shape-rendering="crispEdges"/>`;
   const posts = []; for(let y = ya; y < yb + .01; y += S.w * px) posts.push(y);
@@ -537,8 +538,8 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate){
     const y1 = Math.min(yb, Math.max(ya, gate.p[1] - S.w * px / 2) + S.w * px), y0 = Math.max(ya, y1 - S.w * px), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
     for(const y of [y0, y1]) s += rect(x0, y - h, 3 * px, py, C.hi) + rect(x0 + px, y - h - py, px, py, au.hi) + rect(x0 + px, y - h, px, py, au.mid) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
     // shut: a latch on the split. Open (drawGates swaps them): a leaf swung out from each post.
-    const swung = gate.f >= 2, latch = rect(x0 + px, ym - 10 * py, px, 3 * py, au.mid) + rect(x0 + px, ym - 10 * py, px, py, au.hi) + rect(x0 + px, ym - 8 * py, px, py, au.lo);
-    const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - 14 * py, 4 * px, 10 * py, C.mid) + rect(x0 + 3 * px, y - 14 * py, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - 14 * py, px, 10 * py, C.lo)).join("");
+    const swung = gate.f >= 2, latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
+    const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - h * .7, 4 * px, h * .5, C.mid) + rect(x0 + 3 * px, y - h * .7, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - h * .7, px, h * .5, C.lo)).join("");
     s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
   }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
@@ -601,7 +602,7 @@ function fence34(P, closed, kinds, which, o = {}){
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
-    // a bar fence stands as its pictures, by the exhibit's condition; a side seen edge-on is a column instead
+    // a fence with pictures (bars, wood) stands as them, by the exhibit's condition; a side seen edge-on is a column instead
     if(F.sprite){
       const gp = o.gate && o.gate.i === i ? o.gate : null;
       s += fenceSpriteSvg(F.sprite, a, b, o.cond, gp) || fenceEdgeSvg(F.sprite, a, b, o.cond, hi, gp);
