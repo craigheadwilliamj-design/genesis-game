@@ -1964,7 +1964,7 @@ function placeGhost(clientX, clientY){
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
-  if(!why && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
+  if(!why && !state.sandbox && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
   if(best){
     // slide along the path in grid steps: round the touch point to the grid, then put it back on the path

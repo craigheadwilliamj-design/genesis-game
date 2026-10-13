@@ -19,7 +19,7 @@ function freshLodging(){ return {stays:[], last:{booked:0, guests:0, money:0}}; 
 // Why this hotel can't be built yet, or null
 function hotelLocked(type){
   const t = BUILDINGS[type];
-  if(t.minRating && state.rating < t.minRating) return `Your park needs ${t.minRating} stars first.`;
+  if(!state.sandbox && t.minRating && state.rating < t.minRating) return `Your park needs ${t.minRating} stars first.`;
   if(t.minGuests && lastGuests() < t.minGuests) return `Your park needs ${t.minGuests} guests a day first. Yesterday had ${lastGuests()}.`;
   return null;
 }

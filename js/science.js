@@ -85,7 +85,7 @@ function projectProblem(kind, id){
   if(info.needs && !hasTech(info.needs)) return `Research ${TECH.find(x => x.id === info.needs).label} first.`;
   if(!sc.crew.paleo) return "Hire a researcher to run research.";
   if(freeBay("paleo") < 0) return bayFull("paleo", "researcher");
-  if(sc.points + 1e-9 < info.points) return `Needs ${info.points} research points. You have ${Math.floor(sc.points)}.`;
+  if(!state.sandbox && sc.points + 1e-9 < info.points) return `Needs ${info.points} research points. You have ${Math.floor(sc.points)}.`;
   return null;
 }
 function startProject(kind, id){
@@ -144,7 +144,7 @@ const lerpT = ([a, b], t) => a + (b - a) * t;
 // the trips a whole genome takes on average, and the price
 function tripOdds(id, periodId){
   const g = genomeInfo(id), p = placeOf(periodId), t = sizeT(g.space);
-  const fail = clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8), trips = lerpT(TRIP.trips, t);
+  const fail = state.sandbox ? 0 : clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8), trips = lerpT(TRIP.trips, t);
   // a genome ends on a find that overshoots 100% by about half a find's worth, hence the .5
   return {fail, trips, gain:100 / Math.max(.6, trips * (1 - fail) - .5), cost:Math.round(p.trip * lerpT(TRIP.costMul, t) * ghostLevel("cost") / 50) * 50};
 }
@@ -303,9 +303,11 @@ const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce
 // Called every tick. Research points trickle in, and every project, trip, clone and batch checks its own clock.
 function scienceTick(dtMin){
   const sc = state.science, c = state.ceres;
+  // sandbox: unlimited money and points, and every job finishes the moment it starts
+  if(state.sandbox){ state.money = SANDBOX_MONEY; sc.points = SANDBOX_POINTS; }
   // researchers with no project are on general research and earn points. Ones running a project don't.
   if(dept("oracle")) sc.points += Math.max(0, sc.crew.paleo - sc.projects.length) * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
-  const now = nowMin();
+  const now = state.sandbox ? Infinity : nowMin();
   if(sc.projects.length && sc.projects.some(p => p.end <= now)){
     const done = sc.projects.filter(p => p.end <= now);
     sc.projects = sc.projects.filter(p => p.end > now);

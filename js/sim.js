@@ -91,7 +91,7 @@ function pickStarters(){
 }
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
 // stars the park needs for an animal: none for the starting pool
-const starsNeed = s => isStarter(s) ? 0 : s.stars;
+const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
@@ -117,7 +117,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
-    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME,
+    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
@@ -150,6 +150,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(s.sandbox === undefined) s.sandbox = false;
   if(!s.fenceGrid) s.fenceGrid = {};
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
@@ -541,8 +542,10 @@ const goalApi = { get state(){ return state; }, isReachable, speciesShown };
 
 /* ---------- money ---------- */
 
-function canAfford(cost){ return state.money >= cost; }
-function spend(cost, kind){ state.money -= cost; state.today[kind] += cost; }
+// Sandbox mode (state.sandbox, toggled in the park office): everything is free and money never drops
+const SANDBOX_MONEY = 999999999, SANDBOX_POINTS = 999999;
+function canAfford(cost){ return state.sandbox || state.money >= cost; }
+function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }

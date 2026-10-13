@@ -160,9 +160,10 @@ $("#introGo").onclick = () => {
   $("#dlgIntro").close(); setSpeed(1);
 };
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
-$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; biomeCards($("#menuBiomes")); saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
+$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; $("#sandboxToggle").checked = !!state.sandbox; biomeCards($("#menuBiomes")); saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
 $("#closeMenu").onclick = () => $("#dlgMenu").close();
 $("#nameInput").addEventListener("input", e => { state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true); if(!sel) ui.panel(); saveSoon(); });
+$("#sandboxToggle").addEventListener("change", e => { state.sandbox = e.target.checked; if(state.sandbox){ state.money = SANDBOX_MONEY; state.science.points = SANDBOX_POINTS; } ui.hud(true); ui.panel(); saveSoon(); });
 $("#howBtn").onclick = () => { $("#dlgMenu").close(); $("#introSetup").hidden = true; $("#dlgIntro").showModal(); };
 $("#newGame").onclick = () => {
   const b = $("#newGame");
