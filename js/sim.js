@@ -117,7 +117,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
-    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME,
+    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
@@ -150,6 +150,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(s.sandbox === undefined) s.sandbox = false;
   if(!s.fenceGrid) s.fenceGrid = {};
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
@@ -541,8 +542,10 @@ const goalApi = { get state(){ return state; }, isReachable, speciesShown };
 
 /* ---------- money ---------- */
 
-function canAfford(cost){ return state.money >= cost; }
-function spend(cost, kind){ state.money -= cost; state.today[kind] += cost; }
+// Sandbox mode (state.sandbox, toggled in the park office): everything is free and money never drops
+const SANDBOX_MONEY = 999999999, SANDBOX_POINTS = 999999;
+function canAfford(cost){ return state.sandbox || state.money >= cost; }
+function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
