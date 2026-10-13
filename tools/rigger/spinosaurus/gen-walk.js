@@ -2,11 +2,12 @@
 //   node tools/rigger/spinosaurus/gen-walk.js [OUT_DIR] ['{"S":12,"lift":4}']
 // Writes spinosaurus-walk.json (the project with the walk) and walk-sheet.png (a contact sheet).
 // 2-bone IK on each hind leg (stance foot planted and sliding back at body speed, swing foot lifted, far leg half a cycle behind),
-// body bob, tail and neck counter-motion, small arms swinging. The body sits `sink` px low so the legs have a bend to work with.
+// body bob, tail and neck counter-motion, small arms swinging. Swim: body low in the water (the game clips everything under the waterline,
+// row K.waterline; pass it to rigtogame.py as --waterline), legs tucked back and paddling slowly, head up, a big tail wave. The body sits `sink` px low so the legs have a bend to work with.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
 const fs = require('fs'), path = require('path');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
-const K = Object.assign({N:8, S:12, ax:53, ay:67, sink:2.5, lift:4, bob:.8, tail:7, neck:3, fps:8, ds:.6, arm:10}, JSON.parse(process.argv[3] || '{}'));
+const K = Object.assign({N:8, S:12, ax:53, ay:67, sink:2.5, lift:4, bob:.8, tail:7, neck:3, fps:8, ds:.6, arm:10, swimDy:8, swimTail:9, waterline:50}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
  const proj = JSON.parse(fs.readFileSync(path.join(here, 'spinosaurus-rig.json'), 'utf8'));
@@ -56,16 +57,38 @@ fs.mkdirSync(OUT, {recursive:true});
     }
     frames.push(pose);
   }
-  P.clips[0].frames = frames; P.clips[0].fps = K.fps; ci = 0; cur = 0; sel = null; save(true);
+  const swim = [];
+  for(let i = 0; i < K.N; i++){
+    const f = i/K.N, pose = {};
+    pose[ID.body] = {r:rd(.8*Math.sin(TAU*f)), dx:0, dy:rd(K.swimDy + .5*Math.sin(TAU*2*f + 1))};
+    pose[ID.tail] = {r:rd(K.swimTail*Math.sin(TAU*f)), dx:0, dy:0};
+    pose[ID.tailEnd] = {r:rd(K.swimTail*.9*Math.sin(TAU*(f - .15))), dx:0, dy:0};
+    pose[ID.neck] = {r:rd(-3 + 1.5*Math.sin(TAU*(f + .2))), dx:0, dy:0};
+    pose[ID.head] = {r:rd(-2 + 1.2*Math.sin(TAU*(f + .3))), dx:0, dy:0};
+    pose[ID.jaw] = {r:0, dx:0, dy:0};
+    for(const L of legs){
+      const a = 55 + 9*Math.sin(TAU*(f + L.off));   // a slow paddle, the legs swept back
+      pose[L.thigh] = {r:rd(a), dx:0, dy:0}; pose[L.shin] = {r:rd(25 + 8*Math.sin(TAU*(f + L.off - .2))), dx:0, dy:0}; pose[L.foot] = {r:rd(-a - 20), dx:0, dy:0};
+      pose[L.arm] = {r:rd(25 + 6*Math.sin(TAU*(f + L.off))), dx:0, dy:0}; pose[L.hand] = {r:rd(15), dx:0, dy:0};
+    }
+    swim.push(pose);
+  }
+  P.clips = [{name:'walk', fps:K.fps, frames}, {name:'swim', fps:6, frames:swim}]; ci = 0; cur = 0; sel = null; save(true);
   const Z = 4, cols = 4, rows = Math.ceil(frames.length/cols), c = document.createElement('canvas'); c.width = 100*Z*cols; c.height = 75*Z*rows;
   const x = c.getContext('2d'); x.fillStyle = '#23272e'; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingEnabled = false;
   frames.forEach((f, i) => { x.save(); x.translate((i%cols)*100*Z, Math.floor(i/cols)*75*Z); x.beginPath(); x.rect(0, 0, 100*Z, 75*Z); x.clip();
     x.strokeStyle = '#3a8'; x.setLineDash([6, 6]); x.beginPath(); x.moveTo(0, 68*Z); x.lineTo(100*Z, 68*Z); x.stroke(); x.setLineDash([]);
     x.scale(Z, Z); drawPose(x, f, 1, true); x.restore();
     x.fillStyle = '#fff'; x.font = '12px sans-serif'; x.fillText('frame ' + i, (i%cols)*100*Z + 6, Math.floor(i/cols)*75*Z + 14); });
-  return {walk:c.toDataURL('image/png'), proj:JSON.stringify(pruned())};
+  const sc = document.createElement('canvas'); sc.width = 100*Z*cols; sc.height = 75*Z*2;
+  const sx = sc.getContext('2d'); sx.fillStyle = '#23272e'; sx.fillRect(0, 0, sc.width, sc.height); sx.imageSmoothingEnabled = false;
+  swim.forEach((f, i) => { sx.save(); sx.translate((i%cols)*100*Z, Math.floor(i/cols)*75*Z); sx.beginPath(); sx.rect(0, 0, 100*Z, 75*Z); sx.clip();
+    sx.scale(Z, Z); drawPose(sx, f, 1, true); sx.restore();
+    sx.fillStyle = 'rgba(60,140,255,.35)'; sx.fillRect((i%cols)*100*Z, Math.floor(i/cols)*75*Z + K.waterline*Z, 100*Z, (75 - K.waterline)*Z); });
+  return {walk:c.toDataURL('image/png'), swim:sc.toDataURL('image/png'), proj:JSON.stringify(pruned())};
  }, [proj, K]);
  fs.writeFileSync(path.join(OUT, 'walk-sheet.png'), Buffer.from(out.walk.split(',')[1], 'base64'));
+ fs.writeFileSync(path.join(OUT, 'swim-sheet.png'), Buffer.from(out.swim.split(',')[1], 'base64'));
  fs.writeFileSync(path.join(OUT, 'spinosaurus-walk.json'), out.proj);
  console.log('errors', errs); await b.close();
 })();
