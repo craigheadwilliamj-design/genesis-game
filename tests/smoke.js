@@ -1716,6 +1716,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // stopping can start it at once, and eating never does
       RIG_IDLE.chance = 1; const f3 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f3.el.innerHTML = rigSvg("plat", f3); tick2(f3);
       const atStop = f3.rg.lock; f3.rg.mode = "walk"; f3.rg.idleT = 1; f3.rg.lock = false; f3.act = "eat"; tick2(f3);
+      // a rig with several idle clips (the Coelophysis: idle and idle2) picks one at random each time, and eases into it rather than jumping
+      const f5 = {r:3, sp:"coel", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f5.el.innerHTML = rigSvg("coel", f5);
+      RIG_IDLE.chance = 0; tick2(f5); const seen = new Set(); let eased = true;
+      for(let k = 0; k < 30; k++){ f5.rg.gap = 0; const before = f5.rg.cur.slice(); tick2(f5); seen.add(f5.rg.idleC); if(f5.rg.blend >= 1 || Math.max(...f5.rg.cur.map((v, i) => Math.abs(v - before[i]))) > 15) eased = false; for(let i = 0; i < 60; i++) tick2(f5); }
+      out.rigIdles = (RIGS.coel && RIGS.coel.clips.idle2 ? true : false) && seen.has("idle") && seen.has("idle2") && eased && !f5.rg.lock;
       RIG_IDLE.chance = keepChance;
       out.rigIdleHold = holds && started && locked > 10 && locked < 30 && moved > 10 && done && atStop && !f3.rg.lock;
       // lying down finishes before it lets go
