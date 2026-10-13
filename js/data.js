@@ -1913,7 +1913,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   drom:"scrubland grassland", plty:"wetland grassland",    amph:"temperate grassland",  gpit:"tropical temperate",
   siva:"grassland scrubland", pcer:"scrubland desert",     dire:"grassland temperate",     macr:"grassland scrubland",
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
-  smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
+  smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland scrubland",     mamm:"tundra boreal",
   colm:"grassland temperate",  mglo:"boreal grassland",  pach:"temperate scrubland",
   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
