@@ -1,4 +1,4 @@
-// Builds the Coelophysis walk and rest clips on the hand-made rig in coelophysis-rig.json (parts, joints, shading and both idles made in the rigger).
+// Builds the Coelophysis walk and rest clips on the hand-made rig in coelophysis-rig.json (parts, joints and both idles made in the rigger; the parts are flat, so it first runs tools/pixelcoel_rig_shade.py on them for the shading and texture).
 //   node tools/rigger/coelophysis/gen-clips.js [OUT_DIR] ['{"S":10,"lift":3}']
 // Writes coelophysis-clips.json (the project with walk, idle, idle2 and rest), contact sheets of each clip, and in the repo
 // sprites/coel.png (the standing pose) and sprites/coel-walk.png (the walk strip, the fallback when rigs are off or in a vivarium).
@@ -9,13 +9,15 @@
 // on its belly, then the head and neck lower and the tail settles on the ground.
 // Then: python3 tools/rigtogame.py tools/rigger/coelophysis/coelophysis-clips.json coel --walk walk --idle idle idle2 --rest rest
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here), ROOT = path.join(here, '..', '..', '..');
 const K = Object.assign({N:8, S:10, sink:1.2, lift:3, bob:.6, tail:5, neck:2.5, fps:8, ds:.6, arm:7,
   restN:12, lie:13.5, restNeck:14, restHead:-8, restTail:-6, restTailEnd:-3, restArm:-70}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
- const proj = JSON.parse(fs.readFileSync(path.join(here, 'coelophysis-rig.json'), 'utf8'));
+ const shaded = path.join(os.tmpdir(), 'coel-shaded-' + process.pid + '.json');
+ execFileSync('python3', ['-B', '-I', path.join(ROOT, 'tools', 'pixelcoel_rig_shade.py'), path.join(here, 'coelophysis-rig.json'), shaded], {stdio:'inherit'});
+ const proj = JSON.parse(fs.readFileSync(shaded, 'utf8')); fs.unlinkSync(shaded);
  const b = await chromium.launch({executablePath:'/opt/pw-browsers/chromium', args:['--no-sandbox']});
  const p = await b.newPage({viewport:{width:1300, height:800}}); const errs = [];
  p.on('pageerror', e => errs.push(e.message));
