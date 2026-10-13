@@ -109,7 +109,7 @@ function tripRow(id, periodId, label){
     if(ev) h += ` Trips take ${spanText(Math.round(g.event.days * DAY_MIN * ghostLevel("speed")))}.`;
     if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? `more trips to finish the ${ev ? "record" : "genome"}` : `trips for a whole ${ev ? "record" : "genome"}`}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
     if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out ${ev ? "recording" : "looking for"} it.</b>`;
-    if(g.animal && g.animal.stars) h += ` Needs ${g.animal.stars}★ to clone.`;
+    if(g.animal && g.animal.stars && !state.sandbox) h += ` Needs ${g.animal.stars}★ to clone.`;
   }
   return h + `</span></li>`;
 }
