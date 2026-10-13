@@ -33,12 +33,17 @@ label{display:flex;align-items:center;gap:6px}
 #side{grid-area:side;background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:8px;display:flex;flex-direction:column;gap:10px}
 h3{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim)}
 #parts{display:flex;flex-direction:column;gap:2px;max-height:34vh;overflow:auto}
-.part{display:flex;align-items:center;gap:4px;padding:3px 5px;border-radius:5px;border:1px solid transparent;cursor:pointer}
+.part{display:flex;align-items:center;gap:4px;padding:3px 5px;border-radius:5px;border:1px solid transparent;cursor:pointer;user-select:none;-webkit-user-select:none}
 .part:hover{background:var(--panel2)}
 .part.sel{background:var(--panel2);border-color:var(--acc)}
 .part .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .part button{padding:0 5px;border:0;background:none;color:var(--dim)}
 .part button:hover{color:var(--ink)}
+.part .grip{color:var(--dim);cursor:grab;padding:0 3px;touch-action:none;user-select:none;-webkit-user-select:none;letter-spacing:-2px}
+.part .grip:hover{color:var(--ink)}
+.part.dragging{opacity:.45;cursor:grabbing}
+.part.drop-before{box-shadow:0 -2px 0 var(--acc)}
+.part.drop-after{box-shadow:0 2px 0 var(--acc)}
 .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
 .row>span{width:54px;color:var(--dim)}
 body[data-mode=rig] .poseonly,body[data-mode=pose] .rigonly{display:none!important}
@@ -373,6 +378,35 @@ function buildStrip(){
 function syncStrip(){ [...$('#strip').children].forEach((el, i) => el.classList.toggle('sel', i === cur)); const e = $('#strip').children[cur]; if(e) e.scrollIntoView({block:'nearest', inline:'nearest'}); }
 
 // ---------- panels ----------
+// Drag a row to change the draw order (the top row is drawn last, in front). A mouse can drag from anywhere on the row; a finger or pen
+// from the handle, so the list still scrolls. The row you drag becomes the selected part, and Undo puts the order back.
+let rowDragged = false;
+function startRowDrag(e, n, row){
+  const box = $('#parts'), sx = e.clientX, sy = e.clientY, others = () => [...box.children].filter(r => r !== row);
+  let moved = false, ins = 0;
+  try{ row.setPointerCapture(e.pointerId); }catch{}
+  const mark = d => {
+    box.querySelectorAll('.drop-before,.drop-after').forEach(r => r.classList.remove('drop-before', 'drop-after'));
+    const rs = others(); if(!rs.length) return;
+    if(d < rs.length) rs[d].classList.add('drop-before'); else rs[rs.length - 1].classList.add('drop-after');
+  };
+  const move = ev => {
+    if(!moved){ if(Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return; moved = true; row.classList.add('dragging'); }
+    const br = box.getBoundingClientRect();
+    if(ev.clientY < br.top + 18) box.scrollTop -= 8; else if(ev.clientY > br.bottom - 18) box.scrollTop += 8;
+    ins = 0; for(const r of others()){ const b = r.getBoundingClientRect(); if(ev.clientY > b.top + b.height/2) ins++; else break; }
+    mark(ins);
+  };
+  const end = ev => {
+    row.removeEventListener('pointermove', move); row.removeEventListener('pointerup', end); row.removeEventListener('pointercancel', end);
+    if(!moved) return;   // a plain click: the row's own handler selects it
+    rowDragged = true; setTimeout(() => { rowDragged = false; }, 0);
+    sel = n.id;
+    if(ev.type === 'pointerup'){ const arr = P.nodes.filter(x => x !== n); arr.splice(arr.length - ins, 0, n); if(arr.some((x, i) => x !== P.nodes[i])) P.nodes = arr; }
+    save();
+  };
+  row.addEventListener('pointermove', move); row.addEventListener('pointerup', end); row.addEventListener('pointercancel', end);
+}
 function buildParts(){
   const box = $('#parts'); box.innerHTML = '';
   for(let i = P.nodes.length - 1; i >= 0; i--){
@@ -386,8 +420,10 @@ function buildParts(){
     up.onclick = ev => { ev.stopPropagation(); if(i < P.nodes.length - 1){ [P.nodes[i], P.nodes[i+1]] = [P.nodes[i+1], P.nodes[i]]; save(); } };
     const dn = document.createElement('button'); dn.textContent = '▼'; dn.title = 'Draw earlier (behind)';
     dn.onclick = ev => { ev.stopPropagation(); if(i > 0){ [P.nodes[i], P.nodes[i-1]] = [P.nodes[i-1], P.nodes[i]]; save(); } };
-    d.append(eye, nm, up, dn);
-    d.onclick = () => { sel = n.id; buildParts(); fillProps(); draw(); };
+    const grip = document.createElement('span'); grip.className = 'grip'; grip.textContent = '⋮⋮'; grip.title = 'Drag to change the draw order';
+    d.append(grip, eye, nm, up, dn);
+    d.addEventListener('pointerdown', e => { if(e.target.closest('button')) return; if(e.pointerType !== 'mouse' && !e.target.closest('.grip')) return; startRowDrag(e, n, d); });
+    d.onclick = () => { if(rowDragged) return; sel = n.id; buildParts(); fillProps(); draw(); };
     box.appendChild(d);
   }
 }
