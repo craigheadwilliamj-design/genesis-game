@@ -1347,8 +1347,9 @@ function animalWander(h, e){
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
   const A = walkArea(h, e), ws = swims(SPECIES_BY_ID[h.sp]) ? waterOf(e) : [];
+  const toWater = h.swim ? .15 : .5;   // swimmers spend about half their time in the water, but one already in it mostly heads out (else a big pond by the fence traps it)
   for(let i = 0; i < 8; i++){
-    const p = ws.length && Math.random() < .5 ? randomInside(pickOne(ws).points) : randomInside(e.points);   // swimmers spend half their time in the water
+    const p = ws.length && Math.random() < toWater ? randomInside(pickOne(ws).points) : randomInside(e.points);
     if(!standable(p, A)) continue;
     const r = walkRoute([h.x, h.y], p, A);
     if(r){ h.path = r; return; }
@@ -1453,7 +1454,8 @@ function paceRoute(h, e){
 // Patrolling: a lap of the fence line, from the nearest corner
 function patrolRoute(h, e){
   const A = walkArea(h, e), nodes = cornerNodes(e.points, A.m).filter(p => !inObstacle(p, A)); if(nodes.length < 3) return null;
-  const i0 = nodes.indexOf(nearestTo(h, nodes)), out = [];
+  // a lap carries on from the corner it last reached (patrols get cut short by the next act, and always starting at the nearest corner would keep it round one end)
+  const w = h.wp ? nodes.findIndex(n => Math.hypot(n[0] - h.wp[0], n[1] - h.wp[1]) < .5) : -1, i0 = w >= 0 ? (w + 1) % nodes.length : nodes.indexOf(nearestTo(h, nodes)), out = [];
   let at = [h.x, h.y];
   for(let k = 0; k <= nodes.length; k++){ const n = nodes[(i0 + k) % nodes.length], r = walkRoute(at, n, A); if(!r) break; out.push(...r); at = n; }
   return out.length ? out : null;
@@ -1510,7 +1512,7 @@ function animateAnimals(dt){
     const stay = ACT_STAYS.has(act), idle = act === "pace" ? 0 : act === "play" ? .3 + Math.random() * .8 : act === "social" ? 1.5 + Math.random() * 2 : 1 + Math.random() * 3;
     if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
-    if(d < .3){ h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
+    if(d < .3){ h.wp = h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
     swimCheck(h, e);
