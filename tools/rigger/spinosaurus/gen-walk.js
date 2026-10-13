@@ -1,4 +1,5 @@
 // Builds the Spinosaurus walk clip from the rig in spinosaurus-rig.json (parts and joints by hand in the rigger, already shaded).
+// NOTE: idle and rest were posed by hand in the rigger (spinosaurus-source.json); this script only regenerates walk and swim. The croc-scute texture comes from tools/pixelspin_rig_shade.py (source.json in, clips.json out).
 //   node tools/rigger/spinosaurus/gen-walk.js [OUT_DIR] ['{"S":12,"lift":4}']
 // Writes spinosaurus-walk.json (the project with the walk) and walk-sheet.png (a contact sheet).
 // 2-bone IK on each hind leg (stance foot planted and sliding back at body speed, swing foot lifted, far leg half a cycle behind),
