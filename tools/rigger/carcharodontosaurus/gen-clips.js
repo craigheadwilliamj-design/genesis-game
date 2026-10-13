@@ -5,13 +5,20 @@
 // at body speed, swing foot lifted, far leg half a cycle behind), body bob, tail and neck counter-motion, small arms swinging.
 // Idle: it looks round, jaw gapes, tail flicks. Rest: it lowers onto its belly with the legs folded under it, head lowered, tail on the ground.
 const { chromium } = require('/opt/node22/lib/node_modules/playwright');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), os = require('os'), { execFileSync } = require('child_process');
 const here = __dirname, OUT = path.resolve(process.argv[2] || here);
 const K = Object.assign({N:8, S:15, ax:53, ay:66.5, lift:5, bob:.9, tail:6, neck:3, fps:8, ds:.6,
-  lie:15, restN:10, restTail:6, restNeck:6, restHead:6, restThigh:-85, restShin:160, restFoot:-60, restArm:10}, JSON.parse(process.argv[3] || '{}'));
+  lie:15, restN:10, shade:true, restTail:6, restNeck:6, restHead:6, restThigh:-85, restShin:160, restFoot:-60, restArm:10}, JSON.parse(process.argv[3] || '{}'));
 fs.mkdirSync(OUT, {recursive:true});
 (async()=>{
- const proj = JSON.parse(fs.readFileSync(path.join(here, 'carcharodontosaurus-rig.json'), 'utf8'));
+ // the rig's parts are flat base colors: shade them first (tools/pixelcarc_rig_shade.py) so the clips, previews and game pictures carry the texture; {"shade":false} leaves them flat
+ let rigFile = path.join(here, 'carcharodontosaurus-rig.json');
+ if(K.shade !== false){
+  const tmp = path.join(os.tmpdir(), 'carc-shaded-' + process.pid + '.json');
+  execFileSync('python3', ['-B', '-I', path.join(here, '..', '..', 'pixelcarc_rig_shade.py'), rigFile, tmp], {stdio:'inherit'});
+  rigFile = tmp;
+ }
+ const proj = JSON.parse(fs.readFileSync(rigFile, 'utf8'));
  const b = await chromium.launch({executablePath:'/opt/pw-browsers/chromium', args:['--no-sandbox']});
  const p = await b.newPage({viewport:{width:1300, height:800}}); const errs = [];
  p.on('pageerror', e => errs.push(e.message));
