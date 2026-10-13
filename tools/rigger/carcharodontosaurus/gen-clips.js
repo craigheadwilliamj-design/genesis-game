@@ -1,3 +1,5 @@
+// NOTE: the game now uses the hand-animated project, carcharodontosaurus-hand.json (walk, idle, rest made in the rigger: python3 tools/rigtogame.py tools/rigger/carcharodontosaurus/carcharodontosaurus-hand.json carc --walk walk --idle idle --rest rest, then sprites/carc.png is its idle frame 0).
+// This script is the earlier procedural version (IK walk, shaded and toed from the flat rig); running it overwrites carcharodontosaurus-clips.json only.
 // Builds the Carcharodontosaurus walk, idle and rest clips from the rig in carcharodontosaurus-rig.json (parts and joints by hand in the rigger).
 //   node tools/rigger/carcharodontosaurus/gen-clips.js [OUT_DIR] ['{"S":12,"lift":4}']
 // Writes carcharodontosaurus-clips.json (the project with the three clips), walk/idle/rest contact sheets and rest.png (the rest pose).
