@@ -2,7 +2,8 @@
    RIGS
    Animals drawn from parts instead of a baked strip. A rig (RIGS[id], made from a rigger project by tools/rigtogame.py) is a list of
    parts in draw order, each a cropped picture with a joint, a parent and a place in the parent's frame, plus the poses of a walk
-   loop, one or more idle clips (idle, idle2, ...) and a rest clip. A pose is a turn r (degrees) and a shift dx, dy for each part. Every frame the pose is tweened between
+   loop, one or more idle clips (idle, idle2, ...) and a rest clip. A pose is a turn r (degrees) and a shift dx, dy for each part,
+   and whether it shows: a part with `off:1` (a shut eye, a bubble) is hidden unless a frame lists it as [r, dx, dy, 1], and [r, dx, dy, 0] hides any part for a frame. Showing switches at frames, it never tweens or eases. Every frame the pose is tweened between
    its key poses, each part gets its world matrix, and the browser draws the part's picture turned at screen size, so details stay
    whole at any zoom. Opt in per species with `rig:1` in SPRITES; with no rig (or in a vivarium) the old strips are used. `rstep` is how far it walks per walk-clip frame (in dot radii, like `step`) when the strips' `step` doesn't suit the rig.
    map.js calls rigSvg (the picture) from spriteSvg and rigStep (the motion) from animateAnimals.
@@ -25,23 +26,28 @@ const rigOf = sp => (rigsOn && SPRITES[sp] && SPRITES[sp].rig && RIGS[sp]) ? rig
 // a rig with a swim clip is drawn in the water (rigSvg's waterline) instead of falling back to a swim strip
 const rigSwims = sp => { const R = rigOf(sp); return !!(R && R.clips.swim); };
 
-// sparse frames ({part index: r or [r, dx, dy]}) become flat arrays of r, dx, dy for every part
+// sparse frames ({part index: r or [r, dx, dy] or [r, dx, dy, shown]}) become flat arrays of r, dx, dy for every part, and which parts show (R.def by default)
 function rigPrep(R){
   if(R.ready) return R;
   const n = R.parts.length;
-  for(const c of Object.values(R.clips)) c.dense = c.frames.map(f => {
-    const a = new Float32Array(n * 3);
-    for(const k in f){ const v = f[k]; if(Array.isArray(v)){ a[k*3] = v[0]; a[k*3 + 1] = v[1]; a[k*3 + 2] = v[2]; } else a[k*3] = v; }
-    return a;
-  });
+  R.def = Uint8Array.from(R.parts, p => p.off ? 0 : 1);
+  for(const c of Object.values(R.clips)){
+    c.dense = c.frames.map(f => {
+      const a = new Float32Array(n * 3);
+      for(const k in f){ const v = f[k]; if(Array.isArray(v)){ a[k*3] = v[0]; a[k*3 + 1] = v[1]; a[k*3 + 2] = v[2]; } else a[k*3] = v; }
+      return a;
+    });
+    c.vis = c.frames.map(f => { const s = R.def.slice(); for(const k in f){ const v = f[k]; if(Array.isArray(v) && v.length > 3) s[k] = v[3] ? 1 : 0; } return s; });
+  }
   R.ready = true;
   return R;
 }
 
-// the pose a loop has at a point in its cycle (0 to 1, wrapping), tweened between its two key poses
-function rigSample(R, clip, phase, out){
+// the pose a loop has at a point in its cycle (0 to 1, wrapping), tweened between its two key poses; vis (optional) gets which parts show, from the key pose it's on
+function rigSample(R, clip, phase, out, vis){
   const fr = R.clips[clip].dense, N = fr.length, t = (((phase % 1) + 1) % 1) * N, i = Math.floor(t) % N, u = t - Math.floor(t), A = fr[i], B = fr[(i + 1) % N];
   for(let k = 0; k < out.length; k++) out[k] = A[k] + (B[k] - A[k]) * u;
+  if(vis) vis.set(R.clips[clip].vis[i]);
 }
 
 // each part's world matrix, [a, b, c, d, e, f] a part, from its parent's: parent * translate(x + dx, y + dy) * rotate(r)
@@ -60,7 +66,7 @@ function rigMatrices(R, pose, m){
 const rigTransform = (p, m, i) => { const o = i * 6, s = p.f ? -1 : 1; return `matrix(${(m[o]*s).toFixed(4)} ${(m[o + 1]*s).toFixed(4)} ${m[o + 2].toFixed(4)} ${m[o + 3].toFixed(4)} ${m[o + 4].toFixed(3)} ${m[o + 5].toFixed(3)})`; };
 
 const rigState = R => ({cur:new Float32Array(R.parts.length * 3), from:new Float32Array(R.parts.length * 3), tgt:new Float32Array(R.parts.length * 3),
-  mats:new Float64Array(R.parts.length * 6), mode:null, blend:1, idleT:1, idleC:"idle", gap:RIG_IDLE.gap[0], restT:0, lock:false, last:performance.now(), wlk:0, swimT:0});
+  mats:new Float64Array(R.parts.length * 6), vis:R.def.slice(), mode:null, blend:1, idleT:1, idleC:"idle", gap:RIG_IDLE.gap[0], restT:0, lock:false, last:performance.now(), wlk:0, swimT:0});
 
 // the animal's picture, the same size and footing as a strip's: its cell fits two and a half dots across, the feet a little below the middle
 // In water a rig with a swim clip is clipped at its waterline (C.wl, a cell row): the part above shows, the part below is a faint ghost, and a ripple line (the exhibit's water colors) sits on the line.
@@ -75,7 +81,7 @@ function rigSvg(sp, h){
   const R = rigOf(sp), S = SPRITES[sp], w = h.r * 2.5 * (S.size || 1), k = w / R.w, ht = R.h * k;
   const g = h.rg ??= rigState(R);
   rigMatrices(R, g.cur, g.mats);
-  const tf = `translate(${(-w/2).toFixed(2)} ${(h.r*.5 - ht).toFixed(2)}) scale(${k.toFixed(5)})`, parts = () => R.parts.map((p, i) => `<image href="${p.img}" x="${p.ix}" y="${p.iy}" width="${p.iw}" height="${p.ih}" style="image-rendering:pixelated" transform="${rigTransform(p, g.mats, i)}"/>`).join("");
+  const tf = `translate(${(-w/2).toFixed(2)} ${(h.r*.5 - ht).toFixed(2)}) scale(${k.toFixed(5)})`, parts = () => R.parts.map((p, i) => `<image href="${p.img}" x="${p.ix}" y="${p.iy}" width="${p.iw}" height="${p.ih}" style="image-rendering:pixelated"${g.vis[i] ? "" : ` visibility="hidden"`} transform="${rigTransform(p, g.mats, i)}"/>`).join("");
   if(!(h.swim && R.clips.swim)){ g.wlk = 0; return `<g class="spr" transform="scale(${h.face || 1} 1)"><g class="rig" transform="${tf}">${parts()}</g></g>`; }
   const id = h.cid ??= "rgc" + (++rigClipN), wl = rigWl(R, g), wc = rigWater(h), x0 = -R.w * .2, W = R.w * 1.4;
   return `<g class="spr" transform="scale(${h.face || 1} 1)"><defs><clipPath id="${id}a"><rect x="${x0}" y="-20" width="${W}" height="${(wl + 20).toFixed(2)}"/></clipPath><clipPath id="${id}b"><rect x="${x0}" y="${wl.toFixed(2)}" width="${W}" height="${R.h}"/></clipPath></defs>`
@@ -95,14 +101,14 @@ function rigStep(h, mode){
   if(swim) mode = mode === "walk" ? "swim" : "float";
   if(swim){
     const C = R.clips.swim, N = C.dense.length;
-    if(mode === "swim") rigSample(R, "swim", (h.stride || 0) / (h.r * (S.rswim || S.rstep || S.step || .5) * N), g.tgt);
-    else { g.swimT += dt * C.fps * .35 / N; rigSample(R, "swim", g.swimT, g.tgt); }
+    if(mode === "swim") rigSample(R, "swim", (h.stride || 0) / (h.r * (S.rswim || S.rstep || S.step || .5) * N), g.tgt, g.vis);
+    else { g.swimT += dt * C.fps * .35 / N; rigSample(R, "swim", g.swimT, g.tgt, g.vis); }
   }
-  else if(mode === "walk" && R.clips.walk) rigSample(R, "walk", (h.stride || 0) / (h.r * (S.rstep || S.step || .5) * R.clips.walk.dense.length), g.tgt);
+  else if(mode === "walk" && R.clips.walk) rigSample(R, "walk", (h.stride || 0) / (h.r * (S.rstep || S.step || .5) * R.clips.walk.dense.length), g.tgt, g.vis);
   else if(mode === "rest" && R.clips.rest){   // settle once, then hold the last frame until the act changes
     if(g.mode !== "rest") g.restT = 0;
     g.restT += dt * R.clips.rest.fps; const N = R.clips.rest.dense.length;
-    rigSample(R, "rest", Math.min(g.restT, N - 1) / N, g.tgt);
+    rigSample(R, "rest", Math.min(g.restT, N - 1) / N, g.tgt, g.vis);
     g.lock = g.restT < N - 1;   // lying down finishes too
   }else if(R.clips.idle){
     // standing still it holds the idle clip's first frame and plays one of its idle clips (idle, idle2, ... picked at random) once: often as it stops, and again after a while of standing (never while eating, drinking or hiding)
@@ -113,10 +119,10 @@ function rigStep(h, mode){
     const C = R.clips[g.idleC];
     if(g.idleT < 1) g.idleT += dt * C.fps / C.dense.length;
     g.lock = g.idleT < 1;   // once it starts it finishes, whatever the animal's act says
-    if(g.idleT < 1) rigSample(R, g.idleC, g.idleT, g.tgt); else g.tgt.set(R.clips.idle.dense[0]);
+    if(g.idleT < 1) rigSample(R, g.idleC, g.idleT, g.tgt, g.vis); else { g.tgt.set(R.clips.idle.dense[0]); g.vis.set(R.clips.idle.vis[0]); }
     mode = g.idleT < 1 ? "idle-" + g.idleC : "idle";   // a new mode eases in, so a clip that starts away from the standing pose doesn't jump
   }
-  else g.tgt.fill(0);
+  else { g.tgt.fill(0); g.vis.set(R.def); }
   if(mode !== g.mode){ g.from.set(g.cur); g.blend = 0; g.mode = mode; }
   if(g.blend < 1){
     g.blend = Math.min(1, g.blend + dt / RIG_BLEND); const k = g.blend * g.blend * (3 - 2 * g.blend);
@@ -124,10 +130,10 @@ function rigStep(h, mode){
   }else g.cur.set(g.tgt);
   rigMatrices(R, g.cur, g.mats);
   const kids = g0.children;
-  for(let i = 0; i < R.parts.length; i++) kids[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i));
+  for(let i = 0; i < R.parts.length; i++){ kids[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i)); kids[i].setAttribute("visibility", g.vis[i] ? "visible" : "hidden"); }
   const gh = swim && h.el.querySelector(".rig-ghost");
   if(gh){   // the ghost under the waterline follows the parts; the waterline rises as it sinks in; the ripples drift
-    const gk = gh.children; for(let i = 0; i < R.parts.length; i++) gk[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i));
+    const gk = gh.children; for(let i = 0; i < R.parts.length; i++){ gk[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i)); gk[i].setAttribute("visibility", g.vis[i] ? "visible" : "hidden"); }
     g.wlk = Math.min(1, g.wlk + dt / RIG_BLEND); const wl = rigWl(R, g), id = h.cid;
     const ca = h.el.querySelector(`#${id}a rect`), cb = h.el.querySelector(`#${id}b rect`), w1 = h.el.querySelector(".wk1"), w2 = h.el.querySelector(".wk2");
     if(ca) ca.setAttribute("height", (wl + 20).toFixed(2)); if(cb) cb.setAttribute("y", wl.toFixed(2));

@@ -9,6 +9,8 @@ walk, idle and rest clips. Then give the species `rig:1` in SPRITES (data.js). I
 
 Poses are sparse: a frame lists only the parts that are turned or shifted, as `index: r` or `index: [r, dx, dy]`
 (degrees, and pixels in the parent's frame), the same numbers as the rigger. A part not listed is at rest.
+A part marked "Hidden unless a frame shows it" in the rigger gets `off:1`, and a frame that shows or hides a part
+other than its default writes `index: [r, dx, dy, v]` (v 1 shown, 0 hidden); visibility switches at frames, never tweens.
 """
 import argparse, base64, io, json, os, re, sys
 from PIL import Image
@@ -49,6 +51,7 @@ def main():
         parts.append({"n": n["name"], "img": f"sprites/{a.id}/{name}.png", "ix": box[0] - n["px"], "iy": box[1] - n["py"],
                       "iw": box[2] - box[0], "ih": box[3] - box[1],
                       "p": index[n["parent"]] if n.get("parent") else -1, "x": n["lx"], "y": n["ly"], "f": 1 if n.get("flip") else 0})
+        if n.get("off"): parts[-1]["off"] = 1
     def frames(clip_name):
         clip = next((c for c in proj["clips"] if c["name"] == clip_name), None)
         if not clip: sys.exit(f"no clip named {clip_name}; the project has {[c['name'] for c in proj['clips']]}")
@@ -57,7 +60,10 @@ def main():
             row = {}
             for nid, p in f.items():
                 if nid not in index: continue
-                r, dx, dy = p.get("r", 0), p.get("dx", 0), p.get("dy", 0)
+                r, dx, dy, v = p.get("r", 0), p.get("dx", 0), p.get("dy", 0), p.get("v")
+                off = bool(nodes[index[nid]].get("off"))
+                if v is not None and bool(v) == (not off): v = None   # same as the part's default
+                if v is not None: row[str(index[nid])] = [num(r), num(dx), num(dy), 1 if v else 0]; continue
                 if not (r or dx or dy): continue
                 row[str(index[nid])] = num(r) if not (dx or dy) else [num(r), num(dx), num(dy)]
             out.append(row)
