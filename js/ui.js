@@ -513,6 +513,8 @@ function openMoveDialog(e, sp){
   $("#moveGo").onclick = () => {
     const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
     const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n); ui.toast(`${made} ${s.name} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
+    const mix = mixWarning(s, to);
+    if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
     if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
     else go();
   };
@@ -765,6 +767,11 @@ panelEl.addEventListener("click", e => {
       askConfirm(`${s.name} can fly`, `${it.name} has no aviary netting, so the ${s.name} will fly out almost right away and get loose in the park. Put it here anyway?`, "Yes, put it here", () => { b.dataset.sure = "1"; b.click(); });
       return;
     }
+  }
+  // putting a predator in with its prey (or prey in with one) needs a yes first
+  if((a === "buy" || a === "clone" || a === "place") && it && sel.kind === "exhibit" && b.dataset.sureMix !== "1"){
+    const sp = a === "place" ? (sc.ready.find(r => r.id === b.dataset.id) || {}).sp : b.dataset.sp, s = SPECIES_BY_ID[sp], w = s && mixWarning(s, it);
+    if(w){ askConfirm(`Predator and prey`, w, "Yes, mix them", () => { b.dataset.sureMix = "1"; b.click(); }); return; }
   }
   if(a === "moat"){ const c = moatCost(it); if(canAfford(c)){ spend(c, "built"); it.moat = true; done(); } return; }
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }

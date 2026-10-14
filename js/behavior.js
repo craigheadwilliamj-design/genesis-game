@@ -163,7 +163,7 @@ function pickAct(e, a, s, ctx){
     const key = !isHunter(s) ? (ctx.browse ? "forage" : "eat") : cur === "eat" || (cur === "hunt" && since >= B.huntMin) ? "eat" : "hunt";
     sc[key] = n.hunger * 1.1;
   }
-  if(preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5);   // prey in the exhibit: stalk it
+  if(huntDriven(a) && preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5);   // prey in the exhibit: stalk it
   if(n.thirst > floor + 5) sc.drink = n.thirst * 1.15;
   sc.rest = (1 - aw) * 80 + n.discomfort * .25;
   if(n.stress > 30) sc.hide = (n.stress - 15) * {skittish:1.4, curious:.8, aggressive:.5}[T.temper] * (ctx.cover ? 1 : .7);
@@ -319,6 +319,19 @@ function preyIn(e, s, counts){
   for(const sp of counts.keys()) if(attackReason(s, SPECIES_BY_ID[sp])) out.push(sp);
   return out;
 }
+// A predator doesn't kill for sport: only a hungry, stressed or bored one goes after prey it lives with
+function huntDriven(a){ const n = a.need; return !!n && (n.hunger >= ATTACK.hungry || n.stress >= ATTACK.huntStress || n.bored >= ATTACK.huntBored); }
+// The warning for putting species s into exhibit e, or null if nobody there hunts anybody
+function mixWarning(s, e){
+  const prey = new Set(), hunters = new Set();
+  for(const sp of speciesCounts(e).keys()){
+    const o = SPECIES_BY_ID[sp];
+    if(attackReason(s, o)){ hunters.add(s.name); prey.add(o.name); }
+    if(attackReason(o, s)){ hunters.add(o.name); prey.add(s.name); }
+  }
+  if(!hunters.size) return null;
+  return `${[...hunters].join(" and ")} will hunt ${[...prey].join(" and ")} in ${e.name}. They only attack when hungry, stressed or bored, so keep them fed, give them room and things to do. Even then, expect injuries and deaths. Mix them anyway?`;
+}
 const bodyPos = a => { const h = typeof herd !== "undefined" ? herd.get(a.id) : null; return h && h.placed ? h : null; };
 // A puff of dust where an animal is hit, or at the middle of its exhibit when it isn't drawn
 function attackFx(e, a){ const h = bodyPos(a), c = h ? [h.x, h.y] : centroid(e.points); events.fx("dust", c[0], c[1]); }
@@ -351,7 +364,7 @@ function attackStep(e, ctx){
   for(const a of [...list]){
     if(!list.includes(a) || a.darted || now - (a.hitAt ?? -1e9) < A.gap) continue;
     const s = SPECIES_BY_ID[a.sp]; if(!s) continue;
-    if(a.act === "hunt" && (a.actFor || 0) >= A.stalk && preyIn(e, s, ctx.counts).length){
+    if(a.act === "hunt" && huntDriven(a) && (a.actFor || 0) >= A.stalk && preyIn(e, s, ctx.counts).length){
       const me = bodyPos(a);
       let prey = null, bd = Infinity;
       for(const v of list){

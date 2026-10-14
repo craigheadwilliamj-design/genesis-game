@@ -1333,6 +1333,8 @@ const ATTACK = {
   stalk:10,            // minutes a predator has been hunting before it can strike
   strike:5,            // meters from its prey (plus its own size) it must close to strike
   huntChance:.5,       // chance each behavior step it strikes once in range (a third if positions are unknown)
+  hungry:55,           // a predator only goes after prey when its hunger is this high, or its stress or boredom is over the lines below
+  huntStress:60, huntBored:75,
   drive:40,            // pull of the hunt act with prey in the exhibit, plus half its hunger
   fightStress:60,      // an aggressive animal over this stress picks fights (a crowded one of any kind, 15 higher)
   fightRate:.006,      // chance each behavior step at the top of that range
