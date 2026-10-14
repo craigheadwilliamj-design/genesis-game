@@ -2658,6 +2658,53 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // biome paint (js/biomepaint.js)
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, keep = state.biomePaint; state.biomePaint = [];
+    const o = ownedRects()[0], x = Math.round((o[0] + o[2]) / 2), y = Math.round((o[1] + o[3]) / 2);
+    const [A, B] = Object.keys(BIOMES).filter(k => k !== parkBiome());
+    const rs = () => JSON.stringify(state.biomePaint.map(p => [p.biome, ...p.r]));
+    paintRect(A, [x, y, x + 10, y + 10]);
+    out.paintAdds = state.biomePaint.length === 1 && state.biomePaint[0].biome === A;
+    out.paintSnapsToGrid = (() => { const r = paintBox([x + .4, y + .4], [x + 5.6, y + 3.2]); return r.every(Number.isInteger) && r[2] - r[0] === 6 && r[3] - r[1] === 3; })();
+    out.paintLeavesParkBiome = state.biome === undefined || state.biome === parkBiome();
+    paintRect(B, [x + 2, y + 2, x + 6, y + 6]);
+    out.paintCoversInPlace = state.biomePaint.length === 2 && paintAt(x + 3, y + 3).biome === B && paintAt(x + 8, y + 8).biome === A;
+    out.paintRepick = (() => { const t = paintAt(x + 3, y + 3); return repickPaint(t.id, A) && paintAt(x + 3, y + 3).biome === A && !repickPaint(t.id, A); })();
+    // painted over: a patch fully covered is deleted, the list stays small
+    paintRect(B, [x - 1, y - 1, x + 11, y + 11]);
+    out.paintCoveredLayersDeleted = state.biomePaint.length === 1 && rs() === JSON.stringify([[B, x - 1, y - 1, x + 11, y + 11]]);
+    out.paintSameAgainIsNoop = (() => { const n = paintVer; const r = paintRect(B, [x, y, x + 4, y + 4]); return r.same && paintVer === n && state.biomePaint.length === 1; })();
+    // a patch the new one spans across is trimmed, and touching same-biome patches merge
+    paintRect(A, [x - 5, y - 5, x + 15, y + 2]);
+    out.paintTrimsPartlyCovered = rs() === JSON.stringify([[B, x - 1, y + 2, x + 11, y + 11], [A, x - 5, y - 5, x + 15, y + 2]]);
+    paintRect(B, [x - 1, y + 11, x + 11, y + 14]);
+    out.paintMergesNeighbours = rs() === JSON.stringify([[A, x - 5, y - 5, x + 15, y + 2], [B, x - 1, y + 2, x + 11, y + 14]]);
+    out.paintNeverOffLand = typeof paintRect(A, [o[2] + 5, o[1], o[2] + 20, o[1] + 10]) === "string" && state.biomePaint.length === 2;
+    // erasing: a tap takes the patch, a box splits what it cuts
+    out.eraseBoxSplits = (() => { const n = eraseRect([x + 3, y + 5, x + 7, y + 8]); return n === 1 && state.biomePaint.filter(p => p.biome === B).length === 4 && !paintAt(x + 4, y + 6) && !!paintAt(x + 1, y + 6) && !!paintAt(x + 4, y + 3) && !!paintAt(x + 4, y + 10) && !!paintAt(x + 9, y + 6); })();
+    out.eraseTapTakesPatch = erasePaintAt(x + 1, y + 6) && !paintAt(x + 1, y + 6) && !erasePaintAt(x + 1, y + 6);
+    // drawing is cached until the paint changes, and uses the biome ground patterns
+    const s1 = paintSvg(), s2 = paintSvg();
+    out.paintDrawn = s1 === s2 && s1.includes(`url(#p-${A})`) && s1.includes(`url(#p-${B})`) && s1.includes("plotClip") && !s1.includes("NaN");
+    paintRect(B, [x, y, x + 2, y + 2]);
+    out.paintCacheRefreshes = paintSvg() !== s1;
+    // save and load
+    const copy = JSON.parse(JSON.stringify(state)), before = rs();
+    const loaded = upgradeSave(copy);
+    out.paintSurvivesSave = JSON.stringify(loaded.biomePaint.map(p => [p.biome, ...p.r])) === before && loaded.biomePaint.length > 0;
+    delete copy.biomePaint;
+    out.paintOldSaveDefault = Array.isArray(upgradeSave(copy).biomePaint) && upgradeSave(copy).biomePaint.length === 0 && newPark().biomePaint.length === 0;
+    out.paintMenuAndTool = !!document.querySelector('#sideMenu [data-tool="paint"]');
+    out.paintToolBar = (() => { setTool("paint"); const ok = document.querySelectorAll("#dSizes [data-pickbiome]").length === Object.keys(BIOMES).length + 1 && !$("#dSizes").hidden;
+      pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
+      const drawn = state.biomePaint.some(p => p.r.join() === [x + 20, y, x + 24, y + 3].join());
+      paintPick = "erase"; pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
+      const gone = !paintAt(x + 21, y + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
+    state.biomePaint = keep || []; paintTouch(); render();
+    return out;
+  }));
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
