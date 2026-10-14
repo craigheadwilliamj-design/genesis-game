@@ -2199,11 +2199,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.renameUpdatesHud = state.name === "Renamed <b>Park</b>" && q("#parkName").textContent === state.name && !q("#parkName b") && !q("#officeTitle b");
     inp.value = "x".repeat(60); inp.dispatchEvent(new Event("input", {bubbles:true})); out.renameCapped = state.name.length === 40;
     state.name = nm; ui.hud(true);
-    officeTab = "office"; ui.panel(); q('[data-action="otab2"][data-k="menu"]').click();
-    out.mainMenuHasButtons = !!q('#panel [data-action="restart"]') && !!q('#panel [data-action="howTo"]') && !!q("#sandboxToggle");
-    q('#panel [data-action="restart"]').click();
+    out.menuNotInOffice = !q('#panel [data-action="restart"]') && !q('#panel [data-k="menu"]');
+    q("#mainMenuBtn").click();
+    out.mainMenuButtonOpens = q("#dlgMain").open && !!q("#restartBtn") && !!q("#howBtn") && !!q("#sandboxToggle") && q("#mainMenuBtn").closest(".hud");
+    q("#restartBtn").click();
     out.restartAsks = q("#dlgConfirm").open && /Restart/.test(q("#confirmYes").textContent) && !q("#dlgStart").open;
     q("#confirmNo").click(); out.restartCancelKeeps = !q("#dlgConfirm").open && !q("#dlgStart").open && state.name === nm;
+    q("#dlgMain").close();
     officeTab = "office"; ui.panel();
     return out;
   }));

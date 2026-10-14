@@ -189,8 +189,15 @@ panelEl.addEventListener("input", e => {
   const t = $("#officeTitle"); if(t) t.textContent = state.name;
   saveSoon();
 });
-panelEl.addEventListener("change", e => {
-  if(e.target.id !== "sandboxToggle") return;
+function openMainMenu(){
+  $("#sandboxToggle").checked = !!state.sandbox; $("#mainBiome").textContent = `Park biome: ${BIOMES[parkBiome()].label}. It was set when the park opened and can't be changed.`;
+  saveInfo(saveMsg || "Saved in this browser."); $("#dlgMain").showModal();
+}
+$("#mainMenuBtn").onclick = openMainMenu;
+$("#closeMain").onclick = () => $("#dlgMain").close();
+$("#howBtn").onclick = () => { $("#dlgMain").close(); $("#dlgIntro").showModal(); };
+$("#restartBtn").onclick = () => askConfirm("Restart?", "This leaves the park you're in and returns to the start screen. Anything not saved is lost, and a new park replaces your save when you start it.", "Restart", () => { $("#dlgMain").close(); setSpeed(0); showStart(); });
+$("#sandboxToggle").addEventListener("change", e => {
   state.sandbox = e.target.checked; if(state.sandbox){ state.money = SANDBOX_MONEY; state.science.points = SANDBOX_POINTS; }
   ui.hud(true); ui.panel(); saveSoon();
 });
