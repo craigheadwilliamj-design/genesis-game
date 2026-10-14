@@ -1613,10 +1613,20 @@ const nodeKey = p => Math.round(p[0]*4) + ":" + Math.round(p[1]*4);
 function partyPos(p){
   if(p.to){
     const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1;
-    return [p.at.x + dx*p.t - dy/L*p.off, p.at.y + dy*p.t + dx/L*p.off];
+    return [p.at.x + dx*p.t + (p.ox || 0), p.at.y + dy*p.t + (p.oy || 0)];
+  }
+  return [p.at.x + (p.ox || 0), p.at.y + (p.oy || 0)];
+}
+// Where a party wants to be beside its path node or stretch: across the whole width of the path while walking, up against the fence or wall when watching or waiting
+function partyOff(p){
+  if(p.stand) return [p.stand.dx, p.stand.dy];
+  if(p.to){
+    const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1, room = (p.at.room && p.at.room.get(p.to)) || 1;
+    const w = (room > 1 ? WIDE_PATH.halfWidth : 1.5) - .35, lat = (p.lane || 0) * w;
+    return [-dy/L*lat, dx/L*lat];
   }
   const a = p.off * 4.4;
-  return [p.at.x + Math.cos(a) * Math.abs(p.off) * 1.5, p.at.y + Math.sin(a) * Math.abs(p.off) * 1.5];
+  return [Math.cos(a) * Math.abs(p.off) * 1.5, Math.sin(a) * Math.abs(p.off) * 1.5];
 }
 // Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
 const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
@@ -1625,6 +1635,8 @@ function drawParties(){
   const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
   for(const p of parties){
     if(!p.at) continue;
+    const o = partyOff(p), k = p.ox === undefined ? 1 : .08;   // ease toward the spot so they drift to the fence instead of jumping
+    p.ox = (p.ox || 0) + (o[0] - (p.ox || 0)) * k; p.oy = (p.oy || 0) + (o[1] - (p.oy || 0)) * k;
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
     const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;

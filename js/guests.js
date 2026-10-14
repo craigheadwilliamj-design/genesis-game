@@ -170,7 +170,7 @@ function newParty(n){
   const pers = rollPers();
   const p = {id:uid("g"), n, name:SURNAMES[Math.floor(Math.random() * SURNAMES.length)] + " party", pers, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
              until:state.minute + rand(...GUEST.stay) / GUEST.pace, at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
-             spd:rand(...GUEST.speed) * GUEST.pace, off:(Math.random()*2-1) * 1.4, tramRoll:Math.random(), in:null, rowdy:pers.includes("hooligan")};
+             spd:rand(...GUEST.speed) * GUEST.pace, off:(Math.random()*2-1) * 1.4, tramRoll:Math.random(), in:null, rowdy:pers.includes("hooligan"), lane:Math.random()*2-1, sj:[Math.random()*2-1, Math.random()*2-1]};
   p.sneaked = sneaksIn(p);   // hooligans may slip in without a ticket
   if(!p.sneaked && state.ticket > fairTicket() * 1.3 * pm(p, "ticket")){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
@@ -208,7 +208,7 @@ function partyLeaves(p){
 function goHome(p){
   if(p.home) return;
   leaveQueue(p);
-  p.home = true; p.dest = null; p.why = null;
+  p.home = true; p.dest = null; p.why = null; p.linger = 0; p.stroll = 0;
 }
 function leaveQueue(p){
   if(!p.in) return;
@@ -255,7 +255,9 @@ function pickSight(p){
   const add = (x, appeal, taste) => {
     const f = fieldFor(p, x.id), d = f && f.dist.get(p.at);
     if(d === undefined) return;
-    const w = (appeal + 1) / (1 + d / 60) * taste;
+    const whim = p.whim || (p.whim = {});
+    if(whim[x.id] === undefined) whim[x.id] = rand(...SIGHT.whim);   // each party likes its own mix, so they don't all file to the same star
+    const w = (appeal + 1) / (1 + d / SIGHT.distPull) * taste * whim[x.id];
     opts.push([x, w]); tot += w;
   };
   for(const e of state.exhibits) if(!p.seen.has(e.id) && e.animals.length && gGraph.anchors[e.id]) add(e, exhibitAppeal(e), tasteOf(p, e));
@@ -293,6 +295,23 @@ function planParty(p){
     else if(s.b.id !== p.dest){ p.dest = s.b.id; p.why = need; if(s.d > GUEST.farWalk && !p.map) thinks(p, "far"); return; }
   }
   if(p.dest) return;
+  // on impulse: a stand or restroom close by when a need is creeping up, or a gift shop that catches the eye
+  const I = SIGHT.impulse;
+  for(const [k, d] of Object.entries(NEEDS)){
+    const ck = "i" + k;
+    if(p.needs[k] < d.seek * I.frac || (p.cool[ck] || 0) > state.minute || (p.cool[k] || 0) > state.minute) continue;
+    p.cool[ck] = state.minute + I.gap / GUEST.pace;
+    const s = bestStop(p, k);
+    if(s && s.d <= I.near && Math.random() < I.chance){ p.dest = s.b.id; p.why = k; return; }
+  }
+  if((p.cool.ishop || 0) <= state.minute && p.mood >= 45 && p.cash >= 5){
+    p.cool.ishop = state.minute + I.gap / GUEST.pace;
+    const s = bestStop(p, "shop");
+    if(s && s.d <= I.shopNear && Math.random() < I.shop){ p.dest = s.b.id; p.why = "shop"; return; }
+  }
+  // sometimes they just wander the paths for a bit before choosing the next exhibit
+  if(p.stroll > 0) return;
+  if(Math.random() < SIGHT.strollChance && !p.done){ p.stroll = Math.round(rand(...SIGHT.strollLen)); return; }
   const e = pickSight(p);
   if(e){ p.dest = e.id; p.why = "see"; return; }
   // nothing new to see: a party that saw nothing at all is bored, and everyone starts thinking about home
@@ -304,6 +323,7 @@ function planParty(p){
 }
 // Pick the next node to walk to. False means the party isn't walking anywhere for now.
 function headOut(p){
+  p.stand = null;
   planParty(p);
   // too broke to ride, and the tram would have saved them a good walk
   if(p.dest && !p.noTram && p.cash < tramFare() * p.n && !canRide(p)){
@@ -319,8 +339,14 @@ function headOut(p){
     if(p.home){ partyLeaves(p); return false; }
   }
   // wander: any way but back the way we came
+  // and lean toward stretches they haven't walked yet
   const opts = [...p.at.adj.keys()].filter(n => n !== p.prev && !(p.at.ride && p.at.ride.has(n)));
-  p.to = opts.length ? opts[Math.floor(Math.random() * opts.length)] : p.prev;
+  if(opts.length){
+    const trail = p.trail || (p.trail = new Map()), ws = opts.map(n => 1 / (1 + (trail.get(n.k) || 0)) ** 2), tot = ws.reduce((a, b) => a + b, 0);
+    let r = Math.random() * tot, i = 0;
+    while(i < opts.length - 1 && (r -= ws[i]) > 0) i++;
+    p.to = opts[i];
+  } else p.to = p.prev;
   return !!p.to;
 }
 // Got where we were going
@@ -333,13 +359,32 @@ function reachDest(p){
   if(!b || !guestBuilding(b)){ p.dest = null; p.why = null; return; }
   if(!svcQ.has(id)) svcQ.set(id, {queue:[], busy:[]});
   svcQ.get(id).queue.push(p); p.in = id; p.waited = 0;
+  standNear(p, b.points);
 }
-function seeExhibit(p, e){
+// Where a party stands to watch or wait: a spot up against the nearest fence or wall, as an offset from its path node (drawing only; it never changes where the party is on the map)
+function standNear(p, pts){
+  const n = p.at; let best = null;
+  if(!n || !pts) return;
+  for(let i = 0; i < pts.length; i++){ const r = segProj(n.x, n.y, pts[i], pts[(i + 1) % pts.length]); if(!best || r.d < best.d) best = r; }
+  if(!best) return;
+  const d = best.d || .01, ux = (best.x - n.x) / d, uy = (best.y - n.y) / d, s = p.sj;
+  let go = Math.min(14, Math.max(0, d - .7 + s[1] * .25)), dx, dy;
+  for(let k = 0; k < 6; k++){   // spread along the fence, and back off if that put them inside
+    dx = ux * go - uy * s[0] * 1.8; dy = uy * go + ux * s[0] * 1.8;
+    if(!inPoly(n.x + dx, n.y + dy, pts)) break;
+    go = Math.max(0, go - .8);
+  }
+  p.stand = {dx, dy};
+}
+function seeExhibit(p, e, quick){
   if(p.dest === e.id && p.why === "see"){ p.dest = null; p.why = null; }
   if(p.seen.has(e.id)) return;
   p.seen.add(e.id);
   if(!e.animals.length) return;
   const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
+  // stop and watch for a while: longer for a bigger draw
+  if(!quick) p.lingerAt = e.id;
+  if(!quick) p.linger = state.minute + (SIGHT.dwell[0] + (SIGHT.dwell[1] - SIGHT.dwell[0]) * a / (a + 15)) * rand(.8, 1.2) / GUEST.pace;
   p.mood += GUEST.seeGain * a / (a + 15) * (1 - HIDING.appeal * bother) - HIDING.mood * bother;
   if(bother >= HIDING.thought) thinks(p, "hiding");
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
@@ -373,13 +418,29 @@ function board(p){
 }
 function walkParty(p, left){
   for(let i = 0; i < 40 && left > 0 && !p.gone && !p.in; i++){
+    if(p.linger > state.minute){   // standing and watching, up against the fence
+      if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points); }
+      return;
+    }
     if(!p.to){ if(!headOut(p)) return; board(p); }
     const L = p.at.adj.get(p.to) || .01, rem = L * (1 - p.t);   // how far the edge feels: a ride is shorter than it looks, a platform wait longer
     if(left < rem){ p.t += left / L; return; }
     left -= rem;
     const ids = p.at.sees && p.at.sees.get(p.to);
-    if(ids) for(const id of ids){ const e = state.exhibits.find(x => x.id === id); if(e) seeExhibit(p, e); }
-    p.prev = p.at; p.at = p.to; p.to = null; p.t = 0;
+    if(ids) for(const id of ids){
+      const e = state.exhibits.find(x => x.id === id);
+      if(!e || p.seen.has(id)) continue;
+      if(p.home){ seeExhibit(p, e, true); continue; }   // on the way out they only glance
+      // walking past an exhibit they haven't seen: stop for it, or keep going
+      const g = p.glance || (p.glance = new Set());
+      if(g.has(id) || !e.animals.length) continue;
+      g.add(id);
+      const a = exhibitAppeal(e), onTrip = p.why in NEEDS;
+      if(Math.random() < clamp(SIGHT.glance * a / (a + SIGHT.glanceAppeal) * tasteOf(p, e) * (onTrip ? .3 : 1), 0, .95)) seeExhibit(p, e);
+    }
+    p.prev = p.at; p.at = p.to; p.to = null; p.t = 0; p.stand = null; p.lane = Math.random() * 2 - 1;
+    if(p.stroll > 0) p.stroll--;
+    if(p.trail) p.trail.set(p.at.k, (p.trail.get(p.at.k) || 0) + 1);
     if(!p.at.rail){ trashCheck(p); boxCheck(p); }
   }
 }
