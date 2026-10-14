@@ -516,6 +516,7 @@ const SIGHT = {
   strollChance:.4,     // chance, when they have nothing planned, of drifting along the paths instead of picking an exhibit
   strollLen:[3, 9],    // corners a stroll lasts
   standReach:12,       // meters of fence either side of the path a party might pick to stand at
+  standGap:7,          // meters out from a fence a party will look for paving to stand on
   standPull:6,         // meters at which a fence spot's chance is halved, so the crowd spreads out but favors what's close
   deckShare:.8,        // chance a party stands on a viewing platform for the exhibit when there's one close
   deckReach:16,        // meters from the path stop to the platform's middle

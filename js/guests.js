@@ -12,7 +12,7 @@ let gGraph = null;         // the guests' walking map: {nodes, anchors:{id -> no
 let gFieldsWalk = new Map();   // the same, for guests who can't ride the tram
 let gFields = new Map();   // stop id -> quickest way there from every node, worked out when first needed
 let svcQ = new Map();      // building id -> {queue:[party], busy:[party]}
-let staffSegs = [], guestSegs = [];   // [a, b, half width] of each staff road and guest path stretch, so guests never stand or step on a staff road
+let guestSegs = [];   // [a, b, half width] of each guest path stretch: guests stand and step only on these, never on grass or staff paths
 let moodColors = false;    // color guests on the map by how happy they are
 let nextSize = 1;          // how many are in the next party through the gate
 
@@ -122,7 +122,6 @@ function buildGuestGraph(){
   }
   gGraph = {nodes, anchors, gate};
   const segs = (ps, hw) => ps.flatMap(p => p.points.slice(1).map((v, i) => [p.points[i], v, hw(p)]));
-  staffSegs = segs(state.paths.filter(isService), () => SERVICE_ROAD.halfWidth);
   guestSegs = segs(live, p => isWide(p) ? WIDE_PATH.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH);
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
@@ -386,7 +385,7 @@ function stepOff(p, meters){
     const k = o[0].toFixed(2) + "," + o[1].toFixed(2) + "@" + p.at.k + (p.to ? ">" + p.to.k : "");
     if(p.offK !== k){
       p.offK = k;
-      const bad = f => onStaff(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && onStaff(p.to.x + o[0] * f, p.to.y + o[1] * f));
+      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
       let f = 1; while(f > .05 && bad(f)) f *= .6;
       p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
     }
@@ -434,17 +433,17 @@ function observeTick(p, now){
   if(e) observe(p, e);
   w.next = now + rand(...OBS.gap) / GUEST.pace;
 }
-// Is this spot on a staff road, and not on a guest path laid over it?
-const onStaff = (x, y) => staffSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw + .25) && !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw);
+// Is this spot off the guest paths (on grass, a staff path, anything that isn't paving guests may use)? A little in from the edge so feet stay on it.
+const offPath = (x, y) => !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw - .35);
 // Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
 function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
   for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
   for(const l of parkFences()) if(cross(l.points)) return false;
-  // never onto a staff road: anywhere along the walk that's on one and not also on a guest path laid over it is out
-  const L = Math.hypot(x1 - x0, y1 - y0);
-  for(let t = 0; t <= L; t += .5){ const k = L ? t / L : 0; if(onStaff(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
-  if(onStaff(x1, y1)) return false;
+  // only on guest paving the whole way (up to the last meter or so for a platform's steps, which stand just off the path)
+  const L = Math.hypot(x1 - x0, y1 - y0), end = skip && skip.type === "platform" ? L - 1.5 : L;
+  for(let t = 0; t <= end; t += .5){ const k = L ? t / L : 0; if(offPath(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
+  if(end === L && offPath(x1, y1)) return false;
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
   for(const b of state.buildings){
     if(b === skip || BUILDINGS[b.type].prop) continue;
@@ -488,7 +487,13 @@ function standNear(p, pts, e, bld){
       let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
       if(inPoly(x + nx * .8, y + ny * .8, pts)){ nx = -nx; ny = -ny; }
       if(inPoly(x + nx * .8, y + ny * .8, pts)) continue;
-      cand.push([x + nx * (.7 + Math.random() * .5), y + ny * (.7 + Math.random() * .5), 1 / (1 + d / SIGHT.standPull)]);
+      // as close to the fence as the paving goes: step out until on a guest path (grass between path and fence stays empty)
+      for(let g = .6; g <= SIGHT.standGap; g += .4){
+        const X = x + nx * g, Y = y + ny * g;
+        if(offPath(X, Y)) continue;
+        if(Math.hypot(X - n.x, Y - n.y) <= SIGHT.standReach) cand.push([X, Y, 1 / (1 + d / SIGHT.standPull)]);
+        break;
+      }
     }
   }
   // pick by weight, and drop any spot they couldn't walk to without crossing a fence, a staff road or a building
