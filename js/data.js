@@ -369,6 +369,8 @@ const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 
 // What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
+// Cloning from a better genome is cheaper: no discount at or under `from` quality, `max` off at 100
+const CLONE_DISCOUNT = {from:50, max:.25};
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
 // GHOST upgrades, researched at ORACLE: trip price and time multipliers per level, and quality points added to every sample

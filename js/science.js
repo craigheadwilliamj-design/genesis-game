@@ -216,6 +216,8 @@ const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fa
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
+// What TAR charges to clone: the animal's price less a discount for a high-quality genome
+const clonePrice = sp => { const d = state.science.dna[sp], D = CLONE_DISCOUNT; return Math.round(SPECIES_BY_ID[sp].price * (1 - D.max * clamp(((d ? d.quality : 0) - D.from) / (100 - D.from), 0, 1)) / 10) * 10; };
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
@@ -223,14 +225,14 @@ function cloneProblem(sp){
     (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
     (!d || d.genome < 100 ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. It needs 100%.` : null) ||
     (state.rating + 1e-9 < starsNeed(s) ? `Needs a ${starsNeed(s)}-star park. You have ${starTxt(state.rating)}.` : null) ||
-    (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
+    (!canAfford(clonePrice(sp)) ? `Cloning costs ${money(clonePrice(sp))}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
 function orderClone(sp, exhibitId, sex){
   if(cloneProblem(sp)) return false;
   if(sex !== "male" && sex !== "female") sex = pickSex(sp);
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
-  spend(s.price, "animals");
+  spend(clonePrice(sp), "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
   state.science.clones.push({id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
   events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);

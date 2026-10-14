@@ -2502,6 +2502,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.ghostLastPointMoves = sc.dna[old.id].quality === 100;
     sc.dna = {[old.id]:{genome:100, quality:50}}; addSample(old.id, 0, 51, 51);
     out.ghostSmallStepMoves = sc.dna[old.id].quality === 51;
+    sc.dna = {[old.id]:{genome:100, quality:50}}; const c50 = clonePrice(old.id); sc.dna[old.id].quality = 100; const c100 = clonePrice(old.id);
+    out.cloneCheaperAtHighQuality = c50 === Math.round(old.price / 10) * 10 && c100 < c50 && c100 >= old.price * .74 && c100 <= old.price * .76;
     window.logScience = keep.log; sc.dna = keep.dna; sc.tech = keep.tech; state.sandbox = keep.sb; events.toast = keep.toast;
     return out;
   });
