@@ -604,6 +604,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.money = -BANKRUPT - 1; checkBankrupt();
     out.debtBankrupts = state.over === true && goCount.length === 1;
     events.gameOver = og; state.over = over0; state.money = money0; state.debtWarned = false;
+    // sandbox keeps money pinned, through ticks, spending and earning (the HUD Bank readout used to flicker)
+    { const sb0 = state.sandbox, t0 = state.today; state.sandbox = true; state.money = SANDBOX_MONEY; const led0 = state.today.built || 0;
+      let pinned = true;
+      for(let i = 0; i < 5; i++){ tick(1); pinned = pinned && state.money === SANDBOX_MONEY; }
+      spend(5000, "built"); pinned = pinned && state.money === SANDBOX_MONEY;
+      earn(700, "tickets"); pinned = pinned && state.money === SANDBOX_MONEY;
+      out.sandboxMoneyPinned = pinned && state.today.built === led0 + 5000;
+      state.sandbox = sb0; state.money = money0; }
 
     // a full day: guests come, go, and leave a mood behind for the rating
     resetParties(); state.minute = OPEN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
