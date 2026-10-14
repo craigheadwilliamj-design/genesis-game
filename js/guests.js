@@ -12,6 +12,7 @@ let gGraph = null;         // the guests' walking map: {nodes, anchors:{id -> no
 let gFieldsWalk = new Map();   // the same, for guests who can't ride the tram
 let gFields = new Map();   // stop id -> quickest way there from every node, worked out when first needed
 let svcQ = new Map();      // building id -> {queue:[party], busy:[party]}
+let staffSegs = [], guestSegs = [];   // [a, b, half width] of each staff road and guest path stretch, so guests never stand or step on a staff road
 let moodColors = false;    // color guests on the map by how happy they are
 let nextSize = 1;          // how many are in the next party through the gate
 
@@ -120,6 +121,9 @@ function buildGuestGraph(){
     if(ids.length){ (n.sees = n.sees || new Map()).set(m, ids); (m.sees = m.sees || new Map()).set(n, ids); }
   }
   gGraph = {nodes, anchors, gate};
+  const segs = (ps, hw) => ps.flatMap(p => p.points.slice(1).map((v, i) => [p.points[i], v, hw(p)]));
+  staffSegs = segs(state.paths.filter(isService), () => SERVICE_ROAD.halfWidth);
+  guestSegs = segs(live, p => isWide(p) ? WIDE_PATH.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH);
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
   indexDecor(nodes);
@@ -366,7 +370,7 @@ function partyOff(p){
   if(p.stand) return [p.stand.dx, p.stand.dy];
   if(p.to){
     const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1, room = (p.at.room && p.at.room.get(p.to)) || 1;
-    const w = (room > 1 ? WIDE_PATH.halfWidth : 1.5) - .35, lat = (p.lane || 0) * w;
+    const w = (room > 1 ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH) - .6, lat = (p.lane || 0) * w;
     return [-dy/L*lat, dx/L*lat];
   }
   const a = p.off * 4.4;
@@ -375,7 +379,19 @@ function partyOff(p){
 // They walk to their spot at their own pace, not slide there (the drawing reads p.ox/p.oy)
 function stepOff(p, meters){
   if(!p.at) return;
-  const o = partyOff(p);
+  let o = partyOff(p);
+  // standing about at a node (or at a spot): pull in toward the path line until it's off any staff road
+  // (walking, the lane must stay off one at both ends of the stretch)
+  {
+    const k = o[0].toFixed(2) + "," + o[1].toFixed(2) + "@" + p.at.k + (p.to ? ">" + p.to.k : "");
+    if(p.offK !== k){
+      p.offK = k;
+      const bad = f => onStaff(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && onStaff(p.to.x + o[0] * f, p.to.y + o[1] * f));
+      let f = 1; while(f > .05 && bad(f)) f *= .6;
+      p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
+    }
+    o = p.offT;
+  }
   if(p.ox === undefined){ p.ox = o[0]; p.oy = o[1]; return; }
   const dx = o[0] - p.ox, dy = o[1] - p.oy, d = Math.hypot(dx, dy);
   if(d <= meters){ p.ox = o[0]; p.oy = o[1]; } else { p.ox += dx / d * meters; p.oy += dy / d * meters; }
@@ -418,24 +434,17 @@ function observeTick(p, now){
   if(e) observe(p, e);
   w.next = now + rand(...OBS.gap) / GUEST.pace;
 }
+// Is this spot on a staff road, and not on a guest path laid over it?
+const onStaff = (x, y) => staffSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw + .25) && !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw);
 // Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
 function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
   for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
   for(const l of parkFences()) if(cross(l.points)) return false;
-  // staff roads join guest paths, so touching one at the path is fine: just don't stand on one, or cut across one away from the path
-  for(const p of state.paths){
-    if(!isService(p)) continue;
-    for(let i = 1; i < p.points.length; i++){
-      const c = p.points[i-1], d = p.points[i];
-      if(segProj(x1, y1, c, d).d < SERVICE_ROAD.halfWidth + .3) return false;
-      if(segCross(A, B, c, d)){
-        const dx = B[0] - A[0], dy = B[1] - A[1], ex = d[0] - c[0], ey = d[1] - c[1], den = dx * ey - dy * ex;
-        const t = den ? ((c[0] - A[0]) * ey - (c[1] - A[1]) * ex) / den : 0;
-        if(t * Math.hypot(dx, dy) > SERVICE_ROAD.halfWidth + 1.5) return false;
-      }
-    }
-  }
+  // never onto a staff road: anywhere along the walk that's on one and not also on a guest path laid over it is out
+  const L = Math.hypot(x1 - x0, y1 - y0);
+  for(let t = 0; t <= L; t += .5){ const k = L ? t / L : 0; if(onStaff(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
+  if(onStaff(x1, y1)) return false;
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
   for(const b of state.buildings){
     if(b === skip || BUILDINGS[b.type].prop) continue;
