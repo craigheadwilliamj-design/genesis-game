@@ -2172,20 +2172,22 @@ function gateTap(e){
 /* ---------- keepers on the map ---------- */
 const keeperEls = new Map();
 function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; }
-// A person drawn from a strip (HUMAN_SPRITES): the frame follows distance walked, and it faces the way it last moved
-function humanOf(kind, c){ const v = HUMAN_SPRITES[kind]; let h = 0; for(const ch of String(c.id)) h = (h * 31 + ch.charCodeAt(0)) | 0; return v[Math.abs(h) % v.length]; }
-function humanSvg(hs, hm){
-  const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k;
-  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden"><image class="hi" href="${hs.src}" width="${H.w * hs.n}" height="${H.ht}" style="image-rendering:pixelated"/></svg></g>`;
+// A person drawn from strips (HUMAN_SPRITES): the walk frame follows distance walked, the work strip plays on the clock while standing at a job, and it faces the way it last moved
+function humanSvg(kind, hm){
+  const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k, V = H[kind];
+  const im = (cls, a) => `<image class="${cls}" href="${a.src}" width="${H.w * a.n}" height="${H.ht}" style="image-rendering:pixelated"/>`;
+  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}</svg></g>`;
 }
-function humanStep(el, hs, hm, x, y){
-  const dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy);
+function humanStep(el, kind, c, x, y){
+  const H = HUMAN_SPRITES, V = H[kind], dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy), now = performance.now();
   el._hx = x; el._hy = y;
-  if(d > 1e-4){ el._hd = (el._hd || 0) + d; el._hmove = performance.now(); if(Math.abs(dx) > 1e-4) el._hface = dx < 0 ? -1 : 1; }
-  const moving = performance.now() - (el._hmove || 0) < 250, f = moving ? Math.floor((el._hd || 0) / HUMAN_SPRITES.step) % hs.n : 0;
-  const g = el.querySelector(".hf"), im = el.querySelector(".hi"); if(!g || !im) return;
+  if(d > 1e-4){ el._hd = (el._hd || 0) + d; el._hmove = now; if(Math.abs(dx) > 1e-4) el._hface = dx < 0 ? -1 : 1; }
+  const moving = now - (el._hmove || 0) < 250, working = !moving && V.work && V.work.jobs.includes(c.job);
+  const g = el.querySelector(".hf"), iw = el.querySelector(".hw"), ik = el.querySelector(".hk"); if(!g || !iw) return;
+  const f = working ? Math.floor(now / V.work.ms) % V.work.n : moving ? Math.floor((el._hd || 0) / H.step) % V.walk.n : 0, mode = working ? 1 : 0;
   if(el._hf !== el._hface){ el._hf = el._hface; g.setAttribute("transform", el._hface < 0 ? "scale(-1 1)" : ""); }
-  if(el._hfr !== f){ el._hfr = f; im.setAttribute("x", -f * HUMAN_SPRITES.w); }
+  if(el._hm !== mode){ el._hm = mode; iw.style.display = mode ? "none" : ""; if(ik) ik.style.display = mode ? "" : "none"; el._hfr = -1; }
+  if(el._hfr !== f){ el._hfr = f; (mode ? ik : iw).setAttribute("x", -f * H.w); }
 }
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
@@ -2198,15 +2200,15 @@ function drawKeepers(){
     const fp = fillPos(c);   // filling trays: inside the fence
     const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
     const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
-    const drive = onAtv(c), hs = humanOf("keeper", c), hm = Math.max(HUMAN_SPRITES.h, 16*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
+    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 16*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key; el._hf = el._hfr = undefined;
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
       // an animal being moved rides along beside its keeper; on a service road with an ATV, they ride it
       el.innerHTML = atvSvg(r, drive) + (cargo ? `<circle cx="${-r*1.6}" cy="${-r*.6}" r="${r*1.1}" fill="${cargo}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : "") +
-        humanSvg(hs, hm) +
+        humanSvg("keeper", hm) +
         (food ? `<rect x="${r*.4}" y="${-hm*.7}" width="${r*1.1}" height="${r*1.1}" fill="${food}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "");
     }
-    humanStep(el, hs, hm, x, y);
+    humanStep(el, "keeper", c, x, y);
     walker34(el, x, y);
   }
   // mechanics: orange with a white wrench-dot
