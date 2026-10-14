@@ -106,8 +106,11 @@ function sexSplit(e, sp){
   const l = e.animals.filter(a => a.sp === sp && a.sex), m = l.filter(a => a.sex === "male").length;
   return l.length ? ` <span class="meta">(${m} M, ${l.length - m} F)</span>` : "";
 }
+// Status in the pecking order, 0 (alpha) to 1: luck, DNA quality and being male
+const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 90) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
 function nameAnimal(a, st){
   if(!a.sex) a.sex = pickSex(a.sp, st);
+  if(a.rank == null) a.rank = pickRank(a);
   if(a.name) return a;
   const seq = (st || state).animalSeq || ((st || state).animalSeq = {}), n = (seq[a.sp] || 0) + 1;
   seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
@@ -346,7 +349,8 @@ function upgradeSave(s){
     for(const a of all) if(!a.name) nameAnimal(a, s); }
   // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
   { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
-    for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s); }
+    for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
+    for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
   return s;
 }
 
