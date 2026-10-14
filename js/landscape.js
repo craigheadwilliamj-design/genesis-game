@@ -612,7 +612,7 @@ const hitShape = (name, x, y, k, pick, dead) => pick || dead ? `<path d="${sprit
 function plantSpriteSvg(f, t, S, dead, pick){
   const w = t.r * 2 * (S.size || 1), ht = w / S.ratio, flip = seedOf(f) & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + ht * .05 : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .06)}" cy="${n2(f.y)}" rx="${n2(w * .38)}" ry="${n2(w * .12)}" fill="#1D2B22" fill-opacity=".2"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/plants/${t.key}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(t.key, x, y, w / SPRITE_HIT[t.key][0], pick, dead)}</g>`;
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="${spriteUrl(`sprites/plants/${t.key}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(t.key, x, y, w / SPRITE_HIT[t.key][0], pick, dead)}</g>`;
 }
 // A rock or boulder from its picture (ROCK_SPRITES): a soft shadow, then the stone sitting on its spot, one of the biome's shapes picked and flipped by its id
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
@@ -625,7 +625,7 @@ function rockPicOf(type, biome){ const n = rockPick[type], l = (ROCK_SPRITES[bio
 function rockSpriteSvg(f, list, biome, dead, pick){
   const sd = seedOf(f), i = f.pic != null && f.pic >= 0 && f.pic < list.length ? f.pic : sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .08)}" cy="${n2(f.y + .1)}" rx="${n2(w * .46)}" ry="${n2(w * .13)}" fill="#1D2B22" fill-opacity=".22"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="${spriteUrl(`sprites/rocks/${f.type}-${b}-${i + 1}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
 }
 // A statue: a stone plinth paved like its theme's paths, and a bronze disc with the animal's letter (the size of its dot on the map) or the person's initials
 function statueSvg(f, t, edge, dead){
