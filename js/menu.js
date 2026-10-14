@@ -145,7 +145,7 @@ function menuRow(it){
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.parkPlants){
-    const rows = PLANT_SIZES.slice().reverse().map(size => `<p class="snote">${size[0].toUpperCase() + size.slice(1)}</p>` + parkPlantKeys(size).map(k => plantRow(k, "biome")).join("")).join("");
+    const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
     return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.statues){
@@ -156,7 +156,7 @@ function menuRow(it){
   }
   if(it.period){
     const quat = it.period === "Quaternary", biomes = quat ? Object.keys(BIOMES).filter(b => PLANTS_OF.Quaternary[b] || PARK_PLANTS_OF[b]) : Object.keys(PLANTS_OF[it.period]);
-    const rows = biomes.map(biome => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + (PLANTS_OF[it.period][biome] || []).concat(quat ? (PARK_PLANTS_OF[biome] || []).slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size)) : []).map(k => plantRow(k, "size")).join("")).join("");
+    const rows = biomes.map(biome => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
     const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
     return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
@@ -169,6 +169,7 @@ function menuRow(it){
 }
 
 // A plant's row in the build menu. Park plants and Quaternary plants are listed in both the Park Plants and the Quaternary dropdowns (both grow in exhibits and out in the park).
+const bySize = ks => ks.slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size));
 const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name)).concat(
   Object.keys(PLANTS_OF.Quaternary).length ? Object.keys(PLANTS_OF.Quaternary).map(b => PLANTS_OF.Quaternary[b][PLANT_SIZES.indexOf(size)]) : []);
 const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in water" : t.wet ? ", land or water" : "", where = tail === "biome" ? esc(BIOMES[t.biome].label.toLowerCase()) : t.size;

@@ -953,6 +953,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     resetParties();
 
     // build sidebar and the Move tool
+    { // Park Plants dropdown: biome headings in BIOMES order, sizes ascending inside each
+      const sub = document.querySelector('#sideMenu [data-open="park-plants"] .ssub'), order = Object.keys(BIOMES).map(b => BIOMES[b].label), heads = [], sizes = []; let ok = !!sub;
+      if(sub) for(const el of [...sub.children].slice(1)){
+        if(el.tagName === "P"){ heads.push(el.textContent); sizes.push([]); }
+        else sizes[sizes.length - 1].push(PLANT_SIZES.indexOf(el.querySelector(".price").textContent.split(", ").find(x => PLANT_SIZES.includes(x))));
+      }
+      out.parkPlantsByBiome = ok && heads.length > 0 && heads.every(h => order.includes(h)) && heads.map(h => order.indexOf(h)).every((v, i, a) => !i || v > a[i - 1]) && sizes.every(a => a.every((v, i) => v >= 0 && (!i || v >= a[i - 1])));
+    }
     out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="restroom"]') && !!document.querySelector('[data-fence="concrete"]');
     out.fencePrice = exhibitCost([[0,0],[40,0],[40,40],[0,40]], "bars") - exhibitCost([[0,0],[40,0],[40,40],[0,40]]) === Math.round(160 * BARRIERS.bars.perMeter);
     {
