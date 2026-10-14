@@ -2488,7 +2488,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // GHOST quality: best upgrades reach 100 in every period, without them it stays under the ceiling, the last steps always converge
   const ghq = await page.evaluate(() => {
     const out = {}, sc = state.science, keep = {dna:sc.dna, tech:sc.tech.slice(), sb:state.sandbox, toast:events.toast, log:logScience};
-    state.sandbox = true; events.toast = () => {}; window.logScience = () => {};
+    state.sandbox = true; events.toast = () => {}; window.logScience = () => {}; const devWas = localStorage.getItem("genesis-dev"); localStorage.setItem("genesis-dev", "1");
     const run = (period, sp, n) => { sc.dna = {}; for(let i = 0; i < n; i++) tripReturns({period, sp, bay:0, start:0, end:0}); return sc.dna[sp] ? sc.dna[sp].quality : 0; };
     const old = SPECIES.find(s => s.period === "Devonian");
     const per = old.period;
@@ -2504,6 +2504,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.ghostSmallStepMoves = sc.dna[old.id].quality === 51;
     sc.dna = {[old.id]:{genome:100, quality:50}}; const c50 = clonePrice(old.id); sc.dna[old.id].quality = 100; const c100 = clonePrice(old.id);
     out.cloneCheaperAtHighQuality = c50 === Math.round(old.price / 10) * 10 && c100 < c50 && c100 >= old.price * .74 && c100 <= old.price * .76;
+    localStorage.removeItem("genesis-dev");
+    sc.dna = {[old.id]:{genome:100, quality:60}}; addSample(old.id, 0, 100, 100); const offQ = sc.dna[old.id].quality;
+    out.qualityRefineDevOnly = offQ === 60 && clonePrice(old.id) === old.price;
+    if(devWas !== null) localStorage.setItem("genesis-dev", devWas);
     window.logScience = keep.log; sc.dna = keep.dna; sc.tech = keep.tech; state.sandbox = keep.sb; events.toast = keep.toast;
     return out;
   });

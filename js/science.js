@@ -176,6 +176,8 @@ function addSample(sp, gain, q, cap = 100){
   const dna = state.science.dna;
   const d = dna[sp] || (dna[sp] = {genome:0, quality:0});
   // a finished genome is refined by every trip: about a third of the way to the best this place can give, at least a point
+  // refining a finished genome is dev-only for now (the clone discount below is too)
+  if(d.genome >= 100 && !devMode()) return {gain:0, better:0};
   if(d.genome >= 100){ const before = d.quality; if(before < cap) d.quality = Math.min(cap, before + Math.max(1, Math.ceil((cap - before) * .3))); return {gain:0, better:d.quality - before}; }
   const g = Math.min(gain, 100 - d.genome);
   d.quality = Math.round((d.quality * d.genome + q * g) / (d.genome + g));
@@ -217,7 +219,7 @@ function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLON
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
 // What TAR charges to clone: the animal's price less a discount for a high-quality genome
-const clonePrice = sp => { const d = state.science.dna[sp], D = CLONE_DISCOUNT; return Math.round(SPECIES_BY_ID[sp].price * (1 - D.max * clamp(((d ? d.quality : 0) - D.from) / (100 - D.from), 0, 1)) / 10) * 10; };
+const clonePrice = sp => { if(!devMode()) return SPECIES_BY_ID[sp].price; const d = state.science.dna[sp], D = CLONE_DISCOUNT; return Math.round(SPECIES_BY_ID[sp].price * (1 - D.max * clamp(((d ? d.quality : 0) - D.from) / (100 - D.from), 0, 1)) / 10) * 10; };
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||

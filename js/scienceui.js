@@ -105,7 +105,7 @@ function tripRow(id, periodId, label){
   if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : g.event ? "Research education programs at ORACLE first." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
     const ev = !!g.event, what = ev ? "record" : "DNA";
-    h += `${d ? `${ev ? "Record" : "DNA"} quality ${d.quality}%.${d.genome >= 100 ? (ev ? " Complete, and on offer at Education Centers. More trips can raise quality." : " Complete. More trips can raise quality.") : ""}` : `No ${what} yet.`}`;
+    h += `${d ? `${ev ? "Record" : "DNA"} quality ${d.quality}%.${d.genome >= 100 ? (ev ? " Complete, and on offer at Education Centers." + (devMode() ? " More trips can raise quality." : "") : " Complete." + (devMode() ? " More trips can raise quality." : "")) : ""}` : `No ${what} yet.`}`;
     if(ev) h += ` Trips take ${spanText(Math.round(g.event.days * DAY_MIN * ghostLevel("speed")))}.`;
     if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? `more trips to finish the ${ev ? "record" : "genome"}` : `trips for a whole ${ev ? "record" : "genome"}`}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
     if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out ${ev ? "recording" : "looking for"} it.</b>`;
@@ -138,7 +138,7 @@ function ghostHtml(b){
   }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))} and bring back DNA of ${Math.min(100, p.quality[0] + ghostQuality())}–${bestQuality(p.id)}% quality. Bigger animals take more trips.</div>`;
-  h += `<div class="meta" style="margin-top:6px">Quality is how clean and whole the DNA is. Clones follow it. Once a genome is complete, every extra trip refines it toward the best this period can give now: <b>${bestQuality(p.id)}%</b>.${bestQuality(p.id) < 100 ? " Research the Careful sampling and Cryo-preserved samples upgrades at ORACLE to raise that." : ""}</div>`;
+  h += `<div class="meta" style="margin-top:6px">Quality is how clean and whole the DNA is. Clones follow it: under 70% they are sickly, under 50% frail. ${devMode() ? `Once a genome is complete, every extra trip refines it toward the best this period can give now: <b>${bestQuality(p.id)}%</b>, and a better genome makes clones cheaper (up to a quarter off at 100%).` : `A genome's quality is set by the samples it is built from, up to <b>${bestQuality(p.id)}%</b> in this period right now.`}${bestQuality(p.id) < 100 ? " Research the Careful sampling and Cryo-preserved samples upgrades at ORACLE to raise that." : ""}</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
