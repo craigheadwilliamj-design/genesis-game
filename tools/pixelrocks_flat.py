@@ -21,6 +21,10 @@ MOSSY = ramp((134, 138, 140)); MOSSY["top"] = mix((84, 122, 70), (255, 255, 255)
 LITTER = ramp((128, 130, 128)); LITTER["top"] = mix((140, 98, 52), (255, 255, 255), .1); LITTER["hi"] = mix(LITTER["hi"], (140, 98, 52), .25)   # grey with a leaf-litter cap
 BUFF = ramp((190, 150, 108))   # desert: sandstone strata, buff / rust red / cream, from ROCK_STONE desert
 RUST = ramp((168, 88, 50)); CREAM = ramp((222, 198, 150)); VARNISH = ramp((92, 74, 64))
+FIELD = ramp((142, 145, 136))   # grassland: fieldstone, ROCK_STONE grey-green
+LIME = ramp((208, 202, 180))    # pale limestone
+FSTAIN = ramp((142, 145, 136)); FSTAIN["top"] = mix((142, 145, 136), (176, 150, 90), .35); FSTAIN["hi"] = mix(FSTAIN["hi"], (176, 150, 90), .2)   # fieldstone with an iron-stained, sun-bleached cap
+FMOSS = ramp((142, 145, 136)); FMOSS["top"] = mix((140, 160, 80), (255, 255, 255), .12); FMOSS["hi"] = mix(FMOSS["hi"], (140, 160, 80), .3)   # fieldstone with a lichen-green cap
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -141,6 +145,16 @@ def shapes():
     S["rock-desert-4"] = render(254, [(0, 0, 11, 9, 6, .12, [(5, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], CREAM)
     S["rock-desert-5"] = render(255, [(0, 0, 14, 10, 5, .18, [(7, 1, 0, 0), (5, .82, .6, 0)])], VARNISH, bands=0)
     S["rock-desert-6"] = render(256, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], [BUFF, RUST], bands=0)
+    S["boulder-grassland-1"] = render(161, [(0, 0, 26, 20, 9, .07, [(5, 1, 0, 0), (6, .98, .2, 0), (6, .94, .5, 0), (5, .86, .8, 0), (4, .72, 1.2, 0), (3, .5, 1.5, 0)])], FIELD, cracks=1)
+    S["boulder-grassland-2"] = render(162, [(-14, 3, 15, 12, 8, .08, [(5, 1, 0, 0), (5, .95, .3, 0), (4, .84, .6, 0), (3, .65, .8, 0)]), (12, -4, 19, 14, 9, .07, [(6, 1, 0, 0), (6, .97, .3, 0), (5, .9, .6, 0), (4, .78, 1, 0), (3, .58, 1.3, 0)])], FMOSS)
+    S["boulder-grassland-3"] = render(163, [(0, 0, 15, 12, 8, .08, [(5, 1, 0, 0), (5, .98, .3, 0), (5, .93, .6, 0), (4, .85, 1, 0), (4, .72, 1.4, 0), (3, .55, 1.8, 0)])], LIME, cracks=1)
+    S["boulder-grassland-4"] = render(164, [(0, 0, 22, 14, 9, .06, [(6, 1, 0, 0), (6, .96, .3, 0), (5, .88, .7, 0), (4, .7, 1.1, 0)])], FSTAIN, cracks=1)
+    S["rock-grassland-1"] = render(261, [(0, 0, 16, 10, 8, .07, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .62, .7, 0)])], FIELD)
+    S["rock-grassland-2"] = render(262, [(0, 0, 11, 8, 7, .1, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], FSTAIN, bands=0)
+    S["rock-grassland-3"] = render(263, [(0, 0, 13, 9, 8, .08, [(4, 1, 0, 0), (5, .95, .3, 0), (4, .78, .6, 0)])], LIME)
+    S["rock-grassland-4"] = render(264, [(0, 0, 10, 8, 7, .1, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], FMOSS, bands=0)
+    S["rock-grassland-5"] = render(265, [(-6, 1, 8, 6, 7, .1, [(3, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 10, 7, 8, .1, [(4, 1, 0, 0), (4, .92, .3, 0), (3, .7, .5, 0)])], FIELD, bands=0)
+    S["rock-grassland-6"] = render(266, [(0, 0, 14, 7, 8, .08, [(3, 1, 0, 0), (3, .96, .3, 0), (3, .8, .5, 0)])], LIME, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"

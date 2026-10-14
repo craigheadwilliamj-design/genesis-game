@@ -1,4 +1,4 @@
-# Draws the seamless water tiles (tropical deep blue-green jungle pool, clean; desert turquoise oasis, clean; wetland swamp; temperate blue-green pond, clean like scrubland; scrubland brackish pool, kept clean: only ripples and glints, no wash blocks, film, silt or twigs) in the Dimetrodon's flat, simple style: sprites/water/wetland.png, 144 px = 18 m (0.125 m a pixel, like the ground tiles), fully opaque,
+# Draws the seamless water tiles (grassland murky brown-green river with silt; tropical deep blue-green jungle pool, clean; desert turquoise oasis, clean; wetland swamp; temperate blue-green pond, clean like scrubland; scrubland brackish pool, kept clean: only ripples and glints, no wash blocks, film, silt or twigs) in the Dimetrodon's flat, simple style: sprites/water/wetland.png, 144 px = 18 m (0.125 m a pixel, like the ground tiles), fully opaque,
 # used as the #w-wetland pattern behind wetland water (waterSvg in landscape.js; index.html has the pattern). Dark tannin-green water built from small low-contrast details
 # so the repeat doesn't show: a fine two-tone wash of deeper and lighter water in 2x2 blocks, a few small patches of algal film, rows of short ripple dashes (a lit top pixel run
 # with a darker run under it), tiny sun glints, and silt flecks and little drifting twigs. Nothing modern, no plants. Light is from the top left. Features wrap over the edges.
@@ -14,6 +14,7 @@ PAL = {
     "temperate": dict(base=(58, 116, 128), lite=(140, 196, 190), film=((140, 176, 90), .7), ripple=(180, 224, 224), glint=(232, 248, 244), silt=(92, 84, 52), twig=(88, 70, 44), calm=True),   # clear blue-green pond, kept clean: ripples and glints only
     "scrubland": dict(base=(108, 134, 124), lite=(190, 205, 180), film=((226, 224, 200), .8), ripple=(206, 210, 180), glint=(246, 244, 226), silt=(128, 104, 68), twig=(214, 208, 180), calm=True),   # brackish pool, salt film, pale salt dashes
     "desert":    dict(base=(46, 144, 150), lite=(130, 214, 200), film=((140, 176, 90), .7), ripple=(190, 240, 232), glint=(240, 252, 246), silt=(190, 160, 100), twig=(88, 70, 44), calm=True),   # clear turquoise oasis, kept clean: ripples and glints only
+    "grassland": dict(base=(98, 108, 72), lite=(164, 172, 112), film=((150, 160, 90), .6), ripple=(196, 204, 152), glint=(232, 236, 204), silt=(150, 118, 74), twig=(100, 78, 46)),   # murky brown-green river, silt flecks and drifting twigs
     "tropical":  dict(base=(16, 104, 100), lite=(70, 190, 170), film=((90, 150, 60), .7), ripple=(120, 235, 215), glint=(220, 255, 245), silt=(70, 50, 28), twig=(70, 50, 28), calm=True, wash=True),   # clear deep blue-green jungle pool, bright glints, kept clean
 }
 
@@ -59,5 +60,5 @@ def tile(size, seed, pal):
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/water"
 os.makedirs(out, exist_ok=True)
-for name, seed in (("wetland", 5), ("scrubland", 11), ("temperate", 3), ("desert", 17), ("tropical", 23)):
+for name, seed in (("wetland", 5), ("scrubland", 11), ("temperate", 3), ("desert", 17), ("tropical", 23), ("grassland", 29)):
     im = tile(144, seed, PAL[name]); im.save(f"{out}/{name}.png"); print(name, im.size, len({p[:3] for p in im.get_flattened_data()}), "colors")
