@@ -33,6 +33,8 @@ const MINUTES_PER_SECOND = 6;
 const WALK_SPEED = 20;
 // The same speed in meters per park minute, which is what the simulation counts in
 const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
+// Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN, so 1x looks like walking, not a sped-up film
+const STAFF_PACE = .5;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
 // The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
 const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
@@ -687,7 +689,7 @@ const KEEPER = {
   hireCost:2000,       // one-time cost to hire a keeper
   wage:120,            // each keeper's pay per day
   carry:40,            // food units a keeper can carry by hand
-  speed:WALK_PER_MIN,  // keepers walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // keepers walk at STAFF_PACE of full walking speed
   tirePerMeter:.03,    // stamina lost per meter walked
   tirePerDelivery:2,   // stamina lost loading or unloading
   restBelow:25,        // keepers take a break when stamina drops under this
@@ -737,7 +739,7 @@ const UPGRADES = [
 const CUSTODIAN = {
   hireCost:1500,
   wage:100,
-  speed:WALK_PER_MIN,  // custodians walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // custodians walk at STAFF_PACE of full walking speed
   carry:100,           // units of stock they carry per trip
   scrubPerMin:4,       // restroom dirt cleaned each minute
   sweepPerMin:2,       // pieces of litter picked up each minute
@@ -816,7 +818,7 @@ const LODGING = {
 const SECURITY = {
   hireCost:2000,
   wage:140,
-  speed:WALK_PER_MIN,  // guards walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // guards walk at STAFF_PACE of full walking speed
   deterRadius:25,      // vandalism near a guard is much rarer
   deterCut:.3,
   catchRadius:15,      // a guard catches a vandal this close
@@ -916,7 +918,7 @@ const MAINT = {
   repairBelow:85,      // mechanics fix fences under this condition
   inspectMinutes:5,    // time to inspect a fence
   repairPerMinute:4,   // condition restored per minute of work
-  speed:WALK_PER_MIN,  // mechanics walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // mechanics walk at STAFF_PACE of full walking speed
   hireCost:2000,
   wage:150,
 };
@@ -1196,7 +1198,7 @@ const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoi
 const VET = {
   hireCost:3000,
   wage:200,
-  speed:WALK_PER_MIN,  // vets walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // vets walk at STAFF_PACE of full walking speed
   patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:14, dept:true, unique:true,

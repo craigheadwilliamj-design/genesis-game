@@ -466,8 +466,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.dockLayout = ["b-kst", "b-kdock", "b-kbr", "e-k1", "e-k2"].every(id => !!kGraph.anchors[id]);
     dock.store = {plants:100, meat:100};
     state.staff.keepers.push({id:"k-d", name:"D", stamina:100}); syncCrew();
-    const day = state.day;
+    const day = state.day, keeperSpeed = KEEPER.speed; KEEPER.speed = WALK_PER_MIN; // this layout is a long haul; test the route, not the pace
     while(state.day === day && !(state.exhibits[1].stock.meat > 0)) tick(1);
+    KEEPER.speed = keeperSpeed;
     out.dockToExhibit = state.day === day && state.exhibits[1].stock.meat > 0 && stockOf(dock, "meat") < 100 && state.staff.keepers[0].stamina > 50;
 
     // a worn-out keeper holding food delivers it before taking a break
