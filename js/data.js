@@ -26,15 +26,15 @@ const START = {
 };
 
 // How fast time passes. At 1x speed, one real second is this many park minutes.
-// The park is open 8:00 AM to 8:00 PM (720 minutes), so 6 means a day lasts 120 seconds.
-const MINUTES_PER_SECOND = 6;
+// The park is open 8:00 AM to 8:00 PM (720 minutes), so 3 means a day lasts 240 seconds.
+const MINUTES_PER_SECOND = 3;
 
-// How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
+// How fast full-pace walkers go on screen at 1x speed, in meters per real second at the OLD 6 minutes a second (half that now, with 3). Guests, keepers, and mechanics all use it.
 const WALK_SPEED = 20;
 // The same speed in meters per park minute, which is what the simulation counts in
-const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
-// Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN, so 1x looks like walking, not a sped-up film
-const STAFF_PACE = .5;
+const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, so a longer day doesn't change how far anyone gets in a park minute (on screen that halves WALK_SPEED)
+// Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN (1 = the old sim speed; the longer day is what slows them on screen)
+const STAFF_PACE = 1;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
 // The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
 const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
