@@ -2176,18 +2176,18 @@ function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed
 function humanSvg(kind, hm){
   const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k, V = H[kind];
   const im = (cls, a) => `<image class="${cls}" href="${a.src}" width="${H.w * a.n}" height="${H.ht}" style="image-rendering:pixelated"/>`;
-  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}</svg></g>`;
+  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}</svg></g>`;
 }
 function humanStep(el, kind, c, x, y){
   const H = HUMAN_SPRITES, V = H[kind], dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy), now = performance.now();
   el._hx = x; el._hy = y;
   if(d > 1e-4){ el._hd = (el._hd || 0) + d; el._hmove = now; if(Math.abs(dx) > 1e-4) el._hface = dx < 0 ? -1 : 1; }
-  const moving = now - (el._hmove || 0) < 250, working = !moving && V.work && V.work.jobs.includes(c.job);
-  const g = el.querySelector(".hf"), iw = el.querySelector(".hw"), ik = el.querySelector(".hk"); if(!g || !iw) return;
-  const f = working ? Math.floor(now / V.work.ms) % V.work.n : moving ? Math.floor((el._hd || 0) / H.step) % V.walk.n : 0, mode = working ? 1 : 0;
+  const moving = now - (el._hmove || 0) < 250, mode = moving ? "hw" : V.work && V.work.jobs.includes(c.job) ? "hk" : V.wait ? "hs" : "hw";
+  const A = {hw:V.walk, hk:V.work, hs:V.wait}[mode], g = el.querySelector(".hf"); if(!g) return;
+  const f = moving ? Math.floor((el._hd || 0) / H.step) % A.n : mode === "hw" ? 0 : Math.floor(now / A.ms) % A.n;
   if(el._hf !== el._hface){ el._hf = el._hface; g.setAttribute("transform", el._hface < 0 ? "scale(-1 1)" : ""); }
-  if(el._hm !== mode){ el._hm = mode; iw.style.display = mode ? "none" : ""; if(ik) ik.style.display = mode ? "" : "none"; el._hfr = -1; }
-  if(el._hfr !== f){ el._hfr = f; (mode ? ik : iw).setAttribute("x", -f * H.w); }
+  if(el._hm !== mode){ el._hm = mode; for(const m of ["hw", "hk", "hs"]){ const im = el.querySelector("." + m); if(im) im.style.display = m === mode ? "" : "none"; } el._hfr = -1; }
+  if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); }
 }
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
