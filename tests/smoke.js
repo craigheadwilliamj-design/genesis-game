@@ -1391,6 +1391,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const vis = k => !row(k).hidden, wet = Object.keys(LAND).find(k => LAND[k].period === "Jurassic" && LAND[k].biome === "wetland");
         out.plantBiomeFilter = vis("jur-tropical-large") && !!wet && !vis(wet) && plantBiomeMenu === "tropical";
         sel.value = ""; sel.dispatchEvent(new Event("change", {bubbles:true})); out.plantBiomeAll = vis(wet) && vis("jur-tropical-large"); }
+      { const sel0 = sel; landTabs.ex = null; sel = {kind:"exhibit", id:gx.id}; landTabs.sub = "rocks"; landTabs.ex = gx.id; landTabs.biome = "temperate";
+        const html = landHtml(gx), box = document.createElement("div"); box.innerHTML = html;
+        out.panelRockShapes = box.querySelectorAll('[data-action="rockShape"][data-type="rock"]').length === ROCK_SPRITES.temperate.rock.length + 1 && box.querySelectorAll('[data-action="rockShape"][data-type="boulder"] img').length === ROCK_SPRITES.temperate.boulder.length && html.includes("rock-temperate-1.png");
+        rockPick.rock = null; const btn = box.querySelector('[data-action="rockShape"][data-type="rock"][data-pic="1"]');
+        panelEl.appendChild(btn); btn.click(); btn.remove();
+        out.panelRockPick = rockPick.rock === 1 && tool === "land-rock" && rockBiome === "temperate";
+        landTabs.sub = "plants"; landTabs.biome = "tropical"; landTabs.period = "Jurassic"; const ph = landHtml(gx); out.panelPlantThumbs = ph.includes("sprites/plants/jur-tropical-"); if(!out.panelPlantThumbs) sel = sel0; landTabs.sub = "plants"; setTool("select"); }
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
