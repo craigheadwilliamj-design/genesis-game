@@ -2191,6 +2191,32 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return typeof emblemSvg === "undefined" && typeof emblemOn === "undefined" && !Object.values(THEMES).some(T => "emblem" in T) && els.every(el => !el.querySelector('circle[r="1.08"]'));
   }, tl);
 
+  // tapping an animal: the target is the visible sprite, not just its ground spot
+  checks.animalTapOnSprite = await page.evaluate(() => {
+    const keep = new Map(herd), t0 = tilt, k0 = view.k; let ok = true;
+    const mk = (id, sp, spr, x, y, r) => ({id, sp, placed:true, spr, viv:false, r, x, y, exhibitId:"none", face:1});
+    const exh = state.exhibits.find(e => e.animals.length), a = exh && exh.animals[0];
+    if(!a) return true;
+    for(const tl of [true, false]) for(const k of [1.5, 5, 14]){
+      if(tilt !== tl) document.querySelector("#ztilt").click();
+      view.k = k; herd.clear();
+      const [gx, gy] = state.gate;
+      for(const [sp, spr] of [["dime", true], ["mega", false], ["coel", true]]){
+        const h = mk(a.id, sp, spr, gx, gy - 20, sp === "mega" ? 1.2 : Math.max(animalRadius("dime"), 4 / k)); herd.clear(); herd.set(a.id, h);
+        view.tx = innerWidth / 2 - gx * k; view.ty = innerHeight / 2 - (gy - 20) * k * (tilt ? TILT : 1);
+        const b = animalBox(h), r = svg.getBoundingClientRect(), sx = r.left + view.tx + h.x * k, sy = r.top + view.ty + h.y * ky() + b.oy * k;
+        const rx = Math.max(12, b.hw * k), ry = Math.max(12, b.hh * k);
+        const hit = (dx, dy) => { const g = animalAt(sx + dx, sy + dy); return !!g && g.id === a.id; };
+        ok = ok && hit(0, 0) && hit(rx * .8, 0) && hit(-rx * .8, 0) && hit(0, -ry * .8) && !hit(rx * 1.6, 0);
+        // a bigger sprite's box is bigger than the old 12px reach
+        if(spr && b.hw * k > 40) ok = ok && hit(b.hw * k * .8, 0);
+      }
+    }
+    herd.clear(); for(const [id, h] of keep) herd.set(id, h);
+    view.k = k0; if(tilt !== t0) document.querySelector("#ztilt").click(); render();
+    return ok;
+  });
+
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {
     document.querySelectorAll("dialog[open]").forEach(d => d.close());
