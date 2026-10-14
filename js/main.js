@@ -38,7 +38,7 @@ $("#dlgDeaths").addEventListener("cancel", e => e.preventDefault());   // Esc do
 events.dayEnded = r => {
   const L = r.ledger, row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
   const stars = r.rating - r.ratingBefore;
-  ui.toast("", "day", `<h4>Day ${r.day} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
+  ui.toast("", "day", `<h4>${fmtDate(r.day)} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
     ${row("Tickets", money(L.tickets))}
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
     ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
@@ -64,7 +64,7 @@ events.dayEnded = r => {
 events.gameOver = () => {
   setSpeed(0);
   $("#dlgOver h2").textContent = "The park went bankrupt";
-  $("#overText").textContent = `${state.name} went bankrupt on day ${state.day}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
+  $("#overText").textContent = `${state.name} went bankrupt on ${fmtDate(state.day)}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
   $("#dlgOver").showModal();
 };
 

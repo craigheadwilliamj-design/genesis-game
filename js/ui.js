@@ -16,7 +16,7 @@ const ui = {
     set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
     set("clock", fmtClock(state.minute));
-    set("dayLabel", `Day ${state.day} · ${weatherNow().label}`);
+    set("dayLabel", `${fmtDate(state.day)} · ${weatherNow().label}`);
     set("parkName", state.name);
     const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
     if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
@@ -154,7 +154,7 @@ function overviewHtml(){
 
   if(state.history.length){
     const rows = state.history.slice(-7).reverse();
-    h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Day</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.day}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
+    h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Date</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${fmtDate(r.day)}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
   }
 
   h += `<div class="row" style="margin-top:12px"><button class="btn" data-action="otab2" data-k="menu">Main Menu</button></div>`;
@@ -273,7 +273,7 @@ function exhibitHtml(e){
   }
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
-    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until day ${state.staff.feedFrom}.` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
   }
   h += `</section>`;
 
@@ -477,7 +477,7 @@ function healthHtml(e){
   if(!e.animals.length && !away.length) return "";
   const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
   let h = `<section><h3>Health</h3>`;
-  if(!healthActive()) items.push(hli("ok", `Animals start falling ill on day ${state.health.from}.`));
+  if(!healthActive()) items.push(hli("ok", `Animals start falling ill on ${fmtDate(state.health.from)}.`));
   if(hr.sick.length){
     const worst = Math.max(...hr.sick.map(a => a.sick.sev));
     items.push(hli(worst >= 40 ? "bad" : "warn", `${hr.sick.length} sick or injured.`));
@@ -600,7 +600,7 @@ function stationHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>` + zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
   h += staffNote("keeper");
-  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
+  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until ${fmtDate(state.staff.feedFrom)}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
   h += `</section>`;

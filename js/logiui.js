@@ -47,7 +47,7 @@ function dockHtml(b){
       <button class="buy" data-action="rush" data-t="${t}"${canAfford(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup)) ? "" : " disabled"} title="Delivered now">Rush ${LOGI.rushLot}, ${money(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup))}</button>
       <span class="need">${isGuestGood(t) ? `$${unitPrice(t).toFixed(2)}` : money(Math.round(unitPrice(t)))} a unit. Tonight: ${n} units${n && price ? ` (${money(Math.round(n * price))})` : ""}.</span></li>`;
   }).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? `Partner parks pay for deliveries until day ${state.staff.feedFrom}.` : `Tonight's delivery costs about ${money(Math.round(cost))}.`} Farms and ranches make food cheaper once you have researched food production.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? `Partner parks pay for deliveries until ${fmtDate(state.staff.feedFrom)}.` : `Tonight's delivery costs about ${money(Math.round(cost))}.`} Farms and ranches make food cheaper once you have researched food production.</div></section>`;
   return h;
 }
 

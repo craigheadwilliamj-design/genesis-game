@@ -769,6 +769,12 @@ function checkGoals(){
 function devMode(){ try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
 function money(n){ const s = "$" + Math.abs(Math.round(n)).toLocaleString(); return n < 0 ? "−" + s : s; }
 function fmtArea(m2){ return `${Math.round(m2).toLocaleString()} m²`; }
+// state.day to a calendar date: {d, m (1 based), y}, and "3 Mar Y2" for the HUD and logs. Days before 1 count as day 1.
+function dateOf(day){
+  const n = Math.max(0, Math.floor(day) - 1), dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length;
+  return {d:n % dpm + 1, m:Math.floor(n / dpm) % mpy + 1, y:CALENDAR.startYear + Math.floor(n / (dpm * mpy))};
+}
+function fmtDate(day){ const t = dateOf(day); return `${t.d} ${CALENDAR.months[t.m - 1]} Y${t.y}`; }
 function fmtClock(min){
   const h = Math.floor(min / 60), m = Math.floor(min % 60);
   const h12 = ((h + 11) % 12) + 1;

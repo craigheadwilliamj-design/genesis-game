@@ -34,6 +34,8 @@ const WALK_SPEED = 40;
 // The same speed in meters per park minute, which is what the simulation counts in
 const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
+// The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
+const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
 const DAY_MIN = CLOSE_MIN - OPEN_MIN;   // park minutes in one open day. Research, trips, and growing are counted in these.
 
 // Building costs

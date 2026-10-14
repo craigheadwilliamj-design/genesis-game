@@ -14,7 +14,7 @@ const nowMin = () => (state.day - 1) * DAY_MIN + (state.minute - OPEN_MIN);
 const minAt = (day, minute) => (day - 1) * DAY_MIN + (minute - OPEN_MIN);
 function whenText(m){
   const r = m % DAY_MIN;
-  return r < 1 && m > 0 ? `closing on day ${Math.round(m / DAY_MIN)}` : `day ${Math.floor(m / DAY_MIN) + 1}, ${fmtClock(OPEN_MIN + r)}`;
+  return r < 1 && m > 0 ? `closing on ${fmtDate(Math.round(m / DAY_MIN))}` : `${fmtDate(Math.floor(m / DAY_MIN) + 1)}, ${fmtClock(OPEN_MIN + r)}`;
 }
 // A length of time in open days and hours: "1 day 3h", "5h 20m"
 function spanText(min){
