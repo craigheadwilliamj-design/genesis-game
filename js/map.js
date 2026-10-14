@@ -2200,7 +2200,7 @@ function drawKeepers(){
     const fp = fillPos(c);   // filling trays: inside the fence
     const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
     const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
-    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 16*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
+    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
       el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
       // an animal being moved rides along beside its keeper; on a service road with an ATV, they ride it

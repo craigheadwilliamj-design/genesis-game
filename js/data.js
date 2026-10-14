@@ -26,11 +26,11 @@ const START = {
 };
 
 // How fast time passes. At 1x speed, one real second is this many park minutes.
-// The park is open 8:00 AM to 8:00 PM (720 minutes), so 12 means a day lasts 60 seconds.
-const MINUTES_PER_SECOND = 12;
+// The park is open 8:00 AM to 8:00 PM (720 minutes), so 6 means a day lasts 120 seconds.
+const MINUTES_PER_SECOND = 6;
 
 // How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
-const WALK_SPEED = 40;
+const WALK_SPEED = 20;
 // The same speed in meters per park minute, which is what the simulation counts in
 const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
@@ -400,7 +400,7 @@ const PERIOD_COLOR = {
 // idle is how many frames sprites/<id>-idle.png has (same strip format) and ms how long each shows. A picture with both walks on the walk strip and plays idle while it holds still;
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
 // People drawn as pixel figures: each strip is `n` frames of 16 x 32 px side by side, facing right (flipped to face left). `walk` plays while moving (a frame every `step` meters), `work` while standing at a job in `jobs` (a frame every `ms`), and `wait` plays while standing with nothing to do (a frame every `ms`). `h` is how tall the 32 px cell is in meters (about 1.9 m of person; a bit larger than true pixel size so they read).
-const HUMAN_SPRITES = {keeper:{walk:{src:"sprites/human/keeper-walk.png", n:5}, work:{src:"sprites/human/keeper-work.png", n:4, ms:220, jobs:["mucking", "filling"]}, wait:{src:"sprites/human/keeper-wait.png", n:4, ms:450}}, w:16, ht:32, h:2.4, step:.35, feet:30};
+const HUMAN_SPRITES = {keeper:{walk:{src:"sprites/human/keeper-walk.png", n:5}, work:{src:"sprites/human/keeper-work.png", n:4, ms:220, jobs:["mucking", "filling"]}, wait:{src:"sprites/human/keeper-wait.png", n:4, ms:450}}, w:16, ht:32, h:3.6, step:.525, feet:30};
 const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.032}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.047}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
@@ -1325,7 +1325,7 @@ const BEHAVIOR = {
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
   escape:1.5,          // a stressed aggressive animal tries the fence up to this much more
-  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 12 minutes a second, so this is 12 to 22 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
+  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 6 minutes a second, so this is 25 to 45 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
 };
 // Animal-on-animal attacks (behavior.js, "attacks"). Hurt animals get an injury (a.sick, kind "injury") that vets treat; a bad enough one kills.
