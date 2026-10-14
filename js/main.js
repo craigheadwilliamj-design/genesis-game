@@ -146,6 +146,17 @@ function pickBiome(e){
   state.biome = b.dataset.biome;
   biomeCards(e.currentTarget); render(); saveSoon();
 }
+// Click the version label 5 times in a row (each within 1.5 s of the last) to flip dev-mode.
+{ let n = 0, last = 0;
+  $("#verLabel").addEventListener("click", () => {
+    const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
+    if(n < 5) return;
+    n = 0;
+    const on = !devMode();
+    try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
+    ui.toast(on ? "Dev mode on." : "Dev mode off.");
+  });
+}
 $("#introBiomes").addEventListener("click", pickBiome);
 $("#menuBiomes").addEventListener("click", pickBiome);
 
