@@ -284,7 +284,7 @@ function render(){
   }
   // Genesis buildings get a narrow pale gravel strip so they stand off the grass; all strips go in one pass under the paths and every roof, so none paints over a neighbor
   for(const bl of state.buildings){
-    if(BUILDINGS[bl.type].prop || themeKey(bl) !== "genesis") continue;
+    if(BUILDINGS[bl.type].prop || bl.type === "platform" || themeKey(bl) !== "genesis") continue;   // a platform juts over the habitat, so no path-like gravel under it
     s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
   }
   // path surface doesn't show under a viewing platform's deck: mask the footprints out of the paths
