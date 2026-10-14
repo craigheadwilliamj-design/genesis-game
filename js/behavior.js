@@ -37,6 +37,7 @@ const matesWanted = s => { const t = traitsOf(s); return t.social === "solitary"
 // How awake it is at this time of day, 0 to 1
 function awake(s, min = state.minute){
   const h = min / 60, a = traitsOf(s).active;
+  if(isNight(min) && a !== "nocturnal") return a === "diurnal" ? .2 : .3;   // the park is shut: day animals sleep
   if(a === "nocturnal") return h < 9 || h >= 18.5 ? .7 : .2;
   if(a === "crepuscular") return h < 10 || h >= 18 ? 1 : .45;
   // diurnal: a nap in the heat of a hot afternoon
@@ -231,7 +232,7 @@ function behaviorCtx(e){
     cover:!!e.viv || land.some(t => t.slots || t.cover || t.flora),
     water:!!e.viv || waterOf(e).length > 0 || (BIOMES[biomeOf(e)].wet || 0) > 0,
     browse:!e.viv && browseRate(e, "plants") + browseRate(e, "paleoflora") > 0,
-    seen:isReachable(e) && typeof parties !== "undefined" ? clamp(parties.length / BEHAVIOR.busyAt, 0, 1) : 0,
+    seen:guestsSeen(e) * (1 - SCREEN.cut * screenShare(e)),   // how much of a crowd the animals feel: quiet signs hush the guests near them, screens block the view
     enrich:enrichment(e), x:exposure(e), dirt:e.dirt || 0, free:freeFeeding(), comfort:new Map(),
   };
   ctx.soc = socialInfo(e, ctx.ratio);
@@ -264,10 +265,10 @@ function stressTarget(e, a, s, ctx, why){
   { const [v, text] = socialStress(a, ctx.soc.get(s.id)); add(v, text); }
   if(T.social === "herd") { if(c >= lo) t -= 5; else add(15, "its herd is too small to feel safe"); }
   if(T.social === "pack" && c < lo && !ctx.soc.has(s.id)) add(10, "its pack is too small");   // an open exhibit's pack is handled by socialStress
-  add(ctx.x * 25, "it's out in the weather");
+  if(!a.inside) add(ctx.x * 25, "it's out in the weather");
   if(ctx.dirt > CLEAN.penaltyFrom) add((ctx.dirt - CLEAN.penaltyFrom) * .5, "the exhibit is dirty");
   if(a.sick && !a.sick.chronic) add(12, "it's sick or hurt");
-  if(T.temper === "skittish") add(BEHAVIOR.shyGuests * ctx.seen * (ctx.cover ? .5 : 1), ctx.cover ? "guests crowd the fence" : "guests crowd the fence and there's no cover to retreat to");
+  if(T.temper === "skittish" && !a.inside) add(BEHAVIOR.shyGuests * ctx.seen * (ctx.cover ? .5 : 1), ctx.cover ? "guests crowd the fence" : "guests crowd the fence and there's no cover to retreat to");
   if(n.hunger > 70) add((n.hunger - 70) * .6, "it's hungry");
   if(n.thirst > 70) add((n.thirst - 70) * .6, "it's thirsty");
   if(n.lonely > 60) add((n.lonely - 60) * .3, "it's lonely");
@@ -345,7 +346,7 @@ function needsStep(e, a, s, ctx, dt){
     case "patrol": n.bored -= B.patrol * dt; break;
     case "pace": n.bored -= B.pace * dt; n.stress += .05 * dt; break;
     case "rest": n.discomfort -= .1 * dt; n.stress -= .1 * dt; break;
-    case "hide": n.stress -= B.hideCalm * dt * (ctx.cover ? 1 : .33); break;
+    case "hide": n.stress -= B.hideCalm * dt * (ctx.cover ? 1 : .33) * (a.inside ? SHELTER.hideCalm : 1); break;
   }
   n.stress += (stressTarget(e, a, s, ctx) - n.stress) * Math.min(1, dt / B.stressDrift);
   n.discomfort += (100 * (1 - comfortOf(e, s, ctx)) * .8 - n.discomfort) * Math.min(1, dt / B.comfortDrift);
@@ -357,15 +358,19 @@ function behaviorTick(dtMin){
   behaveAcc += dtMin;
   while(behaveAcc >= BEHAVIOR.step){
     behaveAcc -= BEHAVIOR.step;
+    shelterSweep();
     for(const e of state.exhibits){
       if(!e.animals.length) continue;
       const ctx = behaviorCtx(e);
+      ctx.load = shelterLoad(e);
       for(const a of e.animals){
         const s = SPECIES_BY_ID[a.sp]; if(!s) continue;
         needsStep(e, a, s, ctx, BEHAVIOR.step);
-        const next = pickAct(e, a, s, ctx);
+        const next = shelterStep(e, a, s, ctx, pickAct(e, a, s, ctx));
         if(next !== a.act){ a.act = next; a.actFor = 0; } else a.actFor = (a.actFor || 0) + BEHAVIOR.step;
       }
+      const vis = visibleShare(e), prev = hideAvg.has(e.id) ? hideAvg.get(e.id) : vis;
+      hideAvg.set(e.id, prev + (vis - prev) * Math.min(1, BEHAVIOR.step / HIDING.window));
       attackStep(e, ctx);
     }
   }
@@ -399,13 +404,14 @@ function behaviorNight(){
       n.thirst = Math.max(15, thirstFloor(s, ctx));
       n.bored = 20; n.stress *= .5; n.discomfort *= .7;
       for(const k of NEED_KEYS) n[k] = Math.round(n[k]);
-      a.act = "rest"; a.actFor = 0; a.why = null;
+      a.act = "rest"; a.actFor = 0; a.why = null; a.inside = null;
     }
   }
+  shelterRun.clear(); hideAvg.clear();   // a new day: everyone is out and about again
 }
 
 /* ---------- what it means for the park ---------- */
-const actLabel = a => a.act && ACTS[a.act] ? ACTS[a.act].label : "Settling in";
+const actLabel = a => a.inside ? insideText(a) : a.act && ACTS[a.act] ? ACTS[a.act].label : "Settling in";
 const whyText = {bored:"bored", stressed:"stressed", lonely:"lonely", hungry:"hungry", thirsty:"thirsty"};
 const WHY_FIX = {
   bored:"Enrichment props (Habitat Props, or Enrichment for a vivarium), rocks, plants and more room give them something to do.",
@@ -429,6 +435,10 @@ function behaviorScore(e){
     const top = Object.keys(why).sort((x, y) => why[y] - why[x])[0];
     out.issues.push({bad:true, text:`Pacing. ${pacing.length} ${names(pacing)} ${pacing.length === 1 ? "is" : "are"} pacing, mostly because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[top]}. ${WHY_FIX[top]}`});
   }
+  const inside = list.filter(a => a.inside);
+  if(inside.length) out.issues.push({bad:false, text:`${inside.length} ${names(inside)} ${inside.length === 1 ? "is" : "are"} inside a shelter (${[...new Set(inside.map(insideText))].join(", ").toLowerCase()}). Guests can't see ${inside.length === 1 ? "it" : "them"}.`});
+  const gone = 1 - hideAvgOf(e);
+  if(gone > HIDING.from) out.issues.push({bad:true, text:`${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests are let down by an exhibit with nothing to see.`});
   if(hiding.length) out.issues.push({bad:true, text:`Hiding. ${hiding.length} ${names(hiding)} ${hiding.length === 1 ? "is" : "are"} hiding. Something here frightens ${hiding.length === 1 ? "it" : "them"}. See Behavior.`});
   if(stress >= 50 && !hiding.length && !pacing.length) out.issues.push({bad:true, text:`Stressed (${Math.round(stress)}%). See Behavior.`});
   for(const i of socialInfo(e).values()){ out.delta += i.delta * i.n / list.length; out.issues.push({bad:i.bad, text:`Social. ${i.text}`}); }
@@ -448,6 +458,114 @@ const stressEscape = a => a && a.need && traitsOf(SPECIES_BY_ID[a.sp]).temper ==
 function actsSummary(list){
   const c = {}; for(const a of list){ const k = actLabel(a).toLowerCase(); c[k] = (c[k] || 0) + 1; }
   return Object.entries(c).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n} ${k}`).join(", ");
+}
+
+/* ---------- going inside ---------- */
+// Animals walk into a shelter (a LAND item with slots) to hide, sleep or wait out bad weather, and come out when the reason ends. Inside, they aren't drawn (map.js)
+// and guests can't see them. Nothing here is saved: shelterRun is rebuilt as the day goes (a.inside is cleared on load and every night).
+//   shelterRun  animal id -> {f: the shelter, why: "hide" | "sleep" | "weather", in: is it inside yet, since: park minutes spent walking there, take: slots it uses}
+//   hideAvg     exhibit id -> the share of its animals guests could see, averaged over HIDING.window
+const shelterRun = new Map(), hideAvg = new Map();
+const isNight = (min = state.minute) => min < OPEN_MIN || min >= CLOSE_MIN;
+const insideText = a => { const w = a.inside, t = SHELTER.text[w]; return typeof t === "string" ? t : t ? t[state.weather && t[state.weather.today] ? state.weather.today : "storm"] : "Inside"; };
+const shelterFits = (t, s) => !!t.slots && (t.only ? t.only.includes(s.id) : (t.fits || 99) >= coverSlots(s));
+const shelterTake = (t, s) => Math.min(coverSlots(s), t.slots);
+// Slots taken in each of an exhibit's shelters right now
+function shelterLoad(e){
+  const m = new Map();
+  for(const a of e.animals){ const r = shelterRun.get(a.id); if(r) m.set(r.f, (m.get(r.f) || 0) + r.take); }
+  return m;
+}
+// Forget animals that are gone (sold, moved, died)
+function shelterSweep(){
+  if(!shelterRun.size) return;
+  const alive = new Set(); for(const e of state.exhibits) for(const a of e.animals) alive.add(a.id);
+  for(const id of shelterRun.keys()) if(!alive.has(id)) shelterRun.delete(id);
+}
+// Why this animal wants to be indoors right now, given the act it just picked: "hide" (frightened), "weather" (storm, heat wave or cold snap; a share of them each day), "sleep" (resting while drowsy, or on a nap), or null
+function shelterWhy(a, s, act, n){
+  if(act === "hide") return "hide";
+  const wk = state.weather ? state.weather.today : "fair", W = WEATHER.kinds[wk];
+  if(W.happy && !(wk === "cold" && COLD_HARDY.includes(s.id)) && n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && napRoll(a, 7, true) < (SHELTER.weather[wk] ?? 1)) return "weather";
+  if(act === "rest" && (a.napFor || awake(s) <= SHELTER.sleepBelow)) return "sleep";
+  return null;
+}
+const nearShelter = (h, f) => Math.hypot(h.x - f.x, h.y - f.y) <= LAND[f.type].r * (f.k || 1) + (h.r || 1) + .6;
+function shelterIn(a, run){ run.in = true; a.inside = run.why; }
+function shelterOut(a, ctx){
+  const run = shelterRun.get(a.id);
+  if(run && ctx && ctx.load) ctx.load.set(run.f, Math.max(0, (ctx.load.get(run.f) || 0) - run.take));
+  shelterRun.delete(a.id); a.inside = null;
+  const h = bodyPos(a); if(h){ h.path = null; h.wait = Math.random() * 1.5; }
+}
+// Has a walking animal reached its shelter? (checked every behavior step, and every frame by map.js)
+function shelterArrive(a, run){
+  if(run.in) return;
+  const h = bodyPos(a);
+  if(!h || run.since >= SHELTER.giveUp || nearShelter(h, run.f)) shelterIn(a, run);
+}
+// Every behavior step, after the act is picked: go in, stay in, come out, or stay outside because every shelter is full. Returns the act to take.
+function shelterStep(e, a, s, ctx, act){
+  if(e.viv){ a.inside = null; return act; }
+  let run = shelterRun.get(a.id);
+  if(run && !landOf(e).includes(run.f)){ shelterOut(a, ctx); run = null; }   // bulldozed, or moved to another exhibit
+  if(!run && a.inside) a.inside = null;
+  const why = shelterWhy(a, s, act, needsOf(a));
+  if(why === "weather" && act !== "rest") act = "rest";
+  if(!why){ if(run) shelterOut(a, ctx); return act; }
+  if(run){ run.why = why; if(run.in) a.inside = why; else { run.since += BEHAVIOR.step; shelterArrive(a, run); } return act; }
+  // look for the nearest shelter with room that suits it (not a canopy in a cold snap, nothing too small, a burrow only for burrowers)
+  const wk = state.weather ? state.weather.today : "fair", h = bodyPos(a), from = h ? [h.x, h.y] : centroid(e.points);
+  let best = null, bd = Infinity;
+  for(const f of landOf(e)){
+    const t = LAND[f.type]; if(!t || !shelterFits(t, s) || (why === "weather" && wk === "cold" && t.noCold)) continue;
+    if((ctx.load.get(f) || 0) + shelterTake(t, s) > t.slots) continue;
+    const d = Math.hypot(f.x - from[0], f.y - from[1]); if(d < bd){ bd = d; best = f; }
+  }
+  if(!best) return act;   // every shelter is full: it stays outside and takes the usual penalties
+  run = {f:best, why, in:false, since:0, take:shelterTake(LAND[best.type], s)};
+  shelterRun.set(a.id, run); ctx.load.set(best, (ctx.load.get(best) || 0) + run.take);
+  if(h){ h.path = null; h.wait = 0; }   // head over now
+  shelterArrive(a, run);
+  return act;
+}
+
+/* ---------- what guests see ---------- */
+// Quiet signs by an exhibit's fence that work
+const quietSigns = e => state.buildings.filter(b => b.type === "quiet" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= QUIET.reach);
+// How much of a crowd the exhibit's animals feel, 0 to 1: the parties in the park, except that those within earshot of a quiet sign count less (rowdy ones barely)
+function guestsSeen(e){
+  if(!isReachable(e) || typeof parties === "undefined") return 0;
+  const signs = quietSigns(e).map(b => centroid(b.points));
+  let n = 0;
+  for(const p of parties) n += signs.length && p.at && signs.some(c => Math.hypot(c[0] - p.at.x, c[1] - p.at.y) <= QUIET.hear) ? 1 - QUIET.cut * (p.rowdy ? QUIET.rowdy : 1) : 1;
+  return clamp(n / BEHAVIOR.busyAt, 0, 1);
+}
+// The share of an open exhibit's animals that privacy screens shield from the path: each screen looks after SCREEN.holds of them
+function screenShare(e){
+  if(e.viv || !e.animals.length) return 0;
+  return clamp(landOf(e).filter(f => LAND[f.type] && LAND[f.type].screen).length * SCREEN.holds / e.animals.length, 0, 1);
+}
+// How far out of sight one animal is, 0 in plain view to 1 gone. Sleeping inside at night doesn't count.
+function unseenWeight(a){
+  const w = a.inside; if(!w) return 0;
+  return w === "sleep" && isNight() ? 0 : HIDING.weights[w] ?? 1;
+}
+// The share of an exhibit's animals guests can see right now, 0 to 1 (animals behind a screen count a little short, since only part of them shows)
+function visibleShare(e){
+  if(e.viv || !e.animals.length) return 1;
+  let miss = 0, out = 0;
+  for(const a of e.animals){ miss += unseenWeight(a); if(!a.inside) out++; }
+  miss += out * HIDING.weights.screen * screenShare(e);
+  return clamp(1 - miss / e.animals.length, 0, 1);
+}
+const hideAvgOf = e => hideAvg.has(e.id) ? hideAvg.get(e.id) : visibleShare(e);
+// How much hiding animals let a party down at this exhibit, 0 to 1. Guests who have learned a lot forgive it, and personalities differ (hideTol).
+function hideBother(p, e){
+  const gone = 1 - hideAvgOf(e);
+  if(gone <= HIDING.from) return 0;
+  const learned = 1 - HIDING.eduCut * Math.min(1, (p.edu || 0) / HIDING.eduFull);
+  return clamp((gone - HIDING.from) / (1 - HIDING.from), 0, 1) * learned / pm(p, "hideTol");
 }
 
 /* ---------- attacks ---------- */
@@ -510,7 +628,7 @@ function attackStep(e, ctx){
       const me = bodyPos(a);
       let prey = null, bd = Infinity;
       for(const v of list){
-        if(v === a || v.darted || !attackReason(s, SPECIES_BY_ID[v.sp])) continue;
+        if(v === a || v.darted || v.inside || !attackReason(s, SPECIES_BY_ID[v.sp])) continue;
         const p = bodyPos(v), d = me && p ? Math.hypot(p.x - me.x, p.y - me.y) - (me.r || 1) - (p.r || 1) : 0;
         if(d < bd){ bd = d; prey = v; }
       }
@@ -525,7 +643,7 @@ function attackStep(e, ctx){
     if(n.stress < over || (!agg && ctx.ratio >= 1)) continue;
     const p = A.fightRate * fightBias(a) * clamp((n.stress - over + 10) / 40, 0, 1) * (ctx.ratio < 1 ? A.crowded : 1);
     if(Math.random() >= p) continue;
-    const others = list.filter(v => v !== a && !v.darted);
+    const others = list.filter(v => v !== a && !v.darted && !v.inside);
     if(!others.length) continue;
     a.hitAt = now;
     hurtAnimal(e, others[Math.floor(Math.random() * others.length)], s.name, "fight", A.fightHurt, 0);
@@ -555,7 +673,7 @@ function looseAttacks(dtMin){
     const at = loosePos(l); if(!at) continue;
     for(const e of state.exhibits){
       if(e.viv || e.animals.length < 1 || !canGetIn(e, s) || distToPoly(at[0], at[1], e.points) > A.reach) continue;
-      const prey = e.animals.filter(v => !v.darted && attackReason(s, SPECIES_BY_ID[v.sp]));
+      const prey = e.animals.filter(v => !v.darted && !v.inside && attackReason(s, SPECIES_BY_ID[v.sp]));
       if(!prey.length || Math.random() >= 1 - Math.pow(1 - A.looseRate, dtMin)) continue;
       l.biteAt = now;
       hurtAnimal(e, prey[Math.floor(Math.random() * prey.length)], s.name, "loose", A.bite, A.kill);

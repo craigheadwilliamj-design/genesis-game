@@ -450,6 +450,7 @@ const BUILDINGS = {
   donate:    {label:"Donation box", one:"a donation box", glyph:"", color:"#2F6B4A", price:350, upkeep:2, w:1.4, d:1.4, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
+  quiet:     {label:"Quiet sign",  one:"a quiet sign",  glyph:"",  color:"#3E7C8C", price:200,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
   lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
   resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
@@ -512,7 +513,8 @@ const GUEST = {
              food, shop, museum (will buy), donate, learn, infra (mood lost to needs, litter, crowds),
              ticket (how dear a ticket can be before they grumble), price (price sensitivity), patience,
              walk (mood lost to being on their feet), decor, broken, toilet (filthy restrooms), litter,
-             flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build)
+             flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build),
+             hideTol (how well they take animals hiding indoors: it divides the let-down, so higher is more forgiving)
      n       numbers its exhibit tastes and reactions use (see personas.js)
    --------------------------------------------------------------------- */
 const PERS = {
@@ -531,15 +533,15 @@ const PERSONALITIES = {
     n:{danger:7, active:4, platform:3, tame:3, slow:2, tasteDanger:1.5, tasteActive:.5, tasteTame:.5, center:1, spectacle:1.6}},
   conserv:{label:"Conservationist", color:"#3E9B4F", weight:.12,
     text:"Cares how the animals are treated: roomy, well-kept exhibits, rare species, research and education. Gives to conservation. Hates a park that feels like pure entertainment.",
-    fx:{donate:3, learn:1.3, shop:.9},
+    fx:{donate:3, learn:1.3, shop:.9, hideTol:2},
     n:{well:5, poor:8, rare:5, stress:4, showy:6, showyBelow:15, tasteWelfare:.8, tasteRare:.5, center:1.8}},
   paleo:{label:"Paleo-Nerd", color:"#8A5CC2", weight:.14,
     text:"Wants variety and accuracy: many species across the eras, complete genomes, signs and museum shows. Bored by repeats and by low-genome clones.",
-    fx:{learn:1.4, museum:1.4, food:.9},
+    fx:{learn:1.4, museum:1.4, food:.9, hideTol:2.5},
     n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
   family:{label:"Family Focused", color:"#2F86C8", weight:.26,
     text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
-    fx:{infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, need:{energy:1.25, bladder:1.15}},
+    fx:{infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
     n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
   fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
     text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
@@ -676,6 +678,7 @@ const THOUGHTS = {
   scary:      {text:"That was far too scary for the kids."},
   gory:       {text:"We watched an animal hunting. Not for kids."},
   ejected:    {text:"Security threw us out!"},
+  hiding:     {text:"Where are the animals? They're all hiding."},
 };
 
 // Each vivarium size is also a building you can place
@@ -1236,6 +1239,8 @@ const LAND = {
   cavelg: {label:"Large Cave",     one:"a large cave",      price:8500, r:6, color:"#5B5750", slots:40, fits:12, look:"cave"},
   canopysm:{label:"Small Canopy",  one:"a small canopy",    price:1400, r:3, color:"#B9A77E", slots:8, fits:8,  look:"canopy", noCold:true},
   canopylg:{label:"Large Canopy",  one:"a large canopy",    price:4200, r:5, color:"#A8946A", slots:24, fits:19, look:"canopy", noCold:true},
+  // a privacy screen (screen): a reed panel near the fence that shields up to SCREEN.holds animals from the path's view. It calms shy animals without hiding them from guests.
+  screen: {label:"Privacy Screen", one:"a privacy screen", price:900, r:1.8, color:"#8C9A4B", screen:true},
   traysm: {label:"Small Food Tray",  one:"a small food tray",  price:400,  r:1.2, color:"#8A8F96", tray:12},
   traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
   traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
@@ -1340,6 +1345,30 @@ const BEHAVIOR = {
   nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 6 minutes a second, so this is 25 to 45 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
 };
+// Going inside (behavior.js, "going inside"). Animals walk into a shelter with room (LAND slots; a shelter holds animals up to its slots, each taking coverSlots) to hide, sleep or wait out bad weather, and aren't drawn or seen while in.
+const SHELTER = {
+  sleepBelow:.5,       // an animal this drowsy (awake() at or under it) that is resting goes in to sleep; so does a napper
+  needLine:70,         // hunger or thirst over this and a weather-sheltering animal comes out to eat or drink
+  giveUp:90,           // park minutes of walking before an animal that can't find its way to its shelter just goes in
+  weather:{storm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
+  hideCalm:1.5,        // hiding behind walls sheds stress this many times as fast as hiding in the open
+  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
+};
+// Guests who come to see animals that are all indoors are let down (seeExhibit in guests.js; hideBother in behavior.js)
+const HIDING = {
+  window:120,          // park minutes the share of animals in view is averaged over, so a quick scramble doesn't count
+  from:.4,             // guests only mind when more than this share of the animals are out of sight (averaged)
+  mood:10,             // mood a visit loses when nearly every animal is out of sight, at full bother
+  appeal:.5,           // and how much of the visit's pleasure in the exhibit goes
+  thought:.2,          // bother at which they say so
+  weights:{hide:1, sleep:.5, weather:.25, screen:.2},   // how far out of sight each kind counts: hiding fully, sleeping inside by day half (none at night), sheltering from weather a quarter, an outside animal behind a screen a fifth
+  eduCut:.8,           // a guest who has learned a lot (p.edu of eduFull or more) feels this much less of it
+  eduFull:40,
+};
+// Privacy screens (LAND `screen`): each shields this many animals from the path's view. It cuts the guest stress they take (ctx.seen) by `cut` for that share of the herd.
+const SCREEN = {holds:4, cut:.6, fenceReach:7};
+// Quiet signs (BUILDINGS.quiet): guests within `hear` of a working one, which stands within `reach` of an exhibit's fence, count `cut` less toward the crowd the exhibit's animals feel (rowdy parties only `rowdy` as much).
+const QUIET = {reach:20, hear:14, cut:.6, rowdy:.3};
 // Animal-on-animal attacks (behavior.js, "attacks"). Hurt animals get an injury (a.sick, kind "injury") that vets treat; a bad enough one kills.
 //   Loose predators strike animals in an exhibit they can get into (a breach, or a fence weaker than they are) from the fence line.
 //   A predator housed with prey stalks it (the hunt act) and strikes once it is close. Stressed aggressive (or crowded) animals fight each other.
