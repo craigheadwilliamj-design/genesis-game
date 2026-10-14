@@ -60,7 +60,7 @@ function fireScientist(kind){
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
 const researching = (kind, id) => state.science.projects.some(p => p.kind === kind && p.id === id);
-const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s));
+const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s) && speciesAvailable(s.id));
 const isUnlocked = id => state.science.unlocked.includes(id);
 
 // What unlocking an animal's genome costs in research points: its period's base plus a share of its price,
@@ -71,7 +71,7 @@ function unlockPoints(s){ return Math.max(4, Math.round((PERIOD_BY_ID[s.period].
 function projectInfo(kind, id){
   if(kind === "tech"){ const t = TECH.find(x => x.id === id); return t ? {label:t.label, points:t.points, needs:t.needs, done:hasTech(id)} : null; }
   if(kind === "refine"){ const era = ERA_OF[id]; return era ? {label:`${id} medicine`, points:REFINE_POINTS[era], needs:MED_TECH[era], done:hasTech("ref-" + id)} : null; }
-  if(kind === "species"){ const s = SPECIES_BY_ID[id]; return s && !isStarter(s) ? {label:s.name, points:unlockPoints(s), done:isUnlocked(id)} : null; }
+  if(kind === "species"){ const s = SPECIES_BY_ID[id]; return s && !isStarter(s) && speciesAvailable(id) ? {label:s.name, points:unlockPoints(s), done:isUnlocked(id)} : null; }
   return null;
 }
 const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);

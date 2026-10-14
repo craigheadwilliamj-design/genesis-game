@@ -147,7 +147,7 @@ function menuRow(it){
     return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.statues){
-    const keys = Object.keys(LAND).filter(k => LAND[k].statue), row = k => { const t = LAND[k], g = statueGrant(k);
+    const keys = Object.keys(LAND).filter(k => LAND[k].statue && (!LAND[k].sp || speciesAvailable(LAND[k].sp))), row = k => { const t = LAND[k], g = statueGrant(k);
       return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="" data-lock="${k}"${g ? ` title="${esc(statueHint(k))}"` : ""}>${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${t.free ? "" : ", grant"}</span></span></button>`; };
     const rows = `<p class="snote">Animals</p>${keys.filter(k => !LAND[k].initials).map(row).join("")}<p class="snote">People</p>${keys.filter(k => LAND[k].initials).map(row).join("")}`;
     return `<div class="sitem" data-open="statues"><button class="srow head" aria-expanded="false">${menuIcon("land-st-owen")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(keys)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
