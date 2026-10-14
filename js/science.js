@@ -172,10 +172,11 @@ function launchTrip(id, periodId){
 }
 
 // Add a DNA sample to the genome library. Returns how much the genome grew.
-function addSample(sp, gain, q){
+function addSample(sp, gain, q, cap = 100){
   const dna = state.science.dna;
   const d = dna[sp] || (dna[sp] = {genome:0, quality:0});
-  if(d.genome >= 100){ const before = d.quality; if(q > d.quality) d.quality = Math.min(q, d.quality + Math.max(1, Math.round((q - d.quality) * .5))); return {gain:0, better:d.quality - before}; }
+  // a finished genome is refined by every trip: about a third of the way to the best this place can give, at least a point
+  if(d.genome >= 100){ const before = d.quality; if(before < cap) d.quality = Math.min(cap, before + Math.max(1, Math.ceil((cap - before) * .3))); return {gain:0, better:d.quality - before}; }
   const g = Math.min(gain, 100 - d.genome);
   d.quality = Math.round((d.quality * d.genome + q * g) / (d.genome + g));
   d.genome = Math.min(100, Math.round(d.genome + g));
@@ -189,20 +190,20 @@ function tripReturns(t){
     logScience(msg, false); events.toast(msg, "bad"); return;
   }
   const q = Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality());
-  const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q);
+  const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q, bestQuality(t.period));
   const d = sc.dna[t.sp];
   if(g.event){
     const m = r.gain ? `GHOST recorded the ${g.name} (${q}% quality). ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
-                     : `GHOST brought back more of the ${g.name}. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than the record the lab already has."}`;
+                     : `GHOST brought back more of the ${g.name}. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "The record is already as good as this period gives."}`;
     logScience(m, true); events.toast(m, "good"); return;
   }
   let msg = r.gain ? `GHOST brought back ${g.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
-                   : `GHOST brought back more ${g.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than what the lab already has."}`;
+                   : `GHOST brought back more ${g.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "The record is already as good as this period gives."}`;
   // Sometimes the team turns up traces of another animal ORACLE has unlocked
   const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && isUnlocked(x.id) && !genomeDone(x.id));
   if(others.length && Math.random() < TRIP.bonus.chance){
     const o = others[Math.floor(Math.random() * others.length)];
-    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality()));
+    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality()), bestQuality(t.period));
     if(r2.gain) msg += ` They also found ${o.name} traces (+${Math.round(r2.gain)}%).`;
   }
   logScience(msg, true); events.toast(msg, "good");

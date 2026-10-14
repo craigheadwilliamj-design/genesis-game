@@ -2498,9 +2498,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech.push("ghostq1", "ghostq2");
     out.ghostCeilingIs100 = Object.keys(PERIOD_BY_ID).every(id => bestQuality(id) === 100) && Object.keys(MUSEUM_BY_ID).every(id => bestQuality(id) === 100);
     out.ghostFullUpgradesReach100 = run(per, old.id, 400) === 100;
-    sc.dna = {[old.id]:{genome:100, quality:99}}; addSample(old.id, 0, 100);
+    sc.dna = {[old.id]:{genome:100, quality:99}}; addSample(old.id, 0, 100, 100);
     out.ghostLastPointMoves = sc.dna[old.id].quality === 100;
-    sc.dna = {[old.id]:{genome:100, quality:50}}; addSample(old.id, 0, 51);
+    sc.dna = {[old.id]:{genome:100, quality:50}}; addSample(old.id, 0, 51, 51);
     out.ghostSmallStepMoves = sc.dna[old.id].quality === 51;
     window.logScience = keep.log; sc.dna = keep.dna; sc.tech = keep.tech; state.sandbox = keep.sb; events.toast = keep.toast;
     return out;

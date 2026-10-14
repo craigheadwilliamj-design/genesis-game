@@ -138,7 +138,7 @@ function ghostHtml(b){
   }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))} and bring back DNA of ${Math.min(100, p.quality[0] + ghostQuality())}–${bestQuality(p.id)}% quality. Bigger animals take more trips.</div>`;
-  h += `<div class="meta" style="margin-top:6px">Quality is how clean and whole the DNA is. Clones follow it. A finished genome keeps improving when a trip brings back a better sample, up to the best this period can give now: <b>${bestQuality(p.id)}%</b>.${bestQuality(p.id) < 100 ? " Research the Careful sampling and Cryo-preserved samples upgrades at ORACLE to raise that." : ""}</div>`;
+  h += `<div class="meta" style="margin-top:6px">Quality is how clean and whole the DNA is. Clones follow it. Once a genome is complete, every extra trip refines it toward the best this period can give now: <b>${bestQuality(p.id)}%</b>.${bestQuality(p.id) < 100 ? " Research the Careful sampling and Cryo-preserved samples upgrades at ORACLE to raise that." : ""}</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
