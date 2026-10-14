@@ -14,7 +14,7 @@ PAL = {
     "temperate": dict(base=(58, 116, 128), lite=(140, 196, 190), film=((140, 176, 90), .7), ripple=(180, 224, 224), glint=(232, 248, 244), silt=(92, 84, 52), twig=(88, 70, 44), calm=True),   # clear blue-green pond, kept clean: ripples and glints only
     "scrubland": dict(base=(108, 134, 124), lite=(190, 205, 180), film=((226, 224, 200), .8), ripple=(206, 210, 180), glint=(246, 244, 226), silt=(128, 104, 68), twig=(214, 208, 180), calm=True),   # brackish pool, salt film, pale salt dashes
     "desert":    dict(base=(46, 144, 150), lite=(130, 214, 200), film=((140, 176, 90), .7), ripple=(190, 240, 232), glint=(240, 252, 246), silt=(190, 160, 100), twig=(88, 70, 44), calm=True),   # clear turquoise oasis, kept clean: ripples and glints only
-    "grassland": dict(base=(70, 130, 128), lite=(150, 200, 180), film=((150, 160, 90), .6), ripple=(190, 232, 220), glint=(238, 250, 244), silt=(150, 118, 74), twig=(100, 78, 46), calm=True),   # clear green-teal river, kept clean: ripples and glints only, so it reads as water on the pale ground
+    "grassland": dict(base=(58, 118, 104), lite=(138, 190, 160), film=((150, 160, 90), .6), ripple=(190, 232, 220), glint=(238, 250, 244), silt=(150, 118, 74), twig=(100, 78, 46), calm=True),   # clear green-teal river, kept clean: ripples and glints only, so it reads as water on the pale ground
     "tropical":  dict(base=(16, 104, 100), lite=(70, 190, 170), film=((90, 150, 60), .7), ripple=(120, 235, 215), glint=(220, 255, 245), silt=(70, 50, 28), twig=(70, 50, 28), calm=True, wash=True),   # clear deep blue-green jungle pool, bright glints, kept clean
 }
 
