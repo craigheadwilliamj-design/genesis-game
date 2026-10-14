@@ -1870,7 +1870,7 @@ const STATUES = {
   cope:  {label:"E.D. Cope",    initials:"EDC", text:"Named over a thousand species, Dimetrodon among them, in the Bone Wars."},
 };
 // Species a non-dev player can see and get; everything else in SPECIES is hidden (saves that already own one keep it)
-const LAUNCH_ROSTER = ["arth","mega","pulm","dcau","comp","lyst","dryo","hyps","ovir","psit","coel","sile","orni","hete","mosc","scut","este","desm","scel","plat","gall","para","macr","aepy","mglo","pach","tric","trex","dipl","apat","mamm","smil","kele","icht","eryo","inos","diic","plhy","long","eryt","kent","cryo","allo","beel","simo","igua","velo","pter","paki","ambu","andr","chal","dgal","dodo","elas","prio","carc","spin","coty","dime"];
+const LAUNCH_ROSTER = ["arth","mega","pulm","dcau","comp","lyst","dryo","hyps","ovir","psit","coel","sile","orni","hete","mosc","scut","este","desm","scel","plat","gall","para","macr","aepy","mglo","pach","tric","trex","dipl","apat","mamm","smil","kele","icht","eryo","inos","diic","plhy","long","eryt","kent","cryo","allo","beel","simo","igua","velo","pter","paki","ambu","andr","chal","dgal","dodo","elas","prio","carc","spin","coty","dime","tikt"];
 const speciesAvailable = id => devMode() || LAUNCH_ROSTER.includes(id);
 const STATUE_PRICE = {animal:4000, person:7500};
 for(const [id, st] of Object.entries(STATUES)){
