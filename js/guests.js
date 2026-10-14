@@ -359,7 +359,7 @@ function reachDest(p){
   if(!b || !guestBuilding(b)){ p.dest = null; p.why = null; return; }
   if(!svcQ.has(id)) svcQ.set(id, {queue:[], busy:[]});
   svcQ.get(id).queue.push(p); p.in = id; p.waited = 0;
-  standNear(p, b.points);
+  standNear(p, b.points, null, b);
 }
 // Where a party wants to be beside its path node or stretch: across the whole width of the path while walking, at its spot when watching or waiting
 function partyOff(p){
@@ -418,9 +418,25 @@ function observeTick(p, now){
   if(e) observe(p, e);
   w.next = now + rand(...OBS.gap) / GUEST.pace;
 }
+// Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
+function standOk(x0, y0, x1, y1, skip){
+  const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
+  for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
+  for(const l of parkFences()) if(cross(l.points)) return false;
+  for(const p of state.paths){
+    if(!isService(p)) continue;
+    for(let i = 1; i < p.points.length; i++) if(segSegDist(A, B, p.points[i-1], p.points[i]) < SERVICE_ROAD.halfWidth + .3) return false;
+  }
+  for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
+  for(const b of state.buildings){
+    if(b === skip || BUILDINGS[b.type].prop) continue;
+    if(inPoly(x1, y1, b.points) || cross(b.points.concat([b.points[0]]))) return false;
+  }
+  return true;
+}
 // Where a party stands to watch or wait: a spot along a fence or wall (or on a viewing platform), as an offset from its path node.
 // Drawing only; it never changes where the party is on the map. Spots are picked along the whole stretch of fence in range, the nearer the likelier, so a crowd spreads out.
-function standNear(p, pts, e){
+function standNear(p, pts, e, bld){
   const n = p.at;
   if(!n || !pts) return;
   // a viewing platform on this exhibit within a short stroll: most would rather stand up there
@@ -433,9 +449,15 @@ function standNear(p, pts, e){
     }
     if(best){
       const P = best.points, u = .12 + Math.random() * .76, v = .12 + Math.random() * .76;
-      p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
-      if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
-      return;
+      const x = P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v, y = P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v;
+      // up the steps: the ground part of the walk, to where it meets the deck, must be clear
+      let t = 0;
+      while(t < 1 && !inPoly(n.x + (x - n.x) * t, n.y + (y - n.y) * t, P)) t += .02;
+      if(standOk(n.x, n.y, n.x + (x - n.x) * t, n.y + (y - n.y) * t, best)) p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
+      if(p.stand){
+        if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
+        return;
+      }
     }
   }
   const cand = [];
@@ -451,9 +473,14 @@ function standNear(p, pts, e){
       cand.push([x + nx * (.7 + Math.random() * .5), y + ny * (.7 + Math.random() * .5), 1 / (1 + d / SIGHT.standPull)]);
     }
   }
-  if(!cand.length) return;
-  let r = Math.random() * cand.reduce((s, c) => s + c[2], 0), c = cand[cand.length - 1];
-  for(const k of cand){ r -= k[2]; if(r <= 0){ c = k; break; } }
+  // pick by weight, and drop any spot they couldn't walk to without crossing a fence, a staff road or a building
+  let c = null;
+  for(let tries = 0; tries < 10 && cand.length && !c; tries++){
+    let r = Math.random() * cand.reduce((s, k) => s + k[2], 0), i = cand.length - 1;
+    for(let j = 0; j < cand.length; j++){ r -= cand[j][2]; if(r <= 0){ i = j; break; } }
+    if(standOk(n.x, n.y, cand[i][0], cand[i][1], bld)) c = cand[i]; else cand.splice(i, 1);
+  }
+  if(!c) return;
   p.stand = {dx:c[0] - n.x, dy:c[1] - n.y};
   if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);
 }
@@ -503,6 +530,9 @@ function walkParty(p, left){
       if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points, e); }
       return;
     }
+    // done watching or being served: walk back to the path the way they came before setting off along it
+    if(p.stand && !p.to){ p.stand = null; }
+    if(!p.to && Math.hypot(p.ox || 0, p.oy || 0) > 2.5) return;
     if(!p.to){ if(!headOut(p)) return; board(p); }
     const L = p.at.adj.get(p.to) || .01, rem = L * (1 - p.t);   // how far the edge feels: a ride is shorter than it looks, a platform wait longer
     if(left < rem){ p.t += left / L; return; }
