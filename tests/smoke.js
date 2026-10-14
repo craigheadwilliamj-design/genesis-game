@@ -1906,6 +1906,33 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       drawFx(performance.now() + FX_DUST.life + 50);
       out.dustPuff = shown && fl.childElementCount === 0 && fxList.length === 0 && JSON.stringify(state).length === before;
     }
+    {   // animal names: default tag + counter per species, migration, rename from the panel
+      const seqKeep = state.animalSeq, exKeep = state.exhibits;
+      state.animalSeq = {}; state.exhibits = [{id:"e-nm", name:"Name Test", points:[[0,0],[40,0],[40,40],[0,40]], animals:[], happy:70, cond:100}];
+      const e = state.exhibits[0], mk = id => nameAnimal({id, sp:"coty"});
+      const a1 = mk("a-n1"), a2 = mk("a-n2"), d1 = nameAnimal({id:"a-n3", sp:"coel"});
+      e.animals.push(a1, a2, d1);
+      out.animalDefaultNames = a1.name === "COTY-001" && a2.name === "COTY-002" && d1.name === "COEL-001" && state.animalSeq.coty === 2;
+      // numbers are never reused, even after one leaves
+      e.animals.splice(1, 1);
+      out.animalNamesNotReused = mk("a-n4").name === "COTY-003";
+      // an old save with unnamed animals (and no counter) gets names, and keeps counting after the highest one
+      const old = JSON.parse(JSON.stringify(state)); delete old.animalSeq;
+      old.exhibits[0].animals.forEach(a => { delete a.name; }); old.exhibits[0].animals.push({id:"a-n5", sp:"coty", name:"COTY-007"}, {id:"a-n6", sp:"coty"});
+      const up = upgradeSave(old);
+      out.animalMigration = up.exhibits[0].animals.every(a => /^[A-Z]+-\d{3}$/.test(a.name)) && new Set(up.exhibits[0].animals.map(a => a.name)).size === up.exhibits[0].animals.length && up.exhibits[0].animals.find(a => a.id === "a-n6").name === "COTY-009" && up.animalSeq.coty === 9;
+      // the panel: open, shows the name escaped, rename in place, blank keeps the old name
+      select("animal", a1.id); animalLive(true);
+      const inp = document.getElementById("aName");
+      out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
+      inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");
+      inp.value = "x".repeat(60); inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRenameMax = a1.name.length === 24;
+      inp.value = "   "; inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRenameBlank = a1.name === "x".repeat(24) && inp.value === a1.name;
+      select(null); state.animalSeq = seqKeep; state.exhibits = exKeep; syncAnimals();
+    }
     localStorage.removeItem("genesis-dev");
     return out;
   }));

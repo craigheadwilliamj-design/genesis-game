@@ -89,18 +89,19 @@ function step(now){
   drawParties();
   if(sel && sel.kind === "guest") guestLive();
   if(sel && sel.kind === "staff") staffLive();
+  if(sel && sel.kind === "animal") animalLive();
   drawTrams();
   drawKeepers();
   drawGates(now);
   drawWeather(now);
-  drawStaffRing();
+  drawStaffRing(); drawAnimalRing();
   drawLoose();
   drawFx(now);
   ui.hud();
   sinceDraw += dt; sincePanel += dt;
   if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }
   // refresh the side panel now and then, but not while the mouse is over it (so buttons don't jump)
-  if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
+  if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff" || sel.kind === "animal")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
 }
 
 /* ---------- saving ---------- */

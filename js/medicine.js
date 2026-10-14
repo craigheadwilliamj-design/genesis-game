@@ -257,7 +257,7 @@ function sendHome(a, homeId){
   delete a.darted;
   const e = state.exhibits.find(x => x.id === homeId);
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); }
-  else state.science.ready.push({id:a.id, sp:a.sp, q:a.q ?? 90});
+  else state.science.ready.push({id:a.id, name:a.name, sp:a.sp, q:a.q ?? 90});
 }
 // The PMC was bulldozed: patients go home as they are, and nobody is carried there any more
 function pmcRemoved(b){
@@ -533,7 +533,7 @@ function healthNight(){
       p.cured = true;
       const home = state.exhibits.find(x => x.id === p.home);
       if(home) state.staff.transfers.push({id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmcBuilding().id, to:home.id, med:true});
-      else { discharge(p.a.id); state.science.ready.push({id:p.a.id, sp:p.a.sp, q:p.a.q ?? 90}); }
+      else { discharge(p.a.id); state.science.ready.push({id:p.a.id, name:p.a.name, sp:p.a.sp, q:p.a.q ?? 90}); }
       events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in holding."}`, chronic ? "" : "good");
     }
   }

@@ -36,6 +36,7 @@ const ui = {
     else if(sel.kind === "fence") h = fenceLineHtml(it);
     else if(sel.kind === "guest") h = guestHtml(it);
     else if(sel.kind === "staff") h = staffHtml(it);
+    else if(sel.kind === "animal") h = animalHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
@@ -44,6 +45,7 @@ const ui = {
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
+    if(sel && sel.kind === "animal") animalLive(true);
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
   },
 
@@ -806,7 +808,7 @@ panelEl.addEventListener("click", e => {
     if(!canAfford(s.price) || state.rating + 1e-9 < starsNeed(s)) return;
     spend(s.price, "animals");
     if(!it.animals.length) it.happy = 70;
-    it.animals.push({id:uid("a-"), sp:s.id});
+    it.animals.push(nameAnimal({id:uid("a-"), sp:s.id}));
     afterChange(); render();
   }
   if(a === "sell"){

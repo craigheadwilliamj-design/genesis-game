@@ -92,6 +92,13 @@ function pickStarters(){
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
 // stars the park needs for an animal: none for the starting pool
 const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
+// A new animal's default name: its species tag and a 3-digit counter per species (never reused)
+function nameAnimal(a, st){
+  if(a.name) return a;
+  const seq = (st || state).animalSeq || ((st || state).animalSeq = {}), n = (seq[a.sp] || 0) + 1;
+  seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
+  return a;
+}
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
@@ -117,6 +124,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
+    animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:OPEN_MIN,
@@ -317,6 +325,11 @@ function upgradeSave(s){
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   // animals from before behavior get a fresh set of needs (behavior.js)
   for(const e of s.exhibits) for(const a of e.animals) if(!a.need) a.need = freshNeeds();
+  // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
+  if(!s.animalSeq) s.animalSeq = {};
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
+    for(const a of all) if(a.name) { const m = /^(.*)-(\d+)$/.exec(a.name); if(m && m[1] === a.sp.toUpperCase()) s.animalSeq[a.sp] = Math.max(s.animalSeq[a.sp] || 0, +m[2]); }
+    for(const a of all) if(!a.name) nameAnimal(a, s); }
   return s;
 }
 
