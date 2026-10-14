@@ -2319,6 +2319,69 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   checks.dateOldSaveLoads = cal.loads;
   checks.dateInHud = cal.hud;
 
+  // S12: every science job finishes exactly when its `end` passes, however long the step, across closing, and across a reload
+  const sci = await page.evaluate(() => {
+    const out = {}, H = Math.PI / 2;
+    const had = {money:state.money, day:state.day, minute:state.minute, over:state.over, sandbox:state.sandbox};
+    state.buildings = state.buildings.filter(b => !["oracle", "ghost", "tar", "ceres"].includes(b.type));
+    state.buildings.push({id:"s12-or", type:"oracle", points:rectPts(230, 262, 24, 16, H)}, {id:"s12-gh", type:"ghost", points:rectPts(180, 262, 28, 20, H)}, {id:"s12-ta", type:"tar", points:rectPts(230, 290, 26, 18, H)}, {id:"s12-ce", type:"ceres", points:rectPts(180, 290, 26, 18, H)});
+    state.paths.push({id:"s12-p0", name:"s", points:[[state.gate[0],state.gate[1]],[205,290],[205,262]]}, {id:"s12-p1", name:"s", points:[[205,262],[222,262]]}, {id:"s12-p2", name:"s", points:[[205,262],[193,262]]}, {id:"s12-p3", name:"s", points:[[205,290],[217,290]]}, {id:"s12-p4", name:"s", points:[[205,290],[193,290]]});
+    recompute(); buildKeeperGraph(); state.sandbox = false; state.over = false; state.money = 1e9;
+    const sc = () => state.science;
+    for(const k of ["paleo", "temporal", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
+    const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
+    // log the park minute each job actually finishes
+    const seen = {}, real = {fp:finishProject, tr:tripReturns, fc:finishClone, fb:finishBatch};
+    finishProject = p => { seen.proj = nowMin(); real.fp(p); }; tripReturns = t => { seen.trip = nowMin(); real.tr(t); };
+    finishClone = c => { seen.clone = nowMin(); real.fc(c); }; finishBatch = b => { seen.bed = nowMin(); real.fb(b); };
+    const era = Object.keys(CERES_GROW.medicine)[0];
+    const run = (startDay, startMinute, dts, reload) => {
+      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; s.ready = [];
+      for(const k of Object.keys(seen)) delete seen[k];
+      state.day = startDay; state.minute = startMinute; s.points = 1e6; s.tech = s.tech.filter(t => t !== "moat"); s.tech.push("medpaleo");
+      state.rating = 5; startProject("tech", "moat"); launchTrip(sp.id, sp.period); orderClone(sp.id, null); growBatch("med", era);
+      const jobs = {proj:sc().projects[0], trip:sc().trips[0], clone:sc().clones[0], bed:state.ceres.beds[0]};
+      if(Object.values(jobs).some(j => !j)) return null;
+      const ends = Object.fromEntries(Object.entries(jobs).map(([k, j]) => [k, j.end]));
+      const last = Math.max(...Object.values(ends)), t0 = nowMin();
+      let i = 0, reloaded = false;
+      while(nowMin() < last + 5 && i++ < 100000){
+        tick(dts[i % dts.length]);
+        if(reload && !reloaded && nowMin() - t0 > 100){ reloaded = true; state = upgradeSave(JSON.parse(JSON.stringify(state))); recompute(); buildKeeperGraph(); }
+      }
+      return Math.max(...Object.keys(ends).map(k => k in seen ? Math.abs(seen[k] - ends[k]) : 1e9));
+    };
+    let ok = true, why = "";
+    for(const [label, startMinute, dts, reload] of [["morning 1m", OPEN_MIN + 5, [1], false], ["morning 4.8m (4x)", OPEN_MIN + 5, [4.8], false], ["before close, 7m", CLOSE_MIN - 100, [7], false], ["3 minutes before close, 100m", CLOSE_MIN - 3, [100], false], ["a day at once", OPEN_MIN + 200, [720, 1500], false], ["uneven steps", OPEN_MIN + 301, [0.3, 11, 2.2, 58], false], ["reload mid-job", CLOSE_MIN - 50, [3.3], true]]){
+      const d = run(4, startMinute, dts, reload);
+      if(d === null || d > 1e-3){ ok = false; why += ` ${label}:${d}`; }
+    }
+    out.scienceFinishesAtEnd = ok; out.why = why;
+    // the end of a step at closing carries into the next morning
+    state.day = 9; state.minute = CLOSE_MIN - 3; sc().projects = []; sc().trips = []; sc().clones = []; state.ceres.beds = [];
+    tick(10);
+    out.closingKeepsOvershoot = state.day === 10 && Math.abs(state.minute - (OPEN_MIN + 7)) < 1e-6;
+    // general research earns the same points whatever the step
+    const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = OPEN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
+    const a = rate(1), b = rate(8), c = rate(240);
+    out.pointsIgnoreStepSize = Math.abs(a - b) < 1e-6 && Math.abs(a - c) < 1e-6 && a > 0;
+    // a clone waits (its clock held) while TAR has no geneticist, then finishes on schedule after one is hired
+    sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = OPEN_MIN + 20;
+    state.rating = 5; const why0 = cloneProblem(sp.id); orderClone(sp.id, null); if(!sc().clones[0]) return {why:"clone: " + why0 + " crew " + JSON.stringify(sc().crew) + " tar " + !!dept("tar")}; const cl = sc().clones[0], len = cl.end - cl.start, g = sc().crew.gene; sc().crew.gene = 0;
+    for(const k of Object.keys(seen)) delete seen[k];
+    tick(300); const held = sc().clones.length === 1 && Math.abs(cl.end - cl.start - len) < 1e-6;
+    sc().crew.gene = g; const e2 = cl.end; tick(len + 10);
+    out.cloneWaitsThenFinishes = held && Math.abs(seen.clone - e2) < 1e-3;
+    finishProject = real.fp; tripReturns = real.tr; finishClone = real.fc; finishBatch = real.fb;
+    state.money = had.money; state.over = had.over; state.sandbox = had.sandbox;
+    return out;
+  });
+  if(sci.why) console.log("S12 late jobs:" + sci.why);
+  checks.scienceFinishesAtEnd = sci.scienceFinishesAtEnd;
+  checks.closingKeepsOvershoot = sci.closingKeepsOvershoot;
+  checks.pointsIgnoreStepSize = sci.pointsIgnoreStepSize;
+  checks.cloneWaitsThenFinishes = sci.cloneWaitsThenFinishes;
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
