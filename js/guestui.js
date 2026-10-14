@@ -150,7 +150,7 @@ function hotelHtml(b){
   h += `<dl class="kv"><dt>Rooms</dt><dd>${t.rooms}, for ${LODGING.perRoom} guests each</dd><dt>Booked last night</dt><dd>${bk ? `${bk.rooms} room${bk.rooms === 1 ? "" : "s"}, ${money(bk.money || 0)}` : "Not open a night yet"}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= 50 ? "var(--bad)" : dirt >= LODGING.cleanAt ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
   h += `<div class="meta" style="margin-top:4px">Rooms get dirty every night they're used, and a dirty hotel books fewer rooms. ${state.staff.custodians.length ? "Custodians clean it during the day." : "Hire a custodian to clean it."}</div></section>`;
-  h += `<section><h3>Toiletries</h3>${stockRows(b)}<div class="meta" style="margin-top:6px">Each booked room uses ${LODGING.toiletries} units of merchandise. ${guestGoodsFree() ? `Suppliers bring them until day ${state.logi.guestFrom}.` : roomsStocked(b) < t.rooms ? "Running low: custodians restock it from the dock or a warehouse." : "Custodians keep it stocked."}</div></section>`;
+  h += `<section><h3>Toiletries</h3>${stockRows(b)}<div class="meta" style="margin-top:6px">Each booked room uses ${LODGING.toiletries} units of merchandise. ${guestGoodsFree() ? `Suppliers bring them until ${fmtDate(state.logi.guestFrom)}.` : roomsStocked(b) < t.rooms ? "Running low: custodians restock it from the dock or a warehouse." : "Custodians keep it stocked."}</div></section>`;
   h += `<div class="meta">Each night, some of the day's guests book a room, more at a higher-rated park. Next morning they start the day here, with no ticket to buy and more to spend.</div>`;
   return h;
 }
@@ -200,7 +200,7 @@ const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
 // What's on the shelves, and who fills them
 function vendorStockHtml(b){
   let h = `<section><h3>Stock</h3>${stockRows(b)}`;
-  if(guestGoodsFree()) h += `<div class="meta" style="margin-top:6px">Suppliers deliver straight to your stands and shops until day ${state.logi.guestFrom}. After that, they sell only what's on the shelves: the Delivery Dock orders stock, and custodians carry it here.</div>`;
+  if(guestGoodsFree()) h += `<div class="meta" style="margin-top:6px">Suppliers deliver straight to your stands and shops until ${fmtDate(state.logi.guestFrom)}. After that, they sell only what's on the shelves: the Delivery Dock orders stock, and custodians carry it here.</div>`;
   else h += `<div class="meta" style="margin-top:6px">${state.staff.custodians.length ? "Custodians restock it from the dock, a warehouse, or a cold store." : "Nobody is restocking it. Build a Custodial Closet and hire a custodian."} Each item uses as many units as it costs you in dollars.</div>`;
   return h + `</section>`;
 }

@@ -133,7 +133,7 @@ function ghostHtml(b){
     if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
     h += `<ul class="shop" style="margin-top:10px">${MUSEUM_EVENTS.map(ev => tripRow(ev.id, ev.id, `<span class="dot" style="background:#8A6D3B"></span>${esc(ev.name)} <span class="per">${esc(ev.ago)}</span>`)).join("")}</ul></div></section>`;
     if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
-    if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">Day ${l.day}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
+    if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
     return h;
   }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
@@ -144,7 +144,7 @@ function ghostHtml(b){
   for(const f of plantsIn(p.id)) h += tripRow(f.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${esc(f.name)} <span class="per">plants</span>`);
   h += `</ul></div></section>`;
   if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
-  if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">Day ${l.day}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
+  if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
   return h;
 }
 

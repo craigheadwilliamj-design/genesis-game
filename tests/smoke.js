@@ -2306,6 +2306,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   checks.focusModeHides = fm.hidden;
   checks.focusModeRestores = fm.back;
 
+  const cal = await page.evaluate(() => {
+    const f = fmtDate, dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length, yr = dpm * mpy;
+    const old = JSON.parse(JSON.stringify(state)); delete old.calendar;
+    let loads = true; try{ upgradeSave(old); }catch{ loads = false; }
+    return {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
+  });
+  checks.dateFirstDay = cal.first === "1 Jan Y1";
+  checks.dateMonthRollover = cal.eom === "30 Jan Y1" && cal.next === "1 Feb Y1";
+  checks.dateYearRollover = cal.eoy === "30 Dec Y1" && cal.ny === "1 Jan Y2" && cal.y3 === "1 Jan Y3";
+  checks.dateBadDay = cal.zero === "1 Jan Y1";
+  checks.dateOldSaveLoads = cal.loads;
+  checks.dateInHud = cal.hud;
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
