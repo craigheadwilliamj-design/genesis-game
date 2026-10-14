@@ -2453,7 +2453,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
-    const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed"];
+    const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"];
     out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
@@ -2549,6 +2549,110 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   });
   Object.assign(checks, gq);
+
+  // shelters: animals walk into a shelter in a storm, at night, and when frightened; shelters hold only so many; they aren't drawn or tappable inside;
+  // hiding animals let guests down (educated and paleo-nerd guests less); privacy screens and quiet signs cut the crowd the animals feel
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    state.money = 1e9; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
+    state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    const sp = SPECIES.filter(s => !s.viv && !COLD_HARDY.includes(s.id) && traitsOf(s).active === "diurnal" && traitsOf(s).temper === "skittish").sort((x, y) => coverSlots(x) - coverSlots(y))[0], cap = Math.floor(LAND.shelter.slots / coverSlots(sp));
+    const e = {id:"e-sh", name:"Shy", points:[[104,124],[180,124],[180,231],[104,231]], animals:Array.from({length:12}, (_, i) => ({id:"sh" + i, sp:sp.id})), happy:80, cond:100, stock:{}, land:[]};
+    state.exhibits.push(e);
+    const barn = {id:"l-b", type:"shelter", x:142, y:178}; e.land.push(barn);
+    afterChange(); syncAnimals(); resetParties();
+    const place = (list, x, y) => list.forEach(a => { const h = herd.get(a.id); h.x = x; h.y = y; h.placed = true; });
+    const reset = () => { shelterRun.clear(); hideAvg.clear(); for(const a of e.animals){ a.inside = null; a.act = "forage"; a.actFor = 99; a.napFor = 0; a.napDay = -1; a.need = freshNeeds(); } };
+    const inside = () => e.animals.filter(a => a.inside), step = () => { behaviorTick(BEHAVIOR.step); animateAnimals(.016); };
+    const wx = (w, m) => { state.weather = {today:w, next:"fair", from:999}; state.minute = m; };
+
+    // a storm sends them in, up to the room the shelter has (a small barn holds 10 slots, and each of these takes a few)
+    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 142, 178);
+    const probe = e.animals[0], hp = herd.get(probe.id), ab = animalBox(hp);
+    const tap = () => { const r = svg.getBoundingClientRect(); return animalAt(r.left + view.tx + hp.x * view.k, r.top + view.ty + hp.y * ky() + ab.oy * view.k); };
+    const before = tap();
+    step();
+    const ins = inside();
+    out.stormSendsAnimalsIn = ins.length > 0 && ins.every(a => a.inside === "weather") && /storm/i.test(actLabel(ins[0]));
+    out.shelterCapacityRespected = ins.length === cap && e.animals.length - ins.length === 12 - cap && e.animals.filter(a => !a.inside).every(a => !shelterRun.has(a.id));
+    const gone = ins[0], gh = herd.get(gone.id), shown = e.animals.find(a => !a.inside), sh = herd.get(shown.id);
+    out.insideNotDrawn = gh.el.style.display === "none" && sh.el.style.display !== "none";
+    place(e.animals.filter(a => !a.inside), 110, 130);
+    out.insideNotTappable = before !== null && (() => { const r = svg.getBoundingClientRect(), b = animalBox(gh); return animalAt(r.left + view.tx + gh.x * view.k, r.top + view.ty + gh.y * ky() + b.oy * view.k) === null; })();
+    // the animal panel still opens from the Animals tab, and says where it is
+    select("animal", gone.id); out.panelOpensForInsideAnimal = !!selItem() && selItem().id === gone.id && /storm/i.test(actLabel(gone)); select(null);
+    // the exhibit report says so
+    out.reportSaysSheltering = exhibitReport(e).issues.some(i => /inside a shelter/.test(i.text));
+    // fair weather brings them out again
+    wx("fair", OPEN_MIN + 140); step(); step(); animateAnimals(.016);
+    out.fairWeatherBringsOut = inside().length === 0 && gh.el.style.display !== "none";
+    // a bulldozed shelter lets them out
+    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 142, 178); step(); const was = inside().length;
+    e.land = e.land.filter(f => f !== barn); step(); out.bulldozedShelterReleases = was > 0 && inside().length === 0; e.land.push(barn);
+    // a hot day and a cold snap too, but not a canopy in the cold
+    reset(); wx("hot", OPEN_MIN + 120); place(e.animals, 142, 178); step(); out.heatSendsIn = inside().length > 0 && /heat/i.test(actLabel(inside()[0]));
+    e.land = [{id:"l-c", type:"canopysm", x:142, y:178}]; reset(); wx("cold", OPEN_MIN + 120); place(e.animals, 142, 178); step(); out.coldSkipsCanopy = inside().length === 0;
+    reset(); wx("hot", OPEN_MIN + 120); step(); out.heatUsesCanopy = inside().length > 0; e.land = [barn];
+
+    // asleep at night
+    reset(); wx("fair", 23 * 60); place(e.animals, 142, 178); step();
+    out.nightSleepsInside = inside().length === cap && inside().every(a => a.inside === "sleep") && /sleeping inside/i.test(actLabel(inside()[0]));
+    wx("fair", OPEN_MIN + 120); step(); step(); out.wakesAndComesOut = inside().length === 0;
+    // a nap
+    reset(); wx("fair", 13 * 60); place(e.animals, 142, 178); e.animals.forEach(a => { a.act = "rest"; a.actFor = 0; a.napFor = 200; }); step(); out.napGoesInside = inside().length > 0 && inside().every(a => a.inside === "sleep");
+    // frightened ones hide inside, and come out calm
+    reset(); wx("fair", OPEN_MIN + 120); place(e.animals, 142, 178); const shy = e.animals[0]; shy.need.stress = 95; step();
+    out.frightenedHideInside = shy.inside === "hide" && actLabel(shy) === "Hiding inside";
+    shy.need.stress = 2; for(let i = 0; i < 12; i++){ shy.need.stress = 2; step(); } out.calmComesOut = !shy.inside;
+    // far from the shelter it has to walk first; it goes in on arrival
+    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 110, 130); step();
+    const walkers = e.animals.filter(a => shelterRun.has(a.id) && !shelterRun.get(a.id).in);
+    place(walkers, 142, 178); animateAnimals(.016);
+    out.walksThenEnters = walkers.length > 0 && inside().length === cap && e.animals.every(a => !shelterRun.has(a.id) || shelterRun.get(a.id).in || !a.inside);
+    // not saved
+    const snap = JSON.parse(JSON.stringify(state)); upgradeSave(snap); out.insideNotKept = snap.exhibits.find(x => x.id === "e-sh").animals.every(a => !("inside" in a));
+
+    // guests: animals that hide let a visit down; sleeping at night doesn't count, and sheltering from weather counts little
+    reset(); wx("fair", OPEN_MIN + 120);
+    const w = k => { e.animals.forEach(a => a.inside = null); e.animals.slice(0, 8).forEach(a => a.inside = k); return visibleShare(e); };
+    const vh = w("hide"), vw = w("weather"), vs = w("sleep"); state.minute = 23 * 60; const vn = w("sleep"); state.minute = OPEN_MIN + 120;
+    out.hidingCountsMost = vh < vs && vs < vw && vw < 1 && vn === 1;
+    e.animals.forEach(a => a.inside = null);
+    const mkP = (pers, edu) => { const p = newParty(2); p.pers = pers; p.edu = edu || 0; delete p.fxc; p.mood = 60; p.seen = new Set(); p.thought = new Set(); return p; };
+    const visit = (p, avg) => { hideAvg.set(e.id, avg); const m0 = p.mood; seeExhibit(p, e); return p.mood - m0; };
+    const ok1 = visit(mkP(["neutral", "neutral"]), 1), bad = mkP(["neutral", "neutral"]), lo = visit(bad, .2);
+    out.hidingLowersMood = lo < ok1 - 3 && bad.thought.has("hiding") && THOUGHTS.hiding && /animals/i.test(THOUGHTS.hiding.text);
+    const fine = mkP(["neutral", "neutral"]), loFine = visit(fine, .8);
+    out.hidingToleratedWhenFew = Math.abs(loFine - ok1) < 1e-9 && !fine.thought.has("hiding");
+    const learned = visit(mkP(["neutral", "neutral"], 40), .2), half = visit(mkP(["neutral", "neutral"], 20), .2);
+    out.educatedPenalisedLess = learned > lo + 3 && learned > half && half > lo;
+    const bo = pers => { hideAvg.set(e.id, .2); return hideBother(mkP(pers), e); };
+    out.paleoAndConservLeastBothered = bo(["paleo", "neutral"]) < bo(["neutral", "neutral"]) && bo(["conserv", "neutral"]) < bo(["neutral", "neutral"]) && bo(["family", "neutral"]) > bo(["neutral", "neutral"]) && bo(["paleo", "neutral"]) <= bo(["conserv", "neutral"]);
+    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals are hiding\. Add quiet signs or give shy animals more places to hide/.test(i.text)) && /Add quiet signs/.test(behaviorHtml(e));
+    hideAvg.set(e.id, 1); out.noHintWhenVisible = !exhibitReport(e).issues.some(i => /animals are hiding/.test(i.text));
+
+    // privacy screens and quiet signs cut the crowd the animals feel (ctx.seen)
+    hideAvg.clear(); resetParties();
+    for(let i = 0; i < 100; i++) parties.push({id:"fp" + i, at:{x:112, y:122}, rowdy:false, n:2});
+    const base = behaviorCtx(e).seen;
+    out.screenCutsSeen = (() => { e.land.push({id:"l-s", type:"screen", x:109, y:200}); const v = behaviorCtx(e).seen; e.land.pop(); return base > 0 && v < base * .9; })();
+    out.screenPlacedByFence = !landProblem(e, "screen", 109, 200) && /fence/.test(landProblem(e, "screen", 142, 150) || "") && /habitat props/i.test(decorProblem("screen", 400, 400) || "");
+    out.screenDrawn = (() => { const g = featSvg({id:"l-s", type:"screen", x:109, y:200}, "temperate", false, () => false); return g.includes("<rect") && !g.includes("NaN"); })();
+    const q = {id:"b-q", type:"quiet", points:rectPts(110, 121, BUILDINGS.quiet.w, BUILDINGS.quiet.d, 0)}; state.buildings.push(q);
+    const hushed = behaviorCtx(e).seen;
+    parties.forEach(p => p.rowdy = true); const loud = behaviorCtx(e).seen; parties.forEach(p => p.rowdy = false);
+    q.cond = 5; const brokenSign = behaviorCtx(e).seen; q.cond = 100;
+    state.buildings.pop(); const gone2 = behaviorCtx(e).seen;
+    out.quietSignCutsSeen = hushed < base * .6 && Math.abs(gone2 - base) < 1e-9 && Math.abs(brokenSign - base) < 1e-9;
+    out.rowdyPartlyIgnoreQuietSign = loud > hushed && loud < base;
+    // a shy herd is less stressed with the signs up
+    state.buildings.push(q); const T = e.animals[0], stressWith = stressTarget(e, T, sp, behaviorCtx(e)); state.buildings.pop(); const stressWithout = stressTarget(e, T, sp, behaviorCtx(e));
+    out.quietSignCalmsShyAnimals = traitsOf(sp).temper !== "skittish" || stressWith < stressWithout;
+    resetParties();
+    state.exhibits = state.exhibits.filter(x => x !== e); afterChange(); syncAnimals();
+    return out;
+  }));
 
   await page.waitForTimeout(800);
   let ok = true;

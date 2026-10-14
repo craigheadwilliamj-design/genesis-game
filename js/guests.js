@@ -339,8 +339,9 @@ function seeExhibit(p, e){
   if(p.seen.has(e.id)) return;
   p.seen.add(e.id);
   if(!e.animals.length) return;
-  const a = exhibitAppeal(e);
-  p.mood += GUEST.seeGain * a / (a + 15);
+  const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
+  p.mood += GUEST.seeGain * a / (a + 15) * (1 - HIDING.appeal * bother) - HIDING.mood * bother;
+  if(bother >= HIDING.thought) thinks(p, "hiding");
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
   personaSee(p, e);
   if(a >= 30) thinks(p, "wow");

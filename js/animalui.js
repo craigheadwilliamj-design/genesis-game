@@ -78,7 +78,7 @@ animalRing.innerHTML = `<circle r="8" fill="none" stroke="#fff" stroke-width="3"
 guestLayer.appendChild(animalRing);
 function drawAnimalRing(){
   const h = sel && sel.kind === "animal" ? herd.get(sel.id) : null;
-  if(h && !hidden34(h.x, h.y)){
+  if(h && !(h.a && h.a.inside) && !hidden34(h.x, h.y)){
     const b = animalBox(h);
     animalRing.style.display = ""; animalRing.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()} translate(0 ${b.oy.toFixed(2)})`);
     const r = Math.max(8 / view.k, Math.max(b.hw, b.hh) * 1.1); for(const c of animalRing.children) c.setAttribute("r", r.toFixed(2));
@@ -89,7 +89,7 @@ function animalAt(cx, cy){
   const w = toWorld(cx, cy);
   let best = null, bd = Infinity;
   for(const [id, h] of herd){
-    if(!h.placed || hidden34(h.x, h.y)) continue;
+    if(!h.placed || (h.a && h.a.inside) || hidden34(h.x, h.y)) continue;   // one indoors isn't there to tap (the Animals tab still opens it)
     const b = animalBox(h), dx = (w.x - h.x) * view.k, dy = (w.y - h.y) * ky() - b.oy * view.k;
     const rx = Math.max(12, b.hw * view.k), ry = Math.max(12, b.hh * view.k), n = Math.hypot(dx / rx, dy / ry);
     if(n > 1.15) continue;   // the box's corners count a little

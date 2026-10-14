@@ -12,6 +12,7 @@ const propTones = c => [mixHex(c, "#FFFFFF", .2), c, mixHex(c, "#000000", .28), 
 const PROP_ICONS = {
   info:[".XX.", ".XX.", "....", ".XX.", ".XX.", ".XX.", ".XX."],
   dollar:["..X..", ".XXX.", "X.X..", ".XXX.", "..X.X", ".XXX.", "..X.."],
+  quiet:["..XXXXX..", ".X.....X.", "X..X.X..X", "X.......X", "X...X...X", "X...X...X", "X.XXXXX.X", ".X.....X.", "..XXXXX.."],   // a face with a finger over its lips
   nofeed:(() => { const r = []; for(let y = 0; y < 9; y++){ let row = ""; for(let x = 0; x < 9; x++){ const d = Math.hypot(x - 4, y - 4); row += (d >= 3.2 && d < 4.5) || (x === y && d < 4.5) ? "X" : "."; } r.push(row); } return r; })(),
 };
 
@@ -95,10 +96,10 @@ function propArt(bl, inv, on, dead){
     boxes.push(bx(-.52, .52, -.47, .47, 1.35, 1.5, TD));
   } else {
     // info and Do Not Feed signs: a thin board on two posts. The painted face is the front; the back is bare grey with two bolts.
-    const nof = bl.type === "nofeed", top = 1 + 9*px;
+    const icon = bl.type === "nofeed" ? PROP_ICONS.nofeed : bl.type === "quiet" ? PROP_ICONS.quiet : PROP_ICONS.info, top = 1 + 9*px;
     for(const s of [-1, 1]) boxes.push(bx(s*.6 - .05, s*.6 + .05, -.06, .06, 0, 1.6, TM));
     boxes.push(bx(-.75, .75, -.06, .06, 1, top, TC, {
-      front:Q => broken ? "" : Q(-.75, .75, top - px, top, PALE) + Q(-.75, .75, 1, 1 + px, PALE) + Q(-.75, -.75 + px, 1, top, PALE) + Q(.75 - px, .75, 1, top, PALE) + pbits(Q, px, nof ? PROP_ICONS.nofeed : PROP_ICONS.info, 0, 1 + px, PALE),
+      front:Q => broken ? "" : Q(-.75, .75, top - px, top, PALE) + Q(-.75, .75, 1, 1 + px, PALE) + Q(-.75, -.75 + px, 1, top, PALE) + Q(.75 - px, .75, 1, top, PALE) + pbits(Q, px, icon, 0, 1 + px, PALE),
       back:Q => Q(-.75, .75, 1, top, TM[0]) + Q(-.68, -.55, 1.08, 1.08 + px, TM[2]) + Q(.55, .68, 1.08, 1.08 + px, TM[2]) + Q(-.68, -.55, top - px*2, top - px, TM[2]) + Q(.55, .68, top - px*2, top - px, TM[2])}));
   }
   // far boxes first; at the same depth the lower one first

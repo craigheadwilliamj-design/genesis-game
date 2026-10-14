@@ -113,6 +113,13 @@ function guestBuildingHtml(b){
     h += `<div class="meta" style="margin-top:6px">Guests are ${Math.round((1 - THROWN.signCut) * 100)}% less likely to throw trash into these exhibits. Trash makes animals ill, and some die. Bins and guards nearby help too.</div></section>`;
     return h;
   }
+  if(b.type === "quiet"){
+    h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
+    const [x, y] = centroid(b.points), near = state.exhibits.filter(e => !e.viv && distToEdge(x, y, e.points) <= QUIET.reach);
+    h += `<section><h3>Quiets guests for</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No open exhibit within ${QUIET.reach} m. Move it closer to a fence.</div>`}`;
+    h += `<div class="meta" style="margin-top:6px">Guests within ${QUIET.hear} m of it count ${Math.round(QUIET.cut * 100)}% less toward the crowd these exhibits' animals feel, and rowdy ones mostly ignore it. Shy animals stress less and hide less.</div></section>`;
+    return h;
+  }
   if(b.type === "donate"){
     h += `<section><h3>Donations</h3><dl class="kv"><dt>Given so far</dt><dd>${money(Math.round(b.gift || 0))}</dd></dl><div class="meta" style="margin-top:4px">Guests within ${DONATE.reach} m may drop a little in, more if they learned something. Vandals can break it.</div></section>`;
   } else if(b.type === "bin"){

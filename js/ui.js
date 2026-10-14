@@ -413,7 +413,7 @@ function propsHtml(e){
   }
   if(sub === "shelters"){
     const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold. Animals walk in to hide, sleep and wait out bad weather, as many as the shelter has room for, and guests can't see them while they are inside. A Privacy Screen (${SCREEN.holds} animals each, within ${SCREEN.fenceReach} m of the fence) blocks their view of the path: shy animals stress less, and stay in sight.</div>`;
     if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
       h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
@@ -440,6 +440,12 @@ function behaviorHtml(e){
   let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
   h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
   h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Exhibit tab), plants from their own period" : "enrichment props (Habitat Props), the rocks, plants and water they like"}, and room to roam.</div></section>`;
+  if(!e.viv){
+    const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
+    h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;
+    h += `<div class="meta" style="margin-top:4px;color:${gone > HIDING.from ? "var(--bad)" : "inherit"}">${gone > HIDING.from ? `${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests who see an empty exhibit are let down, though well-informed ones forgive it.` : "Most of the animals are out where guests can see them."}</div>`;
+    h += `<div class="meta" style="margin-top:4px">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%${quietSigns(e).length ? `, with ${quietSigns(e).length} quiet sign${quietSigns(e).length === 1 ? "" : "s"} by the fence` : ""}${screenShare(e) ? `, ${Math.round(screenShare(e) * 100)}% of the herd behind a privacy screen` : ""}. ${shy ? "Shy animals feel it most. " : ""}Animals inside a shelter are out of sight, sleeping at night doesn't count against you, and weather shelter only a little.</div></section>`;
+  }
   const soc = [...ctx.soc.values()];
   if(soc.length) h += `<section><h3>Social</h3>${soc.map(i => `<div class="meta" style="color:${i.bad ? "var(--bad)" : "var(--good)"}">${esc(i.text)}</div>`).join("")}</section>`;
   for(const [sp, c] of speciesCounts(e)){

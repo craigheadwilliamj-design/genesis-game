@@ -427,6 +427,7 @@ function landProblem(e, key, x, y){
   if(t.aquatic && !waterOf(e).some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Place it in the exhibit's water.`;
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && Math.hypot(e.gate[0] - x, e.gate[1] - y) < r + 3) return "Keep clear of the gate.";
+  if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
@@ -441,7 +442,7 @@ function landSpot(x, y, key){
 function decorProblem(key, x, y){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  if(t.slots || t.tray || t.toy || t.toyFor) return "Habitat props go inside an open exhibit.";
+  if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return statuesOn() ? `${t.label} is locked. ${statueHint(key)}` : "Statues aren't available yet.";
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
@@ -677,6 +678,19 @@ function shelter34(f, t, edge, sw){
   return `<polygon points="${polyStr(P.map(([a, b]) => [a + wall*.3, b + wall*.25]))}" fill="#1D2B22" fill-opacity=".2"/>` + w.s
     + (w.main >= 0 ? quad34(P, w.main, .18, .82, 0, wall * .85, "#2A211A") : "") + hipRoof34(P, wall, t.r * .45, "#6B5A44", null, line, "ns", t.color);
 }
+// a privacy screen: a woven reed panel on two posts, flat pixel style (light from the top left: lit left edges, dark gaps between canes, lashings and a shadow under it)
+function screen34(f, t, dead){
+  const px = ROCK_MPP, q = v => Math.round(v / px + 1e-4) * px, hw = q(t.r * (f.k || 1)), hy = q(2.2 / TILT), x0 = q(f.x - hw), x1 = x0 + hw * 2, yb = q(f.y), yt = yb - hy, n2 = v => v.toFixed(2);
+  const R = (a, b, c, d, fill, o) => `<rect x="${n2(a)}" y="${n2(c)}" width="${n2(b - a)}" height="${n2(d - c)}" fill="${fill}"${o ? ` fill-opacity="${o}"` : ""}/>`;
+  const reed = ["#A7B461", "#8C9A4B", "#6B7838"], wood = ["#8A6538", "#6A4A2B", "#4A311B"];
+  let s = R(x0 + px * 2, x1 + px * 4, yb - px, yb + px * 2, "#1D2B22", ".22");
+  for(let x = x0 + px * 2; x + px * 3 <= x1 - px * 2; x += px * 3){ s += R(x, x + px * 2, yt + px * 2, yb, reed[1]) + R(x, x + px, yt + px * 2, yb, reed[0]) + R(x + px * 2, x + px * 3, yt + px * 2, yb, reed[2]); }
+  for(const g of [.34, .68]) s += R(x0, x1, q(yb - hy * g), q(yb - hy * g) + px, wood[1]);
+  s += R(x0, x1, yt, yt + px * 2, wood[0]) + R(x0, x1, yt + px * 2, yt + px * 3, wood[2]);
+  for(const x of [x0, x1 - px * 2]) s += R(x, x + px * 2, yt - px * 2, yb, wood[1]) + R(x, x + px, yt - px * 2, yb, wood[0]) + R(x + px, x + px * 2, yb - px * 2, yb, wood[2]);
+  if(dead) s += `<rect x="${n2(x0)}" y="${n2(yt - px * 2)}" width="${n2(hw * 2)}" height="${n2(hy + px * 2)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+  return s;
+}
 // a canopy: a round shade cloth on poles, peaked in the middle
 function canopy34(f, t, edge, sw){
   const r = t.r * .9, x = f.x, y = f.y, H = t.r * .55, top = y - H / TILT, peak = y - (H + t.r * .22) / TILT, n2 = v => v.toFixed(2), ns = `vector-effect="non-scaling-stroke"`;
@@ -711,6 +725,7 @@ function featSvg(f, biome, pick, isDead){
   else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
   else if(up && t.look === "canopy") s += canopy34(f, t, edge, dead ? 3 : 1.5);
   else if(up && t.slots && !t.look) s += shelter34(f, t, edge, dead ? 3 : 1.5);
+  else if(t.screen) s += screen34(f, t, dead);
   else if(t.tray){
     // a round steel tray, filled to the level of the food in it
     const fill = t.tray ? clamp(trayHas(f) / t.tray, 0, 1) : 0, main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0];
