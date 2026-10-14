@@ -68,10 +68,10 @@ function guestLive(force){
   }
   set("gCash", money(p.cash));
   set("gEdu", `${Math.round(p.edu || 0)}%`);
-  const th = [...p.thought].reverse().slice(0, 6).filter(k => THOUGHTS[k]), key = th.join(), ul = document.getElementById("gThoughts");
+  const th = [...(p.notes || []).slice(-4).reverse(), ...[...p.thought].reverse().slice(0, 5).filter(k => THOUGHTS[k]).map(k => THOUGHTS[k])], key = th.map(x => x.text).join("|"), ul = document.getElementById("gThoughts");
   if(ul && ul.dataset.v !== key){
     ul.dataset.v = key;
-    ul.innerHTML = th.length ? th.map(k => `<li class="${THOUGHTS[k].good ? "" : "bad"}"><span>"${esc(THOUGHTS[k].text)}"</span></li>`).join("") : `<li><span class="meta">Nothing on their mind yet.</span></li>`;
+    ul.innerHTML = th.length ? th.map(x => `<li class="${x.good ? "" : "bad"}"><span>"${esc(x.text)}"</span></li>`).join("") : `<li><span class="meta">Nothing on their mind yet.</span></li>`;
   }
   const why = ejectProblem(p), btn = document.getElementById("gEject");
   const label = p.ejecting === "escort" ? "Being walked out" : p.ejecting ? "Security called" : p.home && p.why === "home" ? "Already leaving" : "Eject from park";

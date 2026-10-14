@@ -505,14 +505,21 @@ const GUEST = {
   badMood:30,          // and this low gets none
 };
 // How guests spend time on the paths: stopping at exhibits, strolling, and acting on impulse. Times are guest minutes (divided by GUEST.pace in the park clock).
+// What a party notices while it stands watching an exhibit: one thing every so often (guest minutes between), each with its own small effect on mood
+const OBS = {gap:[2.5, 6], learn:.35, chance:{exhibit:.2}};
 const SIGHT = {
-  dwell:[5, 16],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
+  dwell:[10, 26],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
   glance:.9,           // top chance of stopping for an unseen exhibit they walk past (scaled by its appeal and their taste)
   glanceAppeal:12,     // appeal at which that chance is half of the top
   whim:[.35, 1.65],    // each party's own random liking for each exhibit when choosing where to head
   distPull:45,         // meters at which an exhibit's pull is halved when choosing (smaller means they stick closer to where they are)
   strollChance:.4,     // chance, when they have nothing planned, of drifting along the paths instead of picking an exhibit
   strollLen:[3, 9],    // corners a stroll lasts
+  standReach:12,       // meters of fence either side of the path a party might pick to stand at
+  standGap:7,          // meters out from a fence a party will look for paving to stand on
+  standPull:6,         // meters at which a fence spot's chance is halved, so the crowd spreads out but favors what's close
+  deckShare:.8,        // chance a party stands on a viewing platform for the exhibit when there's one close
+  deckReach:16,        // meters from the path stop to the platform's middle
   impulse:{frac:.55, near:55, chance:.6, shop:.2, shopNear:45, gap:40},   // a need over this share of its seek line, and a stop this close: chance of going; chance of popping into a shop; minutes between tries
 };
 /* ---------------------------------------------------------------------
@@ -690,6 +697,8 @@ const THOUGHTS = {
   gory:       {text:"We watched an animal hunting. Not for kids."},
   ejected:    {text:"Security threw us out!"},
   hiding:     {text:"Where are the animals? They're all hiding."},
+  feeding:    {text:"It was great watching them eat.", good:true},
+  sickly:     {text:"Some of those animals looked unwell."},
 };
 
 // Each vivarium size is also a building you can place

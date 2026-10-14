@@ -12,6 +12,7 @@ let gGraph = null;         // the guests' walking map: {nodes, anchors:{id -> no
 let gFieldsWalk = new Map();   // the same, for guests who can't ride the tram
 let gFields = new Map();   // stop id -> quickest way there from every node, worked out when first needed
 let svcQ = new Map();      // building id -> {queue:[party], busy:[party]}
+let guestSegs = [];   // [a, b, half width] of each guest path stretch: guests stand and step only on these, never on grass or staff paths
 let moodColors = false;    // color guests on the map by how happy they are
 let nextSize = 1;          // how many are in the next party through the gate
 
@@ -120,6 +121,8 @@ function buildGuestGraph(){
     if(ids.length){ (n.sees = n.sees || new Map()).set(m, ids); (m.sees = m.sees || new Map()).set(n, ids); }
   }
   gGraph = {nodes, anchors, gate};
+  const segs = (ps, hw) => ps.flatMap(p => p.points.slice(1).map((v, i) => [p.points[i], v, hw(p)]));
+  guestSegs = segs(live, p => isWide(p) ? WIDE_PATH.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH);
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
   indexDecor(nodes);
@@ -208,7 +211,7 @@ function partyLeaves(p){
 function goHome(p){
   if(p.home) return;
   leaveQueue(p);
-  p.home = true; p.dest = null; p.why = null; p.linger = 0; p.stroll = 0;
+  p.home = true; p.dest = null; p.why = null; p.linger = 0; p.stroll = 0; p.watch = null;
 }
 function leaveQueue(p){
   if(!p.in) return;
@@ -359,22 +362,150 @@ function reachDest(p){
   if(!b || !guestBuilding(b)){ p.dest = null; p.why = null; return; }
   if(!svcQ.has(id)) svcQ.set(id, {queue:[], busy:[]});
   svcQ.get(id).queue.push(p); p.in = id; p.waited = 0;
-  standNear(p, b.points);
+  standNear(p, b.points, null, b);
 }
-// Where a party stands to watch or wait: a spot up against the nearest fence or wall, as an offset from its path node (drawing only; it never changes where the party is on the map)
-function standNear(p, pts){
-  const n = p.at; let best = null;
-  if(!n || !pts) return;
-  for(let i = 0; i < pts.length; i++){ const r = segProj(n.x, n.y, pts[i], pts[(i + 1) % pts.length]); if(!best || r.d < best.d) best = r; }
-  if(!best) return;
-  const d = best.d || .01, ux = (best.x - n.x) / d, uy = (best.y - n.y) / d, s = p.sj;
-  let go = Math.min(14, Math.max(0, d - .7 + s[1] * .25)), dx, dy;
-  for(let k = 0; k < 6; k++){   // spread along the fence, and back off if that put them inside
-    dx = ux * go - uy * s[0] * 1.8; dy = uy * go + ux * s[0] * 1.8;
-    if(!inPoly(n.x + dx, n.y + dy, pts)) break;
-    go = Math.max(0, go - .8);
+// Where a party wants to be beside its path node or stretch: across the whole width of the path while walking, at its spot when watching or waiting
+function partyOff(p){
+  if(p.stand) return [p.stand.dx, p.stand.dy];
+  if(p.to){
+    const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1, room = (p.at.room && p.at.room.get(p.to)) || 1;
+    const w = (room > 1 ? WIDE_PATH.halfWidth : PATH_HALF_WIDTH) - .6, lat = (p.lane || 0) * w;
+    return [-dy/L*lat, dx/L*lat];
   }
-  p.stand = {dx, dy};
+  const a = p.off * 4.4;
+  return [Math.cos(a) * Math.abs(p.off) * 1.5, Math.sin(a) * Math.abs(p.off) * 1.5];
+}
+// They walk to their spot at their own pace, not slide there (the drawing reads p.ox/p.oy)
+function stepOff(p, meters){
+  if(!p.at) return;
+  let o = partyOff(p);
+  // standing about at a node (or at a spot): pull in toward the path line until it's off any staff road
+  // (walking, the lane must stay off one at both ends of the stretch)
+  {
+    const k = o[0].toFixed(2) + "," + o[1].toFixed(2) + "@" + p.at.k + (p.to ? ">" + p.to.k : "");
+    if(p.offK !== k){
+      p.offK = k;
+      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
+      let f = 1; while(f > .05 && bad(f)) f *= .6;
+      p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
+    }
+    o = p.offT;
+  }
+  if(p.ox === undefined){ p.ox = o[0]; p.oy = o[1]; return; }
+  const dx = o[0] - p.ox, dy = o[1] - p.oy, d = Math.hypot(dx, dy);
+  if(d <= meters){ p.ox = o[0]; p.oy = o[1]; } else { p.ox += dx / d * meters; p.oy += dy / d * meters; }
+}
+// What a party at an exhibit notices, a thing at a time, while it stands there
+function observe(p, e){
+  const note = (text, d, good) => { (p.notes = p.notes || []).push({text, good:!!good}); if(p.notes.length > 12) p.notes.shift(); if(d) p.mood = clamp(p.mood + d, 0, 100); };
+  const seen = e.animals.filter(a => !a.inside);
+  if(!seen.length){ note("There's nothing out to see right now.", -1); return; }
+  if(Math.random() < OBS.chance.exhibit){
+    const sp = SPECIES_BY_ID[seen[0].sp];
+    if(e.happy < 35){ note("They don't look happy in there.", -1); return; }
+    if(!hasSign(e)){ note(`I'd love to know more about the ${sp.name}.`, 0); return; }
+    if(e.happy >= 75){ note("They look really well looked after.", 1, true); return; }
+  }
+  const a = seen[Math.floor(Math.random() * seen.length)], sp = SPECIES_BY_ID[a.sp], n = sp.name;
+  if(a.sick){ note(`${a.name} the ${n} looks unwell.`, -2); thinks(p, "sickly"); return; }
+  learn(p, EDU.see * OBS.learn * (hasSign(e) ? 1 + EDU.sign : 1));
+  switch(a.act){
+    case "eat": note(`The ${n} is tucking into a meal.`, 1, true); thinks(p, "feeding"); break;
+    case "drink": note(`A ${n} stops for a drink.`, .5, true); break;
+    case "rest": note(`That ${n} is having a lie down.`, 0); break;
+    case "hunt": note(`The ${n} is stalking something...`, 1, true); break;
+    case "forage": note(`A ${n} is rooting around for food.`, .5, true); break;
+    case "social": note(`The ${n}s are sticking close together.`, 1, true); break;
+    case "play": note(`Look, a ${n} is playing!`, 2, true); thinks(p, "playful"); break;
+    case "hide": note(`The ${n} is keeping out of sight.`, -1); break;
+    case "pace": note(`The ${n} keeps pacing the fence.`, -2); thinks(p, "pacing"); break;
+    case "patrol": note(`The ${n} is prowling along the fence.`, .5, true); break;
+    default: note(`The ${n} is just standing there.`, 0);
+  }
+}
+function observeTick(p, now){
+  const w = p.watch;
+  if(!w || p.linger <= now){ p.watch = null; return; }
+  if(p.stand && Math.hypot((p.ox || 0) - p.stand.dx, (p.oy || 0) - p.stand.dy) > .4) return;   // still walking over
+  if(w.next === undefined){ w.next = now + rand(...OBS.gap) * .4 / GUEST.pace; return; }
+  if(now < w.next) return;
+  const e = state.exhibits.find(x => x.id === w.id);
+  if(e) observe(p, e);
+  w.next = now + rand(...OBS.gap) / GUEST.pace;
+}
+// Is this spot off the guest paths (on grass, a staff path, anything that isn't paving guests may use)? A little in from the edge so feet stay on it.
+const offPath = (x, y) => !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw - .35);
+// Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
+function standOk(x0, y0, x1, y1, skip){
+  const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
+  for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
+  for(const l of parkFences()) if(cross(l.points)) return false;
+  // only on guest paving the whole way (up to the last meter or so for a platform's steps, which stand just off the path)
+  const L = Math.hypot(x1 - x0, y1 - y0), end = skip && skip.type === "platform" ? L - 1.5 : L;
+  for(let t = 0; t <= end; t += .5){ const k = L ? t / L : 0; if(offPath(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
+  if(end === L && offPath(x1, y1)) return false;
+  for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
+  for(const b of state.buildings){
+    if(b === skip || BUILDINGS[b.type].prop) continue;
+    if(inPoly(x1, y1, b.points) || cross(b.points.concat([b.points[0]]))) return false;
+  }
+  return true;
+}
+// Where a party stands to watch or wait: a spot along a fence or wall (or on a viewing platform), as an offset from its path node.
+// Drawing only; it never changes where the party is on the map. Spots are picked along the whole stretch of fence in range, the nearer the likelier, so a crowd spreads out.
+function standNear(p, pts, e, bld){
+  const n = p.at;
+  if(!n || !pts) return;
+  // a viewing platform on this exhibit within a short stroll: most would rather stand up there
+  if(e && Math.random() < SIGHT.deckShare){
+    let best = null, bd = SIGHT.deckReach;
+    for(const b of state.buildings){
+      if(b.type !== "platform" || b.exhibitId !== e.id || !(derived.reach && derived.reach[b.id])) continue;
+      const [cx, cy] = centroid(b.points), d = Math.hypot(cx - n.x, cy - n.y);
+      if(d < bd){ bd = d; best = b; }
+    }
+    if(best){
+      const P = best.points, u = .12 + Math.random() * .76, v = .12 + Math.random() * .76;
+      const x = P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v, y = P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v;
+      // up the steps: the ground part of the walk, to where it meets the deck, must be clear
+      let t = 0;
+      while(t < 1 && !inPoly(n.x + (x - n.x) * t, n.y + (y - n.y) * t, P)) t += .02;
+      if(standOk(n.x, n.y, n.x + (x - n.x) * t, n.y + (y - n.y) * t, best)) p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
+      if(p.stand){
+        if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
+        return;
+      }
+    }
+  }
+  const cand = [];
+  for(let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    for(let t = 0; t <= L; t += 1){
+      const x = a[0] + (b[0] - a[0]) * t / L, y = a[1] + (b[1] - a[1]) * t / L, d = Math.hypot(x - n.x, y - n.y);
+      if(d > SIGHT.standReach) continue;
+      // one step out from the fence, on the side that isn't inside
+      let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+      if(inPoly(x + nx * .8, y + ny * .8, pts)){ nx = -nx; ny = -ny; }
+      if(inPoly(x + nx * .8, y + ny * .8, pts)) continue;
+      // as close to the fence as the paving goes: step out until on a guest path (grass between path and fence stays empty)
+      for(let g = .6; g <= SIGHT.standGap; g += .4){
+        const X = x + nx * g, Y = y + ny * g;
+        if(offPath(X, Y)) continue;
+        if(Math.hypot(X - n.x, Y - n.y) <= SIGHT.standReach) cand.push([X, Y, 1 / (1 + d / SIGHT.standPull)]);
+        break;
+      }
+    }
+  }
+  // pick by weight, and drop any spot they couldn't walk to without crossing a fence, a staff road or a building
+  let c = null;
+  for(let tries = 0; tries < 10 && cand.length && !c; tries++){
+    let r = Math.random() * cand.reduce((s, k) => s + k[2], 0), i = cand.length - 1;
+    for(let j = 0; j < cand.length; j++){ r -= cand[j][2]; if(r <= 0){ i = j; break; } }
+    if(standOk(n.x, n.y, cand[i][0], cand[i][1], bld)) c = cand[i]; else cand.splice(i, 1);
+  }
+  if(!c) return;
+  p.stand = {dx:c[0] - n.x, dy:c[1] - n.y};
+  if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);
 }
 function seeExhibit(p, e, quick){
   if(p.dest === e.id && p.why === "see"){ p.dest = null; p.why = null; }
@@ -383,7 +514,7 @@ function seeExhibit(p, e, quick){
   if(!e.animals.length) return;
   const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
   // stop and watch for a while: longer for a bigger draw
-  if(!quick) p.lingerAt = e.id;
+  if(!quick){ p.lingerAt = e.id; p.watch = {id:e.id}; }
   if(!quick) p.linger = state.minute + (SIGHT.dwell[0] + (SIGHT.dwell[1] - SIGHT.dwell[0]) * a / (a + 15)) * rand(.8, 1.2) / GUEST.pace;
   p.mood += GUEST.seeGain * a / (a + 15) * (1 - HIDING.appeal * bother) - HIDING.mood * bother;
   if(bother >= HIDING.thought) thinks(p, "hiding");
@@ -419,9 +550,12 @@ function board(p){
 function walkParty(p, left){
   for(let i = 0; i < 40 && left > 0 && !p.gone && !p.in; i++){
     if(p.linger > state.minute){   // standing and watching, up against the fence
-      if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points); }
+      if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points, e); }
       return;
     }
+    // done watching or being served: walk back to the path the way they came before setting off along it
+    if(p.stand && !p.to){ p.stand = null; }
+    if(!p.to && Math.hypot(p.ox || 0, p.oy || 0) > 2.5) return;
     if(!p.to){ if(!headOut(p)) return; board(p); }
     const L = p.at.adj.get(p.to) || .01, rem = L * (1 - p.t);   // how far the edge feels: a ride is shorter than it looks, a platform wait longer
     if(left < rem){ p.t += left / L; return; }
@@ -524,7 +658,9 @@ function guestsTick(m0, m1){
     throwTick(p, gdt);
     teaseTick(p, gdt);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
+    if(p.watch) observeTick(p, m1);
     walkParty(p, WALK_PER_MIN * p.spd * dt);
+    stepOff(p, WALK_PER_MIN * p.spd * dt);
   }
   serviceTick(dt, m1);
   parties = parties.filter(p => !p.gone);
