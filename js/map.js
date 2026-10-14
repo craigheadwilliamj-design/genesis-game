@@ -315,7 +315,7 @@ function render(){
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
-      if(tilt){ s += prop34(bl, t, r, fill, edge, sw) + (isBroken(bl) ? `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") + `</g>`; continue; }
+      if(tilt){ s += propArt(bl, inv, on, dead) + `</g>`; continue; }
       if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
@@ -324,7 +324,7 @@ function render(){
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
       if(bl.type === "nofeed" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">⊘</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      s += `</g>`;
+      s += propFrontMark(bl, r) + `</g>`;
       continue;
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
@@ -1036,43 +1036,6 @@ function building34(bl, t, on, dead, reach, inv){
   return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)));
 }
 
-// Path props standing up in the 3/4 view: bins, lamps, cameras, signs, benches and picnic tables.
-// r is the prop's drawn radius, which never shrinks below a tappable size.
-function prop34(bl, t, r, fill, edge, sw){
-  const [cx, cy] = centroid(bl.points), up = h => cy - h / TILT, ln = `stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
-  const shadow = (rx, h) => `<ellipse cx="${(cx + h*.22).toFixed(2)}" cy="${(cy + h*.18).toFixed(2)}" rx="${rx.toFixed(2)}" ry="${(rx*.7).toFixed(2)}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
-  const pole = (h, w) => `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="#3A3A34" pointer-events="none"/>`;
-  const R = r * .75;
-  if(bl.type === "bin"){ const h = R * 1.6;
-    return shadow(R, h) + `<rect x="${(cx - R).toFixed(2)}" y="${up(h).toFixed(2)}" width="${(2*R).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${cy.toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="#1D2B22" ${ln}/>`; }
-  if(bl.type === "donate"){ const h = R * 2.2, w = R * 1.3;
-    return shadow(R, h) + `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><rect x="${(cx - w*.3).toFixed(2)}" y="${up(h*.85).toFixed(2)}" width="${(w*.6).toFixed(2)}" height="${(h*.08 / TILT).toFixed(2)}" fill="#1D2B22" pointer-events="none"/>` +
-      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h*.4).toFixed(2)}" font-size="${(w*.7).toFixed(2)}" fill="#F2D46B" pointer-events="none">$</text>`); }
-  if(bl.type === "lamp" || bl.type === "camera"){ const h = R * 5, w = Math.max(.15, R*.25);
-    return shadow(R*.7, h*.3) + pole(h, w) + (bl.type === "lamp" ? `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.8).toFixed(2)}" ry="${(R*.8 / TILT).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.4).toFixed(2)}" ry="${(R*.4 / TILT).toFixed(2)}" fill="#FFF6C8" pointer-events="none"/>`}`
-      : `<rect x="${(cx - R*.9).toFixed(2)}" y="${up(h + R*.4).toFixed(2)}" width="${(R*1.8).toFixed(2)}" height="${(R*.9 / TILT).toFixed(2)}" rx="${(R*.2).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${(cx + R*.9).toFixed(2)}" cy="${up(h).toFixed(2)}" rx="${(R*.25).toFixed(2)}" ry="${(R*.25 / TILT).toFixed(2)}" fill="#E8F0FF" pointer-events="none"/>`}`); }
-  if(bl.type === "sign" || bl.type === "nofeed"){ const h = R * 3, w = Math.max(.12, R*.2), bw = R * 1.6, bh = R * 1.3;
-    return shadow(R*.6, h*.3) + pole(h, w) + `<rect x="${(cx - bw/2).toFixed(2)}" y="${up(h + bh*.5).toFixed(2)}" width="${bw.toFixed(2)}" height="${(bh / TILT).toFixed(2)}" rx="${(R*.15).toFixed(2)}" fill="${fill}" ${ln}/>` +
-      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h).toFixed(2)}" font-size="${(bh*.85).toFixed(2)}" pointer-events="none">${bl.type === "sign" ? "i" : "⊘"}</text>`); }
-  // benches and picnic tables: slats on thin legs, drawn back to front
-  const P = insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))), line = `${ln} stroke-linejoin="round"`, dark = "#3A3A34";
-  const [px, py] = centroid(P), U = [(P[1][0] - P[0][0])/2, (P[1][1] - P[0][1])/2], V = [(P[3][0] - P[0][0])/2, (P[3][1] - P[0][1])/2];
-  const [L, W] = Math.hypot(...U) >= Math.hypot(...V) ? [U, V] : [V, U], north = W[1] <= 0 ? 1 : -1;   // which way along the short axis is north
-  const box = (sl, sw, dw) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [px + L[0]*a*sl + W[0]*(b*sw + dw), py + L[1]*a*sl + W[1]*(b*sw + dw)]);
-  const slab = (Q, h0, h1) => walls34(Q, h0, h1, fill, line).s + `<polygon points="${polyStr(Q.map(lift34(h1)))}" fill="${fill}" ${line}/>` + shade34(Q.map(lift34(h1)), .5);
-  let out = `<polygon points="${polyStr(P.map(([x, y]) => [x + .25, y + .2]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
-  const leg = (f, d, h) => { const x = px + L[0]*f + W[0]*d, y = py + L[1]*f + W[1]*d; return `<path d="M${x.toFixed(2)} ${y.toFixed(2)}V${(y - h / TILT).toFixed(2)}" stroke="${dark}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; };
-  if(bl.type === "bench"){
-    // the backrest goes on the far side, so the seat faces the viewer
-    out += leg(-.85, 0, .42) + leg(.85, 0, .42) + slab(box(1, .38, north*.62), .5, .95) + slab(box(1, .55, -north*.2), .42, .5);
-    return out;
-  }
-  // picnic table: a bench each side and the top in between
-  out += slab(box(.9, .17, north*.78), .4, .47);
-  out += leg(-.8, 0, .72) + leg(.8, 0, .72) + slab(box(1, .42, 0), .72, .8);
-  return out + slab(box(.9, .17, -north*.78), .4, .47);
-}
-
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
 function parcelOverlay(){
@@ -1152,8 +1115,16 @@ function renderOverlay(){
     const col = ghost.ok ? "var(--sel)" : "var(--bad)", t = BUILDINGS[tool];
     const gk = themeFor("building", {type:tool, points:ghost.pts}), gb = gk ? {theme:gk} : null;
     if(gb) s += `<g opacity=".8"><polygon points="${polyStr(ghost.pts)}" fill="${themeFill(gb, t.color)}"/>${themeBuildSvg(gb, polyStr(ghost.pts), polyStr(insetRect(ghost.pts, .86)))}</g>`;
-    s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
-    s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
+    if(t.prop && tilt){
+      // a path object: the pixel picture with its footprint dashed round it and an arrow out of its front
+      const gi = {id:"ghost", type:tool, points:ghost.pts, theme:gk}, [fx, fy] = propFront(gi), [gx, gy] = centroid(ghost.pts), fr = Math.max(t.w, t.d) / 2 + .5;
+      s += `<g opacity=".85" pointer-events="none">${propArt(gi, inv, false, false)}</g><polygon points="${polyStr(ghost.pts)}" fill="none" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="M${gx} ${gy}L${gx + fx*fr} ${gy + fy*fr}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${gx + fx*fr}" cy="${gy + fy*fr}" r="${Math.max(.3, 4*inv)}" fill="${col}"/>`;
+    } else {
+      s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+      s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
+      if(t.prop) s += propFrontMark({points:ghost.pts}, Math.max(t.w, t.d) / 2);
+    }
   }
   if(gateGhost && !gateGhost.loose){
     const gr = Math.max(1.6, 5*inv);
@@ -2080,7 +2051,7 @@ function placeGhost(clientX, clientY){
     // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
     if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + ra), e.points))) off = Math.max(0, off - .1);
     x = best.x + nx*side*off; y = best.y + ny*side*off;
-    angle = Math.atan2(dy, dx);
+    angle = Math.atan2(dy, dx) + (t.prop && side > 0 ? Math.PI : 0);   // a path object's front (+v) faces the path it stands by
   } else if(t.onPath) why = why || "Move it next to a path.";
   angle += rot * Math.PI/4;
   if(!best){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
@@ -2119,6 +2090,7 @@ function rotateMoved(){
     for(const [dx, dy] of offs){ it.points = shiftPts(turned, dx, dy); if(!moveProblem("building", it)){ why = null; nudged = true; break; } }
   }
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
+  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + 1) % 8;
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
   setStat(reach ? (nudged ? "Turned, and nudged to fit." : "Turned.") : "Turned, but it has no path to the entrance, so it won't work.", !reach);
@@ -2142,6 +2114,7 @@ function placeBuilding(e){
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
+  if(t.prop) b.rot = rot;   // how many 45° turns the player gave it; its front is read off the points (propFront)
   autoZone(b);
   themeNew("building", b);
   state.buildings.push(b);

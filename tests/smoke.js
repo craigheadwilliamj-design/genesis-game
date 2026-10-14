@@ -2382,6 +2382,35 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   checks.pointsIgnoreStepSize = sci.pointsIgnoreStepSize;
   checks.cloneWaitsThenFinishes = sci.cloneWaitsThenFinishes;
 
+  // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
+  const props = await page.evaluate(() => {
+    const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed"];
+    const tl = tilt; tilt = true;
+    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
+    // the front turns: the front vector follows the angle, and the picture changes with it
+    const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
+    out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
+    out.propFrontsDiffer = names.every(ty => { const t = BUILDINGS[ty], at = r => propArt({id:"pd", type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}, .1, false, false); return at(0) !== at(4); });
+    // placing with a rotation stores it
+    state.sandbox = true; state.over = false; state.money = 1e7;
+    let placed = null;
+    for(let y = 40; y < 700 && !placed; y += 12){
+      state.paths.push({id:"p-prop", points:[[60, y], [160, y]]});
+      setTool("bench"); for(let i = 0; i < 3; i++) rotateTool();
+      const r = svg.getBoundingClientRect(), px = (x, yy) => [r.left + view.tx + x * view.k, r.top + view.ty + yy * ky()];
+      placeGhost(...px(110, y + 1));
+      if(ghost && ghost.ok){ placeBuilding({clientX:px(110, y + 1)[0], clientY:px(110, y + 1)[1]}); placed = state.buildings[state.buildings.length - 1]; }
+      else state.paths.pop();
+    }
+    out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 3 && rot === 3;
+    if(placed){ const old = JSON.parse(JSON.stringify(placed)); delete old.rot; const snap = JSON.parse(JSON.stringify(state)); snap.buildings = snap.buildings.map(b => b.id === old.id ? old : b); upgradeSave(snap);
+      out.oldSaveGetsRot = snap.buildings.find(b => b.id === old.id).rot === 0; }
+    setTool("select"); tilt = tl; render();
+    out.propsRenderInGame = !!document.querySelector(`#map [data-id="${placed && placed.id}"]`) || !!document.querySelector(`[data-id="${placed && placed.id}"]`);
+    return out;
+  });
+  Object.assign(checks, props);
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }

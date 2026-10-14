@@ -354,6 +354,7 @@ function seeExhibit(p, e){
   if(!sign && (p.noSign = (p.noSign || 0) + 1) >= EDU.noInfo) thinks(p, "noInfo");
 }
 // Is there a working info sign by this exhibit's fence?
+// hook: propFront(b) says which way a sign faces; today any sign near the fence counts from every side
 const hasSign = e => state.buildings.some(b => b.type === "sign" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= EDU.signReach);
 // Minutes this party needs to walk to a stop from where it is
 function walkMins(p, id){

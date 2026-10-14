@@ -232,6 +232,7 @@ function upgradeSave(s){
   for(const k of ["decor", "water", "fences"]) if(!Array.isArray(s[k])) s[k] = [];
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
+  for(const b of s.buildings) if(BUILDINGS[b.type] && BUILDINGS[b.type].prop && b.rot === undefined) b.rot = 0;   // path objects: 45° turns the player gave them (see propart.js)
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
   if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
   for(const b of s.buildings) if(b.type === "edcenter" && !b.mods) b.mods = [];   // modules and focus, see services.js   // museum attractions, see services.js
