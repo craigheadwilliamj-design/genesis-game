@@ -110,7 +110,10 @@ Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S28 (S): Zip build**
 > Make a zip of `index.html`, `js/`, `sprites/` (no `tools/`, `tests/`), and verify it opens from disk with dev-mode off.
 
+**S29 (M): Start-up screen, PALEO-TYCOON rename, biome lock**
+> Rename the game to "PALEO-TYCOON" (index.html `<title>`, the intro dialog "Welcome to Genesis Park" in `#dlgIntro`, HUD and any other user-facing "Genesis Park Tycoon" text; keep the in-game default park name and the Genesis theme as they are unless the user says otherwise). Build a proper start-up screen shown before a park begins: game title, New Park (name + biome pick, reusing `biomeCards` in js/main.js and `#introBiomes`), and Continue if a save exists. Choosing a biome locks the park's background biome (`state.biome`, `parkBiome()` in sim.js) for the life of that park: remove the biome picker from the park office dialog (`#menuBiomes` in main.js ~line 163) so it can't be changed, and only a new park (via the start screen) can pick another. Old saves keep their current biome. Add smoke checks that the biome can't be changed mid-park and that a new park can. Update CLAUDE.md where it mentions picking the biome in the park office.
+
 ---
 
 ## Suggested order
-S1, S6, S5 (quick wins), S2, S3, S4, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S19, S18, S20, S22, S23, S24, S17, S21, sprites, S27, S26, S28.
+S1, S6, S5 (quick wins), S29, S2, S3, S4, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16, S19, S18, S20, S22, S23, S24, S17, S21, sprites, S27, S26, S28.
