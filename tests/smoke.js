@@ -17,7 +17,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   const checks = await page.evaluate(() => {
     const out = {};
-    document.querySelector("#introGo").click(); setSpeed(0);
+    // start screen: shown first, no Continue without a save, a new park picks its biome, and nothing changes it mid-park
+    const q = x => document.querySelector(x), sb = state.biome;
+    out.startScreenShown = q("#dlgStart").open && q("#startContinue").hidden && /PALEO-TYCOON/.test(document.title) && /PALEO-TYCOON/.test(q("#dlgStart").textContent);
+    q("#startNew").click();
+    const pickK = Object.keys(BIOMES).find(k => k !== DEFAULT_PARK_BIOME);
+    q(`#startBiomes [data-biome="${pickK}"]`).click(); q("#startName").value = "Smoke Park"; q("#startGo").click();
+    out.newParkPicksBiome = !q("#dlgStart").open && state.biome === pickK && parkBiome() === pickK && state.name === "Smoke Park" && sb === DEFAULT_PARK_BIOME;
+    q("#introGo").click(); setSpeed(0);
+    out.biomeLockedMidPark = !q("#menuBiomes") && !q("#dlgMenu [data-biome]");
+    q("#startBiomes").innerHTML = `<button data-biome="${DEFAULT_PARK_BIOME}"></button>`; q("#startBiomes button").click();
+    out.biomeLockedMidPark = out.biomeLockedMidPark && state.biome === pickK;
+    state.biome = DEFAULT_PARK_BIOME;
     // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
     PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
     window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;

@@ -1,4 +1,4 @@
-<title>Genesis Park Tycoon</title>
+<title>PALEO-TYCOON</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -278,6 +278,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 .biomepick small{font-weight:400;color:var(--ink-2);font-size:11.5px;line-height:1.2}
 .setup{margin-bottom:6px}
 .setup .field{margin-bottom:10px}
+.startTitle{font-size:40px!important;letter-spacing:.04em}
 dialog h2{margin:0 0 8px;font:700 26px/1.1 "Barlow Condensed",sans-serif;text-wrap:balance}
 dialog p{margin:0 0 10px;color:var(--ink-2)}
 dialog ol,dialog ul{margin:0 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
@@ -768,14 +769,21 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   </main>
 </div>
 
-<dialog id="dlgIntro">
-  <h2>Welcome to Genesis Park</h2>
-  <p>You have $150,000 and an empty plot. Turn it into a park people will pay to see.</p>
-  <div class="setup" id="introSetup" hidden>
-    <label class="field"><span>Name your park</span><input id="introName" maxlength="40" placeholder="Genesis Park"></label>
-    <div class="field"><span>Where it's set</span></div>
-    <div class="biomepick" id="introBiomes" role="radiogroup" aria-label="Park biome"></div>
+<dialog id="dlgStart">
+  <h2 class="startTitle">PALEO-TYCOON</h2>
+  <p>Bring the past back to life and build a park people will pay to see.</p>
+  <div class="row" style="margin-bottom:14px"><button class="btn primary" id="startContinue" hidden>Continue</button><button class="btn" id="startNew">New park</button></div>
+  <div class="setup" id="startSetup" hidden>
+    <label class="field"><span>Name your park</span><input id="startName" maxlength="40" placeholder="Genesis Park"></label>
+    <div class="field"><span>Where it's set (this can't be changed later)</span></div>
+    <div class="biomepick" id="startBiomes" role="radiogroup" aria-label="Park biome"></div>
+    <div class="row"><button class="btn primary" id="startGo">Open the park</button></div>
   </div>
+</dialog>
+
+<dialog id="dlgIntro">
+  <h2>Welcome to PALEO-TYCOON</h2>
+  <p>You have $150,000 and an empty plot. Turn it into a park people will pay to see.</p>
   <ol>
     <li><b>Draw an exhibit</b> from Build, Exhibit Tools, Fence Types. Pick a fence, tap corners on the map, then tap the first corner to close it.</li>
     <li><b>Connect it with a path</b> that starts from the entrance at the bottom. Guests only see exhibits beside a path.</li>
@@ -816,8 +824,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <dialog id="dlgMenu">
   <h2>Park office</h2>
   <label class="field" style="margin-bottom:14px"><span>Park name</span><input id="nameInput" maxlength="40"></label>
-  <div class="field"><span>Park biome</span></div>
-  <div class="biomepick" id="menuBiomes" role="radiogroup" aria-label="Park biome"></div>
+  <p id="menuBiome" style="margin-bottom:14px"></p>
   <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
   <p id="saveInfo"></p>
   <div class="row">
