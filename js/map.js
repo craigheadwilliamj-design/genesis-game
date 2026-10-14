@@ -11,9 +11,10 @@ const mapwrap = $("#mapwrap");
 
 const KMIN = 0.4, KMAX = 27.3;      // zoom limits, in screen pixels per meter
 let view = {k:2, tx:0, ty:0};
-// 3/4 view (prototype): the ground is squashed by TILT top to bottom, so it reads as seen at an angle
+// 3/4 view (the only main view): the ground is squashed by TILT top to bottom, so it reads as seen at an angle.
+// The `!tilt` branches below are the old flat top-down drawing; they are dead code now and can be removed piece by piece.
 const TILT = .7;
-let tilt = (() => { try { return localStorage.getItem("gp-tilt") !== "0"; } catch(e){ return true; } })();
+const tilt = true;
 function tf(){ return tilt ? TILT : 1; }
 function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
 function upright(){ return tilt ? ` scale(1 ${(1/TILT).toFixed(4)})` : ""; }   // added to a sprite's transform so it isn't squashed
@@ -2864,13 +2865,7 @@ $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
-// flip the 3/4 view, keeping the middle of the screen where it is
-$("#ztilt").onclick = () => {
-  const {w, h} = svgSize(), wy = (h/2 - view.ty)/ky();
-  tilt = !tilt; try { localStorage.setItem("gp-tilt", tilt ? "1" : "0"); } catch(e){}
-  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt); applyTransform(); render(); syncAnimals();
-};
-$("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt);
+svg.classList.add("tilt");
 $("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Green farms, blue stores, gold exhibits" : "Off"; render(); };
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;

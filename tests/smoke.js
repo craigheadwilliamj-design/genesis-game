@@ -1657,8 +1657,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute();
     out.themeMatchedBonus = derived.themes["e-t"].ok && derived.appeal > appealMixed && themeFitShare(e0) === 1;
     out.themeFitHappier = exhibitReport(e0).target > (e0.theme = "genesis", exhibitReport(e0).target);
-    e0.theme = "volcanic"; const tl0 = tilt; tilt = false; render(); tilt = tl0;   // the exhibit rail is flat-view only
-    out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live) && world.innerHTML.includes(THEMES.volcanic.accent);
+    e0.theme = "volcanic"; render();
+    out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live);   // the accent rail was flat-view only
     state.themes.brush = "volcanic"; state.money = 1e6;
     const bp = {id:"p-n", points:[[260,300],[300,300]]}; themeNew("path", bp);
     out.themeBrush = bp.theme === "volcanic" && state.money < 1e6;
@@ -2228,19 +2228,46 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   }));
 
   // tapping the entrance in select mode opens the Park Office, same as the menu button
-  for(const tl of [true, false]){
+  for(const tl of [true]){
     const pos = await page.evaluate(tl => {
       officeTab = "staff"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
       document.querySelectorAll("dialog[open]").forEach(d => d.close());
-      if(tilt !== tl) document.querySelector("#ztilt").click();
       setTool("select"); view.k = Math.max(view.k, 4); const [gx, gy] = state.gate; view.tx = innerWidth / 2 - gx * view.k; view.ty = innerHeight / 2 - gy * view.k * (tilt ? TILT : 1); render();
       const el = document.querySelector('[data-kind="entrance"]'); if(!el) return null;
       const r = el.querySelector("rect").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height - 3, tilt};
     }, tl);
     let opened = false;
     if(pos){ await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(150); opened = await page.evaluate(() => !sel && officeTab === "office" && !!document.querySelector("#officeName")); }
-    checks[tl ? "entranceTapOpensOffice" : "entranceTapOpensOfficeFlat"] = opened;
+    checks.entranceTapOpensOffice = opened;
   }
+  // the 3/4 toggle is gone; the Park Map dialog opens, draws the park, recenters on a click and closes
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, q = x => document.querySelector(x), d = q("#dlgParkMap");
+    document.querySelectorAll("dialog[open]").forEach(x => x.close());
+    out.noTiltButton = !q("#ztilt") && tilt === true;
+    out.mapButtonThere = !!q("#mapBtn.hbtn");
+    q("#mapBtn").click();
+    out.mapOpens = d.open;
+    const cv = q("#parkMapCv"), g = cv.getContext("2d"), {b, S} = pmapGeo;
+    const px = (x, y) => { const c = g.getImageData(Math.round((x - b.x0) * S), Math.round((y - b.y0) * S), 1, 1).data; return "#" + [...c.slice(0, 3)].map(v => v.toString(16).padStart(2, "0")).join("").toUpperCase(); };
+    const data = g.getImageData(0, 0, cv.width, cv.height).data, seen = new Set();
+    for(let i = 0; i < data.length; i += 4 * 17) seen.add(data[i] + "," + data[i + 1] + "," + data[i + 2]);
+    out.mapNotBlank = cv.width > 100 && seen.size >= 4;
+    const p = state.paths.find(p => !isService(p) && !isWide(p) && !isBridge(p) && !isTram(p));
+    const exs = state.exhibits; state.exhibits = [{id:"e-pm", name:"PM", points:[[200,205],[240,205],[240,240],[200,240]], animals:[], happy:70, cond:100}]; drawParkMap(cv); const e = state.exhibits[0];
+    out.mapShowsPath = !!p && p.points.length > 1 && px((p.points[0][0] + p.points[1][0]) / 2, (p.points[0][1] + p.points[1][1]) / 2).toUpperCase() === PMAP.path.toUpperCase();
+    out.mapShowsExhibit = !!e && (() => { const c = centroid(e.points); return px(c[0], c[1]) === BIOMES[biomeOf(e)].color.toUpperCase(); })(); state.exhibits = exs;
+    // a click recenters the main camera on that spot and closes it
+    const r = cv.getBoundingClientRect(), tx = 150, ty = 100, before = {...view};
+    cv.dispatchEvent(new MouseEvent("click", {clientX: r.left + (tx - b.x0) * S * r.width / cv.width, clientY: r.top + (ty - b.y0) * S * r.height / cv.height, bubbles: true}));
+    const sz = svgSize(), cx = (sz.w / 2 - view.tx) / view.k, cy = (sz.h / 2 - view.ty) / ky();
+    out.mapClickRecenters = !d.open && Math.abs(cx - tx) < 6 && Math.abs(cy - ty) < 6 || (!d.open && (view.tx !== before.tx || view.ty !== before.ty));
+    // Esc and M: open with the key, close with the key; the camera stays
+    document.dispatchEvent(new KeyboardEvent("keydown", {key:"m", bubbles:true})); out.mapKeyOpens = d.open;
+    const v2 = {...view}; document.dispatchEvent(new KeyboardEvent("keydown", {key:"M", bubbles:true})); out.mapKeyCloses = !d.open && view.tx === v2.tx && view.ty === v2.ty && view.k === v2.k;
+    q("#mapBtn").click(); q("#closeParkMap").click(); out.mapCloseButton = !d.open;
+    return out;
+  }));
   // Park Office: brand and Park button open it, every tab renders, renaming updates the HUD, Restart asks first
   Object.assign(checks, await page.evaluate(() => {
     const out = {}, q = x => document.querySelector(x), nm = state.name;
@@ -2273,11 +2300,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
   // the DNA + leaf campus emblem is gone: no helper, no theme field, no emblem circle in the entrance or a science roof (both views)
-  for(const tl of [true, false]) checks[tl ? "noEmblem" : "noEmblemFlat"] = await page.evaluate(tl => {
-    if(tilt !== tl) document.querySelector("#ztilt").click(); render();
+  checks.noEmblem = await page.evaluate(() => {
+    render();
     const els = [...document.querySelectorAll('[data-kind="entrance"], [data-kind="building"]')];
     return typeof emblemSvg === "undefined" && typeof emblemOn === "undefined" && !Object.values(THEMES).some(T => "emblem" in T) && els.every(el => !el.querySelector('circle[r="1.08"]'));
-  }, tl);
+  });
 
   // tapping an animal: the target is the visible sprite, not just its ground spot
   checks.animalTapOnSprite = await page.evaluate(() => {
@@ -2285,8 +2312,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const mk = (id, sp, spr, x, y, r) => ({id, sp, placed:true, spr, viv:false, r, x, y, exhibitId:"none", face:1});
     const exh = state.exhibits.find(e => e.animals.length), a = exh && exh.animals[0];
     if(!a) return true;
-    for(const tl of [true, false]) for(const k of [1.5, 5, 14]){
-      if(tilt !== tl) document.querySelector("#ztilt").click();
+    for(const k of [1.5, 5, 14]){
       view.k = k; herd.clear();
       const [gx, gy] = state.gate;
       for(const [sp, spr] of [["dime", true], ["mega", false], ["coel", true]]){
@@ -2301,7 +2327,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
     }
     herd.clear(); for(const [id, h] of keep) herd.set(id, h);
-    view.k = k0; if(tilt !== t0) document.querySelector("#ztilt").click(); render();
+    view.k = k0; render();
     return ok;
   });
 
@@ -2428,7 +2454,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
     const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed"];
-    const tl = tilt; tilt = true;
     out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
@@ -2448,7 +2473,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 3 && rot === 3;
     if(placed){ const old = JSON.parse(JSON.stringify(placed)); delete old.rot; const snap = JSON.parse(JSON.stringify(state)); snap.buildings = snap.buildings.map(b => b.id === old.id ? old : b); upgradeSave(snap);
       out.oldSaveGetsRot = snap.buildings.find(b => b.id === old.id).rot === 0; }
-    setTool("select"); tilt = tl; render();
+    setTool("select"); render();
     out.propsRenderInGame = !!document.querySelector(`#map [data-id="${placed && placed.id}"]`) || !!document.querySelector(`[data-id="${placed && placed.id}"]`);
     return out;
   });
@@ -2456,7 +2481,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   // viewing platforms: flat pixel deck, front over the exhibit, entry on the path side, at every fence-side direction
   const decks = await page.evaluate(() => {
-    const out = {}, tl = tilt; tilt = true;
+    const out = {};
     const t = BUILDINGS.platform, sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
     const dirs = [0, 1, 2, 3, 4, 5, 6, 7], arts = [], fronts = [];
     let allOk = true;
@@ -2497,7 +2522,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     if(e0){ const [cx, cy] = centroid(e0.points); state.buildings.push({id:"b-maskplat", type:"platform", exhibitId:e0.id, points:rectPts(cx, cy, t.w, t.d, 0), inward:true}); render();
       out.platformCutsPathTexture = !document.querySelector(`#map polygon[fill="#CBC5B4"][points="${polyStr(state.buildings[state.buildings.length - 1].points)}"]`) && !!document.querySelector("#deckcut polygon") && !!document.querySelector('[mask="url(#deckcut)"]'); state.buildings = state.buildings.filter(b => b.id !== "b-maskplat"); render(); }
     else out.platformCutsPathTexture = true;
-    tilt = tl; render();
+    render();
     return out;
   });
   Object.assign(checks, decks);
