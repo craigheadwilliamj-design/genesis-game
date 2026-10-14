@@ -29,6 +29,7 @@ function deterrence(x, y){
   if(litterAt(x, y) >= 6) f *= VANDAL.litterBoost;
   return f;
 }
+// hook: a camera could watch a cone out of its lens (propFront(b)); today it watches the whole circle
 // Is this spot watched by a Security Office's cameras?
 function onCamera(x, y){
   if(!hasTech("cameras")) return false;
