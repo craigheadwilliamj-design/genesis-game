@@ -2485,6 +2485,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   Object.assign(checks, decks);
 
+  // GHOST quality: best upgrades reach 100 in every period, without them it stays under the ceiling, the last steps always converge
+  const ghq = await page.evaluate(() => {
+    const out = {}, sc = state.science, keep = {dna:sc.dna, tech:sc.tech.slice(), sb:state.sandbox, toast:events.toast, log:logScience};
+    state.sandbox = true; events.toast = () => {}; window.logScience = () => {};
+    const run = (period, sp, n) => { sc.dna = {}; for(let i = 0; i < n; i++) tripReturns({period, sp, bay:0, start:0, end:0}); return sc.dna[sp] ? sc.dna[sp].quality : 0; };
+    const old = SPECIES.find(s => s.period === "Devonian");
+    const per = old.period;
+    sc.tech = sc.tech.filter(t => !/^ghostq/.test(t)); if(!sc.unlocked.includes(old.id)) sc.unlocked.push(old.id);
+    const q0 = run(per, old.id, 400);
+    out.ghostNoUpgradesBelowCeiling = q0 < 100 && q0 <= bestQuality(per);
+    sc.tech.push("ghostq1", "ghostq2");
+    out.ghostCeilingIs100 = Object.keys(PERIOD_BY_ID).every(id => bestQuality(id) === 100) && Object.keys(MUSEUM_BY_ID).every(id => bestQuality(id) === 100);
+    out.ghostFullUpgradesReach100 = run(per, old.id, 400) === 100;
+    sc.dna = {[old.id]:{genome:100, quality:99}}; addSample(old.id, 0, 100);
+    out.ghostLastPointMoves = sc.dna[old.id].quality === 100;
+    sc.dna = {[old.id]:{genome:100, quality:50}}; addSample(old.id, 0, 51);
+    out.ghostSmallStepMoves = sc.dna[old.id].quality === 51;
+    window.logScience = keep.log; sc.dna = keep.dna; sc.tech = keep.tech; state.sandbox = keep.sb; events.toast = keep.toast;
+    return out;
+  });
+  Object.assign(checks, ghq);
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }

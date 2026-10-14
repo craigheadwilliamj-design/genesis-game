@@ -251,11 +251,11 @@ const TIME_PERIODS = [
   {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07, quality:[65,98]},
   {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10, quality:[60,96]},
   {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15, quality:[55,95]},
-  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15, quality:[50,90]},
-  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,88]},
-  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,85]},
-  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,80]},
-  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10, quality:[30,75]},
+  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15, quality:[50,92]},
+  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,92]},
+  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,92]},
+  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,92]},
+  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10, quality:[30,92]},
 ];
 
 // Science staff, hired at their department's building
@@ -308,15 +308,15 @@ const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.
 //   learn   extra learning a visit gives (0 to 100 per guest), scaled by the record's quality
 //   joy     mood it adds or takes away. appeal: how much keener guests are to visit the center for it
 const MUSEUM_EVENTS = [
-  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, quality:[30,75], space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
+  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, quality:[30,90], space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
    text:"Walk through a glowing blue-green sea as the first oxygen-makers poison the old air and the iron rusts red."},
-  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, quality:[25,70], space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
+  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, quality:[25,90], space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
    text:"A hall of lava seas, a sky full of rocks, and the Moon hanging huge and close. Nothing lives here yet."},
-  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, quality:[35,80], space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
+  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, quality:[35,90], space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
    text:"A reef tank of trilobites, spined worms and Anomalocaris, when nearly every kind of body suddenly appeared."},
-  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, quality:[35,80], space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
+  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, quality:[35,90], space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
    text:"Follow a Tiktaalik-like fish from the shallows up onto the mud, as fins turn into legs."},
-  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, quality:[40,85], space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
+  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, quality:[40,90], space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
    text:"The worst mass extinction there ever was, told in a dim hall of volcanoes and a dying sea. Sobering."},
   {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, quality:[45,90], space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
    text:"A shaking floor, a fireball overhead, and the end of the dinosaurs. A crowd favorite."},

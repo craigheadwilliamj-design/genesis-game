@@ -139,6 +139,8 @@ const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.ani
 // GHOST upgrade multiplier for "cost" or "speed", and the quality points added to every sample
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
 const ghostQuality = () => GHOST_UPGRADE.quality[hasTech("ghostq2") ? 2 : hasTech("ghostq1") ? 1 : 0];
+// The best quality a trip to this place can bring back right now (with the lab's upgrades)
+const bestQuality = periodId => Math.min(100, placeOf(periodId).quality[1] + ghostQuality());
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
 // What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
@@ -173,7 +175,7 @@ function launchTrip(id, periodId){
 function addSample(sp, gain, q){
   const dna = state.science.dna;
   const d = dna[sp] || (dna[sp] = {genome:0, quality:0});
-  if(d.genome >= 100){ const before = d.quality; if(q > d.quality) d.quality = Math.round(d.quality + (q - d.quality) * .5); return {gain:0, better:d.quality - before}; }
+  if(d.genome >= 100){ const before = d.quality; if(q > d.quality) d.quality = Math.min(q, d.quality + Math.max(1, Math.round((q - d.quality) * .5))); return {gain:0, better:d.quality - before}; }
   const g = Math.min(gain, 100 - d.genome);
   d.quality = Math.round((d.quality * d.genome + q * g) / (d.genome + g));
   d.genome = Math.min(100, Math.round(d.genome + g));
