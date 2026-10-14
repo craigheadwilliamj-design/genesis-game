@@ -1341,6 +1341,13 @@ const ATTACK = {
   crowded:2,           // fights are this many times likelier in a cramped exhibit
   fightHurt:[8, 22],   // severity a fight adds
 };
+// Sex (a.sex, "male" or "female"). No breeding in v1.0; these are light effects. Tunable.
+const SEX = {
+  balance:.8,          // chance a new animal takes the sex its species has fewer of in the park (else a coin flip)
+  lonelyMult:1.5,      // pair and herd species with only one sex in the exhibit grow lonely this much faster
+  happy:-3,            // and the exhibit's happiness target moves by this
+  maleFight:1.3,       // males of aggressive species pick fights this much likelier (see fightBias; S30 animals-attack-animals hooks here)
+};
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
 const ACTS = {
   eat:   {label:"Eating"},

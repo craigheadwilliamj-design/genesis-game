@@ -93,7 +93,21 @@ const isStarter = s => !!(state && state.starters && state.starters.includes(s.i
 // stars the park needs for an animal: none for the starting pool
 const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
 // A new animal's default name: its species tag and a 3-digit counter per species (never reused)
+// Random but roughly balanced: usually the sex its species has fewer of across the park
+function pickSex(sp, st){
+  const s = st || state, n = {male:0, female:0};
+  for(const a of [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
+  if(n.male !== n.female && Math.random() < SEX.balance) return n.male < n.female ? "male" : "female";
+  return Math.random() < .5 ? "male" : "female";
+}
+const sexMark = a => a.sex === "male" ? "M" : a.sex === "female" ? "F" : "";
+// " (2 M, 1 F)" for one species in an exhibit's animal list
+function sexSplit(e, sp){
+  const l = e.animals.filter(a => a.sp === sp && a.sex), m = l.filter(a => a.sex === "male").length;
+  return l.length ? ` <span class="meta">(${m} M, ${l.length - m} F)</span>` : "";
+}
 function nameAnimal(a, st){
+  if(!a.sex) a.sex = pickSex(a.sp, st);
   if(a.name) return a;
   const seq = (st || state).animalSeq || ((st || state).animalSeq = {}), n = (seq[a.sp] || 0) + 1;
   seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
@@ -330,6 +344,9 @@ function upgradeSave(s){
   { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
     for(const a of all) if(a.name) { const m = /^(.*)-(\d+)$/.exec(a.name); if(m && m[1] === a.sp.toUpperCase()) s.animalSeq[a.sp] = Math.max(s.animalSeq[a.sp] || 0, +m[2]); }
     for(const a of all) if(!a.name) nameAnimal(a, s); }
+  // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
+    for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s); }
   return s;
 }
 
