@@ -2695,6 +2695,26 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.paintSurvivesSave = JSON.stringify(loaded.biomePaint.map(p => [p.biome, ...p.r])) === before && loaded.biomePaint.length > 0;
     delete copy.biomePaint;
     out.paintOldSaveDefault = Array.isArray(upgradeSave(copy).biomePaint) && upgradeSave(copy).biomePaint.length === 0 && newPark().biomePaint.length === 0;
+    out.paintExhibitBiome = (() => {
+      const e = {id:"e-pb", name:"Paint", points:[[x, y], [x + 12, y], [x + 12, y + 9], [x, y + 9]], animals:[], land:[], biome:"grassland"};
+      state.exhibits.push(e);
+      const keepP = state.biomePaint; state.biomePaint = []; paintTouch();
+      const T = "desert", box = [x, y, x + 12, y + 9], third = [x, y, x + 4, y + 9];
+      const first = biomeOf(e) === "grassland";
+      paintRect(T, third);
+      const minority = biomeOf(e) === "grassland" && paintShare(e).counts[T] > 0;    // a third painted: the base still wins
+      paintRect(T, [x, y, x + 8, y + 9]);
+      const tipped = biomeOf(e) === T;                                               // two thirds: it tips
+      const free = exhibitPaintCost(box, T) === Math.round(12 * 9 * BIOMES[T].perSqM / 3);   // only the last third costs
+      state.biomePaint = []; paintTouch();
+      const priced = exhibitPaintCost(box, T) === Math.round(108 * BIOMES[T].perSqM) && exhibitPaintCost(box, "grassland") === 0;
+      paintRect(T, box);
+      const drawn = exhibitPaintSvg(e).includes(`url(#b-${T})`) && exhibitPaintSvg(e).includes("clip-path");
+      const panel = biomeHtml(e).includes("Paint ground") && !biomeHtml(e).includes("biomeSel");
+      state.exhibits.pop(); state.biomePaint = keepP; paintTouch();
+      return first && minority && tipped && free && priced && drawn && panel;
+    })();
+    out.vivNeverPainted = (() => { const v = {viv:"S", biome:"desert", points:[[0,0],[5,0],[5,5],[0,5]], animals:[]}; const k = state.biomePaint; state.biomePaint = [{id:"x", biome:"tropical", r:[0,0,5,5]}]; paintTouch(); const ok = biomeOf(v) === "desert"; state.biomePaint = k; paintTouch(); return ok; })();
     out.paintMenuAndTool = !!document.querySelector('#sideMenu [data-tool="paint"]');
     out.paintToolBar = (() => { setTool("paint"); const ok = document.querySelectorAll("#dSizes [data-pickbiome]").length === Object.keys(BIOMES).length + 1 && !$("#dSizes").hidden;
       pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
