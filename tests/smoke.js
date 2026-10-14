@@ -1727,6 +1727,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const f4 = {r:3, sp:"plat", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f4.el.innerHTML = rigSvg("plat", f4);
       const rs = () => { f4.rg.last = performance.now() - 100; rigStep(f4, "rest"); }; rs(); const lockedRest = f4.rg.lock; for(let i = 0; i < 80; i++) rs();
       out.rigRestLock = lockedRest && !f4.rg.lock;
+      // swapped parts (o:1, a frame's v): the Cotylorhynchus shows one of its three heads, open while it walks, shut once it has lain down to sleep
+      const shownHeads = f => [...f.el.querySelector(".rig").children].map((im, i) => [RIGS.coty.parts[i].n, im.style.display !== "none"]).filter(([n, on]) => /HEAD/.test(n) && on).map(([n]) => n).join();
+      const f6 = {r:3, sp:"coty", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f6.el.innerHTML = rigSvg("coty", f6);
+      const openAtFirst = shownHeads(f6) === "COTY_HEAD";
+      for(let i = 0; i < 200; i++){ f6.rg.last = performance.now() - 100; rigStep(f6, "rest"); }
+      const asleep = shownHeads(f6) === "COTY_HEAD_CLOSED";
+      f6.stride = 1; f6.rg.last = performance.now() - 100; rigStep(f6, "walk");
+      out.rigSwap = openAtFirst && asleep && shownHeads(f6) === "COTY_HEAD";
       // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
