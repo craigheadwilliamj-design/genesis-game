@@ -16,9 +16,14 @@ const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
 
 /* ---------- land for sale ---------- */
 // Parcel (i, j) is the cell between PARCELS.xs[i..i+1] and ys[j..j+1]. The home plot's cells are always owned.
-const parcelRect = (i, j) => [PARCELS.xs[i], PARCELS.ys[j], PARCELS.xs[i+1], PARCELS.ys[j+1]];
+const PARCEL_YS = PARCELS.ys.concat(LEGACY_SOUTH_YS);
+const SOUTH_LINE = PARCELS.ys[PARCELS.ys.length - 1];   // the entrance line: the park's hard southern edge
+const parcelRect = (i, j) => [PARCELS.xs[i], PARCEL_YS[j], PARCELS.xs[i+1], PARCEL_YS[j+1]];
+const parcelSouth = (i, j) => PARCEL_YS[j+1] > SOUTH_LINE;   // south of the entrance: never for sale
 const parcelId = (i, j) => i + "," + j;
-const PARCEL_CELLS = (() => { const out = []; for(let i = 0; i < PARCELS.xs.length - 1; i++) for(let j = 0; j < PARCELS.ys.length - 1; j++) out.push([i, j]); return out; })();
+const PARCEL_CELLS = (() => { const out = []; for(let i = 0; i < PARCELS.xs.length - 1; i++) for(let j = 0; j < PARCEL_YS.length - 1; j++) out.push([i, j]); return out; })();
+// Cells that can ever be offered: everything but the legacy rows south of the entrance
+const SALE_CELLS = PARCEL_CELLS.filter(([i, j]) => !parcelSouth(i, j));
 function parcelHome(i, j){ const [x0, y0, x1, y1] = parcelRect(i, j), h = PARCELS.home; return x0 >= h[0] && x1 <= h[2] && y0 >= h[1] && y1 <= h[3]; }
 const ownsParcel = (i, j) => parcelHome(i, j) || (state.parcels || []).includes(parcelId(i, j));
 const parcelArea = (i, j) => { const [x0, y0, x1, y1] = parcelRect(i, j); return (x1 - x0) * (y1 - y0); };
@@ -29,9 +34,12 @@ function parcelRing(i, j){
   return best;
 }
 const parcelPrice = (i, j) => Math.round(parcelArea(i, j) * (PARCELS.rates[Math.min(parcelRing(i, j), PARCELS.rates.length - 1)]) / 100) * 100;
-const parcelTouches = (i, j) => [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCELS.ys.length - 1 && ownsParcel(i + a, j + b));
+const parcelTouches = (i, j) => !parcelSouth(i, j) && [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCEL_YS.length - 1 && ownsParcel(i + a, j + b));
+const parcelsBought = () => (state.parcels || []).length;
 function parcelProblem(i, j){
   if(ownsParcel(i, j)) return "You already own this land.";
+  if(parcelSouth(i, j)) return "No land is for sale south of the entrance.";
+  if(parcelsBought() >= MAX_PARCELS) return `You own the most land allowed (${MAX_PARCELS} of ${MAX_PARCELS} plots).`;
   if(!parcelTouches(i, j)) return "Not for sale yet. Buy the land next to it first.";
   const cost = parcelPrice(i, j);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -47,7 +55,7 @@ function ownedRects(){
   const key = state.parcels.join("|");
   if(ownedCache && ownedCache.state === state && ownedCache.key === key) return ownedCache.rects;
   const rects = [];
-  for(let j = 0; j < PARCELS.ys.length - 1; j++){
+  for(let j = 0; j < PARCEL_YS.length - 1; j++){
     let run = null;
     for(let i = 0; i < PARCELS.xs.length - 1; i++){
       if(ownsParcel(i, j)){ const r = parcelRect(i, j); if(run) run[2] = r[2]; else run = r.slice(); }
@@ -60,7 +68,7 @@ function ownedRects(){
 const inOwned = (x, y, tol = .5) => ownedRects().some(r => x >= r[0] - tol && x <= r[2] + tol && y >= r[1] - tol && y <= r[3] + tol);
 // The park's outer fence line as segments [[x,y],[x,y]]: cell edges with no owned land on the far side
 function ownedEdges(){
-  const out = [], has = (a, c) => a >= 0 && c >= 0 && a < PARCELS.xs.length - 1 && c < PARCELS.ys.length - 1 && ownsParcel(a, c);
+  const out = [], has = (a, c) => a >= 0 && c >= 0 && a < PARCELS.xs.length - 1 && c < PARCEL_YS.length - 1 && ownsParcel(a, c);
   for(const [i, j] of PARCEL_CELLS){
     if(!ownsParcel(i, j)) continue;
     const [x0, y0, x1, y1] = parcelRect(i, j);

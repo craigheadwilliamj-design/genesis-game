@@ -128,7 +128,16 @@ function render(){
   for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
   s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   const bd = ownedEdges().map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
-  s += `<path d="${bd}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  // the southern edge (the entrance line) is a hard wall, open only at the entrance; the other edges stay a dashed property line
+  const wall = [];
+  const bd2 = ownedEdges().filter(([p, q]) => { if(p[1] === SOUTH_LINE && q[1] === SOUTH_LINE){ wall.push([Math.min(p[0], q[0]), Math.max(p[0], q[0])]); return false; } return true; }).map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
+  s += `<path d="${bd2}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(wall.length){
+    const gx = state.gate[0], gap = 6, cuts = [];
+    for(const [a, c] of wall){ if(gx - gap > a && gx + gap < c){ cuts.push([a, gx - gap], [gx + gap, c]); } else cuts.push([a, c]); }
+    const wd = cuts.map(([a, c]) => `M${a} ${SOUTH_LINE}H${c}`).join("");
+    s += `<path d="${wd}" fill="none" stroke="#4A4A42" stroke-width="1.3" stroke-linecap="butt" pointer-events="none"/><path d="${wd}" fill="none" stroke="#8C8C80" stroke-width=".5" transform="translate(0 -.4)" pointer-events="none"/><path d="${wd}" fill="none" stroke="#2E2E28" stroke-width=".4" stroke-dasharray="1.3 1.3" transform="translate(0 .4)" pointer-events="none"/>`;
+  }
 
   const isDoomed = (kind, id) => (doomed && doomed.kind === kind && doomed.id === id) || (tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id);
   const isSel = (kind, id) => sel && sel.kind === kind && sel.id === id;
@@ -1068,7 +1077,7 @@ function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, 
 
 function parcelOverlay(){
   const inv = 1/view.k; let s = "";
-  for(const [i, j] of PARCEL_CELLS){
+  for(const [i, j] of SALE_CELLS){
     if(ownsParcel(i, j)) continue;
     const [x0, y0, x1, y1] = parcelRect(i, j), open = parcelTouches(i, j), on = parcelSel && parcelSel[0] === i && parcelSel[1] === j;
     s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="${on ? "var(--sel)" : open ? "var(--good)" : "var(--ink)"}" fill-opacity="${on ? .3 : open ? .16 : .1}" stroke="${on ? "var(--sel)" : "var(--boundary)"}" stroke-width="${on ? 3 : 1}" stroke-dasharray="${open ? "none" : "6 4"}" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -1896,14 +1905,14 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function updateParcelBar(){
-  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${fmtArea(ownedBox() ? PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0) : 0)} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
+  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${parcelsBought()} of ${MAX_PARCELS} plots bought. ${fmtArea(PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0))} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
   const [i, j] = parcelSel, why = parcelProblem(i, j);
-  showBar("Buy this plot", `${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
+  showBar("Buy this plot", `Plot ${parcelsBought() + 1} of ${MAX_PARCELS}. ${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
   $("#dFinish").disabled = !!why; setStat(why || "", !!why);
 }
 function parcelTap(e){
   const p = toWorld(e.clientX, e.clientY);
-  const c = PARCEL_CELLS.find(([i, j]) => { const r = parcelRect(i, j); return p.x >= r[0] && p.x < r[2] && p.y >= r[1] && p.y < r[3]; });
+  const c = SALE_CELLS.find(([i, j]) => { const r = parcelRect(i, j); return p.x >= r[0] && p.x < r[2] && p.y >= r[1] && p.y < r[3]; });
   parcelSel = c && !ownsParcel(c[0], c[1]) ? c : null;
   updateParcelBar(); renderOverlay();
 }
@@ -2593,15 +2602,24 @@ function deleteMoveCorner(){
 function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:r.height}; }
 function fit(){
   const {w, h} = svgSize(); if(!w || !h) return;
-  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:PARCELS.ys[PARCELS.ys.length-1]} : ownedBox(), pad = 40;
+  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:SOUTH_LINE} : ownedBox(), pad = 40;
   view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/((b.y1 - b.y0)*tf())), KMIN, KMAX);
   view.tx = (w - (b.x1 - b.x0)*view.k)/2 - b.x0*view.k;
   view.ty = (h - (b.y1 - b.y0)*ky())/2 - b.y0*ky();
   render();
 }
+// Keep the park on screen: the view can't scroll more than a margin past the land you own (a thin one to the south, where there's nothing)
+function clampView(){
+  const {w, h} = svgSize(); if(!w || !h) return;
+  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:SOUTH_LINE} : ownedBox(), k = view.k, kk = ky(), m = 60;
+  // world x/y at the screen center must stay within the box plus a margin
+  const cx = (w/2 - view.tx)/k, cy = (h/2 - view.ty)/kk;
+  const nx = clamp(cx, b.x0 - m, b.x1 + m), ny = clamp(cy, b.y0 - m, b.y1 + 20);
+  view.tx = w/2 - nx*k; view.ty = h/2 - ny*kk;
+}
 function zoomAt(mx, my, f){
   const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/ky();
-  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender();
+  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); clampView(); queueRender();
 }
 function centerOn(it){
   if(!it) return;
@@ -2750,7 +2768,7 @@ svg.addEventListener("pointermove", e => {
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if(!drag.moved && Math.hypot(dx, dy) < 6) return;
   drag.moved = true;
-  view.tx = drag.tx + dx; view.ty = drag.ty + dy; applyTransform();
+  view.tx = drag.tx + dx; view.ty = drag.ty + dy; clampView(); applyTransform();
 });
 
 function endPointer(e){

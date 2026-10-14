@@ -87,6 +87,27 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         JSON.stringify(upgradeSave({...JSON.parse(JSON.stringify(state)), parcels:undefined}).parcels) === "[]";
       state.parcels = keep; state.money = m0;
     }
+    // S33: nothing for sale south of the entrance, a hard southern barrier, a 15-plot cap, old saves keep their land
+    {
+      const m0 = state.money, keep = state.parcels.slice(); state.money = 1e9;
+      const south = PARCEL_CELLS.filter(([i, j]) => parcelRect(i, j)[3] > state.gate[1]);
+      state.parcels = PARCEL_CELLS.filter(([i, j]) => !parcelSouth(i, j)).map(([i, j]) => parcelId(i, j)).slice(0, 5);
+      out.noSouthParcels = south.length > 0 && SALE_CELLS.every(([i, j]) => parcelRect(i, j)[3] <= state.gate[1]) && PARCELS.ys[PARCELS.ys.length-1] === state.gate[1] &&
+        south.every(([i, j]) => !!parcelProblem(i, j) && !buyParcel(i, j) && !parcelTouches(i, j));
+      out.southBarrier = !insidePlot([[100,200],[100,310]]) && !insidePlot([[100,306],[120,306]]) && insidePlot([[100,200],[100,305]]) &&
+        !!pathProblem([[200,290],[200,320]], "path") && !!decorProblem(Object.keys(LAND).find(k => k.startsWith("q-")), 200, 312) ;
+      out.southEdgeWall = ownedEdges().every(([p, q]) => p[1] <= state.gate[1] && q[1] <= state.gate[1]);
+      state.parcels = [];
+      // buy outward from the home plot until the cap
+      for(let pass = 0; pass < 20 && state.parcels.length < MAX_PARCELS; pass++) for(const [i, j] of SALE_CELLS) if(state.parcels.length < MAX_PARCELS && !ownsParcel(i, j) && !parcelProblem(i, j)) buyParcel(i, j);
+      const left = SALE_CELLS.find(([i, j]) => !ownsParcel(i, j) && parcelTouches(i, j)), why16 = left ? parcelProblem(left[0], left[1]) : "";
+      out.parcelCap = state.parcels.length === MAX_PARCELS && !!left && /allowed/.test(why16) && !buyParcel(left[0], left[1]) && state.parcels.length === MAX_PARCELS;
+      // an old save that owns south land keeps it
+      state.parcels = [parcelId(2, 5), parcelId(2, 6)];
+      const old = upgradeSave(JSON.parse(JSON.stringify(state)));
+      out.oldSouthSave = old.parcels.length === 2 && ownsParcel(2, 5) && ownsParcel(2, 6) && insidePlot([[100,320],[100,350]]) && !ownedEdges().some(([p, q]) => p[1] > 505);
+      state.parcels = keep; state.money = m0;
+    }
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
     out.oldSaveStarters = upgradeSave(oldS).starters.join() === "arth,lyst,hyps";
 
