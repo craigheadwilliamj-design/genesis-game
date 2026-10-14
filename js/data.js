@@ -2050,7 +2050,6 @@ const THEMES = {
       ridge:[[{c:"#10261A", w:3.6}, {c:"#C9A24B", w:1.5}], null, null],
       units:[null, {c:"#B3AEA1", c2:"#6F6B61", n:3, min:150}, null]},
     eave:{c:"#14281C", w:1.8},
-    emblem:["oracle", "ghost", "tar", "ceres"],
     // dark green steel rail: two rails with a small gold cap on each post. Dangerous animals get a tall steel panel wall on a concrete base with a gold band along the top.
     bord:{c:"#1F3D2B", w:5, trim:[{c:"#C9A24B", w:1}],
       more:[{c:"#CBC5B4", w:1.5}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}],
