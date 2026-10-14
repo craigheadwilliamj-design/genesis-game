@@ -137,6 +137,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S37 (S): Remove the DNA + leaf emblem everywhere** Best after S34 (entrance building)
 > The campus emblem (DNA + leaf, `emblemSvg`/`emblemOn` in js/themes.js, `THEMES[x].emblem` list `oracle, ghost, tar, ceres` in data.js ~line 2035) is drawn on the roofs of the four science buildings and on the entrance (map.js ~line 288, or wherever S34's new entrance building draws it). Remove it from all of them in the flat and 3/4 views, and make sure nothing reintroduces it.
 
+**S38 (S): Animal tap targets centered on the sprite**
+> `animalAt` (js/animalui.js ~line 77) hit-tests against the animal's ground position `h.x,h.y` with a minimum reach of 12 px, so small animals are hard to tap because the drawn sprite sits above/around that point. Center the target on the visible sprite (its box from `SPRITES` ratio/size, `spriteSvg`/rig height, flip, 3/4 view lift) and make the reach at least the sprite's size on screen with a sensible minimum for tiny or zoomed-out animals; prefer the nearest sprite center and keep dots/vivarium animals working.
+
 ---
 
 ## Suggested order
