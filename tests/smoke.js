@@ -2089,6 +2089,73 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // vivariums ignore all of it
       const viv = mk("e-sx14", lid, [M, M]); viv.viv = true; state.exhibits = [viv];
       out.vivariumImmune = socialInfo(viv).size === 0 && behaviorScore(viv).issues.every(i => !/^Social/.test(i.text)) && rankPos(viv, viv.animals[0]) === null;
+      // packs: family units with an alpha pair, not herds
+      {
+        const pk = SPECIES.find(s => traitsOf(s).social === "pack" && s.group[0] >= 3), kid = pk.id, min = pk.group[0];
+        const pin = (e, id) => socialInfo(e).get(id);
+        const full = mk("e-pk1", kid, [M, F, M, F, M]), bach2 = mk("e-pk2", kid, [M, M, M, M]), mat2 = mk("e-pk3", kid, [F, F, F, F]), two2 = mk("e-pk4", kid, [M, M, F, F]);
+        state.exhibits = [full, bach2, mat2, two2];
+        const ps = [full, bach2, mat2, two2].map(e => pin(e, kid));
+        out.packNotHerd = ps.every(i => i.kind === "pack" && !i.fights) && pin(bach2, kid).delta !== SOCIAL.bachelor && pin(mat2, kid).delta !== SOCIAL.matriarch && !/bachelor|fighting/.test(pin(two2, kid).text);
+        // alpha pair: a male and a female lead when both sexes are there; a single-sex pack has none
+        const o = pin(full, kid).order;
+        out.packAlphaPair = pin(full, kid).pair && o[0].sex !== o[1].sex && o[0].rank <= o.slice(2).reduce((m, a) => Math.min(m, a.rank), 1) + 1e-9 && !pin(full, kid).bad
+          && !pin(bach2, kid).pair && /No alpha pair/.test(pin(bach2, kid).text) && /No alpha pair/.test(pin(mat2, kid).text);
+        out.packRankShown = rankPos(full, o[1]).pack && rankPos(full, o[1]).i === 1 && rankPos(full, o[0]).i === 0;
+        // too small: stressed and lonely, one alone is the worst case
+        const alone = mk("e-pk5", kid, [M]), few = mk("e-pk6", kid, [M, F]);
+        state.exhibits = [full, alone, few];
+        const st = (e) => socialStress(e.animals[0], pin(e, kid))[0];
+        out.packTooSmall = pin(alone, kid) && /Pack too small/.test(pin(alone, kid).text) && (min === 2 || /Pack too small/.test(pin(few, kid).text)) && st(alone) > st(few) && st(few) >= 0 && st(full) === 0 && pin(alone, kid).delta < pin(few, kid).delta && pin(few, kid).delta <= pin(full, kid).delta;
+        for(const e of [alone, full]) e.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const lone0 = needsOf(alone.animals[0]).lonely, lone1 = needsOf(full.animals[0]).lonely;
+        const ctxA = behaviorCtx(alone), ctxF = behaviorCtx(full);
+        needsStep(alone, alone.animals[0], pk, ctxA, 30); needsStep(full, full.animals[0], pk, ctxF, 30);
+        out.packLonely = needsOf(alone.animals[0]).lonely - lone0 > needsOf(full.animals[0]).lonely - lone1 && /Pack too small/.test(behaviorScore(alone).issues.map(i => i.text).join(" "));
+        // the alpha pair eats first: a shortage lands on subordinates, and they get hungrier sooner
+        const fk = {day:state.day, from:state.staff.feedFrom, stock:full.stock};
+        state.staff.feedFrom = 0; full.stock = {};
+        const foodKind = Object.keys(dailyNeed(full))[0];
+        full.stock[foodKind] = (dailyNeed(full)[foodKind] || 1) * .1; eatTick(1);
+        const fd = packFeed.get(full.id);
+        out.packEatsFirst = !!fd && fd.sub > fd.top && fd.sub > 0;
+        full.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const ctxS = behaviorCtx(full), alphaA = pin(full, kid).order[0], subA = pin(full, kid).order[3];
+        needsStep(full, alphaA, pk, ctxS, 30); needsStep(full, subA, pk, ctxS, 30);
+        out.packLowRankHungrier = needsOf(subA).hunger > needsOf(alphaA).hunger;
+        full.stock = {[foodKind]:(dailyNeed(full)[foodKind] || 1) * 3}; eatTick(1);
+        out.packFedNoShortage = !packFeed.has(full.id);
+        state.staff.feedFrom = fk.from; full.stock = fk.stock;
+        // hunting together: more hunters, better odds; a joint hunt pulls mates in
+        full.animals.forEach(a => a.act = "rest");
+        const c1 = behaviorCtx(full); full.animals[0].act = "hunt"; const c2 = behaviorCtx(full); full.animals[1].act = "hunt"; full.animals[2].act = "hunt"; const c3 = behaviorCtx(full);
+        out.packHuntsTogether = packHuntBoost(full, full.animals[0], c1) === 1 && packHuntBoost(full, full.animals[0], c2) === 1 && packHuntBoost(full, full.animals[0], c3) > 1 && ATTACK.huntChance * packHuntBoost(full, full.animals[0], c3) <= PACK.huntMax + 1e-9;
+        full.animals.forEach(a => a.act = "rest");
+        // challenges: none without stress, rare with it
+        full.animals.forEach(a => { a.need = freshNeeds(); a.hitAt = -1e9; }); const calm = behaviorCtx(full);
+        const rk = full.animals.map(a => a.rank), toastKeep = events.toast, fxKeep2 = events.fx; events.toast = () => {}; events.fx = () => {};
+        let calmN = 0; for(let i = 0; i < 3000; i++) if(packChallenge(full, pin(full, kid), calm, 1e6 + i * 100)) calmN++;
+        out.packCalmNoChallenge = calmN === 0 && full.animals.every((a, i) => a.rank === rk[i]);
+        const roomy = {...calm, ratio:.5}; let hotN = 0;
+        for(let i = 0; i < 3000; i++){ full.animals.forEach(a => { delete a.sick; a.hitAt = -1e9; }); if(packChallenge(full, pin(full, kid), roomy, 1e6 + i * 100)) hotN++; }
+        const noPairN = (() => { let n = 0; for(let i = 0; i < 3000; i++){ bach2.animals.forEach(a => { delete a.sick; a.hitAt = -1e9; }); if(packChallenge(bach2, pin(bach2, kid), calm, 1e6 + i * 100)) n++; } return n; })();
+        out.packChallengesRareUnderStress = hotN > 0 && hotN < 3000 * .05 && noPairN > 0 && noPairN < 3000 * .05;
+        events.toast = toastKeep; events.fx = fxKeep2;
+        // vivariums ignore all of it
+        const pv = mk("e-pk7", kid, [M, M, F]); pv.viv = true; state.exhibits = [pv];
+        pv.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const pvc = behaviorCtx(pv), pvStress = stressTarget(pv, pv.animals[0], pk, pvc);
+        packFeedStep(pv, .8);
+        out.packVivariumImmune = socialInfo(pv).size === 0 && rankPos(pv, pv.animals[0]) === null && !packFeed.has(pv.id) && packHuntBoost(pv, pv.animals[0], {hunting:new Map([[kid, 3]])}) === 1
+          && behaviorScore(pv).issues.every(i => !/^Social/.test(i.text)) && pvc.hunting.size === 0;
+        const pvAlone = mk("e-pk8", kid, [M]); pvAlone.viv = true; state.exhibits = [pvAlone];
+        out.packVivariumAloneFine = socialInfo(pvAlone).size === 0;
+        // old saves load: nothing new is saved
+        const oldP = JSON.parse(JSON.stringify(state)); oldP.exhibits = [mk("e-pk9", kid, [M, F])]; for(const a of oldP.exhibits[0].animals) delete a.rank;
+        out.packOldSave = upgradeSave(oldP).exhibits[0].animals.every(a => typeof a.rank === "number");
+       
+        state.exhibits = [alone]; out.packPanelShows = /Social/.test(behaviorHtml(alone)) && /Pack too small/.test(behaviorHtml(alone));
+      }
       // old saves get ranks
       const old2 = JSON.parse(JSON.stringify(state)); old2.exhibits = [mk("e-sx15", herd, [M, F])]; for(const a of old2.exhibits[0].animals) delete a.rank;
       out.rankMigrated = upgradeSave(old2).exhibits[0].animals.every(a => typeof a.rank === "number");

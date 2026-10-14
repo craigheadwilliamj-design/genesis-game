@@ -100,14 +100,25 @@ const byRank = (x, y) => (x.rank ?? .5) - (y.rank ?? .5) || (x.id < y.id ? -1 : 
 function rankPos(e, a){
   const t = traitsOf(SPECIES_BY_ID[a.sp]);
   if(e.viv || (t.social !== "herd" && t.social !== "pack")) return null;
-  const l = e.animals.filter(v => v.sp === a.sp).sort(byRank);
+  const l = e.animals.filter(v => v.sp === a.sp);
+  if(t.social === "pack") { const o = packOrder(l).order; return o.length > 1 ? {i:o.indexOf(a), n:o.length, pack:true} : null; }
+  l.sort(byRank);
   return l.length > 1 ? {i:l.indexOf(a), n:l.length} : null;
+}
+// A pack's pecking order: the best-ranked animal and the best-ranked of the other sex lead (the alpha pair), then everyone else by rank.
+// {order, pair: true when the two leaders are a male and a female}
+function packOrder(list){
+  const sorted = list.slice().sort(byRank), a1 = sorted[0];
+  if(!a1) return {order:[], pair:false};
+  const mate = sorted.find(x => x !== a1 && x.sex && a1.sex && x.sex !== a1.sex) || sorted[1];
+  if(!mate) return {order:sorted, pair:false};
+  return {order:[a1, mate, ...sorted.filter(x => x !== a1 && x !== mate)], pair:!!(a1.sex && mate.sex && a1.sex !== mate.sex)};
 }
 // What the mix of sexes means for each species with two or more in an open exhibit: a Map of species id to
 // {sp, name, kind, m, f, n, text, bad, delta, fights, low (male id -> 0 alpha to 1 bottom), spaceMult, ...}. Empty for a vivarium.
 function socialInfo(e, ratio){
   const out = new Map();
-  if(e.viv || e.animals.length < 2) return out;
+  if(e.viv || e.animals.length < 1) return out;
   const by = new Map();
   for(const a of e.animals){ if(!a.sex) continue; const r = by.get(a.sp) || {m:[], f:[]}; r[a.sex === "male" ? "m" : "f"].push(a); by.set(a.sp, r); }
   if(ratio == null){ let need = 0; for(const a of e.animals) need += SPECIES_BY_ID[a.sp].space; ratio = need ? area(e.points) / need : 9; }
@@ -115,9 +126,21 @@ function socialInfo(e, ratio){
   let room, cov;
   for(const [sp, r] of by){
     const s = SPECIES_BY_ID[sp], k = traitsOf(s).social, m = r.m.length, f = r.f.length, n = m + f;
-    if(n < 2) continue;
+    if(n < 2 && k !== "pack") continue;
     const i = {sp, name:s.name, kind:k, m, f, n, text:"", bad:false, delta:0, fights:false, spaceMult, males:r.m, low:new Map(), relief:0};
-    if(k === "solitary"){
+    if(k === "pack"){
+      // a family unit, not a herd: no bachelor or matriarch bonus, no male rivalry; size, an alpha pair and food decide how it does
+      const P = PACK, min = s.group[0], po = packOrder(r.m.concat(r.f)), feed = packFeed.get(e.id), small = n < min;
+      i.pack = true; i.min = min; i.small = small; i.alone = n === 1; i.pair = po.pair; i.order = po.order; i.top = new Set(po.order.slice(0, 2).map(a => a.id)); i.short = !!feed && feed.sub >= .2;
+      const parts = [];
+      if(i.alone) parts.push(`Pack too small. A lone ${s.name} is anxious and lonely: they live in packs of ${min} or more.`);
+      else if(small) parts.push(`Pack too small. ${s.name} live in packs of ${min} or more, and there are only ${n}.`);
+      if(!po.pair) parts.push(i.alone ? "No alpha pair." : `No alpha pair. ${m ? "Only males" : "Only females"} lead the ${s.name}; a male and a female should.`);
+      if(i.short) parts.push("Short of food. The alpha pair eats first and the rest go hungry.");
+      i.bad = !!parts.length;
+      i.text = parts.length ? parts.join(" ") : `A settled ${s.name} pack, led by an alpha pair.`;
+      i.delta = (small ? -P.smallHappy * (min - n) / Math.max(1, min - 1) * (i.alone ? P.aloneMult : 1) : 0) - (po.pair ? 0 : P.noPairHappy) + (i.bad ? 0 : P.settled);
+    } else if(k === "solitary"){
       if(room == null){ room = clamp((ratio - 1) / (S.roomFull - 1), 0, 1); const c = coverOf(e); cov = c.need ? clamp(c.have / c.need, 0, 1) : 1; }
       const w = wantsOf(e, s), h = haveOf(e, s), rock = w.rock ? clamp(h.rock / w.rock, 0, 1) : 1;
       i.relief = Math.min(S.max, S.relief.room * room + S.relief.rock * rock + S.relief.cover * cov);
@@ -152,6 +175,10 @@ function socialStress(a, i){
   if(!i || !a.sex) return [0, ""];
   const S = SOCIAL;
   if(i.kind === "solitary") return [i.pen(a), "it's a loner and has company"];
+  if(i.kind === "pack"){
+    const P = PACK, short = i.small ? (i.alone ? P.aloneStress : P.smallStress * (i.min - i.n) / Math.max(1, i.min - 1)) : 0, noPair = !i.pair && !i.top.has(a.id) ? P.noPairStress : 0;
+    return [short + noPair, short >= noPair ? (i.alone ? "it's alone without a pack" : "its pack is too small") : "there is no alpha pair"];
+  }
   if(i.kind === "pair") return [i.odd === a.sex ? S.pairStress : 0, "it has no mate of the other sex"];
   if(i.fights) return [S.rivalStress * Math.min(i.m - 1, S.rivalCap) * i.spaceMult * (a.sex === "male" ? .6 + .4 * (i.low.get(a.id) || 0) : .25), "the males are fighting"];
   return [0, ""];
@@ -170,6 +197,29 @@ function rivalFight(e, i, now){
     const n = needsOf(l); n.stress = Math.min(100, n.stress + SOCIAL.loseStress * (.5 + .5 * low));
   }
 }
+// Rank challenges in a pack are rare and only come under stress: hungry subordinates (the alphas eat first), a cramped pen, or no alpha pair.
+// A subordinate takes on someone in the alpha pair (or the top animal with no pair); a win swaps their ranks. Either way the loser is hurt and stressed.
+function packChallenge(e, i, ctx, now){
+  const P = PACK, ord = i.order;
+  if(ord.length < 3 && i.pair) return false;
+  if(ord.length < 2) return false;
+  const subs = ord.slice(2).filter(a => !a.darted && !(a.sick && a.sick.kind === "injury") && now - (a.hitAt ?? -1e9) >= ATTACK.gap);
+  const hungry = subs.some(a => a.need && (a.need.hunger >= P.hungerLine || a.need.stress >= P.stressLine));
+  const feed = packFeed.get(e.id);
+  const drivers = (hungry && feed && feed.sub >= .2 ? 1 : 0) + (ctx.ratio < 1 ? 1 : 0) + (i.pair ? 0 : 1);
+  if(!drivers || Math.random() >= P.challengeRate * drivers) return false;
+  const pool = subs.length ? subs : ord.slice(1);   // with no subordinates (a pair), the second takes on the first
+  const c = pool[Math.floor(Math.random() * pool.length)], t = ord[subs.length ? Math.floor(Math.random() * 2) : 0];
+  if(!c || c === t || t.darted) return false;
+  const win = Math.random() < P.upset;
+  const [w, l] = win ? [c, t] : [t, c];
+  c.hitAt = t.hitAt = now;
+  if(win){ const r = c.rank; c.rank = t.rank; t.rank = r; }
+  if(hurtAnimal(e, l, SPECIES_BY_ID[l.sp].name, "fight", P.hurt, 0, `A ${SPECIES_BY_ID[l.sp].name} challenged the pack leaders in ${e.name}.`) === "hurt"){
+    const n = needsOf(l); n.stress = Math.min(100, n.stress + P.loseStress);
+  }
+  return true;
+}
 function behaviorCtx(e){
   const counts = speciesCounts(e), kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
   let need = 0; for(const s of kinds) need += s.space * counts.get(s.id);
@@ -185,6 +235,8 @@ function behaviorCtx(e){
     enrich:enrichment(e), x:exposure(e), dirt:e.dirt || 0, free:freeFeeding(), comfort:new Map(),
   };
   ctx.soc = socialInfo(e, ctx.ratio);
+  ctx.hunting = new Map();   // species id -> how many are in the hunt act (packs hunt together)
+  if(!e.viv) for(const a of e.animals) if(a.act === "hunt") ctx.hunting.set(a.sp, (ctx.hunting.get(a.sp) || 0) + 1);
   return ctx;
 }
 const foodOk = (e, s, ctx) => ctx.free || stockFor(e, foodType(s)) > .01;
@@ -211,7 +263,7 @@ function stressTarget(e, a, s, ctx, why){
   if(c > hi) add(agg ? 22 : 15, `there are too many ${s.name}`);
   { const [v, text] = socialStress(a, ctx.soc.get(s.id)); add(v, text); }
   if(T.social === "herd") { if(c >= lo) t -= 5; else add(15, "its herd is too small to feel safe"); }
-  if(T.social === "pack" && c < lo) add(10, "its pack is too small");
+  if(T.social === "pack" && c < lo && !ctx.soc.has(s.id)) add(10, "its pack is too small");   // an open exhibit's pack is handled by socialStress
   add(ctx.x * 25, "it's out in the weather");
   if(ctx.dirt > CLEAN.penaltyFrom) add((ctx.dirt - CLEAN.penaltyFrom) * .5, "the exhibit is dirty");
   if(a.sick && !a.sick.chronic) add(12, "it's sick or hurt");
@@ -246,6 +298,8 @@ function pickAct(e, a, s, ctx){
     sc[key] = n.hunger * 1.1;
   }
   if(huntDriven(a) && preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5);   // prey in the exhibit: stalk it
+  const pk = T.social === "pack" && ctx.soc.get(s.id) ? (ctx.hunting.get(s.id) || 0) - (cur === "hunt" ? 1 : 0) : 0;   // pack mates already hunting: join in
+  if(pk > 0 && huntDriven(a) && preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5 + PACK.huntJoin * Math.min(pk, 3));
   if(n.thirst > floor + 5) sc.drink = n.thirst * 1.15;
   sc.rest = (1 - aw) * 80 + n.discomfort * .25;
   if(n.stress > 30) sc.hide = (n.stress - 15) * {skittish:1.4, curious:.8, aggressive:.5}[T.temper] * (ctx.cover ? 1 : .7);
@@ -277,8 +331,12 @@ function needsStep(e, a, s, ctx, dt){
   const temper = {curious:1.4, skittish:.8, aggressive:1.1}[T.temper] * (T.temper === "curious" ? 1 - .3 * ctx.seen : 1);   // curious ones like watching the guests
   n.bored += B.bored * dt * aw * temper * (1.4 - ctx.enrich);
   if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1); else n.lonely -= B.social * dt;
+  const pk = T.social === "pack" ? ctx.soc.get(s.id) : null;
+  if(pk && pk.small) n.lonely += B.lonely * dt * PACK.lonelyExtra * (pk.alone ? 2 : 1);   // too few to feel like a pack
+  const lack = pk && packFeed.get(e.id); const mine = lack ? (pk.top.has(a.id) ? lack.top : lack.sub) : 0;
+  if(mine > 0) n.hunger += B.hunger * dt * (.5 + .5 * aw) * PACK.lackHunger * mine;   // the alphas eat first, so a shortage reaches the rest sooner
   switch(a.act){
-    case "eat": if(food) n.hunger -= B.eat * dt; break;
+    case "eat": if(food) n.hunger -= B.eat * dt * (1 - PACK.lackBlock * mine); break;
     case "hunt": n.bored -= B.forage * dt; break;   // the stalk is the best part
     case "forage": n.bored -= (ctx.browse ? B.forage : B.graze) * dt; if(ctx.browse && !isHunter(s)) n.hunger -= B.browse * dt; break;
     case "drink": if(n.thirst > floor) n.thirst = Math.max(floor, n.thirst - B.drink * dt); break;
@@ -444,7 +502,7 @@ function attackStep(e, ctx){
   const list = e.animals, A = ATTACK;
   if(list.length < 2) return;
   const now = nowAbs();
-  if(ctx.soc) for(const i of ctx.soc.values()) if(i.fights) rivalFight(e, i, now);
+  if(ctx.soc) for(const i of ctx.soc.values()){ if(i.fights) rivalFight(e, i, now); else if(i.pack) packChallenge(e, i, ctx, now); }
   for(const a of [...list]){
     if(!list.includes(a) || a.darted || now - (a.hitAt ?? -1e9) < A.gap) continue;
     const s = SPECIES_BY_ID[a.sp]; if(!s) continue;
@@ -456,7 +514,7 @@ function attackStep(e, ctx){
         const p = bodyPos(v), d = me && p ? Math.hypot(p.x - me.x, p.y - me.y) - (me.r || 1) - (p.r || 1) : 0;
         if(d < bd){ bd = d; prey = v; }
       }
-      if(prey && bd <= A.strike && Math.random() < (me ? A.huntChance : A.huntChance * .66)){
+      if(prey && bd <= A.strike && Math.random() < (me ? A.huntChance : A.huntChance * .66) * packHuntBoost(e, a, ctx)){
         a.hitAt = now; hurtAnimal(e, prey, s.name, "hunt", A.bite, A.kill);
         continue;
       }
@@ -474,6 +532,11 @@ function attackStep(e, ctx){
   }
 }
 
+// A pack hunts as one: each extra pack mate in the hunt act adds PACK.huntBonus to the strike chance (1 for a lone hunter or a vivarium), and it never goes over PACK.huntMax in all
+function packHuntBoost(e, a, ctx){
+  const h = !e.viv && traitsOf(SPECIES_BY_ID[a.sp]).social === "pack" && ctx.hunting ? ctx.hunting.get(a.sp) || 0 : 0;
+  return h > 1 ? Math.min(1 + PACK.huntBonus * (h - 1), PACK.huntMax / ATTACK.huntChance) : 1;
+}
 // How far a point is from a shape's edge (0 inside)
 function distToPoly(x, y, pts){
   if(inPoly(x, y, pts)) return 0;

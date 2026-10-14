@@ -731,6 +731,7 @@ function eatTick(dtMin){
     e.stock = e.stock || {};
     const need = dailyNeed(e);
     e.grassFed = false;
+    let want = 0, unmet = 0, cover = 1;   // for the pack pecking order below
     // time spent with some food run out makes animals more likely to fall ill
     if(!free && Object.keys(need).some(t => stockFor(e, t) <= 0.01)) e.hungryMin = (e.hungryMin || 0) + dtMin;
     for(const t of Object.keys(need)){
@@ -739,12 +740,24 @@ function eatTick(dtMin){
       let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN) * (1 - browseShare(e, t, need[t]));
       eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
-      e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat);
+      want += eat; cover = Math.min(cover, clamp(has / ((need[t] || 1) * PACK.pile), 0, 1));
+      e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat); unmet += Math.max(0, eat);
       // out of Paleoflora: they eat the grass hay instead
       if(t === "paleoflora" && eat > 0 && (e.stock.plants || 0) > 0 && !need.plants){ e.stock.plants = Math.max(0, e.stock.plants - eat); e.grassFed = true; }
       else if(t === "paleoflora" && (e.stock.paleoflora || 0) <= 0 && (e.stock.plants || 0) > 0) e.grassFed = true;
     }
+    packFeedStep(e, free ? 0 : Math.max(want ? unmet / want : 0, 1 - cover));
   }
+}
+// Packs eat in rank order: the alpha pair first, then the rest. The shortage (0 to 1, of what the whole exhibit wants: food unmet this tick, or a pile under
+// PACK.pile of a day's need) lands on the subordinates first. packFeed: exhibit id -> {sub, top}, the share each tier goes without. Open exhibits only.
+const packFeed = new Map();
+function packFeedStep(e, lack){
+  if(e.viv || lack <= 0){ packFeed.delete(e.id); return; }
+  const n = e.animals.length, top = Math.min(2, n), subs = n - top;
+  if(!subs){ packFeed.set(e.id, {sub:0, top:lack}); return; }
+  const miss = lack * n;   // animal-shares of food missing
+  packFeed.set(e.id, {sub:Math.min(1, miss / subs), top:Math.min(1, Math.max(0, miss - subs) / top)});
 }
 
 // Each night keepers go home and come back rested
