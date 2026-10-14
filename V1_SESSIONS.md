@@ -116,6 +116,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S30 (M): Animals attack other animals** Best after S10 (reuses its dust-cloud hook)
 > Today predators never attack other animals: `predator:true` species can only be housed with their own kind (data.js ~line 59), and `hunt` in behavior.js is only a stalking animation. Wire in real animal-on-animal attacks: (1) loose/escaped predators attack animals in exhibits they reach, (2) fights inside an exhibit between aggressive or stressed animals (`temper`, `a.need.stress`, crowding via `cramped`), (3) if a predator ends up with prey (breach, transfer, dev-mode), it hunts it. Attacks cause injuries and deaths through the existing health/medicine system (js/medicine.js `injuryChance`, deaths queue in main.js), show in the death dialog with cause, fire the S10 dust-cloud hook, and are tunable from a constant in data.js. Smoke checks for each case.
 
+**S31 (M): Animal sex, chosen when ordering from TAR** Best after S8 (animal panel)
+> No animal has a sex today and there is no breeding code. Give every animal `a.sex` ("male"/"female"). The TAR clone order (`orderClone`, js/science.js ~line 226; ordering UI in js/scienceui.js and the exhibit panel's Cloning tab, js/ui.js) lets the player pick male or female per animal ordered, stored on the clone job and carried to the hatched animal. Partner-park starter animals and old saves get a random or balanced sex (migrate in `upgradeSave`). Show sex in the animal panel and exhibit lists. Light effects only, tunable in data.js: pair/herd species that lack both sexes get a small happiness/`lonely` penalty (`matesWanted`, js/behavior.js), and males of aggressive species can fight more (hook for S30). No breeding or eggs in v1.0.
+
 ---
 
 ## Suggested order
