@@ -191,11 +191,12 @@ function exhibitHtml(e){
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"animals", label:"Animals", color:"#4E7F2E"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
   if((exTabs.tab === "land" || exTabs.tab === "props") && e.viv) exTabs.tab = "main";
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
@@ -791,6 +792,8 @@ panelEl.addEventListener("click", e => {
   if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
+  if(a === "animalOpen"){ const an = animalById(b.dataset.id); if(an){ animalSelName = an.name; select("animal", an.id); } return; }
+  if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }

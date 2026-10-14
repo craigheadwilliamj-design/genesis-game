@@ -2217,6 +2217,30 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return ok;
   });
 
+  // Animals tab: alphabetical list, click opens the animal, Sell removes just that one and pays resale
+  const at = await page.evaluate(() => {
+    let money0;
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    const e = {id:"e-animtab", name:"Tab test", viv:"L", points:rectPts(400, 400, 16, 10, 0), animals:[], happy:70};
+    for(let i = 0; i < 4; i++) e.animals.push({id:"a-tab" + i, sp:"arth"});
+    state.exhibits.push(e); money0 = state.money; state.money = 1e6;
+    e.animals.forEach((a, i) => a.name = ["zed", "Bob", "alice", "Carl"][i % 4] + i);
+    select("exhibit", e.id); exTabs.tab = "animals"; ui.panel();
+    const names = [...panelEl.querySelectorAll(".animal-row b:first-child")].map(x => x.textContent);
+    const sorted = [...e.animals].map(a => a.name).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const listed = names.length === e.animals.length && names.join() === sorted.join();
+    const target = e.animals.find(a => a.name === sorted[0]);
+    panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
+    const opened = sel && sel.kind === "animal" && sel.id === target.id;
+    const n0 = e.animals.length, m0 = state.money = 1e6, pay = sellValue(target);
+    state.staff.transfers.push({id:"tr-smoke", animalId:target.id, sp:target.sp, from:e.id, to:e.id});
+    sellAnimal(target.id);
+    const sold = e.animals.length === n0 - 1 && !e.animals.some(a => a.id === target.id) && !herd.has(target.id) && state.money - m0 === pay && !state.staff.transfers.some(t => t.animalId === target.id) && !sel;
+    exTabs.tab = "main"; select(null); state.exhibits.splice(state.exhibits.indexOf(e), 1); state.money = money0; recompute();
+    return {listed, opened, sold};
+  });
+  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; }
+
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {
     document.querySelectorAll("dialog[open]").forEach(d => d.close());

@@ -28,7 +28,7 @@ function animalHtml(a){
   h += `<div class="meta">${esc(s.name)} · ${esc(s.period)}${e ? " · in " + esc(e.name) : ""}${a.cl ? " · clone" : ""} · ${a.q ?? 90}% DNA${a.sex ? ` · <b title="${a.sex}">${sexMark(a)}</b> ${a.sex}` : ""}</div>`;
   const rp = e ? rankPos(e, a) : null;
   if(rp) h += `<div class="meta">${rp.pack ? (rp.i < 2 ? "Alpha pair" : "Subordinate, rank " + (rp.i + 1)) : rp.i === 0 ? "Alpha" : "Rank " + (rp.i + 1)} of ${rp.n} in the ${traitsOf(s).social}</div>`;
-  h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span></div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? sellBtn(a) : ""}</div>`;
   h += `<section><h3>Happiness <span class="num" id="anMoodN"></span></h3><div class="meter"><i id="anMoodBar"></i></div></section>`;
   h += `<section><h3>Needs</h3>${NEED_KEYS.map(k => `<div class="need-row"><span>${NEED_TEXT[k]}</span><span id="anN-${k}"></span></div><div class="meter"><i id="anB-${k}"></i></div>`).join("")}</section>`;
   h += `<section><h3>Wants</h3><ul class="issues" id="anWants"></ul></section>`;
@@ -115,3 +115,32 @@ panelEl.addEventListener("change", ev => {
   const a = selItem(); if(!a) return;
   ev.target.value = animalSelName = renameAnimal(a, ev.target.value); saveSoon();
 });
+
+// The Animals tab: every animal in the exhibit by name, with sex, health and a Sell button
+const sellValue = a => Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale);
+const sellBtn = a => `<button class="btn sell" data-action="animalSell" data-id="${esc(a.id)}">Sell +${money(sellValue(a))}</button>`;
+const byName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase()) || String(a.id).localeCompare(String(b.id));
+function animalsTabHtml(e){
+  if(!e.animals.length) return `<section><h3>Animals</h3><div class="meta">No animals here yet.</div></section>`;
+  const rows = [...e.animals].sort(byName).map(a => {
+    const s = SPECIES_BY_ID[a.sp], sk = a.sick, sev = sk ? Math.round(sk.sev) : 0;
+    const hp = sk ? `${sk.kind === "injury" ? "Injured" : "Ill"} ${sev}%` : "Healthy";
+    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(100 - sev, sk ? (sev < 40 ? "var(--warn)" : "var(--bad)") : "var(--ok)")}</span>${sellBtn(a)}</li>`;
+  });
+  return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul></section>`;
+}
+function sellAnimalAsk(id){
+  const a = animalById(id), e = a && animalHome(id); if(!a || !e) return;
+  askConfirm("Sell animal?", `Sell ${a.name || SPECIES_BY_ID[a.sp].name} for ${money(sellValue(a))}?`, "Sell", () => sellAnimal(id));
+}
+function sellAnimal(id){
+  const a = animalById(id), e = a && animalHome(id); if(!a || !e) return false;
+  earn(sellValue(a), "sold");
+  e.animals.splice(e.animals.indexOf(a), 1);
+  state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== id);
+  state.health.ward = state.health.ward.filter(p => p.a.id !== id);
+  const h = herd.get(id); if(h){ h.el.remove(); herd.delete(id); }
+  if(sel && sel.kind === "animal" && sel.id === id) select(null);
+  afterChange(); render(); ui.panel();
+  return true;
+}
