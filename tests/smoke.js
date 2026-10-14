@@ -1193,6 +1193,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // a small loop is just a pen, not an exhibit
       L([300,100],[305,100]); L([305,100],[305,105]); L([305,105],[300,105]); L([300,105],[300,100]);
       out.fenceSmallPen = state.exhibits.length === 2;
+      // lifting fence with Bulldoze asks first; Cancel leaves it, Remove lifts it
+      L([380,60],[381,60]);
+      const lk = "380,60,h", liftDrag = () => { fdrag = {lift:true, swept:new Set([lk])}; endFenceDrag(); };
+      liftDrag(); const askedLift = $("#dlgConfirm").open && /fence/i.test($("#confirmTitle").textContent) && !!fencePieces()[lk];
+      $("#confirmNo").click(); const keptLift = !fencePieces()[lk] ? false : !$("#dlgConfirm").open;
+      liftDrag(); $("#confirmYes").click();
+      out.fenceLiftConfirm = askedLift && keptLift && !fencePieces()[lk];
       // bulldozing an exhibit lifts the fence it doesn't share, and refunds it
       const before = Object.keys(state.fenceGrid).length, r = refundFor("exhibit", de);
       const mb = state.money; removeItem("exhibit", de);
