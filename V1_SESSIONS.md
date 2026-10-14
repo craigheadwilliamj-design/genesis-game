@@ -2,7 +2,7 @@
 
 Each session below is standalone: paste its prompt into a fresh session (CLAUDE.md is read automatically). One session = one commit/branch, run `node tests/smoke.js` before finishing. Size: S = quick, M = moderate, L = big (consider splitting or running it on its own). "Needs" lists sessions that must be done first. Anything with no "Needs" can run any time, in any order.
 
-Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas`.
+Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas`.
 
 ---
 
@@ -95,7 +95,7 @@ Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 > One simple sprite per staff type (keeper, vet, mechanic, custodian, guard) and three guest sprites, drawn in `drawParties` and the staff draw code.
 
 **S25+ (L total, many sessions): Animal sprites**
-> 52 animals still need sprites (only coel, plat, lyst have them). Run 3 to 4 animals per session, grouped by body plan/period (e.g. small theropods: comp, orni, velo, ovir, gall; ceratopsians/ornithopods; sauropods; synapsids; amphibians; mammals). Follow CLAUDE.md "Sprite rigger" workflow and the art direction.
+> 51 animals still need sprites (only coel, plat, lyst, prio have them). Run 3 to 4 animals per session, grouped by body plan/period (e.g. small theropods: comp, orni, velo, ovir, gall; ceratopsians/ornithopods; sauropods; synapsids; amphibians; mammals). Follow CLAUDE.md "Sprite rigger" workflow and the art direction.
 
 ---
 
