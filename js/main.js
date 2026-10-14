@@ -91,6 +91,7 @@ function step(now){
   drawTrams();
   drawKeepers();
   drawGates(now);
+  drawWeather(now);
   drawStaffRing();
   drawLoose();
   ui.hud();
