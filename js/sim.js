@@ -133,7 +133,7 @@ function freshScience(){
     tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
     projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals ORACLE has unlocked, so GHOST can look for their DNA
-    dna:{},            // species id (or plant DNA id) -> {genome: 0-100, quality: 0-100}
+    dna:{},            // species id (or plant DNA id) -> {genome: 0-100}
     trips:[],          // expeditions in the field: {period, sp, start, end}
     clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
@@ -276,7 +276,7 @@ function upgradeSave(s){
   if(sc.crew.botanist === undefined) sc.crew.botanist = s.buildings.some(b => b.type === "ceres") ? 1 : 0;
   // plant DNA and medicine refinement became things to collect and research: parks already using them have them
   if(!sc.dna) sc.dna = {};
-  const hasT = id => sc.tech.includes(id), giveDna = era => { for(const f of Object.values(PLANT_DNA)) if(f.era === era && !sc.dna[f.id]) sc.dna[f.id] = {genome:100, quality:90}; };
+  const hasT = id => sc.tech.includes(id), giveDna = era => { for(const f of Object.values(PLANT_DNA)) if(f.era === era && !sc.dna[f.id]) sc.dna[f.id] = {genome:100}; };
   if(hasT("mesoplant")) giveDna("mesozoic");
   if(hasT("paleoplant")) giveDna("paleozoic");
   if(hasT("paleoflora") && !Object.values(PLANT_DNA).some(f => sc.dna[f.id] && sc.dna[f.id].genome >= 100)) giveDna("mesozoic");
@@ -285,6 +285,13 @@ function upgradeSave(s){
   // science jobs moved into bays, one per scientist. Running jobs keep a bay; queued ones and extra incubators are cancelled and paid back.
   let back = 0;
   for(const k of ["projects", "trips", "clones", "log"]) if(!sc[k]) sc[k] = [];
+  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back the GHOST quality upgrades
+  for(const d of Object.values(sc.dna)) delete d.quality;
+  for(const [id, pts] of [["ghostq1", 40], ["ghostq2", 90]]){
+    if(sc.tech.includes(id)){ sc.tech = sc.tech.filter(t => t !== id); sc.points = (sc.points || 0) + pts; }
+    const live = sc.projects.filter(p => p.kind === "tech" && p.id === id);
+    for(const p of live){ sc.points = (sc.points || 0) + (p.cost || pts); sc.projects.splice(sc.projects.indexOf(p), 1); }
+  }
   for(const [kind, jobs] of Object.entries({paleo:sc.projects, temporal:sc.trips, gene:sc.clones, botanist:s.ceres.beds})){
     const n = sc.crew[kind] || 0, taken = new Set(jobs.filter(j => j.bay !== undefined).map(j => j.bay));
     for(const j of jobs.filter(x => x.bay === undefined).sort((a, c) => a.start - c.start)){

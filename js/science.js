@@ -113,7 +113,7 @@ function finishProject(p){
 
 /* ---------- GHOST: expeditions ---------- */
 
-// Animals and plants both have genomes: sc.dna[id] = {genome: 0-100, quality}
+// Animals and plants both have genomes: sc.dna[id] = {genome: 0-100}, how complete the lab's record is
 function genomeInfo(id){
   const s = SPECIES_BY_ID[id]; if(s) return {id, name:s.name, space:s.space, animal:s};
   const f = PLANT_DNA_BY_ID[id]; if(f) return {id, name:f.name, space:f.space, plant:f};
@@ -136,11 +136,8 @@ function genomeOpen(id){
 // The periods GHOST can look in for a genome
 const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : g.event ? [g.id] : [g.plant.period]; };
 
-// GHOST upgrade multiplier for "cost" or "speed", and the quality points added to every sample
+// GHOST upgrade multiplier for "cost" or "speed"
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
-const ghostQuality = () => GHOST_UPGRADE.quality[hasTech("ghostq2") ? 2 : hasTech("ghostq1") ? 1 : 0];
-// The best quality a trip to this place can bring back right now (with the lab's upgrades)
-const bestQuality = periodId => Math.min(100, placeOf(periodId).quality[1] + ghostQuality());
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
 // What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
@@ -172,40 +169,34 @@ function launchTrip(id, periodId){
 }
 
 // Add a DNA sample to the genome library. Returns how much the genome grew.
-function addSample(sp, gain, q, cap = 100){
+function addSample(sp, gain){
   const dna = state.science.dna;
-  const d = dna[sp] || (dna[sp] = {genome:0, quality:0});
-  // a finished genome is refined by every trip: about a third of the way to the best this place can give, at least a point
-  // refining a finished genome is dev-only for now (the clone discount below is too)
-  if(d.genome >= 100 && !devMode()) return {gain:0, better:0};
-  if(d.genome >= 100){ const before = d.quality; if(before < cap) d.quality = Math.min(cap, before + Math.max(1, Math.ceil((cap - before) * .3))); return {gain:0, better:d.quality - before}; }
+  const d = dna[sp] || (dna[sp] = {genome:0});
   const g = Math.min(gain, 100 - d.genome);
-  d.quality = Math.round((d.quality * d.genome + q * g) / (d.genome + g));
   d.genome = Math.min(100, Math.round(d.genome + g));
-  return {gain:g, better:0};
+  return {gain:g};
 }
 
 function tripReturns(t){
-  const sc = state.science, p = placeOf(t.period), g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
+  const sc = state.science, g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
   if(Math.random() < odds.fail){
     const msg = `GHOST came back from the ${placeName(t.period)} empty-handed. The ${g.name} trail went cold.`;
     logScience(msg, false); events.toast(msg, "bad"); return;
   }
-  const q = Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality());
-  const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q, bestQuality(t.period));
+  const was = (sc.dna[t.sp] || {genome:0}).genome, r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread));
   const d = sc.dna[t.sp];
   if(g.event){
-    const m = r.gain ? `GHOST recorded the ${g.name} (${q}% quality). ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
-                     : `GHOST brought back more of the ${g.name}. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "The record is already as good as this period gives."}`;
+    const m = r.gain ? `GHOST recorded more of the ${g.name}. ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
+                     : `GHOST brought back more of the ${g.name}, but the record was already complete.`;
     logScience(m, true); events.toast(m, "good"); return;
   }
-  let msg = r.gain ? `GHOST brought back ${g.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
-                   : `GHOST brought back more ${g.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "The record is already as good as this period gives."}`;
+  let msg = r.gain ? `GHOST brought back ${g.name} DNA. Genome ${d.genome}% complete.` : `GHOST brought back more ${g.name} DNA, but the genome was already complete.`;
+  if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) msg += ` TAR can clone it now, though the clones will be frail until the genome is more complete.`;
   // Sometimes the team turns up traces of another animal ORACLE has unlocked
   const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && isUnlocked(x.id) && !genomeDone(x.id));
   if(others.length && Math.random() < TRIP.bonus.chance){
     const o = others[Math.floor(Math.random() * others.length)];
-    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality()), bestQuality(t.period));
+    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]));
     if(r2.gain) msg += ` They also found ${o.name} traces (+${Math.round(r2.gain)}%).`;
   }
   logScience(msg, true); events.toast(msg, "good");
@@ -218,25 +209,26 @@ const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fa
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
-// What TAR charges to clone: the animal's price less a discount for a high-quality genome
-const clonePrice = sp => { if(!devMode()) return SPECIES_BY_ID[sp].price; const d = state.science.dna[sp], D = CLONE_DISCOUNT; return Math.round(SPECIES_BY_ID[sp].price * (1 - D.max * clamp(((d ? d.quality : 0) - D.from) / (100 - D.from), 0, 1)) / 10) * 10; };
+// TAR can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
+const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
+const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
     (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
     (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
-    (!d || d.genome < 100 ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. It needs 100%.` : null) ||
+    (!cloneOpen(sp) ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. TAR needs ${CLONE_GENOME.min}% to clone it.` : null) ||
     (state.rating + 1e-9 < starsNeed(s) ? `Needs a ${starsNeed(s)}-star park. You have ${starTxt(state.rating)}.` : null) ||
-    (!canAfford(clonePrice(sp)) ? `Cloning costs ${money(clonePrice(sp))}. You have ${money(state.money)}.` : null);
+    (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
 function orderClone(sp, exhibitId, sex){
   if(cloneProblem(sp)) return false;
   if(sex !== "male" && sex !== "female") sex = pickSex(sp);
-  const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
-  spend(clonePrice(sp), "animals");
+  const s = SPECIES_BY_ID[sp], cq = cloneQuality(sp);
+  spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  state.science.clones.push({id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
+  state.science.clones.push({id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end});
   events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }

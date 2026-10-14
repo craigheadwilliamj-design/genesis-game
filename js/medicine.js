@@ -104,9 +104,9 @@ function trashNight(out){
 }
 
 /* ---------- genome therapy ---------- */
-// A vet lifts a clone's DNA quality (a.q) toward the lab's genome for its species (sc.dna), which GHOST can improve.
+// A vet lifts a clone's DNA quality (a.q) toward what the lab's genome for its species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
 // The player queues animals (a.gene), and a free vet does them one by one.
-const labQuality = sp => genomeDone(sp) ? state.science.dna[sp].quality : 0;
+const labQuality = sp => cloneQuality(sp);
 const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
 function geneProblem(a){
@@ -114,8 +114,8 @@ function geneProblem(a){
   if(!hasTech("genetherapy")) return "Research Genome therapy at ORACLE first.";
   if(!dept("pmc")) return "Genome therapy needs a connected Paleo-Medicine Center.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
-  if(!genomeDone(a.sp)) return `The lab needs a complete ${s.name} genome first.`;
-  if(gain < GENE.minGain) return `The lab's ${s.name} genome is only ${labQuality(a.sp)}% quality. Send GHOST for better samples to raise it.`;
+  if(!cloneOpen(a.sp)) return `The lab needs at least ${CLONE_GENOME.min}% of the ${s.name} genome first.`;
+  if(gain < GENE.minGain) return `The lab's ${s.name} genome is only ${state.science.dna[a.sp].genome}% complete, good for ${labQuality(a.sp)}% quality. Send GHOST for more of it.`;
   if(!canAfford(geneCost(gain))) return `The procedure costs ${money(geneCost(gain))}. You have ${money(state.money)}.`;
   return null;
 }

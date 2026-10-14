@@ -218,16 +218,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
-    state.science.dna.arth = {genome:100, quality:75};
+    state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
     out.geneNeedsTech = !!geneProblem(ga);
     state.science.tech.push("genetherapy");
-    out.geneGainCapped = geneGain(ga) === 15 && geneCost(15) === GENE.base + 15 * GENE.perPoint;
-    state.science.dna.arth.quality = 60;
+    out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    state.science.dna.arth.genome = 65;
     out.geneNoBetterGenome = !!geneProblem(ga);
-    state.science.dna.arth.quality = 75;
+    state.science.dna.arth.genome = 80;
     out.geneQueues = !geneProblem(ga); ga.gene = true;
     const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && state.today.medicine - med0 >= geneCost(15) && illChance(viv, ga).p < illBefore;
+    out.geneVetDoesIt = run(600, () => ga.q === 70 && !ga.gene) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -2485,33 +2485,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   Object.assign(checks, decks);
 
-  // GHOST quality: best upgrades reach 100 in every period, without them it stays under the ceiling, the last steps always converge
-  const ghq = await page.evaluate(() => {
-    const out = {}, sc = state.science, keep = {dna:sc.dna, tech:sc.tech.slice(), sb:state.sandbox, toast:events.toast, log:logScience};
-    state.sandbox = true; events.toast = () => {}; window.logScience = () => {}; const devWas = localStorage.getItem("genesis-dev"); localStorage.setItem("genesis-dev", "1");
-    const run = (period, sp, n) => { sc.dna = {}; for(let i = 0; i < n; i++) tripReturns({period, sp, bay:0, start:0, end:0}); return sc.dna[sp] ? sc.dna[sp].quality : 0; };
-    const old = SPECIES.find(s => s.period === "Devonian");
-    const per = old.period;
-    sc.tech = sc.tech.filter(t => !/^ghostq/.test(t)); if(!sc.unlocked.includes(old.id)) sc.unlocked.push(old.id);
-    const q0 = run(per, old.id, 400);
-    out.ghostNoUpgradesBelowCeiling = q0 < 100 && q0 <= bestQuality(per);
-    sc.tech.push("ghostq1", "ghostq2");
-    out.ghostCeilingIs100 = Object.keys(PERIOD_BY_ID).every(id => bestQuality(id) === 100) && Object.keys(MUSEUM_BY_ID).every(id => bestQuality(id) === 100);
-    out.ghostFullUpgradesReach100 = run(per, old.id, 400) === 100;
-    sc.dna = {[old.id]:{genome:100, quality:99}}; addSample(old.id, 0, 100, 100);
-    out.ghostLastPointMoves = sc.dna[old.id].quality === 100;
-    sc.dna = {[old.id]:{genome:100, quality:50}}; addSample(old.id, 0, 51, 51);
-    out.ghostSmallStepMoves = sc.dna[old.id].quality === 51;
-    sc.dna = {[old.id]:{genome:100, quality:50}}; const c50 = clonePrice(old.id); sc.dna[old.id].quality = 100; const c100 = clonePrice(old.id);
-    out.cloneCheaperAtHighQuality = c50 === Math.round(old.price / 10) * 10 && c100 < c50 && c100 >= old.price * .74 && c100 <= old.price * .76;
-    localStorage.removeItem("genesis-dev");
-    sc.dna = {[old.id]:{genome:100, quality:60}}; addSample(old.id, 0, 100, 100); const offQ = sc.dna[old.id].quality;
-    out.qualityRefineDevOnly = offQ === 60 && clonePrice(old.id) === old.price;
-    if(devWas !== null) localStorage.setItem("genesis-dev", devWas);
-    window.logScience = keep.log; sc.dna = keep.dna; sc.tech = keep.tech; state.sandbox = keep.sb; events.toast = keep.toast;
+  // Genome quality is completeness: TAR clones from 60%, and the closer to 100% the healthier the clone
+  const gq = await page.evaluate(() => {
+    const out = {}, sc = state.science, keep = {dna:sc.dna, sb:state.sandbox, clones:sc.clones.slice(), money:state.money, rating:state.rating, tech:sc.tech.slice()};
+    const sp = SPECIES.find(s => !s.viv && !s.stars) || SPECIES.find(s => !s.viv);
+    sc.dna = {[sp.id]:{genome:CLONE_GENOME.min - 1}};
+    out.cloneNeedsMinGenome = !cloneOpen(sp.id) && /needs 60%/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === 0;
+    sc.dna[sp.id].genome = CLONE_GENOME.min;
+    out.cloneOpensAtMin = cloneOpen(sp.id) && !/genome is/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === CLONE_GENOME.q0 && CLONE_GENOME.q0 < 50;
+    const qs = [60, 70, 80, 90, 100].map(g => { sc.dna[sp.id].genome = g; return cloneQuality(sp.id); });
+    out.cloneHealthRisesWithGenome = qs.every((q, i) => !i || q > qs[i - 1]) && qs[4] === 100 && qs[2] >= 70;
+    state.sandbox = true; state.money = 1e8; state.rating = 5; sc.clones = [];
+    sc.dna[sp.id].genome = 60; sc.tech = sc.tech.slice();
+    const had = sc.crew.gene, bays = freeBay("gene");
+    out.noQualityField = !("quality" in sc.dna[sp.id]) && typeof bestQuality === "undefined" && typeof ghostQuality === "undefined" && !TECH.some(t => /^ghostq/.test(t)) && !TIME_PERIODS.some(p => "quality" in p);
+    // old saves: quality fields and the GHOST quality upgrades go, and the research points come back
+    const snap = JSON.parse(JSON.stringify(state)); snap.science.dna = {[sp.id]:{genome:70, quality:80}}; snap.science.tech.push("ghostq1", "ghostq2"); const pts = snap.science.points || 0;
+    upgradeSave(snap);
+    out.oldSaveDropsQuality = !("quality" in snap.science.dna[sp.id]) && snap.science.dna[sp.id].genome === 70 && !snap.science.tech.some(t => /^ghostq/.test(t)) && Math.round(snap.science.points - pts) === 130;
+    sc.dna = keep.dna; sc.clones = keep.clones; sc.tech = keep.tech; state.sandbox = keep.sb; state.money = keep.money; state.rating = keep.rating;
     return out;
   });
-  Object.assign(checks, ghq);
+  Object.assign(checks, gq);
 
   await page.waitForTimeout(800);
   let ok = true;

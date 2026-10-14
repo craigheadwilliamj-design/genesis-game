@@ -105,7 +105,7 @@ function tripRow(id, periodId, label){
   if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : g.event ? "Research education programs at ORACLE first." : `Research ${esc(g.name)} at ORACLE first.`;
   else {
     const ev = !!g.event, what = ev ? "record" : "DNA";
-    h += `${d ? `${ev ? "Record" : "DNA"} quality ${d.quality}%.${d.genome >= 100 ? (ev ? " Complete, and on offer at Education Centers." + (devMode() ? " More trips can raise quality." : "") : " Complete." + (devMode() ? " More trips can raise quality." : "")) : ""}` : `No ${what} yet.`}`;
+    h += d ? (d.genome >= 100 ? (ev ? "Complete, and on offer at Education Centers." : "Complete.") : !ev && d.genome >= CLONE_GENOME.min ? `TAR can clone it now (${cloneQuality(id)}% DNA quality, healthier as it fills in).` : "") : `No ${what} yet.`;
     if(ev) h += ` Trips take ${spanText(Math.round(g.event.days * DAY_MIN * ghostLevel("speed")))}.`;
     if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? `more trips to finish the ${ev ? "record" : "genome"}` : `trips for a whole ${ev ? "record" : "genome"}`}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
     if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out ${ev ? "recording" : "looking for"} it.</b>`;
@@ -137,8 +137,8 @@ function ghostHtml(b){
     return h;
   }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
-  h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))} and bring back DNA of ${Math.min(100, p.quality[0] + ghostQuality())}–${bestQuality(p.id)}% quality. Bigger animals take more trips.</div>`;
-  h += `<div class="meta" style="margin-top:6px">Quality is how clean and whole the DNA is. Clones follow it: under 70% they are sickly, under 50% frail. ${devMode() ? `Once a genome is complete, every extra trip refines it toward the best this period can give now: <b>${bestQuality(p.id)}%</b>, and a better genome makes clones cheaper (up to a quarter off at 100%).` : `A genome's quality is set by the samples it is built from, up to <b>${bestQuality(p.id)}%</b> in this period right now.`}${bestQuality(p.id) < 100 ? " Research the Careful sampling and Cryo-preserved samples upgrades at ORACLE to raise that." : ""}</div>`;
+  h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))}. Each one brings back part of a genome. Bigger animals take more trips.</div>`;
+  h += `<div class="meta" style="margin-top:6px">TAR can clone an animal once its genome is ${CLONE_GENOME.min}% complete. The closer it is to 100%, the healthier the clones: ${CLONE_GENOME.q0}% DNA quality at ${CLONE_GENOME.min}% (frail), 100% when whole.</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
@@ -154,7 +154,7 @@ function ghostHtml(b){
 function tarHtml(b){
   const sc = state.science;
   let h = deptHead(b);
-  h += `<div class="meta">A complete genome can be cloned as many times as you like. Clone quality follows the DNA quality: under 70% makes sickly animals, under 50% frail ones.</div>`;
+  h += `<div class="meta">A genome that is ${CLONE_GENOME.min}% complete or more can be cloned as many times as you like. Clone quality follows how complete it is: under 70% makes sickly animals, under 50% frail ones.</div>`;
   h += sciStaffHtml("gene");
   const speed = Math.round(cloneSpeed() * 100);
   h += baysHtml("Incubator bays", "gene", (c, i) => { const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId); return progressCard(esc(s.name), `for ${e ? esc(e.name) : "no exhibit yet"}`, c, i); }, "Empty. Order a clone below or from an exhibit's panel.");
@@ -166,10 +166,10 @@ function tarHtml(b){
   else {
     h += `<ul class="shop">`;
     for(const s of lib){
-      const d = sc.dna[s.id], why = d.genome >= 100 ? cloneProblem(s.id) : "Genome incomplete.";
+      const d = sc.dna[s.id], open = cloneOpen(s.id), why = open ? cloneProblem(s.id) : `Needs ${CLONE_GENOME.min}% genome.`;
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
-      h += d.genome >= 100 ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(clonePrice(s.id))}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(clonePrice(s.id))}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}DNA quality ${d.quality}%. ${d.genome >= 100 ? `Takes ${spanText(cloneMinutes(s.id))}.` : ""}${d.genome >= 100 && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
+      h += open ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality. Takes ${spanText(cloneMinutes(s.id))}.` : ""}${open && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
