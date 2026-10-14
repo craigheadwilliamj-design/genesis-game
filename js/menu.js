@@ -19,6 +19,7 @@ const BUILD_MENU = [
     {label:"Picnic Areas", tool:"picnic"},
     {label:"Lamp Posts", tool:"lamp"},
     {label:"Security Cameras", tool:"camera", tech:"cameras", note:"Watches the paths within a short radius and sends the nearest guard to any vandal it sees. Needs a Security Office with guards."},
+    {label:"Donation Boxes", tool:"donate", note:"Guests who pass one may drop a little in, more if they learned something. A small bonus, counted under Donations."},
     {label:"Info Signs", tool:"sign"},
     {label:"Do Not Feed Signs", tool:"nofeed", note:"Guests are less likely to throw trash into an exhibit with one beside its fence. Put it on the path within 20 m of the fence."},
   ]},

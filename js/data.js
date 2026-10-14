@@ -425,6 +425,7 @@ const BUILDINGS = {
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true, onPath:true},
   camera:    {label:"Security camera", one:"a security camera", glyph:"", color:"#2B3F6B", price:900, upkeep:4, tech:"cameras", w:1.2, d:1.2, prop:true, onPath:true},
+  donate:    {label:"Donation box", one:"a donation box", glyph:"", color:"#2F6B4A", price:350, upkeep:2, w:1.4, d:1.4, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
@@ -580,6 +581,12 @@ const MENU = {
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
 // Litter lies on the paths in squares this many meters across
+const DONATE = {
+  reach:12,            // guests passing a working box this close may give
+  chance:.14,          // chance a party gives at a box it passes; learning raises it
+  amount:1.2,          // dollars a guest gives, more if they learned something
+  eduBoost:1.5,        // a guest who learned everything gives this much more, and is more likely to
+};
 const LITTER = {
   cell:8,              // size of a litter square
   binReach:20,         // guests use a bin this close

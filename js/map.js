@@ -37,7 +37,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Info sign", "No-feed"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Donations", "Info sign", "No-feed"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
@@ -310,9 +310,9 @@ function render(){
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
       if(tilt){ s += prop34(bl, t, r, fill, edge, sw) + (isBroken(bl) ? `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") + `</g>`; continue; }
-      if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
+      if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
+      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
       if(bl.type === "camera" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#E8F0FF" pointer-events="none"/>`;
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
@@ -969,6 +969,9 @@ function prop34(bl, t, r, fill, edge, sw){
   const R = r * .75;
   if(bl.type === "bin"){ const h = R * 1.6;
     return shadow(R, h) + `<rect x="${(cx - R).toFixed(2)}" y="${up(h).toFixed(2)}" width="${(2*R).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${cy.toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="#1D2B22" ${ln}/>`; }
+  if(bl.type === "donate"){ const h = R * 2.2, w = R * 1.3;
+    return shadow(R, h) + `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><rect x="${(cx - w*.3).toFixed(2)}" y="${up(h*.85).toFixed(2)}" width="${(w*.6).toFixed(2)}" height="${(h*.08 / TILT).toFixed(2)}" fill="#1D2B22" pointer-events="none"/>` +
+      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h*.4).toFixed(2)}" font-size="${(w*.7).toFixed(2)}" fill="#F2D46B" pointer-events="none">$</text>`); }
   if(bl.type === "lamp" || bl.type === "camera"){ const h = R * 5, w = Math.max(.15, R*.25);
     return shadow(R*.7, h*.3) + pole(h, w) + (bl.type === "lamp" ? `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.8).toFixed(2)}" ry="${(R*.8 / TILT).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.4).toFixed(2)}" ry="${(R*.4 / TILT).toFixed(2)}" fill="#FFF6C8" pointer-events="none"/>`}`
       : `<rect x="${(cx - R*.9).toFixed(2)}" y="${up(h + R*.4).toFixed(2)}" width="${(R*1.8).toFixed(2)}" height="${(R*.9 / TILT).toFixed(2)}" rx="${(R*.2).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${(cx + R*.9).toFixed(2)}" cy="${up(h).toFixed(2)}" rx="${(R*.25).toFixed(2)}" ry="${(R*.25 / TILT).toFixed(2)}" fill="#E8F0FF" pointer-events="none"/>`}`); }

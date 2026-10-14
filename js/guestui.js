@@ -113,7 +113,9 @@ function guestBuildingHtml(b){
     h += `<div class="meta" style="margin-top:6px">Guests are ${Math.round((1 - THROWN.signCut) * 100)}% less likely to throw trash into these exhibits. Trash makes animals ill, and some die. Bins and guards nearby help too.</div></section>`;
     return h;
   }
-  if(b.type === "bin"){
+  if(b.type === "donate"){
+    h += `<section><h3>Donations</h3><dl class="kv"><dt>Given so far</dt><dd>${money(Math.round(b.gift || 0))}</dd></dl><div class="meta" style="margin-top:4px">Guests within ${DONATE.reach} m may drop a little in, more if they learned something. Vandals can break it.</div></section>`;
+  } else if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
     h += `<div class="meta" style="margin-top:4px">Guests with a wrapper or cup throw it in a bin within ${LITTER.binReach} m. ${full ? "This one is full, so trash spills onto the path. " : ""}The night crew empties bins after closing.</div></section>`;

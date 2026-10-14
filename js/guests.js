@@ -378,7 +378,7 @@ function walkParty(p, left){
     const ids = p.at.sees && p.at.sees.get(p.to);
     if(ids) for(const id of ids){ const e = state.exhibits.find(x => x.id === id); if(e) seeExhibit(p, e); }
     p.prev = p.at; p.at = p.to; p.to = null; p.t = 0;
-    if(!p.at.rail) trashCheck(p);
+    if(!p.at.rail){ trashCheck(p); boxCheck(p); }
   }
 }
 
@@ -407,7 +407,7 @@ function serveParty(p, b){
   const why = p.why;
   p.in = null; p.dest = null; p.why = null;
   serveAt(p, b, why);
-  trashCheck(p);
+  trashCheck(p); boxCheck(p);
 }
 
 /* ---------- through the day ---------- */
