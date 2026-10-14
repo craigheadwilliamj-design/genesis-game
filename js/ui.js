@@ -793,6 +793,7 @@ panelEl.addEventListener("click", e => {
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "animalOpen"){ const an = animalById(b.dataset.id); if(an){ animalSelName = an.name; select("animal", an.id); } return; }
+  if(a === "animalBack"){ select("exhibit", b.dataset.id); return; }
   if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
