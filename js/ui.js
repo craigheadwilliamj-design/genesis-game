@@ -674,6 +674,10 @@ function greenhouseHtml(b){
 }
 
 function depotHtml(b){
+  if(!devMode()){
+    const k = knownCond(b);
+    return deptHead(b) + zoneRow("building", b) + `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div><div class="meta">Wears about ${VEHICLES.wear}% a day. A mechanic keeps it up.</div>`;
+  }
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.depot.blurb)}</div>` + zoneRow("building", b);
   const working = depotWorking(b), k = knownCond(b);
   h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs on site` : "ATVs grounded"}</span></div>`;

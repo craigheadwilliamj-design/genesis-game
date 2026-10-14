@@ -808,7 +808,7 @@ const atvs = () => state.staff.atvs;
 const allStaffList = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets, state.staff.custodians || [], state.staff.guards || []);
 // A broken depot grounds its own ATVs wherever they are parked
 function usableAtvs(){
-  if(!hasTech("vehicles")) return [];
+  if(!devMode() || !hasTech("vehicles")) return [];
   const ok = new Set(depots().filter(depotWorking).map(b => b.id));
   return atvs().filter(a => ok.has(a.depot));
 }
@@ -822,7 +822,13 @@ function freeAtvNodes(c){
 }
 // Each depot holds its set of ATVs; demolishing one takes them with it
 function syncAtvs(){
-  const list = atvs(), ids = new Set(depots().map(b => b.id));
+  const list = atvs();
+  if(!devMode()){   // launch build: no ATVs, staff just walk
+    list.length = 0;
+    for(const c of [...crew, ...mcrew, ...vcrew, ...ccrew, ...gcrew]) if(c.atvId || c.riding || c.mountAt || c.parkAt) resetAtv(c);
+    return;
+  }
+  const ids = new Set(depots().map(b => b.id));
   for(let i = list.length - 1; i >= 0; i--) if(!ids.has(list[i].depot)) list.splice(i, 1);
   for(const b of depots()){ let n = list.filter(a => a.depot === b.id).length; while(n++ < VEHICLES.perDepot) list.push({id:uid("a-"), depot:b.id, at:null, by:null}); }
   const have = new Set(list.map(a => a.id)), held = new Set();
@@ -833,4 +839,4 @@ function syncAtvs(){
   for(const a of list) if(a.by && !held.has(a.id)) a.by = null;
 }
 // Is this person driving right now? Only while on an ATV, and only on a service road.
-function onAtv(c){ const nx = c.route && c.route[0]; return !!(c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }
+function onAtv(c){ if(!devMode()) return false; const nx = c.route && c.route[0]; return !!(c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }

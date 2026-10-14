@@ -59,12 +59,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     wv = walkFrom(C, rider, new Set([A])); rv = routeTo(wv, A); out.atvFetch = !rv.mount && Math.abs(wv.dist.get(A) - 200) < 1e-6;
     wv = walkFrom(B, rider, new Set([B])); out.atvRemount = routeTo(wv, A).mount === B && Math.abs(wv.dist.get(A) - 100/VEHICLES.speedMult) < 1e-6;
     // each depot brings 3 ATVs, shared by everyone, and demolishing it takes them
-    const keepB = state.buildings, keepA = state.staff.atvs;
+    const keepB = state.buildings, keepA = state.staff.atvs, wasDev = localStorage.getItem("genesis-dev"); localStorage.setItem("genesis-dev", "1");
     state.buildings = [{id:"dep1", type:"depot"}, {id:"dep2", type:"depot"}]; state.staff.atvs = [];
     syncAtvs(); const two = atvs().length === 2 * VEHICLES.perDepot;
     state.buildings = [{id:"dep1", type:"depot"}]; syncAtvs(); const one = atvs().length === VEHICLES.perDepot && atvs().every(a => a.depot === "dep1");
-    state.buildings = keepB; state.staff.atvs = keepA;
     out.atvPerDepot = two && one;
+    // launch build: no ATVs spawn, loaded depots stay (and wear), nobody drives
+    localStorage.removeItem("genesis-dev"); state.buildings = [{id:"dep1", type:"depot"}]; state.staff.atvs = [{id:"a-x", depot:"dep1", at:null, by:null}];
+    syncAtvs(); const fake = {riding:true, atvId:"a-x", route:[{}], at:{svc:new Set()}}; fake.at.svc.add(fake.route[0]);
+    out.atvOffLaunch = atvs().length === 0 && usableAtvs().length === 0 && !onAtv(fake) && depots().length === 1 && buildingHidden("depot") && techHidden("vehicles") && !techRows("build").includes(esc(TECH.find(x => x.id === "vehicles").label)) && startProject("tech", "vehicles") !== null;
+    localStorage.setItem("genesis-dev", "1"); syncAtvs();
+    out.atvOnDev = atvs().length === VEHICLES.perDepot && !buildingHidden("depot") && !techHidden("vehicles");
+    if(wasDev === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", wasDev);
+    state.buildings = keepB; state.staff.atvs = keepA;
 
     // every new park sells one species from pool A, two from pool B and one mid-tier anchor from pool C
     let starterOk = true; const seenA = new Set(), seenC = new Set();
