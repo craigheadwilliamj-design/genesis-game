@@ -1924,6 +1924,13 @@ function fenceDragStat(){
 function endFenceDrag(){
   const keys = fenceDragKeys(), lift = fdrag.lift; fdrag = null;
   if(!keys.length){ renderOverlay(); return; }
+  if(lift){
+    askConfirm("Remove this fence?", "Animals inside can escape.", "Remove", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
+    renderOverlay(); return;
+  }
+  finishFenceDrag(keys, false);
+}
+function finishFenceDrag(keys, lift){
   const r = lift ? liftPieces(keys) : layPieces(keys, fenceSel);
   if(!r){ renderOverlay(); return; }   // the stat line already says why
   afterChange(); render();
@@ -2303,7 +2310,7 @@ function bulldozeTap(kind, id){
 
 // Exhibits hold animals, so bulldozing one asks first
 function confirmExhibitRemoval(e){
-  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park. Are you sure?`, "Yes", () => {
+  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e); doomed = null; setStat("");
   }, "No");
