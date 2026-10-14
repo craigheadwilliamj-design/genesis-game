@@ -146,7 +146,7 @@ def temperate_tile(base, size, seed, flecks, dashes, pebbles):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
-PRAIRIE = hexc("#A9C76A")   # BIOMES.grassland.color in data.js, and its park color too (the park used to be the paler #B7C995): one floor for exhibits and the park
+PRAIRIE = hexc("#C3CC76")   # BIOMES.grassland.color in data.js, and its park color too (the park used to be the paler #B7C995): one floor for exhibits and the park
 def grassland_tile(base, size, seed, flecks, dashes, pebbles):
     # Open-plains floor built from small, low-contrast details so the repeat is hidden: a faint two-scale wash of sun-bleached and damp-loam patches, lots of 1 to 3 px flecks of pale silt,
     # warm clay and soil, short dry-earth dashes, a few small pebbles (lit top row, shaded base). No grass, flowers or plants, so nothing is out of its era.
