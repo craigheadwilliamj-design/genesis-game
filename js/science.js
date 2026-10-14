@@ -51,7 +51,7 @@ function fireScientist(kind){
   const jobs = BAY_JOBS[kind]();
   for(const j of jobs.filter(x => x.bay >= sc.crew[kind])){
     jobs.splice(jobs.indexOf(j), 1);
-    const r = jobRefund(kind, j); sc.points += r.points || 0; state.money += r.money || 0;
+    const r = jobRefund(kind, j); sc.points += r.points || 0; if(!state.sandbox) state.money += r.money || 0;
     events.toast("Closing that bay stopped the job in it. The cost came back.");
   }
 }

@@ -590,7 +590,7 @@ const goalApi = { get state(){ return state; }, isReachable, speciesShown };
 const SANDBOX_MONEY = 999999999, SANDBOX_POINTS = 999999;
 function canAfford(cost){ return state.sandbox || state.money >= cost; }
 function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; checkBankrupt(); }
-function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
+function earn(amount, kind){ if(!state.sandbox) state.money += amount; state.today[kind] += amount; }
 // Bankruptcy is the only game over: debt past BANKRUPT. One warning at half of it.
 function checkBankrupt(){
   if(state.sandbox || state.over) return;
