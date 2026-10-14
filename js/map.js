@@ -38,7 +38,7 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Donations", "Info sign", "No-feed"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Donations", "Info sign", "No-feed", "Quiet"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
@@ -327,6 +327,7 @@ function render(){
       if(bl.type === "camera" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#E8F0FF" pointer-events="none"/>`;
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
       if(bl.type === "nofeed" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">⊘</text>`;
+      if(bl.type === "quiet" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">~</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
       s += propFrontMark(bl, r) + `</g>`;
       continue;
@@ -1438,6 +1439,7 @@ function bankSpot(h, e){
 // Where the act takes it, or null to stay where it is
 function actGoal(h, e, a){
   const land = landOf(e).filter(f => LAND[f.type]), of = k => land.filter(f => LAND[f.type][k]);
+  const sr = shelterRun.get(a.id); if(sr && !sr.in && land.includes(sr.f)) return featSpot(h, sr.f, true);   // on its way into the shelter it was given a place in
   switch(a.act){
     case "eat": {
       const t = trays(e).filter(f => trayHas(f) > 0);
@@ -1543,6 +1545,11 @@ function swimCheck(h, e){
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
+    // an animal heading for a shelter goes in the moment it gets there; one inside isn't drawn or moved, and walks back out when it comes out
+    const run = h.a && shelterRun.get(h.a.id); if(run && !run.in) shelterArrive(h.a, run);
+    const ins = !!(h.a && h.a.inside);
+    if(ins !== !!h.ins){ h.ins = ins; h.el.style.display = ins ? "none" : ""; if(!ins){ h.path = null; h.wait = 0; } }
+    if(ins) continue;
     if(!e.viv) swimCheck(h, e);   // in a pond or not, even if it never moves (it may be napping where it spawned)
     // a clip that has started (the idle one, lying down) finishes first, whatever the animal's AI now wants, then it carries on
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
@@ -1611,15 +1618,32 @@ function partyPos(p){
   const a = p.off * 4.4;
   return [p.at.x + Math.cos(a) * Math.abs(p.off) * 1.5, p.at.y + Math.sin(a) * Math.abs(p.off) * 1.5];
 }
+// Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
+const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
+  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
+    const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;
+    if(spr){
+      let el = guestEls.get(p.id);
+      if(!el){
+        el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
+        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(guestKind(p), hm, null);
+        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el);
+      }
+      const col = cols[ci] || SHIRTS[ci];
+      if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
+      humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y); seen.add(p.id);
+      continue;
+    }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0].push(m); all.push(m);
+    d[ci].push(m); all.push(m);
   }
+  for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
@@ -2039,7 +2063,7 @@ function placeGhost(clientX, clientY){
     const nx = -dy/L, ny = dx/L;
     // a sign goes on the edge of the path that faces the exhibit fence closest to where you point (so you can pick either side of a path); everything else on the side you point at
     let fx = p.x, fy = p.y;
-    if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+    if(tool === "sign" || tool === "nofeed" || tool === "quiet"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
     const ra = rot*Math.PI/4, dn = Math.abs(t.w*Math.sin(ra)) + Math.abs(t.d*Math.cos(ra));   // how deep it is across the path once turned
     let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at

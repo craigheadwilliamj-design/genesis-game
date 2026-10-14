@@ -364,10 +364,11 @@ function seeExhibit(p, e, quick){
   if(p.seen.has(e.id)) return;
   p.seen.add(e.id);
   if(!e.animals.length) return;
-  const a = exhibitAppeal(e);
+  const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
   // stop and watch for a while: longer for a bigger draw
   if(!quick) p.linger = state.minute + (SIGHT.dwell[0] + (SIGHT.dwell[1] - SIGHT.dwell[0]) * a / (a + 15)) * rand(.8, 1.2) / GUEST.pace;
-  p.mood += GUEST.seeGain * a / (a + 15);
+  p.mood += GUEST.seeGain * a / (a + 15) * (1 - HIDING.appeal * bother) - HIDING.mood * bother;
+  if(bother >= HIDING.thought) thinks(p, "hiding");
   if(e.happy < 35){ thinks(p, "sadAnimals"); p.mood -= 4; }
   personaSee(p, e);
   if(a >= 30) thinks(p, "wow");
