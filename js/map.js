@@ -783,7 +783,7 @@ function block34(bl, t, S, P, col, line, inv){
     if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
       s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
   }
-  // the roof: the same art as the flat map (rooftop units, the campus emblem), just lifted
+  // the roof: the same art as the flat map (rooftop units), just lifted
   const R = P.map(lift34(W)), [rx, ry] = centroid(R), k = 1/inv;
   if(S.glass){
     s += `<polygon points="${polyStr(R)}" fill="${S.glassCol || "#BFE3D9"}" fill-opacity=".92" ${line}/>`;
@@ -925,7 +925,7 @@ function entrance34(inv){
     let f = `<rect x="${gx - E.half - 1}" y="${gy - E.depth - 1}" width="${2 * E.half + 2}" height="${2 * E.depth + 2}" fill="transparent"/>`;
     for(const [x0, x1] of [[-E.half, -E.gap], [E.gap, E.half]]) f += flatPoly34(rect(x0, x1, -E.depth, E.depth, 0), R[1], "", true) + flatPoly34(rect(x0 + .26, x1 - .26, -E.depth + .26, E.depth - .26, 0), R[0], "", true);
     f += flatPoly34(rect(-E.half, E.half, -E.depth * .45, E.depth * .45, 0), R[1], "", true) + flatPoly34(rect(-E.half, E.half, -.13, .13, 0), FLAT34.gold, "", true);
-    return hit + f + emblemSvg(gx, gy, 2.2) + `<text class="lbl" x="${gx}" y="${gy + E.depth + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}" pointer-events="none">Entrance</text></g>`;
+    return hit + f + `<text class="lbl" x="${gx}" y="${gy + E.depth + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}" pointer-events="none">Entrance</text></g>`;
   }
   let s = hit + `<rect x="${gx - E.half - 1}" y="${gy - E.depth - (E.pillar + 3) / TILT}" width="${2 * E.half + 2}" height="${2 * E.depth + (E.pillar + 3) / TILT + 1}" fill="transparent"/>`;
   s += flatPoly34(rect(-E.half - .7, E.half + .7, -E.depth + .4, E.depth + .8, 0), "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".22"');   // the shadow the whole thing throws
@@ -946,7 +946,7 @@ function entrance34(inv){
   s += flatText34((f0, f1, h0, h1, fill) => Q(f0, f1, E.beam + .3 + (h0 - 0), E.beam + .3 + (h1 - 0), fill), 1, 0, 0, "ENTRANCE", W[0]);
   s += flatPoly34(rect(-E.half - .3, E.half + .3, -E.depth - .3, E.depth + .3, E.pillar + .3), R[1], "", true) + flatPoly34(rect(-E.half - .3, 0, -E.depth - .3, E.depth + .3, E.pillar + .3), R[0], "", true);
   s += face(-E.half - .3, E.half + .3, E.pillar, E.pillar + .3, E.depth + .3, FLAT34.eave) + flatLine34(up(E.pillar + .3)([gx - E.half - .3, gy + E.depth + .3]), up(E.pillar + .3)([gx + E.half + .3, gy + E.depth + .3]), FLAT34.gold, px);
-  return s + emblemSvg(gx, up(E.pillar + 1.9)([0, gy])[1], 1.6) + `</g>`;
+  return s + `</g>`;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);

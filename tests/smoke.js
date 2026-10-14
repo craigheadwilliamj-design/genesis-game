@@ -2184,6 +2184,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     checks[tl ? "entranceTapOpensOffice" : "entranceTapOpensOfficeFlat"] = opened;
   }
   await page.evaluate(() => { const d = document.querySelector("#dlgMenu"); if(d.open) d.close(); });
+  // the DNA + leaf campus emblem is gone: no helper, no theme field, no emblem circle in the entrance or a science roof (both views)
+  for(const tl of [true, false]) checks[tl ? "noEmblem" : "noEmblemFlat"] = await page.evaluate(tl => {
+    if(tilt !== tl) document.querySelector("#ztilt").click(); render();
+    const els = [...document.querySelectorAll('[data-kind="entrance"], [data-kind="building"]')];
+    return typeof emblemSvg === "undefined" && typeof emblemOn === "undefined" && !Object.values(THEMES).some(T => "emblem" in T) && els.every(el => !el.querySelector('circle[r="1.08"]'));
+  }, tl);
 
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {
