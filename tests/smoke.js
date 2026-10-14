@@ -808,6 +808,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.guestTapFinds = guestAt(gx * view.k + view.tx + box.left + 3, gy * ky() + view.ty + box.top - 3) === ej && guestAt(gx * view.k + view.tx + box.left + 300, gy * ky() + view.ty + box.top) !== ej;
       drawParties();
       out.guestDotColored = shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0 && guestRing.style.display === "";
+      // zoomed in, guests are pixel people with a pip in the dot color; zoomed out they go back to dots
+      { const k0 = view.k; view.k = 14; drawParties(); const sp = guestEls.size === 1 && guestEls.get(ej.id).firstChild.getAttribute("fill") === SHIRTS[PERS_INDEX.fun] && shirtPaths[PERS_INDEX.fun].getAttribute("d") === "";
+        view.k = 1; drawParties(); out.guestSprites = sp && guestEls.size === 0 && shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0; view.k = k0; drawParties(); }
       // the guard reaches it: it is walked to the gate, unhappy, rather than thrown out
       gcrew[0].at = nearestNode(ej.at.x, ej.at.y); const mood0 = ej.mood, mn0 = state.today.moodN;
       guardWatch();

@@ -1611,15 +1611,32 @@ function partyPos(p){
   const a = p.off * 4.4;
   return [p.at.x + Math.cos(a) * Math.abs(p.off) * 1.5, p.at.y + Math.sin(a) * Math.abs(p.off) * 1.5];
 }
+// Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
+const GUEST_SPRITE_PX = 10, guestEls = new Map();
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
+  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
+    const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;
+    if(spr){
+      let el = guestEls.get(p.id);
+      if(!el){
+        el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
+        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg("guest", hm, null);
+        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el);
+      }
+      const col = cols[ci] || SHIRTS[ci];
+      if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
+      humanStep(el, "guest", {}, x, y); walker34(el, x, y); seen.add(p.id);
+      continue;
+    }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0].push(m); all.push(m);
+    d[ci].push(m); all.push(m);
   }
+  for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
