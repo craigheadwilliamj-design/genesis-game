@@ -506,7 +506,7 @@ function healthNight(){
           if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; out.showing.push({e, a}); }
           continue;
         }
-        if(Math.random() < injuryChance(e, a).p){ fallSick(a, "injury", HEALTH.injuryStart); out.hurt++; }
+        if(Math.random() < injuryChance(e, a).p){ fallSick(a, "injury", HEALTH.injuryStart); out.hurt++; if(typeof herd !== "undefined" && herd.has(a.id) && injuryChance(e, a).why.includes("attacks")) events.fx("dust", herd.get(a.id).x, herd.get(a.id).y); }
         else if(Math.random() < illChance(e, a).p){ fallSick(a, "illness", HEALTH.illStart); if(!a.sick.hidden) out.ill++; }
       }
     }

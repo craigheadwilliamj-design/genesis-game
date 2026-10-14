@@ -126,6 +126,7 @@ function harmGuests(dtMin){
       if(at) for(const q of parties){ const d = q.at ? Math.hypot(q.at.x - at[0], q.at.y - at[1]) : Infinity; if(d < vd){ vd = d; v = q; } }
       if(--v.n <= 0){ leaveQueue(v); v.gone = true; parties = parties.filter(q => q !== v); }
       else { thinks(v, "scared"); goHome(v); }
+      if(at) events.fx("dust", at[0], at[1]);
       sf.deaths++;
       spend(ESCAPE.lawsuit, "fines");
       state.rating = Math.max(0, state.rating - .3);

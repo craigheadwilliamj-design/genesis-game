@@ -22,6 +22,7 @@ events.toast = (t, kind) => ui.toast(t, kind);
 // Deaths pile up while the day rolls over, then show once in a dialog that pauses the game
 let deathQueue = [];
 events.died = d => deathQueue.push(d);
+events.fx = (kind, x, y) => fxAdd(kind, x, y);
 function showDeaths(){
   if(!deathQueue.length) return;
   const n = deathQueue.length;
@@ -94,6 +95,7 @@ function step(now){
   drawWeather(now);
   drawStaffRing();
   drawLoose();
+  drawFx(now);
   ui.hud();
   sinceDraw += dt; sincePanel += dt;
   if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }

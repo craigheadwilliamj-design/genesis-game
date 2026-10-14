@@ -1898,6 +1898,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.weather.today = keep; drawWeather(performance.now());
       out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.stormk === "storm" && seen.fairk === "fair";
     }
+    // dust puff: the hook adds squares that don't take clicks, then they clear and nothing lands in state
+    {
+      const fl = document.querySelector("#fxLayer"), before = JSON.stringify(state).length;
+      events.fx("dust", 10, 10); drawFx(performance.now());
+      const shown = fl.querySelectorAll("rect").length >= 4 && getComputedStyle(fl).pointerEvents === "none";
+      drawFx(performance.now() + FX_DUST.life + 50);
+      out.dustPuff = shown && fl.childElementCount === 0 && fxList.length === 0 && JSON.stringify(state).length === before;
+    }
     localStorage.removeItem("genesis-dev");
     return out;
   }));
