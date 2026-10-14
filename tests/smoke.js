@@ -602,6 +602,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.fullBinSpills = litterTotal() === 2 && bin.fill === LITTER.binCap && !tp1.trash;
     tp1.trash = 2; tp1.trashAt = state.minute; trashCheck(tp1);
     out.fullBinSkipped = tp1.trash === 2 && litterTotal() === 2 && bin.fill === LITTER.binCap;
+    // a donation box beside the path takes a little money from a passing party (once each), more from one that learned something
+    const dbox = {id:"b-dbox", type:"donate", points:rectPts(103.3, 180, BUILDINGS.donate.w, BUILDINGS.donate.d, Math.PI / 2)};
+    state.buildings.push(dbox); afterChange();
+    tp1.at = nearestGuestNode(100, 180); tp1.gave = null; tp1.edu = 60;
+    const dn0 = state.today.donations, rr3 = Math.random; Math.random = () => 0; boxCheck(tp1); const dn1 = state.today.donations; boxCheck(tp1); Math.random = rr3;
+    out.donationBox = dn1 > dn0 && state.today.donations === dn1 && dbox.gift > 0 && BUILDINGS.donate.prop && BUILDINGS.donate.upkeep > 0;
+    state.buildings.splice(state.buildings.indexOf(dbox), 1); afterChange();
     // with no bin in reach, trash held long enough ends up on the ground
     const far = nearestGuestNode(300, 125); tp1.at = far; tp1.trash = 1; tp1.trashAt = state.minute - LITTER.holdMin;
     const rr2 = Math.random; Math.random = () => 0; trashCheck(tp1); Math.random = rr2;
