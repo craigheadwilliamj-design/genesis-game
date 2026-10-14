@@ -223,18 +223,19 @@ function cloneProblem(sp){
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
-function orderClone(sp, exhibitId){
+function orderClone(sp, exhibitId, sex){
   if(cloneProblem(sp)) return false;
+  if(sex !== "male" && sex !== "female") sex = pickSex(sp);
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  state.science.clones.push({id:uid("a-"), sp, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
-  events.toast(`TAR started a ${s.name} clone. Ready ${whenText(end)}.`);
+  state.science.clones.push({id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
+  events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push(nameAnimal({id:a.id, name:a.name, sp:a.sp, cl:true, q:a.q}));
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, sp:a.sp, cl:true, q:a.q}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -253,7 +254,7 @@ function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
   if(e){ putAnimal(e, c); events.toast(`TAR finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push(nameAnimal({id:c.id, sp:c.sp, q:c.q})); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
+  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, sp:c.sp, q:c.q})); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
 }
 
 /* ---------- CERES: growing plants and medicine ---------- */

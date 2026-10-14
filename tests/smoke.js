@@ -1999,6 +1999,41 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const oldE = JSON.parse(JSON.stringify(pen("e-at4", ["coty"]))); out.attackOldSave = !oldE.animals[0].sick && !oldE.animals[0].hitAt;
       state.exhibits = exKeep; state.safety.loose = looseKeep; events.fx = fxKeep; events.died = diedKeep; events.toast = tKeep; syncAnimals();
     }
+    {   // sex: ordered clones carry the chosen sex, old saves get one, a single-sex herd is lonelier and less happy
+      const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
+      events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
+      const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
+      const herd = SPECIES.find(s => matesWanted(s) > 0 && !s.predator).id;
+      const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
+      state.science.clones = []; state.science.ready = [];
+      const dest = pen("e-sx0", []); state.exhibits = [dest];
+      orderClone(herd, dest.id, "female"); orderClone(herd, null, "male"); orderClone(herd);
+      const jobs = state.science.clones.slice();
+      out.cloneStoresSex = jobs[0].sex === "female" && jobs[1].sex === "male" && (jobs[2].sex === "male" || jobs[2].sex === "female");
+      for(const j of jobs.slice(0, 2)) finishClone(j);
+      out.cloneHatchKeepsSex = dest.animals[0].sex === "female" && state.science.ready[0].sex === "male";
+      // old saves: animals everywhere, including holding and clones in the incubator, get a sex
+      const old = JSON.parse(JSON.stringify(state)); old.exhibits = [pen("e-sx1", [herd, herd, herd, herd])];
+      for(const a of old.exhibits[0].animals) delete a.sex;
+      old.science.ready = [{id:"rd", sp:herd, q:90}]; old.science.clones = [{id:"cl", sp:herd, q:90}];
+      const up = upgradeSave(old);
+      out.sexMigrated = up.exhibits[0].animals.every(a => a.sex === "male" || a.sex === "female") && up.science.ready[0].sex && up.science.clones[0].sex;
+      let m = 0; for(let i = 0; i < 200; i++) m += pickSex(herd, {exhibits:[{animals:[{sp:herd, sex:"male"}, {sp:herd, sex:"male"}]}], science:{ready:[]}}) === "male";
+      out.sexBalances = m < 60;
+      // mixed vs single-sex
+      const one = pen("e-sx2", [herd, herd, herd, herd]), two = pen("e-sx3", [herd, herd, herd, herd]);
+      one.animals.forEach(a => a.sex = "male"); two.animals.forEach((a, i) => a.sex = i % 2 ? "male" : "female");
+      state.exhibits = [one, two];
+      const sp = SPECIES_BY_ID[herd], c1 = behaviorCtx(one), c2 = behaviorCtx(two);
+      out.singleSexFlagged = c1.single.has(herd) && !c2.single.has(herd);
+      const l = (e, c) => { const a = e.animals[0]; a.need = {...freshNeeds(), lonely:0}; a.act = "rest"; needsStep(e, a, sp, c, 5); return a.need.lonely; };
+      out.singleSexLonelier = l(one, c1) > l(two, c2);
+      const b1 = behaviorScore(one), b2 = behaviorScore(two);
+      out.singleSexLessHappy = b1.delta < b2.delta && b1.issues.some(i => /one sex/.test(i.text)) && !b2.issues.some(i => /one sex/.test(i.text));
+      out.fightBiasMale = fightBias({sp:"dime", sex:"male"}) > 1 && fightBias({sp:"dime", sex:"female"}) === 1;
+      out.sexShown = sexSplit(two, herd).includes("2 M, 2 F") && sexMark({sex:"male"}) === "M";
+      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.science.ready = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
+    }
     localStorage.removeItem("genesis-dev");
     return out;
   }));
