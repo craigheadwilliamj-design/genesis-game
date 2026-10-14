@@ -10,10 +10,14 @@
 // A parcel costs its area times the rate for its ring, and can be bought once it touches land you own.
 const PARCELS = {
   xs:[-280,-140,0,140,280,420,560,700],
-  ys:[-200,-100,0,100,200,305,405,505],
+  ys:[-200,-100,0,100,200,305],  // 305 is the entrance line (state.gate): nothing is for sale south of it
   home:[0,0,420,305],
   rates:[0, 0.8, 1.4],  // dollars per m² by ring (1 touches the home plot, 2 is the next one out)
 };
+
+const MAX_PARCELS = 15;  // most plots a park can buy
+// Rows south of the entrance line. Never for sale; only here so old saves that bought them keep their land.
+const LEGACY_SOUTH_YS = [405, 505];
 
 const START = {
   money: 150000,
