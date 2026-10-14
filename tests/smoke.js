@@ -1973,10 +1973,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       e = pen("e-at3", ["dime", "coty", "coty"]); state.exhibits = [e];
       const pred = e.animals[0], ctx3 = behaviorCtx(e);
       for(const a of e.animals) a.need = {...freshNeeds(), hunger:10};
-      out.predatorStalks = pickAct(e, pred, dm, ctx3) === "hunt" && pickAct(e, e.animals[1], SPECIES_BY_ID.coty, ctx3) !== "hunt";
+      // a fed, calm predator leaves its prey alone, however long it hunts; a hungry (or stressed, or bored) one stalks it
+      out.fedLeavesPrey = pickAct(e, pred, dm, ctx3) !== "hunt" && !huntDriven(pred);
+      pred.act = "hunt"; pred.actFor = ATTACK.stalk;
+      for(let i = 0; i < 300; i++){ delete pred.hitAt; attackStep(e, ctx3); }
+      out.noMindlessAttacks = hurtCount(e) === 0;
+      pred.need.hunger = 80;
+      out.predatorStalks = huntDriven(pred) && pickAct(e, pred, dm, ctx3) === "hunt" && pickAct(e, e.animals[1], SPECIES_BY_ID.coty, ctx3) !== "hunt";
+      pred.need.hunger = 10; pred.need.stress = 70; out.stressDrivesHunt = huntDriven(pred);
+      pred.need.stress = 15; pred.need.bored = 90; out.boredDrivesHunt = huntDriven(pred);
+      pred.need.bored = 20; pred.need.hunger = 80;
       pred.act = "hunt"; pred.actFor = 0;
       attackStep(e, ctx3); out.noStrikeBeforeStalk = hurtCount(e) === 0;
       pred.actFor = ATTACK.stalk;
+      // the mix warning names who hunts whom, and stays quiet for a compatible herd
+      out.mixWarns = /Dimetrodon will hunt Cotylorhynchus/.test(mixWarning(dm, pen("e-mx", ["coty"])) || "") && mixWarning(SPECIES_BY_ID.coty, pen("e-mx2", ["coty"])) === null && !!mixWarning(SPECIES_BY_ID.coty, pen("e-mx3", ["dime"]));
       for(let i = 0; i < 100 && !hurtCount(e); i++){ delete pred.hitAt; attackStep(e, ctx3); }
       const prey = e.animals.find(a => a.sick && a.sick.hit);
       out.predatorStrikes = !!prey && prey.sp === "coty" && prey.sick.hit.how === "hunt" && pred.hitAt != null;

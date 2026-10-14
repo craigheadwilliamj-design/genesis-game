@@ -1466,7 +1466,7 @@ function actGoal(h, e, a){
     case "hunt": {
       // prey in the exhibit: stalk the nearest one, stopping a body short
       const s = SPECIES_BY_ID[a.sp]; let prey = null, bd = Infinity;
-      for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && attackReason(s, SPECIES_BY_ID[o.sp])){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; prey = o; } }
+      for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && huntDriven(a) && attackReason(s, SPECIES_BY_ID[o.sp])){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; prey = o; } }
       if(prey){ const r = (h.r || 1) + (prey.r || 1), dx = h.x - prey.x, dy = h.y - prey.y, d = Math.hypot(dx, dy) || 1; return d <= r ? null : [prey.x + dx / d * r, prey.y + dy / d * r]; }
       const f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null;
     }
