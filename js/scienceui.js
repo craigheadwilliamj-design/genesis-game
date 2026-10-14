@@ -28,6 +28,26 @@ function baysHtml(title, kind, cardOf, emptyText){
 const progressCard = (title, sub, j, bay) =>
   `<div class="card bay"><div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${title}</b>${sub ? ` <span class="meta">${sub}</span>` : ""}<div style="margin-top:6px">${meter(doneShare(j), "var(--gold)")}</div><div class="meta" style="margin-top:4px">${leftText(j.end)} left. Ready ${whenText(j.end)}.</div></div>`;
 
+// A clone in an incubator: a progress bar that keeps moving (cloneLive), or, once it has died, a red CLONE FAILED overlay over the card with the bar
+// stopped where it failed and a button to discard the specimen. `bay` is the bay number, left out in an exhibit's Cloning tab.
+function cloneCard(c, bay){
+  const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId), pct = Math.round(cloneProgress(c));
+  const bar = `<div style="margin-top:6px;position:relative;z-index:2"><div class="meter" data-cbar="${c.id}"><i style="width:${pct}%;background:${c.failed ? "#d94b4b" : "var(--gold)"}"></i></div></div>`;
+  const txt = c.failed ? `Stopped at ${pct}%.` : `${pct}%. ${leftText(c.end)} left. Ready ${whenText(c.end)}.`;
+  const head = `<div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${esc(s.name)}</b> <span class="meta">${sexMark(c)} for ${e ? esc(e.name) : "no exhibit yet"}</span>`;
+  const ov = c.failed ? `<div style="position:absolute;inset:0;z-index:1;border-radius:10px;background:rgba(140,18,18,.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:8px;text-align:center;gap:3px"><div style="font:800 19px/1.1 system-ui,sans-serif;letter-spacing:.12em">CLONE FAILED</div><div style="font-size:11px;opacity:.95;padding:0 10px">${esc(c.why || "Culture failure")}. Specimen lost at ${pct}%.</div><button class="btn" data-action="discardClone" data-id="${c.id}" style="margin-top:2px;padding:2px 10px">Discard specimen</button></div>` : "";
+  return `<div class="card bay" style="position:relative${c.failed ? ";min-height:112px" : ""}">${head}${c.failed ? "<div style=\"height:46px\"></div>" : ""}${bar}<div class="meta" style="margin-top:4px;position:relative;z-index:2${c.failed ? ";color:#fff" : ""}" data-ctxt="${c.id}">${txt}</div>${ov}</div>`;
+}
+// Moves the clone bars while the panel stays as it is (the panel is not rebuilt while the mouse is over it)
+function cloneLive(){
+  for(const el of document.querySelectorAll("[data-cbar]")){
+    const c = state.science.clones.find(x => x.id === el.dataset.cbar); if(!c || c.failed) continue;
+    const pct = Math.round(cloneProgress(c)), i = el.firstElementChild;
+    if(i) i.style.width = pct + "%";
+    const t = document.querySelector(`[data-ctxt="${c.id}"]`); if(t) t.textContent = `${pct}%. ${leftText(c.end)} left. Ready ${whenText(c.end)}.`;
+  }
+}
+
 /* ---------- ORACLE ---------- */
 
 // Why nothing new can start at ORACLE right now, if that's so
@@ -138,7 +158,7 @@ function ghostHtml(b){
   }
   const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
   h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))}. Each one brings back part of a genome. Bigger animals take more trips.</div>`;
-  h += `<div class="meta" style="margin-top:6px">TAR can clone an animal once its genome is ${CLONE_GENOME.min}% complete. The closer it is to 100%, the healthier the clones: ${CLONE_GENOME.q0}% DNA quality at ${CLONE_GENOME.min}% (frail), 100% when whole.</div>`;
+  h += `<div class="meta" style="margin-top:6px">TAR can clone an animal once its genome is ${CLONE_GENOME.min}% complete. The closer it is to 100%, the healthier the clones and the less likely the clone is to fail (up to ${Math.round(CLONE_GENOME.failMax * 100)}% at ${CLONE_GENOME.min}%): ${CLONE_GENOME.q0}% DNA quality at ${CLONE_GENOME.min}% (frail), 100% when whole.</div>`;
   if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
   h += `<ul class="shop" style="margin-top:10px">`;
   for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
@@ -157,7 +177,7 @@ function tarHtml(b){
   h += `<div class="meta">A genome that is ${CLONE_GENOME.min}% complete or more can be cloned as many times as you like. Clone quality follows how complete it is: under 70% makes sickly animals, under 50% frail ones.</div>`;
   h += sciStaffHtml("gene");
   const speed = Math.round(cloneSpeed() * 100);
-  h += baysHtml("Incubator bays", "gene", (c, i) => { const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId); return progressCard(esc(s.name), `for ${e ? esc(e.name) : "no exhibit yet"}`, c, i); }, "Empty. Order a clone below or from an exhibit's panel.");
+  h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty. Order a clone below or from an exhibit's panel.");
   h = h.replace(/<\/section>$/, `<div class="meta">Clones take ${speed === 100 ? "their usual time" : `${speed}% of the usual time`}. ${hasTech("fast2") ? "" : "Research faster incubators at ORACLE, under Park management."}</div></section>`);
   if(sc.ready.length) h += `<section><h3>Waiting for an exhibit</h3><ul class="herd">${sc.ready.map(r => `<li><span class="dot" style="background:${PERIOD_COLOR[SPECIES_BY_ID[r.sp].period]}"></span><span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${sexMark(r)} ${r.q}% DNA</span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Tap an exhibit and choose "Move in here".</div></section>`;
   const lib = SPECIES.filter(s => sc.dna[s.id]);
@@ -169,7 +189,7 @@ function tarHtml(b){
       const d = sc.dna[s.id], open = cloneOpen(s.id), why = open ? cloneProblem(s.id) : `Needs ${CLONE_GENOME.min}% genome.`;
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += open ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality. Takes ${spanText(cloneMinutes(s.id))}.` : ""}${open && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% chance of failing` : ""}. Takes ${spanText(cloneMinutes(s.id))}.` : ""}${open && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
@@ -246,6 +266,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "gtab"){ ghostTab = b.dataset.k; ui.panel(); return; }
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "stopResearch"){ const p = state.science.projects[+b.dataset.i]; if(p) stopProject(p); done(); return; }
+  if(a === "discardClone"){ if(discardClone(b.dataset.id)) done(); return; }
   if(a === "trip"){ if(launchTrip(b.dataset.sp, b.dataset.p)) done(); return; }
   if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "CERES can't grow that.", "bad"); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }

@@ -373,7 +373,18 @@ const TAR_UPGRADE = {speed:.75};
 const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
 // Cloning from a partial genome: TAR clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
 // runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
-const CLONE_GENOME = {min:60, q0:40};
+const CLONE_GENOME = {min:60, q0:40, failMax:.35};
+// Clones from a partial genome can die in the incubator: `failMax` chance at the minimum, none once the genome is whole. A failed clone stops
+// partway (between `failFrom` and `failTo` of its time), keeps its bay and fee, and sits there until the player discards it.
+const CLONE_FAIL = {from:.2, to:.9, causes:[
+  "Embryonic cell cascade failure",
+  "Developmental gene sequence missing from the genome",
+  "Chromosome mismatch in the gap regions",
+  "Zygotic genome activation failed",
+  "Telomere collapse during cell division",
+  "Culture rejected: incomplete regulatory code",
+  "Organ-field patterning arrested",
+]};
 
 // What CERES grows in its beds. Works like TAR's incubators, but with plants.
 //   days    how long one batch takes, in open days
