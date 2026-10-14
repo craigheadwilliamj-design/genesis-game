@@ -36,7 +36,7 @@ function staffTabHtml(){
     h += `<li><span class="dot" style="background:#4B3A8C"></span><span><b>${esc(k.plural)}</b> <span class="meta">${n} · ${money(k.wage)} a day each</span>${ok ? "" : `<span class="meta" style="display:block">Build ${esc(BUILDINGS[k.dept].label)} first.</span>`}</span>` +
       `<span style="display:flex;gap:6px;align-items:center"><button class="btn sell" data-action="hireSciTab" data-k="${kind}"${ok && canAfford(k.hireCost) ? "" : " disabled"}>Hire, ${money(k.hireCost)}</button>${n ? `<button class="btn sell" data-action="fireSciAsk" data-k="${kind}">Fire</button>` : ""}</span></li>`;
   }
-  return h + `</ul></section>`;
+  return h + `</ul></section>` + zonesSectionHtml();
 }
 
 /* ---------- one worker ---------- */

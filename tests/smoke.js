@@ -2204,6 +2204,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     q('#panel [data-action="restart"]').click();
     out.restartAsks = q("#dlgConfirm").open && /Restart/.test(q("#confirmYes").textContent) && !q("#dlgStart").open;
     q("#confirmNo").click(); out.restartCancelKeeps = !q("#dlgConfirm").open && !q("#dlgStart").open && state.name === nm;
+    // work zones live in the Staff tab, not the supplies overview; their buttons work from there
+    officeTab = "staff"; ui.panel();
+    out.zonesInStaffTab = !!q("#panel #zonesSection") && !!q('#panel [data-action="zoneTool"]') && !!q('#panel [data-action="supplyToggle"]');
+    q('#panel [data-action="zoneTool"]').click(); out.staffZoneToolWorks = tool === "zone"; setTool("select");
+    officeTab = "money"; ui.panel();
+    out.noZonesInSupplies = !/Work zones/.test(q("#panel").textContent) && !q('#panel [data-action="zoneTool"]');
+    out.zoneToolInStaffMenu = BUILD_MENU.find(g => g.id === "staff").items.some(i => i.tool === "zone") && !BUILD_MENU.find(g => g.id === "mgmt").items.some(i => i.tool === "zone");
     officeTab = "office"; ui.panel();
     return out;
   }));

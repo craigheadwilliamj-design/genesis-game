@@ -130,7 +130,7 @@ function addRow(z, items, label){
 
 function logiOverviewHtml(){
   const any = state.exhibits.some(e => e.animals.length), hasStores = storesBuilt().length;
-  if(!any && !hasStores && !zones().length) return "";
+  if(!any && !hasStores) return "";
   const sum = stockSummary();
   let h = `<section><h3>Supplies</h3>`;
   const warns = logiWarnings();
@@ -144,7 +144,13 @@ function logiOverviewHtml(){
   if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at CERES`);
   const L = state.logi;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;
-  h += `<h3 style="margin-top:12px">Work zones</h3>`;
+  return h + `</section>`;
+}
+
+// The work zones section, shown in the park office Staff tab
+function zonesSectionHtml(){
+  let h = `<section id="zonesSection">`;
+  h += `<h3>Work zones</h3>`;
   if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
   else h += `<div class="meta">Zones group keepers with the exhibits and stores around them. Draw one to split the park into work areas.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="zoneTool">Draw a zone</button><button class="btn" data-action="supplyToggle">${supplyOn ? "Hide" : "Show"} supply lines</button></div></section>`;
