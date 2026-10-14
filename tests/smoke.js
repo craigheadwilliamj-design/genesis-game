@@ -955,7 +955,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // build sidebar and the Move tool
     { // Park Plants dropdown: biome headings in BIOMES order, sizes ascending inside each
       const sub = document.querySelector('#sideMenu [data-open="park-plants"] .ssub'), order = Object.keys(BIOMES).map(b => BIOMES[b].label), heads = [], sizes = []; let ok = !!sub;
-      if(sub) for(const el of [...sub.children].slice(1)){
+      if(sub) for(const el of [...sub.children].filter(el => el.matches("p[data-pbiome], button"))){
         if(el.tagName === "P"){ heads.push(el.textContent); sizes.push([]); }
         else sizes[sizes.length - 1].push(PLANT_SIZES.indexOf(el.querySelector(".price").textContent.split(", ").find(x => PLANT_SIZES.includes(x))));
       }
@@ -1385,6 +1385,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       rockBiome = null; rockBiomeMenu = "grassland"; landGhost = {key:"rock", x:150, y:150, ok:true}; rockPick.rock = 0; refreshShapes();
       out.rockMenuBiome = rockBiomeNow() === "grassland" && document.querySelector('[data-shapes="rock"] img').src.includes("rock-grassland-1.png") && document.querySelector('[data-shapes="rock"] .shapebiome').value === "grassland";
       { const sel = document.querySelector('[data-shapes="rock"] .shapebiome'); sel.value = ""; sel.dispatchEvent(new Event("change", {bubbles:true})); out.rockMenuBiomeAuto = rockBiomeMenu === null; }
+      { const sel = document.querySelector('#sideMenu [data-open="plants-Jurassic"] .plantbiome'), row = k => document.querySelector(`#sideMenu [data-tool="land-${k}"]`);
+        out.plantMenuThumbs = !!sel && !!row("jur-tropical-large") && !!row("jur-tropical-large").querySelector("image[href*='sprites/plants/jur-tropical-large.png']");
+        sel.value = "tropical"; sel.dispatchEvent(new Event("change", {bubbles:true}));
+        const vis = k => !row(k).hidden, wet = Object.keys(LAND).find(k => LAND[k].period === "Jurassic" && LAND[k].biome === "wetland");
+        out.plantBiomeFilter = vis("jur-tropical-large") && !!wet && !vis(wet) && plantBiomeMenu === "tropical";
+        sel.value = ""; sel.dispatchEvent(new Event("change", {bubbles:true})); out.plantBiomeAll = vis(wet) && vis("jur-tropical-large"); }
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;

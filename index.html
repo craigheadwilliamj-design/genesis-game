@@ -117,6 +117,8 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .shapes .shape{width:34px;height:34px;padding:2px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line,#999);border-radius:4px;background:var(--chrome-2);font-weight:700}
 .shapes .shape[aria-pressed="true"]{background:var(--forest);border-color:var(--forest);color:var(--on-forest)}
 .shapes .shapebiome{width:100%;font-size:12px}
+#sideMenu [data-pbiome][hidden]{display:none}
+.plantbiome{margin:2px 10px 4px;width:calc(100% - 20px);font-size:12px}
 .shapes img{max-width:100%;max-height:100%;image-rendering:pixelated}
 .ssub{display:none;flex-direction:column;border-left:2px solid var(--line);margin:0 0 4px 22px}
 .sitem.open>.ssub{display:flex}
