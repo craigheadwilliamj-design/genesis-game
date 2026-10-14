@@ -140,6 +140,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S38 (S): Animal tap targets centered on the sprite**
 > `animalAt` (js/animalui.js ~line 77) hit-tests against the animal's ground position `h.x,h.y` with a minimum reach of 12 px, so small animals are hard to tap because the drawn sprite sits above/around that point. Center the target on the visible sprite (its box from `SPRITES` ratio/size, `spriteSvg`/rig height, flip, 3/4 view lift) and make the reach at least the sprite's size on screen with a sensible minimum for tiny or zoomed-out animals; prefer the nearest sprite center and keep dots/vivarium animals working.
 
+**S39 (M): Animals tab in the exhibit menu, with sell buttons** Needs S8 (animal panel), S31 (sex) for the sex column
+> Add an "Animals" tab to the exhibit panel (`exTabs` in js/ui.js ~line 185, tab renderers ~line 195). It lists every animal in the exhibit alphabetically by name, each row clickable (opens that animal's panel exactly like tapping it on the map, `select("animal", id)`), showing name, sex and current health, with a Sell button on each row. The animal panel (js/animalui.js `animalHtml`) gets the same Sell button. Selling reuses the resale rule from the existing species-level sell (`data-action="sell"` in js/ui.js ~line 825: `price * COST.animalResale`, `earn(..., "sold")`) but removes that specific animal (by id, also from `herd` and any transfer/medical state), asks for confirmation first (`askConfirm`), and closes the animal panel if that animal was selected. Vivarium exhibits get the tab too.
+
 ---
 
 ## Suggested order
