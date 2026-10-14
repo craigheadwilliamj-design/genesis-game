@@ -222,6 +222,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.territorialInjury = injuryChance(pen, pen.animals[0]).p > HEALTH.territorial;
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
+    out.devModeOffByDefault = devMode() === false && !("dev" in state) && !JSON.stringify(state).includes("genesis-dev");
     return out;
   }));
 

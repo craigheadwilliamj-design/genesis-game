@@ -723,6 +723,8 @@ function checkGoals(){
 
 /* ---------- formatting shared by the screen ---------- */
 
+// Hidden dev-mode switch. Lives in localStorage only, never in `state`, so a shared save can't carry it.
+function devMode(){ try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
 function money(n){ const s = "$" + Math.abs(Math.round(n)).toLocaleString(); return n < 0 ? "−" + s : s; }
 function fmtArea(m2){ return `${Math.round(m2).toLocaleString()} m²`; }
 function fmtClock(min){
