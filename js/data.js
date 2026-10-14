@@ -505,8 +505,10 @@ const GUEST = {
   badMood:30,          // and this low gets none
 };
 // How guests spend time on the paths: stopping at exhibits, strolling, and acting on impulse. Times are guest minutes (divided by GUEST.pace in the park clock).
+// What a party notices while it stands watching an exhibit: one thing every so often (guest minutes between), each with its own small effect on mood
+const OBS = {gap:[2.5, 6], learn:.35, chance:{exhibit:.2}};
 const SIGHT = {
-  dwell:[5, 16],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
+  dwell:[10, 26],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
   glance:.9,           // top chance of stopping for an unseen exhibit they walk past (scaled by its appeal and their taste)
   glanceAppeal:12,     // appeal at which that chance is half of the top
   whim:[.35, 1.65],    // each party's own random liking for each exhibit when choosing where to head
@@ -694,6 +696,8 @@ const THOUGHTS = {
   gory:       {text:"We watched an animal hunting. Not for kids."},
   ejected:    {text:"Security threw us out!"},
   hiding:     {text:"Where are the animals? They're all hiding."},
+  feeding:    {text:"It was great watching them eat.", good:true},
+  sickly:     {text:"Some of those animals looked unwell."},
 };
 
 // Each vivarium size is also a building you can place

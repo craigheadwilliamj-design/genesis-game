@@ -208,7 +208,7 @@ function partyLeaves(p){
 function goHome(p){
   if(p.home) return;
   leaveQueue(p);
-  p.home = true; p.dest = null; p.why = null; p.linger = 0; p.stroll = 0;
+  p.home = true; p.dest = null; p.why = null; p.linger = 0; p.stroll = 0; p.watch = null;
 }
 function leaveQueue(p){
   if(!p.in) return;
@@ -361,6 +361,63 @@ function reachDest(p){
   svcQ.get(id).queue.push(p); p.in = id; p.waited = 0;
   standNear(p, b.points);
 }
+// Where a party wants to be beside its path node or stretch: across the whole width of the path while walking, at its spot when watching or waiting
+function partyOff(p){
+  if(p.stand) return [p.stand.dx, p.stand.dy];
+  if(p.to){
+    const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1, room = (p.at.room && p.at.room.get(p.to)) || 1;
+    const w = (room > 1 ? WIDE_PATH.halfWidth : 1.5) - .35, lat = (p.lane || 0) * w;
+    return [-dy/L*lat, dx/L*lat];
+  }
+  const a = p.off * 4.4;
+  return [Math.cos(a) * Math.abs(p.off) * 1.5, Math.sin(a) * Math.abs(p.off) * 1.5];
+}
+// They walk to their spot at their own pace, not slide there (the drawing reads p.ox/p.oy)
+function stepOff(p, meters){
+  if(!p.at) return;
+  const o = partyOff(p);
+  if(p.ox === undefined){ p.ox = o[0]; p.oy = o[1]; return; }
+  const dx = o[0] - p.ox, dy = o[1] - p.oy, d = Math.hypot(dx, dy);
+  if(d <= meters){ p.ox = o[0]; p.oy = o[1]; } else { p.ox += dx / d * meters; p.oy += dy / d * meters; }
+}
+// What a party at an exhibit notices, a thing at a time, while it stands there
+function observe(p, e){
+  const note = (text, d, good) => { (p.notes = p.notes || []).push({text, good:!!good}); if(p.notes.length > 12) p.notes.shift(); if(d) p.mood = clamp(p.mood + d, 0, 100); };
+  const seen = e.animals.filter(a => !a.inside);
+  if(!seen.length){ note("There's nothing out to see right now.", -1); return; }
+  if(Math.random() < OBS.chance.exhibit){
+    const sp = SPECIES_BY_ID[seen[0].sp];
+    if(e.happy < 35){ note("They don't look happy in there.", -1); return; }
+    if(!hasSign(e)){ note(`I'd love to know more about the ${sp.name}.`, 0); return; }
+    if(e.happy >= 75){ note("They look really well looked after.", 1, true); return; }
+  }
+  const a = seen[Math.floor(Math.random() * seen.length)], sp = SPECIES_BY_ID[a.sp], n = sp.name;
+  if(a.sick){ note(`${a.name} the ${n} looks unwell.`, -2); thinks(p, "sickly"); return; }
+  learn(p, EDU.see * OBS.learn * (hasSign(e) ? 1 + EDU.sign : 1));
+  switch(a.act){
+    case "eat": note(`The ${n} is tucking into a meal.`, 1, true); thinks(p, "feeding"); break;
+    case "drink": note(`A ${n} stops for a drink.`, .5, true); break;
+    case "rest": note(`That ${n} is having a lie down.`, 0); break;
+    case "hunt": note(`The ${n} is stalking something...`, 1, true); break;
+    case "forage": note(`A ${n} is rooting around for food.`, .5, true); break;
+    case "social": note(`The ${n}s are sticking close together.`, 1, true); break;
+    case "play": note(`Look, a ${n} is playing!`, 2, true); thinks(p, "playful"); break;
+    case "hide": note(`The ${n} is keeping out of sight.`, -1); break;
+    case "pace": note(`The ${n} keeps pacing the fence.`, -2); thinks(p, "pacing"); break;
+    case "patrol": note(`The ${n} is prowling along the fence.`, .5, true); break;
+    default: note(`The ${n} is just standing there.`, 0);
+  }
+}
+function observeTick(p, now){
+  const w = p.watch;
+  if(!w || p.linger <= now){ p.watch = null; return; }
+  if(p.stand && Math.hypot((p.ox || 0) - p.stand.dx, (p.oy || 0) - p.stand.dy) > .4) return;   // still walking over
+  if(w.next === undefined){ w.next = now + rand(...OBS.gap) * .4 / GUEST.pace; return; }
+  if(now < w.next) return;
+  const e = state.exhibits.find(x => x.id === w.id);
+  if(e) observe(p, e);
+  w.next = now + rand(...OBS.gap) / GUEST.pace;
+}
 // Where a party stands to watch or wait: a spot along a fence or wall (or on a viewing platform), as an offset from its path node.
 // Drawing only; it never changes where the party is on the map. Spots are picked along the whole stretch of fence in range, the nearer the likelier, so a crowd spreads out.
 function standNear(p, pts, e){
@@ -377,6 +434,7 @@ function standNear(p, pts, e){
     if(best){
       const P = best.points, u = .12 + Math.random() * .76, v = .12 + Math.random() * .76;
       p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
+      if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
       return;
     }
   }
@@ -397,6 +455,7 @@ function standNear(p, pts, e){
   let r = Math.random() * cand.reduce((s, c) => s + c[2], 0), c = cand[cand.length - 1];
   for(const k of cand){ r -= k[2]; if(r <= 0){ c = k; break; } }
   p.stand = {dx:c[0] - n.x, dy:c[1] - n.y};
+  if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);
 }
 function seeExhibit(p, e, quick){
   if(p.dest === e.id && p.why === "see"){ p.dest = null; p.why = null; }
@@ -405,7 +464,7 @@ function seeExhibit(p, e, quick){
   if(!e.animals.length) return;
   const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
   // stop and watch for a while: longer for a bigger draw
-  if(!quick) p.lingerAt = e.id;
+  if(!quick){ p.lingerAt = e.id; p.watch = {id:e.id}; }
   if(!quick) p.linger = state.minute + (SIGHT.dwell[0] + (SIGHT.dwell[1] - SIGHT.dwell[0]) * a / (a + 15)) * rand(.8, 1.2) / GUEST.pace;
   p.mood += GUEST.seeGain * a / (a + 15) * (1 - HIDING.appeal * bother) - HIDING.mood * bother;
   if(bother >= HIDING.thought) thinks(p, "hiding");
@@ -546,7 +605,9 @@ function guestsTick(m0, m1){
     throwTick(p, gdt);
     teaseTick(p, gdt);
     if(!p.at){ if(p.home) partyLeaves(p); continue; }
+    if(p.watch) observeTick(p, m1);
     walkParty(p, WALK_PER_MIN * p.spd * dt);
+    stepOff(p, WALK_PER_MIN * p.spd * dt);
   }
   serviceTick(dt, m1);
   parties = parties.filter(p => !p.gone);
