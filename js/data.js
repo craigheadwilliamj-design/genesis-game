@@ -1320,6 +1320,25 @@ const BEHAVIOR = {
   nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 12 minutes a second, so this is 12 to 22 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
 };
+// Animal-on-animal attacks (behavior.js, "attacks"). Hurt animals get an injury (a.sick, kind "injury") that vets treat; a bad enough one kills.
+//   Loose predators strike animals in an exhibit they can get into (a breach, or a fence weaker than they are) from the fence line.
+//   A predator housed with prey stalks it (the hunt act) and strikes once it is close. Stressed aggressive (or crowded) animals fight each other.
+const ATTACK = {
+  reach:8,             // meters from the fence a loose predator can strike at
+  looseRate:.05,       // chance a park minute that a loose predator in reach attacks
+  gap:25,              // park minutes between one attacker's attacks
+  bite:[25, 60],       // severity a predator's attack adds (0 to 100; 100 kills)
+  kill:.12,            // chance a predator's attack kills outright
+  scare:25,            // stress the victim takes
+  stalk:10,            // minutes a predator has been hunting before it can strike
+  strike:5,            // meters from its prey (plus its own size) it must close to strike
+  huntChance:.5,       // chance each behavior step it strikes once in range (a third if positions are unknown)
+  drive:40,            // pull of the hunt act with prey in the exhibit, plus half its hunger
+  fightStress:60,      // an aggressive animal over this stress picks fights (a crowded one of any kind, 15 higher)
+  fightRate:.006,      // chance each behavior step at the top of that range
+  crowded:2,           // fights are this many times likelier in a cramped exhibit
+  fightHurt:[8, 22],   // severity a fight adds
+};
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
 const ACTS = {
   eat:   {label:"Eating"},

@@ -1933,6 +1933,61 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalRenameBlank = a1.name === "x".repeat(24) && inp.value === a1.name;
       select(null); state.animalSeq = seqKeep; state.exhibits = exKeep; syncAnimals();
     }
+    {   // animal attacks: loose predators raid exhibits they can get into, stressed animals fight, predators hunt their prey
+      const exKeep = state.exhibits, looseKeep = state.safety.loose, fxKeep = events.fx, diedKeep = events.died, tKeep = events.toast;
+      const fx = [], died = []; events.fx = (k, x, y) => fx.push([k, x, y]); events.died = d => died.push(d); events.toast = () => {};
+      const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
+      const hurtCount = e => e.animals.filter(a => a.sick && a.sick.hit).length;
+      // 1. a loose Dimetrodon beside a pen of Cotylorhynchus: it gets in through a breach, not through a strong fence
+      let e = pen("e-at1", ["coty", "coty", "coty"]); state.exhibits = [e];
+      const dm = SPECIES_BY_ID.dime, lo = () => ({id:"l-at", sp:"dime", status:"loose", at:null, x:46, y:20});
+      state.safety.loose = [lo()];
+      e.barrier = "concrete"; e.cond = 100;
+      for(let i = 0; i < 20; i++) looseAttacks(60);
+      out.attackFenceHolds = !canGetIn(e, dm) && hurtCount(e) === 0 && !fx.length;
+      e.cond = 0;
+      for(let i = 0; i < 20 && !hurtCount(e); i++){ state.safety.loose[0].biteAt = undefined; looseAttacks(60); }
+      const hit = e.animals.find(a => a.sick && a.sick.hit);
+      out.looseAttacks = !!hit && hit.sick.kind === "injury" && hit.sick.hit.by === dm.name && hit.sick.hit.how === "loose" && fx.length >= 1 && fx[0][0] === "dust" && state.safety.loose[0].biteAt != null;
+      // out of reach, or with the gap between bites not yet passed, it leaves them be
+      const before = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0);
+      looseAttacks(60); state.safety.loose[0].x = 200; state.safety.loose[0].biteAt = undefined; looseAttacks(60);
+      out.looseNeedsReach = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0) === before;
+      // a bite can kill outright, and the death dialog names the attacker
+      const vic = e.animals[0]; died.length = 0; vic.sick = {kind:"injury", sev:90}; hurtAnimal(e, vic, dm.name, "loose", [30, 30], 0);
+      out.attackKills = !e.animals.includes(vic) && died.length === 1 && died[0].cause === "Killed by a Dimetrodon" && died[0].exhibit === e.name;
+      // 2. fights: a stressed, crowded herd hurts itself; a calm one doesn't
+      e = pen("e-at2", ["coel", "coel", "coel", "coel"]); state.exhibits = [e];
+      const ctxOf = ratio => ({counts:speciesCounts(e), ratio});
+      for(const a of e.animals) a.need = {...freshNeeds(), stress:10};
+      for(let i = 0; i < 400; i++){ for(const a of e.animals) delete a.hitAt; attackStep(e, ctxOf(.5)); }
+      out.calmNoFights = hurtCount(e) === 0;
+      for(const a of e.animals) a.need.stress = 100;
+      for(let i = 0; i < 400 && !hurtCount(e); i++){ for(const a of e.animals) delete a.hitAt; attackStep(e, ctxOf(.5)); }
+      const fought = e.animals.find(a => a.sick && a.sick.hit);
+      out.fightsInjure = !!fought && fought.sick.hit.how === "fight" && fought.sick.kind === "injury" && needsOf(fought).stress >= 100 - 1;
+      // an aggressive animal that is not crowded still fights at high stress, and the cause reads right if it dies
+      const f2 = e.animals.find(a => a !== fought); died.length = 0; f2.sick = {kind:"injury", sev:95}; hurtAnimal(e, f2, "Coelophysis", "fight", [10, 10], 0);
+      out.fightDeathCause = died.length === 1 && /fight/.test(died[0].cause);
+      // 3. a predator housed with prey stalks it (the hunt act) and strikes
+      e = pen("e-at3", ["dime", "coty", "coty"]); state.exhibits = [e];
+      const pred = e.animals[0], ctx3 = behaviorCtx(e);
+      for(const a of e.animals) a.need = {...freshNeeds(), hunger:10};
+      out.predatorStalks = pickAct(e, pred, dm, ctx3) === "hunt" && pickAct(e, e.animals[1], SPECIES_BY_ID.coty, ctx3) !== "hunt";
+      pred.act = "hunt"; pred.actFor = 0;
+      attackStep(e, ctx3); out.noStrikeBeforeStalk = hurtCount(e) === 0;
+      pred.actFor = ATTACK.stalk;
+      for(let i = 0; i < 100 && !hurtCount(e); i++){ delete pred.hitAt; attackStep(e, ctx3); }
+      const prey = e.animals.find(a => a.sick && a.sick.hit);
+      out.predatorStrikes = !!prey && prey.sp === "coty" && prey.sick.hit.how === "hunt" && pred.hitAt != null;
+      // it keeps its distance while the gap between strikes runs, and its own kind is never prey
+      const sevs = JSON.stringify(e.animals.map(a => a.sick)); attackStep(e, ctx3);
+      out.huntGapHolds = JSON.stringify(e.animals.map(a => a.sick)) === sevs;
+      out.noCannibals = preyIn(e, dm, speciesCounts(e)).join() === "coty";
+      // old saves: no new fields are needed
+      const oldE = JSON.parse(JSON.stringify(pen("e-at4", ["coty"]))); out.attackOldSave = !oldE.animals[0].sick && !oldE.animals[0].hitAt;
+      state.exhibits = exKeep; state.safety.loose = looseKeep; events.fx = fxKeep; events.died = diedKeep; events.toast = tKeep; syncAnimals();
+    }
     localStorage.removeItem("genesis-dev");
     return out;
   }));

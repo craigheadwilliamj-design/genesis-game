@@ -551,6 +551,6 @@ function animalDies(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.rating = Math.max(0, state.rating - .05);
-  const cause = a.sick.cause === "trash" ? "Ate trash thrown in by guests" : a.sick.kind === "injury" ? "Injuries" : "Illness";
+  const hit = a.sick.hit, cause = a.sick.cause === "trash" ? "Ate trash thrown in by guests" : hit ? (hit.how === "fight" ? `Wounds from a fight with a ${hit.by}` : `Killed by a ${hit.by}`) : a.sick.kind === "injury" ? "Injuries" : "Illness";
   events.died({animal:SPECIES_BY_ID[a.sp].name, exhibit:e.name, cause});
 }
