@@ -503,6 +503,17 @@ const GUEST = {
   goodMood:75,         // an average leaving mood this high gets full marks for guest comfort
   badMood:30,          // and this low gets none
 };
+// How guests spend time on the paths: stopping at exhibits, strolling, and acting on impulse. Times are guest minutes (divided by GUEST.pace in the park clock).
+const SIGHT = {
+  dwell:[5, 16],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
+  glance:.9,           // top chance of stopping for an unseen exhibit they walk past (scaled by its appeal and their taste)
+  glanceAppeal:12,     // appeal at which that chance is half of the top
+  whim:[.35, 1.65],    // each party's own random liking for each exhibit when choosing where to head
+  distPull:45,         // meters at which an exhibit's pull is halved when choosing (smaller means they stick closer to where they are)
+  strollChance:.4,     // chance, when they have nothing planned, of drifting along the paths instead of picking an exhibit
+  strollLen:[3, 9],    // corners a stroll lasts
+  impulse:{frac:.55, near:55, chance:.6, shop:.2, shopNear:45, gap:40},   // a need over this share of its seek line, and a stop this close: chance of going; chance of popping into a shop; minutes between tries
+};
 /* ---------------------------------------------------------------------
    GUEST PERSONALITIES
    Every party has a primary and a secondary personality. The primary pulls in full and the
