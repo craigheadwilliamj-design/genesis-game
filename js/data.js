@@ -1352,7 +1352,7 @@ const SEX = {
 };
 // Social life in open exhibits (behavior.js, "social"; vivariums ignore all of it). Driven by traitsOf(s).social.
 //   a.rank is a saved status number, 0 for the alpha up to 1 for the bottom of the pecking order (sorted ascending = alpha first).
-//   Herds and packs: all-male (bachelor) and all-female (matriarchal) groups are stable and happy; one male with females is stable;
+//   Herds: all-male (bachelor) and all-female (matriarchal) groups are stable and happy; one male with females is stable;
 //   two or more males with females fight, more with more males and less room. Solitary species dislike company (same sex most).
 //   Pairs: one male and one female is ideal. Stress numbers are 0 to 100 added to the animal's stress target.
 const SOCIAL = {
@@ -1368,6 +1368,20 @@ const SOCIAL = {
   fightRate:.01, upset:.2,           // chance each behavior step per extra male that rivals fight; chance the lower rank wins
   hurt:[6, 16], lowHurt:.8,          // injury a fight adds, up to this much more to the lowest rank
   loseStress:20,                     // extra stress on the loser, more the lower its rank
+};
+// Packs (traitsOf(s).social === "pack": group predators) are family units, not herds, and skip the herd rules above (open exhibits only; vivariums ignore all of it).
+//   The two best-ranked animals are the alpha pair (ideally one male and one female: the alpha plus the best-ranked of the other sex); the rest are subordinates.
+//   A pack under its species' group[0] is stressed and lonely, one alone worst. The alpha pair eats first (keepers.js eatTick), so shortages hit subordinates first.
+//   Pack mates hunt together (more strike chance with more hunters). Rank challenges are rare and only happen under stress (hungry subordinates, a crowded pen, no alpha pair).
+const PACK = {
+  settled:2, smallHappy:6, aloneMult:2, noPairHappy:3,   // happiness: a full pack with an alpha pair; lost per missing animal share (alone doubled); lost with no alpha pair
+  smallStress:30, aloneStress:55, noPairStress:12,       // stress: pack under its minimum (scaled by how short it is), a pack animal alone, subordinates with no alpha pair
+  lonelyExtra:1.5,                                       // extra loneliness a minute (times the base rate) in a too-small pack, doubled when alone
+  pile:.5,                                               // food on hand under this share of a day's need counts as a shortage; the alphas eat first
+  lackHunger:1.2, lackBlock:.6,                          // a hungry rank gains hunger this many times faster, and eating helps this much less (both times its share of the shortage)
+  huntJoin:25, huntBonus:.5, huntMax:.95,                // pull to join a hunt per hunting mate; strike chance gain per extra hunter; the most
+  challengeRate:.004, hungerLine:60, stressLine:55,      // chance each behavior step per driver (hungry subordinates, crowding, no alpha pair); subordinates count as hungry or stressed over these
+  upset:.3, hurt:[4, 12], loseStress:15,                 // chance the challenger wins (then they swap ranks); injury a clash adds; stress on the loser
 };
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
 const ACTS = {
