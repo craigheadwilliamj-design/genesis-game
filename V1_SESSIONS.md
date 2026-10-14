@@ -113,6 +113,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S29 (M): Start-up screen, PALEO-TYCOON rename, biome lock**
 > Rename the game to "PALEO-TYCOON" (index.html `<title>`, the intro dialog "Welcome to Genesis Park" in `#dlgIntro`, HUD and any other user-facing "Genesis Park Tycoon" text; keep the in-game default park name and the Genesis theme as they are unless the user says otherwise). Build a proper start-up screen shown before a park begins: game title, New Park (name + biome pick, reusing `biomeCards` in js/main.js and `#introBiomes`), and Continue if a save exists. Choosing a biome locks the park's background biome (`state.biome`, `parkBiome()` in sim.js) for the life of that park: remove the biome picker from the park office dialog (`#menuBiomes` in main.js ~line 163) so it can't be changed, and only a new park (via the start screen) can pick another. Old saves keep their current biome. Add smoke checks that the biome can't be changed mid-park and that a new park can. Update CLAUDE.md where it mentions picking the biome in the park office.
 
+**S30 (M): Animals attack other animals** Best after S10 (reuses its dust-cloud hook)
+> Today predators never attack other animals: `predator:true` species can only be housed with their own kind (data.js ~line 59), and `hunt` in behavior.js is only a stalking animation. Wire in real animal-on-animal attacks: (1) loose/escaped predators attack animals in exhibits they reach, (2) fights inside an exhibit between aggressive or stressed animals (`temper`, `a.need.stress`, crowding via `cramped`), (3) if a predator ends up with prey (breach, transfer, dev-mode), it hunts it. Attacks cause injuries and deaths through the existing health/medicine system (js/medicine.js `injuryChance`, deaths queue in main.js), show in the death dialog with cause, fire the S10 dust-cloud hook, and are tunable from a constant in data.js. Smoke checks for each case.
+
 ---
 
 ## Suggested order
