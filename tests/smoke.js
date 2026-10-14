@@ -234,9 +234,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
     { const was = localStorage.getItem("genesis-dev"); localStorage.removeItem("genesis-dev");
-      out.rosterHidesCoty = !speciesAvailable("coty") && speciesAvailable("trex") && !speciesToUnlock().some(s => s.id === "coty");
-      out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-dime"]'));
-      localStorage.setItem("genesis-dev", "1"); out.devShowsCoty = speciesAvailable("coty") && speciesToUnlock().some(s => s.id === "coty");
+      out.rosterHidesHerr = !speciesAvailable("herr") && speciesAvailable("trex") && !speciesToUnlock().some(s => s.id === "herr");
+      out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-prot"]'));
+      localStorage.setItem("genesis-dev", "1"); out.devShowsHerr = speciesAvailable("herr") && speciesToUnlock().some(s => s.id === "herr");
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was); }
     { const was = localStorage.getItem("genesis-dev"), th = {theme:"volcanic"}, themed = THEMES.volcanic ? "volcanic" : Object.keys(THEMES).find(k => k !== "genesis");
       const pen = state.exhibits[0] || {id:"e-t", name:"T", points:[[0,0],[30,0],[30,30],[0,30]], animals:[{id:"t1", sp:"trex"}]};
