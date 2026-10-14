@@ -291,11 +291,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.v1HidesMenuOff = held.every(t => !menuHas(t)) && menuHas("restroom") && menuHas("path");
       out.v1HidesTechOff = techs.every(id => techHidden(id) && !techRows("build").includes(`data-id="${id}"`) && !techRows("build").includes(esc(TECH.find(x => x.id === id).label))) && techRows("build").includes(esc(TECH.find(x => x.id === "security").label));
       out.v1HidesGoalsOff = ["camp", "hotel", "resort"].every(id => !activeGoals().some(g => g.id === id)) && activeGoals().length === GOALS.length - 3;
+      out.v1HidesStatuesOff = !document.querySelector('#sideMenu [data-open="statues"]') && GOALS.filter(g => g.statue).every(g => !/statue/i.test(grantPrize(g)) && !grantStatue(g)) && Object.keys(LAND).filter(k => LAND[k].statue).every(k => !statueOpen(k) && decorProblem(k, 0, 0) === "Statues aren't available yet.");
       out.v1BlocksTechOff = startProject("tech", "education") !== null && pathProblem([[0,0],[10,0]], "tram") !== null && buildingHidden("lodge");
       localStorage.setItem("genesis-dev", "1"); buildMenu();
       out.v1ShowsMenuOn = held.every(menuHas);
       out.v1ShowsTechOn = techs.every(id => !techHidden(id)) && techRows("build").includes(esc(TECH.find(x => x.id === "hotels").label));
       out.v1ShowsGoalsOn = activeGoals().length === GOALS.length;
+      out.v1ShowsStatuesOn = !!document.querySelector('#sideMenu [data-open="statues"]') && GOALS.filter(g => g.statue).every(g => grantPrize(g).includes("statue")) && statueOpen("st-owen") !== undefined;
       out.v1AllowsTramOn = pathProblem([[0,0],[10,0]], "tram") !== "That isn't available yet." && !buildingHidden("edcenter");
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
       buildMenu(); }

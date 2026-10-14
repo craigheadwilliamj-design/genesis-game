@@ -768,7 +768,7 @@ function checkGoals(){
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);
       if(g.reward) earn(g.reward, "rewards");
-      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${g.statue ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
+      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${grantStatue(g) ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
     }
   }
   checkThemes();   // a grant can unlock a theme
