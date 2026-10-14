@@ -2437,6 +2437,50 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   Object.assign(checks, props);
 
+  // viewing platforms: flat pixel deck, front over the exhibit, entry on the path side, at every fence-side direction
+  const decks = await page.evaluate(() => {
+    const out = {}, tl = tilt; tilt = true;
+    const t = BUILDINGS.platform, sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
+    const dirs = [0, 1, 2, 3, 4, 5, 6, 7], arts = [], fronts = [];
+    let allOk = true;
+    for(const k of dirs){   // a deck on the side of a big exhibit at 8 angles (diagonals too): edge from a to b, the exhibit on the +normal side
+      const ang = k * Math.PI / 4, ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux, cx = 300, cy = 300;
+      const ex = {id:"ex-d" + k, points:[[cx - ux*20, cy - uy*20], [cx + ux*20, cy + uy*20], [cx + ux*20 + nx*30, cy + uy*20 + ny*30], [cx - ux*20 + nx*30, cy - uy*20 + ny*30]], barrier:"bars"};
+      state.exhibits.push(ex);
+      const off = t.d/2 - 1.5, bl = {id:"pd" + k, type:"platform", exhibitId:ex.id, points:rectPts(cx + nx*off, cy + ny*off, t.w, t.d, ang), inward:true};
+      const fr = deckFrame(bl), a = deckArt(bl, .1, false, false, true);
+      fronts.push(fr.v[0]*nx + fr.v[1]*ny);
+      arts.push(a);
+      allOk = allOk && a.length > 1500 && (a.match(/<polygon/g) || []).length > 40 && !/NaN/.test(a) && Math.abs(fr.u[0]*fr.v[1] - fr.u[1]*fr.v[0] - 1) < 1e-6;
+      state.exhibits.pop();
+    }
+    out.platformRendersAllDirections = allOk;
+    out.platformFrontFacesAnimals = fronts.every(f => f > .99);   // the front points into the exhibit at every angle
+    out.platformTurnsWithSide = new Set(arts).size === arts.length;
+    // flip the exhibit to the other side of the fence: the front flips with it
+    const ex = {id:"ex-flip", points:sq(300, 300, 20), barrier:"wood"}; state.exhibits.push(ex);
+    const north = {id:"pn", type:"platform", exhibitId:ex.id, points:rectPts(300, 280 + 2, t.w, t.d, 0), inward:true};   // fence side y=280, exhibit south of it
+    const south = {id:"ps", type:"platform", exhibitId:ex.id, points:rectPts(300, 320 - 2, t.w, t.d, 0), inward:true};   // fence side y=320, exhibit north of it
+    out.platformFrontFlips = deckFrame(north).v[1] > .99 && deckFrame(south).v[1] < -.99;
+    state.exhibits.pop();
+    // in the game: renders in the map, old saves (no inward flag, no rot) load and draw
+    const e0 = state.exhibits.find(x => !x.viv);
+    let loads = true;
+    if(e0){
+      const [cx, cy] = centroid(e0.points), old = {id:"b-oldplat", type:"platform", exhibitId:e0.id, points:rectPts(cx, cy, t.w, t.d, 0), day:1};
+      const snap = JSON.parse(JSON.stringify(state)); snap.buildings.push(old); upgradeSave(snap);
+      const got = snap.buildings.find(b => b.id === "b-oldplat");
+      loads = !!got && got.inward === true && deckArt(got, .1, false, false, true).length > 1500;
+      state.buildings.push(JSON.parse(JSON.stringify(got))); render();
+      out.platformRendersInGame = !!document.querySelector(`#map [data-id="b-oldplat"]`) && /VIEW|polygon/.test(document.querySelector(`#map [data-id="b-oldplat"]`).innerHTML);
+      state.buildings = state.buildings.filter(b => b.id !== "b-oldplat");
+    } else out.platformRendersInGame = true;
+    out.oldSavePlatformLoads = loads;
+    tilt = tl; render();
+    return out;
+  });
+  Object.assign(checks, decks);
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }

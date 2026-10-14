@@ -117,3 +117,59 @@ function propFrontMark(bl, r){
   const [cx, cy] = centroid(bl.points), [fx, fy] = propFront(bl);
   return `<path d="M${(cx + fx*r*.25).toFixed(2)} ${(cy + fy*r*.25).toFixed(2)}L${(cx + fx*r*.95).toFixed(2)} ${(cy + fy*r*.95).toFixed(2)}" stroke="#fff" stroke-opacity=".9" stroke-width="2.4" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
 }
+
+/* Viewing platforms in the flat pixel style, 3/4 view. A raised deck on stilts with a rail all round, steps down to the path on one long side and the viewing rail (with a small VIEW sign) on the other.
+   The deck's footprint is rectPts(...) of the fence side it snapped to, so the long axis follows that side at any angle, diagonals included. Nothing is saved for the facing: the side whose middle lies inside the exhibit is
+   the animal side (the frame's +v, the front, like the path objects), the other long side is the entry. Same boxes (`pbox`) and tones as the path objects. */
+const DECK = {h:2.2, step:.55, steps:3, gap:1.6, rail:1.1, seg:1.75};
+function deckFrame(bl){
+  const P = bl.points, w = Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]), d = Math.hypot(P[3][0] - P[0][0], P[3][1] - P[0][1]), c = centroid(P);
+  const a = w >= d ? [P[1][0] - P[0][0], P[1][1] - P[0][1]] : [P[3][0] - P[0][0], P[3][1] - P[0][1]], al = Math.hypot(a[0], a[1]) || 1;
+  let u = [a[0] / al, a[1] / al], v = [-u[1], u[0]];
+  const hw = Math.max(w, d) / 2, hd = Math.min(w, d) / 2, e = state.exhibits.find(x => x.id === bl.exhibitId);
+  if(e){   // the animal side is the long side that lies over the exhibit
+    const at = s => inPoly(c[0] + v[0]*hd*s, c[1] + v[1]*hd*s, e.points), plus = at(1), minus = at(-1);
+    let flip = false;
+    if(plus !== minus) flip = !plus;
+    else { const [ex, ey] = centroid(e.points); flip = (ex - c[0])*v[0] + (ey - c[1])*v[1] < 0; }
+    if(flip) v = [-v[0], -v[1]];
+  }
+  if(u[0]*v[1] - u[1]*v[0] < 0) u = [-u[0], -u[1]];   // a proper turn, so lettering on the front reads the right way round
+  return {c, u, v, hw, hd, e};
+}
+function deckArt(bl, inv, on, dead, reach){
+  const t = BUILDINGS.platform, T = themeOf(bl), D = DECK, fr = deckFrame(bl), {c, hw, hd, e} = fr, px0 = FLAT34.px;
+  const F = {c, u:fr.u, v:fr.v, k:1, px:px0}, px = px0, H = D.h;
+  const col = themeFill(bl, t.color), fk = e && FENCE34[e.barrier], rc = fk ? mixHex(fk.col, col, .35) : mixHex(col, "#000000", .3);   // the rail takes the fence's color
+  const TC = propTones(col), TD = propTones(mixHex(col, "#000000", .3)), TR = propTones(rc), TS = propTones("#F4F1E8");
+  const GOLD = FLAT34.gold, INK = "#14281C", boxes = [];
+  const bx = (u0, u1, v0, v1, h0, h1, tone, deco, slats) => ({u0, u1, v0, v1, h0, h1, tone, deco, slats});
+  // stilts under the deck, along both long sides
+  const nst = Math.max(2, Math.round(2*hw / 3.5) + 1);
+  for(let i = 0; i < nst; i++){ const uu = -hw + .5 + (2*hw - 1) * i / (nst - 1); for(const sv of [-1, 1]) boxes.push(bx(uu - .2, uu + .2, sv*(hd - .45) - .2, sv*(hd - .45) + .2, 0, H - .4, TD)); }
+  // the deck: planks run along it, a gold trim under the viewing edge, a pale stripe on the entry side
+  boxes.push(bx(-hw, hw, -hd, hd, H - .4, H, TC, {front:Q => Q(-hw, hw, H - .4, H - .4 + px, GOLD), back:Q => Q(-D.gap, D.gap, H - .4, H - .4 + px*2, TS[1]), left:Q => Q(-hd, hd, H - .4, H - .4 + px, TC[2]), right:Q => Q(-hd, hd, H - .4, H - .4 + px, TC[2])}, Math.max(2, Math.round(hd * 2))));
+  // steps down to the path on the entry side
+  for(let j = 0; j < D.steps; j++){ const top = H - D.step * (j + 1); boxes.push(bx(-D.gap + .1, D.gap - .1, -hd - D.step * (j + 1), -hd - D.step * j, 0, top, TC, {front:Q => Q(-D.gap + .1, D.gap - .1, top - px, top, TC[2])})); }
+  // railings: posts and a top and middle rail in runs of D.seg; the entry side is open at the steps
+  const run = (u0, v0, u1, v1) => {
+    const L = Math.hypot(u1 - u0, v1 - v0), n = Math.max(1, Math.round(L / D.seg));
+    for(let i = 0; i <= n; i++){ const uu = u0 + (u1 - u0) * i / n, vv = v0 + (v1 - v0) * i / n; boxes.push(bx(uu - .08, uu + .08, vv - .08, vv + .08, H, H + D.rail, TR)); }
+    for(let i = 0; i < n; i++){ const a = [u0 + (u1 - u0) * i / n, v0 + (v1 - v0) * i / n], b = [u0 + (u1 - u0) * (i + 1) / n, v0 + (v1 - v0) * (i + 1) / n];
+      for(const [h0, h1] of [[H + D.rail - .13, H + D.rail], [H + .5, H + .6]]) boxes.push(bx(Math.min(a[0], b[0]) - .07, Math.max(a[0], b[0]) + .07, Math.min(a[1], b[1]) - .07, Math.max(a[1], b[1]) + .07, h0, h1, TR)); }
+  };
+  const r = .2;
+  run(-hw + r, hd - r, hw - r, hd - r);   // the viewing rail, over the animals
+  run(-hw + r, -hd + r, -hw + r, hd - r); run(hw - r, -hd + r, hw - r, hd - r);   // the two ends
+  run(-hw + r, -hd + r, -D.gap, -hd + r); run(D.gap, -hd + r, hw - r, -hd + r);   // the entry side, open at the steps
+  // the sign hung on the viewing rail, facing the animals
+  boxes.push(bx(-1.4, 1.4, hd - r - .06, hd - r + .06, H + .18, H + 1.0, TS, {front:Q => Q(-1.4, 1.4, H + .18, H + .18 + px, GOLD) + Q(-1.4, 1.4, H + 1.0 - px, H + 1.0, GOLD) + flatText34(Q, 1, 0, H + .3, "VIEW", INK)}));
+  const wy = b => c[1] + (F.u[1]*(b.u0 + b.u1) + F.v[1]*(b.v0 + b.v1)) / 2;
+  boxes.sort((a, b) => wy(a) - wy(b) || a.h0 - b.h0);
+  const sh = H * .22, foot = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([uu, vv]) => [c[0] + F.u[0]*uu + F.v[0]*vv + sh*.8, c[1] + F.u[1]*uu + F.v[1]*vv + sh*.6]);
+  let s = `<polygon points="${polyStr(bl.points)}" fill="transparent"/><polygon points="${polyStr(bl.points.map(lift34(H + D.rail)))}" fill="transparent"/>`;   // something to tap
+  s += flatPoly34(foot, "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".22"');
+  for(const b of boxes) s += pbox(F, b);
+  if(on || dead || !reach) s += `<polygon points="${polyStr(bl.points)}" fill="none" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "var(--bad)"}" stroke-width="${on || dead ? 3 : 1.5}" ${!on && !dead ? `stroke-dasharray="4 3"` : ""} stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  return s;
+}
