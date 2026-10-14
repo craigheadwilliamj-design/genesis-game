@@ -146,8 +146,8 @@ function menuRow(it){
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.parkPlants){
-    const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
-    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
+    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.statues){
     const keys = Object.keys(LAND).filter(k => LAND[k].statue && (!LAND[k].sp || speciesAvailable(LAND[k].sp))), row = k => { const t = LAND[k], g = statueGrant(k);
@@ -157,9 +157,9 @@ function menuRow(it){
   }
   if(it.period){
     const quat = it.period === "Quaternary", biomes = quat ? Object.keys(BIOMES).filter(b => PLANTS_OF.Quaternary[b] || PARK_PLANTS_OF[b]) : Object.keys(PLANTS_OF[it.period]);
-    const rows = biomes.map(biome => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
+    const rows = biomes.map(biome => `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
     const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
-    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
+    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.sub){
     const rows = it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
@@ -173,8 +173,25 @@ function menuRow(it){
 const bySize = ks => ks.slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size));
 const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name)).concat(
   Object.keys(PLANTS_OF.Quaternary).length ? Object.keys(PLANTS_OF.Quaternary).map(b => PLANTS_OF.Quaternary[b][PLANT_SIZES.indexOf(size)]) : []);
+// A plant's menu icon: its real sprite when it has one (pixelated, fitted to the icon box), else the drawn icon
+const plantIcon = k => PLANT_SPRITES[k] ? `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><image href="${spriteUrl(`sprites/plants/${k}.png`)}" x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet" style="image-rendering:pixelated"/></svg>` : menuIcon("land-" + k);
+// The biome dropdown at the top of every plant list. It only filters what the lists show (a plant's biome is part of the plant), and one pick covers all the lists.
+const plantBiomeSelect = () => `<select class="plantbiome" aria-label="Biome" title="Show one biome's plants"><option value="">All biomes</option>${Object.keys(BIOMES).map(k => `<option value="${k}">${esc(BIOMES[k].label)}</option>`).join("")}</select><p class="snote" data-pnone hidden>No plants of this biome here.</p>`;
+let plantBiomeMenu = null;
+function refreshPlantBiome(){
+  document.querySelectorAll("#sideMenu [data-pbiome]").forEach(el => { el.hidden = !!plantBiomeMenu && el.dataset.pbiome !== plantBiomeMenu; });
+  document.querySelectorAll("#sideMenu .plantbiome").forEach(sel => {
+    sel.value = plantBiomeMenu || "";
+    const box = sel.parentNode, none = box.querySelector("[data-pnone]");
+    if(none) none.hidden = !plantBiomeMenu || !!box.querySelector("button[data-pbiome]:not([hidden])");
+  });
+}
+document.addEventListener("change", ev => {
+  if(!ev.target.matches || !ev.target.matches("#sideMenu .plantbiome")) return;
+  plantBiomeMenu = ev.target.value || null; refreshPlantBiome();
+});
 const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in water" : t.wet ? ", land or water" : "", where = tail === "biome" ? esc(BIOMES[t.biome].label.toLowerCase()) : t.size;
-  return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
+  return `<button class="srow sub" data-tool="land-${k}" data-pbiome="${t.biome}" aria-pressed="false" data-tech="${t.tech || ""}">${plantIcon(k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
 
 // Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
 const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
@@ -194,12 +211,17 @@ function buildMenu(){
 function refreshShapes(){
   const b = rockBiomeNow();
   document.querySelectorAll("#sideMenu [data-shapes]").forEach(box => {
-    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel;
+    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel + "|" + rockBiomeMenu;
     if(box.dataset.key === key) return;
-    box.dataset.key = key; box.hidden = !list.length;
-    box.innerHTML = `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${type}-${b}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("");
+    box.dataset.key = key;
+    box.innerHTML = `<select class="shapebiome" aria-label="Stone biome" title="Which biome's stone to place"><option value="">Biome: auto (${esc(BIOMES[b].label)})</option>${Object.keys(BIOMES).map(k => `<option value="${k}"${k === rockBiomeMenu ? " selected" : ""}>${esc(BIOMES[k].label)}</option>`).join("")}</select>`
+      + (list.length ? `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${type}-${b}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("") : "");
   });
 }
+document.addEventListener("change", ev => {
+  if(!ev.target.matches || !ev.target.matches("#sideMenu .shapebiome")) return;
+  rockBiomeMenu = ev.target.value || null; refreshShapes(); if(landGhost) renderOverlay();
+});
 document.addEventListener("click", ev => {
   const btn = ev.target.closest && ev.target.closest("#sideMenu [data-shape]"); if(!btn) return;
   const type = btn.parentNode.dataset.shapes; rockPick[type] = btn.dataset.shape === "" ? null : +btn.dataset.shape;
@@ -208,6 +230,6 @@ document.addEventListener("click", ev => {
 });
 function refreshMenu(){
   if(!state) return;
-  refreshShapes();
+  refreshShapes(); refreshPlantBiome();
   document.querySelectorAll("#sideMenu [data-tech]").forEach(b => { const t = b.dataset.tech, k = b.dataset.lock; b.classList.toggle("locked", (!!t && !hasTech(t)) || (!!k && !statueOpen(k))); });
 }
