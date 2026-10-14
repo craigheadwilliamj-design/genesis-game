@@ -2232,14 +2232,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const target = e.animals.find(a => a.name === sorted[0]);
     panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
     const opened = sel && sel.kind === "animal" && sel.id === target.id;
+    const back = panelEl.querySelector(".back"); back.click();
+    const backOk = sel && sel.kind === "exhibit" && sel.id === e.id && exTabs.tab === "animals";
+    panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
     const n0 = e.animals.length, m0 = state.money = 1e6, pay = sellValue(target);
     state.staff.transfers.push({id:"tr-smoke", animalId:target.id, sp:target.sp, from:e.id, to:e.id});
     sellAnimal(target.id);
     const sold = e.animals.length === n0 - 1 && !e.animals.some(a => a.id === target.id) && !herd.has(target.id) && state.money - m0 === pay && !state.staff.transfers.some(t => t.animalId === target.id) && !sel;
     exTabs.tab = "main"; select(null); state.exhibits.splice(state.exhibits.indexOf(e), 1); state.money = money0; recompute();
-    return {listed, opened, sold};
+    return {listed, opened, sold, backOk};
   });
-  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; }
+  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
 
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {
