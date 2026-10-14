@@ -2288,19 +2288,19 @@ function drawKeepers(){
     humanStep(el, "keeper", c, x, y);
     walker34(el, x, y);
   }
-  // mechanics: orange with a white wrench-dot
+  // mechanics: pixel people in orange coveralls, ringed while inspecting or repairing
   for(const c of mcrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const nx = c.route[0], x = nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
-    const r = Math.max(1.3, 5*inv), working = c.job === "repairing" || c.job === "inspecting", drive = onAtv(c), key = `m${r.toFixed(3)}|${working}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "repairing" || c.job === "inspecting", drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `m${r.toFixed(3)}|${working}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#C8642A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><circle r="${r*.35}" fill="#fff"/>` +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("mechanic", hm, null) +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "mechanic", c, x, y);
     walker34(el, x, y);
   }
   // vets: pixel people in green scrubs, ringed while darting
