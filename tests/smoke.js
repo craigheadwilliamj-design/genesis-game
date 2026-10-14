@@ -2476,6 +2476,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.buildings = state.buildings.filter(b => b.id !== "b-oldplat");
     } else out.platformRendersInGame = true;
     out.oldSavePlatformLoads = loads;
+    // the path surface is masked out under a deck's footprint
+    if(e0){ const [cx, cy] = centroid(e0.points); state.buildings.push({id:"b-maskplat", type:"platform", exhibitId:e0.id, points:rectPts(cx, cy, t.w, t.d, 0), inward:true}); render();
+      out.platformCutsPathTexture = !document.querySelector(`#map polygon[fill="#CBC5B4"][points="${polyStr(state.buildings[state.buildings.length - 1].points)}"]`) && !!document.querySelector("#deckcut polygon") && !!document.querySelector('[mask="url(#deckcut)"]'); state.buildings = state.buildings.filter(b => b.id !== "b-maskplat"); render(); }
+    else out.platformCutsPathTexture = true;
     tilt = tl; render();
     return out;
   });
