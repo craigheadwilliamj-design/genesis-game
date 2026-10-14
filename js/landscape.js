@@ -460,13 +460,14 @@ function decorProblem(key, x, y){
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
-function placeLand(e, key, x, y, biome){
+function placeLand(e, key, x, y, biome, pic){
   const t = LAND[key];
   spend(t.price, "built");
   if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
   if(t.ceres) state.ceres.stock = Math.max(0, state.ceres.stock - t.ceres);
   const f = {id:uid("l-"), type:key, x, y};
   if(biome && !t.flora && !t.slots && !t.tray && !t.statue) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
+  if(pic != null && ROCK_SPRITES[biome || (e ? biomeOf(e) : parkBiome())] && (ROCK_SPRITES[biome || (e ? biomeOf(e) : parkBiome())][key] || [])[pic]) f.pic = pic;   // a chosen rock shape; none means random by id
   if(e){ (e.land = e.land || []).push(f); return f; }
   // a statue's plinth is paved in the theme where it stands (its zone's, or the brush)
   if(t.statue && devMode()){ const z = themedZoneAt({points:[[x, y]]}), k = z ? z.theme : state.themes && state.themes.brush; if(k && k !== "genesis" && THEMES[k] && themeHave(k)) f.theme = k; }
@@ -614,8 +615,14 @@ function plantSpriteSvg(f, t, S, dead, pick){
 }
 // A rock or boulder from its picture (ROCK_SPRITES): a soft shadow, then the stone sitting on its spot, one of the biome's shapes picked and flipped by its id
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
+// The shape the player picked in the build menu for rocks and boulders (null: random, by id). f.pic on a placed rock is its picture's index; old rocks have none and keep the id-based pick.
+const rockPick = {rock:null, boulder:null};
+// The biome a rock is being placed under: the biome tab it was picked from, the exhibit under the cursor, or the park's
+const rockBiomeNow = () => rockBiome || (landGhost && landGhost.e ? biomeOf(landGhost.e) : parkBiome());
+// The picked picture's index for this kind of rock, or null when it's random or the biome has fewer pictures than that
+function rockPicOf(type, biome){ const n = rockPick[type], l = (ROCK_SPRITES[biome] || {})[type]; return l && n != null && n < l.length ? n : null; }
 function rockSpriteSvg(f, list, biome, dead, pick){
-  const sd = seedOf(f), i = sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
+  const sd = seedOf(f), i = f.pic != null && f.pic >= 0 && f.pic < list.length ? f.pic : sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .08)}" cy="${n2(f.y + .1)}" rx="${n2(w * .46)}" ry="${n2(w * .13)}" fill="#1D2B22" fill-opacity=".22"/>` : "")
     + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
 }
