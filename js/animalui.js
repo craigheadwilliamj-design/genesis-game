@@ -63,6 +63,14 @@ function animalLive(force){
   fill("anWants", w, "It wants for nothing right now.", false);
   fill("anStress", animalStressors(a, e, s), "Nothing, it seems.", true);
 }
+// Where an animal's picture is, in the upright frame at its spot (meters; screen pixels are these times view.k): the box's center above the spot and its half sizes.
+// Mirrors spriteSvg / rigSvg (and animalUp's lift in the 3/4 view); a dot is a circle of radius r on its spot.
+function animalBox(h){
+  const r = h.r || 1, S = SPRITES[h.sp], lift = tilt ? -r * (h.spr ? .5 : .85) : 0;
+  if(!h.spr || !S) return {oy: lift, hw: r, hh: r};
+  const R = !h.viv && rigOf(h.sp), w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = R ? w * R.h / R.w : w / S.ratio;
+  return {oy: lift + r * .5 - ht / 2, hw: w / 2, hh: ht / 2};
+}
 // A ring around the animal whose panel is open
 const animalRing = document.createElementNS("http://www.w3.org/2000/svg", "g");
 animalRing.setAttribute("pointer-events", "none"); animalRing.style.display = "none";
@@ -70,17 +78,23 @@ animalRing.innerHTML = `<circle r="8" fill="none" stroke="#fff" stroke-width="3"
 guestLayer.appendChild(animalRing);
 function drawAnimalRing(){
   const h = sel && sel.kind === "animal" ? herd.get(sel.id) : null;
-  if(h && !hidden34(h.x, h.y)){ animalRing.style.display = ""; animalRing.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()}`); const r = Math.max(8 / view.k, (h.r || 1) * 1.2); for(const c of animalRing.children) c.setAttribute("r", r.toFixed(2)); }
-  else animalRing.style.display = "none";
+  if(h && !hidden34(h.x, h.y)){
+    const b = animalBox(h);
+    animalRing.style.display = ""; animalRing.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${upright()} translate(0 ${b.oy.toFixed(2)})`);
+    const r = Math.max(8 / view.k, Math.max(b.hw, b.hh) * 1.1); for(const c of animalRing.children) c.setAttribute("r", r.toFixed(2));
+  } else animalRing.style.display = "none";
 }
-// The animal under a tap (they're pictures or dots in the exhibits, so this is by distance on screen)
+// The animal under a tap: the picture's box on screen (at least a finger wide), the nearest center wins when they overlap
 function animalAt(cx, cy){
   const w = toWorld(cx, cy);
   let best = null, bd = Infinity;
   for(const [id, h] of herd){
     if(!h.placed || hidden34(h.x, h.y)) continue;
-    const d = Math.hypot((h.x - w.x) * view.k, (h.y - w.y) * ky()), reach = Math.max(12, (h.r || 1) * view.k * .8);
-    if(d < reach && d < bd){ bd = d; best = id; }
+    const b = animalBox(h), dx = (w.x - h.x) * view.k, dy = (w.y - h.y) * ky() - b.oy * view.k;
+    const rx = Math.max(12, b.hw * view.k), ry = Math.max(12, b.hh * view.k), n = Math.hypot(dx / rx, dy / ry);
+    if(n > 1.15) continue;   // the box's corners count a little
+    const d = Math.hypot(dx, dy);
+    if(d < bd){ bd = d; best = id; }
   }
   return best ? animalById(best) : null;
 }
