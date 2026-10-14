@@ -1,5 +1,6 @@
 /* Themes: colors for paths, buildings and exhibits, matched areas, species fit, and unlocks. Data is THEMES in data.js. */
-const themeKey = it => THEMES[it.theme] ? it.theme : "genesis";
+// Without dev mode every item draws and counts as Genesis (saved themes stay in the data, unused)
+const themeKey = it => devMode() && THEMES[it.theme] ? it.theme : "genesis";
 const themeOf = it => THEMES[themeKey(it)];
 function mixHex(a, b, t){
   if(!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return a;
@@ -28,6 +29,7 @@ function themedZoneAt(it){
 }
 // The theme a new thing gets: its zone's, else the brush's, if it's unlocked and you can afford the extra (null for Genesis)
 function themeFor(kind, it){
+  if(!devMode()) return null;
   const z = themedZoneAt(it), key = z ? z.theme : state.themes && state.themes.brush;
   if(!key || key === "genesis" || !THEMES[key] || !themeHave(key) || !canAfford(themeFee(kind, it, key))) return null;
   return key;
@@ -67,7 +69,7 @@ function checkThemes(){
   for(const [k, T] of Object.entries(THEMES)){
     if(state.themes.have.includes(k) || !T.unlock.check()) continue;
     state.themes.have.push(k);
-    events.toast(`New theme unlocked: ${T.label}. Pick it in the park office or on any path, building or exhibit.`, "good");
+    if(devMode()) events.toast(`New theme unlocked: ${T.label}. Pick it in the park office or on any path, building or exhibit.`, "good");
   }
 }
 

@@ -201,6 +201,7 @@ panelEl.addEventListener("change", ev => {
 
 // A zone's theme tints the ground and styles what gets built inside it; the button restyles what is already there
 function zoneThemeHtml(z){
+  if(!devMode()) return "";
   const key = THEMES[z.theme] ? z.theme : "genesis", T = THEMES[key], plan = zoneThemePlan(z, key);
   let h = `<section><h3>Theme</h3><label class="field"><span>Zone style</span><select id="zoneThemeSel">${Object.entries(THEMES).map(([k, X]) => `<option value="${k}"${k === key ? " selected" : ""}${themeHave(k) ? "" : " disabled"}>${esc(X.label)}${themeHave(k) ? "" : ` (${esc(X.unlock.hint)})`}</option>`).join("")}</select></label>`;
   h += `<div class="meta" style="margin-top:4px">${key === "genesis" ? "Pick a theme to tint this part of the map and style new paths, buildings and exhibits built here." : `${esc(T.blurb)} New builds inside this zone use it.`}</div>`;

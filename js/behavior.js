@@ -65,6 +65,9 @@ function enrichNeed(e){
   for(const [sp, c] of speciesCounts(e)) n += enrichNeedOf(e, SPECIES_BY_ID[sp], c);
   return n;
 }
+// Toy props are dev-only: players don't see them (Paleoflora bales stay, they are feed), but toys already placed keep working
+const HIDDEN_TOYS = ["post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay"];
+const toyHidden = k => !devMode() && (HIDDEN_TOYS.includes(k) || !!(LAND[k] && LAND[k].vivToy));
 // What one toy is worth to a species (its best diet counts), or its most to anyone with no species
 const toyFor = (t, s) => !t ? 0 : !t.toyFor ? t.toy || 0 : s ? Math.max(0, ...s.diet.map(d => t.toyFor[d] || 0)) : Math.max(...Object.values(t.toyFor));
 const toyPoints = (e, s) => landOf(e).reduce((n, f) => n + toyFor(LAND[f.type], s), 0);
@@ -77,6 +80,7 @@ function toyFit(e){
 // How much there is to do, 0 to 1: toys, the landscaping they like (just plants, in a vivarium), and room to roam
 function enrichment(e){
   if(!e.animals.length) return 0;
+  if(!devMode()) return 1;
   let sat = 0, n = 0;
   for(const [sp, c] of speciesCounts(e)){ const f = speciesFit(e, SPECIES_BY_ID[sp]); sat += c * (e.viv ? f.plants : f.sat); n += c; }
   sat /= n || 1;

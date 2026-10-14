@@ -146,6 +146,7 @@ function themeOptions(kind, it){
   }).join("");
 }
 function themeHtml(kind, it){
+  if(!devMode()) return "";
   const T = themeOf(it);
   let h = `<section><h3>Theme</h3><label class="field"><span>Style</span><select id="themeSel">${themeOptions(kind, it)}</select></label>`;
   if(kind !== "exhibit") h += `<div class="meta" style="margin-top:4px">${esc(T.blurb)} Changing it has no refund.</div>`;
@@ -160,6 +161,7 @@ function themeHtml(kind, it){
   return h + `</section>`;
 }
 function themesOverview(){
+  if(!devMode()) return "";
   let h = `<section><h3>Themes</h3><label class="field"><span>Build new things as</span><select id="brushSel">${themeOptions("", null)}</select></label>`;
   h += `<ul class="issues" style="margin-top:6px">${Object.entries(THEMES).map(([k, T]) => `<li class="${themeHave(k) ? "" : "bad"}">${esc(T.label)}: ${themeHave(k) ? "unlocked." : esc(T.unlock.hint)}${T.fits.length ? ` Suits ${T.fits.map(id => esc(SPECIES_BY_ID[id].name)).join(", ")}.` : ""}</li>`).join("")}</ul>`;
   return h + `<div class="meta" style="margin-top:4px">Match an exhibit with the paths, shops and restrooms near it for an appeal bonus. Animals that suit a theme are happier. Tap any path, building or exhibit to change its theme.</div></section>`;
@@ -311,6 +313,7 @@ function vivPlantsHtml(e){
 // Vivarium enrichment: pick one from the list and it's set in the glass wherever there's room
 const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy);
 function vivToysHtml(e){
+  if(!devMode()) return "";
   const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy), need = enrichNeed(e), have = toyPoints(e);
   let h = `<section><h3>Enrichment</h3><div class="meta">Things to hide under, climb, dig in and hunt from. Bored animals with nothing to do pace.</div>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
@@ -375,7 +378,7 @@ function propsHtml(e){
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
   let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
-    const list = HABITAT_PROPS.filter(isToy), counts = speciesCounts(e);
+    const list = HABITAT_PROPS.filter(k => isToy(k) && !toyHidden(k)), counts = devMode() ? speciesCounts(e) : [];
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to chase, chew, rub on and dig through keeps animals busy. Bored animals with nothing to do pace. Some toys only interest some diets, and frozen treats and hay bales get used up.</div>`;
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
@@ -383,7 +386,7 @@ function propsHtml(e){
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
   }
   if(sub === "shelters"){
-    const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k));
+    const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
     if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
       h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }

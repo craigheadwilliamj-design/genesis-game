@@ -227,6 +227,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-dime"]'));
       localStorage.setItem("genesis-dev", "1"); out.devShowsCoty = speciesAvailable("coty") && speciesToUnlock().some(s => s.id === "coty");
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was); }
+    { const was = localStorage.getItem("genesis-dev"), th = {theme:"volcanic"}, themed = THEMES.volcanic ? "volcanic" : Object.keys(THEMES).find(k => k !== "genesis");
+      const pen = state.exhibits[0] || {id:"e-t", name:"T", points:[[0,0],[30,0],[30,30],[0,30]], animals:[{id:"t1", sp:"trex"}]};
+      const real = state.exhibits.includes(pen), had = pen.enrich;
+      if(!real){ state.exhibits.push(pen); recompute(); }
+      const me = state.exhibits.includes(pen) && pen.animals.length ? pen : null;
+      localStorage.removeItem("genesis-dev");
+      const html = () => [typeof themesOverview === "function" ? themesOverview() : "", themeHtml("exhibit", {theme:themed, points:[]}), zoneThemeHtml({theme:themed, points:[]})].join("");
+      out.themesHiddenOff = themeKey({theme:themed}) === "genesis" && html() === "" && themeFor("path", {points:[[0,0],[1,1]]}) === null;
+      out.toysHiddenOff = toyHidden("post") && toyHidden("hay") && toyHidden("vbark") && !toyHidden("pbale") && !toyHidden("barn");
+      buildMenu(); out.toyMenuHiddenOff = !document.querySelector('#sideMenu [data-tool="land-post"]') && !!document.querySelector('#sideMenu [data-tool="land-pbale"]');
+      out.enrichFullOff = !me || enrichment(me) === 1;
+      out.vivToysHiddenOff = vivToysHtml({viv:true, animals:[], points:[[0,0],[1,0],[1,1]]}) === "";
+      localStorage.setItem("genesis-dev", "1");
+      out.themesShownOn = themeKey({theme:themed}) === themed && themeHtml("exhibit", {theme:themed, points:[]}).includes("themeSel");
+      out.toysShownOn = !toyHidden("post") && !toyHidden("vbark");
+      buildMenu(); out.toyMenuShownOn = !!document.querySelector('#sideMenu [data-tool="land-post"]');
+      if(!real) { state.exhibits.pop(); recompute(); }
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
+      buildMenu(); }
     out.devModeOffByDefault = devMode() === false && !("dev" in state) && !JSON.stringify(state).includes("genesis-dev");
     return out;
   }));
@@ -901,7 +920,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   // Science: research, trips, clones, and growing all run on park minutes, not days
   Object.assign(checks, await page.evaluate(() => {
-    const out = {};
+    const out = {}; localStorage.setItem("genesis-dev", "1");   // these checks cover the dev-only themes and toys
     startWith(newPark(), false); setSpeed(0);
     events.toast = () => {};
     state.money = 1e7; state.day = 3; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
@@ -1841,6 +1860,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
+    localStorage.removeItem("genesis-dev");
     return out;
   }));
 

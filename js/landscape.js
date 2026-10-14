@@ -469,7 +469,7 @@ function placeLand(e, key, x, y, biome){
   if(biome && !t.flora && !t.slots && !t.tray && !t.statue) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
   if(e){ (e.land = e.land || []).push(f); return f; }
   // a statue's plinth is paved in the theme where it stands (its zone's, or the brush)
-  if(t.statue){ const z = themedZoneAt({points:[[x, y]]}), k = z ? z.theme : state.themes && state.themes.brush; if(k && k !== "genesis" && THEMES[k] && themeHave(k)) f.theme = k; }
+  if(t.statue && devMode()){ const z = themedZoneAt({points:[[x, y]]}), k = z ? z.theme : state.themes && state.themes.brush; if(k && k !== "genesis" && THEMES[k] && themeHave(k)) f.theme = k; }
   (state.decor = state.decor || []).push(f);
   return f;
 }
