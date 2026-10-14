@@ -188,7 +188,7 @@ function museumHtml(b){
   const on = showsOf(b), ready = showsReady(b), dn = state.science.dna;
   let h = `<section><h3>Museum attractions <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${MUSEUM.slots}</span></h3>`;
   if(on.length) h += `<ul class="shop">${on.map(id => { const ev = MUSEUM_BY_ID[id];
-    return `<li><span class="nm">${esc(ev.name)}<span class="per">${esc(ev.ago)}</span></span><span class="need">${esc(ev.text)} Teaches ${Math.round(ev.learn * showPower(id))} more, ${money(ev.upkeep)} a day, ${dn[id] ? dn[id].quality : 0}% record quality.</span><span class="need"><button class="btn" data-action="showDrop" data-id="${id}" style="padding:2px 9px">Take it down</button></span></li>`; }).join("")}</ul>`;
+    return `<li><span class="nm">${esc(ev.name)}<span class="per">${esc(ev.ago)}</span></span><span class="need">${esc(ev.text)} Teaches ${ev.learn} more, ${money(ev.upkeep)} a day.</span><span class="need"><button class="btn" data-action="showDrop" data-id="${id}" style="padding:2px 9px">Take it down</button></span></li>`; }).join("")}</ul>`;
   else h += `<div class="meta">Nothing on show yet.</div>`;
   if(!hasTech(MUSEUM.needTech)) {}
   else if(on.length >= MUSEUM.slots) h += `<div class="meta" style="margin-top:6px">The center is full. Take one down to show another.</div>`;

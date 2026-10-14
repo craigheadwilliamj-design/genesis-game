@@ -224,10 +224,8 @@ function servicesNight(){
 
 // Each one is an event GHOST has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
 const showsOf = b => (b.shows || []).filter(id => MUSEUM_BY_ID[id]);
-// A better record makes a better show
-const showPower = id => { const d = state.science.dna[id]; return MUSEUM.minQuality + (1 - MUSEUM.minQuality) * clamp((d ? d.quality : 0) / 100, 0, 1); };
-const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn * showPower(id), 0);
-const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy * showPower(id), 0);
+const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn, 0);
+const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy, 0);
 const showsAppeal = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].appeal, 0);
 const showsUpkeep = b => b.type === "edcenter" ? showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].upkeep, 0) : 0;
 // Events GHOST has finished recording that this center isn't showing yet

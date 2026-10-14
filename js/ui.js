@@ -288,7 +288,7 @@ function cloneHtml(e, rep){
   if(sc.ready.length){
     h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${sexMark(r)} ${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
-  const ready = SPECIES.filter(s => speciesAvailable(s.id) && sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
+  const ready = SPECIES.filter(s => speciesAvailable(s.id) && cloneOpen(s.id) && fitsHabitat(s, e));
   const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
   h += `<section><h3>Add animals</h3>`;
@@ -504,8 +504,8 @@ function healthHtml(e){
   if(e.animals.length && hasTech("genetherapy")){
     const low = e.animals.filter(a => (a.q ?? 90) < 100);
     h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
-      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${genomeDone(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${genomeDone(a.sp) ? "Lab genome isn't better" : "Needs full genome"}</span>`}</li>`; }).join("")}</ul>`;
-    h += `<div class="meta">A vet rewrites the animal's DNA up to the lab's quality for its species, at most ${GENE.step} points a go. To go further, send GHOST for better samples. Healthier DNA means fewer illnesses.</div>`;
+      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${cloneOpen(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${cloneOpen(a.sp) ? "Lab genome isn't better" : `Needs ${CLONE_GENOME.min}% genome`}</span>`}</li>`; }).join("")}</ul>`;
+    h += `<div class="meta">A vet rewrites the animal's DNA up to what the lab's genome gives a clone today, at most ${GENE.step} points a go. To go further, send GHOST for more of the genome. Healthier DNA means fewer illnesses.</div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){
@@ -570,7 +570,7 @@ function animalCard(s, rep, mode){
     h += `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>`;
   } else h += `<button class="buy" data-action="buy" data-sp="${s.id}"${canAfford(s.price) ? "" : " disabled"}>${money(s.price)}</button>`;
   h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
-  if(mode === "clone") h += ` DNA quality ${state.science.dna[s.id].quality}%. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
+  if(mode === "clone") h += ` Genome ${state.science.dna[s.id].genome}% complete, clones ${cloneQuality(s.id)}% DNA quality. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
   h += `</span>`;
   if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build TAR to clone it.</span>`;
   else if(mode === "clone" && !dept("tar")) h += `<span class="warn">TAR isn't connected to a path or service road.</span>`;
@@ -926,9 +926,9 @@ function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
-  if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
+  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at TAR for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete, quality ${d.quality}%. Send GHOST for more.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send GHOST for more.`, lock};
   if(researching("species", s.id)) return {group:"progress", cls:"wait", how:`ORACLE is unlocking it now. ${leftText(sc.projects.find(p => p.kind === "species" && p.id === s.id).end)} left.`, lock};
   if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Unlocked. Send GHOST to collect its DNA.`, lock};
   return {group:"locked", cls:"no", how:`Unlock it at ORACLE (${unlockPoints(s)} research points), then send GHOST.`, lock};

@@ -245,17 +245,16 @@ const VIVARIUMS = {
 //   trip       what one expedition costs for a mid-size animal
 //   days       how long an expedition takes, in open days
 //   risk       extra chance an expedition comes back with nothing. Big animals add more (see TRIP).
-//   quality    [worst, best] DNA quality a sample can have. Deeper time gives worse DNA.
 const TIME_PERIODS = [
-  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05, quality:[70,100]},
-  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07, quality:[65,98]},
-  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10, quality:[60,96]},
-  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15, quality:[55,95]},
-  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15, quality:[50,90]},
-  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,88]},
-  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,85]},
-  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,80]},
-  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10, quality:[30,75]},
+  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05},
+  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07},
+  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10},
+  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15},
+  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15},
+  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12},
+  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12},
+  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10},
+  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10},
 ];
 
 // Science staff, hired at their department's building
@@ -303,28 +302,27 @@ const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.
 
 // Events from deep time. GHOST records each one on trips (like a genome: sc.dna[id]), and a finished record unlocks a museum
 // attraction for the Education Center. A trip's place is the event itself, so it carries what a TIME_PERIODS entry does.
-//   ago/trip/days/risk/quality/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
+//   ago/trip/days/risk/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
 //   price/upkeep   installing it in an Education Center, and its cost a day
-//   learn   extra learning a visit gives (0 to 100 per guest), scaled by the record's quality
+//   learn   extra learning a visit gives (0 to 100 per guest)
 //   joy     mood it adds or takes away. appeal: how much keener guests are to visit the center for it
 const MUSEUM_EVENTS = [
-  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, quality:[30,75], space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
+  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
    text:"Walk through a glowing blue-green sea as the first oxygen-makers poison the old air and the iron rusts red."},
-  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, quality:[25,70], space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
+  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
    text:"A hall of lava seas, a sky full of rocks, and the Moon hanging huge and close. Nothing lives here yet."},
-  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, quality:[35,80], space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
+  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
    text:"A reef tank of trilobites, spined worms and Anomalocaris, when nearly every kind of body suddenly appeared."},
-  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, quality:[35,80], space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
+  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
    text:"Follow a Tiktaalik-like fish from the shallows up onto the mud, as fins turn into legs."},
-  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, quality:[40,85], space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
+  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
    text:"The worst mass extinction there ever was, told in a dim hall of volcanoes and a dying sea. Sobering."},
-  {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, quality:[45,90], space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
+  {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
    text:"A shaking floor, a fireball overhead, and the end of the dinosaurs. A crowd favorite."},
 ];
 const MUSEUM_BY_ID = Object.fromEntries(MUSEUM_EVENTS.map(e => [e.id, e]));
 const MUSEUM = {
   slots:3,             // attractions one Education Center can show at once
-  minQuality:.6,       // an attraction built on the worst record teaches this share of its learning (the best teaches all of it)
   needTech:"education",// GHOST can start recording events once ORACLE has researched this
 };
 
@@ -371,8 +369,11 @@ const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 const CLONE_DAYS_PER_SPACE = 1000;
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
-// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level, and quality points added to every sample
-const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5], quality:[0, 8, 16]};
+// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level
+const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
+// Cloning from a partial genome: TAR clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
+// runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
+const CLONE_GENOME = {min:60, q0:40};
 
 // What CERES grows in its beds. Works like TAR's incubators, but with plants.
 //   days    how long one batch takes, in open days
@@ -1092,8 +1093,6 @@ const TECH = [
   {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:80, needs:"ghostcost1", text:"Trips cost about a third less."},
   {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:35, text:"Expeditions take three quarters of the time."},
   {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:80, needs:"ghostspeed1", text:"Expeditions take about half the time."},
-  {id:"ghostq1",   group:"ghost", label:"Careful sampling",     points:40, text:"Every DNA sample comes back 8 points better in quality."},
-  {id:"ghostq2",   group:"ghost", label:"Cryo-preserved samples", points:90, needs:"ghostq1", text:"Every DNA sample comes back 16 points better in quality."},
   // Genetics
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
