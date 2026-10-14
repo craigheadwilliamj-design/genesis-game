@@ -178,7 +178,8 @@ function render(){
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
-      s += `<polygon points="${pts}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
+      const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
+      s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${fb})" pointer-events="none"/>` + exhibitPaintSvg(e);
       // a hedge row is drawn as a real hedge, as wide as it is
       if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
       // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
@@ -1977,7 +1978,7 @@ function finishDraw(){
 /* ---------- painting ground (js/biomepaint.js) ---------- */
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
-  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box on the grid to paint it. New paint covers old paint. Tap a patch to change its biome, or pick Erase and drag or tap to take paint off. Free, and only for looks.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box on the grid to paint it. New paint covers old paint. Tap a patch to change its biome, or pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
 }
@@ -1985,30 +1986,36 @@ $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-
 function paintDragStat(){
   if(!pdrag) return;
   const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
-  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.` : "");
+  const cost = w && h && paintPick !== "erase" ? exhibitPaintCost(r, paintPick) : 0;
+  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}` : "", cost > 0 && !canAfford(cost));
 }
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
   const tap = d.a[0] === d.b[0] && d.a[1] === d.b[1], r = paintBox(d.a, d.b);
   if(paintPick === "erase"){
     if(tap ? !erasePaintAt(d.wx, d.wy) : !eraseRect(r)){ setStat("No paint there."); return; }
-    setStat(""); render(); return;
+    setStat(""); afterChange(); render(); return;
   }
   if(tap){
     const o = paintAt(d.wx, d.wy);
     if(!o){ setStat("Drag a box to paint."); return; }
-    if(repickPaint(o.id, paintPick)){ setStat(""); render(); }
+    const c = exhibitPaintCost(o.r, paintPick);
+    if(!canAfford(c)){ setStat(`Costs ${money(c)}. You have ${money(state.money)}.`, true); return; }
+    if(repickPaint(o.id, paintPick)){ if(c) spend(c, "built"); setStat(""); afterChange(); render(); }
     return;
   }
+  const c = exhibitPaintCost(r, paintPick);
+  if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
   const res = paintRect(paintPick, r);
   if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
-  setStat(""); render();
+  if(c) spend(c, "built");
+  setStat(""); afterChange(); render();
 }
 // Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
 function bulldozePaint(d){
   const tap = d.a[0] === d.b[0] && d.a[1] === d.b[1];
   const hit = tap ? erasePaintAt(d.a[0], d.a[1]) : eraseRect(paintBox(d.a, d.b)) > 0;
-  if(hit){ setStat(""); render(); }
+  if(hit){ setStat(""); afterChange(); render(); }
   return hit;
 }
 

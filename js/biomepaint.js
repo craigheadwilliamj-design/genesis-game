@@ -104,3 +104,54 @@ function paintSvg(){
   }).join("") + `</g>`;
   paintCache = {state, ver:paintVer, n:list.length, s}; return s;
 }
+
+/* ---- paint inside exhibits (not vivariums) ----
+   An open exhibit's biome is the one with the most ground in it: its base biome (e.biome) wherever it isn't painted, the patch's biome where it is.
+   Sampled on a grid and cached per exhibit until the paint, the save or the exhibit's shape changes. A tie keeps the base. */
+const exShareCache = new WeakMap();
+const ptsSig = pts => pts.length + ":" + pts.reduce((n, p) => n + p[0] * 31 + p[1], 0);
+function paintShare(e){
+  const base = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME, sig = ptsSig(e.points), c = exShareCache.get(e);
+  if(c && c.state === state && c.ver === paintVer && c.sig === sig && c.base === base) return c;
+  const bb = bbox(e.points), list = paintList().filter(p => rectOverlap(p.r, [bb.x0, bb.y0, bb.x1, bb.y1]));
+  const counts = {}; let n = 0, best = base;
+  if(list.length){
+    const step = Math.max(1, Math.ceil(Math.sqrt((bb.x1 - bb.x0) * (bb.y1 - bb.y0) / 900)));
+    for(let x = bb.x0 + step / 2; x < bb.x1; x += step) for(let y = bb.y0 + step / 2; y < bb.y1; y += step){
+      if(!inPoly(x, y, e.points)) continue;
+      let b = base; for(let i = list.length - 1; i >= 0; i--){ const r = list[i].r; if(x >= r[0] && x < r[2] && y >= r[1] && y < r[3]){ b = list[i].biome; break; } }
+      counts[b] = (counts[b] || 0) + 1; n++;
+    }
+    for(const b in counts) if(counts[b] > (counts[best] || 0)) best = b;
+  }
+  const r = {state, ver:paintVer, sig, base, counts, n, biome:best};
+  exShareCache.set(e, r); return r;
+}
+const paintedBiome = e => e.points && !e.viv && state && state.biomePaint && state.biomePaint.length ? paintShare(e).biome : e.biome;
+// The patches over an open exhibit's floor, drawn clipped to its shape
+function exhibitPaintSvg(e){
+  const bb = bbox(e.points), list = paintList().filter(p => rectOverlap(p.r, [bb.x0, bb.y0, bb.x1, bb.y1]));
+  if(!list.length) return "";
+  const id = "pc-" + esc(e.id);
+  return `<clipPath id="${id}"><polygon points="${polyStr(e.points)}"/></clipPath><g clip-path="url(#${id})" pointer-events="none">` + list.map(o => {
+    const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
+    return `<rect ${a} fill="${BIOMES[o.biome].color}" fill-opacity=".8"/><rect ${a} fill="url(#b-${o.biome})"/>`;
+  }).join("") + `</g>`;
+}
+// What painting a box in this biome costs: the biome's grading price for each square meter inside an exhibit that isn't already that biome
+function exhibitPaintCost(box, biome){
+  const r = paintClip(box); if(!r) return 0;
+  let n = 0;
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    const bb = bbox(e.points), x0 = Math.max(r[0], Math.floor(bb.x0)), x1 = Math.min(r[2], Math.ceil(bb.x1)), y0 = Math.max(r[1], Math.floor(bb.y0)), y1 = Math.min(r[3], Math.ceil(bb.y1));
+    if(x0 >= x1 || y0 >= y1) continue;
+    const base = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
+    for(let x = x0; x < x1; x++) for(let y = y0; y < y1; y++){
+      if(!inPoly(x + .5, y + .5, e.points)) continue;
+      const cur = paintAt(x + .5, y + .5);
+      if((cur ? cur.biome : base) !== biome) n++;
+    }
+  }
+  return Math.round(n * BIOMES[biome].perSqM);
+}

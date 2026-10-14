@@ -64,7 +64,7 @@ function spriteHitPath(name, x, y, k){
 }
 const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
 // The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome
-const biomeOf = e => BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
+const biomeOf = e => { const b = paintedBiome(e); return BIOMES[b] ? b : DEFAULT_BIOME; };   // open exhibits: the biome with the most ground, painted or not (js/biomepaint.js)
 function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l[0] === b ? "home" : l.includes(b) ? "near" : "away"; }
 const regradeCost = (e, b) => Math.round(area(e.points) * BIOMES[b].perSqM);
 function regradeProblem(e, b){

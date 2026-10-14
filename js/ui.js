@@ -310,13 +310,18 @@ function cloneHtml(e, rep){
 function biomeHtml(e){
   let h = "";
   const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
+  const fits = () => kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
+    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
+  if(!e.viv){
+    // open exhibits are painted with the Paint Ground tool; the biome with the most ground wins
+    const sh = paintShare(e), parts = Object.entries(sh.counts).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${esc(BIOMES[k].label)} ${Math.round(n / sh.n * 100)}%`).join(", ");
+    return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button><p class="meta">The biome with the most ground in the exhibit is the one the animals and plants count.</p>${fits()}</section>`;
+  }
   h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
     const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
     return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
   }).join("")}</select></label>`;
-  h += kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
-    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
-  h += `</section>`;
+  h += fits() + `</section>`;
   return h;
 }
 // A vivarium's plants: the biome's plants by period (the animals' own periods first), what's in there, and a remove button for each
@@ -819,6 +824,7 @@ panelEl.addEventListener("click", e => {
   if(a === "netOff"){ it.net = false; done(); return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
+  if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; ui.panel(); return; }
   if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
