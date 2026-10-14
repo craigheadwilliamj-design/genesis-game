@@ -146,6 +146,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S40 (M): Park Office rework: tabs, name moves in, Main Menu button** Part of the saves and UI-update tracks (S26, S29). Best after S29 (start screen) and S35 (hide menus)
 > Today the top-bar "Park" button (`#menuBtn`) opens a small dialog (`#dlgMenu`: park name, sandbox, biome note, How to play) and the Park Office is the side panel (`overviewHtml`, `officeTab` in js/ui.js ~line 76: tabs Park / Staff / Grants). Make the top-left park name/brand (`#parkName`) and the Park button both open the Park Office panel. Park Office tabs: **Park** (name, rating, history), **Money** (budget, today's ledger, bills, ticket price/admissions), **Science** (the science-at-a-glance section), **Guests** (guest relations: thoughts, needs, types, `guestsOverviewHtml`), **Staff**, **Grants**. The park name and its editing move into the Park Office (remove `#nameInput` from the old dialog). Add a **Main Menu** button there (replacing the old dialog): restart (back to the start-up screen to begin a new park, with an `askConfirm` warning that the current park is lost unless saved), How to play, and the sandbox toggle. Keep `logiOverviewHtml` (supplies) where it fits best (Money or Park).
 
+**S41 (S): Move work zones under Staff** Best after S40 (Park Office tabs)
+> Work zones show up in two places: the "Draw Work Zone" tool in the build menu's Park Management group (js/menu.js ~line 64) and the "Work zones" list with Draw a zone / supply lines buttons at the bottom of the supplies overview in the Park Office (`logiOverviewHtml`, js/logiui.js ~line 147). Move the build tool into the Staff Buildings group and the list/buttons into the Park Office Staff tab (`staffTabHtml`, js/staffui.js), removing them from the old places.
+
 ---
 
 ## Suggested order
