@@ -59,9 +59,9 @@ const BUILD_MENU = [
     {label:"Security Office", tool:"security"},
     {label:"Tool Shed", tool:"toolshed"},
     {label:"Generator", tool:"generator"},
+    {label:"Draw Work Zone", tool:"zone", price:() => "Free"},
   ]},
   {id:"mgmt", label:"Park Management", items:[
-    {label:"Draw Work Zone", tool:"zone", price:() => "Free"},
     {label:"ORACLE", tool:"oracle"},
     {label:"GHOST", tool:"ghost"},
     {label:"TAR", tool:"tar"},
