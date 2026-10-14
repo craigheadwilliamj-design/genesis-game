@@ -2249,6 +2249,25 @@ function drawKeepers(){
 function atvSvg(r, on){ return on ? `<rect x="${-r*1.9}" y="${-r*1.2}" width="${r*3.8}" height="${r*2.4}" rx="${r*.6}" fill="#4F6273" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ""; }
 
 /* ---------- escaped animals on the map ---------- */
+// Dust puffs where an attack lands: a few flat square pixels that spread and fade (about 0.6 s). Not saved, never clickable.
+const FX_DUST = {life: 600, n: 6, cols: ["#C9B089", "#A8946F", "#B7B0A2", "#8F8A7E"]};
+const fxList = [];
+function fxAdd(kind, x, y){ if(fxList.length < 24) fxList.push({kind, x, y, t0: performance.now(), seed: Math.random() * 6.28}); }
+function drawFx(now){
+  const layer = $("#fxLayer"); if(!layer) return;
+  for(let i = fxList.length - 1; i >= 0; i--) if(now - fxList[i].t0 >= FX_DUST.life) fxList.splice(i, 1);
+  if(!fxList.length){ if(layer.childElementCount) layer.innerHTML = ""; return; }
+  const inv = 1 / view.k, px = Math.max(ROCK_MPP * 2, 2.5 * inv);   // squares stay a few screen pixels at any zoom
+  let s = "";
+  for(const f of fxList){
+    const t = (now - f.t0) / FX_DUST.life, spread = (.8 + 5 * t) * px, sz = px * (1 + t), snap = v => Math.round(v / px) * px;
+    for(let i = 0; i < FX_DUST.n; i++){
+      const a = f.seed + i * 6.28 / FX_DUST.n, x = f.x + snap(Math.cos(a) * spread) - sz / 2, y = f.y + snap(Math.sin(a) * spread * .7) - sz / 2 - t * px;
+      s += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${sz.toFixed(2)}" height="${sz.toFixed(2)}" fill="${FX_DUST.cols[i % FX_DUST.cols.length]}" fill-opacity="${(1 - t).toFixed(2)}"/>`;
+    }
+  }
+  layer.innerHTML = s;
+}
 function drawLoose(){
   const layer = $("#looseLayer"), inv = 1/view.k;
   if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; return; }
