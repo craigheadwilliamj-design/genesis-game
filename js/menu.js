@@ -175,7 +175,7 @@ const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in wat
   return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
 
 // Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
-const menuHidden = it => (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
+const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
 function buildMenu(){
   const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
   const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>

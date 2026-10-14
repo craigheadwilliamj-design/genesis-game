@@ -2385,6 +2385,9 @@ const DEV_GOALS = ["camp", "hotel", "resort"];
 const devHidden = (list, id) => !devMode() && list.includes(id);
 const buildingHidden = type => devHidden(DEV_BUILDINGS, type);
 const techHidden = id => devHidden(DEV_TECH, id);
+// Statues are dev-mode only for v1.0: no buying, no grant rewards. Placed ones in old saves keep drawing and working.
+const statuesOn = () => devMode();
+const grantStatue = g => statuesOn() ? g.statue || null : null;
 const activeGoals = () => GOALS.filter(g => !devHidden(DEV_GOALS, g.id));
 // What a grant pays: cash, or a theme
-const grantPrize = g => (g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward)) + (g.statue ? ` and ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue` : "");
+const grantPrize = g => (g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward)) + (grantStatue(g) ? ` and ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue` : "");

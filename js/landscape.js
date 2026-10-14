@@ -29,8 +29,8 @@ const lineDist = (x, y, line) => { let m = Infinity; for(let i = 1; i < line.len
 const linesCross = (a, b) => { for(let i = 1; i < a.length; i++) for(let j = 1; j < b.length; j++) if(segCross(a[i-1], a[i], b[j-1], b[j])) return true; return false; };
 const lineLineDist = (a, b) => { let m = Infinity; for(let i = 1; i < a.length; i++) for(let j = 1; j < b.length; j++) m = Math.min(m, segSegDist(a[i-1], a[i], b[j-1], b[j])); return m; };
 // Statues: a few are open from the start, the rest come with grants
-const statueGrant = key => GOALS.find(g => g.statue && "st-" + g.statue === key) || null;
-const statueOpen = key => { const t = LAND[key]; if(!t || !t.statue) return true; if(t.free) return true; const g = statueGrant(key); return !!g && state.goalsDone.includes(g.id); };
+const statueGrant = key => !statuesOn() ? null : GOALS.find(g => g.statue && "st-" + g.statue === key) || null;
+const statueOpen = key => { const t = LAND[key]; if(!t || !t.statue) return true; if(!statuesOn()) return false; if(t.free) return true; const g = statueGrant(key); return !!g && state.goalsDone.includes(g.id); };
 const statueHint = key => { const g = statueGrant(key); return g ? `Earn it with the grant "${g.text}".` : ""; };
 const circlePts = (x, y, r, n = 14) => Array.from({length:n}, (_, i) => [x + r * Math.cos(i * 2 * Math.PI / n), y + r * Math.sin(i * 2 * Math.PI / n)]);
 const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
@@ -442,7 +442,7 @@ function decorProblem(key, x, y){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.slots || t.tray || t.toy || t.toyFor) return "Habitat props go inside an open exhibit.";
-  if(t.statue && !statueOpen(key)) return `${t.label} is locked. ${statueHint(key)}`;
+  if(t.statue && !statueOpen(key)) return statuesOn() ? `${t.label} is locked. ${statueHint(key)}` : "Statues aren't available yet.";
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
