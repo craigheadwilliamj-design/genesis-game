@@ -1669,6 +1669,7 @@ function insidePlot(pts, closed){
 }
 
 function pathProblem(pts, type){
+  if(type === "tram" && !devMode()) return "That isn't available yet.";
   if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`;
   if(pts.length < 2) return "Needs at least 2 points.";
   if(lineLength(pts) < 2) return "Too short.";
@@ -1760,7 +1761,8 @@ function startDraw(kind){
   const [t, hint] = DRAW_TEXT[kind];
   showBar(t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
   updateDrawbar();
-  if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
+  if(kind === "tram" && !devMode()) setStat("That isn't available yet.", true);
+  else if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -1971,6 +1973,7 @@ function placeGhost(clientX, clientY){
   }
   let x = p.x, y = p.y, angle = 0, why = null;
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
+  if(!why && buildingHidden(tool)) why = "That isn't available yet.";
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && !state.sandbox && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;

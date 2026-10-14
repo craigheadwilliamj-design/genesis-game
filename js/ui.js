@@ -74,9 +74,9 @@ let officeTab = "office";   // which tab the park office shows
 function grantsHtml(goal){
   const n = state.goalsDone.length;
   let h = goal
-    ? `<div class="card goal"><div class="step">Grant ${GOALS.indexOf(goal) + 1} of ${GOALS.length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Grant ${grantPrize(goal)}</div></div>`
+    ? `<div class="card goal"><div class="step">Grant ${activeGoals().indexOf(goal) + 1} of ${activeGoals().length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Grant ${grantPrize(goal)}</div></div>`
     : `<div class="card goal"><div class="step">All grants awarded</div><b>Keep growing your park</b><div class="meta">Try for 5 stars, or see how many guests you can bring in.</div></div>`;
-  h += `<section><h3>Grants <span class="num">${n} of ${GOALS.length}</span></h3><ul class="checklist">${GOALS.map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
+  h += `<section><h3>Grants <span class="num">${activeGoals().filter(g => state.goalsDone.includes(g.id)).length} of ${activeGoals().length}</span></h3><ul class="checklist">${activeGoals().map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
 function overviewHtml(){
