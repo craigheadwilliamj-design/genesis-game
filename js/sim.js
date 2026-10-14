@@ -151,6 +151,8 @@ function upgradeSave(s){
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
   if(s.sandbox === undefined) s.sandbox = false;
+  if(s.over === "shutdown") s.over = false;   // the deaths shutdown is gone
+  if(s.debtWarned === undefined) s.debtWarned = false;
   if(!s.fenceGrid) s.fenceGrid = {};
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
@@ -545,8 +547,18 @@ const goalApi = { get state(){ return state; }, isReachable, speciesShown };
 // Sandbox mode (state.sandbox, toggled in the park office): everything is free and money never drops
 const SANDBOX_MONEY = 999999999, SANDBOX_POINTS = 999999;
 function canAfford(cost){ return state.sandbox || state.money >= cost; }
-function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; }
+function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; checkBankrupt(); }
 function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
+// Bankruptcy is the only game over: debt past BANKRUPT. One warning at half of it.
+function checkBankrupt(){
+  if(state.sandbox || state.over) return;
+  if(state.money <= -BANKRUPT){ state.over = true; events.gameOver(); return; }
+  if(state.money > -BANKRUPT / 2) state.debtWarned = false;
+  else if(!state.debtWarned){
+    state.debtWarned = true;
+    events.toast(`Careful: you're ${money(-state.money)} in debt. The park goes bankrupt at ${money(BANKRUPT)}.`, "bad");
+  }
+}
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
 function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : type === "tram" ? TRAM.perMeter : type === "bridge" ? BRIDGE.perMeter : COST.pathPerMeter)); }
@@ -686,7 +698,7 @@ function endDay(){
   state.today = freshLedger();
   checkGoals();
 
-  if(state.money < -25000){ state.over = true; events.gameOver(); }
+  checkBankrupt();
   recompute();
   events.dayEnded(report);
   events.changed();

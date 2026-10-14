@@ -511,6 +511,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.deathTakesGuest = guestCount() === n0 - 1 && v.n === 2 && state.safety.deaths === 1;
     state.safety.loose = []; state.safety.deaths = 0;
 
+    // deaths alone never end the game; only debt does (and not in sandbox)
+    resetParties(); guestsArrive(3); const v2 = parties[0];
+    const money0 = state.money, over0 = state.over; state.money = 10 * ESCAPE.lawsuit; state.safety.deaths = 9;
+    state.safety.loose = [{id:"l-y", sp:"trex", status:"loose", at:null, x:v2.at.x, y:v2.at.y}];
+    Math.random = () => 0; harmGuests(1); Math.random = rr;
+    out.deathsDontEndGame = state.safety.deaths === 10 && !state.over;
+    state.safety.loose = []; state.safety.deaths = 0;
+    const goCount = []; const og = events.gameOver; events.gameOver = () => goCount.push(1);
+    state.sandbox = true; state.money = -BANKRUPT * 2; checkBankrupt();
+    out.sandboxNoBankrupt = !state.over && !goCount.length;
+    state.sandbox = false; state.money = -BANKRUPT * .6; checkBankrupt();
+    out.debtWarnsOnce = state.debtWarned === true && !state.over;
+    state.money = -BANKRUPT - 1; checkBankrupt();
+    out.debtBankrupts = state.over === true && goCount.length === 1;
+    events.gameOver = og; state.over = over0; state.money = money0; state.debtWarned = false;
+
     // a full day: guests come, go, and leave a mood behind for the rating
     resetParties(); state.minute = OPEN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
     const day = state.day;

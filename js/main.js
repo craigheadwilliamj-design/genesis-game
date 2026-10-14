@@ -62,13 +62,8 @@ events.dayEnded = r => {
 };
 events.gameOver = () => {
   setSpeed(0);
-  if(state.over === "shutdown"){
-    $("#dlgOver h2").textContent = "The park has been shut down";
-    $("#overText").textContent = `After ${state.safety.deaths} guest deaths from escaped animals, the authorities closed ${state.name} on day ${state.day}. Stronger barriers, moats, and enough keepers with dart guns keep animals where they belong.`;
-  } else {
-    $("#dlgOver h2").textContent = "The park went bankrupt";
-    $("#overText").textContent = `You ran out of money on day ${state.day - 1}, with ${money(state.money)} in the bank. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
-  }
+  $("#dlgOver h2").textContent = "The park went bankrupt";
+  $("#overText").textContent = `${state.name} went bankrupt on day ${state.day}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
   $("#dlgOver").showModal();
 };
 

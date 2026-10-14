@@ -129,8 +129,7 @@ function harmGuests(dtMin){
       sf.deaths++;
       spend(ESCAPE.lawsuit, "fines");
       state.rating = Math.max(0, state.rating - .3);
-      events.toast(`A guest was killed by the escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}. ${sf.deaths} of ${ESCAPE.shutdownDeaths} deaths before the park is shut down.`, "bad");
-      if(sf.deaths >= ESCAPE.shutdownDeaths){ state.over = "shutdown"; events.gameOver(); return; }
+      events.toast(`A guest was killed by the escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}.`, "bad");
     }
   }
 }

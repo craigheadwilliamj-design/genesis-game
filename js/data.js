@@ -1100,9 +1100,10 @@ const NET_PER_METER = 25;   // catch netting along the fence
 // Flying animals. Outside an aviary or vivarium they escape almost at once.
 const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi", "arge", "ppig", "rmlo"];
 
+const BANKRUPT = 25000;   // the park goes bankrupt (the only game over) when debt passes this; a warning comes at half
+
 const ESCAPE = {
   lawsuit:75000,       // cost of each guest killed
-  shutdownDeaths:5,    // this many deaths and the park is shut down
   sedateMinutes:10,    // how long a vet (or a keeper, if there are no vets) takes to dart and sedate an escaped animal
   looseSpeed:WALK_PER_MIN * .75,   // escaped animals wander a bit slower than people walk
   bigHerbivore:1500,   // herbivores needing this much room or more are dangerous when loose
