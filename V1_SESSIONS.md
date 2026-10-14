@@ -2,7 +2,7 @@
 
 Each session below is standalone: paste its prompt into a fresh session (CLAUDE.md is read automatically). One session = one commit/branch, run `node tests/smoke.js` before finishing. Size: S = quick, M = moderate, L = big (consider splitting or running it on its own). "Needs" lists sessions that must be done first. Anything with no "Needs" can run any time, in any order.
 
-Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas`.
+Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas prio`.
 
 ---
 
@@ -95,7 +95,7 @@ Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 > One simple sprite per staff type (keeper, vet, mechanic, custodian, guard) and three guest sprites, drawn in `drawParties` and the staff draw code.
 
 **S25+ (L total, many sessions): Animal sprites**
-> 52 animals still need sprites (only coel, plat, lyst have them). Run 3 to 4 animals per session, grouped by body plan/period (e.g. small theropods: comp, orni, velo, ovir, gall; ceratopsians/ornithopods; sauropods; synapsids; amphibians; mammals). Follow CLAUDE.md "Sprite rigger" workflow and the art direction.
+> 51 animals still need sprites (only coel, plat, lyst, prio have them). Run 3 to 4 animals per session, grouped by body plan/period (e.g. small theropods: comp, orni, velo, ovir, gall; ceratopsians/ornithopods; sauropods; synapsids; amphibians; mammals). Follow CLAUDE.md "Sprite rigger" workflow and the art direction.
 
 ---
 
@@ -112,6 +112,15 @@ Launch roster (55): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 
 **S29 (M): Start-up screen, PALEO-TYCOON rename, biome lock**
 > Rename the game to "PALEO-TYCOON" (index.html `<title>`, the intro dialog "Welcome to Genesis Park" in `#dlgIntro`, HUD and any other user-facing "Genesis Park Tycoon" text; keep the in-game default park name and the Genesis theme as they are unless the user says otherwise). Build a proper start-up screen shown before a park begins: game title, New Park (name + biome pick, reusing `biomeCards` in js/main.js and `#introBiomes`), and Continue if a save exists. Choosing a biome locks the park's background biome (`state.biome`, `parkBiome()` in sim.js) for the life of that park: remove the biome picker from the park office dialog (`#menuBiomes` in main.js ~line 163) so it can't be changed, and only a new park (via the start screen) can pick another. Old saves keep their current biome. Add smoke checks that the biome can't be changed mid-park and that a new park can. Update CLAUDE.md where it mentions picking the biome in the park office.
+
+**S30 (M): Animals attack other animals** Best after S10 (reuses its dust-cloud hook)
+> Today predators never attack other animals: `predator:true` species can only be housed with their own kind (data.js ~line 59), and `hunt` in behavior.js is only a stalking animation. Wire in real animal-on-animal attacks: (1) loose/escaped predators attack animals in exhibits they reach, (2) fights inside an exhibit between aggressive or stressed animals (`temper`, `a.need.stress`, crowding via `cramped`), (3) if a predator ends up with prey (breach, transfer, dev-mode), it hunts it. Attacks cause injuries and deaths through the existing health/medicine system (js/medicine.js `injuryChance`, deaths queue in main.js), show in the death dialog with cause, fire the S10 dust-cloud hook, and are tunable from a constant in data.js. Smoke checks for each case.
+
+**S31 (M): Animal sex, chosen when ordering from TAR** Best after S8 (animal panel)
+> No animal has a sex today and there is no breeding code. Give every animal `a.sex` ("male"/"female"). The TAR clone order (`orderClone`, js/science.js ~line 226; ordering UI in js/scienceui.js and the exhibit panel's Cloning tab, js/ui.js) lets the player pick male or female per animal ordered, stored on the clone job and carried to the hatched animal. Partner-park starter animals and old saves get a random or balanced sex (migrate in `upgradeSave`). Show sex in the animal panel and exhibit lists. Light effects only, tunable in data.js: pair/herd species that lack both sexes get a small happiness/`lonely` penalty (`matesWanted`, js/behavior.js), and males of aggressive species can fight more (hook for S30). No breeding or eggs in v1.0.
+
+**S32 (M): Social structure: herds, bachelors, matriarchs, solitary** Needs S31 (sex), pairs with S30 (fights)
+> Replaces S31's light placeholder sex effects with a real social system, by species social type (`traitsOf(s).social`: solitary / pair / herd / pack, js/behavior.js). Open exhibits only: **vivariums (`e.viv`) ignore all of it.** Rules, all tunable from a `SOCIAL` constant in data.js: (a) **Herds/packs have a hierarchy**: each animal gets a saved rank (`a.rank`, alpha first; by size/age/random), shown in the animal panel. (b) **Bachelor groups** (all male) and **matriarchal groups** (all female) are stable and get a happiness bonus. (c) **Mixed-sex herds**: males fight, scaled by number of males and per-animal space; assumption to keep unless told otherwise: exactly one male with females is stable, two or more males fight. Fights feed S30's attack/injury system and the dust cloud; the loser is stressed and lowest rank suffers most. (d) **Solitary** species dislike any company: same-sex company is a big stress/happiness penalty, opposite-sex is tolerated (small penalty), and being alone is best; extra habitat space (`wantsOf`/`haveOf`, space per animal) and shelter cover (`exposure`, `LAND` shelters) reduce the penalty. (e) **Pairs**: one male plus one female is ideal; two of the same sex is a mild penalty. Show an exhibit "Social" line in `exhibitReport` explaining what's wrong (e.g. "Two males are fighting"), plus smoke checks for each rule and for vivarium immunity.
 
 ---
 
