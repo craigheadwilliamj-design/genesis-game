@@ -385,8 +385,11 @@ function landHtml(e){
   const lb = landTabs.biome, periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][lb]);
   if(!periods.includes(landTabs.period)) landTabs.period = periods[0];
   const lp = landTabs.period;
-  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
-  const plantBtns = PLANTS_OF[lp][lb].concat(lp === "Quaternary" ? PARK_PLANTS_OF[lb] || [] : []).map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
+  // each rock kind: its place button, then a Random button and one thumbnail per picture of this biome's stone (the same pickers as the build menu)
+  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = landLock(t), list = (ROCK_SPRITES[lb] || {})[k] || [], sel = rockPicOf(k, lb);
+    const shapes = list.length ? `<div class="shapes" style="padding:4px 0 0"><button class="shape rnd" data-action="rockShape" data-type="${k}" data-pic="" aria-pressed="${sel == null}" title="Random shape">?</button>${list.map((_, i) => `<button class="shape" data-action="rockShape" data-type="${k}" data-pic="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${k}-${lb}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("")}</div>` : "";
+    return `<div style="width:100%;margin-bottom:6px"><button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>${shapes}</div>`; }).join("");
+  const plantBtns = PLANTS_OF[lp][lb].concat(lp === "Quaternary" ? PARK_PLANTS_OF[lb] || [] : []).map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${PLANT_SPRITES[k] ? `<img src="${spriteUrl(`sprites/plants/${k}.png`)}" alt="" style="height:22px;vertical-align:middle;margin-right:4px;image-rendering:pixelated">` : ""}<b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   const sub = ["plants", "rocks", "water"].includes(landTabs.sub) ? landTabs.sub : "plants";
   const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
   const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
@@ -817,6 +820,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; ui.panel(); return; }
   if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "vivPlant"){ const why = vivPlantProblem(it, b.dataset.key); if(why){ ui.toast(why, "bad"); return; } addVivPlant(it, b.dataset.key); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }

@@ -618,8 +618,9 @@ function plantSpriteSvg(f, t, S, dead, pick){
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
 // The shape the player picked in the build menu for rocks and boulders (null: random, by id). f.pic on a placed rock is its picture's index; old rocks have none and keep the id-based pick.
 const rockPick = {rock:null, boulder:null};
-// The biome a rock is being placed under: the biome tab it was picked from, the exhibit under the cursor, or the park's
-const rockBiomeNow = () => rockBiome || (landGhost && landGhost.e ? biomeOf(landGhost.e) : parkBiome());
+// The biome a rock is being placed under: the biome tab it was picked from, the build menu's biome pick, the exhibit under the cursor, or the park's
+let rockBiomeMenu = null;   // stone biome chosen in the build menu's Rock and Boulder pickers (null: the exhibit's, or the park's)
+const rockBiomeNow = () => rockBiome || rockBiomeMenu || (landGhost && landGhost.e ? biomeOf(landGhost.e) : parkBiome());
 // The picked picture's index for this kind of rock, or null when it's random or the biome has fewer pictures than that
 function rockPicOf(type, biome){ const n = rockPick[type], l = (ROCK_SPRITES[biome] || {})[type]; return l && n != null && n < l.length ? n : null; }
 function rockSpriteSvg(f, list, biome, dead, pick){
