@@ -260,8 +260,8 @@ function cloneHtml(e, rep){
   if(sc.ready.length){
     h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
-  const ready = SPECIES.filter(s => sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
-  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
+  const ready = SPECIES.filter(s => speciesAvailable(s.id) && sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
+  const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
   h += `<section><h3>Add animals</h3>`;
   if(coming.length) h += `<div class="meta" style="margin-bottom:8px">Growing for this exhibit: ${coming.map(c => `${esc(SPECIES_BY_ID[c.sp].name)} (${whenText(c.end)})`).join(", ")}.</div>`;
@@ -892,7 +892,7 @@ function catalogHtml(){
   const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
   let h = "", shown = 0;
   for(const per of order){
-    const list = SPECIES.filter(s => s.period === per).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
+    const list = SPECIES.filter(s => s.period === per && speciesAvailable(s.id)).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
     if(!list.length) continue;
     shown += list.length;
     const p = PERIOD_BY_ID[per];

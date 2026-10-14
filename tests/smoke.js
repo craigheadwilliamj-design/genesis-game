@@ -222,6 +222,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.territorialInjury = injuryChance(pen, pen.animals[0]).p > HEALTH.territorial;
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
+    { const was = localStorage.getItem("genesis-dev"); localStorage.removeItem("genesis-dev");
+      out.rosterHidesCoty = !speciesAvailable("coty") && speciesAvailable("trex") && !speciesToUnlock().some(s => s.id === "coty");
+      out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-dime"]'));
+      localStorage.setItem("genesis-dev", "1"); out.devShowsCoty = speciesAvailable("coty") && speciesToUnlock().some(s => s.id === "coty");
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was); }
     out.devModeOffByDefault = devMode() === false && !("dev" in state) && !JSON.stringify(state).includes("genesis-dev");
     return out;
   }));
