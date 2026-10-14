@@ -24,6 +24,8 @@ function spanText(min){
   return d ? `${d} day${d === 1 ? "" : "s"}${h ? ` ${h}h` : ""}` : h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
 }
 const leftText = end => spanText(end - nowMin());
+// How far a clone got, 0 to 100. A failed one stops where it died.
+const cloneProgress = c => c.failed ? c.stop : doneShare(c);
 const doneShare = j => clamp((nowMin() - j.start) / Math.max(1, j.end - j.start), 0, 1) * 100;
 
 /* ---------- bays: one per scientist ---------- */
@@ -41,7 +43,7 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 function jobRefund(kind, j){
   if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
   if(kind === "temporal") return {money:tripOdds(j.sp, j.period).cost};
-  if(kind === "gene") return {money:SPECIES_BY_ID[j.sp].price};
+  if(kind === "gene") return {money:j.failed ? 0 : SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
 }
 // Let one scientist go. Their bay closes, and so does the job in the highest bay if it was busy (the cost comes back).
@@ -212,6 +214,18 @@ const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 // TAR can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
 const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
 const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
+// The chance a clone dies in the incubator: CLONE_GENOME.failMax at the minimum genome, nothing at 100%
+const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
+function failClone(j){
+  j.failed = true; j.stop = clamp((j.fail - j.start) / Math.max(1, j.end - j.start) * 100, 0, 100);
+  events.toast(`TAR: the ${SPECIES_BY_ID[j.sp].name} clone failed at ${Math.round(j.stop)}%. ${j.why}. Discard the specimen to free the incubator.`, "bad");
+  events.changed();
+}
+function discardClone(id){
+  const sc = state.science, i = sc.clones.findIndex(c => c.id === id && c.failed); if(i < 0) return false;
+  sc.clones.splice(i, 1); events.toast("Specimen discarded. The incubator bay is clear.");
+  return true;
+}
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
@@ -228,7 +242,10 @@ function orderClone(sp, exhibitId, sex){
   const s = SPECIES_BY_ID[sp], cq = cloneQuality(sp);
   spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  state.science.clones.push({id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end});
+  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end};
+  // a partial genome can fail partway (never in sandbox)
+  if(!state.sandbox && Math.random() < cloneFailChance(sp)){ job.fail = start + rand(CLONE_FAIL.from, CLONE_FAIL.to) * (end - start); job.why = CLONE_FAIL.causes[Math.floor(Math.random() * CLONE_FAIL.causes.length)]; }
+  state.science.clones.push(job);
   events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }
@@ -308,7 +325,7 @@ function scienceNext(){
   let m = Infinity;
   for(const j of sc.projects) m = Math.min(m, j.end);
   for(const j of sc.trips) m = Math.min(m, j.end);
-  if(sc.clones.length && tarWorking()) for(const j of sc.clones) m = Math.min(m, j.end);
+  if(sc.clones.length && tarWorking()) for(const j of sc.clones) if(!j.failed) m = Math.min(m, j.fail !== undefined ? j.fail : j.end);
   if(c.beds.length && beds()) for(const j of c.beds) m = Math.min(m, j.end);
   return m - nowMin();
 }
@@ -334,11 +351,15 @@ function scienceTick(dtMin){
   }
   // with TAR closed or nobody to run it, every clone waits
   if(sc.clones.length){
-    if(!tarWorking()) for(const j of sc.clones){ j.start += dtMin; j.end += dtMin; }
-    else if(sc.clones.some(j => j.end <= now)){
-      const done = sc.clones.filter(j => j.end <= now);
-      sc.clones = sc.clones.filter(j => j.end > now);
-      done.forEach(finishClone); sc.hatchDay = state.day;
+    if(!tarWorking()) for(const j of sc.clones){ if(j.failed) continue; j.start += dtMin; j.end += dtMin; if(j.fail !== undefined) j.fail += dtMin; }
+    else {
+      // a clone that was going to die stops here, and stays in its bay until the player discards it
+      for(const j of sc.clones) if(!j.failed && j.fail !== undefined && j.fail <= now) failClone(j);
+      if(sc.clones.some(j => !j.failed && j.end <= now)){
+        const done = sc.clones.filter(j => !j.failed && j.end <= now);
+        sc.clones = sc.clones.filter(j => j.failed || j.end > now);
+        done.forEach(finishClone); sc.hatchDay = state.day;
+      }
     }
   }
   // the same goes for the growing beds

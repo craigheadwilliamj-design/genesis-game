@@ -1091,6 +1091,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.hireOpensBay = freeBay("gene") === 1 && orderClone(small.id, null) && sc.clones[1].bay === 1;
     out.fireClosesBay = (() => { const n = sc.clones.length; fireScientist("gene"); return sc.clones.length === n - 1 && bayCount("gene") === 1; })();
     out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
+    // a partial genome can fail: the clone stops where it died, keeps its bay, and waits to be discarded
+    sc.dna[small.id] = {genome:CLONE_GENOME.min}; sc.rating = 5;
+    out.failChanceScales = Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax) < 1e-9 && (sc.dna[small.id].genome = 80, Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax / 2) < 1e-9) && (sc.dna[small.id].genome = 100, cloneFailChance(small.id) === 0);
+    sc.dna[small.id].genome = CLONE_GENOME.min;
+    const rnd0 = Math.random; Math.random = () => 0;
+    const ordered = orderClone(small.id, null); Math.random = rnd0;
+    const fj = sc.clones[sc.clones.length - 1];
+    out.failRolled = ordered && fj.fail > fj.start && fj.fail < fj.end;
+    out.runningCardHasBar = /data-cbar/.test(cloneCard(fj, 0)) && !/CLONE FAILED/.test(cloneCard(fj, 0));
+    const readyBefore = sc.ready.length;
+    out.cloneFails = adv(base, () => fj.failed) && fj.stop >= CLONE_FAIL.from * 100 - 1 && fj.stop <= CLONE_FAIL.to * 100 + 1;
+    adv(base * 2, () => false);
+    out.failedStaysPut = sc.clones.includes(fj) && sc.ready.length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
+    out.failedCardOverlay = /CLONE FAILED/.test(cloneCard(fj, 0)) && /discardClone/.test(cloneCard(fj, 0)) && cloneCard(fj, 0).includes(`width:${Math.round(fj.stop)}%`);
+    out.discardFreesBay = discardClone(fj.id) && !sc.clones.includes(fj) && freeBay("gene") >= 0;
+    sc.dna[small.id] = {genome:100};
     sc.tar = null;
 
     // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
