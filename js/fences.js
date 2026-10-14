@@ -140,7 +140,7 @@ function pieceSpotProblem(k, with_ = new Set()){
   if(parkWater().some(w => lineShapeDist(seg, w.points) < .3)) return "It runs into water.";
   if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, seg) < footR(LAND[f.type]) * .8)) return "It runs into a plant, rock or statue.";
   if(fenceLines().some(l => linesCross(l.points, seg))) return "It runs into a fence.";
-  if(lineDist(state.gate[0], state.gate[1], seg) < 3) return "Keep clear of the entrance.";
+  if(lineDist(state.gate[0], state.gate[1], seg) < 8.5) return "Keep clear of the entrance.";
   return null;
 }
 // Why a region can't be fenced off, or null

@@ -2081,6 +2081,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // tapping the entrance in select mode opens the Park Office, same as the menu button
+  for(const tl of [true, false]){
+    const pos = await page.evaluate(tl => {
+      const dlg = document.querySelector("#dlgMenu"); if(dlg.open) dlg.close();
+      document.querySelectorAll("dialog[open]").forEach(d => d.close());
+      if(tilt !== tl) document.querySelector("#ztilt").click();
+      setTool("select"); view.k = Math.max(view.k, 4); const [gx, gy] = state.gate; view.tx = innerWidth / 2 - gx * view.k; view.ty = innerHeight / 2 - gy * view.k * (tilt ? TILT : 1); render();
+      const el = document.querySelector('[data-kind="entrance"]'); if(!el) return null;
+      const r = el.querySelector("rect").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height - 3, tilt};
+    }, tl);
+    let opened = false;
+    if(pos){ await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(150); opened = await page.evaluate(() => document.querySelector("#dlgMenu").open); }
+    checks[tl ? "entranceTapOpensOffice" : "entranceTapOpensOfficeFlat"] = opened;
+  }
+  await page.evaluate(() => { const d = document.querySelector("#dlgMenu"); if(d.open) d.close(); });
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }

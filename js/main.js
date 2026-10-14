@@ -176,7 +176,8 @@ $("#startGo").onclick = () => {
 /* ---------- dialogs ---------- */
 $("#introGo").onclick = () => { $("#dlgIntro").close(); setSpeed(1); };
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
-$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; $("#sandboxToggle").checked = !!state.sandbox; $("#menuBiome").textContent = `Park biome: ${BIOMES[parkBiome()].label}. It was set when the park opened and can't be changed.`; saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
+function openParkOffice(){ $("#nameInput").value = state.name; $("#sandboxToggle").checked = !!state.sandbox; $("#menuBiome").textContent = `Park biome: ${BIOMES[parkBiome()].label}. It was set when the park opened and can't be changed.`; saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); }
+$("#menuBtn").onclick = openParkOffice;
 $("#closeMenu").onclick = () => $("#dlgMenu").close();
 $("#nameInput").addEventListener("input", e => { state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true); if(!sel) ui.panel(); saveSoon(); });
 $("#sandboxToggle").addEventListener("change", e => { state.sandbox = e.target.checked; if(state.sandbox){ state.money = SANDBOX_MONEY; state.science.points = SANDBOX_POINTS; } ui.hud(true); ui.panel(); saveSoon(); });
