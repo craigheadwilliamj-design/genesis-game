@@ -26,13 +26,15 @@ const START = {
 };
 
 // How fast time passes. At 1x speed, one real second is this many park minutes.
-// The park is open 8:00 AM to 8:00 PM (720 minutes), so 6 means a day lasts 120 seconds.
-const MINUTES_PER_SECOND = 6;
+// The park is open 8:00 AM to 8:00 PM (720 minutes), so 3 means a day lasts 240 seconds.
+const MINUTES_PER_SECOND = 3;
 
-// How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
+// How fast full-pace walkers go on screen at 1x speed, in meters per real second at the OLD 6 minutes a second (half that now, with 3). Guests, keepers, and mechanics all use it.
 const WALK_SPEED = 20;
 // The same speed in meters per park minute, which is what the simulation counts in
-const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
+const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, so a longer day doesn't change how far anyone gets in a park minute (on screen that halves WALK_SPEED)
+// Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN (1 = the old sim speed; the longer day is what slows them on screen)
+const STAFF_PACE = 1;
 const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
 // The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
 const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
@@ -480,7 +482,7 @@ const GUEST = {
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home, before dividing by pace (slower guests stay longer, so they see the same amount)
   cash:[20, 45],       // money each guest brings to spend inside
-  speed:[.85, 1.15],   // each party's own pace, times pace, times WALK_PER_MIN
+  speed:[1.02, 1.38],  // each party's own pace, times pace, times WALK_PER_MIN (about 20% over the old .85 to 1.15, so guests walk a bit quicker without changing their needs)
   pace:.5,             // guests live at this share of staff pace: they walk, get hungry and tired, and tire of crowds this much slower, so you can click one before it's gone but a trip still feels the same
   startMood:62,        // mood on arrival, plus 4 for each star
   quitBelow:20,        // a party this unhappy heads home early
@@ -687,7 +689,7 @@ const KEEPER = {
   hireCost:2000,       // one-time cost to hire a keeper
   wage:120,            // each keeper's pay per day
   carry:40,            // food units a keeper can carry by hand
-  speed:WALK_PER_MIN,  // keepers walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // keepers walk at STAFF_PACE of full walking speed
   tirePerMeter:.03,    // stamina lost per meter walked
   tirePerDelivery:2,   // stamina lost loading or unloading
   restBelow:25,        // keepers take a break when stamina drops under this
@@ -737,7 +739,7 @@ const UPGRADES = [
 const CUSTODIAN = {
   hireCost:1500,
   wage:100,
-  speed:WALK_PER_MIN,  // custodians walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // custodians walk at STAFF_PACE of full walking speed
   carry:100,           // units of stock they carry per trip
   scrubPerMin:4,       // restroom dirt cleaned each minute
   sweepPerMin:2,       // pieces of litter picked up each minute
@@ -816,7 +818,7 @@ const LODGING = {
 const SECURITY = {
   hireCost:2000,
   wage:140,
-  speed:WALK_PER_MIN,  // guards walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // guards walk at STAFF_PACE of full walking speed
   deterRadius:25,      // vandalism near a guard is much rarer
   deterCut:.3,
   catchRadius:15,      // a guard catches a vandal this close
@@ -916,7 +918,7 @@ const MAINT = {
   repairBelow:85,      // mechanics fix fences under this condition
   inspectMinutes:5,    // time to inspect a fence
   repairPerMinute:4,   // condition restored per minute of work
-  speed:WALK_PER_MIN,  // mechanics walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // mechanics walk at STAFF_PACE of full walking speed
   hireCost:2000,
   wage:150,
 };
@@ -1196,7 +1198,7 @@ const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoi
 const VET = {
   hireCost:3000,
   wage:200,
-  speed:WALK_PER_MIN,  // vets walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // vets walk at STAFF_PACE of full walking speed
   patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:14, dept:true, unique:true,
