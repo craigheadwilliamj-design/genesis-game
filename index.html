@@ -322,6 +322,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .drawbar .dbtns{width:100%}
   .drawbar .dbtns button{flex:1}
 }
+.app.focus main{grid-template-columns:1fr}
+.app.focus #aside,.app.focus #sideMenu{display:none}
 @media (prefers-reduced-motion: reduce){aside{transition:none}}
 </style>
 
@@ -349,6 +351,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
         <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
       </div>
+      <button class="hbtn" id="focusBtn" aria-pressed="false" title="Hide the menus to see only the map (H)">Hide menus</button>
       <button class="hbtn" id="animalsBtn">Animals</button>
       <button class="hbtn" id="menuBtn">Park</button>
     </div>

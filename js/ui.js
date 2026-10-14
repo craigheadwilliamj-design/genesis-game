@@ -26,6 +26,7 @@ const ui = {
   },
 
   panel(){
+    if(document.querySelector(".app.focus")) return;
     const it = selItem();
     if(sel && !it) sel = null;
     let h;
