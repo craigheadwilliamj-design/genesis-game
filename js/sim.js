@@ -706,11 +706,11 @@ function endDay(){
 
 /* ---------- goals ---------- */
 
-function currentGoal(){ return GOALS.find(g => !state.goalsDone.includes(g.id)) || null; }
+function currentGoal(){ return activeGoals().find(g => !state.goalsDone.includes(g.id)) || null; }
 function checkGoals(){
   if(!derived) recompute();
   checkThemes();
-  for(const g of GOALS){
+  for(const g of activeGoals()){
     if(state.goalsDone.includes(g.id)) continue;
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);

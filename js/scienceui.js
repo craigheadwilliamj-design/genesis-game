@@ -47,7 +47,7 @@ function projectRow(kind, id, label, text){
   const need = prereq && !info.done ? ` Needs ${esc(projectInfo("tech", info.needs).label)} first.` : "";
   return `<li class="${prereq && !info.done ? "locked" : ""}"><span class="nm">${label}</span>${right}<span class="need">${text}${need}${run ? `<span style="display:block;margin-top:4px">${meter(doneShare(run), "var(--gold)")}</span>` : ""}</span></li>`;
 }
-const techRows = group => TECH.filter(t => t.group === group).map(t => projectRow("tech", t.id, esc(t.label), esc(t.text))).join("");
+const techRows = group => TECH.filter(t => t.group === group && !techHidden(t.id)).map(t => projectRow("tech", t.id, esc(t.label), esc(t.text))).join("");
 
 function oracleHtml(b){
   const sc = state.science, n = sc.crew.paleo, idle = Math.max(0, n - sc.projects.length);
@@ -126,7 +126,7 @@ function ghostHtml(b){
   const openIn = id => inPeriod(id).some(s => isUnlocked(s.id)) || plantsIn(id).some(f => genomeOpen(f.id));
   if(!ghostTab) ghostTab = PERIOD_ORDER.find(openIn) || "Quaternary";
   const museumOpen = hasTech(MUSEUM.needTech);
-  h += `<section><h3>Genomes by period</h3>${tabBar("gtab", [...PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), {key:"events", label:"Events", color:"#8A6D3B", lock:!museumOpen}], ghostTab)}`;
+  h += `<section><h3>Genomes by period</h3>${tabBar("gtab", [...PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), ...(techHidden(MUSEUM.needTech) ? [] : [{key:"events", label:"Events", color:"#8A6D3B", lock:!museumOpen}])], ghostTab)}`;
   if(ghostTab === "events"){
     const block = ghostBlocker();
     h += `<div class="ptab-body"><div class="meta">Moments from deep time. Each trip brings back recordings, scans and samples. A finished record becomes an attraction for an Education Center, and a better record makes a better show.${museumOpen ? "" : " Research education programs at ORACLE first."}</div>`;

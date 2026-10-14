@@ -160,7 +160,7 @@ function menuRow(it){
     return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   if(it.sub){
-    const rows = it.sub.map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
+    const rows = it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
     return `<div class="sitem" data-open="${it.sub[0]}"><button class="srow head" aria-expanded="false">${menuIcon(it.sub[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange(it.sub)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   const b = BUILDINGS[it.tool], price = it.price ? it.price() : money(b.price);
@@ -173,8 +173,10 @@ const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.
 const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in water" : t.wet ? ", land or water" : "", where = tail === "biome" ? esc(BIOMES[t.biome].label.toLowerCase()) : t.size;
   return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
 
+// Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
+const menuHidden = it => (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
 function buildMenu(){
-  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.map(menuRow).join("")}</div></section>`).join("");
+  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
   const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>
     <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
   $("#sideMenu").innerHTML = `<div class="sidebar-top"><button class="sidetab" id="sideTab" aria-expanded="false" aria-controls="sideBody">${menuIcon("path").replace("ticon", "ticon tab")}<span class="tl"><b>Build</b></span></button>

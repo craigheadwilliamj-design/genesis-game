@@ -246,6 +246,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       if(!real) { state.exhibits.pop(); recompute(); }
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
       buildMenu(); }
+    { const was = localStorage.getItem("genesis-dev"), menuHas = t => !!document.querySelector(`#sideMenu [data-tool="${t}"]`);
+      const held = ["campground", "lodge", "resort", "edcenter", "tramstop", "tram"], techs = ["hotels", "transit", "education", "edtouch"];
+      localStorage.removeItem("genesis-dev"); buildMenu();
+      out.v1HidesMenuOff = held.every(t => !menuHas(t)) && menuHas("restroom") && menuHas("path");
+      out.v1HidesTechOff = techs.every(id => techHidden(id) && !techRows("build").includes(`data-id="${id}"`) && !techRows("build").includes(esc(TECH.find(x => x.id === id).label))) && techRows("build").includes(esc(TECH.find(x => x.id === "security").label));
+      out.v1HidesGoalsOff = ["camp", "hotel", "resort"].every(id => !activeGoals().some(g => g.id === id)) && activeGoals().length === GOALS.length - 3;
+      out.v1BlocksTechOff = startProject("tech", "education") !== null && pathProblem([[0,0],[10,0]], "tram") !== null && buildingHidden("lodge");
+      localStorage.setItem("genesis-dev", "1"); buildMenu();
+      out.v1ShowsMenuOn = held.every(menuHas);
+      out.v1ShowsTechOn = techs.every(id => !techHidden(id)) && techRows("build").includes(esc(TECH.find(x => x.id === "hotels").label));
+      out.v1ShowsGoalsOn = activeGoals().length === GOALS.length;
+      out.v1AllowsTramOn = pathProblem([[0,0],[10,0]], "tram") !== "That isn't available yet." && !buildingHidden("edcenter");
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
+      buildMenu(); }
     out.devModeOffByDefault = devMode() === false && !("dev" in state) && !JSON.stringify(state).includes("genesis-dev");
     return out;
   }));
@@ -883,7 +897,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     resetParties();
 
     // build sidebar and the Move tool
-    out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="campground"]') && !!document.querySelector('[data-fence="concrete"]');
+    out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="restroom"]') && !!document.querySelector('[data-fence="concrete"]');
     out.fencePrice = exhibitCost([[0,0],[40,0],[40,40],[0,40]], "bars") - exhibitCost([[0,0],[40,0],[40,40],[0,40]]) === Math.round(160 * BARRIERS.bars.perMeter);
     {
       const ex = {id:"e-mv", name:"Mv", points:[[200,200],[240,200],[240,240],[200,240]], animals:[], happy:70, cond:100, gate:[220,200]};

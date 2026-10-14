@@ -89,6 +89,7 @@ function projectProblem(kind, id){
   return null;
 }
 function startProject(kind, id){
+  if(kind === "tech" && techHidden(id)) return "That research isn't available yet.";
   const why = projectProblem(kind, id); if(why) return why;
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
