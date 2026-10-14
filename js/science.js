@@ -234,7 +234,7 @@ function orderClone(sp, exhibitId){
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push({id:a.id, sp:a.sp, cl:true, q:a.q});
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sp:a.sp, cl:true, q:a.q}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -253,7 +253,7 @@ function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
   if(e){ putAnimal(e, c); events.toast(`TAR finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push({id:c.id, sp:c.sp, q:c.q}); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
+  else { sc.ready.push(nameAnimal({id:c.id, sp:c.sp, q:c.q})); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
 }
 
 /* ---------- CERES: growing plants and medicine ---------- */
