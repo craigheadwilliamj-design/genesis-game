@@ -282,11 +282,8 @@ function render(){
   // plants, rocks and statues out in the park stand over the path edges
   s += decorSvg(tool === "bulldoze", isDoomed);
 
-  // entrance gate
-  const [gx, gy] = state.gate;
-  s += `<g pointer-events="none"><rect x="${gx-9}" y="${gy-3}" width="18" height="6" rx="1" fill="#1F3A2B"/><rect x="${gx-9}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/><rect x="${gx+6}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/>`;
-  s += emblemSvg(gx, gy - 9, 3.6);
-  s += `<text class="lbl" x="${gx}" y="${gy + 3 + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}">Entrance</text></g>`;
+  // entrance building
+  s += entrance34(inv);
 
   // litter on the paths
   const specks = litterSpecks();
@@ -870,7 +867,8 @@ function flatWalls34(P, h1, ln){
 }
 // letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
 const FLAT_FONT34 = {R:["##.", "#.#", "##.", "#.#", "#.#"], E:["###", "#..", "##.", "#..", "###"], S:["###", "#..", "###", "..#", "###"], T:["###", ".#.", ".#.", ".#.", ".#."],
-  O:["###", "#.#", "#.#", "#.#", "###"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"]};
+  O:["###", "#.#", "#.#", "#.#", "###"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+  N:["#.#", "###", "###", "#.#", "#.#"], A:[".#.", "#.#", "###", "#.#", "#.#"], C:["###", "#..", "#..", "#..", "###"]};
 // door pictograms, 5 wide and 8 tall: a man and a woman
 const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
 function flatText34(Q, L, f, h, str, fill){
@@ -906,6 +904,40 @@ function flatRoof34(P, wall, rise, ln){
   s += flatLine34(ridge[0], ridge[1], FLAT34.ridge, FLAT34.px * 3) + flatLine34(ridge[0], ridge[1], FLAT34.gold, FLAT34.px);   // a dark ridge cap with a gold line on it
   const [vx, vy] = lerp(ridge[0], ridge[1], .32), vh = .95 / TILT;   // a plumbing vent on the ridge
   return s + flatPoly34([[vx - FLAT34.px, vy], [vx + FLAT34.px, vy], [vx + FLAT34.px, vy - vh], [vx - FLAT34.px, vy - vh]], FLAT34.vent, "", true) + flatPoly34([[vx - FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh - FLAT34.px / TILT], [vx - FLAT34.px * 2, vy - vh - FLAT34.px / TILT]], FLAT34.ventHi, "", true);
+}
+// The park entrance: two ticket pillars under a lintel with the name on it, the path running through. Front-facing like the other flat buildings; the flat view gets a top-down version.
+const ENTRANCE = {half:7, gap:4.6, depth:1.1, pillar:5, beam:3.3};   // meters: half the width, half the opening, half the depth, pillar height, where the lintel starts
+function entrance34(inv){
+  const [gx, gy] = state.gate, E = ENTRANCE, hit = `<g data-kind="entrance" data-id="gate" style="cursor:pointer">`;
+  const W = FLAT34.wall, R = FLAT34.roof, up = h => lift34(h);
+  const rect = (x0, x1, y0, y1, h) => [[gx + x0, gy + y0], [gx + x1, gy + y0], [gx + x1, gy + y1], [gx + x0, gy + y1]].map(up(h));   // a horizontal slab at height h
+  const face = (x0, x1, h0, h1, y, fill) => flatPoly34([[gx + x0, gy + y], [gx + x1, gy + y], [gx + x1, gy + y], [gx + x0, gy + y]].map((p, i) => up(i < 2 ? h0 : h1)(p)), fill, "", true);
+  if(!tilt){   // top-down: two green capped pillars and the lintel across, no side faces
+    let f = `<rect x="${gx - E.half - 1}" y="${gy - E.depth - 1}" width="${2 * E.half + 2}" height="${2 * E.depth + 2}" fill="transparent"/>`;
+    for(const [x0, x1] of [[-E.half, -E.gap], [E.gap, E.half]]) f += flatPoly34(rect(x0, x1, -E.depth, E.depth, 0), R[1], "", true) + flatPoly34(rect(x0 + .26, x1 - .26, -E.depth + .26, E.depth - .26, 0), R[0], "", true);
+    f += flatPoly34(rect(-E.half, E.half, -E.depth * .45, E.depth * .45, 0), R[1], "", true) + flatPoly34(rect(-E.half, E.half, -.13, .13, 0), FLAT34.gold, "", true);
+    return hit + f + emblemSvg(gx, gy, 2.2) + `<text class="lbl" x="${gx}" y="${gy + E.depth + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}" pointer-events="none">Entrance</text></g>`;
+  }
+  let s = hit + `<rect x="${gx - E.half - 1}" y="${gy - E.depth - (E.pillar + 3) / TILT}" width="${2 * E.half + 2}" height="${2 * E.depth + (E.pillar + 3) / TILT + 1}" fill="transparent"/>`;
+  s += flatPoly34(rect(-E.half - .7, E.half + .7, -E.depth + .4, E.depth + .8, 0), "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".22"');   // the shadow the whole thing throws
+  s += flatPoly34(rect(-E.gap, E.gap, -E.depth, E.depth, 0), "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".3"');   // and the darker shade under the lintel
+  const px = FLAT34.px;
+  for(const [x0, x1, sgn] of [[-E.half, -E.gap, 1], [E.gap, E.half, -1]]){   // a pillar: plinth, front, lit and shaded edge columns, a gold band, a ticket window, a green cap
+    const mid = (x0 + x1) / 2, ww = 1.5;
+    s += face(x0, x1, 0, E.pillar, E.depth, W[1]) + face(x0, x0 + .26, 0, E.pillar, E.depth, W[0]) + face(x1 - .26, x1, 0, E.pillar, E.depth, W[2]);
+    s += face(x0, x1, 0, .5, E.depth, FLAT34.plinth) + face(x0, x1, .9, .9 + px * 2, E.depth, FLAT34.gold);
+    s += face(mid - ww / 2, mid + ww / 2, 1.4, 3, E.depth, FLAT34.door) + face(mid - ww / 2, mid - ww / 2 + px, 1.4, 3, E.depth, FLAT34.doorEdge) + face(mid - ww / 2 - .2, mid + ww / 2 + .2, 1.3, 1.3 + px * 2, E.depth, FLAT34.eave);
+    s += face(x0 - .3, x1 + .3, E.pillar - .3, E.pillar, E.depth + .3, FLAT34.eave) + flatPoly34(rect(x0 - .3, x1 + .3, -E.depth - .3, E.depth + .3, E.pillar), R[1], "", true);   // the cap's shade, then its roof
+    s += flatPoly34(rect(x0 - .3, x1 + .3 - (x1 - x0 + .6) * .5, -E.depth - .3, E.depth + .3, E.pillar), R[0], "", true) + flatPoly34(rect(mid - px, mid + px, -E.depth + .5, E.depth - .5, E.pillar + px), FLAT34.gold, "", true);
+  }
+  // the lintel across the top of the opening: shade under it, the front in the type color with the name, a green slab on top
+  s += face(-E.gap, E.gap, E.beam - .3, E.beam, E.depth, "#14281C") + face(-E.half, E.half, E.beam, E.pillar, E.depth, W[1]);
+  s += face(-E.half + .3, E.half - .3, E.beam + .25, E.pillar - .25, E.depth, R[1]) + face(-E.half + .3, E.half - .3, E.pillar - .25 - px, E.pillar - .25, E.depth, FLAT34.gold);
+  const Q = (f0, f1, h0, h1, fill) => face(f0, f1, h0, h1, E.depth, fill);
+  s += flatText34((f0, f1, h0, h1, fill) => Q(f0, f1, E.beam + .3 + (h0 - 0), E.beam + .3 + (h1 - 0), fill), 1, 0, 0, "ENTRANCE", W[0]);
+  s += flatPoly34(rect(-E.half - .3, E.half + .3, -E.depth - .3, E.depth + .3, E.pillar + .3), R[1], "", true) + flatPoly34(rect(-E.half - .3, 0, -E.depth - .3, E.depth + .3, E.pillar + .3), R[0], "", true);
+  s += face(-E.half - .3, E.half + .3, E.pillar, E.pillar + .3, E.depth + .3, FLAT34.eave) + flatLine34(up(E.pillar + .3)([gx - E.half - .3, gy + E.depth + .3]), up(E.pillar + .3)([gx + E.half + .3, gy + E.depth + .3]), FLAT34.gold, px);
+  return s + emblemSvg(gx, up(E.pillar + 1.9)([0, gy])[1], 1.6) + `</g>`;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
@@ -2759,6 +2791,7 @@ function endPointer(e){
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
+  if(d.hit.kind === "entrance" && (!tool || tool === "select")){ openParkOffice(); return; }
   if(tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } const an = animalAt(e.clientX, e.clientY); if(an){ animalSelName = an.name; select("animal", an.id); return; } }
   if(d.hit.kind) select(d.hit.kind, d.hit.id); else if(sel) select(null);
 }
