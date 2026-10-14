@@ -423,9 +423,18 @@ function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
   for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
   for(const l of parkFences()) if(cross(l.points)) return false;
+  // staff roads join guest paths, so touching one at the path is fine: just don't stand on one, or cut across one away from the path
   for(const p of state.paths){
     if(!isService(p)) continue;
-    for(let i = 1; i < p.points.length; i++) if(segSegDist(A, B, p.points[i-1], p.points[i]) < SERVICE_ROAD.halfWidth + .3) return false;
+    for(let i = 1; i < p.points.length; i++){
+      const c = p.points[i-1], d = p.points[i];
+      if(segProj(x1, y1, c, d).d < SERVICE_ROAD.halfWidth + .3) return false;
+      if(segCross(A, B, c, d)){
+        const dx = B[0] - A[0], dy = B[1] - A[1], ex = d[0] - c[0], ey = d[1] - c[1], den = dx * ey - dy * ex;
+        const t = den ? ((c[0] - A[0]) * ey - (c[1] - A[1]) * ex) / den : 0;
+        if(t * Math.hypot(dx, dy) > SERVICE_ROAD.halfWidth + 1.5) return false;
+      }
+    }
   }
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
   for(const b of state.buildings){
