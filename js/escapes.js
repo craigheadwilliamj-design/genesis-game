@@ -71,6 +71,7 @@ function escapesTick(dtMin){
     if(Math.random() < 1 - Math.pow(1 - p, dtMin)) breakOut(e, worst);
   }
   moveLoose(dtMin);
+  looseAttacks(dtMin);
   harmGuests(dtMin);
 }
 

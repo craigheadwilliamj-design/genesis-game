@@ -163,6 +163,7 @@ function pickAct(e, a, s, ctx){
     const key = !isHunter(s) ? (ctx.browse ? "forage" : "eat") : cur === "eat" || (cur === "hunt" && since >= B.huntMin) ? "eat" : "hunt";
     sc[key] = n.hunger * 1.1;
   }
+  if(preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5);   // prey in the exhibit: stalk it
   if(n.thirst > floor + 5) sc.drink = n.thirst * 1.15;
   sc.rest = (1 - aw) * 80 + n.discomfort * .25;
   if(n.stress > 30) sc.hide = (n.stress - 15) * {skittish:1.4, curious:.8, aggressive:.5}[T.temper] * (ctx.cover ? 1 : .7);
@@ -225,6 +226,7 @@ function behaviorTick(dtMin){
         const next = pickAct(e, a, s, ctx);
         if(next !== a.act){ a.act = next; a.actFor = 0; } else a.actFor = (a.actFor || 0) + BEHAVIOR.step;
       }
+      attackStep(e, ctx);
     }
   }
 }
@@ -305,4 +307,99 @@ const stressEscape = a => a && a.need && traitsOf(SPECIES_BY_ID[a.sp]).temper ==
 function actsSummary(list){
   const c = {}; for(const a of list){ const k = actLabel(a).toLowerCase(); c[k] = (c[k] || 0) + 1; }
   return Object.entries(c).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${n} ${k}`).join(", ");
+}
+
+/* ---------- attacks ---------- */
+// Animal-on-animal violence (ATTACK in data.js): hunters strike their prey, stressed animals fight, loose predators raid exhibits (looseAttacks, called from escapesTick).
+
+// The species in an exhibit that species s goes after
+function preyIn(e, s, counts){
+  const out = [];
+  if(!counts || counts.size < 2) return out;
+  for(const sp of counts.keys()) if(attackReason(s, SPECIES_BY_ID[sp])) out.push(sp);
+  return out;
+}
+const bodyPos = a => { const h = typeof herd !== "undefined" ? herd.get(a.id) : null; return h && h.placed ? h : null; };
+// A puff of dust where an animal is hit, or at the middle of its exhibit when it isn't drawn
+function attackFx(e, a){ const h = bodyPos(a), c = h ? [h.x, h.y] : centroid(e.points); events.fx("dust", c[0], c[1]); }
+
+// Hurt one animal. A hit adds to an injury (or to an illness it already had); 100 kills. Returns "killed" or "hurt".
+function hurtAnimal(e, v, by, how, range, killP){
+  const s = SPECIES_BY_ID[v.sp], sev = range[0] + Math.random() * (range[1] - range[0]);
+  const hit = {by, how};
+  if(v.sick){ v.sick.sev += sev; delete v.sick.hidden; v.sick.hit = hit; }
+  else v.sick = {kind:"injury", sev:Math.round(sev), cause:"attack", hit};
+  if(killP && Math.random() < killP) v.sick.sev = 100;
+  const n = needsOf(v); n.stress = Math.min(100, n.stress + ATTACK.scare);
+  attackFx(e, v);
+  if(v.sick.sev >= 100){
+    animalDies(e, v);
+    events.toast(`${how === "fight" ? `A ${s.name} was killed in a fight` : `A ${by} killed a ${s.name}`} in ${e.name}.`, "bad");
+    return "killed";
+  }
+  v.sick.sev = Math.round(v.sick.sev);
+  if(how !== "fight") events.toast(`A ${by} attacked a ${s.name} in ${e.name}.`, "bad");
+  else if(e.fightDay !== state.day){ e.fightDay = state.day; events.toast(`Animals are fighting in ${e.name}. Stress and cramped quarters make them lash out.`, "bad"); }
+  return "hurt";
+}
+
+// Every behavior step: predators that have stalked long enough strike their prey, and stressed animals pick fights
+function attackStep(e, ctx){
+  const list = e.animals, A = ATTACK;
+  if(list.length < 2) return;
+  const now = nowAbs();
+  for(const a of [...list]){
+    if(!list.includes(a) || a.darted || now - (a.hitAt ?? -1e9) < A.gap) continue;
+    const s = SPECIES_BY_ID[a.sp]; if(!s) continue;
+    if(a.act === "hunt" && (a.actFor || 0) >= A.stalk && preyIn(e, s, ctx.counts).length){
+      const me = bodyPos(a);
+      let prey = null, bd = Infinity;
+      for(const v of list){
+        if(v === a || v.darted || !attackReason(s, SPECIES_BY_ID[v.sp])) continue;
+        const p = bodyPos(v), d = me && p ? Math.hypot(p.x - me.x, p.y - me.y) - (me.r || 1) - (p.r || 1) : 0;
+        if(d < bd){ bd = d; prey = v; }
+      }
+      if(prey && bd <= A.strike && Math.random() < (me ? A.huntChance : A.huntChance * .66)){
+        a.hitAt = now; hurtAnimal(e, prey, s.name, "hunt", A.bite, A.kill);
+        continue;
+      }
+    }
+    // fights: the stressed, aggressive or crowded, against anyone else in the pen
+    const n = a.need; if(!n || (a.sick && a.sick.kind === "injury")) continue;
+    const agg = traitsOf(s).temper === "aggressive", over = A.fightStress + (agg ? 0 : 15);
+    if(n.stress < over || (!agg && ctx.ratio >= 1)) continue;
+    const p = A.fightRate * clamp((n.stress - over + 10) / 40, 0, 1) * (ctx.ratio < 1 ? A.crowded : 1);
+    if(Math.random() >= p) continue;
+    const others = list.filter(v => v !== a && !v.darted);
+    if(!others.length) continue;
+    a.hitAt = now;
+    hurtAnimal(e, others[Math.floor(Math.random() * others.length)], s.name, "fight", A.fightHurt, 0);
+  }
+}
+
+// How far a point is from a shape's edge (0 inside)
+function distToPoly(x, y, pts){
+  if(inPoly(x, y, pts)) return 0;
+  let d = Infinity;
+  for(let i = 0; i < pts.length; i++) d = Math.min(d, segProj(x, y, pts[i], pts[(i + 1) % pts.length]).d);
+  return d;
+}
+// Can this species get at the animals inside? A breach, or a fence weaker than it is (a moat keeps it out otherwise)
+const canGetIn = (e, s) => !e.viv && !e.moat && (isBreached(e) || escapeStrength(s) > effectiveStrength(e));
+// Loose predators strike animals in exhibits they've wandered up to and can get into
+function looseAttacks(dtMin){
+  const A = ATTACK, now = nowAbs();
+  for(const l of state.safety.loose){
+    if(l.status !== "loose" || now - (l.biteAt ?? -1e9) < A.gap) continue;
+    const s = SPECIES_BY_ID[l.sp]; if(!s || !(s.predator || eats(s, "carnivore"))) continue;
+    const at = loosePos(l); if(!at) continue;
+    for(const e of state.exhibits){
+      if(e.viv || e.animals.length < 1 || !canGetIn(e, s) || distToPoly(at[0], at[1], e.points) > A.reach) continue;
+      const prey = e.animals.filter(v => !v.darted && attackReason(s, SPECIES_BY_ID[v.sp]));
+      if(!prey.length || Math.random() >= 1 - Math.pow(1 - A.looseRate, dtMin)) continue;
+      l.biteAt = now;
+      hurtAnimal(e, prey[Math.floor(Math.random() * prey.length)], s.name, "loose", A.bite, A.kill);
+      break;
+    }
+  }
 }
