@@ -2262,19 +2262,19 @@ function drawKeepers(){
     humanStep(el, "vet", c, x, y);
     walker34(el, x, y);
   }
-  // custodians: teal, with a square of whatever stock they're carrying
+  // custodians: pixel people; the crate in their hands is whatever stock they carry
   for(const c of ccrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), key = `c${r.toFixed(3)}|${good}|${busy}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `c${r.toFixed(3)}|${good}|${busy}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2E8B8B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
-        (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("custodian", hm, good) +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "custodian", c, x, y);
     walker34(el, x, y);
   }
   // security guards: navy, with a white badge; a dashed ring while chasing
