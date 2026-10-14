@@ -2377,8 +2377,8 @@ const GOALS = [
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},
 ];
 // Held back from the v1.0 game (shown only in dev-mode): hotels, Education Centers and their modules, the tram. Placed ones in old saves keep working.
-const DEV_BUILDINGS = ["campground", "lodge", "resort", "edcenter", "tramstop"];
-const DEV_TECH = ["hotels", "transit", "education", "edtheater", "edfossils", "edauditorium", "edlabwindow", "ednursery", "edbotanical", "edsimroom", "ediorama", "edtouch"];
+const DEV_BUILDINGS = ["campground", "lodge", "resort", "edcenter", "tramstop", "depot"];
+const DEV_TECH = ["vehicles", "hotels", "transit", "education", "edtheater", "edfossils", "edauditorium", "edlabwindow", "ednursery", "edbotanical", "edsimroom", "ediorama", "edtouch"];
 const DEV_GOALS = ["camp", "hotel", "resort"];
 const devHidden = (list, id) => !devMode() && list.includes(id);
 const buildingHidden = type => devHidden(DEV_BUILDINGS, type);

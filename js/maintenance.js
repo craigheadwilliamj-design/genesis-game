@@ -47,7 +47,7 @@ function wearTick(dtMin){
   for(const b of depots()){
     const was = condOf(b) >= VEHICLES.offlineBelow;
     b.cond = Math.max(0, condOf(b) - VEHICLES.wear * dtMin / (CLOSE_MIN - OPEN_MIN));
-    if(was && condOf(b) < VEHICLES.offlineBelow) events.toast("A vehicle depot has broken down. Its ATVs are grounded until a mechanic repairs it.", "bad");
+    if(was && condOf(b) < VEHICLES.offlineBelow) events.toast(devMode() ? "A vehicle depot has broken down. Its ATVs are grounded until a mechanic repairs it." : "A depot has broken down. A mechanic needs to repair it.", "bad");
   }
   // tram stations wear too; one that gives out stops taking riders, and the guest map drops it
   for(const b of tramStations()){
@@ -72,7 +72,7 @@ const isMachine = o => o.type === "generator" || o.type === "depot" || !!(o.type
 const isTramB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
 const isPropB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].prop);
 const anchorFor = o => kGraph.anchors[isMachine(o) || isPropB(o) ? o.id : "fix:" + o.id];
-const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? "a vehicle depot" : isTramB(o) ? "a tram station" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
+const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? (devMode() ? "a vehicle depot" : "a depot") : isTramB(o) ? "a tram station" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
 // broken = needs urgent work: a fence with a hole in it, or a generator that has cut out
 const isDown = o => o.type === "generator" ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : isTramB(o) ? !tramWorking(o) : condOf(o) <= 0;
 function repairCost(o, gain){
