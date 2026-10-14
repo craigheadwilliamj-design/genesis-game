@@ -361,20 +361,42 @@ function reachDest(p){
   svcQ.get(id).queue.push(p); p.in = id; p.waited = 0;
   standNear(p, b.points);
 }
-// Where a party stands to watch or wait: a spot up against the nearest fence or wall, as an offset from its path node (drawing only; it never changes where the party is on the map)
-function standNear(p, pts){
-  const n = p.at; let best = null;
+// Where a party stands to watch or wait: a spot along a fence or wall (or on a viewing platform), as an offset from its path node.
+// Drawing only; it never changes where the party is on the map. Spots are picked along the whole stretch of fence in range, the nearer the likelier, so a crowd spreads out.
+function standNear(p, pts, e){
+  const n = p.at;
   if(!n || !pts) return;
-  for(let i = 0; i < pts.length; i++){ const r = segProj(n.x, n.y, pts[i], pts[(i + 1) % pts.length]); if(!best || r.d < best.d) best = r; }
-  if(!best) return;
-  const d = best.d || .01, ux = (best.x - n.x) / d, uy = (best.y - n.y) / d, s = p.sj;
-  let go = Math.min(14, Math.max(0, d - .7 + s[1] * .25)), dx, dy;
-  for(let k = 0; k < 6; k++){   // spread along the fence, and back off if that put them inside
-    dx = ux * go - uy * s[0] * 1.8; dy = uy * go + ux * s[0] * 1.8;
-    if(!inPoly(n.x + dx, n.y + dy, pts)) break;
-    go = Math.max(0, go - .8);
+  // a viewing platform on this exhibit within a short stroll: most would rather stand up there
+  if(e && Math.random() < SIGHT.deckShare){
+    let best = null, bd = SIGHT.deckReach;
+    for(const b of state.buildings){
+      if(b.type !== "platform" || b.exhibitId !== e.id || !(derived.reach && derived.reach[b.id])) continue;
+      const [cx, cy] = centroid(b.points), d = Math.hypot(cx - n.x, cy - n.y);
+      if(d < bd){ bd = d; best = b; }
+    }
+    if(best){
+      const P = best.points, u = .12 + Math.random() * .76, v = .12 + Math.random() * .76;
+      p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
+      return;
+    }
   }
-  p.stand = {dx, dy};
+  const cand = [];
+  for(let i = 0; i < pts.length; i++){
+    const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    for(let t = 0; t <= L; t += 1){
+      const x = a[0] + (b[0] - a[0]) * t / L, y = a[1] + (b[1] - a[1]) * t / L, d = Math.hypot(x - n.x, y - n.y);
+      if(d > SIGHT.standReach) continue;
+      // one step out from the fence, on the side that isn't inside
+      let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
+      if(inPoly(x + nx * .8, y + ny * .8, pts)){ nx = -nx; ny = -ny; }
+      if(inPoly(x + nx * .8, y + ny * .8, pts)) continue;
+      cand.push([x + nx * (.7 + Math.random() * .5), y + ny * (.7 + Math.random() * .5), 1 / (1 + d / SIGHT.standPull)]);
+    }
+  }
+  if(!cand.length) return;
+  let r = Math.random() * cand.reduce((s, c) => s + c[2], 0), c = cand[cand.length - 1];
+  for(const k of cand){ r -= k[2]; if(r <= 0){ c = k; break; } }
+  p.stand = {dx:c[0] - n.x, dy:c[1] - n.y};
 }
 function seeExhibit(p, e, quick){
   if(p.dest === e.id && p.why === "see"){ p.dest = null; p.why = null; }
@@ -419,7 +441,7 @@ function board(p){
 function walkParty(p, left){
   for(let i = 0; i < 40 && left > 0 && !p.gone && !p.in; i++){
     if(p.linger > state.minute){   // standing and watching, up against the fence
-      if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points); }
+      if(!p.stand){ const e = state.exhibits.find(x => x.id === p.lingerAt); if(e) standNear(p, e.points, e); }
       return;
     }
     if(!p.to){ if(!headOut(p)) return; board(p); }

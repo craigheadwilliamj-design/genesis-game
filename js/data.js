@@ -513,6 +513,10 @@ const SIGHT = {
   distPull:45,         // meters at which an exhibit's pull is halved when choosing (smaller means they stick closer to where they are)
   strollChance:.4,     // chance, when they have nothing planned, of drifting along the paths instead of picking an exhibit
   strollLen:[3, 9],    // corners a stroll lasts
+  standReach:12,       // meters of fence either side of the path a party might pick to stand at
+  standPull:6,         // meters at which a fence spot's chance is halved, so the crowd spreads out but favors what's close
+  deckShare:.8,        // chance a party stands on a viewing platform for the exhibit when there's one close
+  deckReach:16,        // meters from the path stop to the platform's middle
   impulse:{frac:.55, near:55, chance:.6, shop:.2, shopNear:45, gap:40},   // a need over this share of its seek line, and a stop this close: chance of going; chance of popping into a shop; minutes between tries
 };
 /* ---------------------------------------------------------------------
