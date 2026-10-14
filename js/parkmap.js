@@ -1,9 +1,10 @@
 /* Park Map: a small top-down pixel map of the whole park in a dialog (HUD button or M).
    Drawn straight from state to a canvas, independent of the main renderer and the 3/4 view. Draws on open and a few times a second while open. */
-const PMAP = {px:3, maxW:760, maxH:480, refreshMs:400, dim:"#6B6A5C", path:"#CBC5B4", wide:"#E0DACA", service:"#8A8478", bridge:"#8B6B3E", tram:"#5A5A66", water:"#4A90B8", wall:"#4A4A42", lab:"#E6E9F0", view:"#FFFFFF"};
+const PMAP = {px:3, maxW:760, maxH:480, refreshMs:400, dim:"#6B6A5C", path:"#CBC5B4", wide:"#E0DACA", service:"#8A8478", bridge:"#8B6B3E", tram:"#5A5A66", water:"#4A90B8", wall:"#2E2E28", lab:"#E6E9F0", view:"#FFFFFF"};
 let pmapTimer = null, pmapGeo = null;
 
-function pmapBounds(){ return {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length - 1], y1:SOUTH_LINE}; }
+// your land plus a margin (more to the south, so the wall and entrance show), never past the whole buyable area
+function pmapBounds(){ const o = ownedBox(), m = 50; return {x0:Math.max(PARCELS.xs[0], o.x0 - m), y0:Math.max(PARCELS.ys[0], o.y0 - m), x1:Math.min(PARCELS.xs[PARCELS.xs.length - 1], o.x1 + m), y1:SOUTH_LINE + 25}; }
 
 function pmapPoly(g, pts){ g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); }
 function pmapLine(g, pts, w, col){ g.strokeStyle = col; g.lineWidth = w; g.lineJoin = "round"; g.lineCap = "round"; g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.stroke(); }
@@ -51,8 +52,9 @@ function drawParkMap(cv){
     if(lab){ const c = centroid(bl.points), r = Math.max(2, 3 / S); g.fillStyle = col; g.fillRect(c[0] - r, c[1] - r, 2 * r, 2 * r); }
   }
   // the south wall and the entrance gap
-  const gx = state.gate[0], gap = 6, y = b.y1 - .4 / S;
-  g.fillStyle = PMAP.wall; g.fillRect(b.x0, y, gx - gap - b.x0, 1.6 / S); g.fillRect(gx + gap, y, b.x1 - gx - gap, 1.6 / S);
+  const gx = state.gate[0], gap = 6, y = SOUTH_LINE - .8 / S;
+  g.fillStyle = PMAP.wall; const wx0 = ownedBox().x0, wx1 = ownedBox().x1;
+  g.fillRect(wx0, y, gx - gap - wx0, 1.6 / S); g.fillRect(gx + gap, y, wx1 - gx - gap, 1.6 / S);
   g.fillStyle = "#D8B04A"; g.fillRect(gx - gap - 1 / S, y - 1 / S, 2 / S * 1.5, 3 / S); g.fillRect(gx + gap - 1 / S, y - 1 / S, 2 / S * 1.5, 3 / S);
   // guests (their personality color) and staff (white)
   const dot = 1.4 / S * 1.6;
