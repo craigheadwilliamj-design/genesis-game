@@ -482,7 +482,7 @@ const GUEST = {
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home, before dividing by pace (slower guests stay longer, so they see the same amount)
   cash:[20, 45],       // money each guest brings to spend inside
-  speed:[.85, 1.15],   // each party's own pace, times pace, times WALK_PER_MIN
+  speed:[1.02, 1.38],  // each party's own pace, times pace, times WALK_PER_MIN (about 20% over the old .85 to 1.15, so guests walk a bit quicker without changing their needs)
   pace:.5,             // guests live at this share of staff pace: they walk, get hungry and tired, and tire of crowds this much slower, so you can click one before it's gone but a trip still feels the same
   startMood:62,        // mood on arrival, plus 4 for each star
   quitBelow:20,        // a party this unhappy heads home early
