@@ -1242,7 +1242,7 @@ const LAND = {
   vbranch:{label:"Climbing Branches",  one:"climbing branches",    price:500,  r:.9, color:"#8A6A48", toy:2, vivToy:true, look:"vbranch"},
   vdig:   {label:"Dig Box",            one:"a dig box",            price:700,  r:.8, color:"#6B5236", toy:2, vivToy:true, look:"vdig"},
   vfeed:  {label:"Live-Feed Dispenser",one:"a live-feed dispenser",price:900,  r:.6, color:"#8A8F96", toy:3, vivToy:true, look:"vfeed"},
-  vmist:  {label:"Misting Pool",       one:"a misting pool",       price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
+  vmist:  {label:"Misters",             one:"misters",              price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
 };
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
