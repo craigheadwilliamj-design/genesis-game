@@ -2,7 +2,7 @@
 
 Each session below is standalone: paste its prompt into a fresh session (CLAUDE.md is read automatically). One session = one commit/branch, run `node tests/smoke.js` before finishing. Size: S = quick, M = moderate, L = big (consider splitting or running it on its own). "Needs" lists sessions that must be done first. Anything with no "Needs" can run any time, in any order.
 
-Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas`.
+Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovir psit coel sile orni hete mosc scut este desm scel plat gall para macr aepy mglo pach` plus `tric trex dipl apat mamm smil kele icht eryo inos diic plhy long eryt kent cryo allo beel simo igua velo pter paki ambu andr chal dgal dodo elas prio`.
 
 ---
 
