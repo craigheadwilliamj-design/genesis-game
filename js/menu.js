@@ -35,7 +35,7 @@ const BUILD_MENU = [
   ]},
   {id:"land", label:"Landscaping", items:[
     {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it like a fence: tap the shore corners, then the first one again. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
-    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
+    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
     {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
@@ -165,7 +165,7 @@ function menuRow(it){
     return `<div class="sitem" data-open="${it.sub[0]}"><button class="srow head" aria-expanded="false">${menuIcon(it.sub[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange(it.sub)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   const b = BUILDINGS[it.tool], price = it.price ? it.price() : money(b.price);
-  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
+  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.shapes ? `<div class="shapes" data-shapes="${it.shapes}"></div>` : ""}${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
 }
 
 // A plant's row in the build menu. Park plants and Quaternary plants are listed in both the Park Plants and the Quaternary dropdowns (both grow in exhibits and out in the park).
@@ -189,7 +189,24 @@ function buildMenu(){
 }
 
 // Grey out what isn't researched yet. Called after anything changes.
+// The shape pickers under Rock and Boulder: a Random button and one thumbnail per picture of the biome in use (rockBiomeNow), redrawn when that changes
+function refreshShapes(){
+  const b = rockBiomeNow();
+  document.querySelectorAll("#sideMenu [data-shapes]").forEach(box => {
+    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel;
+    if(box.dataset.key === key) return;
+    box.dataset.key = key; box.hidden = !list.length;
+    box.innerHTML = `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="sprites/rocks/${type}-${b}-${i + 1}.png" alt="Shape ${i + 1}"></button>`).join("");
+  });
+}
+document.addEventListener("click", ev => {
+  const btn = ev.target.closest && ev.target.closest("#sideMenu [data-shape]"); if(!btn) return;
+  const type = btn.parentNode.dataset.shapes; rockPick[type] = btn.dataset.shape === "" ? null : +btn.dataset.shape;
+  if(tool !== "land-" + type) setTool("land-" + type);
+  refreshShapes(); if(landGhost) renderOverlay();
+});
 function refreshMenu(){
   if(!state) return;
+  refreshShapes();
   document.querySelectorAll("#sideMenu [data-tech]").forEach(b => { const t = b.dataset.tech, k = b.dataset.lock; b.classList.toggle("locked", (!!t && !hasTech(t)) || (!!k && !statueOpen(k))); });
 }

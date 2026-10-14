@@ -1368,6 +1368,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     { const land0 = gx.land, m0 = state.money; gx.land = []; state.money = 1e6; placeLand(gx, "rock", 115, 115, "desert"); placeLand(gx, "rock", 135, 135);
       out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
       gx.land = land0; state.money = m0; }
+    // rock shape picker: a chosen shape is placed and drawn, the ghost shows it, a random pick and old rocks keep the id-based pick
+    { const land0 = gx.land, m0 = state.money, rb = rockBiome, ghost0 = landGhost; gx.land = []; state.money = 1e6; gx.biome = "desert";
+      const n = ROCK_SPRITES.desert.rock.length;
+      rockPick.rock = 2; placeLand(gx, "rock", 115, 115, null, rockPicOf("rock", "desert")); rockPick.rock = null; placeLand(gx, "rock", 135, 135, null, rockPicOf("rock", "desert"));
+      const old = {id:"l-old", type:"rock", x:120, y:120};
+      out.rockPickPlaced = gx.land[0].pic === 2 && gx.land[1].pic === undefined && n > 2 && /rock-desert-3\.png/.test(featSvg(gx.land[0], "desert", false)) && featSvg(old, "desert", false).includes("rock-desert-" + (seedOf(old) % n + 1) + ".png");
+      rockPick.rock = 99; out.rockPickClamp = rockPicOf("rock", "desert") === null; rockPick.boulder = 1; rockPick.rock = 4;
+      setTool("land-boulder"); rockBiome = "desert"; landGhost = {key:"boulder", x:150, y:150, ok:true}; renderOverlay();
+      out.rockGhostShape = /boulder-desert-2\.png/.test($("#overlay").innerHTML || document.body.innerHTML) && !/boulder-desert-[134]\.png/.test($("#overlay").innerHTML || "");
+      refreshShapes();
+      const box = document.querySelector('[data-shapes="rock"]');
+      out.rockThumbs = !!box && box.querySelectorAll("img").length === n && box.querySelector('img').src.includes("rock-desert-1.png") && box.querySelectorAll('[aria-pressed="true"]').length === 1;
+      rockBiome = "tropical"; refreshShapes();
+      out.rockThumbsBiome = document.querySelector('[data-shapes="rock"] img').src.includes("rock-tropical-1.png") && document.querySelectorAll('[data-shapes="rock"] img').length === ROCK_SPRITES.tropical.rock.length;
+      rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
+      gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
