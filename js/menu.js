@@ -197,7 +197,7 @@ function refreshShapes(){
     const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel;
     if(box.dataset.key === key) return;
     box.dataset.key = key; box.hidden = !list.length;
-    box.innerHTML = `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="sprites/rocks/${type}-${b}-${i + 1}.png" alt="Shape ${i + 1}"></button>`).join("");
+    box.innerHTML = `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${type}-${b}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("");
   });
 }
 document.addEventListener("click", ev => {

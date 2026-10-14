@@ -84,7 +84,7 @@ function rigSvg(sp, h){
   const R = rigOf(sp), S = SPRITES[sp], w = h.r * 2.5 * (S.size || 1), k = w / R.w, ht = R.h * k;
   const g = h.rg ??= rigState(R);
   rigMatrices(R, g.cur, g.mats);
-  const tf = `translate(${(-w/2).toFixed(2)} ${(h.r*.5 - ht).toFixed(2)}) scale(${k.toFixed(5)})`, parts = () => R.parts.map((p, i) => `<image href="${p.img}" x="${p.ix}" y="${p.iy}" width="${p.iw}" height="${p.ih}" style="image-rendering:pixelated${rigShown(R, g, i) ? "" : ";display:none"}" transform="${rigTransform(p, g.mats, i)}"/>`).join("");
+  const tf = `translate(${(-w/2).toFixed(2)} ${(h.r*.5 - ht).toFixed(2)}) scale(${k.toFixed(5)})`, parts = () => R.parts.map((p, i) => `<image href="${spriteUrl(p.img)}" x="${p.ix}" y="${p.iy}" width="${p.iw}" height="${p.ih}" style="image-rendering:pixelated${rigShown(R, g, i) ? "" : ";display:none"}" transform="${rigTransform(p, g.mats, i)}"/>`).join("");
   if(!(h.swim && R.clips.swim)){ g.wlk = 0; return `<g class="spr" transform="scale(${h.face || 1} 1)"><g class="rig" transform="${tf}">${parts()}</g></g>`; }
   const id = h.cid ??= "rgc" + (++rigClipN), wl = rigWl(R, g), wc = rigWater(h), x0 = -R.w * .2, W = R.w * 1.4;
   return `<g class="spr" transform="scale(${h.face || 1} 1)"><defs><clipPath id="${id}a"><rect x="${x0}" y="-20" width="${W}" height="${(wl + 20).toFixed(2)}"/></clipPath><clipPath id="${id}b"><rect x="${x0}" y="${wl.toFixed(2)}" width="${W}" height="${R.h}"/></clipPath></defs>`
