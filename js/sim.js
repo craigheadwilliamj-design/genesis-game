@@ -621,9 +621,20 @@ function refundFor(kind, item){
 
 let sinceRecompute = 0;
 
-// Move the park forward by dtMin park minutes
+// Move the park forward by dtMin park minutes. A big step is cut at closing (the rest carries into the next day, not lost)
+// and at the next science job's end, so every job finishes at the minute its `end` passes, however long the step is.
 function tick(dtMin){
   if(state.over) return;
+  if(!(dtMin > 0)) return tickStep(dtMin);
+  let left = dtMin;
+  for(let guard = 0; left > 1e-9 && !state.over && guard < 5000; guard++){
+    let st = Math.min(left, CLOSE_MIN - state.minute);
+    const next = scienceNext();
+    if(next > 1e-6 && next < st) st = next;
+    tickStep(st); left -= st;
+  }
+}
+function tickStep(dtMin){
   const m0 = state.minute, m1 = Math.min(CLOSE_MIN, m0 + dtMin);
   state.minute = m1;
 

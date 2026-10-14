@@ -302,6 +302,18 @@ const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce
 
 /* ---------- time passing ---------- */
 
+// Park minutes until the next job that will complete (a waiting clone or bed doesn't count: its clock is held). Infinity if none.
+function scienceNext(){
+  if(state.sandbox) return Infinity;
+  const sc = state.science, c = state.ceres;
+  let m = Infinity;
+  for(const j of sc.projects) m = Math.min(m, j.end);
+  for(const j of sc.trips) m = Math.min(m, j.end);
+  if(sc.clones.length && tarWorking()) for(const j of sc.clones) m = Math.min(m, j.end);
+  if(c.beds.length && beds()) for(const j of c.beds) m = Math.min(m, j.end);
+  return m - nowMin();
+}
+
 // Called every tick. Research points trickle in, and every project, trip, clone and batch checks its own clock.
 function scienceTick(dtMin){
   const sc = state.science, c = state.ceres;
@@ -309,7 +321,8 @@ function scienceTick(dtMin){
   if(state.sandbox){ state.money = SANDBOX_MONEY; sc.points = SANDBOX_POINTS; }
   // researchers with no project are on general research and earn points. Ones running a project don't.
   if(dept("oracle")) sc.points += Math.max(0, sc.crew.paleo - sc.projects.length) * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
-  const now = state.sandbox ? Infinity : nowMin();
+  // a hair of slack: nowMin() is rebuilt from the day and minute, so a step that lands on `end` can read a rounding error short
+  const now = state.sandbox ? Infinity : nowMin() + 1e-6;
   if(sc.projects.length && sc.projects.some(p => p.end <= now)){
     const done = sc.projects.filter(p => p.end <= now);
     sc.projects = sc.projects.filter(p => p.end > now);
