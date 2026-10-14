@@ -82,16 +82,26 @@ function grantsHtml(goal){
   h += `<section><h3>Grants <span class="num">${activeGoals().filter(g => state.goalsDone.includes(g.id)).length} of ${activeGoals().length}</span></h3><ul class="checklist">${activeGoals().map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
+function officeTabs(){
+  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Money", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
+}
+function mainMenuHtml(){
+  return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
+    <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
+    <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
+    <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
+    <div class="row"><button class="btn" data-action="howTo">How to play</button><button class="btn danger" data-action="restart">Restart</button></div>`;
+}
 function overviewHtml(){
   const d = derived, t = state.today, goal = currentGoal();
-  let h = `<h2>${esc(state.name)}</h2>`;
-
-  h += tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#B8860B"}], officeTab);
+  if(officeTab === "menu") return mainMenuHtml();
+  let h = `<h2 id="officeTitle">${esc(state.name)}</h2>`;
+  h += officeTabs();
   if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
 
+  if(officeTab === "money"){
   const c = dailyCosts();
-  const inc = t.tickets + t.food + t.shop;
   h += `<section><h3>Today so far</h3><dl class="kv">
     <dt>Guests</dt><dd>${t.guests.toLocaleString()}</dd>
     <dt>Tickets</dt><dd>${money(t.tickets)}</dd>
@@ -102,6 +112,14 @@ function overviewHtml(){
     <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
   </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
+  h += logiOverviewHtml();
+  const expected = Math.round(d.demand);
+  h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
+    <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
+
+    return h;
+  }
+  if(officeTab === "science"){
   // science at a glance
   const sc = state.science;
   if(["oracle", "ghost", "tar", "ceres"].some(hasDept)){
@@ -115,12 +133,15 @@ function overviewHtml(){
     </ul></section>`;
   }
 
+    if(!["oracle", "ghost", "tar", "ceres"].some(hasDept)) h += `<section><h3>Science</h3><div class="meta">Build a science department to start research.</div></section>`;
+    return h;
+  }
+  if(officeTab === "guests"){
   h += guestsOverviewHtml();
-  h += logiOverviewHtml();
-  const expected = Math.round(d.demand);
-  h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
-    <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
+    return h;
+  }
 
+  h += `<section><h3>Park name</h3><label class="field"><span>Name</span><input id="officeName" maxlength="40" value="${esc(state.name)}"></label></section>`;
   h += `<section><h3>Rating ${starsSvg(state.rating, 15)} <span class="num">${starTxt(state.rating)}</span></h3>`;
   if(!d.parts.length) h += `<div class="meta">Your park needs animals before it can earn stars.</div>`;
   for(const p of d.parts){
@@ -136,6 +157,7 @@ function overviewHtml(){
     h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Day</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.day}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
   }
 
+  h += `<div class="row" style="margin-top:12px"><button class="btn" data-action="otab2" data-k="menu">Main Menu</button></div>`;
   h += themesOverview();
   return h;
 }
@@ -815,6 +837,8 @@ panelEl.addEventListener("click", e => {
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
+  if(a === "howTo"){ $("#dlgIntro").showModal(); return; }
+  if(a === "restart"){ askConfirm("Restart?", "This leaves the park you're in and returns to the start screen. Anything not saved is lost, and a new park replaces your save when you start it.", "Restart", () => { setSpeed(0); showStart(); }); return; }
   if(a === "gotoDept"){ const d = state.buildings.find(x => x.type === b.dataset.t); if(d) select("building", d.id); return; }
   if(!it) return;
   if(a === "center") centerOn(it);

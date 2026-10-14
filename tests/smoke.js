@@ -25,7 +25,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     q(`#startBiomes [data-biome="${pickK}"]`).click(); q("#startName").value = "Smoke Park"; q("#startGo").click();
     out.newParkPicksBiome = !q("#dlgStart").open && state.biome === pickK && parkBiome() === pickK && state.name === "Smoke Park" && sb === DEFAULT_PARK_BIOME;
     q("#introGo").click(); setSpeed(0);
-    out.biomeLockedMidPark = !q("#menuBiomes") && !q("#dlgMenu [data-biome]");
+    out.biomeLockedMidPark = !q("#menuBiomes") && !q("#dlgMenu") && !q("#panel [data-biome]");
     q("#startBiomes").innerHTML = `<button data-biome="${DEFAULT_PARK_BIOME}"></button>`; q("#startBiomes button").click();
     out.biomeLockedMidPark = out.biomeLockedMidPark && state.biome === pickK;
     state.biome = DEFAULT_PARK_BIOME;
@@ -2172,7 +2172,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // tapping the entrance in select mode opens the Park Office, same as the menu button
   for(const tl of [true, false]){
     const pos = await page.evaluate(tl => {
-      const dlg = document.querySelector("#dlgMenu"); if(dlg.open) dlg.close();
+      officeTab = "staff"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
       document.querySelectorAll("dialog[open]").forEach(d => d.close());
       if(tilt !== tl) document.querySelector("#ztilt").click();
       setTool("select"); view.k = Math.max(view.k, 4); const [gx, gy] = state.gate; view.tx = innerWidth / 2 - gx * view.k; view.ty = innerHeight / 2 - gy * view.k * (tilt ? TILT : 1); render();
@@ -2180,10 +2180,33 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const r = el.querySelector("rect").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height - 3, tilt};
     }, tl);
     let opened = false;
-    if(pos){ await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(150); opened = await page.evaluate(() => document.querySelector("#dlgMenu").open); }
+    if(pos){ await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(150); opened = await page.evaluate(() => !sel && officeTab === "office" && !!document.querySelector("#officeName")); }
     checks[tl ? "entranceTapOpensOffice" : "entranceTapOpensOfficeFlat"] = opened;
   }
-  await page.evaluate(() => { const d = document.querySelector("#dlgMenu"); if(d.open) d.close(); });
+  // Park Office: brand and Park button open it, every tab renders, renaming updates the HUD, Restart asks first
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, q = x => document.querySelector(x), nm = state.name;
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    for(const [id, key] of [["#parkName", "brandOpensOffice"], ["#menuBtn", "parkBtnOpensOffice"]]){
+      officeTab = "grants"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
+      q(id).click(); out[key] = !sel && officeTab === "office" && !!q("#officeName") && !q("#dlgMenu") && !q("dialog#dlgMenu[open]");
+    }
+    out.officeTabsRender = ["office", "money", "science", "guests", "staff", "grants"].every(t => {
+      officeTab = t; ui.panel(); return !!q('#panel [data-action="otab2"][aria-selected="true"][data-k="' + t + '"]') && panelEl.textContent.length > 40;
+    }) && !!(officeTab = "money", ui.panel(), q("#ticketOut")) && !!(officeTab = "guests", ui.panel(), q("#panel section"));
+    officeTab = "office"; ui.panel();
+    const inp = q("#officeName"); inp.value = "Renamed <b>Park</b>"; inp.dispatchEvent(new Event("input", {bubbles:true}));
+    out.renameUpdatesHud = state.name === "Renamed <b>Park</b>" && q("#parkName").textContent === state.name && !q("#parkName b") && !q("#officeTitle b");
+    inp.value = "x".repeat(60); inp.dispatchEvent(new Event("input", {bubbles:true})); out.renameCapped = state.name.length === 40;
+    state.name = nm; ui.hud(true);
+    officeTab = "office"; ui.panel(); q('[data-action="otab2"][data-k="menu"]').click();
+    out.mainMenuHasButtons = !!q('#panel [data-action="restart"]') && !!q('#panel [data-action="howTo"]') && !!q("#sandboxToggle");
+    q('#panel [data-action="restart"]').click();
+    out.restartAsks = q("#dlgConfirm").open && /Restart/.test(q("#confirmYes").textContent) && !q("#dlgStart").open;
+    q("#confirmNo").click(); out.restartCancelKeeps = !q("#dlgConfirm").open && !q("#dlgStart").open && state.name === nm;
+    officeTab = "office"; ui.panel();
+    return out;
+  }));
   // the DNA + leaf campus emblem is gone: no helper, no theme field, no emblem circle in the entrance or a science roof (both views)
   for(const tl of [true, false]) checks[tl ? "noEmblem" : "noEmblemFlat"] = await page.evaluate(tl => {
     if(tilt !== tl) document.querySelector("#ztilt").click(); render();

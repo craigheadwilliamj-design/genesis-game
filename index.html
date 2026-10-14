@@ -335,7 +335,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <path d="M6 30 Q8 14 20 12 Q32 14 34 30 Z" fill="#0E1912"/>
         <path d="M8 22 L4 16 L11 18 L10 10 L16 14 L20 6 L24 14 L30 10 L29 18 L36 16 L32 22" fill="#0E1912"/>
       </svg>
-      <b id="parkName">Genesis Park</b>
+      <b id="parkName" style="cursor:pointer" title="Open the park office">Genesis Park</b>
       <small id="verLabel" title="Version">v0.9</small>
     </div>
     <div class="readouts">
@@ -825,19 +825,6 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <h2 id="confirmTitle"></h2>
   <p id="confirmText"></p>
   <div class="row"><button class="btn danger" id="confirmYes">Yes</button><button class="btn primary" id="confirmNo" style="margin-left:auto">Cancel</button></div>
-</dialog>
-
-<dialog id="dlgMenu">
-  <h2>Park office</h2>
-  <label class="field" style="margin-bottom:14px"><span>Park name</span><input id="nameInput" maxlength="40"></label>
-  <p id="menuBiome" style="margin-bottom:14px"></p>
-  <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
-  <p id="saveInfo"></p>
-  <div class="row">
-    <button class="btn" id="howBtn">How to play</button>
-    <button class="btn danger" id="newGame">Start a new park</button>
-    <button class="btn" id="closeMenu" style="margin-left:auto">Close</button>
-  </div>
 </dialog>
 
 <dialog id="dlgDeaths">
