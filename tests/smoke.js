@@ -1382,6 +1382,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rockThumbs = !!box && box.querySelectorAll("img").length === n && box.querySelector('img').src.includes("rock-desert-1.png") && box.querySelectorAll('[aria-pressed="true"]').length === 1;
       rockBiome = "tropical"; refreshShapes();
       out.rockThumbsBiome = document.querySelector('[data-shapes="rock"] img').src.includes("rock-tropical-1.png") && document.querySelectorAll('[data-shapes="rock"] img').length === ROCK_SPRITES.tropical.rock.length;
+      rockBiome = null; rockBiomeMenu = "grassland"; landGhost = {key:"rock", x:150, y:150, ok:true}; rockPick.rock = 0; refreshShapes();
+      out.rockMenuBiome = rockBiomeNow() === "grassland" && document.querySelector('[data-shapes="rock"] img').src.includes("rock-grassland-1.png") && document.querySelector('[data-shapes="rock"] .shapebiome').value === "grassland";
+      { const sel = document.querySelector('[data-shapes="rock"] .shapebiome'); sel.value = ""; sel.dispatchEvent(new Event("change", {bubbles:true})); out.rockMenuBiomeAuto = rockBiomeMenu === null; }
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;

@@ -193,12 +193,17 @@ function buildMenu(){
 function refreshShapes(){
   const b = rockBiomeNow();
   document.querySelectorAll("#sideMenu [data-shapes]").forEach(box => {
-    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel;
+    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel + "|" + rockBiomeMenu;
     if(box.dataset.key === key) return;
-    box.dataset.key = key; box.hidden = !list.length;
-    box.innerHTML = `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="sprites/rocks/${type}-${b}-${i + 1}.png" alt="Shape ${i + 1}"></button>`).join("");
+    box.dataset.key = key;
+    box.innerHTML = `<select class="shapebiome" aria-label="Stone biome" title="Which biome's stone to place"><option value="">Biome: auto (${esc(BIOMES[b].label)})</option>${Object.keys(BIOMES).map(k => `<option value="${k}"${k === rockBiomeMenu ? " selected" : ""}>${esc(BIOMES[k].label)}</option>`).join("")}</select>`
+      + (list.length ? `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="sprites/rocks/${type}-${b}-${i + 1}.png" alt="Shape ${i + 1}"></button>`).join("") : "");
   });
 }
+document.addEventListener("change", ev => {
+  if(!ev.target.matches || !ev.target.matches("#sideMenu .shapebiome")) return;
+  rockBiomeMenu = ev.target.value || null; refreshShapes(); if(landGhost) renderOverlay();
+});
 document.addEventListener("click", ev => {
   const btn = ev.target.closest && ev.target.closest("#sideMenu [data-shape]"); if(!btn) return;
   const type = btn.parentNode.dataset.shapes; rockPick[type] = btn.dataset.shape === "" ? null : +btn.dataset.shape;
