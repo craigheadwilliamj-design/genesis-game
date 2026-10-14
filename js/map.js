@@ -584,6 +584,41 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
 const gateOpen = {};
 let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
+// Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
+const WX_SCALE = 3, WX_N = {cold:36, storm:60};
+const WX_TINT = {hot:"rgba(255,150,40,.08)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
+let wxKind = "fair", wxFlash = 0, wxNext = 0;
+function drawWeather(now){
+  const k = state.weather ? state.weather.today : "fair";
+  if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
+  if(k === "fair") return;
+  const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
+  if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
+  const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
+  c.clearRect(0, 0, w, h);
+  c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
+  if(k === "hot"){   // gentle shimmer: a few faint pale rows that slide sideways
+    c.fillStyle = "rgba(255,230,160,.07)";
+    for(let i = 0; i < 6; i++){ const y = Math.floor(((now / 40 + i * h / 6) % h)), x = Math.floor(Math.sin(now / 700 + i) * 4 + 6); c.fillRect(x, y, w - 12, 1); }
+    return;
+  }
+  const n = WX_N[k];
+  while(wxPool.length < n) wxPool.push({x:Math.random() * 400, y:Math.random() * 300, z:.6 + Math.random() * .6});
+  for(let i = 0; i < n; i++){
+    const p = wxPool[i];
+    if(k === "storm"){ p.x -= 90 * p.z * dt; p.y += 260 * p.z * dt; }
+    else { p.x += Math.sin(now / 900 + i) * 8 * dt; p.y += 14 * p.z * dt; }
+    if(p.y > h){ p.y = -4; p.x = Math.random() * (w + 40); }
+    if(p.x < -6) p.x = w + Math.random() * 20; else if(p.x > w + 6) p.x = 0;
+    if(k === "storm"){ c.fillStyle = "rgba(190,210,255,.55)"; const x = Math.floor(p.x), y = Math.floor(p.y); c.fillRect(x, y, 1, 2); c.fillRect(x - 1, y + 2, 1, 2); }
+    else { c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1); }
+  }
+  if(k === "storm"){
+    if(now > wxNext){ wxFlash = .35; wxNext = now + 4000 + Math.random() * 9000; }
+    if(wxFlash > 0){ c.fillStyle = `rgba(255,255,255,${wxFlash.toFixed(2)})`; c.fillRect(0, 0, w, h); wxFlash -= dt * 2.5; }
+  }
+}
 // Every frame: swing each gate on screen toward open if a keeper, vet or mechanic is at it, else toward shut, and show the matching picture.
 function drawGates(now){
   const dt = Math.max(0, Math.min(.1, (now - gateT) / 1000)); gateT = now;

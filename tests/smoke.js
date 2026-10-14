@@ -1892,6 +1892,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
+    {   // weather overlay: exists, ignores clicks, follows state.weather.today
+      const cv = document.getElementById("wxfx"), keep = state.weather.today, seen = {};
+      for(const k of ["fair", "hot", "cold", "storm"]){ state.weather.today = k; drawWeather(performance.now()); const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = d.some(v => v) ; seen[k + "k"] = cv.dataset.kind; }
+      state.weather.today = keep; drawWeather(performance.now());
+      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.stormk === "storm" && seen.fairk === "fair";
+    }
     localStorage.removeItem("genesis-dev");
     return out;
   }));

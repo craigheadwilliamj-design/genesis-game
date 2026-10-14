@@ -69,6 +69,7 @@ button:disabled{cursor:default}
 /* ----- map ----- */
 main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0}
 .mapwrap{position:relative;min-width:0;min-height:0;background:var(--outside)}
+#wxfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
 #map{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
 .mapwrap.tool-exhibit #map,.mapwrap.tool-path #map,.mapwrap.tool-wide #map{cursor:crosshair}
 .mapwrap.tool-bulldoze #map{cursor:not-allowed}
@@ -737,6 +738,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <g id="overlay"></g>
         </g>
       </svg>
+      <canvas id="wxfx" aria-hidden="true" data-kind="fair"></canvas>
 
       <div class="tools">
         <nav id="sideMenu" class="side" aria-label="Build menu"></nav>
