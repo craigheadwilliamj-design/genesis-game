@@ -134,6 +134,9 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 **S36 (M): Pack dynamics (separate from herds)** Needs S32 (social structure), pairs with S30
 > Pack species (`traitsOf(s).social === "pack"`: Coelophysis, Velociraptor, Dire Wolf and other group predators) get their own rules in a `PACK` constant in data.js, instead of S32's herd rules. A pack is a family unit, not a herd: an alpha pair leads (rank 1 and 2, usually one male and one female) and the rest are subordinates; sex mix does NOT cause male-vs-male fights the way it does in herds, and bachelor/matriarch bonuses do not apply. Rules: (a) packs need a minimum size (species `group[0]`); below it they are stressed and lonely, and a lone pack animal is the worst case. (b) The alpha pair eats first (`eatTick`), subordinates eat what's left, so too little food hits low ranks first and drives challenges. (c) Pack members hunt together: a pack hunt is a joint `hunt` act and more effective with more members (ties into S30 attacks, dust cloud). (d) Rank challenges are rare and only under stress (hunger, crowding, no alpha pair), not constant. (e) Packs of mixed species don't happen (predators only live with their own kind). Vivariums ignore all of it. Show pack status in the exhibit "Social" line (e.g. "Pack too small", "Alpha pair missing") and ranks in the animal panel. Smoke checks for each rule.
 
+**S37 (S): Remove the DNA + leaf emblem from the science buildings**
+> The campus emblem (DNA + leaf, `emblemSvg`/`emblemOn` in js/themes.js, `THEMES[x].emblem` list `oracle, ghost, tar, ceres` in data.js ~line 2035) is drawn on the roofs of the four science buildings (also used by the entrance gate, map.js ~line 288, which S34 replaces). Remove it from those buildings in the flat and 3/4 views. Interpretation: "park management buildings" = ORACLE/GHOST/TAR/CERES; confirm with the user if they meant others.
+
 ---
 
 ## Suggested order
