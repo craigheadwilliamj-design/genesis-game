@@ -2614,6 +2614,7 @@ function centerOn(it){
 function select(kind, id){
   sel = kind ? {kind, id} : null;
   render(); ui.panel();
+  if(kind && focusMode()){ const it = selItem(); ui.toast(`Selected ${it && (it.name || BUILDINGS[it.type]?.label) || kind}. Press H to show the panel.`); return; }
   if(kind && window.matchMedia("(max-width:760px)").matches) $("#aside").classList.add("open");
 }
 
@@ -2810,6 +2811,20 @@ svg.addEventListener("wheel", e => {
 }, {passive:false});
 
 /* ---------- toolbar and keys ---------- */
+// Focus mode: hide the build menu and side panel so only the map (and the top bar) shows. Remembered per player.
+const focusMode = () => document.querySelector(".app").classList.contains("focus");
+function setFocus(on, keep){
+  const app = document.querySelector(".app"); if(app.classList.contains("focus") === on) return;
+  const before = svgSize().w;
+  app.classList.toggle("focus", on);
+  const fb = $("#focusBtn"); fb.setAttribute("aria-pressed", on); fb.textContent = on ? "Show menus" : "Hide menus"; fb.title = on ? "Bring the menus back (H)" : "Hide the menus to see only the map (H)";
+  if(!keep){ try{ localStorage.setItem("genesis-focus", on ? "1" : "0"); }catch{} }
+  const after = svgSize().w; if(before && after) view.tx += (after - before)/2;
+  if(!on && state) ui.panel();
+  if(state) render();
+}
+$("#focusBtn").onclick = () => setFocus(!focusMode());
+try{ if(localStorage.getItem("genesis-focus") === "1") setFocus(true, true); }catch{}
 buildMenu();
 const sideOpen = on => {
   $("#sideTab").setAttribute("aria-expanded", on); $("#sideBody").hidden = !on; mapwrap.classList.toggle("side-open", on);
@@ -2860,6 +2875,7 @@ document.addEventListener("keydown", e => {
     if(e.key === "Enter"){ e.preventDefault(); finishDraw(); return; }
     if(e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); undoDrawPoint(); return; }
   }
+  if(e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey && !e.altKey){ setFocus(!focusMode()); return; }
   if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sel) select(null); }
   if(e.key === " "){ e.preventDefault(); setSpeed(speed ? 0 : (lastSpeed || 1)); }
   if(e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey){ if(isBuildTool(tool)) rotateTool(); else if(tool === "move" && mvSel) rotateMoved(); }

@@ -2097,6 +2097,23 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   }
   await page.evaluate(() => { const d = document.querySelector("#dlgMenu"); if(d.open) d.close(); });
 
+  // focus mode: H hides the build menu and side panel, the button/H brings them back
+  const fm = await page.evaluate(() => {
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    const vis = id => document.querySelector(id).getClientRects().length > 0, w = () => svg.getBoundingClientRect().width;
+    document.activeElement?.blur?.(); const w0 = w(), both0 = vis("#sideMenu") && vis("#aside");
+    document.dispatchEvent(new KeyboardEvent("keydown", {key:"h"}));
+    const hidden = !vis("#sideMenu") && !vis("#aside") && w() > w0 && localStorage.getItem("genesis-focus") === "1";
+    ui.panel(); select("exhibit", state.exhibits[0]?.id);
+    document.querySelector("#focusBtn").click();
+    const back = vis("#sideMenu") && vis("#aside") && localStorage.getItem("genesis-focus") === "0";
+    select(null);
+    return {both0, hidden, back};
+  });
+  checks.focusModeStartsShown = fm.both0;
+  checks.focusModeHides = fm.hidden;
+  checks.focusModeRestores = fm.back;
+
   await page.waitForTimeout(800);
   let ok = true;
   for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
