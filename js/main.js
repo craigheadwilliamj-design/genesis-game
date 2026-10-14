@@ -154,7 +154,7 @@ function pickBiome(e){
     n = 0;
     const on = !devMode();
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
-    ui.toast(on ? "Dev mode on." : "Dev mode off.");
+    ui.toast(on ? "Dev mode on. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
   });
 }
 $("#introBiomes").addEventListener("click", pickBiome);

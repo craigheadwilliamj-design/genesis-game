@@ -133,9 +133,10 @@ const toolLabel = t => BUILD_NAMES[t] || BUILDINGS[t].label;
 
 function menuRow(it){
   if(it.props){
-    const rows = it.props.map(k => { const t = LAND[k];
+    const props = it.props.filter(k => !toyHidden(k));
+    const rows = props.map(k => { const t = LAND[k];
       return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}</span></span></button>`; }).join("");
-    return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + it.props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(it.props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.fences){
     const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${b.hedge ? menuIcon("hedge") : menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");

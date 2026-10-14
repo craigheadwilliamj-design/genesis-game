@@ -136,7 +136,7 @@ function render(){
   // work zones: a tinted wash and a dashed edge, under everything else
   for(const z of state.zones){
     const on = isSel("zone", z.id), dead = isDoomed("zone", z.id);
-    const ZT = z.theme && THEMES[z.theme] && THEMES[z.theme].ground ? THEMES[z.theme] : null;
+    const ZT = devMode() && z.theme && THEMES[z.theme] && THEMES[z.theme].ground ? THEMES[z.theme] : null;
     if(ZT) s += `<polygon points="${polyStr(z.points)}" fill="${ZT.ground}" fill-opacity=".6" stroke="none" pointer-events="none"/>` + (groundTex(ZT) ? `<polygon points="${polyStr(z.points)}" fill="url(#t-${groundTex(ZT)})" fill-opacity="${ZT.gtex ? .75 : .45}" stroke="none" pointer-events="none"/>` : "");
     s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : ZT ? .04 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
