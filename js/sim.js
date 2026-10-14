@@ -158,7 +158,7 @@ function newPark(){
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
     paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -332,6 +332,7 @@ function upgradeSave(s){
   // and any medicine waiting at CERES moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
+  if(!Array.isArray(s.biomePaint)) s.biomePaint = [];   // ground paint (js/biomepaint.js)
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
   if(s.guestLog.edu === undefined) s.guestLog.edu = null;
