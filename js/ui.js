@@ -416,10 +416,13 @@ function behaviorHtml(e){
   let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
   h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
   h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Exhibit tab), plants from their own period" : "enrichment props (Habitat Props), the rocks, plants and water they like"}, and room to roam.</div></section>`;
+  const soc = [...ctx.soc.values()];
+  if(soc.length) h += `<section><h3>Social</h3>${soc.map(i => `<div class="meta" style="color:${i.bad ? "var(--bad)" : "var(--good)"}">${esc(i.text)}</div>`).join("")}</section>`;
   for(const [sp, c] of speciesCounts(e)){
     const s = SPECIES_BY_ID[sp], t = traitsOf(s), list = e.animals.filter(a => a.sp === sp), aw = awake(s);
     h += `<section><h3><span class="dot" style="background:${PERIOD_COLOR[s.period]};display:inline-block;margin-right:6px"></span>${esc(s.name)} × ${c}</h3>`;
     h += `<div class="meta">${esc(traitText(s))}. ${aw >= .9 ? "Wide awake now." : aw >= .5 ? "A little drowsy now." : "Mostly asleep now."}</div>`;
+    if((t.social === "herd" || t.social === "pack") && !e.viv && list.length > 1) h += `<div class="meta" style="margin-top:2px">Alpha: ${esc(list.slice().sort(byRank)[0].name || "?")}.</div>`;
     h += `<div class="meta" style="margin-top:2px">${ACTIVE_TEXT[t.active]} ${SOCIAL_TEXT[t.social]} ${TEMPER_TEXT[t.temper]}</div>`;
     h += `<div style="margin-top:6px">${NEED_KEYS.map(k => { const v = list.reduce((n, a) => n + needsOf(a)[k], 0) / list.length; return `<div class="factor" style="grid-template-columns:90px 1fr 44px"><span>${NEED_TEXT[k]}</span>${meter(v, col(v))}<span>${Math.round(v)}%</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">${esc(actsSummary(list))}.</div>`;

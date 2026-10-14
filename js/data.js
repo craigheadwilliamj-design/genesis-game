@@ -1344,9 +1344,26 @@ const ATTACK = {
 // Sex (a.sex, "male" or "female"). No breeding in v1.0; these are light effects. Tunable.
 const SEX = {
   balance:.8,          // chance a new animal takes the sex its species has fewer of in the park (else a coin flip)
-  lonelyMult:1.5,      // pair and herd species with only one sex in the exhibit grow lonely this much faster
-  happy:-3,            // and the exhibit's happiness target moves by this
-  maleFight:1.3,       // males of aggressive species pick fights this much likelier (see fightBias; S30 animals-attack-animals hooks here)
+  maleFight:1.3,       // males of aggressive species pick fights this much likelier (see fightBias in behavior.js)
+};
+// Social life in open exhibits (behavior.js, "social"; vivariums ignore all of it). Driven by traitsOf(s).social.
+//   a.rank is a saved status number, 0 for the alpha up to 1 for the bottom of the pecking order (sorted ascending = alpha first).
+//   Herds and packs: all-male (bachelor) and all-female (matriarchal) groups are stable and happy; one male with females is stable;
+//   two or more males with females fight, more with more males and less room. Solitary species dislike company (same sex most).
+//   Pairs: one male and one female is ideal. Stress numbers are 0 to 100 added to the animal's stress target.
+const SOCIAL = {
+  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, DNA quality (a.q), and being male
+  bachelor:3, matriarch:3,           // happiness bonus for a stable all-male / all-female herd or pack
+  soloSame:30, soloOpp:8, soloCap:60,// a loner's stress per same-sex / opposite-sex animal sharing the pen, and the most
+  soloHappy:.25,                     // happiness lost per point of that stress (averaged over the loners)
+  relief:{room:.4, rock:.2, cover:.25}, max:.75, roomFull:3,   // what eases it: space per animal (full at this many times the room it needs), hiding rocks, shelter cover; never more than max
+  pairBonus:2, pairMild:3, pairStress:12,   // pairs: happiness for a male and a female, lost when animals are left over, and their stress
+  rivalStress:14, rivalCap:3,        // males in a mixed group: stress per extra rival (up to this many)...
+  rivalHappy:3,                      // ...and happiness lost per rival
+  spaceRef:1.5,                      // room per animal (1 is just enough) at which rivalry is as it is; cramped is worse, roomy better
+  fightRate:.01, upset:.2,           // chance each behavior step per extra male that rivals fight; chance the lower rank wins
+  hurt:[6, 16], lowHurt:.8,          // injury a fight adds, up to this much more to the lowest rank
+  loseStress:20,                     // extra stress on the loser, more the lower its rank
 };
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
 const ACTS = {

@@ -2003,7 +2003,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
       events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
       const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
-      const herd = SPECIES.find(s => matesWanted(s) > 0 && !s.predator).id;
+      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator).id;
       const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
       state.science.clones = []; state.science.ready = [];
       const dest = pen("e-sx0", []); state.exhibits = [dest];
@@ -2020,16 +2020,59 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.sexMigrated = up.exhibits[0].animals.every(a => a.sex === "male" || a.sex === "female") && up.science.ready[0].sex && up.science.clones[0].sex;
       let m = 0; for(let i = 0; i < 200; i++) m += pickSex(herd, {exhibits:[{animals:[{sp:herd, sex:"male"}, {sp:herd, sex:"male"}]}], science:{ready:[]}}) === "male";
       out.sexBalances = m < 60;
-      // mixed vs single-sex
-      const one = pen("e-sx2", [herd, herd, herd, herd]), two = pen("e-sx3", [herd, herd, herd, herd]);
-      one.animals.forEach(a => a.sex = "male"); two.animals.forEach((a, i) => a.sex = i % 2 ? "male" : "female");
+      // social rules: sexes and species social type decide stability, fights and loner stress
+      const mk = (id, sp, sexes) => { const p = pen(id, sexes.map(() => sp)); p.animals.forEach((x, i) => x.sex = sexes[i]); return p; };
+      const M = "male", F = "female", info = (e, id) => socialInfo(e).get(id);
+      const sp = SPECIES_BY_ID[herd];
+      const bach = mk("e-sx2", herd, [M, M, M, M]), mat = mk("e-sx3", herd, [F, F, F, F]), one = mk("e-sx4", herd, [M, F, F, F]), two = mk("e-sx5", herd, [M, M, F, F]);
+      state.exhibits = [bach, mat, one, two];
+      out.ranksAssigned = two.animals.every(a => typeof a.rank === "number" && a.rank >= 0 && a.rank <= 1);
+      out.socialBachelor = !info(bach, herd).bad && info(bach, herd).delta === SOCIAL.bachelor && !info(bach, herd).fights;
+      out.socialMatriarch = !info(mat, herd).bad && info(mat, herd).delta === SOCIAL.matriarch && !info(mat, herd).fights;
+      out.socialOneMale = !info(one, herd).bad && !info(one, herd).fights;
+      out.socialTwoMales = info(two, herd).fights && info(two, herd).bad && /fighting/.test(info(two, herd).text) && info(two, herd).delta < 0;
+      for(const p of [bach, two]) p.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+      out.socialBonusInReport = behaviorScore(bach).delta > behaviorScore(two).delta && behaviorScore(two).issues.some(i => /Social\. .*fighting/.test(i.text));
+      // more males fight more; less room fights more
+      const three = mk("e-sx6", herd, [M, M, M, F]), tight = mk("e-sx7", herd, [M, M, F, F]); tight.points = [[0,0],[8,0],[8,8],[0,8]];
+      out.fightsScaleWithMales = info(three, herd).delta < info(two, herd).delta;
+      out.fightsScaleWithRoom = info(tight, herd).spaceMult > info(two, herd).spaceMult && info(tight, herd).delta < info(two, herd).delta;
+      // a fight hurts the loser, makes dust, and hits the lowest rank harder
+      const ds = []; const fxKeep2 = events.fx; events.fx = (k) => ds.push(k);
+      const alpha = two.animals.filter(a => a.sex === M).sort(byRank)[0], bottom = two.animals.filter(a => a.sex === M).sort(byRank)[1];
+      const reset = () => two.animals.forEach(a => { a.hitAt = undefined; a.sick = null; a.need = freshNeeds(); });
+      let hurtN = 0, tries = 0; reset();
+      const rk = Math.random; Math.random = () => rk() * .01;   // rolls always succeed
+      while(!hurtN && tries++ < 50){ rivalFight(two, info(two, herd), nowAbs()); hurtN = two.animals.filter(a => a.sick && a.sick.kind === "injury").length; }
+      Math.random = rk;
+      out.fightInjuresAndDusts = hurtN === 1 && ds.includes("dust") && two.animals.some(a => a.sick && a.sick.hit && a.sick.hit.how === "fight");
+      events.fx = fxKeep2;
+      const lowAnimal = bottom, hiAnimal = alpha;
+      const ib = info(two, herd);
+      out.rankLosesMore = socialStress(lowAnimal, ib)[0] > socialStress(hiAnimal, ib)[0] && ib.low.get(lowAnimal.id) > ib.low.get(hiAnimal.id);
+      // loners: same-sex company is worst, opposite sex is tolerated, alone is best; room and cover ease it
+      const loner = SPECIES.find(s => traitsOf(s).social === "solitary" && !s.predator) || SPECIES.find(s => traitsOf(s).social === "solitary"), lid = loner.id;
+      const ls = mk("e-sx8", lid, [M, M]), lo = mk("e-sx9", lid, [M, F]), lbig = mk("e-sx10", lid, [M, M]); lbig.points = [[0,0],[400,0],[400,400],[0,400]]; ls.points = [[0,0],[6,0],[6,6],[0,6]];
+      state.exhibits = [ls, lo, lbig];
+      const iS = info(ls, lid), iO = info(lo, lid), iB = info(lbig, lid);
+      out.lonerSameWorse = iS.pen(ls.animals[0]) > iO.pen(lo.animals[0]) && iO.pen(lo.animals[0]) > 0 && iS.delta < iO.delta;
+      out.lonerAloneBest = socialInfo(mk("e-sx11", lid, [M])).size === 0 && socialStress(ls.animals[0], null)[0] === 0;
+      out.lonerRoomEases = iB.pen(lbig.animals[0]) < iS.pen(ls.animals[0]) && iB.relief > iS.relief;
+      const stressOf = (e, c) => stressTarget(e, e.animals[0], loner, c);
+      out.lonerStressHigher = stressOf(ls, behaviorCtx(ls)) > stressOf(lo, behaviorCtx(lo));
+      // pairs: male and female is ideal, two of a sex is a mild penalty
+      const pairSp = SPECIES.find(s => traitsOf(s).social === "pair" && !s.predator) || SPECIES.find(s => traitsOf(s).social === "pair"), pid = pairSp.id;
+      const pgood = mk("e-sx12", pid, [M, F]), pbad = mk("e-sx13", pid, [M, M]);
+      state.exhibits = [pgood, pbad];
+      out.pairIdeal = !info(pgood, pid).bad && info(pgood, pid).delta > 0 && info(pbad, pid).bad && info(pbad, pid).delta < 0 && info(pbad, pid).delta > -SOCIAL.pairMild - .01;
+      // vivariums ignore all of it
+      const viv = mk("e-sx14", lid, [M, M]); viv.viv = true; state.exhibits = [viv];
+      out.vivariumImmune = socialInfo(viv).size === 0 && behaviorScore(viv).issues.every(i => !/^Social/.test(i.text)) && rankPos(viv, viv.animals[0]) === null;
+      // old saves get ranks
+      const old2 = JSON.parse(JSON.stringify(state)); old2.exhibits = [mk("e-sx15", herd, [M, F])]; for(const a of old2.exhibits[0].animals) delete a.rank;
+      out.rankMigrated = upgradeSave(old2).exhibits[0].animals.every(a => typeof a.rank === "number");
+      out.socialPanelShows = (state.exhibits = [two], /Social/.test(behaviorHtml(two)) && /fighting/.test(behaviorHtml(two)));
       state.exhibits = [one, two];
-      const sp = SPECIES_BY_ID[herd], c1 = behaviorCtx(one), c2 = behaviorCtx(two);
-      out.singleSexFlagged = c1.single.has(herd) && !c2.single.has(herd);
-      const l = (e, c) => { const a = e.animals[0]; a.need = {...freshNeeds(), lonely:0}; a.act = "rest"; needsStep(e, a, sp, c, 5); return a.need.lonely; };
-      out.singleSexLonelier = l(one, c1) > l(two, c2);
-      const b1 = behaviorScore(one), b2 = behaviorScore(two);
-      out.singleSexLessHappy = b1.delta < b2.delta && b1.issues.some(i => /one sex/.test(i.text)) && !b2.issues.some(i => /one sex/.test(i.text));
       out.fightBiasMale = fightBias({sp:"dime", sex:"male"}) > 1 && fightBias({sp:"dime", sex:"female"}) === 1;
       out.sexShown = sexSplit(two, herd).includes("2 M, 2 F") && sexMark({sex:"male"}) === "M";
       cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.science.ready = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;

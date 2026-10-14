@@ -90,30 +90,102 @@ function enrichment(e){
 }
 
 /* ---------- what the exhibit puts on its animals ---------- */
-// Species that want mates but have only one sex in the exhibit (two or more animals, all the same sex)
-function singleSexKinds(e){
+// Males of aggressive species fight more (multiplies the chance of a generic fight in attackStep)
+const fightBias = a => a && a.sex === "male" && traitsOf(SPECIES_BY_ID[a.sp]).temper === "aggressive" ? SEX.maleFight : 1;
+
+/* ---------- social life ---------- */
+const cnt = (n, w) => ({1:"One", 2:"Two", 3:"Three", 4:"Four", 5:"Five"}[n] || n) + " " + w;
+const byRank = (x, y) => (x.rank ?? .5) - (y.rank ?? .5) || (x.id < y.id ? -1 : 1);
+// Where an animal stands in its kind's pecking order here: {i: 0 for the alpha, n: how many}. Only herds and packs have one.
+function rankPos(e, a){
+  const t = traitsOf(SPECIES_BY_ID[a.sp]);
+  if(e.viv || (t.social !== "herd" && t.social !== "pack")) return null;
+  const l = e.animals.filter(v => v.sp === a.sp).sort(byRank);
+  return l.length > 1 ? {i:l.indexOf(a), n:l.length} : null;
+}
+// What the mix of sexes means for each species with two or more in an open exhibit: a Map of species id to
+// {sp, name, kind, m, f, n, text, bad, delta, fights, low (male id -> 0 alpha to 1 bottom), spaceMult, ...}. Empty for a vivarium.
+function socialInfo(e, ratio){
+  const out = new Map();
+  if(e.viv || e.animals.length < 2) return out;
   const by = new Map();
-  for(const a of e.animals) if(a.sex){ const r = by.get(a.sp) || {n:0, m:0}; r.n++; r.m += a.sex === "male"; by.set(a.sp, r); }
-  const out = new Set();
-  for(const [sp, r] of by) if(r.n >= 2 && (r.m === 0 || r.m === r.n) && matesWanted(SPECIES_BY_ID[sp])) out.add(sp);
+  for(const a of e.animals){ if(!a.sex) continue; const r = by.get(a.sp) || {m:[], f:[]}; r[a.sex === "male" ? "m" : "f"].push(a); by.set(a.sp, r); }
+  if(ratio == null){ let need = 0; for(const a of e.animals) need += SPECIES_BY_ID[a.sp].space; ratio = need ? area(e.points) / need : 9; }
+  const S = SOCIAL, spaceMult = clamp(S.spaceRef / Math.max(ratio, .1), .5, 2.5);
+  let room, cov;
+  for(const [sp, r] of by){
+    const s = SPECIES_BY_ID[sp], k = traitsOf(s).social, m = r.m.length, f = r.f.length, n = m + f;
+    if(n < 2) continue;
+    const i = {sp, name:s.name, kind:k, m, f, n, text:"", bad:false, delta:0, fights:false, spaceMult, males:r.m, low:new Map(), relief:0};
+    if(k === "solitary"){
+      if(room == null){ room = clamp((ratio - 1) / (S.roomFull - 1), 0, 1); const c = coverOf(e); cov = c.need ? clamp(c.have / c.need, 0, 1) : 1; }
+      const w = wantsOf(e, s), h = haveOf(e, s), rock = w.rock ? clamp(h.rock / w.rock, 0, 1) : 1;
+      i.relief = Math.min(S.max, S.relief.room * room + S.relief.rock * rock + S.relief.cover * cov);
+      i.soloSame = (m - 1) * S.soloSame * (1 - i.relief); i.soloOpp = f * S.soloOpp * (1 - i.relief);   // for a male; a female swaps m and f
+      const same = (m > 1 || f > 1), pen = (a) => Math.min(S.soloCap, ((a.sex === "male" ? m : f) - 1) * S.soloSame * (1 - i.relief) + (a.sex === "male" ? f : m) * S.soloOpp * (1 - i.relief));
+      i.pen = pen;
+      const avg = (r.m.reduce((t, a) => t + pen(a), 0) + r.f.reduce((t, a) => t + pen(a), 0)) / n;
+      i.delta = -avg * S.soloHappy; i.bad = true;
+      i.text = same ? `${s.name} are loners, and ${m > 1 && f > 1 ? "males and females" : m > 1 ? "males" : "females"} of the same sex are sharing the pen. They'd rather be alone. More room, rocks and shelter ease it.` : `${s.name} are loners. A male and a female tolerate each other, but alone would be best.`;
+    } else if(k === "pair"){
+      const left = Math.abs(m - f);
+      if(!left){ i.delta = S.pairBonus; i.text = n === 2 ? `A male and a female ${s.name}: a good pair.` : `${s.name} are paired off, male and female.`; }
+      else { i.delta = -S.pairMild * left / n; i.bad = true; i.odd = m > f ? "male" : "female"; i.text = n === 2 ? `Two ${m ? "male" : "female"} ${s.name} would be happier as a male and a female.` : `${s.name} would be happier paired off: there's ${left === 1 ? "an extra" : left + " extra"} ${i.odd}${left === 1 ? "" : "s"}.`; }
+    } else if(!f || !m){
+      i.delta = f ? S.matriarch : S.bachelor;
+      i.text = f ? `${s.name} form a settled all-female group.` : `${s.name} form a settled bachelor group.`;
+    } else if(m === 1){
+      i.text = `One male leads the ${s.name} and the females. It's settled.`;
+    } else {
+      i.fights = true; i.bad = true;
+      const t = Math.min(m - 1, S.rivalCap);
+      i.delta = -S.rivalHappy * t * spaceMult;
+      r.m.slice().sort(byRank).forEach((a, x) => i.low.set(a.id, x / (m - 1)));
+      i.text = `${cnt(m, "male " + s.name)} are fighting over the females. ${spaceMult > 1 ? "Cramped quarters make it worse. " : ""}Keep just one male, or split them up.`;
+    }
+    out.set(sp, i);
+  }
   return out;
 }
-// Males of aggressive species fight more (a hook for the animals-attack-animals work: multiply any fight or attack chance by this)
-const fightBias = a => a && a.sex === "male" && traitsOf(SPECIES_BY_ID[a.sp]).temper === "aggressive" ? SEX.maleFight : 1;
+// The stress the social mix puts on one animal, with the reason: [stress, text]
+function socialStress(a, i){
+  if(!i || !a.sex) return [0, ""];
+  const S = SOCIAL;
+  if(i.kind === "solitary") return [i.pen(a), "it's a loner and has company"];
+  if(i.kind === "pair") return [i.odd === a.sex ? S.pairStress : 0, "it has no mate of the other sex"];
+  if(i.fights) return [S.rivalStress * Math.min(i.m - 1, S.rivalCap) * i.spaceMult * (a.sex === "male" ? .6 + .4 * (i.low.get(a.id) || 0) : .25), "the males are fighting"];
+  return [0, ""];
+}
+// Rivals fight over the females now and then; the higher rank usually wins, and the loser (the lower the rank, the worse) is hurt and stressed
+function rivalFight(e, i, now){
+  const A = ATTACK, ms = i.males.filter(a => e.animals.includes(a) && !a.darted && !(a.sick && a.sick.kind === "injury") && now - (a.hitAt ?? -1e9) >= A.gap);
+  if(ms.length < 2 || Math.random() >= SOCIAL.fightRate * (i.m - 1) * i.spaceMult) return;
+  const x = Math.floor(Math.random() * ms.length); let y = Math.floor(Math.random() * (ms.length - 1)); if(y >= x) y++;
+  let [w, l] = byRank(ms[x], ms[y]) <= 0 ? [ms[x], ms[y]] : [ms[y], ms[x]];
+  if(Math.random() < SOCIAL.upset) [w, l] = [l, w];
+  const low = i.low.get(l.id) || 0;
+  w.hitAt = l.hitAt = now;
+  const hurt = SOCIAL.hurt.map(v => v * (1 + low * SOCIAL.lowHurt));
+  if(hurtAnimal(e, l, i.name, "fight", hurt, 0, `The males are fighting over the females in ${e.name}.`) === "hurt"){
+    const n = needsOf(l); n.stress = Math.min(100, n.stress + SOCIAL.loseStress * (.5 + .5 * low));
+  }
+}
 function behaviorCtx(e){
   const counts = speciesCounts(e), kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
   let need = 0; for(const s of kinds) need += s.space * counts.get(s.id);
   let fight = false;
   for(let i = 0; i < kinds.length && !fight; i++) for(let j = i + 1; j < kinds.length && !fight; j++) fight = !!conflict(kinds[i], kinds[j]);
   const land = landOf(e).map(f => LAND[f.type]).filter(Boolean);
-  return {
-    counts, fight, single:singleSexKinds(e), ratio:need ? area(e.points) / need : 9,
+  const ctx = {
+    counts, fight, ratio:need ? area(e.points) / need : 9,
     cover:!!e.viv || land.some(t => t.slots || t.cover || t.flora),
     water:!!e.viv || waterOf(e).length > 0 || (BIOMES[biomeOf(e)].wet || 0) > 0,
     browse:!e.viv && browseRate(e, "plants") + browseRate(e, "paleoflora") > 0,
     seen:isReachable(e) && typeof parties !== "undefined" ? clamp(parties.length / BEHAVIOR.busyAt, 0, 1) : 0,
     enrich:enrichment(e), x:exposure(e), dirt:e.dirt || 0, free:freeFeeding(), comfort:new Map(),
   };
+  ctx.soc = socialInfo(e, ctx.ratio);
+  return ctx;
 }
 const foodOk = (e, s, ctx) => ctx.free || stockFor(e, foodType(s)) > .01;
 // The lowest thirst it can drink down to: water lovers can't make do with the keepers' trough
@@ -137,7 +209,7 @@ function stressTarget(e, a, s, ctx, why){
   if(ctx.ratio < 1) add((1 - ctx.ratio) * 60 * (agg ? 1.5 : 1), "it's cramped");
   if(ctx.fight) add(35, "another species here is a threat");
   if(c > hi) add(agg ? 22 : 15, `there are too many ${s.name}`);
-  if(T.social === "solitary" && c > 1 && ctx.ratio < 2) add(12, "it wants more room away from its rivals");
+  { const [v, text] = socialStress(a, ctx.soc.get(s.id)); add(v, text); }
   if(T.social === "herd") { if(c >= lo) t -= 5; else add(15, "its herd is too small to feel safe"); }
   if(T.social === "pack" && c < lo) add(10, "its pack is too small");
   add(ctx.x * 25, "it's out in the weather");
@@ -204,7 +276,7 @@ function needsStep(e, a, s, ctx, dt){
   n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
   const temper = {curious:1.4, skittish:.8, aggressive:1.1}[T.temper] * (T.temper === "curious" ? 1 - .3 * ctx.seen : 1);   // curious ones like watching the guests
   n.bored += B.bored * dt * aw * temper * (1.4 - ctx.enrich);
-  if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1) * (ctx.single && ctx.single.has(s.id) ? SEX.lonelyMult : 1); else n.lonely -= B.social * dt;
+  if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1); else n.lonely -= B.social * dt;
   switch(a.act){
     case "eat": if(food) n.hunger -= B.eat * dt; break;
     case "hunt": n.bored -= B.forage * dt; break;   // the stalk is the best part
@@ -301,8 +373,7 @@ function behaviorScore(e){
   }
   if(hiding.length) out.issues.push({bad:true, text:`Hiding. ${hiding.length} ${names(hiding)} ${hiding.length === 1 ? "is" : "are"} hiding. Something here frightens ${hiding.length === 1 ? "it" : "them"}. See Behavior.`});
   if(stress >= 50 && !hiding.length && !pacing.length) out.issues.push({bad:true, text:`Stressed (${Math.round(stress)}%). See Behavior.`});
-  const single = singleSexKinds(e);
-  if(single.size){ out.delta += SEX.happy; out.issues.push({bad:true, text:`All one sex. ${[...single].map(sp => SPECIES_BY_ID[sp].name).join(", ")} would be happier with a ${list.find(a => single.has(a.sp)).sex === "male" ? "female" : "male"}.`}); }
+  for(const i of socialInfo(e).values()){ out.delta += i.delta * i.n / list.length; out.issues.push({bad:i.bad, text:`Social. ${i.text}`}); }
   if(playing.length) out.issues.push({bad:false, text:`${playing.length} ${names(playing)} ${playing.length === 1 ? "is" : "are"} playing.`});
   return out;
 }
@@ -349,7 +420,7 @@ const bodyPos = a => { const h = typeof herd !== "undefined" ? herd.get(a.id) : 
 function attackFx(e, a){ const h = bodyPos(a), c = h ? [h.x, h.y] : centroid(e.points); events.fx("dust", c[0], c[1]); }
 
 // Hurt one animal. A hit adds to an injury (or to an illness it already had); 100 kills. Returns "killed" or "hurt".
-function hurtAnimal(e, v, by, how, range, killP){
+function hurtAnimal(e, v, by, how, range, killP, msg){
   const s = SPECIES_BY_ID[v.sp], sev = range[0] + Math.random() * (range[1] - range[0]);
   const hit = {by, how};
   if(v.sick){ v.sick.sev += sev; delete v.sick.hidden; v.sick.hit = hit; }
@@ -364,7 +435,7 @@ function hurtAnimal(e, v, by, how, range, killP){
   }
   v.sick.sev = Math.round(v.sick.sev);
   if(how !== "fight") events.toast(`A ${by} attacked a ${s.name} in ${e.name}.`, "bad");
-  else if(e.fightDay !== state.day){ e.fightDay = state.day; events.toast(`Animals are fighting in ${e.name}. Stress and cramped quarters make them lash out.`, "bad"); }
+  else if(e.fightDay !== state.day){ e.fightDay = state.day; events.toast(msg || `Animals are fighting in ${e.name}. Stress and cramped quarters make them lash out.`, "bad"); }
   return "hurt";
 }
 
@@ -373,6 +444,7 @@ function attackStep(e, ctx){
   const list = e.animals, A = ATTACK;
   if(list.length < 2) return;
   const now = nowAbs();
+  if(ctx.soc) for(const i of ctx.soc.values()) if(i.fights) rivalFight(e, i, now);
   for(const a of [...list]){
     if(!list.includes(a) || a.darted || now - (a.hitAt ?? -1e9) < A.gap) continue;
     const s = SPECIES_BY_ID[a.sp]; if(!s) continue;
