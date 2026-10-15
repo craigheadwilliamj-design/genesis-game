@@ -142,7 +142,7 @@ function freshScience(){
 }
 
 // CERES: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
-function freshCeres(){ return {stock:0, meds:0, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
+function freshCeres(){ return {stock:0, meds:{medpal:0, medmes:0, medcen:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
 // Themes: the one new builds use, and which are unlocked
 function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
@@ -265,7 +265,7 @@ function upgradeSave(s){
   if(!s.safety){ s.safety = freshSafety(); s.safety.escapesFrom = s.day + 3; }
   // parks from before medicine existed get 5 days before animals start falling ill
   if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
-  if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  if(s.ceres.meds === undefined) s.ceres.meds = {medpal:0, medmes:0, medcen:0};
   // science became timed and per animal. Time periods already unlocked become their animals, and trips and clones keep their finish time.
   const sc = s.science;
   if(!sc.projects){
@@ -329,7 +329,6 @@ function upgradeSave(s){
     }
   }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
-  if(s.health.cmeds === undefined) s.health.cmeds = 0;
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at CERES moves to the PMC
@@ -349,6 +348,17 @@ function upgradeSave(s){
     if(s.staff.keepers.length || s.buildings.some(b => b.type === "station")){ s.staff.feedFrom = Math.max(s.staff.feedFrom, s.day + 2); s.logi.notice = true; }
     const pmc = s.buildings.find(b => b.type === "pmc");
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
+  }
+  // contemporary medicine used to be a counter the suppliers refilled; now it is stock in the PMC
+  if(s.health.cmeds !== undefined){ const pmc = s.buildings.find(b => b.type === "pmc"); if(pmc && s.health.cmeds > 0){ pmc.store = pmc.store || {}; pmc.store[CMED] = (pmc.store[CMED] || 0) + s.health.cmeds; } delete s.health.cmeds; }
+  // medicine used to be one good. Split what's on hand across the eras ORACLE has researched (else Cenozoic), so nothing is lost.
+  {
+    const eras = Object.keys(MED_TECH).filter(e => s.science.tech.includes(MED_TECH[e])), into = (eras.length ? eras : ["cenozoic"]).map(e => MED_GOOD[e]);
+    const split = (n, put) => { const each = Math.floor(n / into.length); into.forEach((g, i) => put(g, i === 0 ? n - each * (into.length - 1) : each)); };
+    for(const b of s.buildings) if(b.store && b.store.meds !== undefined){ const n = b.store.meds; delete b.store.meds; split(n, (g, v) => { b.store[g] = (b.store[g] || 0) + v; }); }
+    if(typeof s.ceres.meds !== "object" || s.ceres.meds === null){ const n = s.ceres.meds || 0; s.ceres.meds = {medpal:0, medmes:0, medcen:0}; split(n, (g, v) => { s.ceres.meds[g] += v; }); }
+    for(const g of MED_GOODS) if(s.ceres.meds[g] === undefined) s.ceres.meds[g] = 0;
+    for(const r of s.staff.keepers.concat(s.staff.custodians || [])) if(r.carry && r.carry.type === "meds") r.carry.type = into[0];
   }
   // stock for stands and shops became physical: older parks get a few more days of direct deliveries
   if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor(s.minute / LOGI.truckMin));

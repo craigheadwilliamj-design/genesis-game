@@ -311,7 +311,7 @@ function growBatch(kind, era, size){
 function finishBatch(b){
   const c = state.ceres;
   if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
-  else { c.meds = Math.min(medCap(), (c.meds || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
+  else { const g = MED_GOOD[b.era]; cerMeds()[g] = (cerMeds()[g] || 0) + growInfo("med", b.era).doses; if(cerMedTotal() > medCap()) cerMeds()[g] -= cerMedTotal() - medCap(); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce((s, b) => s + growInfo("med", b.era).doses, 0);
@@ -374,7 +374,7 @@ function scienceTick(dtMin){
   // CERES keeps medicine stocked for the types set to "keep stocked"
   if(beds() && freeBay("botanist") >= 0){
     for(const era of Object.keys(c.auto)){
-      if(!c.auto[era] || (c.meds || 0) + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
+      if(!c.auto[era] || cerMedTotal() + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
       if(growBatch("med", era)) break;
     }
   }
