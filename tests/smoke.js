@@ -713,6 +713,30 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.vandalBreaksBench = !!hit && hit.b === bench && propCond(bench) === 100 - VANDAL.propHit && vp.vandal && vandalLog().acts === 1;
     bench.cond = 10;
     out.brokenBenchUseless = isBroken(bench) && !servesOf(bench).length;
+    // lamps: they light nearby path corners at night and not by day; dark corners cost mood at night, lit ones don't; lit spots deter vandals
+    {
+      const keepParties = parties.slice();
+      const lamp = {id:"b-lamp", type:"lamp", points:rectPts(103, 200, BUILDINGS.lamp.w, BUILDINGS.lamp.d, 0), cond:100};
+      state.buildings.push(lamp); afterChange();
+      const ln = nearestGuestNode(100, 200), nodes = [...gGraph.nodes.values()].filter(n => !n.rail);
+      const dark = nodes.find(n => Math.hypot(n.x - 103, n.y - 200) > LAMP.radius + LAMP.lean + 4);
+      const tm0 = state.minute;
+      state.minute = 0;
+      out.lampLightsNight = ln.lit >= LAMP.litAt && !!dark && dark.lit < LAMP.litAt && darkLevel() === 1 && darkStretches >= 1;
+      state.minute = DAWN_MIN + 120;
+      out.lampNoDayEffect = darkLevel() === 0 && deterrence(100, 200) === VANDAL.lampCut * (litterAt(100, 200) >= 6 ? VANDAL.litterBoost : 1);
+      const moodAfter = n => { resetParties(); guestsArrive(2); const q = parties[0]; q.at = n; q.to = null; q.hold = true; q.mood = 90; q.pers = ["fun"]; q.fxc = null; guestsTick(state.minute, state.minute + 1); return q.mood; };
+      state.minute = 0;
+      const litMood = moodAfter(ln), darkMood = moodAfter(dark);
+      out.darkNodesCostMood = darkMood < litMood - 1e-6;
+      state.minute = DAWN_MIN + 120;
+      out.darkNoCostByDay = Math.abs(moodAfter(dark) - moodAfter(ln)) < 1e-6;
+      state.minute = 0;
+      const dLit = deterrence(100, 200), dDark = deterrence(dark.x, dark.y);
+      out.lampDeterNight = dLit < dDark && dLit <= LAMP.nightCut + 1e-9;
+      state.minute = tm0;
+      state.buildings = state.buildings.filter(b => b !== lamp); afterChange(); resetParties(); parties.push(...keepParties);
+    }
     // a guard nearby puts vandals off, and throws this one out
     const d0 = deterrence(100, 200);
     hireGuard(); syncGuards(); gcrew[0].at = nearestNode(100, 200); gcrew[0].route = [];

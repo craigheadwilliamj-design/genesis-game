@@ -17,7 +17,7 @@ const ui = {
     set("inpark", guestCount().toLocaleString());
     set("clock", fmtClock(clockMin()));
     $("#closedTag").hidden = !state.parkClosed;
-    const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; }
+    const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; drawLights(); }
     set("dayLabel", `${fmtDate(state.day)} · ${weatherNow().label}`);
     set("parkName", state.name);
     const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;

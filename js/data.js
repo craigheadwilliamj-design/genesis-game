@@ -575,7 +575,7 @@ const PERSONALITIES = {
     n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
   family:{label:"Family Focused", color:"#2F86C8", weight:.26,
     text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
-    fx:{infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
+    fx:{dark:1.6, infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
     n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
   fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
     text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
@@ -583,7 +583,7 @@ const PERSONALITIES = {
     n:{variety:2}},
   hooligan:{label:"Hooligan", color:"#E0509B", weight:.06,
     text:"Here to cause trouble. May sneak in without paying, drops litter, vandalizes, throws trash at the animals and bangs on the glass. Security has to catch them.",
-    fx:{food:.8, shop:.5, learn:.5, litter:3},
+    fx:{dark:.3, food:.8, shop:.5, learn:.5, litter:3},
     n:{}},
 };
 const NEEDS = {
@@ -679,6 +679,7 @@ const THOUGHTS = {
   playful:    {text:"We watched the animals play!", good:true},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
+  dark:       {text:"The paths were too dark at night."},
   noSeat:     {text:"My feet hurt and there's nowhere to sit."},
   litter:     {text:"There's trash all over the paths."},
   grossLoo:   {text:"The restrooms were disgusting."},
@@ -787,6 +788,20 @@ const CUSTODIAN = {
   binAt:.6,            // they empty a bin this full
   litterAt:3,          // they sweep a square with this much litter
   reach:30,            // they sweep litter this close to where they stand
+};
+// Lamp posts light the paths at night (dusk to dawn, following the map's night wash)
+const LAMP = {
+  radius:14,           // meters of ground a working lamp lights
+  lean:1.5,            // the pool leans this far toward the way the lamp faces
+  litAt:.25,           // a path corner this lit counts as lit (0 to 1)
+  rings:4,             // stepped pixel rings drawn for each pool
+  glow:"#FFC96B",      // warm light
+  ringAlpha:.16,       // each ring adds this much light
+  fear:.05,            // mood lost a minute on an unlit stretch in full dark (times how much the guest minds)
+  pull:.5,             // share of an exhibit's pull lost at night when no lit path sees it
+  nightCut:.35,        // a lamp nearby multiplies vandalism by this at night (VANDAL.lampCut by day)
+  darkBoost:1.3,       // unlit spots at night make vandalism this much likelier
+  darkCam:.5,          // chance a camera sees a spot no lamp lights, at night
 };
 // Rowdy guests break things when they're unhappy
 const VANDAL = {
