@@ -2824,6 +2824,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
       out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && x.includes("<polygon")));
       out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
+      { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
+        state.exhibits.push(ev); syncAnimals();
+        const hs = [...herd.values()].filter(h => h.exhibitId === "e-fa");
+        out.vivAnimalsInsideGlass = hs.length === 4 && hs.every(h => vivSpot(h, ev, [h.x, h.y]));
+        ev.points = rectPts(260, 300, V.w, V.d, 0); syncAnimals();   // moving the case brings them along
+        out.vivAnimalsFollowMove = hs.every(h => vivSpot(h, ev, [h.x, h.y])); state.exhibits.pop(); }
       const oldV = JSON.parse(JSON.stringify(newPark()));
       oldV.exhibits.push({id:"e-ov", name:"OldV", points:rectPts(200, 270, 6, 4, 0), animals:[], happy:70, viv:"S"}, {id:"e-ov2", name:"OldV2", points:rectPts(220, 270, 16, 10, 0), animals:[], happy:70, viv:"L"});
       let loaded = true; try { startWith(upgradeSave(oldV), false); setSpeed(0); render(); } catch(err){ loaded = false; }
