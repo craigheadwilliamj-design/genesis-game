@@ -25,6 +25,12 @@ FIELD = ramp((142, 145, 136))   # grassland: fieldstone, ROCK_STONE grey-green
 LIME = ramp((208, 202, 180))    # pale limestone
 FSTAIN = ramp((142, 145, 136)); FSTAIN["top"] = mix((142, 145, 136), (176, 150, 90), .35); FSTAIN["hi"] = mix(FSTAIN["hi"], (176, 150, 90), .2)   # fieldstone with an iron-stained, sun-bleached cap
 FMOSS = ramp((142, 145, 136)); FMOSS["top"] = mix((140, 160, 80), (255, 255, 255), .12); FMOSS["hi"] = mix(FMOSS["hi"], (140, 160, 80), .3)   # fieldstone with a lichen-green cap
+SLAB = ramp((127, 135, 128))    # tundra: frost-shattered grey slab, ROCK_STONE grey-green
+DSLAB = ramp((92, 98, 98))      # darker frost-split slate
+PGRAN = ramp((170, 172, 166))   # pale granite
+LICHY = ramp((127, 135, 128)); LICHY["top"] = mix((170, 176, 120), (255, 255, 255), .1); LICHY["hi"] = mix(LICHY["hi"], (170, 176, 120), .3)   # slab with a yellow-green lichen cap
+LICHO = ramp((127, 135, 128)); LICHO["top"] = mix((196, 146, 84), (255, 255, 255), .08); LICHO["hi"] = mix(LICHO["hi"], (196, 146, 84), .28)   # slab with an orange lichen cap
+LICHG = ramp((96, 102, 100)); LICHG["top"] = mix((206, 208, 190), (255, 255, 255), .1); LICHG["hi"] = mix(LICHG["hi"], (206, 208, 190), .3)   # dark slate with a pale grey-white lichen cap
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -155,6 +161,17 @@ def shapes():
     S["rock-grassland-4"] = render(264, [(0, 0, 10, 8, 7, .1, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], FMOSS, bands=0)
     S["rock-grassland-5"] = render(265, [(-6, 1, 8, 6, 7, .1, [(3, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 10, 7, 8, .1, [(4, 1, 0, 0), (4, .92, .3, 0), (3, .7, .5, 0)])], FIELD, bands=0)
     S["rock-grassland-6"] = render(266, [(0, 0, 14, 7, 8, .08, [(3, 1, 0, 0), (3, .96, .3, 0), (3, .8, .5, 0)])], LIME, bands=0)
+    # tundra: frost-shattered slabs, angular (few sides, big jitter), stacked in shifted plates, with lichen-colored caps
+    S["boulder-tundra-1"] = render(171, [(0, 0, 27, 17, 5, .2, [(6, 1, 0, 0), (5, .97, .8, 0), (6, .9, -.6, 0), (5, .8, 1, 0), (4, .62, -.8, 0), (3, .42, .6, 0)])], LICHY, cracks=2)
+    S["boulder-tundra-2"] = render(172, [(-15, 3, 17, 11, 5, .2, [(5, 1, 0, 0), (5, .94, .5, 0), (4, .82, -.5, 0)]), (13, -4, 20, 13, 5, .2, [(6, 1, 0, 0), (6, .96, .6, 0), (5, .88, -.6, 0), (4, .72, .8, 0)])], SLAB, cracks=1)
+    S["boulder-tundra-3"] = render(173, [(0, 0, 14, 10, 5, .22, [(7, 1, 0, 0), (6, .95, 1, 0), (6, .88, -1, 0), (5, .78, .8, 0), (5, .64, -.8, 0), (4, .5, .6, 0)])], LICHG, cracks=2)
+    S["boulder-tundra-4"] = render(174, [(0, 0, 30, 14, 5, .18, [(5, 1, 0, 0), (5, .98, .6, 0), (4, .92, -.6, 0), (3, .78, .8, 0)])], LICHO, cracks=1)
+    S["rock-tundra-1"] = render(271, [(0, 0, 16, 9, 5, .2, [(4, 1, 0, 0), (4, .9, .5, 0), (3, .66, -.4, 0)])], SLAB)
+    S["rock-tundra-2"] = render(272, [(0, 0, 11, 8, 5, .22, [(5, 1, 0, 0), (4, .92, .5, 0), (3, .7, -.4, 0)])], LICHY, bands=0)
+    S["rock-tundra-3"] = render(273, [(0, 0, 15, 6, 5, .2, [(3, 1, 0, 0), (3, .94, .6, 0), (3, .8, -.5, 0)])], DSLAB)
+    S["rock-tundra-4"] = render(274, [(0, 0, 10, 8, 5, .22, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .7, -.3, 0)])], LICHO, bands=0)
+    S["rock-tundra-5"] = render(275, [(-6, 1, 8, 6, 5, .2, [(3, 1, 0, 0), (3, .88, .4, 0)]), (6, -1, 10, 7, 5, .2, [(4, 1, 0, 0), (4, .92, .4, 0), (3, .7, -.4, 0)])], PGRAN, bands=0)
+    S["rock-tundra-6"] = render(276, [(0, 0, 13, 7, 5, .2, [(4, 1, 0, 0), (3, .95, .5, 0), (3, .78, -.4, 0)])], LICHG, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
