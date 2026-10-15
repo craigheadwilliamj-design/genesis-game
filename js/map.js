@@ -166,11 +166,14 @@ function render(){
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
     if(e.viv){
-      // a glass box: pale blue-green fill, dark frame, and a lighter inner pane
+      if(tilt) s += vivFloor34(e, c, dead, on, reach);   // the 3/4 view: a flat substrate floor; the case itself is viv34
+      else {
+      // (flat view) a glass box: pale blue-green fill, dark frame, and a lighter inner pane
       s += `<polygon points="${pts}" fill="#A9D3DA" fill-opacity=".85" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) !== "genesis" ? themeOf(e).edge : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(c) s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${c}" fill-opacity=".35" pointer-events="none"/>`;
       // the biome shows through the glass
       s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".35" pointer-events="none"/><polygon points="${polyStr(insetRect(e.points, .9))}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
+      }
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
     } else {
@@ -711,35 +714,95 @@ function fence34(P, closed, kinds, which, o = {}){
   }
   return `<g pointer-events="none">${s}</g>`;
 }
-// A vivarium in the 3/4 view: a glass tank in a steel frame. "back" draws the far panes (before what's inside),
-// "front" the near panes, the frame, the glass lid and its heat lamp, all see-through.
-function viv34(e, which, hi){
-  const P = e.points, V = VIVARIUMS[e.viv], H = V.d * .45, frame = hi || "#24414A", n2 = v => v.toFixed(2), up = lift34(H);
-  const fr = w => `stroke="${frame}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" fill="none"`;
-  let s = "", d = "";
-  for(let i = 0; i < P.length; i++){
-    const a = P[i], b = P[(i+1) % P.length], ny = norm34(P, i)[1];
-    if(which === "back" ? ny > .05 : ny <= .05) continue;
-    const q = [a, b, up(b), up(a)];
-    s += `<polygon points="${polyStr(q)}" fill="#A9D3DA" fill-opacity="${which === "back" ? .38 : .16}"/>`;
-    if(which === "front"){
-      // the substrate shows through the bottom of the glass, then a soft glare streak across the pane
-      const sub = [a, b, lift34(H * .18)(b), lift34(H * .18)(a)];
-      s += `<polygon points="${polyStr(sub)}" fill="#6B4F33" fill-opacity=".75"/><path d="M${n2(sub[3][0])} ${n2(sub[3][1])}L${n2(sub[2][0])} ${n2(sub[2][1])}" stroke="#8A6B47" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
-      const g = f => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
-      s += `<polygon points="${polyStr([g(.12), g(.2), lift34(H)(g(.32)), lift34(H)(g(.24))])}" fill="#fff" fill-opacity=".22"/>`;
-      d += `M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}`;
+// A vivarium in the flat pixel style (3/4 view): a glass case in a frame, one flat tone a face (left lightest, front base, right darkest), snapped to the 0.13 m pixel.
+// S is a light aluminium case, M a dark wood one, L a dark aluminium case with a middle post and two lamp bars. Each size has its own label plate.
+const VIV34 = {
+  S:{frame:["#DDE2E5", "#B4BCC1", "#89939A"], top:"#EEF1F3", sill:.35, post:.22, lamps:1, label:"S"},
+  M:{frame:["#7A5638", "#5E402A", "#432D1E"], top:"#94694A", sill:.45, post:.28, lamps:1, label:"M"},
+  L:{frame:["#6F7980", "#4F575D", "#363C41"], top:"#8793A0", sill:.55, post:.34, lamps:2, mullion:true, label:"L"}};
+const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
+function vivMix34(a, b, t){
+  const h = c => /^#[0-9a-f]{6}$/i.test(c) ? [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) : null, x = h(a), y = h(b);
+  return x && y ? "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("") : a;
+}
+const vivFace34 = nx => nx < -.3 ? 0 : nx > .3 ? 2 : 1;
+const vivSubCache = {};
+// the floor of a vivarium: the biome's substrate, flat, with rows of darker and lighter dashes and a lit strip along the far sides
+function vivFloor34(e, c, dead, on, reach){
+  const P = e.points, bio = BIOMES[biomeOf(e)].color, sub = vivMix34(bio, "#5A4630", .4), key = e.viv + "|" + sub + "|" + polyStr(P);
+  let det = vivSubCache[key];
+  if(!det){
+    const bb = bbox(P), inner = insetRect(P, .9), dark = vivMix34(sub, "#000000", .2), light = vivMix34(sub, "#FFFFFF", .18);
+    let dk = "", lt = "";
+    for(let r = 0, y = bb.y0 + .45; y < bb.y1; r++, y += .52){
+      for(let x = bb.x0 + ((r * 7) % 5) * .35 + .3; x < bb.x1; x += 1.7){
+        if(!inPoly(x + .26, y, inner)) continue;
+        const a = flatSnap34([x, y]), b = flatSnap34([x + .52, y + .13]), d = `M${a[0].toFixed(2)} ${a[1].toFixed(2)}H${b[0].toFixed(2)}V${b[1].toFixed(2)}H${a[0].toFixed(2)}z`;
+        if(r % 3 === 2) lt += d; else dk += d;
+      }
     }
-    d += `M${n2(up(a)[0])} ${n2(up(a)[1])}L${n2(up(b)[0])} ${n2(up(b)[1])}`;
+    const [cx, cy] = centroid(P); let strips = "";
+    for(let i = 0; i < P.length; i++){   // a lit strip just inside each far side
+      const n = norm34(P, i); if(n[1] > -.05) continue;
+      const a = P[i], b = P[(i + 1) % P.length], w = .26;
+      strips += flatPoly34([a, b, [b[0] - n[0]*w, b[1] - n[1]*w], [a[0] - n[0]*w, a[1] - n[1]*w]], light, "", true);
+    }
+    det = vivSubCache[key] = `${strips}<path d="${dk}" fill="${dark}" shape-rendering="crispEdges" pointer-events="none"/><path d="${lt}" fill="${light}" shape-rendering="crispEdges" pointer-events="none"/>`;
   }
-  // corner posts: the back ones behind, the front ones in front
-  const [, cy] = centroid(P);
-  for(const p of P) if(which === "back" ? p[1] <= cy : p[1] > cy) d += `M${n2(p[0])} ${n2(p[1])}L${n2(up(p)[0])} ${n2(up(p)[1])}`;
-  s += `<path d="${d}" ${fr(hi ? 3 : 2)}/>`;
-  if(which === "front"){
-    const L = P.map(up), [lx, ly] = centroid(L), r = Math.min(V.w, V.d) * .09;
-    s += `<polygon points="${polyStr(L)}" fill="#DDEFF2" fill-opacity=".12" ${fr(hi ? 3 : 1.5)}/>`;
-    s += `<circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * 2.2)}" fill="#FFC25E" fill-opacity=".18"/><rect x="${n2(lx - r)}" y="${n2(ly - r * .6)}" width="${n2(r * 2)}" height="${n2(r * 1.2)}" rx="${n2(r * .3)}" fill="#3A3A34"/><circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * .4)}" fill="#FFE2A0"/>`;
+  const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
+  return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
+}
+// "back" draws the far panes, posts and rim (before what's inside); "front" the near panes, sill, posts, label plate, the lid and its lamp bars, all see-through but the frame
+function viv34(e, which, hi){
+  const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
+  const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
+  const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
+  let s = "", front = -1;
+  for(let i = 0; i < P.length; i++){
+    const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
+    const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
+    s += wallQ(i, 0, 1, 0, H, VIV_GLASS34[f], back ? .42 : .17);
+    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]) + wallQ(i, 0, 1, H - rim, H, fr[ft]);
+    else {
+      const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
+      s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
+      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]) + wallQ(i, 0, 1, H - rim, H, fr[f]);
+      if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
+    }
+  }
+  // corner posts: the far ones behind, the near ones in front; the left ones catch the light
+  for(const p of P){
+    if(back ? p[1] > cy : p[1] <= cy) continue;
+    const t = p[0] < cx - .01 ? 0 : p[0] > cx + .01 ? 2 : 1, w = K.post / 2;
+    s += flatPoly34([[p[0] - w, p[1]], [p[0] + w, p[1]], [p[0] + w, up(p)[1]], [p[0] - w, up(p)[1]]], fr[t], "", true);
+  }
+  if(!back){
+    if(front >= 0){
+      const L = edgeLen34(P, front), fl = P[(front + 1) % P.length][0] < P[front][0], e1 = FLAT34.px / L;
+      const Q = (f0, f1, h0, h1, fill) => wallQ(front, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
+      if(K.mullion) s += Q(.5 - K.post / 2 / L, .5 + K.post / 2 / L, 0, H - rim, fr[1]) + Q(.5 - K.post / 2 / L, .5 - K.post / 2 / L + e1, K.sill, H - rim, fr[0]);
+      const pw = Math.min(.45 / L, .12), pf = .22;   // the label plate: a dark plate with a pale rim and the size's letter
+      s += Q(pf - pw - e1, pf + pw + e1, .38, 1.37, "#C9CFD3") + Q(pf - pw, pf + pw, .38 + FLAT34.px, 1.37 - FLAT34.px, "#2B3338") + flatText34(Q, L, pf, .55, K.label, "#F1E7C4");
+    }
+    // the lid: clear glass in the frame's rim, and the lamp bars standing on it
+    s += flatPoly34(P.map(up), "#DDEFF2", op(.16), true);
+    for(let i = 0; i < P.length; i++){
+      const a = P[i], b = P[(i + 1) % P.length], n = norm34(P, i), w = K.post;
+      s += flatPoly34([up(a), up(b), up([b[0] - n[0]*w, b[1] - n[1]*w]), up([a[0] - n[0]*w, a[1] - n[1]*w])], K.top, "", true);
+    }
+    let m = 0; for(let i = 1; i < P.length; i++) if(edgeLen34(P, i) > edgeLen34(P, m)) m = i;
+    const A = P[m], B = P[(m + 1) % P.length], ln = edgeLen34(P, m); let u = [(B[0] - A[0]) / ln, (B[1] - A[1]) / ln]; if(u[0] < 0) u = [-u[0], -u[1]];
+    let v = [-u[1], u[0]]; if(v[1] < 0) v = [-v[0], -v[1]];
+    const span = Math.min(...[...Array(P.length).keys()].map(i => edgeLen34(P, i))), l = ln * .55, t = .45, bh = .22;
+    for(let k = 0; k < K.lamps; k++){
+      const off = K.lamps === 1 ? 0 : (k ? .22 : -.22) * span, c0 = [cx + v[0]*off, cy + v[1]*off];
+      const at = (su, sv, h) => lift34(h)([c0[0] + u[0]*l/2*su + v[0]*t/2*sv, c0[1] + u[1]*l/2*su + v[1]*t/2*sv]);
+      s += flatPoly34([at(1, -1, H), at(1, 1, H), at(1, 1, H + bh), at(1, -1, H + bh)], vivMix34(K.frame[2], "#000000", .2), "", true);   // right end
+      s += flatPoly34([at(-1, 1, H), at(1, 1, H), at(1, 1, H + bh), at(-1, 1, H + bh)], K.frame[1], "", true);   // front face
+      s += flatPoly34([at(-1, -1, H + bh), at(1, -1, H + bh), at(1, 1, H + bh), at(-1, 1, H + bh)], K.top, "", true);   // top
+      s += flatPoly34([at(-.9, 1, H + .02), at(.9, 1, H + .02), at(.9, 1, H + .15), at(-.9, 1, H + .15)], "#FFD98A", "", true);   // the lens
+    }
+    if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(up))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   }
   return `<g pointer-events="none">${s}</g>`;
 }
@@ -889,7 +952,7 @@ function flatWalls34(P, h1, ln){
 // letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
 const FLAT_FONT34 = {R:["##.", "#.#", "##.", "#.#", "#.#"], E:["###", "#..", "##.", "#..", "###"], S:["###", "#..", "###", "..#", "###"], T:["###", ".#.", ".#.", ".#.", ".#."],
   O:["###", "#.#", "#.#", "#.#", "###"], V:["#.#", "#.#", "#.#", "#.#", ".#."], I:["###", ".#.", ".#.", ".#.", "###"], W:["#...#", "#...#", "#.#.#", "##.##", "#...#"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"],
-  N:["#.#", "###", "###", "#.#", "#.#"], A:[".#.", "#.#", "###", "#.#", "#.#"], C:["###", "#..", "#..", "#..", "###"]};
+  L:["#..", "#..", "#..", "#..", "###"], N:["#.#", "###", "###", "#.#", "#.#"], A:[".#.", "#.#", "###", "#.#", "#.#"], C:["###", "#..", "#..", "#..", "###"]};
 // door pictograms, 5 wide and 8 tall: a man and a woman
 const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
 function flatText34(Q, L, f, h, str, fill){
