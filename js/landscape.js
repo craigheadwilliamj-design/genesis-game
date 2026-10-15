@@ -503,6 +503,7 @@ const WATER_TEX = {
   grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},
   tropical: {damp:"#0A3A14", mud:"#4A3520", lit:"#3FC2A8", dark:"#0A5A5C"},
   tundra:   {damp:"#C6CFBD", mud:"#E6EEEE", lit:"#9CD0DC", dark:"#4A8294"},
+  boreal:   {damp:"#4A6A52", mud:"#3A3830", lit:"#A8C6C8", dark:"#2A4854"},
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.

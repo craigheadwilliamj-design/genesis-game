@@ -13,11 +13,11 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | desert | done | done | 27/27 | 4/4 | done |
 | tropical | done | done | 27/27 | 6/6 | done |
 | temperate | done | done | 27/27 | 7/7 | done |
-| boreal | to do | to do | 0/18 (Permian on) | 0/2 | to do |
+| boreal | done | done | 18/18 | 2/2 | done |
 | grassland | done | done | 6/6 | 1/1 | done |
 | tundra | done | done | 6/6 | 1/1 | done |
 
-That is 99 landscape plants and 19 Park Plants still to do, plus 4 grounds, 4 rock sets and 4 water tiles. A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
+Boreal is done (`tools/pixelplants_boreal.py`; its Quaternary Labrador Tea is called Marsh Rosemary, to keep tundra's Park Plant name unique). A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
 Suggested order, easiest and most visible first: **grassland, tundra** (6 plants each, almost nothing else), then **boreal**, **desert**, **temperate**, **tropical** last (most plants, the most to get wrong).
 
@@ -94,7 +94,7 @@ Wetland shows the whole pattern. For a new biome:
 
 Plants from the Paleogene on use **common names** where an ordinary person has one; older periods keep the scientific names. Wetland already has this (Mosquito Fern / Floating Fern / Bald Cypress in the Paleogene, Cattail / Common Reed / Tupelo in the Neogene, Peat Moss / Sedge / Willow in the Quaternary). The Cretaceous is left scientific on purpose. Edit the strings in `PLANT_TABLE` (`js/data.js`); they are labels only, nothing else reads them.
 
-Biome notes for the common-name pass (a suggestion, adjust as you see fit): desert Paleogene Tamarisk / Saltbush / Mesquite, Neogene Prickly Pear / Agave / Saguaro, Quaternary Creosote Bush / Barrel Cactus / Joshua Tree; tropical Paleogene Climbing Fern / Nipa Palm / (Dipterocarpoxylon: use Dipterocarp Tree), Neogene Heliconia / Banana / Kapok, Quaternary Philodendron / Palm / Mahogany; temperate Paleogene Zelkova / Oak / Dawn Redwood, Neogene Anemone / Maple / Beech, Quaternary Trillium / Hazel / Linden; boreal Paleogene Royal Fern / Birch / Larch, Neogene Blueberry / Alder / Spruce, Quaternary Reindeer Lichen / Labrador Tea / Pine; tundra Neogene Cottongrass / Crowberry / Arctic Willow, Quaternary Saxifrage / Mountain Avens / Dwarf Birch; grassland Neogene Bluegrass / Kangaroo Grass / Pampas Grass, Quaternary Fescue / Grama / Bluestem; scrubland Paleogene Hopbush / Acacia / Eucalyptus, Neogene Sagebrush / Saltbush / Juniper, Quaternary Sage / Chamise / Manzanita. Avoid reusing a Park Plant's exact label in the same list (the wetland names were chosen to avoid "Cattails", "Bald Cypress", "Weeping Willow" clashes only loosely; a near duplicate is fine, an exact duplicate in one list is confusing).
+Biome notes for the common-name pass (a suggestion, adjust as you see fit): desert Paleogene Tamarisk / Saltbush / Mesquite, Neogene Prickly Pear / Agave / Saguaro, Quaternary Creosote Bush / Barrel Cactus / Joshua Tree; tropical Paleogene Climbing Fern / Nipa Palm / (Dipterocarpoxylon: use Dipterocarp Tree), Neogene Heliconia / Banana / Kapok, Quaternary Philodendron / Palm / Mahogany; temperate Paleogene Zelkova / Oak / Dawn Redwood, Neogene Anemone / Maple / Beech, Quaternary Trillium / Hazel / Linden; boreal Paleogene Royal Fern / Birch / Larch, Neogene Blueberry / Alder / Spruce, Quaternary Reindeer Lichen / Marsh Rosemary / Pine; tundra Neogene Cottongrass / Crowberry / Arctic Willow, Quaternary Saxifrage / Mountain Avens / Dwarf Birch; grassland Neogene Bluegrass / Kangaroo Grass / Pampas Grass, Quaternary Fescue / Grama / Bluestem; scrubland Paleogene Hopbush / Acacia / Eucalyptus, Neogene Sagebrush / Saltbush / Juniper, Quaternary Sage / Chamise / Manzanita. Avoid reusing a Park Plant's exact label in the same list (the wetland names were chosen to avoid "Cattails", "Bald Cypress", "Weeping Willow" clashes only loosely; a near duplicate is fine, an exact duplicate in one list is confusing).
 
 ## Rules that apply to every asset
 
