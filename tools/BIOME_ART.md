@@ -15,9 +15,9 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | temperate | done | done | 27/27 | 7/7 | done |
 | boreal | to do | to do | 0/18 (Permian on) | 0/2 | to do |
 | grassland | done | done | 6/6 | 1/1 | done |
-| tundra | to do | to do | 0/6 (Neogene, Quaternary) | 0/1 | to do |
+| tundra | done | done | 6/6 | 1/1 | done |
 
-That is 105 landscape plants and 20 Park Plants still to do, plus 5 grounds, 5 rock sets and 5 water tiles. A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
+That is 99 landscape plants and 19 Park Plants still to do, plus 4 grounds, 4 rock sets and 4 water tiles. A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
 Suggested order, easiest and most visible first: **grassland, tundra** (6 plants each, almost nothing else), then **boreal**, **desert**, **temperate**, **tropical** last (most plants, the most to get wrong).
 
