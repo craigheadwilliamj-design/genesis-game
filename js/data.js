@@ -35,10 +35,18 @@ const WALK_SPEED = 20;
 const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, so a longer day doesn't change how far anyone gets in a park minute (on screen that halves WALK_SPEED)
 // Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN (1 = the old sim speed; the longer day is what slows them on screen)
 const STAFF_PACE = 1;
-const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
 // The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
 const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
-const DAY_MIN = CLOSE_MIN - OPEN_MIN;   // park minutes in one open day. Research, trips, and growing are counted in these.
+// Time runs around the clock. The sim counts in PARK minutes (DAY_MIN of them make one day, MINUTES_PER_SECOND a second on screen, so a day is still 240 s);
+// the 24 h clock is only how a park minute is shown: CLOCK_SCALE clock minutes each. state.minute is park minutes since the daily rollover,
+// which happens at ROLLOVER_HOUR on the clock (endDay and every *Night function run then). clockMin/minuteAtClock (sim.js) convert.
+const DAY_MIN = 720;                    // park minutes in one day. Research, trips, and growing are counted in these.
+const CLOCK_SCALE = 1440 / DAY_MIN;     // clock minutes in a park minute
+const ROLLOVER_HOUR = 4;                // the quiet hour the day turns over: weather rolls, bills are paid, staff reset
+const ROLLOVER_CLOCK = ROLLOVER_HOUR * 60;
+// Daylight on the clock (animals' awake schedules, the night wash on the map). Park-minute versions DAWN_MIN/DUSK_MIN are state.minute values.
+const DAWN_CLOCK = 6 * 60, DUSK_CLOCK = 20 * 60;
+const DAWN_MIN = (DAWN_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE, DUSK_MIN = (DUSK_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE;
 
 // Building costs
 const COST = {
@@ -476,9 +484,17 @@ const BUILDINGS = {
    GUESTS
    Guests come in parties. Needs run from 0 (fine) to 100 (desperate).
    --------------------------------------------------------------------- */
+// The night wash over the map: strongest opacity of the dark-blue layer, and clock hours dusk and dawn take to fade in and out
+const NIGHT = {dark:.35, fade:2.5};
 const GUEST = {
   drawPivot:25,        // species appeal is stretched around this: speciesDraw = pivot * (appeal / pivot) ^ drawPower, so a T. rex counts in full and cheap animals count for little
   drawPower:1.6,
+  arriveFrom:5, arriveTo:21,   // clock hours the day's crowd arrives in (a hump, busiest at 1 PM)
+  trickle:6,           // guests a day who keep arriving round the clock, even at night, at a 5-star park (a few stay the night); fewer at fewer stars
+  curfew:21,           // clock hour most daytime guests plan to be out by (they were all sent home at closing before)
+  overnight:.06,       // share of daytime parties who stay on past it anyway
+  nightStay:240,       // the most park minutes a party that arrives after hours stays
+  trickleLow:.3,       // the share of that trickle a 0-star park still gets
   maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home, before dividing by pace (slower guests stay longer, so they see the same amount)
@@ -835,6 +851,7 @@ const LODGING = {
   dirtyCut:.6,         // a filthy hotel books this much less
   cleanAt:20,          // custodians clean a hotel this dirty
   cashBoost:1.3,       // hotel guests bring more money
+  outAt:(8 * 60 - ROLLOVER_CLOCK) / CLOCK_SCALE,   // hotel guests come out at 8 AM (a state.minute)
   stayBoost:120,       // and stay this many minutes longer
 };
 // Security guards patrol the paths, put vandals off, and throw out the ones they catch
@@ -1362,7 +1379,7 @@ const BEHAVIOR = {
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
   escape:1.5,          // a stressed aggressive animal tries the fence up to this much more
-  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 6 minutes a second, so this is 25 to 45 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
+  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:60, max:120},   // a midday nap (a park minute is 2 clock minutes, so this is 2 to 4 hours): the clock hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
 };
 // Going inside (behavior.js, "going inside"). Animals walk into a shelter with room (LAND slots; a shelter holds animals up to its slots, each taking coverSlots) to hide, sleep or wait out bad weather, and aren't drawn or seen while in.
@@ -2463,7 +2480,7 @@ const GOALS = [
   {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once ORACLE has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
-  {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report after closing.", theme:"gilded", check:g=>g.state.money>=1000000},
+  {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at ORACLE. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},

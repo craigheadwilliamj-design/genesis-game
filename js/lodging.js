@@ -26,7 +26,7 @@ function hotelLocked(type){
 // Toiletries on hand for this many rooms. Before stock is physical, suppliers bring them.
 const roomsStocked = b => guestGoodsFree() ? Infinity : Math.floor(stockOf(b, "merch") / LODGING.toiletries);
 
-// After closing: guests book rooms for tonight, the best-looking hotels first
+// At the daily rollover: guests book rooms for tonight, the best-looking hotels first
 function lodgingNight(){
   const L = state.lodging;
   let want = state.today.guests * LODGING.stayShare * state.rating / 5;
@@ -50,7 +50,7 @@ function lodgingNight(){
 // Morning: last night's hotel guests come out and start their day. They bought their pass with the room.
 function hotelGuestsArrive(){
   const L = state.lodging;
-  if(!L.stays.length || !gGraph) return;
+  if(!L.stays.length || !gGraph || state.parkClosed || state.minute < LODGING.outAt) return;   // they come out in the morning
   for(const s of L.stays){
     const b = buildingById(s.hotel), at = b && gGraph.anchors[b.id];
     if(!at) continue;
@@ -58,7 +58,7 @@ function hotelGuestsArrive(){
     for(let left = s.n; left > 0; left -= LODGING.perRoom){
       const n = Math.min(LODGING.perRoom, left), p = newParty(n);
       if(p.thought.delete("pricey")) p.mood += 8;   // their pass came with the room
-      p.at = at; p.hotel = b.id; p.cash *= LODGING.cashBoost; p.until = Math.min(CLOSE_MIN, p.until + LODGING.stayBoost);
+      p.at = at; p.hotel = b.id; p.cash *= LODGING.cashBoost; p.until = Math.min(DUSK_MIN, p.until + LODGING.stayBoost);
       if(parties.length < GUEST.maxParties) parties.push(p);
     }
   }

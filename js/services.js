@@ -2,7 +2,7 @@
    GUEST SERVICES
    What food stands and gift shops sell (each one is an empty shell until
    you give it a menu), benches and picnic areas, trash bins and litter,
-   restroom dirt, and the night cleaning crew who tidy up after closing.
+   restroom dirt, and the night cleaning crew who tidy up at the daily rollover.
    ===================================================================== */
 
 let litterPts = new Map();   // litter square -> spots along the footpaths inside it, for drawing specks
@@ -212,7 +212,7 @@ function cleaningBill(){
   }
   return Math.round(bill);
 }
-// After closing, contract cleaners pick up the litter, empty the bins, and scrub the restrooms
+// At the daily rollover, contract cleaners pick up the litter, empty the bins, and scrub the restrooms
 function servicesNight(){
   const bill = cleaningBill();
   if(bill) spend(bill, "cleaning");

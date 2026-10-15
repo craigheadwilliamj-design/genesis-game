@@ -152,7 +152,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:OPEN_MIN,
+    day:1, minute:DAWN_MIN + 60, clockV:2, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
@@ -179,6 +179,9 @@ function linesFromTiles(T){
 }
 
 function upgradeSave(s){
+  // the day became a 24 h clock: minute is park minutes since the 4 AM rollover. Old saves counted from opening at 8, so shift by that to keep every science stamp exact.
+  if(s.clockV !== 2){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 2; }
+  if(s.parkClosed === undefined) s.parkClosed = false;
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
@@ -348,7 +351,7 @@ function upgradeSave(s){
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
   // stock for stands and shops became physical: older parks get a few more days of direct deliveries
-  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor((s.minute - OPEN_MIN) / LOGI.truckMin));
+  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor(s.minute / LOGI.truckMin));
   if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
@@ -552,7 +555,7 @@ function recompute(){
 
   // How well the park looks after its guests: how happy they are when they leave.
   // Before anyone has left, guess from how many food stands and restrooms there are.
-  const cap = need => state.buildings.filter(b => reach[b.id] && servesOf(b).includes(need)).reduce((s, b) => s + BUILDINGS[b.type].slots * (CLOSE_MIN - OPEN_MIN) / BUILDINGS[b.type].serveMin * 2.5, 0);
+  const cap = need => state.buildings.filter(b => reach[b.id] && servesOf(b).includes(need)).reduce((s, b) => s + BUILDINGS[b.type].slots * DAY_MIN / BUILDINGS[b.type].serveMin * 2.5, 0);
   const last = state.history.length ? state.history[state.history.length-1].guests : 0;
   const ref = Math.max(last, demand);
   const cover = c => ref > 0 ? Math.min(1, c / ref) : (c > 0 ? 1 : 0);
@@ -630,21 +633,21 @@ function refundFor(kind, item){
 
 let sinceRecompute = 0;
 
-// Move the park forward by dtMin park minutes. A big step is cut at closing (the rest carries into the next day, not lost)
+// Move the park forward by dtMin park minutes. A big step is cut at the daily rollover (the rest carries into the next day, not lost)
 // and at the next science job's end, so every job finishes at the minute its `end` passes, however long the step is.
 function tick(dtMin){
   if(state.over) return;
   if(!(dtMin > 0)) return tickStep(dtMin);
   let left = dtMin;
   for(let guard = 0; left > 1e-9 && !state.over && guard < 5000; guard++){
-    let st = Math.min(left, CLOSE_MIN - state.minute);
+    let st = Math.min(left, DAY_MIN - state.minute);
     const next = scienceNext();
     if(next > 1e-6 && next < st) st = next;
     tickStep(st); left -= st;
   }
 }
 function tickStep(dtMin){
-  const m0 = state.minute, m1 = Math.min(CLOSE_MIN, m0 + dtMin);
+  const m0 = state.minute, m1 = Math.min(DAY_MIN, m0 + dtMin);
   state.minute = m1;
 
   sinceRecompute += m1 - m0;
@@ -677,7 +680,7 @@ function tickStep(dtMin){
   // Guests arrive, walk around, eat, and go home
   guestsTick(m0, m1);
 
-  if(m1 >= CLOSE_MIN) endDay();
+  if(m1 >= DAY_MIN) endDay();
 }
 
 function dailyCosts(){
@@ -714,7 +717,6 @@ function deptProblem(type){
 function logScience(text, ok){ state.science.log.unshift({day:state.day, text, ok}); state.science.log.length = Math.min(state.science.log.length, 8); }
 
 function endDay(){
-  flushParties();
   recompute();
 
   const c = dailyCosts();
@@ -756,7 +758,8 @@ function endDay(){
   for(const e of state.exhibits) if(e.animals.length && e.happy < 30) events.toast(`${e.name}: the animals are unhappy. Tap the exhibit to see why.`, "bad");
 
   state.day++;
-  state.minute = OPEN_MIN;
+  state.minute = 0;
+  shiftStamps(DAY_MIN);
   state.today = freshLedger();
   checkGoals();
 
@@ -795,6 +798,14 @@ function dateOf(day){
   return {d:n % dpm + 1, m:Math.floor(n / dpm) % mpy + 1, y:CALENDAR.startYear + Math.floor(n / (dpm * mpy))};
 }
 function fmtDate(day){ const t = dateOf(day); return `${t.d} ${CALENDAR.months[t.m - 1]} Y${t.y}`; }
+// The 24 h clock, in clock minutes of the day, for a state.minute (park minutes since the rollover), and back
+const clockMin = (m = state.minute) => (ROLLOVER_CLOCK + m * CLOCK_SCALE) % 1440;
+const minuteAtClock = c => (((c - ROLLOVER_CLOCK) % 1440) + 1440) % 1440 / CLOCK_SCALE;
+// How dark it is, 0 (day) to NIGHT.dark (night), in steps so the map overlay only changes now and then. Dusk and dawn each fade over NIGHT.fade clock hours.
+function nightDark(c = clockMin()){
+  const h = c / 60, f = NIGHT.fade, d = Math.max(0, Math.min(1, h < DAWN_CLOCK / 60 + f ? (DAWN_CLOCK / 60 + f - h) / f : h >= DUSK_CLOCK / 60 - f ? (h - (DUSK_CLOCK / 60 - f)) / f : 0));
+  return Math.round(d * NIGHT.dark * 40) / 40;
+}
 function fmtClock(min){
   const h = Math.floor(min / 60), m = Math.floor(min % 60);
   const h12 = ((h + 11) % 12) + 1;

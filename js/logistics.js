@@ -188,11 +188,11 @@ function supplyLines(){
 // Farms and ranches fill their own stores through the day. A full store stops production.
 // Supply trucks also top up the docks every couple of hours while the park is open.
 function logiTick(dtMin){
-  const due = Math.floor((state.minute - OPEN_MIN) / LOGI.truckMin);
-  if(due > (state.logi.trucks || 0)){ state.logi.trucks = due; if(state.minute < CLOSE_MIN) dockDelivery(true); }
+  const due = Math.floor(state.minute / LOGI.truckMin);
+  if(due > (state.logi.trucks || 0)){ state.logi.trucks = due; dockDelivery(true); }
   if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until ${fmtDate(state.logi.guestFrom)}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
-  const share = dtMin / (CLOSE_MIN - OPEN_MIN);
+  const share = dtMin / DAY_MIN;
   for(const b of state.buildings){
     const make = BUILDINGS[b.type].makes; if(!make || !isReachable(b)) continue;
     for(const [t, n] of Object.entries(make)) addGood(b, t, n * share);

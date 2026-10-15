@@ -174,11 +174,16 @@ function newParty(n){
   const p = {id:uid("g"), n, name:SURNAMES[Math.floor(Math.random() * SURNAMES.length)] + " party", pers, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
              until:state.minute + rand(...GUEST.stay) / GUEST.pace, at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
              spd:rand(...GUEST.speed) * GUEST.pace, off:(Math.random()*2-1) * 1.4, tramRoll:Math.random(), in:null, rowdy:pers.includes("hooligan"), lane:Math.random()*2-1, sj:[Math.random()*2-1, Math.random()*2-1]};
+  // most daytime parties plan to be gone by the curfew, a few stay on; ones who turn up after hours stay a while, not a day
+  const m = state.minute, curfew = minuteAtClock(GUEST.curfew * 60);
+  if(m >= curfew || m < ARRIVE_START) p.until = Math.min(p.until, m + GUEST.nightStay);
+  else if(Math.random() >= GUEST.overnight) p.until = Math.min(p.until, Math.max(curfew, m + 60));
   p.sneaked = sneaksIn(p);   // hooligans may slip in without a ticket
   if(!p.sneaked && state.ticket > fairTicket() * 1.3 * pm(p, "ticket")){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
 }
 function guestsArrive(n){
+  if(state.parkClosed) return;   // the gate is shut: nobody comes in and no tickets are sold
   state.today.guests += n;
   if(parties.length < GUEST.maxParties){ const p = newParty(n); if(!p.sneaked) earn(state.ticket * n, "tickets"); parties.push(p); return; }
   earn(state.ticket * n, "tickets");
@@ -609,18 +614,24 @@ function serveParty(p, b){
 
 /* ---------- through the day ---------- */
 
-// Arrivals follow a hump: few at opening, busiest late morning, none after 4 PM.
-const ARRIVE_START = OPEN_MIN, ARRIVE_END = 16 * 60;
+// Arrivals follow a hump: few at first light, busiest early afternoon, none late at night (the hump is as wide in park minutes as the old open day).
+const ARRIVE_START = minuteAtClock(GUEST.arriveFrom * 60), ARRIVE_END = minuteAtClock(GUEST.arriveTo * 60);
 function arrivalShare(m0, m1){
   const f = m => { const t = clamp((m - ARRIVE_START) / (ARRIVE_END - ARRIVE_START), 0, 1); return (1 - Math.cos(Math.PI * t)) / 2; };
   return f(m1) - f(m0);
 }
+// The thin round-the-clock trickle, in guests a day, scaled by rating. It keeps the park from ever going quiet on its own.
+const trickleRate = () => GUEST.trickle * (GUEST.trickleLow + (1 - GUEST.trickleLow) * state.rating / 5);
 
 function guestsTick(m0, m1){
   const dt = m1 - m0, gdt = dt * GUEST.pace;   // guests live in slow motion: gdt is their own time
   if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path Tools). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
-  hotelGuestsArrive();
-  arrivalCarry += derived.demand * arrivalShare(m0, m1);
+  if(state.parkClosed){ for(const p of parties) if(!p.home) goHome(p); }   // closed: everyone still inside heads for the exit
+  else{
+    hotelGuestsArrive();
+    const tr = trickleRate();   // the trickle is part of the day's demand, not on top of it (a park with no draw still gets it)
+    arrivalCarry += Math.max(0, derived.demand - tr) * arrivalShare(m0, m1) + tr * dt / DAY_MIN;
+  }
   while(arrivalCarry >= nextSize){ arrivalCarry -= nextSize; guestsArrive(nextSize); nextSize = GUEST.sizes[Math.floor(Math.random() * GUEST.sizes.length)]; }
   // guests near a dangerous animal on the loose run for the gate
   const danger = state.safety.loose.filter(l => l.status === "loose" && isDangerous(SPECIES_BY_ID[l.sp])).map(loosePos).filter(Boolean);
@@ -666,10 +677,16 @@ function guestsTick(m0, m1){
   parties = parties.filter(p => !p.gone);
 }
 
-// Closing time: everyone still here goes home
-function flushParties(){
-  for(const p of parties) partyLeaves(p);
-  parties = []; svcQ.clear(); arrivalCarry = 0;
+// The day turns over at the rollover hour while guests are still walking about, so their timers (all in state.minute) move back a day with it
+function shiftStamps(d){
+  for(const p of parties){
+    p.until -= d;
+    if(p.linger) p.linger -= d;
+    for(const k of Object.keys(p.cool)) p.cool[k] -= d;
+    if(p.readyAt !== undefined) p.readyAt -= d;
+    if(p.watch && p.watch.next !== undefined) p.watch.next -= d;
+    for(const k of ["trashAt", "ejectAt", "ejectTry"]) if(p[k] !== undefined) p[k] -= d;
+  }
 }
 // Remember how today's guests felt, for tomorrow's crowd and the rating
 function guestsNight(){

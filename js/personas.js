@@ -55,7 +55,7 @@ function hooliganShare(){
 const sightCache = new Map();
 // What guests can see in an exhibit right now. Cached for a park minute.
 function exhibitTraits(e){
-  const c = sightCache.get(e.id), stamp = Math.floor(state.minute);
+  const c = sightCache.get(e.id), stamp = state.day * DAY_MIN + Math.floor(state.minute);
   if(c && c.stamp === stamp && c.n === e.animals.length) return c;
   const n = Math.max(1, e.animals.length), spp = [...speciesCounts(e).keys()].map(id => SPECIES_BY_ID[id]).filter(Boolean);
   const share = f => e.animals.filter(a => f(a, SPECIES_BY_ID[a.sp])).length / n;

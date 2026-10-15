@@ -4,23 +4,23 @@
    upgrades), GHOST fills genomes, TAR clones animals, and CERES grows
    plants and medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
-   finish mid-day rather than at closing.
+   finish at any hour rather than at the daily rollover.
    ===================================================================== */
 
 /* ---------- time ---------- */
 
-// Park minutes since day 1 opened. Closing on one day and opening the next are the same instant.
-const nowMin = () => (state.day - 1) * DAY_MIN + (state.minute - OPEN_MIN);
-const minAt = (day, minute) => (day - 1) * DAY_MIN + (minute - OPEN_MIN);
+// Park minutes since day 1 began. The rollover hour ending one day and starting the next are the same instant.
+const nowMin = () => (state.day - 1) * DAY_MIN + state.minute;
+const minAt = (day, minute) => (day - 1) * DAY_MIN + minute;
 function whenText(m){
   const r = m % DAY_MIN;
-  return r < 1 && m > 0 ? `closing on ${fmtDate(Math.round(m / DAY_MIN))}` : `${fmtDate(Math.floor(m / DAY_MIN) + 1)}, ${fmtClock(OPEN_MIN + r)}`;
+  return `${fmtDate(Math.floor(m / DAY_MIN) + 1)}, ${fmtClock(clockMin(r))}`;
 }
-// A length of time in open days and hours: "1 day 3h", "5h 20m"
+// A length of time in days and hours: "1 day 3h", "5h 20m"
 function spanText(min){
   min = Math.max(0, Math.round(min));
   if(min < 1) return "a moment";
-  const d = Math.floor(min / DAY_MIN), h = Math.floor(min % DAY_MIN / 60), m = min % 60;
+  const c = min * CLOCK_SCALE, d = Math.floor(c / 1440), h = Math.floor(c % 1440 / 60), m = Math.floor(c % 60);   // park minutes shown as clock time
   return d ? `${d} day${d === 1 ? "" : "s"}${h ? ` ${h}h` : ""}` : h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
 }
 const leftText = end => spanText(end - nowMin());
