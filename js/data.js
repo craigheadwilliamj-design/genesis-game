@@ -1374,7 +1374,8 @@ const BEHAVIOR = {
   comfortDrift:60,
   hideCalm:.5,         // stress shed a minute hiding in cover (a third of it with no cover)
   huntMin:20,          // meat eaters stalk this long before they eat
-  shyGuests:35,        // stress skittish animals take from a busy path, halved with cover to retreat to
+  teaseMemory:240,     // park minutes the Behavior tab still blames guests banging on the glass (the spike drains slowly)
+  shyGuests:35,       // stress skittish animals take from a busy path, halved with cover to retreat to
   busyAt:150,          // guests in the park for "busy"
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress

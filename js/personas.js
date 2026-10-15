@@ -173,6 +173,7 @@ function teaseTick(p, dt){
     const chance = H.tease * (isHooligan(p) ? 1 : PERS.second) * deterrence(x, y);
     if(Math.random() < 1 - Math.pow(1 - Math.min(.5, chance), dt)){
       for(const a of e.animals) if(a.need) a.need.stress = Math.min(100, a.need.stress + H.stress);
+      e.teasedAt = nowMin();   // so the Behavior tab can say why they're stressed (a spike isn't in stressTarget)
       p.vandal = true;
       if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); }
       state.today.teased = (state.today.teased || 0) + 1;

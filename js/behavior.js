@@ -269,6 +269,7 @@ function stressTarget(e, a, s, ctx, why){
   if(ctx.dirt > CLEAN.penaltyFrom) add((ctx.dirt - CLEAN.penaltyFrom) * .5, "the exhibit is dirty");
   if(a.sick && !a.sick.chronic) add(12, "it's sick or hurt");
   if(T.temper === "skittish" && !a.inside) add(BEHAVIOR.shyGuests * ctx.seen * (ctx.cover ? .5 : 1), ctx.cover ? "guests crowd the fence" : "guests crowd the fence and there's no cover to retreat to");
+  if(why && e.teasedAt != null && nowMin() - e.teasedAt < BEHAVIOR.teaseMemory) why.push("guests have been banging on the glass (still wearing off)");   // a one-off spike, so it isn't in t
   if(n.hunger > 70) add((n.hunger - 70) * .6, "it's hungry");
   if(n.thirst > 70) add((n.thirst - 70) * .6, "it's thirsty");
   if(n.lonely > 60) add((n.lonely - 60) * .3, "it's lonely");
