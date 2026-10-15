@@ -1650,9 +1650,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ncells = () => Object.keys(state.pathCells).length;
       out.cellsDefaultWalk = ncells() === 5 * 70 && Object.keys(state.pathFixed).length === 350 && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0 && !JSON.parse(JSON.stringify(state)).paths.some(p => p.d);
       out.cellCosts = pathCellCost("g") === COST.pathPerMeter / 5 && pathCellCost("s") === SERVICE_ROAD.perMeter / 5 && pathCellCost("b") === BRIDGE.perMeter / 5;
-      // a straight drag: 21 columns by 5 rows, 3 of the cells already part of the walk
+      // a straight drag lays whole 5 m x 5 m chunks: 5 chunks of 25 cells, none of them on the walk
       const A = [205, 233], B = [225, 233], plan = planPath(A, B, "g");
-      out.cellDragStraight = plan.cells.length === 21 * 5 && plan.todo.length === 21 * 5 - 3 && !plan.why && plan.cost === plan.todo.length * pathCellCost("g") && !plan.todo.some(k => state.pathCells[k]);
+      out.cellDragStraight = plan.cells.length === 5 * 25 && plan.chunks.length === 5 && plan.todo.length === 5 * 25 && !plan.why && plan.cost === plan.todo.length * pathCellCost("g") && !plan.todo.some(k => state.pathCells[k]);
       // the ghost shows exactly the cells that will be laid
       setTool("path"); cdrag = {a:A, b:B, kind:"g"}; pathDragStat(); renderOverlay();
       const ghostCells = ($("#overlay").innerHTML.match(/#4CD964[^>]*>/) ? 1 : 0) && [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="#4CD964"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
@@ -1661,13 +1661,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.cellLaid = ncells() === n0 + plan.todo.length && plan.todo.every(k => state.pathCells[k] === "g") && Math.abs(m0 - state.money - plan.cost) < 1e-6 && derived.joined.size > 0;
       // a diagonal drag lays a 5 m swath along the 45 degree run
       const D1 = [225, 233], D2 = [235, 223], dp = planPath(D1, D2, "g"), has = (x, y) => dp.cells.includes(cellKey(x, y));
-      out.cellDragDiagonal = !dp.why && has(225, 233) && has(235, 223) && has(230, 228) && has(228, 228) && has(232, 228) && !has(230, 233) && !has(230, 223) && dp.cells.length > 60 && dp.cells.length < 90;
+      out.cellDragDiagonal = !dp.why && dp.chunks.length === 5 && dp.cells.length === 125 && has(225, 233) && has(235, 223) && has(232, 228) && dp.chunks.every((c, i) => !i || Math.abs(c[0] - dp.chunks[i - 1][0]) + Math.abs(c[1] - dp.chunks[i - 1][1]) === 1);   // a diagonal run keeps its chunks edge to edge
       layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
       out.cellDiagJoined = cellsJoined(dp.cells, true) && derived.joined.size > 0 && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
       // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
       state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
       const pe = planPath([290, 110], [330, 110], "g");
-      out.cellBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && layPath([290, 110], [330, 110], "g") === null;
+      out.cellBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && pe.bad.size % 25 === 0 && !pe.bad.has("299,110") && pe.bad.has("300,114") && layPath([290, 110], [330, 110], "g") === null;
       state.exhibits = []; state.water = [{id:"w-cp", points:[[300,100],[320,100],[320,120],[300,120]]}];
       out.cellWaterBridge = /water/.test(planPath([290, 110], [330, 110], "g").why) && planPath([290, 110], [330, 110], "b").why === "" && planPath([290, 110], [330, 110], "b").bad.size === 0;
       state.water = [];
@@ -1681,7 +1681,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       setTool("bulldoze");
       const tapAt = (x, y) => { fdrag = {a:[x, y], b:[x, y], lift:true, box:true, swept:new Set(), last:{x, y}}; endFenceDrag(); };
       const c0 = ncells(), mm = state.money; tapAt(220.5, 233.5);
-      out.cellBulldozeTap = ncells() === c0 - 1 && !state.pathCells["220,233"] && state.money > mm;
+      out.cellBulldozeTap = ncells() === c0 - 25 && !state.pathCells["220,233"] && !state.pathCells["224,230"] && !!state.pathCells["225,230"] && state.money > mm;   // a tap takes its whole chunk
       const c1 = ncells(); fdrag = {a:[212, 231], b:[218, 236], lift:true, box:true, swept:new Set(), last:{x:218, y:236}}; endFenceDrag();
       out.cellBulldozeBox = ncells() < c1 && !state.pathCells["214,232"] && !!state.pathCells["205,260"];
       const c2 = ncells(); tapAt(205.5, 260.5);
@@ -1738,10 +1738,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.pathCells["208,235"] = "g"; pathVer++;
       out.reachEdge = G(208, 234) && G(208, 235);
       // two swaths side by side merge into one network
-      reset(); layPath([205, 233], [225, 233], "g"); layPath([205, 226], [225, 226], "g");   // y 231 to 235 and y 224 to 228, then the rows between
-      out.reachSideGap = !G(220, 226);
-      layPath([225, 230], [245, 230], "g");
-      out.reachSideBySide = G(240, 230) && G(240, 228);
+      reset(); layPath([205, 233], [225, 233], "g"); layPath([205, 221], [225, 221], "g");   // chunk rows y 230 to 234 and y 220 to 224, with a row of chunks missing between
+      out.reachSideGap = !G(220, 222);
+      layPath([205, 226], [225, 226], "g");   // the row between: edge to edge with both
+      out.reachSideBySide = G(220, 222) && G(220, 227);
       // the cache follows the cells
       const r0 = pathReach(); pathVer++;
       out.reachCache = pathReach() !== r0 && pathReach() === pathReach();
@@ -1750,26 +1750,26 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.reachBridge = G(238, 233) && pathKind(238, 233) === "b" && [...gGraph.nodes.values()].some(n => n.x > 236);
       // a staff path touching a guest path edge to edge is joined for staff, never for guests; one that doesn't touch stays apart
       reset(); layPath([208, 260], [230, 260], "s"); redo();
-      const farNode = () => { let b = null, bd = 1e9; for(const n of kGraph.nodes.values()){ const d = Math.hypot(n.x - 231, n.y - 261); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
+      const farNode = () => { let b = null, bd = 1e9; for(const n of kGraph.nodes.values()){ const d = Math.hypot(n.x - 232, n.y - 262.5); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
       const start = [...kGraph.nodes.values()].reduce((a, n) => Math.hypot(n.x - 205, n.y - 290) < Math.hypot(a.x - 205, a.y - 290) ? n : a);
       out.staffTouchJoins = S(220, 260) && !G(220, 260) && farNode().d < 3 && walkFrom(start, null).dist.has(farNode().b);
-      out.staffNoGuests = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && ![...gGraph.nodes.values()].some(n => Math.hypot(n.x - 231, n.y - 261) < 2);
+      out.staffNoGuests = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && ![...gGraph.nodes.values()].some(n => Math.hypot(n.x - 232, n.y - 262.5) < 2);
       reset(); layPath([212, 260], [230, 260], "s"); redo();   // a two-cell gap to the walk
       out.staffGapApart = !S(220, 260) && farNode().d > 3;
-      removeCells(["230,260"]); out.staffNeighbors = cellNeighbors(pnum(5, 5)).length === 4;
+      out.staffNeighbors = cellNeighbors(pnum(5, 5)).length === 4;
       // an exhibit gate on a cell edge reads as connected only when its path reaches the entrance
       reset(); layPath([208, 260], [230, 260], "s"); redo();
-      const ex = { id:"e-gt", name:"GT", points:[[214,245],[226,245],[226,258],[214,258]], animals:[], land:[], water:[], cond:100, gate:[215, 258] };
+      const ex = { id:"e-gt", name:"GT", points:[[214,245],[226,245],[226,260],[214,260]], animals:[], land:[], water:[], cond:100, gate:[215, 260] };
       state.exhibits = [ex]; redo();
       out.gateOnEdge = gateCheck(ex).ok;
       ex.gate = [215, 250]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
-      ex.gate = [215, 258]; reset(); layPath([212, 260], [230, 260], "s"); redo();
+      ex.gate = [215, 260]; reset(); layPath([212, 260], [230, 260], "s"); redo();
       out.gateUnjoined = !gateCheck(ex).ok && /join/.test(gateCheck(ex).text);
       reset(); layPath([208, 260], [230, 260], "s"); redo();
       out.exhibitStaffOnly = !isReachable(ex);
       // an exhibit beside a guest path is open to guests, one beside a staff road is not
       out.exhibitStaffOnly = !isReachable(ex);
-      layPath([205, 239], [225, 239], "g"); redo();
+      layPath([205, 244], [225, 244], "g"); redo();
       out.exhibitGuestOpen = isReachable(ex) && !!gGraph.anchors["e-gt"];
       // buildings: a backstage one needs only staff reach, a guest one needs a guest path
       state.exhibits = []; reset(); layPath([208, 260], [230, 260], "s");

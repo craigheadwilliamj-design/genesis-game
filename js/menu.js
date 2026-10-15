@@ -9,9 +9,9 @@
 const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "screen", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay", "pbale"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
-    {label:"Guest Paths", tool:"path", price:() => `${money(pathCellCost("g"))}/m²`, note:"5 m wide. Drag along the grid, straight or diagonal. Lay paths side by side for a wider walk."},
+    {label:"Guest Paths", tool:"path", price:() => `${money(pathCellCost("g"))}/m²`, note:"Laid in 5 m x 5 m chunks. Drag along the grid, straight or diagonal. Bulldoze takes a chunk at a time."},
     {label:"Wooden Bridges", tool:"bridge", price:() => `${money(pathCellCost("b"))}/m²`, note:"The only path that crosses water. Drag it over the water, from one bank to the other."},
-    {label:"Staff Paths", tool:"service", price:() => `${money(pathCellCost("s"))}/m²`, note:"Staff only: guests won't walk it. Staff paths lie under guest paths where they cross."},
+    {label:"Staff Paths", tool:"service", price:() => `${money(pathCellCost("s"))}/m²`, note:"Staff only: guests won't walk it. Laid in 5 m x 5 m chunks, and staff paths lie under guest paths where they cross."},
     {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(TRAM.perMeter)}/m`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
     {label:"Bins", tool:"bin"},
     {label:"Benches", tool:"bench"},

@@ -2,8 +2,8 @@
    PATHS AS CELLS
    A path is a set of 1 m grid cells in state.pathCells, keyed "x,y" (the square from x,y to x+1,y+1) with a
    kind: g guest path, s staff path, b wooden bridge. Every path is PATH_CELLS.width (5) m wide; lay two side by
-   side and they merge into one wide path. A drag lays a 5 m swath along a straight or 45 degree run
-   (pathSwath, planPath, layPath), like the fence tool. Tram track is not cells: it stays in state.paths as lines.
+   side and they merge into one wide path. A drag lays 5 m x 5 m chunks (aligned to multiples of 5) along a straight or 45 degree run
+   (chunkRun, planPath, layPath), like the fence tool, and Bulldoze takes whole chunks (removeCells). Tram track is not cells: it stays in state.paths as lines.
    state.pathFixed holds the cells of the entrance walk, which can't be bulldozed.
 
    Compatibility layer (until the connectivity and navigation rework): the rest of the game still reads
@@ -23,26 +23,21 @@ const pathCellUpkeep = k => PATH_CELLS.kinds[k].upkeepPerMeter / PATH_CELLS.widt
 const cellXY = k => k.split(",").map(Number);
 const cellRect = (x, y) => [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]];
 
-/* ---------- the run a drag lays ---------- */
-// Cells a drag from cell a toward cell b covers: a 5 m swath along the nearest straight or diagonal run
-function pathSwath(a, b){
-  const dx = b[0] - a[0], dy = b[1] - a[1];
-  if(!dx && !dy) return {end:a, cells:[]};
+/* ---------- chunks: paths are laid and bulldozed in 5 m x 5 m blocks of cells ---------- */
+const CHUNK = PATH_CELLS.width;   // a chunk is CHUNK x CHUNK cells, aligned to multiples of 5
+const chunkOf = (x, y) => [Math.floor(x / CHUNK), Math.floor(y / CHUNK)];
+const chunkCells = (cx, cy) => { const out = []; for(let x = cx * CHUNK; x < (cx + 1) * CHUNK; x++) for(let y = cy * CHUNK; y < (cy + 1) * CHUNK; y++) out.push(cellKey(x, y)); return out; };
+// Chunks a drag from cell a toward cell b covers: the straight or 45 degree run of chunks, kept edge to edge (a diagonal step gets a corner chunk)
+function chunkRun(a, b){
+  const ca = chunkOf(a[0], a[1]), cb = chunkOf(b[0], b[1]), dx = cb[0] - ca[0], dy = cb[1] - ca[1];
+  if(!dx && !dy) return {end:ca, chunks:[ca]};
   const o = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), sx = Math.round(Math.cos(o * Math.PI / 4)), sy = Math.round(Math.sin(o * Math.PI / 4));
-  const diag = sx && sy, n = diag ? Math.round((Math.abs(dx) + Math.abs(dy)) / 2) : sx ? Math.abs(dx) : Math.abs(dy), cells = [];
-  const half = PATH_CELLS.width >> 1;
-  if(!diag){
-    const px = -sy, py = sx;
-    for(let i = 0; i <= n; i++) for(let p = -half; p <= half; p++) cells.push([a[0] + sx * i + px * p, a[1] + sy * i + py * p]);
-  } else {
-    // cells whose center is within 2.5 m of the center line, between the two end caps (7 across a row, about 5 m square on)
-    const x0 = Math.min(0, n * sx) - 3, x1 = Math.max(0, n * sx) + 3, y0 = Math.min(0, n * sy) - 3, y1 = Math.max(0, n * sy) + 3;
-    for(let u = x0; u <= x1; u++) for(let v = y0; v <= y1; v++){
-      const t = u * sx + v * sy, q = -sy * u + sx * v;
-      if(t >= 0 && t <= 2 * n && Math.abs(q) <= 3) cells.push([a[0] + u, a[1] + v]);
-    }
+  const diag = sx && sy, n = diag ? Math.round((Math.abs(dx) + Math.abs(dy)) / 2) : sx ? Math.abs(dx) : Math.abs(dy), out = [];
+  for(let i = 0; i <= n; i++){
+    out.push([ca[0] + sx * i, ca[1] + sy * i]);
+    if(diag && i < n) out.push([ca[0] + sx * (i + 1), ca[1] + sy * i]);
   }
-  return {end:[a[0] + sx * n, a[1] + sy * n], cells};
+  return {end:[ca[0] + sx * n, ca[1] + sy * n], chunks:out};
 }
 
 /* ---------- checking a run ---------- */
@@ -79,28 +74,32 @@ function fenceBetween(x, y, nx, ny){
   const P = fencePieces();
   return nx !== x ? !!P[pieceKey(Math.max(x, nx), y, "v")] : !!P[pieceKey(x, Math.max(y, ny), "h")];
 }
-// What laying a swath from cell a to cell b would do: {cells (every cell of the run), todo (the ones that change), bad (cell key to reason), cost, why}
+// What laying chunks from cell a toward cell b would do: {cells (every cell of the run), todo (the ones that change), bad (cell key to reason), cost, why}
 function planPath(a, b, kind){
-  const C = pathCells(), sw = pathSwath(a, b), out = {cells:sw.cells.map(c => cellKey(c[0], c[1])), todo:[], bad:new Map(), cost:0, why:"", end:sw.end, kind};
-  if(!sw.cells.length) return out;
+  const C = pathCells(), run = chunkRun(a, b), out = {cells:run.chunks.flatMap(c => chunkCells(c[0], c[1])), chunks:run.chunks, todo:[], bad:new Map(), cost:0, why:"", end:run.end, kind};
   out.todo = out.cells.filter(k => C[k] !== kind && !(kind === "s" && C[k]));   // a staff path never takes over a guest path or bridge
   if(!out.todo.length){ out.why = "That path is already there."; return out; }
-  const ctx = pathCtx(), run = new Set(out.cells);
+  const ctx = pathCtx(), inRun = new Set(out.cells);
   for(const k of out.todo){
     const [x, y] = cellXY(k);
     let why = pathCellProblem(x, y, kind, ctx);
     if(!why) for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
       const n = cellKey(x + dx, y + dy);
-      if((run.has(n) || C[n]) && fenceBetween(x, y, x + dx, y + dy)){ why = "It runs into a fence."; break; }
+      if((inRun.has(n) || C[n]) && fenceBetween(x, y, x + dx, y + dy)){ why = "It runs into a fence."; break; }
     }
     if(why) out.bad.set(k, why);
+  }
+  // a chunk goes down whole or not at all: one bad cell makes its whole chunk red
+  for(const [cx, cy] of run.chunks){
+    const cs = chunkCells(cx, cy), hit = cs.find(k => out.bad.has(k));
+    if(hit) for(const k of cs) if(!out.bad.has(k)) out.bad.set(k, out.bad.get(hit));
   }
   out.cost = Math.round(out.todo.reduce((s, k) => s + pathCellCost(kind), 0));
   if(out.bad.size) out.why = out.bad.values().next().value;
   else if(!canAfford(out.cost)) out.why = `Costs ${money(out.cost)}. You have ${money(state.money)}.`;
   return out;
 }
-// Lay a swath; returns {n, cost} or null if it can't go there
+// Lay the chunks; returns {n, cost} or null if it can't go there
 function layPath(a, b, kind){
   const plan = planPath(a, b, kind);
   if(plan.why || !plan.todo.length) return null;
@@ -112,7 +111,9 @@ function layPath(a, b, kind){
 }
 // Take cells away (not the entrance walk); gives back the refund share of what each cost
 function removeCells(keys){
-  const C = pathCells(), F = pathFixedCells();
+  const C = pathCells(), F = pathFixedCells(), ch = new Set();
+  for(const k of keys){ const [x, y] = cellXY(k); ch.add(chunkOf(x, y).join(",")); }
+  keys = [...ch].flatMap(c => chunkCells(...c.split(",").map(Number))).filter(k => C[k]);   // bulldozing takes the whole chunk
   let n = 0, back = 0, kept = 0;
   for(const k of keys){
     if(!C[k]) continue;

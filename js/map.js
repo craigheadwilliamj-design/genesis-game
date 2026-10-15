@@ -31,7 +31,7 @@ let pdrag = null;                   // biome paint box being dragged: {a, b} (gr
 let paintPick = null;               // what the paint tool does: a biome id, or "erase"
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
 let cdrag = null;                   // path swath being laid: {a, b, kind, plan} (cells, js/pathcells.js)
-let chover = null;                  // path tool or bulldoze: the cell under the pointer
+let chover = null;                  // path tool or bulldoze: the corner cell of the 5 m chunk under the pointer
 let fhover = null;                  // bulldoze: the fence piece under the pointer
 let parcelSel = null;               // plot picked with the Buy Land tool: [i, j]
 
@@ -1166,7 +1166,7 @@ function renderOverlay(){
     });
   }
   if(cdrag && cdrag.plan) s += pathGhostSvg(cdrag.plan, inv);
-  else if(chover) s += `<rect x="${chover[0]}" y="${chover[1]}" width="1" height="1" fill="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" fill-opacity=".35" stroke="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  else if(chover) s += `<rect x="${chover[0]}" y="${chover[1]}" width="${CHUNK}" height="${CHUNK}" fill="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" fill-opacity=".35" stroke="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
     const keys = fenceDragKeys();
@@ -2160,11 +2160,12 @@ function finishFenceDrag(keys, lift){
 }
 
 /* ---------- laying paths on the grid (js/pathcells.js) ---------- */
+const chunkAtEv = ev => { const c = cellAtEv(ev); return chunkOf(c[0], c[1]).map(v => v * CHUNK); };   // the 5 m chunk under the pointer, as its corner cell
 const cellAtEv = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math.floor(w.x), Math.floor(w.y)]; };
 const PATH_HINT = {
-  g:"Drag along the grid to lay a 5 m wide path, straight or diagonal. Start on the entrance walk or another path. Lay paths side by side for a wider walk. Bulldoze takes cells away.",
-  s:"Staff only: guests won't walk it. Drag to lay a 5 m wide staff path from any path. Bulldoze takes cells away.",
-  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes cells away."
+  g:"Drag along the grid to lay 5 m x 5 m path chunks, straight or diagonal. Start on the entrance walk or another path. Bulldoze takes a chunk at a time.",
+  s:"Staff only: guests won't walk it. Drag to lay 5 m x 5 m staff path chunks from any path. Bulldoze takes a chunk at a time.",
+  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes a chunk at a time."
 };
 function pathBar(){
   const k = PATH_TOOLS[tool], K = PATH_CELLS.kinds[k];
@@ -2936,13 +2937,13 @@ svg.addEventListener("pointermove", e => {
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
-    else if(isPathTool(tool)){ chover = cellAtEv(e); renderOverlay(); }
+    else if(isPathTool(tool)){ chover = chunkAtEv(e); renderOverlay(); }
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
       const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
       if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
       const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
-      const pc = !k && !nh && !gx && pathAt(w.x, w.y) ? [Math.floor(w.x), Math.floor(w.y)] : null;
+      const pc = !k && !nh && !gx && pathAt(w.x, w.y) ? chunkAtEv(e) : null;
       if(k !== fhover || String(pc) !== String(chover)){ fhover = k; chover = pc; renderOverlay(); }
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }
     }
