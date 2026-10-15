@@ -1,54 +1,55 @@
 /* =====================================================================
-   PATHS AS CELLS
-   A path is a set of 1 m grid cells in state.pathCells, keyed "x,y" (the square from x,y to x+1,y+1) with a
-   kind: g guest path, s staff path, b wooden bridge, x crossing (one cell joining staff to guest paths). Every path is PATH_CELLS.width (5) m wide; lay two side by
-   side and they merge into one wide path. A drag lays a 5 m swath along a straight or 45 degree run
-   (pathSwath, planPath, layPath), like the fence tool. Tram track is not cells: it stays in state.paths as lines.
-   state.pathFixed holds the cells of the entrance walk, which can't be bulldozed.
+   PATHS AS CHUNKS
+   A path is a 5 m x 5 m chunk. Chunk (cx, cy) is the square from (5cx, 5cy) to (5cx+5, 5cy+5); state.pathChunks holds them keyed "cx,cy"
+   with a kind: g guest path, s staff path, b wooden bridge. Lay two side by side and they merge into one wide path. A drag lays whole chunks
+   along a straight or 45 degree run (pathRun, planPath, layPath), like the fence tool; a diagonal run adds a connecting chunk at each step so
+   the chunks stay edge to edge. Everything snaps to the chunk grid. Tram track is not chunks: it stays in state.paths as lines.
+   state.pathFixed holds the chunk of the entrance walk, which can't be bulldozed.
+   pathSquares() lists the chunks as squares for the renderer.
 
-   Compatibility layer (until the connectivity and navigation rework): the rest of the game still reads
-   state.paths as lines, so syncPathStrips() derives strip polylines from the cells (flagged d:1, 5 m wide through
-   hw: 2.5, never saved) and keeps them in state.paths. A strip is a straight run along the "core" of the cells
-   (cells whose whole 2.5 m surroundings are path), so a 5 m swath is its center line.
+   Compatibility layer (until the navigation rework): the rest of the game still reads state.paths as lines, so syncPathStrips() derives
+   strip polylines from the chunks (flagged d:1, 5 m wide through hw: 2.5, never saved). The chunks are expanded to 1 m cells for that, and a
+   strip is a straight run along the "core" of the cells (cells whose whole 2.5 m surroundings are path), so a 5 m run's core is its center line.
    ===================================================================== */
 
-let pathVer = 0;   // bumped whenever the cells change, so the derived strips know to rebuild
-const cellKey = (x, y) => x + "," + y;
-const pathCells = () => state.pathCells || (state.pathCells = {});
-const pathFixedCells = () => state.pathFixed || (state.pathFixed = {});
-const pathKind = (x, y) => pathCells()[cellKey(x, y)] || null;
-const pathAt = (wx, wy) => pathKind(Math.floor(wx), Math.floor(wy));
-const pathCellCost = k => PATH_CELLS.kinds[k].perMeter / PATH_CELLS.width;
-const pathCellUpkeep = k => PATH_CELLS.kinds[k].upkeepPerMeter / PATH_CELLS.width;
-const cellXY = k => k.split(",").map(Number);
-const cellRect = (x, y) => [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1]];
+let pathVer = 0;   // bumped whenever the chunks change, so the derived strips and reach know to rebuild
+const CHUNK = 5;   // meters a chunk is across
+const chunkKey = (cx, cy) => cx + "," + cy;
+const pathChunks = () => state.pathChunks || (state.pathChunks = {});
+const pathFixedChunks = () => state.pathFixed || (state.pathFixed = {});
+const chunkXY = k => k.split(",").map(Number);
+const chunkAt = (wx, wy) => [Math.floor(wx / CHUNK), Math.floor(wy / CHUNK)];
+const pathKind = (cx, cy) => pathChunks()[chunkKey(cx, cy)] || null;
+const pathAt = (wx, wy) => pathKind(Math.floor(wx / CHUNK), Math.floor(wy / CHUNK));
+const pathChunkCost = k => PATH_CELLS.kinds[k].perMeter * CHUNK;   // a chunk is 5 m of path
+const pathChunkUpkeep = k => PATH_CELLS.kinds[k].upkeepPerMeter * CHUNK;
+const chunkRect = (cx, cy) => [[cx * CHUNK, cy * CHUNK], [cx * CHUNK + CHUNK, cy * CHUNK], [cx * CHUNK + CHUNK, cy * CHUNK + CHUNK], [cx * CHUNK, cy * CHUNK + CHUNK]];
+// Every chunk as a square, for drawing: {cx, cy, x, y, w, h, kind, fixed}
+function pathSquares(){
+  const C = pathChunks(), F = pathFixedChunks(), out = [];
+  for(const k in C){ const [cx, cy] = chunkXY(k); out.push({cx, cy, x:cx * CHUNK, y:cy * CHUNK, w:CHUNK, h:CHUNK, kind:C[k], fixed:!!F[k]}); }
+  return out;
+}
 
 /* ---------- the run a drag lays ---------- */
-// Cells a drag from cell a toward cell b covers: a 5 m swath along the nearest straight or diagonal run
-function pathSwath(a, b){
+// The chunks a drag from chunk a toward chunk b covers: the nearest straight or 45 degree run, and on a diagonal the chunk beside each step that keeps it edge to edge
+function pathRun(a, b){
   const dx = b[0] - a[0], dy = b[1] - a[1];
-  if(!dx && !dy) return {end:a, cells:[]};
+  if(!dx && !dy) return {end:a, chunks:[a.slice()]};
   const o = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), sx = Math.round(Math.cos(o * Math.PI / 4)), sy = Math.round(Math.sin(o * Math.PI / 4));
-  const diag = sx && sy, n = diag ? Math.round((Math.abs(dx) + Math.abs(dy)) / 2) : sx ? Math.abs(dx) : Math.abs(dy), cells = [];
-  const half = PATH_CELLS.width >> 1;
-  if(!diag){
-    const px = -sy, py = sx;
-    for(let i = 0; i <= n; i++) for(let p = -half; p <= half; p++) cells.push([a[0] + sx * i + px * p, a[1] + sy * i + py * p]);
-  } else {
-    // cells whose center is within 2.5 m of the center line, between the two end caps (7 across a row, about 5 m square on)
-    const x0 = Math.min(0, n * sx) - 3, x1 = Math.max(0, n * sx) + 3, y0 = Math.min(0, n * sy) - 3, y1 = Math.max(0, n * sy) + 3;
-    for(let u = x0; u <= x1; u++) for(let v = y0; v <= y1; v++){
-      const t = u * sx + v * sy, q = -sy * u + sx * v;
-      if(t >= 0 && t <= 2 * n && Math.abs(q) <= 3) cells.push([a[0] + u, a[1] + v]);
-    }
+  const diag = sx && sy, n = diag ? Math.round((Math.abs(dx) + Math.abs(dy)) / 2) : sx ? Math.abs(dx) : Math.abs(dy), chunks = [];
+  for(let i = 0; i <= n; i++){
+    const x = a[0] + sx * i, y = a[1] + sy * i;
+    chunks.push([x, y]);
+    if(diag && i < n) chunks.push([x + sx, y]);
   }
-  return {end:[a[0] + sx * n, a[1] + sy * n], cells};
+  return {end:[a[0] + sx * n, a[1] + sy * n], chunks};
 }
 
 /* ---------- checking a run ---------- */
-// What is in the way of cells, gathered once for a whole run
+// What is in the way of chunks, gathered once for a whole run
 function pathCtx(){
-  const box = pts => { const b = bbox(pts); return {pts, x0:b.x0 - 1, y0:b.y0 - 1, x1:b.x1 + 1, y1:b.y1 + 1}; };
+  const box = pts => { const b = bbox(pts); return {pts, x0:b.x0, y0:b.y0, x1:b.x1, y1:b.y1}; };
   const diag = new Set();
   for(const k of Object.keys(fencePieces())){ const [x, y, d] = k.split(","); if(d === "d" || d === "a") diag.add(x + "," + y); }
   return {
@@ -60,76 +61,87 @@ function pathCtx(){
     diag
   };
 }
-const hitsBox = (o, x, y) => x + 1 > o.x0 && x < o.x1 && y + 1 > o.y0 && y < o.y1;
-// Why one cell can't be a path of this kind, or null
-function pathCellProblem(x, y, kind, ctx){
-  const e = .02;
-  for(const [px, py] of [[x + e, y + e], [x + 1 - e, y + e], [x + 1 - e, y + 1 - e], [x + e, y + 1 - e]]) if(!inOwned(px, py, 0)) return "Keep it inside the park boundary.";
-  const r = cellRect(x, y);
+const hitsBox = (o, x, y) => x + CHUNK > o.x0 && x < o.x1 && y + CHUNK > o.y0 && y < o.y1;
+// Why one chunk can't be a path of this kind, or null
+function pathChunkProblem(cx, cy, kind, ctx){
+  const x = cx * CHUNK, y = cy * CHUNK, e = .02, S = CHUNK;
+  for(const [px, py] of [[x + e, y + e], [x + S - e, y + e], [x + S - e, y + S - e], [x + e, y + S - e]]) if(!inOwned(px, py, 0)) return "Keep it inside the park boundary.";
+  const r = chunkRect(cx, cy);
   for(const o of ctx.ex) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through an exhibit.";
   for(const o of ctx.bl) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through a building.";
   if(kind !== "b") for(const o of ctx.water) if(hitsBox(o, x, y) && (shapesOverlap(r, o.pts) || shapesOverlap(o.pts, r))) return "Paths can't cross water. Lay a wooden bridge over it.";
-  for(const f of ctx.decor) if(f.x > x - f.r && f.x < x + 1 + f.r && f.y > y - f.r && f.y < y + 1 + f.r && Math.hypot(f.x - clamp(f.x, x, x + 1), f.y - clamp(f.y, y, y + 1)) < f.r) return "It runs into a plant, rock or statue. Bulldoze it first.";
-  if(ctx.diag.has(x + "," + y)) return "It runs into a fence.";
+  for(const f of ctx.decor) if(f.x > x - f.r && f.x < x + S + f.r && f.y > y - f.r && f.y < y + S + f.r && Math.hypot(f.x - clamp(f.x, x, x + S), f.y - clamp(f.y, y, y + S)) < f.r) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(ctx.diag.size) for(let i = 0; i < S; i++) for(let j = 0; j < S; j++) if(ctx.diag.has((x + i) + "," + (y + j))) return "It runs into a fence.";
   for(const l of ctx.lines) if(lineEntersShape(l, r)) return "It runs into a fence.";
   return null;
 }
-// Is there a straight fence piece on the edge between two neighboring cells?
-function fenceBetween(x, y, nx, ny){
-  const P = fencePieces();
-  return nx !== x ? !!P[pieceKey(Math.max(x, nx), y, "v")] : !!P[pieceKey(x, Math.max(y, ny), "h")];
+// Is there a straight fence piece across the chunk, or on the edge it shares with the chunk next to it (at cx+dx, cy+dy)?
+function fenceInChunk(cx, cy){
+  const P = fencePieces(), x = cx * CHUNK, y = cy * CHUNK;
+  for(let i = 0; i < CHUNK; i++) for(let j = 1; j < CHUNK; j++) if(P[pieceKey(x + j, y + i, "v")] || P[pieceKey(x + i, y + j, "h")]) return true;
+  return false;
 }
-// What laying a swath from cell a to cell b would do: {cells (every cell of the run), todo (the ones that change), bad (cell key to reason), cost, why}
+function fenceOnChunkEdge(cx, cy, nx, ny){
+  const P = fencePieces();
+  for(let i = 0; i < CHUNK; i++){
+    if(nx !== cx){ if(P[pieceKey(Math.max(cx, nx) * CHUNK, cy * CHUNK + i, "v")]) return true; }
+    else if(P[pieceKey(cx * CHUNK + i, Math.max(cy, ny) * CHUNK, "h")]) return true;
+  }
+  return false;
+}
+// What laying a run from chunk a to chunk b would do: {chunks (keys of the whole run), todo (the ones that change), bad (key to reason), cost, why, end, kind}
 function planPath(a, b, kind){
-  if(kind === "x") return planCrossing(b);   // a crossing is one cell, the one under the pointer
-  const C = pathCells(), sw = pathSwath(a, b), out = {cells:sw.cells.map(c => cellKey(c[0], c[1])), todo:[], bad:new Map(), cost:0, why:"", end:sw.end, kind};
-  if(!sw.cells.length) return out;
-  out.todo = out.cells.filter(k => C[k] !== kind && !(kind === "s" && C[k]));   // a staff path never takes over a guest path or bridge
+  const C = pathChunks(), F = pathFixedChunks(), run = pathRun(a, b), out = {chunks:run.chunks.map(c => chunkKey(c[0], c[1])), todo:[], bad:new Map(), cost:0, why:"", end:run.end, kind};
+  out.todo = out.chunks.filter(k => C[k] !== kind && !F[k] && !(kind === "s" && C[k]));   // a staff path never takes over a guest path or bridge
   if(!out.todo.length){ out.why = "That path is already there."; return out; }
-  const ctx = pathCtx(), run = new Set(out.cells);
+  const ctx = pathCtx(), inRun = new Set(out.chunks);
   for(const k of out.todo){
-    const [x, y] = cellXY(k);
-    let why = pathCellProblem(x, y, kind, ctx);
-    if(!why) for(const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){
-      const n = cellKey(x + dx, y + dy);
-      if((run.has(n) || C[n]) && fenceBetween(x, y, x + dx, y + dy)){ why = "It runs into a fence."; break; }
+    const [cx, cy] = chunkXY(k);
+    let why = pathChunkProblem(cx, cy, kind, ctx);
+    if(!why && fenceInChunk(cx, cy)) why = "It runs into a fence.";
+    if(!why) for(const [dx, dy] of CHUNK_DIRS){
+      const n = chunkKey(cx + dx, cy + dy);
+      if((inRun.has(n) || C[n]) && fenceOnChunkEdge(cx, cy, cx + dx, cy + dy)){ why = "It runs into a fence."; break; }
     }
     if(why) out.bad.set(k, why);
   }
-  out.cost = Math.round(out.todo.reduce((s, k) => s + pathCellCost(kind), 0));
+  out.cost = Math.round(out.todo.length * pathChunkCost(kind));
   if(out.bad.size) out.why = out.bad.values().next().value;
   else if(!canAfford(out.cost)) out.why = `Costs ${money(out.cost)}. You have ${money(state.money)}.`;
   return out;
 }
-// Lay a swath; returns {n, cost} or null if it can't go there
+// Lay a run; returns {n, cost} or null if it can't go there
 function layPath(a, b, kind){
-  if(kind === "x") return layCrossing(b);
   const plan = planPath(a, b, kind);
   if(plan.why || !plan.todo.length) return null;
   spend(plan.cost, "built");
-  const C = pathCells();
+  const C = pathChunks();
   for(const k of plan.todo) C[k] = kind;
   pathVer++;
   return {n:plan.todo.length, cost:plan.cost};
 }
-// Take cells away (not the entrance walk); gives back the refund share of what each cost
-function removeCells(keys){
-  const C = pathCells(), F = pathFixedCells();
+// Take chunks away (not the entrance walk); gives back the refund share of what each cost. One refund for the lot.
+function removeChunks(keys){
+  const C = pathChunks(), F = pathFixedChunks();
   let n = 0, back = 0, kept = 0;
   for(const k of keys){
     if(!C[k]) continue;
     if(F[k]){ kept++; continue; }
-    back += pathCellCost(C[k]) * COST.refundShare; delete C[k]; n++;
+    back += pathChunkCost(C[k]) * COST.refundShare; delete C[k]; n++;
   }
   if(n){ pathVer++; back = Math.round(back); earn(back, "sold"); }
   return {n, back, kept};
 }
-const cellsInBox = (a, b) => {
-  const x0 = Math.floor(Math.min(a[0], b[0])), x1 = Math.floor(Math.max(a[0], b[0])), y0 = Math.floor(Math.min(a[1], b[1])), y1 = Math.floor(Math.max(a[1], b[1])), C = pathCells(), out = [];
-  if(a[0] === b[0] && a[1] === b[1]) return C[cellKey(x0, y0)] ? [cellKey(x0, y0)] : [];
-  for(let x = x0; x <= x1; x++) for(let y = y0; y <= y1; y++){ const k = cellKey(x, y); if(C[k] && x + .5 >= Math.min(a[0], b[0]) && x + .5 <= Math.max(a[0], b[0]) && y + .5 >= Math.min(a[1], b[1]) && y + .5 <= Math.max(a[1], b[1])) out.push(k); }
+// The chunks a bulldoze box takes: every chunk the box overlaps (a tap, a box with no size, takes the one chunk under it). a and b are world points.
+function chunksInBox(a, b){
+  const C = pathChunks(), x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]), out = [];
+  if(x0 === x1 && y0 === y1){ const [cx, cy] = chunkAt(x0, y0), k = chunkKey(cx, cy); return C[k] ? [k] : []; }
+  for(let cx = Math.floor(x0 / CHUNK); cx * CHUNK < x1; cx++) for(let cy = Math.floor(y0 / CHUNK); cy * CHUNK < y1; cy++){
+    const k = chunkKey(cx, cy);
+    if(C[k] && cx * CHUNK + CHUNK > x0 && cy * CHUNK + CHUNK > y0) out.push(k);
+  }
   return out;
-};
+}
 
 /* ---------- old saves ---------- */
 // The cells a line path covers, to its half width: cell centers within hw of the line (a tie goes to the left side, so a 5 m path on a whole meter is 5 cells wide)
@@ -148,9 +160,25 @@ function rasterPath(pts, hw){
   }
   return out;
 }
-// Turn the line paths of a save into cells (tram track stays a line). Land that isn't owned is left out.
+// Chunks from 1 m cells {"x,y": kind}: a chunk exists if most of its area was path (more than half of its 25 cells) or at least a fifth of it was staff path
+// (staff roads used to be 3 m wide, so they get the benefit of the doubt), and takes the kind most of those cells had (a crossing cell counts as staff path)
+function chunksFromCells(cells){
+  const tally = {}, out = {};
+  for(const k in cells){
+    const [x, y] = chunkXY(k), ck = chunkKey(Math.floor(x / CHUNK), Math.floor(y / CHUNK)), kind = cells[k] === "x" ? "s" : cells[k];
+    const t = tally[ck] || (tally[ck] = {n:0, g:0, s:0, b:0});
+    t.n++; t[kind]++;
+  }
+  for(const ck in tally){
+    const t = tally[ck];
+    if(t.n * 2 <= CHUNK * CHUNK && t.s * 5 < CHUNK * CHUNK) continue;
+    out[ck] = t.g + t.b >= t.s ? (t.b > t.g ? "b" : "g") : "s";
+  }
+  return out;
+}
+// Turn the line paths of a save into chunks (tram track stays a line): rasterize each to 1 m cells, then keep the chunks that were mostly path
 function migratePaths(s){
-  s.pathCells = s.pathCells || {}; s.pathFixed = s.pathFixed || {};
+  const cells = {}, fixed = {};
   const owned = [];
   for(const [i, j] of PARCEL_CELLS) if(parcelHome(i, j) || (s.parcels || []).includes(parcelId(i, j))) owned.push(parcelRect(i, j));
   const mine = (x, y) => owned.some(r => x >= r[0] && x + 1 <= r[2] && y >= r[1] && y + 1 <= r[3]);
@@ -162,18 +190,18 @@ function migratePaths(s){
     const k = kindOf(p);
     for(const [x, y] of rasterPath(p.points, hwOf(p))){
       if(!mine(x, y)) continue;
-      const key = cellKey(x, y), old = s.pathCells[key];
-      if(!old || rank[k] >= rank[old]) s.pathCells[key] = k;
-      if(p.fixed) s.pathFixed[key] = 1;
+      const key = x + "," + y, old = cells[key];
+      if(!old || rank[k] >= rank[old]) cells[key] = k;
     }
   }
+  s.pathChunks = chunksFromCells(cells); s.pathFixed = s.pathFixed || fixed;
   s.paths = s.paths.filter(p => p.type === "tram");
   pathVer++;
 }
-// The entrance walk of a new park: 5 m wide from the gate north to the first bend
-function mainWalkCells(gate){
-  const C = {}, F = {}, x0 = Math.floor(gate[0]) - 2;
-  for(let x = x0; x < x0 + 5; x++) for(let y = 235; y < gate[1]; y++){ C[cellKey(x, y)] = "g"; F[cellKey(x, y)] = 1; }
+// The entrance walk of a new park: one chunk wide, from the chunk row by the gate (the gate is the middle of its chunk column) north to y 235
+function mainWalkChunks(gate){
+  const C = {}, F = {}, cx = Math.floor(gate[0] / CHUNK);
+  for(let cy = Math.floor(235 / CHUNK); cy * CHUNK < gate[1]; cy++){ C[chunkKey(cx, cy)] = "g"; F[chunkKey(cx, cy)] = 1; }
   return {C, F};
 }
 
@@ -182,96 +210,65 @@ const STRIP_OFF = (() => { const o = []; for(let dx = -2; dx <= 2; dx++) for(let
 const STRIP_DIRS = [[1, 0], [0, 1], [1, 1], [1, -1]];
 const pnum = (x, y) => (x + 2048) * 8192 + (y + 2048);
 const punum = n => [Math.floor(n / 8192) - 2048, n % 8192 - 2048];
-let stripCache = null;   // {state, paths, cells, ver, size, count}
+let stripCache = null;   // {state, paths, chunks, ver, size, count}
+const cellKey = (x, y) => x + "," + y;
+// The chunks as 1 m cells {"x,y": kind}, which is what the strip builder reads
+function chunkCells(C){
+  const out = {};
+  for(const k in C){ const [cx, cy] = chunkXY(k); for(let i = 0; i < CHUNK; i++) for(let j = 0; j < CHUNK; j++) out[cellKey(cx * CHUNK + i, cy * CHUNK + j)] = C[k]; }
+  return out;
+}
+const cellXY = chunkXY;
 
-/* ---------- connectivity: a flood fill over the cells, edge to edge ---------- */
-// Guests walk guest (g) and bridge (b) cells. Staff walk staff (s) cells and guest and bridge cells, but a staff network and a guest network
-// that merely touch stay apart: only a crossing (x) joins them, and only for staff (a crossing takes any neighbor, guests never use one).
+/* ---------- connectivity: a flood fill over the chunks, edge to edge ---------- */
+// Guests walk guest (g) and bridge (b) chunks. Staff walk every chunk: a staff chunk that touches a guest or bridge chunk is joined to it for staff
+// (guests never step on a staff chunk). Both floods start from the chunk at the gate.
 const guestCell = k => k === "g" || k === "b";
-const CELL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-let reachCache = null;   // {state, cells, ver, size, G, A} sets of pnum keys, rebuilt only when the cells change
+const CHUNK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+let reachCache = null;   // {state, chunks, ver, size, G, A} sets of cnum keys, rebuilt only when the chunks change
+const cnum = (cx, cy) => pnum(cx, cy);
 function pathReach(){
-  const C = pathCells(), size = Object.keys(C).length, c = reachCache;
-  if(c && c.state === state && c.cells === C && c.ver === pathVer && c.size === size) return c;
+  const C = pathChunks(), size = Object.keys(C).length, c = reachCache;
+  if(c && c.state === state && c.chunks === C && c.ver === pathVer && c.size === size && c.gate === state.gate[0] + "," + state.gate[1]) return c;
   const kindAt = new Map();
-  for(const k in C){ const [x, y] = cellXY(k); kindAt.set(pnum(x, y), C[k]); }
+  for(const k in C){ const [x, y] = chunkXY(k); kindAt.set(cnum(x, y), C[k]); }
+  const [gx, gy] = chunkAt(state.gate[0], state.gate[1] - .5);
   const flood = guests => {
-    const seen = new Set(), queue = [];
-    for(const [n, k] of kindAt){
-      if(guests && !guestCell(k)) continue;
-      const [x, y] = punum(n);
-      if(Math.hypot(x + .5 - state.gate[0], y + .5 - state.gate[1]) <= 3){ seen.add(n); queue.push(n); }
-    }
+    const seen = new Set(), queue = [], s = cnum(gx, gy), k0 = kindAt.get(s);
+    if(k0 && (!guests || guestCell(k0))){ seen.add(s); queue.push(s); }
     while(queue.length){
-      const n = queue.pop(), k = kindAt.get(n), [x, y] = punum(n);
-      for(const [dx, dy] of CELL_DIRS){
-        const m = pnum(x + dx, y + dy), j = kindAt.get(m);
+      const n = queue.pop(), [x, y] = punum(n);
+      for(const [dx, dy] of CHUNK_DIRS){
+        const m = cnum(x + dx, y + dy), j = kindAt.get(m);
         if(!j || seen.has(m)) continue;
-        if(guests ? !guestCell(j) : !(k === "x" || j === "x" || guestCell(k) === guestCell(j))) continue;
+        if(guests && !guestCell(j)) continue;
         seen.add(m); queue.push(m);
       }
     }
     return seen;
   };
-  reachCache = {state, cells:C, ver:pathVer, size, G:flood(true), A:flood(false)};
+  reachCache = {state, chunks:C, ver:pathVer, size, gate:state.gate[0] + "," + state.gate[1], G:flood(true), A:flood(false)};
   return reachCache;
 }
-// Is this cell joined to the entrance for guests / for staff?
-const cellReached = (x, y, guests) => pathReach()[guests ? "G" : "A"].has(pnum(x, y));
-// Is a shape within d meters of a cell that is joined to the entrance (guests: guest and bridge cells; staff: any)? With any: of any cell at all, joined or not.
+// Is this chunk joined to the entrance for guests / for staff?
+const chunkReached = (cx, cy, guests) => pathReach()[guests ? "G" : "A"].has(cnum(cx, cy));
+// Is a world point on a chunk joined to the entrance?
+const pointReached = (x, y, guests) => { const [cx, cy] = chunkAt(x, y); return chunkReached(cx, cy, guests); };
+// Is a shape within d meters of a chunk that is joined to the entrance (guests: guest and bridge chunks; staff: any)? With any: of any chunk at all, joined or not.
 function nearCells(shape, d, guests, any){
-  const set = any ? null : pathReach()[guests ? "G" : "A"], C = pathCells(), b = bbox(shape);
-  for(let x = Math.floor(b.x0 - d); x <= Math.ceil(b.x1 + d) - 1; x++) for(let y = Math.floor(b.y0 - d); y <= Math.ceil(b.y1 + d) - 1; y++){
-    if(set ? !set.has(pnum(x, y)) : !C[cellKey(x, y)]) continue;
-    if(any && guests && !guestCell(C[cellKey(x, y)])) continue;
-    const r = cellRect(x, y);
+  const set = any ? null : pathReach()[guests ? "G" : "A"], C = pathChunks(), b = bbox(shape);
+  for(let cx = Math.floor((b.x0 - d) / CHUNK); cx * CHUNK <= b.x1 + d; cx++) for(let cy = Math.floor((b.y0 - d) / CHUNK); cy * CHUNK <= b.y1 + d; cy++){
+    if(set ? !set.has(cnum(cx, cy)) : !C[chunkKey(cx, cy)]) continue;
+    if(any && guests && !guestCell(C[chunkKey(cx, cy)])) continue;
+    const r = chunkRect(cx, cy);
     if(lineShapeDist([...r, r[0]], shape) <= d || inPoly(shape[0][0], shape[0][1], r)) return true;
   }
   return false;
 }
-// Did these cells (keys) just join the entrance? (guests: guest and bridge cells only)
-function cellsJoined(keys, guests){
+// Did these chunks (keys) just join the entrance? (guests: guest and bridge chunks only)
+function chunksJoined(keys, guests){
   const set = pathReach()[guests ? "G" : "A"];
-  return keys.some(k => { const [x, y] = cellXY(k); return set.has(pnum(x, y)); });
-}
-// A crossing is one cell that joins a staff network to a guest network, for staff only
-function planCrossing(c){
-  const C = pathCells(), k = cellKey(c[0], c[1]), out = {cells:[k], todo:[], bad:new Map(), cost:0, why:"", end:c, kind:"x"};
-  if(C[k] === "x"){ out.why = "That crossing is already there."; return out; }
-  if(pathFixedCells()[k]){ out.why = "The main walk from the entrance can't change."; return out; }
-  out.todo = [k];
-  const why = pathCellProblem(c[0], c[1], "x", pathCtx());
-  if(why){ out.bad.set(k, why); out.why = why; return out; }
-  out.cost = Math.round(pathCellCost("x"));
-  if(!canAfford(out.cost)) out.why = `Costs ${money(out.cost)}. You have ${money(state.money)}.`;
-  return out;
-}
-function layCrossing(c){
-  const plan = planCrossing(c);
-  if(plan.why) return null;
-  spend(plan.cost, "built");
-  pathCells()[plan.todo[0]] = "x"; pathVer++;
-  return {n:1, cost:plan.cost};
-}
-// Parks from before crossings: each staff network that touches a guest or bridge cell but has no crossing gets one where it first touches
-// (that staff cell becomes the crossing), so keepers keep the roads they had
-function addCrossings(s){
-  const C = s.pathCells, seen = new Set(), key = (x, y) => x + "," + y;
-  for(const k of Object.keys(C).sort()){
-    if((C[k] !== "s" && C[k] !== "x") || seen.has(k)) continue;
-    const queue = [k]; seen.add(k);
-    let hasX = false, touch = null;
-    while(queue.length){
-      const q = queue.pop(), [x, y] = q.split(",").map(Number);
-      if(C[q] === "x") hasX = true;
-      for(const [dx, dy] of CELL_DIRS){
-        const n = key(x + dx, y + dy), j = C[n];
-        if(j === "s" || j === "x"){ if(!seen.has(n)){ seen.add(n); queue.push(n); } }
-        else if(j && !touch) touch = q;
-      }
-    }
-    if(!hasX && touch) C[touch] = "x";
-  }
+  return keys.some(k => { const [x, y] = chunkXY(k); return set.has(cnum(x, y)); });
 }
 function buildStrips(C){
   const kindAt = new Map(), cells = [];
@@ -285,7 +282,7 @@ function buildStrips(C){
   for(let dx = -2; dx <= 2; dx++) for(let dy = -2; dy <= 2; dy++) SQ.push([dx, dy]);
   for(const [x, y] of cells) if(!core.has(pnum(x, y)) && !SQ.some(([dx, dy]) => core.has(pnum(x + dx, y + dy)))) extra.push(pnum(x, y));
   for(const n of extra) core.add(n);
-  const cls = n => kindAt.get(n) === "s" || kindAt.get(n) === "x" ? "s" : "g";
+  const cls = n => kindAt.get(n) === "s" ? "s" : "g";
   const isCore = (x, y) => core.has(pnum(x, y));
   const edgeOk = (x, y, d) => {
     const [dx, dy] = d;
@@ -295,7 +292,6 @@ function buildStrips(C){
   const deg = (x, y) => { let n = 0; for(let dx = -1; dx <= 1; dx++) for(let dy = -1; dy <= 1; dy++) if((dx || dy) && isCore(x + dx, y + dy)) n++; return n; };
   const pt = (x, y) => [x + .5, y + .5];
   let id = 0;
-  const isX = n => kindAt.get(n) === "x";
   const strip = (cellsIn, pts, type, fe, pk2) => {
     const bridge = cellsIn.filter(n => kindAt.get(n) === "b").length * 2 >= cellsIn.length;
     const t = type || (cls(cellsIn[0]) === "s" ? "service" : bridge ? "bridge" : null);
@@ -315,7 +311,7 @@ function buildStrips(C){
       if(!kindAt.has(m)) return {to:pt(x + d[0] * Math.max(0, Math.min(2, s - 1)), y + d[1] * Math.max(0, Math.min(2, s - 1)))};
       if(core.has(m)){
         if(cls(m) === cls(end)) return {to:pt(nx, ny)};
-        return isX(end) || isX(m) ? {link:[pt(x, y), pt(nx, ny)], from:end, other:m} : {to:pt(x, y)};   // staff and guest paths only join at a crossing
+        return {link:[pt(x, y), pt(nx, ny)], from:end, other:m};   // a staff and a guest path that touch are joined for staff (a service link, live only when both ends are joined)
       }
     }
     return {to:pt(x + d[0] * 2, y + d[1] * 2)};
@@ -340,7 +336,7 @@ function buildStrips(C){
       touched.add(m);
       if(cls(m) !== cls(run[run.length - 1])){
         close(run, d);
-        if(isX(run[run.length - 1]) || isX(m)) strip([run[run.length - 1], m], [pt(cx, cy), pt(nx, ny)], "service", null, m);   // staff and guest paths meet: only a crossing lets staff over
+        strip([run[run.length - 1], m], [pt(cx, cy), pt(nx, ny)], "service", null, m);   // staff and guest paths meet: staff cross over, guests never use the link
         run = [m];
       } else run.push(m);
       cx = nx; cy = ny;
@@ -349,7 +345,7 @@ function buildStrips(C){
   }
   for(const n of core) if(!touched.has(n)){ const [x, y] = punum(n); strip([n], [[x, y + .5], [x + 1, y + .5]]); }
   // a free end that stops short of a path beside it (round a corner, or at the end of a swath that meets another) is tied to it, if there is path all the way
-  const solid = (a, b) => { let x = false; for(let i = 0; i <= 6; i++){ const n = pnum(Math.floor(a[0] + (b[0] - a[0]) * i / 6), Math.floor(a[1] + (b[1] - a[1]) * i / 6)); if(!kindAt.has(n)) return null; if(isX(n)) x = true; } return {x}; };
+  const solid = (a, b) => { let x = false; for(let i = 0; i <= 6; i++){ const n = pnum(Math.floor(a[0] + (b[0] - a[0]) * i / 6), Math.floor(a[1] + (b[1] - a[1]) * i / 6)); if(!kindAt.has(n)) return null; } return true; };
   for(const p of out.slice()) if(p.fe) p.fe.forEach((free, i) => {
     if(!free) return;
     const e = i ? p.points[p.points.length - 1] : p.points[0];
@@ -358,7 +354,6 @@ function buildStrips(C){
     const sol = best && best.d >= 1.2 && best.d <= 4.5 && solid(e, [best.x, best.y]);
     if(!sol) return;
     const same = (best.q.type === "service") === (p.type === "service");
-    if(!same && !sol.x) return;   // staff and guest paths only join at a crossing
     const l = {id:"pc" + (id++), d:1, name:"Path", points:[e.slice(), [best.x, best.y]], hw:PATH_HALF_WIDTH, pk:p.pk, link:1};
     if(!same) l.pk2 = best.q.pk;
     if(p.type && same) l.type = p.type; else if(!same) l.type = "service";
@@ -371,18 +366,20 @@ function syncPathStrips(){
   if(!state) return;
   if(!Object.prototype.hasOwnProperty.call(state, "toJSON"))
     Object.defineProperty(state, "toJSON", {value(){ const o = {...this}; o.paths = this.paths.filter(p => !p.d); return o; }, enumerable:false, configurable:true, writable:true});
-  const C = pathCells(), size = Object.keys(C).length, c = stripCache;
-  if(c && c.state === state && c.paths === state.paths && c.cells === C && c.ver === pathVer && c.size === size && state.paths.some(p => p.d) === (c.count > 0)) return;
+  const C = pathChunks(), size = Object.keys(C).length, c = stripCache;
+  if(c && c.state === state && c.paths === state.paths && c.chunks === C && c.ver === pathVer && c.size === size && state.paths.some(p => p.d) === (c.count > 0)) return;
   const L = state.paths;
   for(let i = L.length - 1; i >= 0; i--) if(L[i].d) L.splice(i, 1);
-  const {strips, kindAt} = buildStrips(C);
+  const {strips} = buildStrips(chunkCells(C));
   L.push(...strips);
-  stripCache = {state, paths:L, cells:C, ver:pathVer, size, count:strips.length};
+  stripCache = {state, paths:L, chunks:C, ver:pathVer, size, count:strips.length};
 }
+// The chunk number a strip's core cell (a cell number) sits in
+const stripChunk = n => { const [x, y] = punum(n); return cnum(Math.floor(x / CHUNK), Math.floor(y / CHUNK)); };
 // Which derived strips are joined to the entrance (guestsOnly: just the ones guests walk)
 function joinedStrips(guestsOnly){
   syncPathStrips();
   const out = [], set = pathReach()[guestsOnly ? "G" : "A"];
-  for(const p of state.paths) if(p.d && !(guestsOnly && isService(p)) && set.has(p.pk) && (p.pk2 === undefined || set.has(p.pk2))) out.push(p.id);
+  for(const p of state.paths) if(p.d && !(guestsOnly && isService(p)) && set.has(stripChunk(p.pk)) && (p.pk2 === undefined || set.has(stripChunk(p.pk2)))) out.push(p.id);
   return out;
 }

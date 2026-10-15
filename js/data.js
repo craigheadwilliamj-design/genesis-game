@@ -2541,12 +2541,11 @@ const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
-// Paths are sets of 1 m grid cells (js/pathcells.js), every one 5 m wide. The old per-meter rates are spread over the width, so a cell costs perMeter / width.
+// Paths are 5 m x 5 m chunks (js/pathcells.js). A chunk is 5 m of path, so it costs perMeter times 5.
 const PATH_CELLS = {width:5, kinds:{
   g:{label:"Guest path",     perMeter:COST.pathPerMeter,   upkeepPerMeter:UPKEEP.pathPerMeter,         color:"#C9BFA8"},
   s:{label:"Staff path",     perMeter:SERVICE_ROAD.perMeter, upkeepPerMeter:SERVICE_ROAD.upkeepPerMeter, color:"#5A5F64"},
-  b:{label:"Wooden bridge",  perMeter:BRIDGE.perMeter,     upkeepPerMeter:BRIDGE.upkeepPerMeter,      color:"#A9825A"},
-  x:{label:"Crossing",       perMeter:150,                 upkeepPerMeter:0,                          color:"#C9A227"}   // one cell: joins a staff path to a guest path, for staff only
+  b:{label:"Wooden bridge",  perMeter:BRIDGE.perMeter,     upkeepPerMeter:BRIDGE.upkeepPerMeter,      color:"#A9825A"}
 }};
 const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:5, crowdMult:2};   // a 10 m promenade: twice the walkers before it feels packed
 // Tram track is drawn like a path, but guests only get on and off at a tram station. The tram runs speedMult times faster than walking.

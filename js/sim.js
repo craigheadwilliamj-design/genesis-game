@@ -17,6 +17,7 @@ const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
 /* ---------- land for sale ---------- */
 // Parcel (i, j) is the cell between PARCELS.xs[i..i+1] and ys[j..j+1]. The home plot's cells are always owned.
 const PARCEL_YS = PARCELS.ys.concat(LEGACY_SOUTH_YS);
+const ENTRANCE_X = 207.5;   // the middle of chunk column 41 (x 205 to 210), so the entrance building and its walk sit on one 5 m chunk
 const SOUTH_LINE = PARCELS.ys[PARCELS.ys.length - 1];   // the entrance line: the park's hard southern edge
 const parcelRect = (i, j) => [PARCELS.xs[i], PARCEL_YS[j], PARCELS.xs[i+1], PARCEL_YS[j+1]];
 const parcelSouth = (i, j) => PARCEL_YS[j+1] > SOUTH_LINE;   // south of the entrance: never for sale
@@ -155,9 +156,9 @@ function newPark(){
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:DAWN_MIN + 60, clockV:2, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
-    gate:[205,305],
+    gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    crossingsV:1, paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
+    paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -186,9 +187,22 @@ function upgradeSave(s){
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);
-  if(!s.pathCells){ migratePaths(s); s.crossingsV = 0; }
+  if(!s.pathChunks){
+    if(s.pathCells) s.pathChunks = chunksFromCells(s.pathCells);   // from the 1 m cell build: a chunk is path where most of its area was
+    else migratePaths(s);
+    delete s.pathCells; delete s.crossingsV;
+  }
   if(!s.pathFixed) s.pathFixed = {};
-  if(!s.crossingsV){ addCrossings(s); s.crossingsV = 1; }   // staff roads that touched guest paths before crossings keep working
+  // the entrance sits in the middle of a 5 m chunk column, and the entrance walk is that one chunk wide (nothing the player built moves)
+  if(!s.gate || s.gate[0] !== ENTRANCE_X){
+    s.gate = [ENTRANCE_X, s.gate ? s.gate[1] : 305];
+    const m = mainWalkChunks(s.gate);
+    s.pathFixed = m.F;
+    for(const k in m.C) s.pathChunks[k] = "g";
+  } else if(!Object.keys(s.pathFixed).length || Object.keys(s.pathFixed).some(k => !s.pathChunks[k])){
+    const m = mainWalkChunks(s.gate); s.pathFixed = m.F;
+    for(const k in m.C) s.pathChunks[k] = "g";
+  }
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
@@ -712,7 +726,7 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const k of Object.values(pathCells())) upkeep += pathCellUpkeep(k);
+  for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
   for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;

@@ -31,7 +31,7 @@ function drawParkMap(cv){
   // paths
   for(const kind of ["s", "g", "b"]){
     g.fillStyle = kind === "s" ? PMAP.service : kind === "b" ? PMAP.bridge : PMAP.path;
-    for(const k in pathCells()) if(pathCells()[k] === kind){ const [x, y] = cellXY(k); g.fillRect(x, y, 1, 1); }
+    for(const q of pathSquares()) if(q.kind === kind) g.fillRect(q.x, q.y, q.w, q.h);
   }
   for(const p of state.paths){
     if(p.d || !p.points || p.points.length < 2) continue;

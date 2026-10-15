@@ -30,8 +30,8 @@ let snapMark = null;
 let pdrag = null;                   // biome paint box being dragged: {a, b} (grid points, js/biomepaint.js)
 let paintPick = null;               // what the paint tool does: a biome id, or "erase"
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
-let cdrag = null;                   // path swath being laid: {a, b, kind, plan} (cells, js/pathcells.js)
-let chover = null;                  // path tool or bulldoze: the cell under the pointer
+let cdrag = null;                   // path run being laid: {a, b, kind, plan} (chunks, js/pathcells.js)
+let chover = null;                  // path tool or bulldoze: the chunk [cx, cy] under the pointer
 let fhover = null;                  // bulldoze: the fence piece under the pointer
 let parcelSel = null;               // plot picked with the Buy Land tool: [i, j]
 
@@ -49,7 +49,7 @@ let fenceSel = "wood";             // fence type the next exhibit is built with
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
 const isDrawTool = t => t === "tram" || t === "zone" || t === "water";
-const PATH_TOOLS = {path:"g", service:"s", bridge:"b", crossing:"x"};   // drag-and-drop path tools and the cell kind each lays (js/pathcells.js)
+const PATH_TOOLS = {path:"g", service:"s", bridge:"b"};   // drag-and-drop path tools and the chunk kind each lays (js/pathcells.js)
 const isPathTool = t => !!PATH_TOOLS[t];
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
@@ -305,7 +305,7 @@ function render(){
   // path surface doesn't show under a viewing platform's deck: mask the footprints out of the paths
   const decks = state.buildings.filter(b => b.type === "platform");
   if(decks.length) s += `<mask id="deckcut" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect x="-100000" y="-100000" width="200000" height="200000" fill="#fff"/>${decks.map(b => `<polygon points="${polyStr(b.points)}" fill="#000"/>`).join("")}</mask>`;
-  under = cellsSvg() + under;
+  under = chunksSvg() + under;
   s += clipDefs + (decks.length ? `<g mask="url(#deckcut)">${under}${over}</g>` : under + over);
   // plants, rocks and statues out in the park stand over the path edges
   s += decorSvg(tool === "bulldoze", isDoomed);
@@ -1166,7 +1166,12 @@ function renderOverlay(){
     });
   }
   if(cdrag && cdrag.plan) s += pathGhostSvg(cdrag.plan, inv);
-  else if(chover) s += `<rect x="${chover[0]}" y="${chover[1]}" width="1" height="1" fill="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" fill-opacity=".35" stroke="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  else if(chover) s += `<rect x="${chover[0] * CHUNK}" y="${chover[1] * CHUNK}" width="${CHUNK}" height="${CHUNK}" fill="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" fill-opacity=".35" stroke="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(fdrag && fdrag.box){   // the path chunks a bulldoze box will take, lit as the box grows
+    let d = "";
+    for(const k of bulldozeChunkKeys(fdrag)){ const [cx, cy] = chunkXY(k); d += `M${cx * CHUNK} ${cy * CHUNK}h${CHUNK}v${CHUNK}h-${CHUNK}z`; }
+    if(d) s += `<path d="${d}" fill="var(--bad)" fill-opacity=".45" stroke="var(--bad)" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
     const keys = fenceDragKeys();
@@ -1915,7 +1920,7 @@ function setTool(t){
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), drag along a fence to lift what you sweep over, or drag a box over empty ground to lift all the fence in it. On bare ground, a tap or box also takes off painted biome ground. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift what you sweep over. On bare ground, a tap takes the path chunk under it and a drag box takes every path chunk it touches (lit red as you drag) and lifts the fence in it; with no path or fence in it, it takes off painted biome ground. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -2136,14 +2141,23 @@ function segHitsRect(p, q, a, b){
 }
 function fenceDragStat(){
   const keys = fenceDragKeys();
-  if(fdrag.lift){ const back = Math.round(keys.reduce((n, k) => n + pieceCost(k, pieceType(fencePieces()[k])) * COST.refundShare, 0)); setStat(`Lift ${keys.length} piece${keys.length === 1 ? "" : "s"} of fence for ${money(back)} back.`); return; }
+  if(fdrag.lift){
+    const back = Math.round(keys.reduce((n, k) => n + pieceCost(k, pieceType(fencePieces()[k])) * COST.refundShare, 0)), ch = fdrag.box ? bulldozeChunkKeys(fdrag) : [];
+    const chBack = Math.round(ch.reduce((n, k) => n + pathChunkCost(pathChunks()[k]) * COST.refundShare, 0));
+    const parts = [];
+    if(ch.length) parts.push(`${ch.length} path chunk${ch.length === 1 ? "" : "s"}`);
+    if(keys.length || !ch.length) parts.push(`${keys.length} piece${keys.length === 1 ? "" : "s"} of fence`);
+    setStat(`Remove ${parts.join(" and ")} for ${money(back + chBack)} back.`);
+    return;
+  }
   const plan = planPieces(keys, fenceSel), m = Math.round(keys.reduce((n, k) => n + pieceLen(k), 0));
   fdrag.why = plan.why;
   setStat(plan.why || `${m} m, ${money(plan.cost)}.`, !!plan.why);
 }
 function endFenceDrag(){
   const keys = fenceDragKeys(), lift = fdrag.lift, box = fdrag.box && fdrag; fdrag = null;
-  if(!keys.length){ if(box && !bulldozeCells(box)) bulldozePaint(box); renderOverlay(); return; }
+  const tookPath = box ? bulldozeChunks(box) : false;   // the chunks lit in the box go at once, with one refund and one toast
+  if(!keys.length){ if(box && !tookPath) bulldozePaint(box); renderOverlay(); return; }
   if(lift){
     askConfirm("Remove this fence?", "Animals inside can escape.", "Remove", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
     renderOverlay(); return;
@@ -2159,70 +2173,71 @@ function finishFenceDrag(keys, lift){
   ui.toast([what].concat(r.notes).join(" "), r.notes.some(n => /gap/.test(n)) ? "bad" : "good");
 }
 
-/* ---------- laying paths on the grid (js/pathcells.js) ---------- */
-const cellAtEv = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math.floor(w.x), Math.floor(w.y)]; };
+/* ---------- laying paths on the chunk grid (js/pathcells.js) ---------- */
+const chunkAtEv = ev => { const w = toWorld(ev.clientX, ev.clientY); return chunkAt(w.x, w.y); };
 const PATH_HINT = {
-  g:"Drag along the grid to lay a 5 m wide path, straight or diagonal. Start on the entrance walk or another path. Lay paths side by side for a wider walk. Bulldoze takes cells away.",
-  s:"Staff only: guests won't walk it. Drag to lay a 5 m wide staff path from any path. Bulldoze takes cells away.",
-  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes cells away.",
-  x:"Tap one cell where a staff path meets a guest path. Staff cross it between the two; guests never step on it. Bulldoze takes it away."
+  g:"Drag to lay 5 m path chunks, straight or diagonal. Start on the entrance walk or another path. Lay paths side by side for a wider walk. Bulldoze takes chunks away.",
+  s:"Staff only: guests won't walk it. Drag to lay staff chunks from any path; one that touches a guest path or the entrance walk is joined to it for staff. Bulldoze takes chunks away.",
+  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes chunks away."
 };
 function pathBar(){
   const k = PATH_TOOLS[tool], K = PATH_CELLS.kinds[k];
   showBar(`Lay ${K.label.toLowerCase()}`, PATH_HINT[k], "", {undo:false, finish:false, cancel:"Done"});
-  setStat(`${money(pathCellCost(k))} a square meter, ${money(K.perMeter)} a meter of path.`);
+  setStat(`${money(pathChunkCost(k))} a 5 m chunk, ${money(K.perMeter)} a meter of path.`);
 }
 function pathDragStat(){
   const d = cdrag, K = PATH_CELLS.kinds[d.kind], plan = d.plan = planPath(d.a, d.b, d.kind);
-  if(!plan.cells.length){ setStat(`Drag to lay ${K.label.toLowerCase()}. ${money(pathCellCost(d.kind))} a square meter.`); return; }
-  setStat(plan.why || `${plan.todo.length} m², ${money(plan.cost)}.`, !!plan.why);
+  setStat(plan.why || `${plan.todo.length} chunk${plan.todo.length === 1 ? "" : "s"}, ${money(plan.cost)}.`, !!plan.why);
 }
-// The cells a drag will lay at their true size: green where it can go, red where it can't, grey where it's already there
+// The chunks a drag will lay at their true size: green where it can go, red where it can't, grey where it's already there
 function pathGhostSvg(plan, inv){
-  const d = {ok:"", bad:"", has:""};
-  for(const k of plan.cells){
-    const [x, y] = cellXY(k), seg = `M${x} ${y}h1v1h-1z`;
-    if(plan.bad.has(k)) d.bad += seg; else if(pathCells()[k] === plan.kind) d.has += seg; else d.ok += seg;
+  const d = {ok:"", bad:"", has:""}, C = pathChunks();
+  for(const k of plan.chunks){
+    const [cx, cy] = chunkXY(k), seg = `M${cx * CHUNK} ${cy * CHUNK}h${CHUNK}v${CHUNK}h-${CHUNK}z`;
+    if(plan.bad.has(k)) d.bad += seg; else if(C[k] === plan.kind || !plan.todo.includes(k)) d.has += seg; else d.ok += seg;
   }
   const f = (c, op, path) => path ? `<path d="${path}" fill="${c}" fill-opacity="${op}" stroke="${c}" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "";
   return `<g pointer-events="none">${f("#8A8F96", .25, d.has)}${f("#4CD964", .4, d.ok)}${f("#E5484D", .5, d.bad)}</g>`;
 }
 function endPathDrag(){
   const d = cdrag; cdrag = null;
-  if(!d.plan || !d.plan.cells.length){ renderOverlay(); return; }
+  if(!d.plan || !d.plan.chunks.length){ renderOverlay(); return; }
   const K = PATH_CELLS.kinds[d.kind], r = layPath(d.a, d.b, d.kind);
   if(!r){ renderOverlay(); if(d.plan.why) ui.toast(d.plan.why, "bad"); return; }
   afterChange(); render(); pathBar();
-  const joined = cellsJoined(d.plan.todo, d.kind !== "s" && d.kind !== "x");
-  ui.toast(joined ? `Laid ${r.n} m² of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
+  const joined = chunksJoined(d.plan.todo, d.kind !== "s");
+  ui.toast(joined ? `Laid ${r.n} chunk${r.n === 1 ? "" : "s"} of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
 }
-// Bulldoze on bare ground: a tap takes the path cell under it, a box takes the cells inside. Returns true if it dealt with path.
-function bulldozeCells(box){
-  const cells = cellsInBox(box.a, box.b);
-  if(!cells.length) return false;
-  const r = removeCells(cells);
+// The chunks a bulldoze box (or tap) takes: the lit ones, never the entrance walk
+function bulldozeChunkKeys(box){ const F = pathFixedChunks(); return chunksInBox(box.a, box.b).filter(k => !F[k]); }
+// Bulldoze on bare ground: a tap takes the chunk under it, a box takes every chunk it touches. Returns true if it dealt with path.
+function bulldozeChunks(box){
+  const all = chunksInBox(box.a, box.b);
+  if(!all.length) return false;
+  const r = removeChunks(all);
   if(!r.n){ setStat("The main walk from the entrance can't be removed.", true); return true; }
   afterChange(); render();
-  setStat(`Removed ${r.n} m² of path${r.back ? `, ${money(r.back)} back` : ""}.${r.kept ? " The main walk from the entrance stays." : ""}`);
+  setStat("");
+  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The main walk from the entrance stays." : ""}`, "good");
   return true;
 }
-// Cells for the map: runs along each row, one path a kind
-let cellsCache = null;
-function cellsSvg(){
-  const C = pathCells(), size = Object.keys(C).length;
-  if(cellsCache && cellsCache.cells === C && cellsCache.ver === pathVer && cellsCache.size === size) return cellsCache.svg;
-  const rows = {s:new Map(), g:new Map(), b:new Map(), x:new Map()};
-  for(const k in C){ const [x, y] = cellXY(k), m = rows[C[k]]; if(!m) continue; if(!m.has(y)) m.set(y, []); m.get(y).push(x); }
+// Chunks for the map: runs along each row, one path a kind
+let chunksCache = null;
+function chunksSvg(){
+  const C = pathChunks(), size = Object.keys(C).length;
+  if(chunksCache && chunksCache.chunks === C && chunksCache.ver === pathVer && chunksCache.size === size) return chunksCache.svg;
+  const rows = {s:new Map(), g:new Map(), b:new Map()};
+  for(const q of pathSquares()){ const m = rows[q.kind]; if(!m) continue; if(!m.has(q.cy)) m.set(q.cy, []); m.get(q.cy).push(q.cx); }
   let svg = "";
-  for(const kind of ["s", "g", "b", "x"]){
+  for(const kind of ["s", "g", "b"]){
     let d = "";
-    for(const [y, xs] of rows[kind]){
+    for(const [cy, xs] of rows[kind]){
       xs.sort((a, b) => a - b);
-      for(let i = 0; i < xs.length;){ let j = i; while(j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++; d += `M${xs[i]} ${y}h${xs[j] - xs[i] + 1}v1h-${xs[j] - xs[i] + 1}z`; i = j + 1; }
+      for(let i = 0; i < xs.length;){ let j = i; while(j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++; const w = (xs[j] - xs[i] + 1) * CHUNK; d += `M${xs[i] * CHUNK} ${cy * CHUNK}h${w}v${CHUNK}h-${w}z`; i = j + 1; }
     }
     if(d) svg += `<path d="${d}" fill="${PATH_CELLS.kinds[kind].color}" shape-rendering="crispEdges" pointer-events="none"/>`;
   }
-  cellsCache = {cells:C, ver:pathVer, size, svg};
+  chunksCache = {chunks:C, ver:pathVer, size, svg};
   return svg;
 }
 
@@ -2907,7 +2922,7 @@ svg.addEventListener("pointerdown", e => {
   }
   if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
   if(isPathTool(tool)){
-    const c = cellAtEv(e); cdrag = {a:c, b:c, kind:PATH_TOOLS[tool]}; chover = null;
+    const c = chunkAtEv(e); cdrag = {a:c, b:c, kind:PATH_TOOLS[tool]}; chover = null;
     drag = {cd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; pathDragStat(); renderOverlay(); return;
   }
   if(tool === "paint"){
@@ -2937,13 +2952,13 @@ svg.addEventListener("pointermove", e => {
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
-    else if(isPathTool(tool)){ chover = cellAtEv(e); renderOverlay(); }
+    else if(isPathTool(tool)){ chover = chunkAtEv(e); renderOverlay(); }
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
       const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
       if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
       const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
-      const pc = !k && !nh && !gx && pathAt(w.x, w.y) ? [Math.floor(w.x), Math.floor(w.y)] : null;
+      const pc = !k && !nh && !gx && pathAt(w.x, w.y) && !pathFixedChunks()[chunkKey(...chunkAt(w.x, w.y))] ? chunkAt(w.x, w.y) : null;
       if(k !== fhover || String(pc) !== String(chover)){ fhover = k; chover = pc; renderOverlay(); }
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }
     }
@@ -2968,7 +2983,7 @@ svg.addEventListener("pointermove", e => {
     queueRender(); return;
   }
   if(!drag) return;
-  if(drag.cd){ const c = cellAtEv(e); drag.moved = true; if(cdrag && (c[0] !== cdrag.b[0] || c[1] !== cdrag.b[1])){ cdrag.b = c; pathDragStat(); renderOverlay(); } return; }
+  if(drag.cd){ const c = chunkAtEv(e); drag.moved = true; if(cdrag && (c[0] !== cdrag.b[0] || c[1] !== cdrag.b[1])){ cdrag.b = c; pathDragStat(); renderOverlay(); } return; }
   if(drag.pd){ const g = gridAt(e); if(pdrag && (g[0] !== pdrag.b[0] || g[1] !== pdrag.b[1])){ pdrag.b = g; paintDragStat(); renderOverlay(); } return; }
   if(drag.fd){
     if(fdrag.box){
