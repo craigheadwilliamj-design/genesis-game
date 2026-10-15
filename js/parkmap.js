@@ -29,8 +29,12 @@ function drawParkMap(cv){
     for(const w of waterOf(e)){ g.fillStyle = wcol(biomeOf(e)); pmapPoly(g, w.points); g.fill(); }
   }
   // paths
+  for(const kind of ["s", "g", "b"]){
+    g.fillStyle = kind === "s" ? PMAP.service : kind === "b" ? PMAP.bridge : PMAP.path;
+    for(const k in pathCells()) if(pathCells()[k] === kind){ const [x, y] = cellXY(k); g.fillRect(x, y, 1, 1); }
+  }
   for(const p of state.paths){
-    if(!p.points || p.points.length < 2) continue;
+    if(p.d || !p.points || p.points.length < 2) continue;
     const w = Math.max(2 * halfWidth(p), 1 / S * 1.5), col = isService(p) ? PMAP.service : isWide(p) ? PMAP.wide : isBridge(p) ? PMAP.bridge : isTram(p) ? PMAP.tram : PMAP.path;
     pmapLine(g, p.points, w, col);
   }

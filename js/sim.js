@@ -157,7 +157,7 @@ function newPark(){
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
+    paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -184,6 +184,10 @@ function upgradeSave(s){
   if(s.clockV !== 2){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 2; }
   if(s.parkClosed === undefined) s.parkClosed = false;
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
+  // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
+  s.paths = (s.paths || []).filter(p => !p.d);
+  if(!s.pathCells){ migratePaths(s); }
+  if(!s.pathFixed) s.pathFixed = {};
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
@@ -428,8 +432,10 @@ function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
 function connectedPathIds(guestsOnly){
-  const usable = state.paths.filter(p => !isTram(p) && !(guestsOnly && isService(p)));
-  const joined = new Set(), queue = [];
+  // path cells: the derived strips are joined by a flood fill over the cells; any loose line paths join the old way
+  const strips = state.paths.filter(p => p.d), joined = new Set(joinedStrips(guestsOnly)), queue = strips.filter(p => joined.has(p.id));
+  const usable = state.paths.filter(p => !p.d && !isTram(p) && !(guestsOnly && isService(p)));
+  if(!usable.length) return joined;
   for(const p of usable) if(p.points.some(v => dist(v, state.gate) < 2)){ joined.add(p.id); queue.push(p); }
   const touches = (p, q) => p.points.some(v => q.points.some((w,i) => i>0 && segProj(v[0], v[1], q.points[i-1], w).d < 1.5));
   while(queue.length){
@@ -536,6 +542,7 @@ function exhibitReport(e){
 
 // Rebuild all the worked-out numbers. Called whenever the park changes.
 function recompute(){
+  syncPathStrips();
   updatePower();
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);
   const guestPaths = state.paths.filter(p => joined.has(p.id)), anyPaths = state.paths.filter(p => joinedAll.has(p.id));
@@ -701,7 +708,8 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
+  for(const k of Object.values(pathCells())) upkeep += pathCellUpkeep(k);
+  for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
