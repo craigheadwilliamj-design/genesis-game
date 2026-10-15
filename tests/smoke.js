@@ -2830,6 +2830,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.vivAnimalsInsideGlass = hs.length === 4 && hs.every(h => vivSpot(h, ev, [h.x, h.y]));
         ev.points = rectPts(260, 300, V.w, V.d, 0); syncAnimals();   // moving the case brings them along
         out.vivAnimalsFollowMove = hs.every(h => vivSpot(h, ev, [h.x, h.y])); state.exhibits.pop(); }
+      { const fs = new Set(); for(let i = 0; i < 40; i++) fs.add(nameAnimal({id:"fz" + i, sp:"tikt"}).face); out.cloneFaceRandom = fs.size === 2 && [...fs].every(f => f === 1 || f === -1);
+        const keep = nameAnimal({id:"fk", sp:"tikt", face:-1}); out.faceKept = keep.face === -1; }
       const oldV = JSON.parse(JSON.stringify(newPark()));
       oldV.exhibits.push({id:"e-ov", name:"OldV", points:rectPts(200, 270, 6, 4, 0), animals:[], happy:70, viv:"S"}, {id:"e-ov2", name:"OldV2", points:rectPts(220, 270, 16, 10, 0), animals:[], happy:70, viv:"L"});
       let loaded = true; try { startWith(upgradeSave(oldV), false); setSpeed(0); render(); } catch(err){ loaded = false; }

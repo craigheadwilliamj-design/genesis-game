@@ -1342,7 +1342,7 @@ function syncAnimals(){
         const [x, y] = randomInside(e.points);
         const el = document.createElementNS("http://www.w3.org/2000/svg", "g");
         el.setAttribute("pointer-events", "none");
-        h = {el, x, y, path:null, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp};
+        h = {el, x, y, path:null, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp, face:a.face || 1};
         herd.set(a.id, h);
         animalLayer.appendChild(el);
       }
