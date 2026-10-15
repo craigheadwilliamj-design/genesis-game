@@ -16,7 +16,7 @@ PAL = {
     "desert":    dict(base=(46, 144, 150), lite=(130, 214, 200), film=((140, 176, 90), .7), ripple=(190, 240, 232), glint=(240, 252, 246), silt=(190, 160, 100), twig=(88, 70, 44), calm=True),   # clear turquoise oasis, kept clean: ripples and glints only
     "grassland": dict(base=(58, 118, 104), lite=(138, 190, 160), film=((150, 160, 90), .6), ripple=(190, 232, 220), glint=(238, 250, 244), silt=(150, 118, 74), twig=(100, 78, 46), calm=True),   # clear green-teal river, kept clean: ripples and glints only, so it reads as water on the pale ground
     "tropical":  dict(base=(16, 104, 100), lite=(70, 190, 170), film=((90, 150, 60), .7), ripple=(120, 235, 215), glint=(220, 255, 245), silt=(70, 50, 28), twig=(70, 50, 28), calm=True, wash=True),   # clear deep blue-green jungle pool, bright glints, kept clean
-    "tundra":    dict(base=(86, 140, 162), lite=(176, 214, 226), film=((200, 220, 226), .8), ripple=(214, 240, 246), glint=(244, 252, 255), silt=(150, 150, 130), twig=(110, 100, 80), calm=True),   # cold clear glacial blue-grey, kept clean: ripples and glints only
+    "tundra":    dict(base=(86, 140, 162), lite=(176, 214, 226), film=((200, 220, 226), .8), ripple=(214, 240, 246), glint=(244, 252, 255), silt=(150, 150, 130), twig=(110, 100, 80), calm=True, floes=9),   # cold clear glacial blue-grey, kept clean: ripples and glints only
 }
 
 def tile(size, seed, pal):
@@ -24,6 +24,7 @@ def tile(size, seed, pal):
     def put(x, y, c): px[(x % size, y % size)] = c
     deep = mix(BASE, BLACK, .14); lite = mix(BASE, pal["lite"], .1); film = mix(pal["film"][0], BASE, pal["film"][1]); film_hi = mix(film, WHITE, .14)
     ripple_hi = mix(BASE, pal["ripple"], .38); ripple_lo = mix(BASE, BLACK, .3); glint = mix(BASE, pal["glint"], .7); silt = mix(BASE, pal["silt"], .5); twig = mix(pal["twig"], BASE, .15)
+    shadow = mix(BASE, BLACK, .3); floe_hi = (240, 248, 250); floe = (206, 226, 234); floe_lo = (150, 184, 200)
     g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
     def vn(x, y, grids=grids):
         v = 0
@@ -55,6 +56,14 @@ def tile(size, seed, pal):
         x, y = rnd.randrange(size), rnd.randrange(size); n = rnd.randint(4, 7)
         for i in range(n): put(x + i, y + (i // 4), twig)
         put(x, y - 1, mix(twig, WHITE, .3))
+    for _ in range(pal.get("floes", 0)):   # small ice floes: a flat pale slab (lit top rows, blue-grey underside) with a darker water shadow under and to the right
+        w, h = rnd.randint(9, 16), rnd.randint(4, 6); x0, y0 = rnd.randrange(size), rnd.randrange(size); rows = []
+        for r in range(h):
+            t = abs(r - (h - 1) / 2) / (h / 2); inset = int(round(t * w * .22)) + rnd.randint(0, 1); rows.append((x0 + inset, x0 + w - inset))
+        for r, (a0, a1) in enumerate(rows):
+            for x in range(a0 + 1, a1 + 2): put(x, y0 + r + 1, shadow)
+        for r, (a0, a1) in enumerate(rows):
+            for x in range(a0, a1): put(x, y0 + r, floe_hi if r == 0 else floe if r < h - 1 else floe_lo)
     im = Image.new("RGBA", (size, size))
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
