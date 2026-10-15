@@ -2814,6 +2814,29 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       for(let i = 0; i < 300 && !topped; i++){ tick(1); topped = stockOf(pm, "medmes") > 2; }
       out.pmcRestocksBeforeEmpty = topped && restockLot("medmes") === HEALTH.dose && restockLot("plants") === 5;
     }
+    // flat vivariums: each size draws a non-empty case (back and front), the sizes differ, and old saves with vivariums load and render
+    {
+      startWith(newPark(), false); setSpeed(0);
+      const H = Math.PI / 2, svgs = {};
+      for(const [sz, V] of Object.entries(VIVARIUMS)){
+        const ev = {id:"e-fv" + sz, name:"Flat " + sz, viv:sz, points:rectPts(200, 260, V.w, V.d, 0), animals:[], happy:70, biome:"tropical"};
+        svgs[sz] = viv34(ev, "back", null) + "|" + viv34(ev, "front", null) + "|" + vivFloor34(ev, null, false, false, true);
+      }
+      out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && x.includes("<polygon")));
+      out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
+      { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
+        state.exhibits.push(ev); syncAnimals();
+        const hs = [...herd.values()].filter(h => h.exhibitId === "e-fa");
+        out.vivAnimalsInsideGlass = hs.length === 4 && hs.every(h => vivSpot(h, ev, [h.x, h.y]));
+        ev.points = rectPts(260, 300, V.w, V.d, 0); syncAnimals();   // moving the case brings them along
+        out.vivAnimalsFollowMove = hs.every(h => vivSpot(h, ev, [h.x, h.y])); state.exhibits.pop(); }
+      { const fs = new Set(); for(let i = 0; i < 40; i++) fs.add(nameAnimal({id:"fz" + i, sp:"tikt"}).face); out.cloneFaceRandom = fs.size === 2 && [...fs].every(f => f === 1 || f === -1);
+        const keep = nameAnimal({id:"fk", sp:"tikt", face:-1}); out.faceKept = keep.face === -1; }
+      const oldV = JSON.parse(JSON.stringify(newPark()));
+      oldV.exhibits.push({id:"e-ov", name:"OldV", points:rectPts(200, 270, 6, 4, 0), animals:[], happy:70, viv:"S"}, {id:"e-ov2", name:"OldV2", points:rectPts(220, 270, 16, 10, 0), animals:[], happy:70, viv:"L"});
+      let loaded = true; try { startWith(upgradeSave(oldV), false); setSpeed(0); render(); } catch(err){ loaded = false; }
+      out.vivOldSaveLoads = loaded && state.exhibits.filter(e => e.viv).length === 2 && !!document.querySelector('[data-kind="exhibit"][data-id="e-ov"] polygon');
+    }
     return out;
   }));
 

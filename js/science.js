@@ -251,7 +251,7 @@ function orderClone(sp, exhibitId, sex){
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, cl:true, q:a.q}));
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:true, q:a.q}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];

@@ -119,6 +119,7 @@ const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 90) / 100 
 function nameAnimal(a, st){
   if(!a.sex) a.sex = pickSex(a.sp, st);
   if(a.rank == null) a.rank = pickRank(a);
+  if(!a.face) a.face = Math.random() < .5 ? -1 : 1;   // which way its picture faces to start (1 right, -1 left), kept on the animal
   if(a.name) return a;
   const seq = (st || state).animalSeq || ((st || state).animalSeq = {}), n = (seq[a.sp] || 0) + 1;
   seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
