@@ -31,6 +31,11 @@ PGRAN = ramp((170, 172, 166))   # pale granite
 LICHY = ramp((127, 135, 128)); LICHY["top"] = mix((170, 176, 120), (255, 255, 255), .1); LICHY["hi"] = mix(LICHY["hi"], (170, 176, 120), .3)   # slab with a yellow-green lichen cap
 LICHO = ramp((127, 135, 128)); LICHO["top"] = mix((196, 146, 84), (255, 255, 255), .08); LICHO["hi"] = mix(LICHO["hi"], (196, 146, 84), .28)   # slab with an orange lichen cap
 LICHG = ramp((96, 102, 100)); LICHG["top"] = mix((206, 208, 190), (255, 255, 255), .1); LICHG["hi"] = mix(LICHG["hi"], (206, 208, 190), .3)   # dark slate with a pale grey-white lichen cap
+GRAN = ramp((95, 106, 115))     # boreal: dark wet granite, ROCK_STONE blue-grey
+WETG = ramp((70, 80, 88))       # darker, rain-soaked granite
+BPALE = ramp((138, 146, 150))   # paler weathered granite
+BMOSS = ramp((95, 106, 115)); BMOSS["top"] = mix((78, 120, 72), (255, 255, 255), .1); BMOSS["hi"] = mix(BMOSS["hi"], (78, 120, 72), .35)   # granite under a thick moss cap
+BSTAIN = ramp((95, 106, 115)); BSTAIN["top"] = mix((95, 106, 115), (150, 104, 60), .4); BSTAIN["hi"] = mix(BSTAIN["hi"], (150, 104, 60), .2)   # granite with a rusty tannin-stained top
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -172,6 +177,17 @@ def shapes():
     S["rock-tundra-4"] = render(274, [(0, 0, 10, 8, 5, .22, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .7, -.3, 0)])], LICHO, bands=0)
     S["rock-tundra-5"] = render(275, [(-6, 1, 8, 6, 5, .2, [(3, 1, 0, 0), (3, .88, .4, 0)]), (6, -1, 10, 7, 5, .2, [(4, 1, 0, 0), (4, .92, .4, 0), (3, .7, -.4, 0)])], PGRAN, bands=0)
     S["rock-tundra-6"] = render(276, [(0, 0, 13, 7, 5, .2, [(4, 1, 0, 0), (3, .95, .5, 0), (3, .78, -.4, 0)])], LICHG, bands=0)
+    # boreal: rounded, dark, rain-wet granite (many sides, small jitter, like glacial erratics) with moss caps
+    S["boulder-boreal-1"] = render(181, [(0, 0, 27, 20, 8, .1, [(6, 1, 0, 0), (6, .98, .3, 0), (6, .94, .6, 0), (5, .86, .9, 0), (4, .7, 1.2, 0), (3, .5, 1.5, 0)])], GRAN, cracks=1)
+    S["boulder-boreal-2"] = render(182, [(-15, 3, 17, 12, 8, .1, [(5, 1, 0, 0), (5, .95, .3, 0), (4, .84, .6, 0), (3, .62, .8, 0)]), (13, -4, 20, 14, 8, .1, [(6, 1, 0, 0), (6, .97, .3, 0), (5, .9, .6, 0), (4, .76, 1, 0), (3, .56, 1.3, 0)])], BMOSS)
+    S["boulder-boreal-3"] = render(183, [(0, 0, 14, 11, 8, .1, [(6, 1, 0, 0), (6, .97, .4, 0), (6, .92, .8, 0), (5, .85, 1.2, 0), (5, .74, 1.6, 0), (4, .6, 2, 0), (3, .42, 2.4, 0)])], WETG, cracks=1)
+    S["boulder-boreal-4"] = render(184, [(0, 0, 25, 15, 8, .09, [(5, 1, 0, 0), (5, .97, .4, 0), (4, .88, .8, 0), (3, .68, 1.2, 0)])], BSTAIN, cracks=1)
+    S["rock-boreal-1"] = render(281, [(0, 0, 16, 10, 8, .1, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .64, .7, 0)])], GRAN)
+    S["rock-boreal-2"] = render(282, [(0, 0, 11, 8, 7, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], BMOSS, bands=0)
+    S["rock-boreal-3"] = render(283, [(0, 0, 13, 9, 8, .1, [(4, 1, 0, 0), (5, .95, .3, 0), (4, .78, .6, 0)])], BPALE)
+    S["rock-boreal-4"] = render(284, [(0, 0, 10, 8, 7, .12, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], WETG, bands=0)
+    S["rock-boreal-5"] = render(285, [(-6, 1, 8, 6, 7, .1, [(3, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 10, 7, 8, .1, [(4, 1, 0, 0), (4, .92, .3, 0), (3, .7, .5, 0)])], BMOSS, bands=0)
+    S["rock-boreal-6"] = render(286, [(0, 0, 14, 7, 8, .1, [(3, 1, 0, 0), (3, .96, .3, 0), (3, .8, .5, 0)])], BSTAIN, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
