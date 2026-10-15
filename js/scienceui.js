@@ -246,7 +246,8 @@ function ceresHtml(b){
   h += `<section><h3>Medicine</h3>`;
   if(!anyMedTech()) h += `<div class="meta">Research medicine at ORACLE and CERES can grow doses for the PMC and for medicated feed.</div>`;
   const fed = state.exhibits.filter(e => e.medFeed && e.animals.length), use = fed.reduce((s, e) => s + feedDoses(e), 0);
-  h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>At CERES</span>${meter((c.meds || 0) / medCap() * 100, "#B0384F")}<span>${Math.floor(c.meds || 0)}/${medCap()}</span></div>`;
+  h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>At CERES</span>${meter(cerMedTotal() / medCap() * 100, "#B0384F")}<span>${Math.floor(cerMedTotal())}/${medCap()}</span></div>`;
+  h += MED_GOODS.map(t => `<div class="meta fnote">${goodName(t)}: ${Math.floor(cerMeds()[t] || 0)} at CERES</div>`).join("");
   h += `<div class="meta">Keepers carry doses to the PMC${stores().some(s => storeOf(s).cold) ? " and cold stores" : ""}. Doses spoil slowly, and slower in a powered cold store. Medicated feed uses ${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}.</div>`;
   h += `<ul class="shop" style="margin-top:8px">${ERA_ORDER.map(era => growRow("med", era)).join("")}</ul></section>`;
 

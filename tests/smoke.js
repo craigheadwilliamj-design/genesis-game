@@ -169,13 +169,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pmcOnGraph = !!kGraph.anchors["b-pmc"] && !!kGraph.anchors["e-v"];
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
     healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
     const cured = state.health.ward[0] && state.health.ward[0].cured;
-    out.treated = !!cured && pmcStock() === 10 - HEALTH.dose;
+    out.treated = !!cured && pmcStock("medpal") === 10 - HEALTH.dose;
     out.curedGoesHome = run(600, () => viv.animals.length === 2 && !state.health.ward.length) && !viv.animals.some(a => a.sick);
 
     // a check-up finds a hidden mild illness, and the vet treats it on the spot (no dart, no PMC)
@@ -183,8 +183,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     viv.vetCheck = state.day - HEALTH.checkEvery;
     fallSick(viv.animals[1], "illness", HEALTH.illStart);
     out.mildStartsHidden = !!viv.animals[1].sick.hidden;
-    const meds0 = pmcStock();
-    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock() === meds0 - HEALTH.fieldDose &&
+    const meds0 = pmcStock("medpal");
+    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock("medpal") === meds0 - HEALTH.fieldDose &&
       !state.health.ward.length && !state.staff.transfers.length && viv.animals.length === 2;
     // injuries always go to the PMC
     vetsNight(); keepersNight();
@@ -194,7 +194,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // without the era's medicine, contemporary medicine eases a patient down to its era's floor, and it goes home chronic
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
-    state.buildings.find(b => b.id === "b-pmc").store = {meds:0};
+    state.buildings.find(b => b.id === "b-pmc").store = {medpal:0};
     const m0 = state.today.medicine; state.health.cmeds = 0;
     const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
     state.health.ward.push(pal);
@@ -212,7 +212,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
     // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
@@ -1136,11 +1136,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.batchTakesTime = adv(60) === false && !state.ceres.pots["Jurassic-small"];
     out.batchDone = adv(growMinutes("plant", "Jurassic", "small"), () => state.ceres.pots["Jurassic-small"] === CERES_GROW.plant.mesozoic.small.count);
     // medicine comes from batches, not a steady trickle
-    state.ceres.meds = 0; state.minute = DAWN_MIN + 60;
-    out.medNoTrickle = (adv(30), state.ceres.meds === 0);
-    out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => state.ceres.meds >= 20);
-    state.ceres.auto.mesozoic = true; state.ceres.meds = 0;
-    out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => state.ceres.meds >= 20);
+    state.ceres.meds = {medpal:0, medmes:0, medcen:0}; state.minute = DAWN_MIN + 60;
+    out.medNoTrickle = (adv(30), cerMedTotal() === 0);
+    out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
+    state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
+    out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
     state.ceres.auto.mesozoic = false;
 
     // medicine only cures a period's animals once refined for it

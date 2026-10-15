@@ -59,7 +59,7 @@ function warehouseHtml(b){
     const full = storeTotal(b) >= storeCap(b) - .5;
     h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Custodians carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
   } else {
-    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => !MED_GOODS.includes(t)).map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
   }
   return h + `</section>`;
 }
@@ -142,6 +142,17 @@ function logiOverviewHtml(){
     h += `<div class="meta fnote">Eats ${Math.round(x.need)} a day${x.make ? `, farms make ${x.make}` : ""}. ${x.need ? (days < 1 ? `<b style="color:var(--bad)">Under a day in stores.</b>` : `${days >= 10 ? "10+" : days.toFixed(1)} days in stores.`) : ""}</div>`;
   }
   if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at CERES`);
+  // medicine: one row an era (PMC, stores and CERES) and the contemporary doses the suppliers keep topped up
+  if(hasDept("pmc") || hasDept("ceres")){
+    for(const t of MED_GOODS){
+      const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
+      if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
+      h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
+      h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at CERES.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
+    }
+    h += bar3("Contemporary medicine", sum.cmed.have / sum.cmed.cap * 100, GOOD_COLOR.cmed, `${sum.cmed.have}/${sum.cmed.cap}`);
+    h += `<div class="meta fnote">At the PMC. Suppliers restock it every night at ${money(MODERN.cost)} a dose.</div>`;
+  }
   const L = state.logi;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;
   return h + `</section>`;

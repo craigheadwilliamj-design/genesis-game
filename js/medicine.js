@@ -21,11 +21,12 @@ const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
 // Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
 function pickMed(s, n){
-  if(canTreat(s) && medOnHand() >= n) return "era";
+  if(canTreat(s) && medOnHand(medGoodOf(s)) >= n) return "era";
   if(dept("pmc") && (state.health.cmeds || 0) >= n) return "modern";
   return null;
 }
-function takeMed(kind, n){ if(kind === "era") useMeds(n); else state.health.cmeds -= n; }
+const medGoodOf = s => MED_GOOD[eraOf(s)];
+function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else state.health.cmeds -= n; }
 // Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
 function ease(a){
   const fl = MODERN.floor[eraOf(SPECIES_BY_ID[a.sp])];
@@ -401,7 +402,7 @@ function treatDone(c){
   if(!a || !a.sick) return;
   const s = SPECIES_BY_ID[a.sp], k = pickMed(s, HEALTH.fieldDose);
   if(!k || (a.sick.chronic && k !== "era")){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${s.name} in ${e.name}.`, "bad"); return; }
-  takeMed(k, HEALTH.fieldDose);
+  takeMed(k, HEALTH.fieldDose, s);
   if(k === "era"){ delete a.sick; events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} on the spot.`, "good"); }
   else { ease(a); events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`); }
   events.changed();
@@ -484,7 +485,12 @@ function healthNight(){
     e.medFedOk = false;
     if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;
     const need = feedDoses(e);
-    if(hungerShare(e) < .5 && medOnHand() >= need){ useMeds(need); e.medFedOk = true; }
+    // the feed is mixed from the era medicines of the animals it can help; take it from whichever the PMC holds
+    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))];
+    if(hungerShare(e) < .5 && goods.reduce((s, g) => s + pmcStock(g), 0) >= need){
+      let left = need; for(const g of goods){ const t = Math.min(left, pmcStock(g)); useMeds(t, g); left -= t; }
+      e.medFedOk = true;
+    }
   }
   if(healthActive()){
     for(const e of state.exhibits){
@@ -521,7 +527,7 @@ function healthNight(){
     if(p.cured || cap <= 0) continue;
     const s = SPECIES_BY_ID[p.a.sp];
     // start a course of medicine, or switch to the era's own once it's available
-    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose); p.med = k; } }
+    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose, s); p.med = k; } }
     if(!p.med) continue;
     cap--;
     const era = eraOf(s), fl = MODERN.floor[era];

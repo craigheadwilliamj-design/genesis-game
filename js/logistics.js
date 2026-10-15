@@ -8,7 +8,7 @@
 
 function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, guestFrom:GUEST_GOODS_FROM, trucks:0}; }
 // Keepers carry food from stations to exhibits; custodians stock every store (animal food, medicine, stand and shop goods)
-const KEEPER_GOODS = FEED_GOODS.concat(["meds"]);
+const KEEPER_GOODS = FEED_GOODS.concat(MED_GOODS);
 const isGuestGood = t => GUEST_GOODS.includes(t);
 // Until this day, suppliers deliver straight to stands and shops, so they never run out
 const guestGoodsFree = () => state.day < (state.logi.guestFrom || 0);
@@ -37,11 +37,11 @@ function takeGood(b, t, n){
 // CERES keeps its own stock of medicine (and Paleoflora), which keepers collect
 const cereses = () => state.buildings.filter(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]);
 function supplyOf(b, t){
-  if(b.type === "ceres") return t === "meds" ? Math.floor(state.ceres.meds || 0) : 0;
+  if(b.type === "ceres") return MED_GOODS.includes(t) ? Math.floor(cerMeds()[t] || 0) : 0;
   return Math.floor(stockOf(b, t));
 }
 function takeSupply(b, t, n){
-  if(b.type === "ceres"){ const r = Math.min(n, Math.floor(state.ceres.meds || 0)); state.ceres.meds -= r; return r; }
+  if(b.type === "ceres"){ const m = cerMeds(), r = Math.min(n, Math.floor(m[t] || 0)); m[t] -= r; return r; }
   return takeGood(b, t, n);
 }
 // Put goods somewhere: a building to try first, then anything that holds them. Anything that fits nowhere is lost.
@@ -51,9 +51,15 @@ function stashGood(t, n, first){
   for(const b of order){ if(left <= 0.01) break; left -= addGood(b, t, left); }
   return n - Math.max(0, left);
 }
-const pmcStock = () => { const p = pmcBuilding(); return p ? stockOf(p, "meds") : 0; };
+// CERES keeps a stock per medicine (state.ceres.meds is {medpal, medmes, medcen})
+function cerMeds(){ const c = state.ceres; if(!c.meds || typeof c.meds !== "object") c.meds = {medpal:0, medmes:0, medcen:0}; return c.meds; }
+const cerMedTotal = () => MED_GOODS.reduce((s, t) => s + (cerMeds()[t] || 0), 0);
+// a good's number for the PMC (all three together when none is named)
+const pmcStock = g => { const p = pmcBuilding(); return p ? (g ? stockOf(p, g) : MED_GOODS.reduce((s, t) => s + stockOf(p, t), 0)) : 0; };
 const medOnHand = pmcStock;
-function useMeds(n){ const p = pmcBuilding(); if(p) takeGood(p, "meds", n); }
+function useMeds(n, g){ const p = pmcBuilding(); if(p) takeGood(p, g, n); }
+// the eras whose medicine ORACLE has researched, so the PMC only reserves room for those
+const medGoodsWanted = () => MED_GOODS.filter(g => hasTech(MED_TECH[Object.keys(MED_GOOD).find(k => MED_GOOD[k] === g)]));
 
 /* ---------- zones ---------- */
 
@@ -116,8 +122,8 @@ function storeTarget(b, t){
   const d = storeOf(b);
   if(!d || d.source || d.dock || !d.holds.includes(t)) return 0;
   const cap = storeCap(b);
-  if(b.type === "pmc") return Math.ceil(cap * .8);
-  if(t === "meds") return d.bulk && cereses().length ? Math.min(Math.round(cap * .05), 20) : 0;
+  if(b.type === "pmc") return medGoodsWanted().includes(t) ? Math.ceil(cap * .8 / medGoodsWanted().length) : 0;
+  if(MED_GOODS.includes(t)) return d.bulk && cereses().length && medGoodsWanted().includes(t) ? Math.min(Math.round(cap * .05), 20) : 0;
   if(BUILDINGS[b.type].rooms) return t === "merch" ? Math.round(cap * .8) : 0;
   // a stand or shop keeps most of its shelves full of what its menu uses, split between its goods
   if(d.vendor){
@@ -140,7 +146,7 @@ function haulSources(j){
     const d = storeOf(b); if(b === j.d || supplyOf(b, j.t) < 1) continue;
     if(j.cls === 1 ? (d.bulk || d.source) : (d.dock || d.source)) out.push(b);
   }
-  if(j.t === "meds") for(const b of cereses()) if(supplyOf(b, "meds") >= 1) out.push(b);
+  if(MED_GOODS.includes(j.t)) for(const b of cereses()) if(supplyOf(b, j.t) >= 1) out.push(b);
   return out;
 }
 // The most run-down store this worker can restock, with the nearest place to get what it needs. `near` finds the closest of a list.
@@ -265,10 +271,10 @@ function spoilNight(){
     for(const t of Object.keys(b.store)){
       const lose = b.store[t] * spoilRate(b, t);
       b.store[t] = Math.max(0, b.store[t] - lose);
-      L.lost += lose; L.lostCost += lose * (t === "meds" ? MED_UNIT_VALUE : isGuestGood(t) ? GUEST_GOOD_PRICE : FOOD_UNIT_COST);
+      L.lost += lose; L.lostCost += lose * (MED_GOODS.includes(t) ? MED_UNIT_VALUE : isGuestGood(t) ? GUEST_GOOD_PRICE : FOOD_UNIT_COST);
     }
   }
-  const c = state.ceres; if(c.meds) c.meds = Math.max(0, c.meds - c.meds * GOODS.meds.spoil);
+  const cm = cerMeds(); for(const t of MED_GOODS) if(cm[t]) cm[t] = Math.max(0, cm[t] - cm[t] * GOODS[t].spoil);
   L.lostDay = state.day;
   if(L.lost >= 10) events.toast(`${Math.round(L.lost)} units of food spoiled overnight, worth about ${money(Math.round(L.lostCost))}.`, "bad");
 }
@@ -287,6 +293,12 @@ function stockSummary(){
   for(const t of FEED_GOODS) out[t] = {have:0, cap:0, need:parkDemand(t), make:parkProduction(t)};
   out.paleoflora = {have:Math.floor(state.ceres.stock || 0), need:state.exhibits.reduce((s, e) => s + (dailyNeed(e).paleoflora || 0), 0)};
   for(const b of storesBuilt()) for(const t of FEED_GOODS){ if(storeOf(b).holds.includes(t)) out[t].cap += storeCap(b); out[t].have += stockOf(b, t); }
+  // medicine: one stock an era (PMC, cold stores and CERES), plus the supplier-restocked contemporary doses
+  for(const t of MED_GOODS){
+    out[t] = {have:0, cap:0, ceres:Math.floor(cerMeds()[t] || 0), pmc:pmcStock(t)};
+    for(const b of storesBuilt()) out[t].have += stockOf(b, t);
+  }
+  out.cmed = {have:Math.floor(state.health.cmeds || 0), cap:MODERN.stock};
   return out;
 }
 // Exhibits and stores keepers can't reach, or that no keeper is covering
