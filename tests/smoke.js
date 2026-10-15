@@ -1553,13 +1553,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*ky()); const flush = ghost;
     out.rotateFlush = false;
     if(flush.ok){ const fb = {id:"b-flush", type:"food", points:flush.pts}; state.buildings.push(fb); setTool("move"); mvSel = fb.id; rotateMoved(); out.rotateFlush = Math.abs(Math.atan2(fb.points[1][1] - fb.points[0][1], fb.points[1][0] - fb.points[0][0]) - flush.angle) > .5 && !moveProblem("building", fb); }
-    // drawing a path onto the edge of another snaps to its centerline, so they join
-    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}]; recompute();
-    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*ky()];
-    const sn = snapAt(...cl(250, 297.5));   // on the edge of the 5 m path, 2.5 m off its centerline
-    out.pathEdgeSnaps = Math.abs(sn.y - 300) < .01 && sn.info && sn.info.type === "seg";
-    const farSn = snapAt(...cl(250, 290));  // well clear of it
-    out.pathFarNoSnap = Math.abs(farSn.y - 290) < .5 || !!farSn.info === false;
     setTool("select");
     state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}, {id:"p-w", type:"wide", points:[[250,240],[250,297.5]]}]; recompute();
     out.wideShortNotJoined = !derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 0;
@@ -1649,15 +1642,83 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     Object.assign(state, {paths:trSaved.paths, buildings:trSaved.buildings, money:trSaved.money}); state.science.tech = trSaved.tech; state.today.fares = trSaved.fares;
     recompute(); buildGuestGraph(); buildKeeperGraph(); render(); drawTrams();
 
-    // the path preview band is as wide as the path it will become
-    const bandW = kind => { setTool(kind); draw.pts = [[300,300]]; draw.hover = [340,300]; renderOverlay(); const m = $("#overlay").innerHTML.match(/stroke-opacity="\.35" stroke-width="([\d.]+)"/); setTool("select"); return m && +m[1]; };
-    out.pathBandWidth = bandW("path") === 2*PATH_HALF_WIDTH && bandW("wide") === 2*WIDE_PATH.halfWidth && bandW("service") === 2*SERVICE_ROAD.halfWidth;
+    // paths are cells: drag-and-drop swaths, true-size ghost, bulldoze, migration, costs, and guests still get around
+    {
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, cells:state.pathCells, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
+      state.gate = [205, 305]; state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
+      state.pathCells = JSON.parse(JSON.stringify(keep.cells)); state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = keep.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+      const ncells = () => Object.keys(state.pathCells).length;
+      out.cellsDefaultWalk = ncells() === 5 * 70 && Object.keys(state.pathFixed).length === 350 && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0 && !JSON.parse(JSON.stringify(state)).paths.some(p => p.d);
+      out.cellCosts = pathCellCost("g") === COST.pathPerMeter / 5 && pathCellCost("s") === SERVICE_ROAD.perMeter / 5 && pathCellCost("b") === BRIDGE.perMeter / 5;
+      // a straight drag: 21 columns by 5 rows, 3 of the cells already part of the walk
+      const A = [205, 233], B = [225, 233], plan = planPath(A, B, "g");
+      out.cellDragStraight = plan.cells.length === 21 * 5 && plan.todo.length === 21 * 5 - 3 && !plan.why && plan.cost === plan.todo.length * pathCellCost("g") && !plan.todo.some(k => state.pathCells[k]);
+      // the ghost shows exactly the cells that will be laid
+      setTool("path"); cdrag = {a:A, b:B, kind:"g"}; pathDragStat(); renderOverlay();
+      const ghostCells = ($("#overlay").innerHTML.match(/#4CD964[^>]*>/) ? 1 : 0) && [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="#4CD964"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
+      out.cellGhostMatches = ghostCells === plan.todo.length && /\d+ m²/.test($("#dStat").textContent);
+      const m0 = state.money, n0 = ncells(); endPathDrag();
+      out.cellLaid = ncells() === n0 + plan.todo.length && plan.todo.every(k => state.pathCells[k] === "g") && Math.abs(m0 - state.money - plan.cost) < 1e-6 && derived.joined.size > 0;
+      // a diagonal drag lays a 5 m swath along the 45 degree run
+      const D1 = [225, 233], D2 = [235, 223], dp = planPath(D1, D2, "g"), has = (x, y) => dp.cells.includes(cellKey(x, y));
+      out.cellDragDiagonal = !dp.why && has(225, 233) && has(235, 223) && has(230, 228) && has(228, 228) && has(232, 228) && !has(230, 233) && !has(230, 223) && dp.cells.length > 60 && dp.cells.length < 90;
+      layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
+      out.cellDiagJoined = cellsJoined(dp.cells, true) && derived.joined.size > 0 && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
+      // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
+      state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
+      const pe = planPath([290, 110], [330, 110], "g");
+      out.cellBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && layPath([290, 110], [330, 110], "g") === null;
+      state.exhibits = []; state.water = [{id:"w-cp", points:[[300,100],[320,100],[320,120],[300,120]]}];
+      out.cellWaterBridge = /water/.test(planPath([290, 110], [330, 110], "g").why) && planPath([290, 110], [330, 110], "b").why === "" && planPath([290, 110], [330, 110], "b").bad.size === 0;
+      state.water = [];
+      out.cellOffLand = /boundary/.test(planPath([-60, 110], [-40, 110], "g").why);
+      state.fenceGrid = {[pieceKey(300, 100, "v")]:{}}; 
+      out.cellBlockedFence = /fence/.test(planPath([290, 100], [310, 100], "g").why);
+      state.fenceGrid = {};
+      // too dear
+      state.money = 5; out.cellTooDear = /Costs/.test(planPath([100, 100], [140, 100], "g").why); state.money = 1e6;
+      // bulldoze: a tap takes one cell, a box takes the cells in it, the entrance walk stays
+      setTool("bulldoze");
+      const tapAt = (x, y) => { fdrag = {a:[x, y], b:[x, y], lift:true, box:true, swept:new Set(), last:{x, y}}; endFenceDrag(); };
+      const c0 = ncells(), mm = state.money; tapAt(220.5, 233.5);
+      out.cellBulldozeTap = ncells() === c0 - 1 && !state.pathCells["220,233"] && state.money > mm;
+      const c1 = ncells(); fdrag = {a:[212, 231], b:[218, 236], lift:true, box:true, swept:new Set(), last:{x:218, y:236}}; endFenceDrag();
+      out.cellBulldozeBox = ncells() < c1 && !state.pathCells["214,232"] && !!state.pathCells["205,260"];
+      const c2 = ncells(); tapAt(205.5, 260.5);
+      out.cellBulldozeFixed = ncells() === c2 && !!state.pathCells["205,260"];
+      setTool("select");
+      // old saves: line paths become cells (tram stays a line), the same width they had
+      const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathCells; delete oldS.pathFixed;
+      oldS.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o1", points:[[205,235],[300,235]]}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}, {id:"p-o3", type:"wide", points:[[250,200],[250,150]]}, {id:"p-o4", type:"bridge", points:[[300,235],[300,200]]}, {id:"p-tr", type:"tram", points:[[250,312],[480,312]]}, {id:"x", d:1, points:[[0,0],[5,0]]}];
+      upgradeSave(oldS);
+      const colN = (cells, x, kind) => Object.keys(cells).filter(k => k.startsWith(x + ",") && (!kind || cells[k] === kind)).length;
+      const rowN = (cells, y, x0, x1, kind) => Object.keys(cells).filter(k => { const [cx, cy] = k.split(",").map(Number); return cy === y && cx >= x0 && cx <= x1 && cells[k] === kind; }).length;
+      out.cellMigrate = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathCells["203,260"] === "g" && oldS.pathCells["207,260"] === "g" && !oldS.pathCells["202,260"] && !oldS.pathCells["208,260"]
+        && Object.keys(oldS.pathFixed).length > 300 && oldS.pathFixed["205,260"] === 1 && !oldS.pathFixed["250,200"]
+        && rowN(oldS.pathCells, 250, 150, 200, "s") >= 150 / 50 && colN(oldS.pathCells, 175, "s") === 3 && colN(oldS.pathCells, 250, "g") > 0 && Object.keys(oldS.pathCells).filter(k => oldS.pathCells[k] === "b").length > 0
+        && !Object.keys(oldS.pathCells).some(k => +k.split(",")[1] >= 305);
+      out.cellMigrateWide = Object.keys(oldS.pathCells).filter(k => k.startsWith("245,") || k.startsWith("254,")).length > 0 && !oldS.pathCells["244,170"] && !!oldS.pathCells["245,170"] && !!oldS.pathCells["254,170"] && !oldS.pathCells["255,170"];
+      const again = upgradeSave(JSON.parse(JSON.stringify(oldS)));
+      out.cellMigrateOnce = Object.keys(again.pathCells).length === Object.keys(oldS.pathCells).length;
+      // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
+      layPath(A, B, "g");   // mend the gap the bulldoze left
+      state.exhibits = [{id:"e-cp2", name:"CP2", points:[[212,222],[222,222],[222,229],[212,229]], animals:[], land:[], water:[], cond:100}];
+      layPath([208, 250], [230, 250], "s"); recompute(); buildGuestGraph(); buildKeeperGraph();
+      const gw = walkFrom(gGraph.anchors.gate, false);
+      out.cellGuestsReach = isReachable(state.exhibits[0]) && !!gGraph.anchors["e-cp2"] && gw.dist.has(gGraph.anchors["e-cp2"]);
+      out.cellStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
+      // a party walks it end to end
+      render();
+      out.cellRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathCells:keep.cells, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
+      pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
+    }
 
     // themes: old saves get defaults, themes unlock by play, a matched area draws more, animals that suit a theme are happier
     const old = JSON.parse(JSON.stringify(state)); delete old.themes; upgradeSave(old);
     out.themesDefault = old.themes.brush === "genesis" && old.themes.have.length === 1;
     // the Range theme was renamed Homestead: old saves move over
-    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
+    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", type:"tram", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", type:"tram", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
     out.themeRangeRenamed = rg.paths[0].theme === "homestead" && rg.themes.brush === "homestead" && rg.themes.have.includes("homestead") && !THEMES.range;
     out.themeWesternRenamed = rg.paths[1].theme === "mesa" && rg.themes.have.includes("mesa") && !rg.themes.have.includes("western") && !THEMES.western;
     // the Classic theme became Japanese Garden: old saves move over
@@ -1701,7 +1762,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const it of [...state.paths, ...state.buildings, ...state.exhibits]) delete it.theme;
     const nz = zoneThemePlan(state.zones[0], "volcanic").length, rz = restyleZone(state.zones[0], "volcanic");
     render();
-    out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
+    out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.filter(p => !p.d).concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
     // vivariums take plants of their biome, scaled down, and regrading clears them
     {
       const v = {id:"e-vp", name:"Fern house", viv:"L", biome:"tropical", points:[[0,0],[16,0],[16,10],[0,10]].map(p => [p[0] + 900, p[1] + 900]), animals:[{id:"a-vp", sp:"arth"}], happy:70};
