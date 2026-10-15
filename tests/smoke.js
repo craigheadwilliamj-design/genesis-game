@@ -2799,6 +2799,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       paintPick = "erase"; pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
       const gone = !paintAt(x + 21, y + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
     state.biomePaint = keep || []; paintTouch(); render();
+
+    // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
+    startWith(newPark(), false); setSpeed(0);
+    {
+      state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
+      const H = Math.PI / 2, add = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, H)});
+      add("m-pmc", "pmc", 230, 262); add("m-ce", "ceres", 180, 262); add("m-cl", "closet", 205, 230);
+      state.paths.push({id:"m1", name:"m1", points:[[205,230],[205,262]]}, {id:"m2", name:"m2", points:[[205,262],[222,262]]}, {id:"m3", name:"m3", points:[[205,262],[193,262]]});
+      state.science.tech.push("medmeso");
+      recompute(); buildKeeperGraph(); buildGuestGraph(); hireCustodian(); syncCustodians();
+      const pm = state.buildings.find(b => b.id === "m-pmc"); pm.store = {medmes:2}; state.ceres.meds = {medpal:0, medmes:30, medcen:0};
+      state.minute = 10; let topped = false;
+      for(let i = 0; i < 300 && !topped; i++){ tick(1); topped = stockOf(pm, "medmes") > 2; }
+      out.pmcRestocksBeforeEmpty = topped && restockLot("medmes") === HEALTH.dose && restockLot("plants") === 5;
+    }
     return out;
   }));
 
