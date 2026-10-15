@@ -1082,7 +1082,7 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:14, d:10, dept:true,
-                       store:{cap:400, holds:["meat", "fish", ...MED_GOODS, "snacks"], spoil:1, cold:true, bulk:true},
+                       store:{cap:400, holds:["meat", "fish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},

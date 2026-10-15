@@ -123,7 +123,7 @@ function storeTarget(b, t){
   if(!d || d.source || d.dock || !d.holds.includes(t)) return 0;
   const cap = storeCap(b);
   if(b.type === "pmc"){ const want = medGoodsWanted().concat(CMED); return want.includes(t) ? Math.ceil(cap * .8 / want.length) : 0; }
-  if(t === CMED) return 0;   // bulk stores don't hold contemporary medicine back: it goes from the dock to the PMC
+  if(t === CMED) return d.bulk && hasDept("pmc") ? Math.min(Math.round(cap * .05), 20) : 0;   // a cold store keeps a buffer for the PMC
   if(MED_GOODS.includes(t)) return d.bulk && cereses().length && medGoodsWanted().includes(t) ? Math.min(Math.round(cap * .05), 20) : 0;
   if(BUILDINGS[b.type].rooms) return t === "merch" ? Math.round(cap * .8) : 0;
   // a stand or shop keeps most of its shelves full of what its menu uses, split between its goods
