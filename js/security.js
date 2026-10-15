@@ -84,7 +84,7 @@ function guardGo(c, n, job){
 function dispatchGuard(p){
   let best = null, bd = Infinity;
   for(const c of gcrew){
-    if(!c.at || c.chase) continue;
+    if(!c.at || c.chase || c.escort) continue;
     const [gx, gy] = keeperPos(c), d = Math.hypot(gx - p.at.x, gy - p.at.y);
     if(d < bd){ bd = d; best = c; }
   }
@@ -123,11 +123,14 @@ function guardWatch(){
       if(p.gone || !p.at) continue;
       const d = Math.hypot(p.at.x - gx, p.at.y - gy);
       // a party the player called security on, waiting where it stands: the guard walks it to the gate
-      if(p.hold && !p.vandal && d < PERS.escortRadius){ escortOut(p, c); continue; }
-      if((p.vandal || p.ejecting === true) && d < SECURITY.catchRadius){
-        leaveQueue(p); p.gone = true; p.ejected = true;
+      const free = !c.escort && p.ejecting !== "escort";   // a guard walking someone out, or a party already being walked, is left alone
+      if(free && p.hold && !p.vandal && d < PERS.escortRadius){ escortOut(p, c); continue; }
+      if(free && (p.vandal || p.ejecting === true) && d < SECURITY.catchRadius){
+        // caught: the guard walks them to the gate, no longer a vandal
+        const wasVandal = p.vandal;
+        p.vandal = false; p.ejected = true; escortOut(p, c, true);
         if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
-        if(!p.vandal) events.toast(`${(guardRec(c) || {}).name || "A guard"} caught the ${p.name} and threw them out.`, "good");
+        if(!wasVandal) events.toast(`${(guardRec(c) || {}).name || "A guard"} caught the ${p.name} and threw them out.`, "good");
         else {
           L.caught++;
           if(L.caught === 1 || L.caught % 5 === 0) events.toast(`${(guardRec(c) || {}).name || "A guard"} threw out a party of vandals. ${L.caught} caught today.`, "good");
@@ -146,6 +149,12 @@ function guardsTick(dtMin){
   for(const c of gcrew){
     const r = guardRec(c); if(!r) continue;
     if(!c.at){ const o = offices()[0]; if(!o) continue; c.at = kGraph.anchors[o.id]; c.job = "idle"; }
+    // walking a party to the gate: the guard stays beside them until they're out
+    if(c.escort){
+      const p = c.escort;
+      if(!p.gone && p.at){ c.job = "escorting"; c.route = []; c.t = 0; continue; }
+      c.escort = null; c.job = "idle"; c.wait = 0; if(p.at) c.at = p.at;
+    }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
       if(c.route.length){
@@ -161,7 +170,7 @@ function guardsTick(dtMin){
   }
   guardWatch();
 }
-function guardsNight(){ for(const c of gcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.chase = null; c.wait = 0; } }
+function guardsNight(){ for(const c of gcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.chase = null; c.escort = null; c.wait = 0; } }
 
 function hireGuard(){
   if(!state.buildings.some(b => b.type === "security")) return "Build a Security Office first.";

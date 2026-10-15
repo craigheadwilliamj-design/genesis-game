@@ -299,7 +299,7 @@ function huntJob(c){
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
-function keeperPos(c){ const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at.x) * c.t, c.at.y + (nx.y - c.at.y) * c.t] : [c.at.x, c.at.y]; }
+function keeperPos(c){ if(c.escort && c.escort.at && !c.escort.gone){ const [x, y] = partyPos(c.escort); return [x + 1.2, y]; } const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at.x) * c.t, c.at.y + (nx.y - c.at.y) * c.t] : [c.at.x, c.at.y]; }
 
 function chase(c, l){
   // a vet already darted it: walk over and pick it up

@@ -2333,18 +2333,19 @@ function drawKeepers(){
     humanStep(el, "custodian", c, x, y);
     walker34(el, x, y);
   }
-  // security guards: navy, with a white badge; a dashed ring while chasing
+  // security guards: pixel people in navy, ringed while chasing; the escort strip plays while walking a party out
   for(const c of gcrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), chasing = !!c.chase, drive = onAtv(c), key = `g${r.toFixed(3)}|${chasing}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), chasing = !!c.chase, drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `g${r.toFixed(3)}|${chasing}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("guard", hm, null) +
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "guard", c, x, y);
     walker34(el, x, y);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them

@@ -718,7 +718,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     hireGuard(); syncGuards(); gcrew[0].at = nearestNode(100, 200); gcrew[0].route = [];
     out.guardDeters = deterrence(100, 200) <= d0 * SECURITY.deterCut + 1e-9;
     guardWatch();
-    out.guardCatches = vp.gone && vp.ejected && vandalLog().caught === 1;
+    out.guardCatches = !vp.gone && vp.ejected && !vp.vandal && vp.ejecting === "escort" && vp.home && gcrew[0].escort === vp && vandalLog().caught === 1;
+    // the guard stays beside the party while escorting, then goes free once they're out
+    guardsTick(1); out.guardEscortsBeside = gcrew[0].job === "escorting" && Math.abs(keeperPos(gcrew[0])[0] - partyPos(vp)[0] - 1.2) < 1e-6;
+    vp.gone = true; guardsTick(1); out.guardEscortEnds = gcrew[0].escort === null && gcrew[0].job !== "escorting";
     // with cameras, vandalism near the office sends the nearest guard
     state.science.tech.push("cameras");
     resetParties(); guestsArrive(2); const cp = parties[0]; cp.at = nearestGuestNode(130, 120); cp.rowdy = true;
@@ -821,11 +824,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.guestPanelCloses = sel === null;
       // a hooligan won't wait: a guard has to catch it
       const ho = mk("hooligan", "fun"); ho.at = nearestGuestNode(100, 200); parties = [ho];
-      gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null;
+      gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null; guardsTick(1);   // the last escort is over
       out.ejectHooligan = ejectGuest(ho) === null && !ho.hold && ho.ejecting === true && gcrew[0].chase === ho;
       guardWatch(); out.hooliganRunsFree = !ho.gone;
       gcrew[0].at = nearestNode(ho.at.x, ho.at.y); guardWatch();
-      out.hooliganCaught = ho.gone && ho.ejected;
+      out.hooliganCaught = ho.ejected && ho.ejecting === "escort" && ho.home && gcrew[0].escort === ho; ho.gone = true; guardsTick(1);
       // security that never shows up gives up after a while
       const wt = mk("fun", "fun"); wt.at = nearestGuestNode(100, 200); parties = [wt]; gcrew[0].at = nearestNode(300, 235);
       ejectGuest(wt); state.minute += PERS.ejectWait + 1; ejectTick(wt);
