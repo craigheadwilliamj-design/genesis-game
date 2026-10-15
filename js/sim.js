@@ -157,7 +157,7 @@ function newPark(){
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
+    crossingsV:1, paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -186,8 +186,9 @@ function upgradeSave(s){
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);
-  if(!s.pathCells){ migratePaths(s); }
+  if(!s.pathCells){ migratePaths(s); s.crossingsV = 0; }
   if(!s.pathFixed) s.pathFixed = {};
+  if(!s.crossingsV){ addCrossings(s); s.crossingsV = 1; }   // staff roads that touched guest paths before crossings keep working
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
@@ -545,12 +546,15 @@ function recompute(){
   syncPathStrips();
   updatePower();
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);
-  const guestPaths = state.paths.filter(p => joined.has(p.id)), anyPaths = state.paths.filter(p => joinedAll.has(p.id));
-  const near = (shape, list) => list.some(p => lineShapeDist(p.points, shape) <= REACH);
+  const loose = p => !p.d && !isTram(p);   // loose lines (tests push them) still count the old way; cells are done by nearCells
+  const guestPaths = state.paths.filter(p => joined.has(p.id) && loose(p)), anyPaths = state.paths.filter(p => joinedAll.has(p.id) && loose(p));
+  // path cells: a shape is on the path when it is within REACH of a path's middle, which is REACH - 2.5 m (half the width) from its edge
+  const nearG = shape => nearCells(shape, REACH - PATH_HALF_WIDTH, true), nearA = shape => nearCells(shape, REACH - PATH_HALF_WIDTH, false);
+  const near = (shape, list, staff) => (staff ? nearA : nearG)(shape) || list.some(p => lineShapeDist(p.points, shape) <= REACH);
   const reach = {}, reports = {}, themes = {};
   // Guests reach exhibits and shops by footpath. Staff reach backstage buildings by footpath or service road.
-  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
-  for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths);
+  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths, false); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
+  for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths, !!BUILDINGS[b.type].dept);
 
   // How much guests want to visit
   let appeal = 0, animals = 0, happySum = 0;

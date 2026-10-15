@@ -49,7 +49,7 @@ let fenceSel = "wood";             // fence type the next exhibit is built with
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
 const isDrawTool = t => t === "tram" || t === "zone" || t === "water";
-const PATH_TOOLS = {path:"g", service:"s", bridge:"b"};   // drag-and-drop path tools and the cell kind each lays (js/pathcells.js)
+const PATH_TOOLS = {path:"g", service:"s", bridge:"b", crossing:"x"};   // drag-and-drop path tools and the cell kind each lays (js/pathcells.js)
 const isPathTool = t => !!PATH_TOOLS[t];
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
@@ -2164,7 +2164,8 @@ const cellAtEv = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math
 const PATH_HINT = {
   g:"Drag along the grid to lay a 5 m wide path, straight or diagonal. Start on the entrance walk or another path. Lay paths side by side for a wider walk. Bulldoze takes cells away.",
   s:"Staff only: guests won't walk it. Drag to lay a 5 m wide staff path from any path. Bulldoze takes cells away.",
-  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes cells away."
+  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes cells away.",
+  x:"Tap one cell where a staff path meets a guest path. Staff cross it between the two; guests never step on it. Bulldoze takes it away."
 };
 function pathBar(){
   const k = PATH_TOOLS[tool], K = PATH_CELLS.kinds[k];
@@ -2192,7 +2193,7 @@ function endPathDrag(){
   const K = PATH_CELLS.kinds[d.kind], r = layPath(d.a, d.b, d.kind);
   if(!r){ renderOverlay(); if(d.plan.why) ui.toast(d.plan.why, "bad"); return; }
   afterChange(); render(); pathBar();
-  const joined = cellsJoined(d.plan.todo, d.kind !== "s");
+  const joined = cellsJoined(d.plan.todo, d.kind !== "s" && d.kind !== "x");
   ui.toast(joined ? `Laid ${r.n} m² of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
 }
 // Bulldoze on bare ground: a tap takes the path cell under it, a box takes the cells inside. Returns true if it dealt with path.
@@ -2210,10 +2211,10 @@ let cellsCache = null;
 function cellsSvg(){
   const C = pathCells(), size = Object.keys(C).length;
   if(cellsCache && cellsCache.cells === C && cellsCache.ver === pathVer && cellsCache.size === size) return cellsCache.svg;
-  const rows = {s:new Map(), g:new Map(), b:new Map()};
+  const rows = {s:new Map(), g:new Map(), b:new Map(), x:new Map()};
   for(const k in C){ const [x, y] = cellXY(k), m = rows[C[k]]; if(!m) continue; if(!m.has(y)) m.set(y, []); m.get(y).push(x); }
   let svg = "";
-  for(const kind of ["s", "g", "b"]){
+  for(const kind of ["s", "g", "b", "x"]){
     let d = "";
     for(const [y, xs] of rows[kind]){
       xs.sort((a, b) => a - b);
@@ -2699,7 +2700,7 @@ function moveProblem(kind, it){
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
-    if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
+    if(BUILDINGS[it.type].onPath){ if(!nearCells(pts, 0, true, true) && !state.paths.some(p => !p.d && !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
     else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
