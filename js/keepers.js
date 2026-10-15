@@ -86,7 +86,7 @@ function gateCheck(e){
   const d = GATE_REACH - PATH_HALF_WIDTH, sq = [[e.gate[0] - .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] + .05], [e.gate[0] - .05, e.gate[1] + .05]];
   const loose = state.paths.filter(p => !p.d && !isTram(p)).some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
   if(!loose && !nearCells(sq, d, false, true)) return {ok:false, text:"The gate doesn't touch a path or service road."};
-  if(!loose && !nearCells(sq, d, false)) return {ok:false, text:"The path at the gate doesn't join the entrance. Staff paths need a crossing onto a guest path."};
+  if(!loose && !nearCells(sq, d, false)) return {ok:false, text:"The path at the gate doesn't join the entrance. "};
   return {ok:true, text:"Gate opens onto a path."};
 }
 

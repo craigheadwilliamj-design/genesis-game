@@ -1,7 +1,7 @@
 /* =====================================================================
    PATHS AS CELLS
    A path is a set of 1 m grid cells in state.pathCells, keyed "x,y" (the square from x,y to x+1,y+1) with a
-   kind: g guest path, s staff path, b wooden bridge, x crossing (one cell joining staff to guest paths). Every path is PATH_CELLS.width (5) m wide; lay two side by
+   kind: g guest path, s staff path, b wooden bridge. Every path is PATH_CELLS.width (5) m wide; lay two side by
    side and they merge into one wide path. A drag lays a 5 m swath along a straight or 45 degree run
    (pathSwath, planPath, layPath), like the fence tool. Tram track is not cells: it stays in state.paths as lines.
    state.pathFixed holds the cells of the entrance walk, which can't be bulldozed.
@@ -81,7 +81,6 @@ function fenceBetween(x, y, nx, ny){
 }
 // What laying a swath from cell a to cell b would do: {cells (every cell of the run), todo (the ones that change), bad (cell key to reason), cost, why}
 function planPath(a, b, kind){
-  if(kind === "x") return planCrossing(b);   // a crossing is one cell, the one under the pointer
   const C = pathCells(), sw = pathSwath(a, b), out = {cells:sw.cells.map(c => cellKey(c[0], c[1])), todo:[], bad:new Map(), cost:0, why:"", end:sw.end, kind};
   if(!sw.cells.length) return out;
   out.todo = out.cells.filter(k => C[k] !== kind && !(kind === "s" && C[k]));   // a staff path never takes over a guest path or bridge
@@ -103,7 +102,6 @@ function planPath(a, b, kind){
 }
 // Lay a swath; returns {n, cost} or null if it can't go there
 function layPath(a, b, kind){
-  if(kind === "x") return layCrossing(b);
   const plan = planPath(a, b, kind);
   if(plan.why || !plan.todo.length) return null;
   spend(plan.cost, "built");
@@ -185,10 +183,12 @@ const punum = n => [Math.floor(n / 8192) - 2048, n % 8192 - 2048];
 let stripCache = null;   // {state, paths, cells, ver, size, count}
 
 /* ---------- connectivity: a flood fill over the cells, edge to edge ---------- */
-// Guests walk guest (g) and bridge (b) cells. Staff walk staff (s) cells and guest and bridge cells, but a staff network and a guest network
-// that merely touch stay apart: only a crossing (x) joins them, and only for staff (a crossing takes any neighbor, guests never use one).
+// Guests walk guest (g) and bridge (b) cells. Staff walk staff (s) cells and, where they touch edge to edge, guest and bridge cells too;
+// guests never step on a staff cell.
 const guestCell = k => k === "g" || k === "b";
 const CELL_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// The one place neighbors come from (edge to edge): the keys next to a cell key, so the flood fill and adjacency checks stay generic
+const cellNeighbors = n => { const [x, y] = punum(n); return CELL_DIRS.map(([dx, dy]) => pnum(x + dx, y + dy)); };
 let reachCache = null;   // {state, cells, ver, size, G, A} sets of pnum keys, rebuilt only when the cells change
 function pathReach(){
   const C = pathCells(), size = Object.keys(C).length, c = reachCache;
@@ -203,11 +203,10 @@ function pathReach(){
       if(Math.hypot(x + .5 - state.gate[0], y + .5 - state.gate[1]) <= 3){ seen.add(n); queue.push(n); }
     }
     while(queue.length){
-      const n = queue.pop(), k = kindAt.get(n), [x, y] = punum(n);
-      for(const [dx, dy] of CELL_DIRS){
-        const m = pnum(x + dx, y + dy), j = kindAt.get(m);
-        if(!j || seen.has(m)) continue;
-        if(guests ? !guestCell(j) : !(k === "x" || j === "x" || guestCell(k) === guestCell(j))) continue;
+      const n = queue.pop();
+      for(const m of cellNeighbors(n)){
+        const j = kindAt.get(m);
+        if(!j || seen.has(m) || (guests && !guestCell(j))) continue;   // staff walk every kind, guests only guest and bridge
         seen.add(m); queue.push(m);
       }
     }
@@ -234,45 +233,6 @@ function cellsJoined(keys, guests){
   const set = pathReach()[guests ? "G" : "A"];
   return keys.some(k => { const [x, y] = cellXY(k); return set.has(pnum(x, y)); });
 }
-// A crossing is one cell that joins a staff network to a guest network, for staff only
-function planCrossing(c){
-  const C = pathCells(), k = cellKey(c[0], c[1]), out = {cells:[k], todo:[], bad:new Map(), cost:0, why:"", end:c, kind:"x"};
-  if(C[k] === "x"){ out.why = "That crossing is already there."; return out; }
-  if(pathFixedCells()[k]){ out.why = "The main walk from the entrance can't change."; return out; }
-  out.todo = [k];
-  const why = pathCellProblem(c[0], c[1], "x", pathCtx());
-  if(why){ out.bad.set(k, why); out.why = why; return out; }
-  out.cost = Math.round(pathCellCost("x"));
-  if(!canAfford(out.cost)) out.why = `Costs ${money(out.cost)}. You have ${money(state.money)}.`;
-  return out;
-}
-function layCrossing(c){
-  const plan = planCrossing(c);
-  if(plan.why) return null;
-  spend(plan.cost, "built");
-  pathCells()[plan.todo[0]] = "x"; pathVer++;
-  return {n:1, cost:plan.cost};
-}
-// Parks from before crossings: each staff network that touches a guest or bridge cell but has no crossing gets one where it first touches
-// (that staff cell becomes the crossing), so keepers keep the roads they had
-function addCrossings(s){
-  const C = s.pathCells, seen = new Set(), key = (x, y) => x + "," + y;
-  for(const k of Object.keys(C).sort()){
-    if((C[k] !== "s" && C[k] !== "x") || seen.has(k)) continue;
-    const queue = [k]; seen.add(k);
-    let hasX = false, touch = null;
-    while(queue.length){
-      const q = queue.pop(), [x, y] = q.split(",").map(Number);
-      if(C[q] === "x") hasX = true;
-      for(const [dx, dy] of CELL_DIRS){
-        const n = key(x + dx, y + dy), j = C[n];
-        if(j === "s" || j === "x"){ if(!seen.has(n)){ seen.add(n); queue.push(n); } }
-        else if(j && !touch) touch = q;
-      }
-    }
-    if(!hasX && touch) C[touch] = "x";
-  }
-}
 function buildStrips(C){
   const kindAt = new Map(), cells = [];
   for(const k of Object.keys(C)){ const [x, y] = cellXY(k); kindAt.set(pnum(x, y), C[k]); cells.push([x, y]); }
@@ -285,7 +245,7 @@ function buildStrips(C){
   for(let dx = -2; dx <= 2; dx++) for(let dy = -2; dy <= 2; dy++) SQ.push([dx, dy]);
   for(const [x, y] of cells) if(!core.has(pnum(x, y)) && !SQ.some(([dx, dy]) => core.has(pnum(x + dx, y + dy)))) extra.push(pnum(x, y));
   for(const n of extra) core.add(n);
-  const cls = n => kindAt.get(n) === "s" || kindAt.get(n) === "x" ? "s" : "g";
+  const cls = n => kindAt.get(n) === "s" ? "s" : "g";
   const isCore = (x, y) => core.has(pnum(x, y));
   const edgeOk = (x, y, d) => {
     const [dx, dy] = d;
@@ -295,13 +255,11 @@ function buildStrips(C){
   const deg = (x, y) => { let n = 0; for(let dx = -1; dx <= 1; dx++) for(let dy = -1; dy <= 1; dy++) if((dx || dy) && isCore(x + dx, y + dy)) n++; return n; };
   const pt = (x, y) => [x + .5, y + .5];
   let id = 0;
-  const isX = n => kindAt.get(n) === "x";
-  const strip = (cellsIn, pts, type, fe, pk2) => {
+  const strip = (cellsIn, pts, type, fe) => {
     const bridge = cellsIn.filter(n => kindAt.get(n) === "b").length * 2 >= cellsIn.length;
     const t = type || (cls(cellsIn[0]) === "s" ? "service" : bridge ? "bridge" : null);
     const p = {id:"pc" + (id++), d:1, name:"Path", points:pts, hw:PATH_HALF_WIDTH, pk:cellsIn[0]};
     if(t) p.type = t;
-    if(pk2 !== undefined) p.pk2 = pk2;   // a link between a staff and a guest network is only live when both its ends are joined
     if(fe && (fe[0] || fe[1])) p.fe = fe;
     out.push(p);
   };
@@ -313,10 +271,7 @@ function buildStrips(C){
     for(let s = 1; s <= 5; s++){
       const nx = x + d[0] * s, ny = y + d[1] * s, m = pnum(nx, ny);
       if(!kindAt.has(m)) return {to:pt(x + d[0] * Math.max(0, Math.min(2, s - 1)), y + d[1] * Math.max(0, Math.min(2, s - 1)))};
-      if(core.has(m)){
-        if(cls(m) === cls(end)) return {to:pt(nx, ny)};
-        return isX(end) || isX(m) ? {link:[pt(x, y), pt(nx, ny)], from:end, other:m} : {to:pt(x, y)};   // staff and guest paths only join at a crossing
-      }
+      if(core.has(m)) return cls(m) === cls(end) ? {to:pt(nx, ny)} : {link:[pt(x, y), pt(nx, ny)], from:end, other:m};
     }
     return {to:pt(x + d[0] * 2, y + d[1] * 2)};
   };
@@ -325,8 +280,8 @@ function buildStrips(C){
     const [fx, fy] = punum(run[0]), [lx, ly] = punum(run[run.length - 1]);
     let a = pt(fx, fy), b = pt(lx, ly);
     const e1 = reach(run, run[run.length - 1], d), e0 = reach(run, run[0], [-d[0], -d[1]]);
-    if(e1 && e1.to) b = e1.to; else if(e1 && e1.link) strip([e1.from, e1.other], e1.link, "service", null, e1.other);
-    if(e0 && e0.to) a = e0.to; else if(e0 && e0.link) strip([e0.from, e0.other], e0.link, "service", null, e0.other);
+    if(e1 && e1.to) b = e1.to; else if(e1 && e1.link) strip([e1.from, e1.other], e1.link, "service");
+    if(e0 && e0.to) a = e0.to; else if(e0 && e0.link) strip([e0.from, e0.other], e0.link, "service");
     strip(run, [a, b], null, [!!(e0 && e0.to), !!(e1 && e1.to)]);
   };
   for(const d of STRIP_DIRS) for(const n of core){
@@ -340,7 +295,7 @@ function buildStrips(C){
       touched.add(m);
       if(cls(m) !== cls(run[run.length - 1])){
         close(run, d);
-        if(isX(run[run.length - 1]) || isX(m)) strip([run[run.length - 1], m], [pt(cx, cy), pt(nx, ny)], "service", null, m);   // staff and guest paths meet: only a crossing lets staff over
+        strip([run[run.length - 1], m], [pt(cx, cy), pt(nx, ny)], "service");   // staff and guest paths meet: staff cross, guests don't
         run = [m];
       } else run.push(m);
       cx = nx; cy = ny;
@@ -349,18 +304,14 @@ function buildStrips(C){
   }
   for(const n of core) if(!touched.has(n)){ const [x, y] = punum(n); strip([n], [[x, y + .5], [x + 1, y + .5]]); }
   // a free end that stops short of a path beside it (round a corner, or at the end of a swath that meets another) is tied to it, if there is path all the way
-  const solid = (a, b) => { let x = false; for(let i = 0; i <= 6; i++){ const n = pnum(Math.floor(a[0] + (b[0] - a[0]) * i / 6), Math.floor(a[1] + (b[1] - a[1]) * i / 6)); if(!kindAt.has(n)) return null; if(isX(n)) x = true; } return {x}; };
+  const solid = (a, b) => { for(let i = 0; i <= 6; i++) if(!kindAt.has(pnum(Math.floor(a[0] + (b[0] - a[0]) * i / 6), Math.floor(a[1] + (b[1] - a[1]) * i / 6)))) return false; return true; };
   for(const p of out.slice()) if(p.fe) p.fe.forEach((free, i) => {
     if(!free) return;
     const e = i ? p.points[p.points.length - 1] : p.points[0];
     let best = null;
     for(const q of out) if(q !== p && !q.link) for(let j = 1; j < q.points.length; j++){ const r = segProj(e[0], e[1], q.points[j-1], q.points[j]); if(!best || r.d < best.d) best = {...r, q}; }
-    const sol = best && best.d >= 1.2 && best.d <= 4.5 && solid(e, [best.x, best.y]);
-    if(!sol) return;
-    const same = (best.q.type === "service") === (p.type === "service");
-    if(!same && !sol.x) return;   // staff and guest paths only join at a crossing
-    const l = {id:"pc" + (id++), d:1, name:"Path", points:[e.slice(), [best.x, best.y]], hw:PATH_HALF_WIDTH, pk:p.pk, link:1};
-    if(!same) l.pk2 = best.q.pk;
+    if(!best || best.d < 1.2 || best.d > 4.5 || !solid(e, [best.x, best.y])) return;
+    const same = (best.q.type === "service") === (p.type === "service"), l = {id:"pc" + (id++), d:1, name:"Path", points:[e.slice(), [best.x, best.y]], hw:PATH_HALF_WIDTH, pk:p.pk, link:1};
     if(p.type && same) l.type = p.type; else if(!same) l.type = "service";
     out.push(l);
   });
@@ -383,6 +334,6 @@ function syncPathStrips(){
 function joinedStrips(guestsOnly){
   syncPathStrips();
   const out = [], set = pathReach()[guestsOnly ? "G" : "A"];
-  for(const p of state.paths) if(p.d && !(guestsOnly && isService(p)) && set.has(p.pk) && (p.pk2 === undefined || set.has(p.pk2))) out.push(p.id);
+  for(const p of state.paths) if(p.d && !(guestsOnly && isService(p)) && set.has(p.pk)) out.push(p.id);
   return out;
 }

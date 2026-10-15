@@ -157,7 +157,7 @@ function newPark(){
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[205,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    crossingsV:1, paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
+    paths:[], ...(() => { const m = mainWalkCells([205,305]); return {pathCells:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -186,9 +186,8 @@ function upgradeSave(s){
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);
-  if(!s.pathCells){ migratePaths(s); s.crossingsV = 0; }
+  if(!s.pathCells){ migratePaths(s); }
   if(!s.pathFixed) s.pathFixed = {};
-  if(!s.crossingsV){ addCrossings(s); s.crossingsV = 1; }   // staff roads that touched guest paths before crossings keep working
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];

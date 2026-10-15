@@ -1703,7 +1703,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
       layPath(A, B, "g");   // mend the gap the bulldoze left
       state.exhibits = [{id:"e-cp2", name:"CP2", points:[[212,222],[222,222],[222,229],[212,229]], animals:[], land:[], water:[], cond:100}];
-      layPath([208, 250], [230, 250], "s"); layCrossing([208, 250]); recompute(); buildGuestGraph(); buildKeeperGraph();
+      layPath([208, 250], [230, 250], "s"); recompute(); buildGuestGraph(); buildKeeperGraph();
       const gw = walkFrom(gGraph.anchors.gate, false);
       out.cellGuestsReach = isReachable(state.exhibits[0]) && !!gGraph.anchors["e-cp2"] && gw.dist.has(gGraph.anchors["e-cp2"]);
       out.cellStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
@@ -1748,42 +1748,33 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // a bridge cell joins like a guest path, and guests walk it
       reset(); layPath([205, 233], [225, 233], "g"); layPath([225, 233], [240, 233], "b"); redo();
       out.reachBridge = G(238, 233) && pathKind(238, 233) === "b" && [...gGraph.nodes.values()].some(n => n.x > 236);
-      // staff and guest paths that merely touch stay apart; a crossing joins them for staff only
+      // a staff path touching a guest path edge to edge is joined for staff, never for guests; one that doesn't touch stays apart
       reset(); layPath([208, 260], [230, 260], "s"); redo();
       const farNode = () => { let b = null, bd = 1e9; for(const n of kGraph.nodes.values()){ const d = Math.hypot(n.x - 231, n.y - 261); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
-      out.staffApart = !S(220, 260) && !G(220, 260) && !pathReach().A.has(pnum(220, 260)) && farNode().d > 3 && !state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id));
-      const xr = layCrossing([208, 260]); redo();
       const start = [...kGraph.nodes.values()].reduce((a, n) => Math.hypot(n.x - 205, n.y - 290) < Math.hypot(a.x - 205, a.y - 290) ? n : a);
-      out.crossingJoinsStaff = !!xr && pathKind(208, 260) === "x" && S(220, 260) && !G(220, 260) && !G(208, 260) && farNode().d < 3 && walkFrom(start, null).dist.has(farNode().b);
-      out.crossingNoGuests = !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && ![...gGraph.nodes.values()].some(n => Math.hypot(n.x - 231, n.y - 261) < 2);
-      out.crossingCosts = Math.abs(planCrossing([300, 300]).cost - pathCellCost("x")) < 1 && layCrossing([208, 260]) === null;
-      // taking the crossing away splits them again
-      removeCells(["208,260"]); redo();
-      out.crossingBulldoze = !state.pathCells["208,260"] && !S(220, 260) && farNode().d > 3;
-      // a crossing in the middle of nowhere joins nothing
-      layCrossing([300, 300]); out.crossingAlone = !S(300, 300);
+      out.staffTouchJoins = S(220, 260) && !G(220, 260) && farNode().d < 3 && walkFrom(start, null).dist.has(farNode().b);
+      out.staffNoGuests = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && ![...gGraph.nodes.values()].some(n => Math.hypot(n.x - 231, n.y - 261) < 2);
+      reset(); layPath([212, 260], [230, 260], "s"); redo();   // a two-cell gap to the walk
+      out.staffGapApart = !S(220, 260) && farNode().d > 3;
+      removeCells(["230,260"]); out.staffNeighbors = cellNeighbors(pnum(5, 5)).length === 4;
       // an exhibit gate on a cell edge reads as connected only when its path reaches the entrance
-      reset(); layPath([208, 260], [230, 260], "s"); layCrossing([208, 260]); redo();
+      reset(); layPath([208, 260], [230, 260], "s"); redo();
       const ex = { id:"e-gt", name:"GT", points:[[214,245],[226,245],[226,258],[214,258]], animals:[], land:[], water:[], cond:100, gate:[215, 258] };
       state.exhibits = [ex]; redo();
       out.gateOnEdge = gateCheck(ex).ok;
       ex.gate = [215, 250]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
-      ex.gate = [215, 258]; removeCells(["208,260"]); redo();
+      ex.gate = [215, 258]; reset(); layPath([212, 260], [230, 260], "s"); redo();
       out.gateUnjoined = !gateCheck(ex).ok && /join/.test(gateCheck(ex).text);
+      reset(); layPath([208, 260], [230, 260], "s"); redo();
+      out.exhibitStaffOnly = !isReachable(ex);
       // an exhibit beside a guest path is open to guests, one beside a staff road is not
-      layCrossing([208, 260]); redo();
       out.exhibitStaffOnly = !isReachable(ex);
       layPath([205, 239], [225, 239], "g"); redo();
       out.exhibitGuestOpen = isReachable(ex) && !!gGraph.anchors["e-gt"];
       // buildings: a backstage one needs only staff reach, a guest one needs a guest path
-      state.exhibits = []; reset(); layPath([208, 260], [230, 260], "s"); layCrossing([208, 260]);
+      state.exhibits = []; reset(); layPath([208, 260], [230, 260], "s");
       state.buildings = [{id:"b-ws", type:"workshop", points:rectPts(222, 270, BUILDINGS.workshop.w, BUILDINGS.workshop.d, 0), cond:100}, {id:"b-rr", type:"restroom", points:rectPts(222, 252, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0), cond:100}]; redo();
       out.buildingReach = isReachable(state.buildings[0]) && !isReachable(state.buildings[1]);
-      // old saves: a staff road touching a guest path gets a crossing so keepers keep their road
-      const oldX = {paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}], parcels:[], boundary:state.boundary, gate:[205,305]};
-      migratePaths(oldX); oldX.crossingsV = 0; addCrossings(oldX);
-      const xs = Object.keys(oldX.pathCells).filter(k => oldX.pathCells[k] === "x");
-      out.crossingMigrate = xs.length === 1 && ["g", "b"].some(g => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const [x, y] = xs[0].split(",").map(Number); return oldX.pathCells[(x+dx) + "," + (y+dy)] === g; }));
       state.buildings = []; state.exhibits = [];
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathCells:keep.cells, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
       pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
