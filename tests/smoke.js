@@ -713,6 +713,30 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.vandalBreaksBench = !!hit && hit.b === bench && propCond(bench) === 100 - VANDAL.propHit && vp.vandal && vandalLog().acts === 1;
     bench.cond = 10;
     out.brokenBenchUseless = isBroken(bench) && !servesOf(bench).length;
+    // lamps: they light nearby path corners at night and not by day; dark corners cost mood at night, lit ones don't; lit spots deter vandals
+    {
+      const keepParties = parties.slice();
+      const lamp = {id:"b-lamp", type:"lamp", points:rectPts(103, 200, BUILDINGS.lamp.w, BUILDINGS.lamp.d, 0), cond:100};
+      state.buildings.push(lamp); afterChange();
+      const ln = nearestGuestNode(100, 200), nodes = [...gGraph.nodes.values()].filter(n => !n.rail);
+      const dark = nodes.find(n => Math.hypot(n.x - 103, n.y - 200) > LAMP.radius + LAMP.lean + 4);
+      const tm0 = state.minute;
+      state.minute = 0;
+      out.lampLightsNight = ln.lit >= LAMP.litAt && !!dark && dark.lit < LAMP.litAt && darkLevel() === 1 && darkStretches >= 1;
+      state.minute = DAWN_MIN + 120;
+      out.lampNoDayEffect = darkLevel() === 0 && deterrence(100, 200) === VANDAL.lampCut * (litterAt(100, 200) >= 6 ? VANDAL.litterBoost : 1);
+      const moodAfter = n => { resetParties(); guestsArrive(2); const q = parties[0]; q.at = n; q.to = null; q.hold = true; q.mood = 90; q.pers = ["fun"]; q.fxc = null; guestsTick(state.minute, state.minute + 1); return q.mood; };
+      state.minute = 0;
+      const litMood = moodAfter(ln), darkMood = moodAfter(dark);
+      out.darkNodesCostMood = darkMood < litMood - 1e-6;
+      state.minute = DAWN_MIN + 120;
+      out.darkNoCostByDay = Math.abs(moodAfter(dark) - moodAfter(ln)) < 1e-6;
+      state.minute = 0;
+      const dLit = deterrence(100, 200), dDark = deterrence(dark.x, dark.y);
+      out.lampDeterNight = dLit < dDark && dLit <= LAMP.nightCut + 1e-9;
+      state.minute = tm0;
+      state.buildings = state.buildings.filter(b => b !== lamp); afterChange(); resetParties(); parties.push(...keepParties);
+    }
     // a guard nearby puts vandals off, and throws this one out
     const d0 = deterrence(100, 200);
     hireGuard(); syncGuards(); gcrew[0].at = nearestNode(100, 200); gcrew[0].route = [];
@@ -2775,6 +2799,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       paintPick = "erase"; pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
       const gone = !paintAt(x + 21, y + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
     state.biomePaint = keep || []; paintTouch(); render();
+
+    // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
+    startWith(newPark(), false); setSpeed(0);
+    {
+      state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
+      const H = Math.PI / 2, add = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, H)});
+      add("m-pmc", "pmc", 230, 262); add("m-ce", "ceres", 180, 262); add("m-cl", "closet", 205, 230);
+      state.paths.push({id:"m1", name:"m1", points:[[205,230],[205,262]]}, {id:"m2", name:"m2", points:[[205,262],[222,262]]}, {id:"m3", name:"m3", points:[[205,262],[193,262]]});
+      state.science.tech.push("medmeso");
+      recompute(); buildKeeperGraph(); buildGuestGraph(); hireCustodian(); syncCustodians();
+      const pm = state.buildings.find(b => b.id === "m-pmc"); pm.store = {medmes:2}; state.ceres.meds = {medpal:0, medmes:30, medcen:0};
+      state.minute = 10; let topped = false;
+      for(let i = 0; i < 300 && !topped; i++){ tick(1); topped = stockOf(pm, "medmes") > 2; }
+      out.pmcRestocksBeforeEmpty = topped && restockLot("medmes") === HEALTH.dose && restockLot("plants") === 5;
+    }
     return out;
   }));
 

@@ -123,8 +123,8 @@ function storeTarget(b, t){
   if(!d || d.source || d.dock || !d.holds.includes(t)) return 0;
   const cap = storeCap(b);
   if(b.type === "pmc"){ const want = medGoodsWanted().concat(CMED); return want.includes(t) ? Math.ceil(cap * .8 / want.length) : 0; }
-  if(t === CMED) return d.bulk && hasDept("pmc") ? Math.min(Math.round(cap * .05), 20) : 0;   // a cold store keeps a buffer for the PMC
-  if(MED_GOODS.includes(t)) return d.bulk && cereses().length && medGoodsWanted().includes(t) ? Math.min(Math.round(cap * .05), 20) : 0;
+  if(t === CMED) return d.bulk && hasDept("pmc") ? Math.min(Math.round(cap * .1), 60) : 0;   // a cold store keeps a buffer for the PMC
+  if(MED_GOODS.includes(t)) return d.bulk && cereses().length && medGoodsWanted().includes(t) ? Math.min(Math.round(cap * .1), 60) : 0;
   if(BUILDINGS[b.type].rooms) return t === "merch" ? Math.round(cap * .8) : 0;
   // a stand or shop keeps most of its shelves full of what its menu uses, split between its goods
   if(d.vendor){
@@ -150,6 +150,8 @@ function haulSources(j){
   if(MED_GOODS.includes(j.t)) for(const b of cereses()) if(supplyOf(b, j.t) >= 1) out.push(b);
   return out;
 }
+// The least worth a trip: food moves in lots of 5, but medicine is used a dose or two at a time and the PMC only holds a few, so it can't wait for 5 to be missing
+const restockLot = t => MED_GOODS.includes(t) || t === CMED ? HEALTH.dose : 5;
 // The most run-down store this worker can restock, with the nearest place to get what it needs. `near` finds the closest of a list.
 // Only custodians restock stores: they pass the goods and a carry limit of their own.
 function pickHaul(k, near, goods, most){
@@ -163,7 +165,7 @@ function pickHaul(k, near, goods, most){
       // a store only takes what fits: every good shares its room
       const have = stockOf(d, t) + inbound(d.id, t), room = storeRoom(d, t) - dd.holds.reduce((s, x) => s + inbound(d.id, x), 0);
       const need = Math.min(tgt - have, room);
-      if(have >= tgt * .6 || need < Math.min(5, tgt)) continue;
+      if(have >= tgt * .6 || need < Math.min(restockLot(t), tgt)) continue;
       cands.push({d, t, need, cls:dd.bulk ? 2 : 1, ratio:have / tgt});
     }
   }

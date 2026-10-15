@@ -25,7 +25,12 @@ const guardNear = (x, y) => gcrew.some(c => c.at && Math.hypot(keeperPos(c)[0] -
 function deterrence(x, y){
   let f = 1;
   if(guardNear(x, y)) f *= SECURITY.deterCut;
-  if(state.buildings.some(b => b.type === "lamp" && !isBroken(b) && Math.hypot(centroid(b.points)[0] - x, centroid(b.points)[1] - y) < VANDAL.lampReach)) f *= VANDAL.lampCut;
+  const dk = darkLevel();
+  if(dk > 0){   // at night the lamps' light is what counts: a lit spot is safer, a dark one is a gift
+    const lit = lightAt(x, y) >= LAMP.litAt;
+    f *= lit ? 1 - dk * (1 - LAMP.nightCut) : 1 + dk * (LAMP.darkBoost - 1);
+    if(!lit && state.buildings.some(b => b.type === "lamp" && !isBroken(b) && Math.hypot(centroid(b.points)[0] - x, centroid(b.points)[1] - y) < VANDAL.lampReach)) f *= VANDAL.lampCut;
+  } else if(state.buildings.some(b => b.type === "lamp" && !isBroken(b) && Math.hypot(centroid(b.points)[0] - x, centroid(b.points)[1] - y) < VANDAL.lampReach)) f *= VANDAL.lampCut;
   if(litterAt(x, y) >= 6) f *= VANDAL.litterBoost;
   return f;
 }
@@ -34,8 +39,53 @@ function deterrence(x, y){
 function onCamera(x, y){
   if(!hasTech("cameras")) return false;
   const near = (b, r) => { const [cx, cy] = centroid(b.points); return Math.hypot(cx - x, cy - y) < r; };
-  return offices().some(b => near(b, SECURITY.cameraRadius)) || state.buildings.some(b => b.type === "camera" && !isBroken(b) && near(b, SECURITY.postRadius));
+  const seen = offices().some(b => near(b, SECURITY.cameraRadius)) || state.buildings.some(b => b.type === "camera" && !isBroken(b) && near(b, SECURITY.postRadius));
+  // at night a camera needs light: unlit spots are only seen some of the time
+  if(seen && darkLevel() > 0 && lightAt(x, y) < LAMP.litAt) return Math.random() < 1 - darkLevel() * (1 - LAMP.darkCam);
+  return seen;
 }
+
+/* ---------- lamp light ---------- */
+
+// 0 (day) to 1 (full night): the night wash, normalised
+const darkLevel = () => nightDark() / NIGHT.dark;
+// Where each working lamp's pool is centred, and its radius. The pool leans toward the way the lamp faces.
+function lampSpots(){
+  return state.buildings.filter(b => b.type === "lamp" && !isBroken(b)).map(b => {
+    const [cx, cy] = centroid(b.points), f = propFront(b);
+    return {id:b.id, x:cx + f[0] * LAMP.lean, y:cy + f[1] * LAMP.lean, r:LAMP.radius};
+  });
+}
+// How lit a spot is by the lamps (0 to 1, regardless of the hour)
+function lightAt(x, y, spots = lampSpots()){
+  let v = 0;
+  for(const s of spots){ const d = Math.hypot(s.x - x, s.y - y); if(d < s.r) v = Math.max(v, 1 - d / s.r); }
+  return v;
+}
+// Mark each guest-path corner with how lit the walk from there is (n.lit, 0 to 1), count the dark stretches, and note which exhibits a lit path sees
+let darkStretches = 0;
+function indexLight(nodes){
+  const spots = lampSpots();
+  for(const n of nodes.values()){
+    n.lit = 0;
+    if(n.rail) continue;
+    n.lit = lightAt(n.x, n.y, spots);
+    for(const m of n.adj.keys()) if(!m.rail) n.lit = Math.max(n.lit, lightAt((n.x + m.x) / 2, (n.y + m.y) / 2, spots) * .999);
+  }
+  // a dark stretch is a run of connected unlit corners
+  darkStretches = 0; const seen = new Set();
+  for(const n of nodes.values()){
+    if(n.rail || seen.has(n) || n.lit >= LAMP.litAt) continue;
+    darkStretches++; const q = [n]; seen.add(n);
+    while(q.length){ const c = q.pop(); for(const m of c.adj.keys()) if(!m.rail && !seen.has(m) && m.lit < LAMP.litAt){ seen.add(m); q.push(m); } }
+  }
+  const lit = new Set();
+  for(const n of nodes.values()) if(n.sees && n.lit >= LAMP.litAt) for(const ids of n.sees.values()) for(const id of ids) lit.add(id);
+  litExhibits = lit;
+}
+let litExhibits = new Set();
+// At night, how much a party shuns an exhibit nobody can see from a lit path (1 is no change)
+const darkPull = id => litExhibits.has(id) ? 1 : 1 - LAMP.pull * darkLevel();
 // Each minute, an unhappy rowdy party out on the paths might break something
 function vandalTick(p, dt){
   if(!p.rowdy || p.home || p.in || !p.at || p.mood >= VANDAL.moodBelow) return;

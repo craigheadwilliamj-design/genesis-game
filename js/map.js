@@ -398,6 +398,7 @@ function render(){
   renderOverlay();
   syncAnimals();
   applyTransform();
+  drawLights();
 }
 
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
@@ -1162,7 +1163,18 @@ function renderOverlay(){
   overlay.innerHTML = s;
 }
 
-function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`); }
+function applyTransform(){ const t = `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`; cam.setAttribute("transform", t); const lc = $("#lightCam"); if(lc) lc.setAttribute("transform", t); }
+// Lamp light pools: stepped rings per working lamp in one layer above the night wash, drawn only when the lamp set changes; brightness follows the clock
+let lightKey = "";
+function drawLights(){
+  const g = $("#lightPools"); if(!g) return;
+  const spots = lampSpots(), key = spots.map(s => `${s.id}:${s.x.toFixed(1)},${s.y.toFixed(1)}`).join("|");
+  if(key !== lightKey){
+    lightKey = key;
+    g.innerHTML = spots.map(s => Array.from({length:LAMP.rings}, (_, i) => `<circle cx="${s.x}" cy="${s.y}" r="${(s.r * (1 - i / LAMP.rings)).toFixed(2)}" fill="${LAMP.glow}" fill-opacity="${LAMP.ringAlpha}"/>`).join("")).join("");
+  }
+  const o = darkLevel().toFixed(2); if(g.getAttribute("opacity") !== o) g.setAttribute("opacity", o);
+}
 
 /* ---------- animals wandering in their exhibits ---------- */
 const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
@@ -1810,6 +1822,7 @@ function setTool(t){
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
       : b.tram ? `Point beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
       : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
+      : b.type === "lamp" ? `Point at a path and tap. After dark it lights about ${LAMP.radius} m around it: guests feel safe on lit paths, and vandals and cameras notice it.${spin}`
       : b.onPath ? `Point at a path and tap. It sits on the edge you point at.${spin}`
       : b.prop ? `Point beside a path and it snaps on.${free}${spin}`
       : `Point beside a path and it turns to face it.${free}${spin}`,

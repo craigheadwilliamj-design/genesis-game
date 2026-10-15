@@ -373,6 +373,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <main>
     <div class="mapwrap" id="mapwrap">
       <div id="nightWash" style="position:absolute;inset:0;z-index:2;pointer-events:none;background:#0b1640;mix-blend-mode:multiply;opacity:0"></div>
+      <svg id="lightSvg" style="position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;mix-blend-mode:screen"><g id="lightCam"><g id="lightPools" opacity="0"></g></g></svg>
       <svg id="map" aria-label="Your park">
         <defs>
           <pattern id="contours" width="240" height="240" patternUnits="userSpaceOnUse">

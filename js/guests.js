@@ -126,6 +126,7 @@ function buildGuestGraph(){
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
   indexDecor(nodes);
+  indexLight(nodes);
   // everyone carries on from the same spot on the new map
   for(const p of parties){
     const x = p.at ? p.at.x : null, y = p.at ? p.at.y : null;
@@ -265,7 +266,7 @@ function pickSight(p){
     if(d === undefined) return;
     const whim = p.whim || (p.whim = {});
     if(whim[x.id] === undefined) whim[x.id] = rand(...SIGHT.whim);   // each party likes its own mix, so they don't all file to the same star
-    const w = (appeal + 1) / (1 + d / SIGHT.distPull) * taste * whim[x.id];
+    const w = (appeal + 1) / (1 + d / SIGHT.distPull) * taste * whim[x.id] * (state.exhibits.includes(x) ? darkPull(x.id) : 1);
     opts.push([x, w]); tot += w;
   };
   for(const e of state.exhibits) if(!p.seen.has(e.id) && e.animals.length && gGraph.anchors[e.id]) add(e, exhibitAppeal(e), tasteOf(p, e));
@@ -655,6 +656,9 @@ function guestsTick(m0, m1){
     // walking through litter
     const mess = p.at && !p.at.rail ? litterAt(p.at.x, p.at.y) : 0;
     if(mess >= 3){ hurt += LITTER.hurt * inf * Math.min(1, mess / LITTER.heavy); if(mess >= 6) thinks(p, "litter"); }
+    // after dark, a stretch no lamp lights is a bit frightening
+    const dk = darkLevel();
+    if(dk > 0 && p.at && !p.at.rail && (p.at.lit || 0) < LAMP.litAt){ hurt += LAMP.fear * dk * pm(p, "dark") * (1 - (p.at.lit || 0) / LAMP.litAt); if(dk >= .5) thinks(p, "dark"); }
     // gardens, water and statues along the way cheer them up, and they stop to read each statue's plaque
     if(p.at && p.at.decor){ hurt -= DECOR.joy * pm(p, "decor") * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
     if(p.at && p.at.statues) for(const id of p.at.statues) statueSeen(p, id);
