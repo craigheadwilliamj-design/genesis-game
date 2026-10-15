@@ -23,3 +23,10 @@ Move all `lineDist(...p.points)`, `linesCross`, `lineShapeDist`, `lineEntersShap
 
 ## P6: Polish and performance
 Profile the cell flood fill, graph rebuilds and render with a big park; incremental updates instead of full rebuilds on each drag; undo-friendly bulldoze; tool hints; tidy dead code (old point-by-point path code, `WIDE_PATH`, compatibility layer); update CLAUDE.md fully.
+
+
+## Revision (after P1 landed): chunks, drag-bulldoze, built-in crossings
+- A path is a 5 m x 5 m CHUNK, not 1 m cells. Chunk coordinates are `floor(x / 5)`; `state.pathCells` becomes `state.pathChunks` (same kinds g/s/b). A drag lays whole chunks along a straight or 45 degree run (diagonal runs fill the extra chunks needed to stay edge-connected, a 2-wide stair step). Side by side chunks merge into a bigger path. All placement/ghost/bulldoze snap to the chunk grid.
+- Bulldoze is a drag-box: with the Bulldoze tool, press and drag across paths; the chunks inside the box are highlighted as you drag; releasing deletes them (one refund, one undo-less confirm only if it is large). A tap on a single chunk deletes just that chunk.
+- No Crossing tile. A staff path chunk that touches a guest/bridge chunk (or a building door, exhibit gate, depot) is automatically connected for STAFF; guests still never use staff chunks. Staff paths touching guest paths stay visually distinct (clean edge).
+- New session P1b (chunk conversion + drag-bulldoze + built-in crossings) runs after P2 and before P3/P4/P5, converting the cell code, the migration and P2's flood fill to chunks and removing the Crossing tile. P3, P4 and P5 are then written against chunks.
