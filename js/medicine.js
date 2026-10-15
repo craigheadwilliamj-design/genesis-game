@@ -198,9 +198,11 @@ function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && 
 // Can a vet cure this one where it stands?
 // A chronic case only comes back for a real cure, with the era's own medicine.
 function fieldTreatable(a){
-  if(!noticed(a) || a.darted || a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
-  const k = pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
-  return a.sick.chronic ? k === "era" : !!k;
+  if(!noticed(a) || a.darted) return false;
+  // a chronic case (illness or injury) is already eased, so only the era's own medicine matters
+  if(a.sick.chronic) return pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose) === "era";
+  if(a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
+  return !!pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
 }
 
 // What's happening to one sick animal, in words
