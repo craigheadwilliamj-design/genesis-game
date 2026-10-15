@@ -150,8 +150,8 @@ function logiOverviewHtml(){
       h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
       h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at CERES.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
     }
-    h += bar3("Contemporary medicine", sum.cmed.have / sum.cmed.cap * 100, GOOD_COLOR.cmed, `${sum.cmed.have}/${sum.cmed.cap}`);
-    h += `<div class="meta fnote">At the PMC. Suppliers restock it every night at ${money(MODERN.cost)} a dose.</div>`;
+    h += bar3(goodName(CMED), sum.cmed.have / sum.cmed.want * 100, GOOD_COLOR[CMED], `${Math.floor(sum.cmed.have)} stored`);
+    h += `<div class="meta fnote">${Math.floor(sum.cmed.pmc)} at the PMC. Order it at the dock, ${money(MODERN.cost)} a dose.</div>`;
   }
   const L = state.logi;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;

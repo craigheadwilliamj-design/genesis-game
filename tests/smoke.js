@@ -194,12 +194,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // without the era's medicine, contemporary medicine eases a patient down to its era's floor, and it goes home chronic
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
-    state.buildings.find(b => b.id === "b-pmc").store = {medpal:0};
-    const m0 = state.today.medicine; state.health.cmeds = 0;
+    state.buildings.find(b => b.id === "b-pmc").store = {medpal:0, medmod:MODERN.stock};
+    const fakeDock = {type:"dock", auto:true};
     const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
     state.health.ward.push(pal);
     healthNight();
-    out.modernRestock = state.today.medicine - m0 === MODERN.stock * MODERN.cost && state.health.cmeds === MODERN.stock - HEALTH.dose;
+    out.modernRestock = dockOrders(fakeDock).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
     out.modernEases = pal.med === "modern" && Math.abs(pal.a.sick.sev - (50 - HEALTH.healPerNight * MODERN.heal.paleozoic)) < 1e-9 && !pal.cured;
     for(let i = 0; i < 5 && !pal.cured; i++) healthNight();
     out.modernLeavesChronic = pal.cured && pal.a.sick && pal.a.sick.chronic && pal.a.sick.sev === MODERN.floor.paleozoic;

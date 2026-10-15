@@ -329,7 +329,6 @@ function upgradeSave(s){
     }
   }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
-  if(s.health.cmeds === undefined) s.health.cmeds = 0;
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at CERES moves to the PMC
@@ -350,6 +349,8 @@ function upgradeSave(s){
     const pmc = s.buildings.find(b => b.type === "pmc");
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
+  // contemporary medicine used to be a counter the suppliers refilled; now it is stock in the PMC
+  if(s.health.cmeds !== undefined){ const pmc = s.buildings.find(b => b.type === "pmc"); if(pmc && s.health.cmeds > 0){ pmc.store = pmc.store || {}; pmc.store[CMED] = (pmc.store[CMED] || 0) + s.health.cmeds; } delete s.health.cmeds; }
   // medicine used to be one good. Split what's on hand across the eras ORACLE has researched (else Cenozoic), so nothing is lost.
   {
     const eras = Object.keys(MED_TECH).filter(e => s.science.tech.includes(MED_TECH[e])), into = (eras.length ? eras : ["cenozoic"]).map(e => MED_GOOD[e]);

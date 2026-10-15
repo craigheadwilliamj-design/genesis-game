@@ -1038,6 +1038,7 @@ const GOODS = {
   medpal: {label:"Paleozoic medicine", spoil:.02},
   medmes: {label:"Mesozoic medicine",  spoil:.02},
   medcen: {label:"Cenozoic medicine",  spoil:.02},
+  medmod: {label:"Contemporary medicine", spoil:.02},   // bought at the dock, never grown
   // what food stands and gift shops sell from: a unit is $1 of wholesale stock
   snacks: {label:"Snacks",      spoil:.08},
   drinks: {label:"Drinks",      spoil:.01},
@@ -1045,11 +1046,12 @@ const GOODS = {
 };
 const FEED_GOODS = ["plants", "meat", "fish", "insects"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
-const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS);   // what the dock buys
-// CERES medicine is kept per era; contemporary medicine is separate (state.health.cmeds, restocked by suppliers)
+const CMED = "medmod";   // contemporary medicine: bought at the dock
+const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS, [CMED]);   // what the dock buys
+// CERES medicine is kept per era. Contemporary medicine (CMED) is a good of its own: the dock orders it, custodians carry it to the PMC
 const MED_GOOD = {paleozoic:"medpal", mesozoic:"medmes", cenozoic:"medcen"};
 const MED_GOODS = ["medpal", "medmes", "medcen"];
-const GOOD_COLOR = {...FOOD_COLOR, medpal:"#7A2E5C", medmes:"#B0384F", medcen:"#D9674A", cmed:"#8C8C96", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
+const GOOD_COLOR = {...FOOD_COLOR, medpal:"#7A2E5C", medmes:"#B0384F", medcen:"#D9674A", medmod:"#8C8C96", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
 // Units of guest goods a day each guest gets through when the shelves stay full. Ordering never plans for less,
 // because a day of empty shelves sells little and would otherwise shrink the next order.
 const GUEST_USE = {snacks:1, drinks:.7, merch:1.5};
@@ -1233,8 +1235,8 @@ const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
 // Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
 // but can't cure prehistoric illness for good: the animal goes home with a chronic case.
 const MODERN = {
-  stock:30,            // doses the PMC keeps on hand
-  cost:25,             // price of each dose
+  stock:30,            // doses the dock keeps on order (auto-ordering)
+  cost:25,             // price of each dose at the dock
   heal:{cenozoic:.9, mesozoic:.7, paleozoic:.5},     // how well it works, as a share of the era's own medicine
   floor:{cenozoic:5, mesozoic:10, paleozoic:15},    // how sick it leaves an animal, at best
   chronicHappy:.25,     // a chronic case counts as this much of a sick animal for happiness
@@ -1249,7 +1251,7 @@ const VET = {
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
-BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:MED_GOODS, spoil:1, sink:true};
+BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:MED_GOODS.concat(CMED), spoil:1, sink:true};
 
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};

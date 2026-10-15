@@ -11,7 +11,7 @@
 
 let vcrew = [];   // vets walking around right now (positions aren't saved)
 
-function freshHealth(){ return {from:HEALTH.startDay, ward:[], cmeds:0}; }
+function freshHealth(){ return {from:HEALTH.startDay, ward:[]}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
 // An era's medicine only cures a period's animals once it has been refined for that period
@@ -22,22 +22,15 @@ const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
 // Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
 function pickMed(s, n){
   if(canTreat(s) && medOnHand(medGoodOf(s)) >= n) return "era";
-  if(dept("pmc") && (state.health.cmeds || 0) >= n) return "modern";
+  if(dept("pmc") && pmcStock(CMED) >= n) return "modern";
   return null;
 }
 const medGoodOf = s => MED_GOOD[eraOf(s)];
-function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else state.health.cmeds -= n; }
+function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else useMeds(n, CMED); }
 // Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
 function ease(a){
   const fl = MODERN.floor[eraOf(SPECIES_BY_ID[a.sp])];
   a.sick = {kind:a.sick.kind, sev:Math.min(a.sick.sev, fl), chronic:true};
-}
-// Overnight, suppliers top the PMC up with contemporary medicine
-function modernMedsNight(){
-  const h = state.health;
-  if(!dept("pmc")) return;
-  const n = Math.min(MODERN.stock - (h.cmeds || 0), Math.floor(Math.max(0, state.money) / MODERN.cost));
-  if(n > 0){ h.cmeds = (h.cmeds || 0) + n; spend(n * MODERN.cost, "medicine"); }
 }
 const pmcs = () => state.buildings.filter(b => b.type === "pmc" && kGraph && kGraph.anchors[b.id]);
 const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
@@ -479,7 +472,6 @@ function vetStatus(v){
 
 function healthNight(){
   const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0};
-  modernMedsNight();
   // medicated feed: CERES doses go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
