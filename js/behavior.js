@@ -346,7 +346,7 @@ function needsStep(e, a, s, ctx, dt){
     case "play": n.bored -= B.play * dt * (.4 + ctx.enrich); n.stress -= .1 * dt; break;
     case "patrol": n.bored -= B.patrol * dt; break;
     case "pace": n.bored -= B.pace * dt; n.stress += .05 * dt; break;
-    case "rest": n.discomfort -= .1 * dt; n.stress -= .1 * dt; break;
+    case "rest": n.discomfort -= .1 * dt; n.stress -= (a.inside ? SHELTER.restCalm : .1) * dt; break;
     case "hide": n.stress -= B.hideCalm * dt * (ctx.cover ? 1 : .33) * (a.inside ? SHELTER.hideCalm : 1); break;
   }
   n.stress += (stressTarget(e, a, s, ctx) - n.stress) * Math.min(1, dt / B.stressDrift);
@@ -486,6 +486,8 @@ function shelterSweep(){
 // Why this animal wants to be indoors right now, given the act it just picked: "hide" (frightened), "weather" (storm, heat wave or cold snap; a share of them each day), "sleep" (resting while drowsy, or on a nap), or null
 function shelterWhy(a, s, act, n){
   if(act === "hide") return "hide";
+  const run = shelterRun.get(a.id);   // a stressed animal, shy or not, makes for a shelter and stays in until it has calmed down (but comes out for food and water)
+  if(n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && (n.stress >= SHELTER.stressLine || (run && run.why === "hide" && n.stress > SHELTER.calmLine))) return "hide";
   const wk = state.weather ? state.weather.today : "fair", W = WEATHER.kinds[wk];
   if(W.happy && !(wk === "cold" && COLD_HARDY.includes(s.id)) && n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && napRoll(a, 7, true) < (SHELTER.weather[wk] ?? 1)) return "weather";
   if(act === "rest" && (a.napFor || awake(s) <= SHELTER.sleepBelow)) return "sleep";
@@ -513,6 +515,7 @@ function shelterStep(e, a, s, ctx, act){
   if(!run && a.inside) a.inside = null;
   const why = shelterWhy(a, s, act, needsOf(a));
   if(why === "weather" && act !== "rest") act = "rest";
+  if(why === "hide") act = "hide";
   if(!why){ if(run) shelterOut(a, ctx); return act; }
   if(run){ run.why = why; if(run.in) a.inside = why; else { run.since += BEHAVIOR.step; shelterArrive(a, run); } return act; }
   // look for the nearest shelter with room that suits it (not a canopy in a cold snap, nothing too small, a burrow only for burrowers)
