@@ -26,7 +26,7 @@ function updatePower(){
   for(const e of state.exhibits) if(e.barrier !== "electric") delete e.powered;
   // cold stores come after fences; without power they only keep food like a plain store
   for(const b of coldStores()){ b.powered = left >= LOGI.coldPower; if(b.powered) left -= LOGI.coldPower; }
-  if(cut && state.minute > OPEN_MIN && powerShortNotified !== state.day){
+  if(cut && state.minute > 0 && powerShortNotified !== state.day){
     powerShortNotified = state.day;
     events.toast(`Power shortage: ${cut} electrified fence${cut === 1 ? " has" : "s have"} no power. Build or repair generators.`, "bad");
   }

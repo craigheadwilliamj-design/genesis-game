@@ -15,12 +15,14 @@ const ui = {
     $("#roMoney").classList.toggle("neg", state.money < 0);
     set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
-    set("clock", fmtClock(state.minute));
+    set("clock", fmtClock(clockMin()));
+    $("#closedTag").hidden = !state.parkClosed;
+    const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; }
     set("dayLabel", `${fmtDate(state.day)} · ${weatherNow().label}`);
     set("parkName", state.name);
     const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
     if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
-    $("#dayFill").style.width = ((state.minute - OPEN_MIN) / (CLOSE_MIN - OPEN_MIN) * 100).toFixed(1) + "%";
+    $("#dayFill").style.width = (state.minute / DAY_MIN * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
     if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 16); $("#rating").setAttribute("aria-label", `${r} stars`); }
   },
@@ -109,7 +111,7 @@ function overviewHtml(){
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Research and expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
     ${t.supplies ? `<dt>Food and gift stock</dt><dd>−${money(t.supplies)}</dd>` : ""}
-    <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
+    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
   </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
   h += logiOverviewHtml();
@@ -141,6 +143,8 @@ function overviewHtml(){
     return h;
   }
 
+  h += `<section><h3>Gate</h3><div class="row"><button class="btn${state.parkClosed ? " primary" : ""}" data-action="toggleClosed">${state.parkClosed ? "Open the park" : "Close park"}</button></div>
+    <div class="meta" style="margin-top:6px">${state.parkClosed ? "The park is closed: no new guests, no tickets, and everyone inside is heading for the exit. Wages and upkeep still run." : "The park is open round the clock, busiest by day, with a thin trickle of guests at night. Close it to send everyone home."}</div></section>`;
   h += `<section><h3>Park name</h3><label class="field"><span>Name</span><input id="officeName" maxlength="40" value="${esc(state.name)}"></label></section>`;
   h += `<section><h3>Rating ${starsSvg(state.rating, 15)} <span class="num">${starTxt(state.rating)}</span></h3>`;
   if(!d.parts.length) h += `<div class="meta">Your park needs animals before it can earn stars.</div>`;
@@ -439,7 +443,7 @@ function propsHtml(e){
 }
 
 // Behavior tab: what the animals are doing, how each species' needs stand, and what's stressing them
-const ACTIVE_TEXT = {diurnal:"Up all day.", nocturnal:"Sleeps through most of the day. Busiest at opening and closing.", crepuscular:"Busiest in the first and last two hours of the day, and drowsy in between."};
+const ACTIVE_TEXT = {diurnal:"Up all day, asleep at night.", nocturnal:"Sleeps through the day. Up all night.", crepuscular:"Busiest at dawn and dusk, and drowsy in between."};
 const SOCIAL_TEXT = {solitary:"Wants no company, and rivals need room to keep apart.", pair:"Wants a partner of its own kind.", herd:"Feels safe in a herd, and nervous with too few.", pack:"Lives in a pack. Left alone it paces."};
 const TEMPER_TEXT = {skittish:"Busy paths stress it. Cover to retreat to helps.", curious:"Bores fast, loves to play, and likes watching people.", aggressive:"Crowding stresses it, and a stressed one tests the fence."};
 function behaviorHtml(e){
@@ -798,6 +802,11 @@ panelEl.addEventListener("click", e => {
   if(a === "tramFare"){
     state.tramFare = clamp(tramFare() + (+b.dataset.d), 1, TRAM.maxFare);
     recompute(); ui.panel(); saveSoon(); return;
+  }
+  if(a === "toggleClosed"){
+    state.parkClosed = !state.parkClosed;
+    ui.toast(state.parkClosed ? "Park closed. Guests are heading for the exit." : "Park open again.", state.parkClosed ? "bad" : "good");
+    ui.hud(); ui.panel(); saveSoon(); return;
   }
   if(a === "ticket"){
     state.ticket = clamp(state.ticket + (+b.dataset.d), 1, 150);

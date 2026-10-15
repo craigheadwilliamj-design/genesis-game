@@ -171,7 +171,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     hireVet();
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
     viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
-    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
+    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
     healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
     const cured = state.health.ward[0] && state.health.ward[0].cured;
@@ -253,7 +253,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // hungry, dirty animals fall ill more than well-kept ones
     const a = viv.animals[1], base = illChance(viv, a).p;
-    viv.hungryMin = CLOSE_MIN - OPEN_MIN; viv.dirt = 90;
+    viv.hungryMin = DAY_MIN; viv.dirt = 90;
     out.neglectRaisesIllness = illChance(viv, a).p > base * 4;
     // rivals of a territorial species hurt each other, more when cramped
     const pen = {id:"e-r", name:"Rex", points:[[0,0],[40,0],[40,40],[0,40]], animals:[{id:"r1", sp:"trex"}, {id:"r2", sp:"trex"}]};
@@ -335,7 +335,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // a keeper feeds the exhibit from the dock's stock, then a custodian restocks the station
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
-    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
+    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     viv.stock = {};
     out.keeperFeeds = run(900, () => (viv.stock.paleoflora || 0) + (viv.stock.plants || 0) >= 1);
     out.foodLeftDock = stockOf(dock, "plants") < 12;
@@ -431,9 +431,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // production fills its own store through the day, and stops when full
     const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();
-    logiTick(CLOSE_MIN - OPEN_MIN);
+    logiTick(DAY_MIN);
     out.farmMakes = Math.round(stockOf(farm, "plants")) === BUILDINGS.farm.makes.plants;
-    logiTick(10 * (CLOSE_MIN - OPEN_MIN));
+    logiTick(10 * (DAY_MIN));
     out.farmStops = stockOf(farm, "plants") <= storeCap(farm);
     // farms cut what the dock orders
     dock.store = {};
@@ -481,7 +481,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // food still in hand at closing stays with the keeper overnight, and gets delivered the next day
     keepersNight();
     out.carryOvernight = !!c.carry && c.carry.amount === 10 && k.carry && k.carry.amount === 10;
-    state.minute = OPEN_MIN; let fed = false;
+    state.minute = DAWN_MIN; let fed = false;
     for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
     out.carryDeliveredNextDay = fed;
 
@@ -555,10 +555,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.guestField = Math.abs(f.dist.get(gGraph.anchors.gate) - w.dist.get(gGraph.anchors["b-f"])) < 1e-6;
 
     // a thirsty party walks to the food stand, pays, and stops being thirsty
-    state.minute = OPEN_MIN + 60; const t0 = state.today.tickets;
+    state.minute = DAWN_MIN + 60; const t0 = state.today.tickets;
     guestsArrive(2); const p = parties[0];
     out.ticketPaid = state.today.tickets - t0 === state.ticket * 2;
-    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = CLOSE_MIN; p.spd = 1.15;   // a quick walker, so one soda is enough when it gets there
+    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = DUSK_MIN; p.spd = 1.15;   // a quick walker, so one soda is enough when it gets there
     // only the parties set up here: nobody new comes in
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); state.minute++; if(until()) return true; } return false; };
     // (it may grab a meal too if it got hungry on the way)
@@ -569,7 +569,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // nowhere to eat: they say so
     const fs = state.buildings.find(b => b.id === "b-f"); state.buildings = state.buildings.filter(b => b !== fs); afterChange();
     p.needs.hunger = 80; p.needs.energy = 0; p.dest = null; p.why = null;
-    p.home = false; p.mood = 70; p.until = CLOSE_MIN; planParty(p);
+    p.home = false; p.mood = 70; p.until = DUSK_MIN; planParty(p);
     out.noFoodThought = p.thought.has("noFood");
     state.buildings.push(fs); afterChange();
     // going home: the party walks out the gate and its mood counts
@@ -617,18 +617,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.sandbox = sb0; state.money = money0; }
 
     // a full day: guests come, go, and leave a mood behind for the rating
-    resetParties(); state.minute = OPEN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
+    resetParties(); state.minute = DAWN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && parties.length < 8;   // a few guests may still be in the park: the day turns over at 4 AM, not at closing
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested
     const bench = {id:"b-bench", type:"bench", points:rectPts(96.8, 200, BUILDINGS.bench.w, BUILDINGS.bench.d, Math.PI / 2)};
     state.buildings.push(bench); afterChange();
-    resetParties(); state.minute = OPEN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
-    tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = CLOSE_MIN;
+    resetParties(); state.minute = DAWN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
+    tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = DUSK_MIN;
     out.benchRests = !!gGraph.anchors["b-bench"] && run(400, () => tp1.needs.energy < 5) && bench.served && bench.served.n === 2;
 
     // trash goes in a bin nearby; a nearly full bin spills the rest; a full one gets walked past; the night crew clears it all, for a fee
@@ -677,7 +677,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.noStockNoSale = !servesOf(kio).length && !!kGraph.anchors["b-kio"] && !!kGraph.anchors["b-wh"] && !!kGraph.anchors["b-cl"];
     wh.store = {drinks:100};
     hireCustodian(); syncCustodians();
-    const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
+    const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
     out.custodianRestocks = work(600, () => stockOf(kio, "drinks") > 0) && stockOf(wh, "drinks") < 100 && servesOf(kio).includes("thirst");
     // a sale takes as many units as the item costs to stock
     const sb = stockOf(kio, "drinks"), sp2 = newParty(2); sp2.needs = {hunger:0, thirst:80, bladder:0, energy:0}; sp2.cash = 100;
@@ -697,7 +697,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.logi.usedLast = ul;
     // supply trucks top up the dock while the park is open
     const tdk = {id:"b-tdk", type:"dock", points:rectPts(196, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
-    const tm = state.minute; state.minute = OPEN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
+    const tm = state.minute; state.minute = DAWN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
     out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
     state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
     state.staff.custodians = []; syncCustodians();
@@ -835,7 +835,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     }
     // a mechanic fixes the broken bench, and a custodian scrubs off graffiti
     hireMechanic();
-    const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };
+    const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };
     out.mechanicFixesProp = fix(900, () => propCond(bench) >= 99.9);
     state.staff.mechanics = [];
     const fs4 = buildingById("b-f"); fs4.graffiti = 80; hireCustodian(); syncCustodians();
@@ -858,7 +858,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     }
 
     // education: an info sign by an exhibit teaches far more than looking, unless it's broken
-    resetParties(); state.minute = OPEN_MIN + 60;
+    resetParties(); state.minute = DAWN_MIN + 60;
     const g1 = state.exhibits.find(e => e.id === "e-g1"), kid = () => { guestsArrive(2); return parties[parties.length - 1]; };
     const e0 = kid(); seeExhibit(e0, g1);
     const sign = {id:"b-sign", type:"sign", points:rectPts(96.9, 170, BUILDINGS.sign.w, BUILDINGS.sign.d, Math.PI / 2)};
@@ -874,7 +874,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("education");
     const ed = {id:"b-ed", type:"edcenter", points:rectPts(200, 111.5, BUILDINGS.edcenter.w, BUILDINGS.edcenter.d, 0), fee:4};
     state.buildings.push(ed); afterChange();
-    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100; e4.until = CLOSE_MIN;
+    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100; e4.until = state.minute + 700;
     out.centerIsSight = !!gGraph.anchors["b-ed"] && pickSight(e4) === ed;
     const fee0 = state.today.edfees; serveAt(e4, ed, "see");
     out.centerTeaches = e4.edu === EDU.center && state.today.edfees - fee0 === 8 && ed.served.n === 2;
@@ -928,7 +928,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings = state.buildings.filter(b => b !== lodge); afterChange(); state.rating = r0; state.history = h0; state.logi.guestFrom = gf0;
 
     // lots of guests stay quick to simulate
-    state.minute = OPEN_MIN + 120;
+    state.minute = DAWN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
     out.partyCap = parties.length === GUEST.maxParties && guestCount() === 3000;
     for(let i = 0; i < 30; i++) tick(.8);
@@ -1015,9 +1015,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.paths.push({id:"p-t", name:"t", points:[[205,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[205,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[205,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[205,290],[193,290]]});
     recompute(); buildKeeperGraph();
     out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
-    const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= CLOSE_MIN - 2){ state.day++; state.minute = OPEN_MIN; } tick(1); if(fn && fn()) return true; } return false; };
+    const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= DAY_MIN - 2){ state.day++; state.minute = 0; } tick(1); if(fn && fn()) return true; } return false; };
     sc.tech = sc.tech.filter(t => t !== "bars");   // bars are free in every park, so research is tested from scratch
-    state.minute = OPEN_MIN + 60;
+    state.minute = 10;
 
     // research: needs a researcher, takes time proportional to cost, and finishes mid-day
     out.needsPaleo = !!startProject("tech", "bars");
@@ -1033,7 +1033,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pricierIsSlower = sc.projects[0].end - sc.projects[0].start === t15 * 4;
     sc.projects = [];
     // points accrue with time, not at night
-    const pts0 = sc.points; state.minute = OPEN_MIN + 60; tick(60);
+    const pts0 = sc.points; state.minute = DAWN_MIN + 60; tick(60);
     out.pointsTrickle = Math.abs(sc.points - pts0 - RESEARCH_PER_PALEO * 60 / DAY_MIN) < 1e-6;
     // a researcher on a project earns nothing, and stopping it gives the points back
     sc.points = 100; startProject("tech", "moat");
@@ -1048,7 +1048,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // animals are unlocked one by one under their period
     const small = SPECIES.filter(x => !x.viv).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
     out.tripLockedFirst = !!tripProblem(small.id, small.period);
-    sc.points = 500; state.minute = OPEN_MIN + 60;
+    sc.points = 500; state.minute = DAWN_MIN + 60;
     out.unlockAnimal = startProject("species", small.id) === null && !isUnlocked(small.id);
     out.unlockCostScales = unlockPoints(big) > unlockPoints(small);
     adv(projectMinutes(unlockPoints(small)) + 5, () => isUnlocked(small.id));
@@ -1058,7 +1058,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.needsTeam = !!tripProblem(small.id, small.period);
     hireScientist("temporal");
     out.tripOk = !tripProblem(small.id, small.period);
-    const mny = state.money; state.minute = OPEN_MIN + 60;
+    const mny = state.money; state.minute = DAWN_MIN + 60;
     out.launch = launchTrip(small.id, small.period) && state.money === mny - tripOdds(small.id, small.period).cost && sc.trips.length === 1;
     out.oneTeamOneTrip = !!tripProblem(small.id, small.period);
     const trip = sc.trips[0];
@@ -1086,7 +1086,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[small.id] = {genome:100, quality:90}; hireScientist("gene");
     const base = cloneMinutes(small.id);
     out.cloneTimed = base === Math.round((1 + small.space / CLONE_DAYS_PER_SPACE) * DAY_MIN);
-    state.rating = 5; state.minute = OPEN_MIN + 60;
+    state.rating = 5; state.minute = DAWN_MIN + 60;
     out.cloneOrder = orderClone(small.id, null) && sc.clones.length === 1;
     out.incubatorCount = bayCount("gene") === 1 && sc.clones[0].bay === 0;
     sc.tech.push("fast1");
@@ -1127,13 +1127,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[PLANT_DNA.Jurassic.id] = {genome:100, quality:80};
     out.floraGrows = growProblem("plant", "Jurassic", "small") === null && ceresRate() > 0;
     out.otherPeriodNeedsOwnDna = /Triassic plant DNA/.test(growProblem("plant", "Triassic", "small"));
-    state.minute = OPEN_MIN + 60;
+    state.minute = DAWN_MIN + 60;
     growBatch("plant", "Jurassic", "small");
     out.bedBusy = state.ceres.beds.length === 1 && !state.ceres.pots["Jurassic-small"];
     out.batchTakesTime = adv(60) === false && !state.ceres.pots["Jurassic-small"];
     out.batchDone = adv(growMinutes("plant", "Jurassic", "small"), () => state.ceres.pots["Jurassic-small"] === CERES_GROW.plant.mesozoic.small.count);
     // medicine comes from batches, not a steady trickle
-    state.ceres.meds = 0; state.minute = OPEN_MIN + 60;
+    state.ceres.meds = 0; state.minute = DAWN_MIN + 60;
     out.medNoTrickle = (adv(30), state.ceres.meds === 0);
     out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => state.ceres.meds >= 20);
     state.ceres.auto.mesozoic = true; state.ceres.meds = 0;
@@ -1594,7 +1594,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     render(); out.tramBrokenDrawn = world.innerHTML.includes("#6E2A26");
     state.science.tech.push("transit");
     state.staff.mechanics = []; hireMechanic();
-    let fixed = false; for(let i = 0; i < 1500 && !fixed; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); fixed = condOf(stA) >= 99.9; }
+    let fixed = false; for(let i = 0; i < 1500 && !fixed; i++){ state.minute = DAWN_MIN + 60; mechanicsTick(1); fixed = condOf(stA) >= 99.9; }
     out.tramMechanicRepairs = fixed && tramWorking(stA) && !!gGraph.anchors["b-trA:rail"] && tramStops(state.paths[2]).stops.length === 2;
     state.staff.mechanics = []; syncMechanics(); state.minute = trMin;
     // stations wear faster with more track beside them
@@ -1700,7 +1700,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const keep = {exhibits:state.exhibits, minute:state.minute, day:state.day}, sq = (x, y, w) => [[x, y], [x + w, y], [x + w, y + w], [x, y + w]];
       const lone = {id:"bh1", name:"Lone", points:sq(0, 0, 40), animals:[{id:"bl", sp:"velo"}], happy:70, cond:100, stock:{meat:999}};
       const pack = {id:"bh2", name:"Pack", points:sq(100, 0, 60), animals:[0, 1, 2, 3].map(i => ({id:"bp" + i, sp:"velo"})), happy:70, cond:100, stock:{meat:999}};
-      state.exhibits = [lone, pack]; state.minute = 18 * 60; state.day = 1;
+      state.exhibits = [lone, pack]; state.minute = minuteAtClock(18 * 60); state.day = 1;
       for(let i = 0; i < 60; i++) behaviorTick(BEHAVIOR.step);
       out.behaviorLonelyPaces = lone.animals[0].act === "pace" && lone.animals[0].why === "lonely" && pack.animals.every(a => a.act !== "pace") && lone.animals[0].need.lonely > pack.animals[0].need.lonely;
       out.behaviorTell = exhibitReport(lone).issues.some(i => i.bad && i.text.startsWith("Pacing.")) && behaviorHtml(lone).includes("Pacing because");
@@ -1711,15 +1711,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
       // midday naps: a fed plant eater lies down once in the nap hours for 30 to 80 minutes and stays down, none at night or outside the hours, and not every animal naps
       const nx = {id:"bh3", name:"Nap", points:sq(200, 0, 80), animals:Array.from({length:20}, (_, i) => ({id:"bn" + i, sp:"plat"})), happy:70, cond:100, stock:{paleoflora:999, grass:999}};
-      state.exhibits = [nx]; state.day = 5; state.minute = 9 * 60; behaviorNight();
+      state.exhibits = [nx]; state.day = 5; state.minute = minuteAtClock(9 * 60); behaviorNight();
       let before = 0, longest = {}; const napped = new Set();
-      for(let t = 9 * 60; t < 22 * 60; t += BEHAVIOR.step){
+      for(let t = minuteAtClock(9 * 60); t < minuteAtClock(22 * 60); t += BEHAVIOR.step){
         state.minute = t; for(const a of nx.animals) a.need.hunger = 20, a.need.thirst = 15, a.need.stress = 10;
         behaviorTick(BEHAVIOR.step);
-        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(t < BEHAVIOR.nap.from * 60 - 1) before++; }
+        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(clockMin(t) < BEHAVIOR.nap.from * 60 - 1) before++; }
       }
       const lens = Object.values(longest);
-      out.behaviorNap = napped.size >= 6 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, 8 * 60) === 0 && napLull(SPECIES_BY_ID.plat, 13 * 60) > 0 && napLull(SPECIES_BY_ID.ornw, 13 * 60) === 0;
+      out.behaviorNap = napped.size >= 6 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, minuteAtClock(8 * 60)) === 0 && napLull(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) > 0 && napLull(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) === 0;
       // diet toys: a shank thrills a meat eater and bores a plant eater; hay feeds plant eaters; treats run out, frozen ones faster in a heat wave
       {
         const T = SPECIES_BY_ID.trex, H = SPECIES_BY_ID.tric, m = SPECIES_BY_ID.mamm;
@@ -2425,21 +2425,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       return Math.max(...Object.keys(ends).map(k => k in seen ? Math.abs(seen[k] - ends[k]) : 1e9));
     };
     let ok = true, why = "";
-    for(const [label, startMinute, dts, reload] of [["morning 1m", OPEN_MIN + 5, [1], false], ["morning 4.8m (4x)", OPEN_MIN + 5, [4.8], false], ["before close, 7m", CLOSE_MIN - 100, [7], false], ["3 minutes before close, 100m", CLOSE_MIN - 3, [100], false], ["a day at once", OPEN_MIN + 200, [720, 1500], false], ["uneven steps", OPEN_MIN + 301, [0.3, 11, 2.2, 58], false], ["reload mid-job", CLOSE_MIN - 50, [3.3], true]]){
+    for(const [label, startMinute, dts, reload] of [["morning 1m", DAWN_MIN + 5, [1], false], ["morning 4.8m (4x)", DAWN_MIN + 5, [4.8], false], ["before rollover, 7m", DAY_MIN - 100, [7], false], ["3 minutes before rollover, 100m", DAY_MIN - 3, [100], false], ["a day at once", DAWN_MIN + 200, [720, 1500], false], ["uneven steps", DAWN_MIN + 301, [0.3, 11, 2.2, 58], false], ["reload mid-job", DAY_MIN - 50, [3.3], true]]){
       const d = run(4, startMinute, dts, reload);
       if(d === null || d > 1e-3){ ok = false; why += ` ${label}:${d}`; }
     }
     out.scienceFinishesAtEnd = ok; out.why = why;
     // the end of a step at closing carries into the next morning
-    state.day = 9; state.minute = CLOSE_MIN - 3; sc().projects = []; sc().trips = []; sc().clones = []; state.ceres.beds = [];
+    state.day = 9; state.minute = DAY_MIN - 3; sc().projects = []; sc().trips = []; sc().clones = []; state.ceres.beds = [];
     tick(10);
-    out.closingKeepsOvershoot = state.day === 10 && Math.abs(state.minute - (OPEN_MIN + 7)) < 1e-6;
+    out.closingKeepsOvershoot = state.day === 10 && Math.abs(state.minute - 7) < 1e-6;
     // general research earns the same points whatever the step
-    const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = OPEN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
+    const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = DAWN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
     const a = rate(1), b = rate(8), c = rate(240);
     out.pointsIgnoreStepSize = Math.abs(a - b) < 1e-6 && Math.abs(a - c) < 1e-6 && a > 0;
     // a clone waits (its clock held) while TAR has no geneticist, then finishes on schedule after one is hired
-    sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = OPEN_MIN + 20;
+    sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = DAWN_MIN + 20;
     state.rating = 5; const why0 = cloneProblem(sp.id); orderClone(sp.id, null); if(!sc().clones[0]) return {why:"clone: " + why0 + " crew " + JSON.stringify(sc().crew) + " tar " + !!dept("tar")}; const cl = sc().clones[0], len = cl.end - cl.start, g = sc().crew.gene; sc().crew.gene = 0;
     for(const k of Object.keys(seen)) delete seen[k];
     tick(300); const held = sc().clones.length === 1 && Math.abs(cl.end - cl.start - len) < 1e-6;
@@ -2454,6 +2454,56 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   checks.closingKeepsOvershoot = sci.closingKeepsOvershoot;
   checks.pointsIgnoreStepSize = sci.pointsIgnoreStepSize;
   checks.cloneWaitsThenFinishes = sci.cloneWaitsThenFinishes;
+
+  // S13: the clock runs round the clock; a trickle of guests keeps coming; Close park empties the park; the day turns over once, at 4 AM
+  const clk = await page.evaluate(() => {
+    const out = {}, keep = {day:state.day, minute:state.minute, rating:state.rating, money:state.money, over:state.over, sandbox:state.sandbox, closed:state.parkClosed};
+    state.over = false; state.sandbox = false; state.money = 1e7; state.rating = 5; state.parkClosed = false; resetParties();
+    // the clock passes 8 PM without a rollover
+    state.day = 30; state.minute = minuteAtClock(19 * 60 + 50); tick(10);
+    out.clockPastEight = state.day === 30 && clockMin() > 20 * 60 && clockMin() < 20 * 60 + 30 && fmtClock(clockMin()) === "8:10 PM";
+    out.clockMapsBack = Math.abs(minuteAtClock(clockMin(123)) - 123) < 1e-9 && clockMin(0) === ROLLOVER_CLOCK && DAY_MIN * CLOCK_SCALE === 1440;
+    // guests still arrive at night, a few staying on
+    resetParties(); state.day = 31; state.minute = minuteAtClock(21 * 60); nextSize = 1;
+    const g0 = state.today.guests, t0 = state.today.tickets;
+    for(let i = 0; i < 200; i++) tick(1);
+    out.guestsArriveAtNight = state.today.guests > g0 && state.today.tickets > t0 && state.day === 31;
+    out.someStayOvernight = guestCount() > 0 && isNight();
+    out.trickleScalesWithRating = (r => { const a = (state.rating = 0, trickleRate()), b = (state.rating = 5, trickleRate()); return a > 0 && b > a && Math.abs(b - GUEST.trickle) < 1e-9; })();
+    // Closed: no new guests, no tickets, the park empties, bills still come, the HUD says so
+    state.parkClosed = true; state.today = freshLedger(); ui.hud(true);
+    out.hudSaysClosed = !document.querySelector("#closedTag").hidden;
+    const gc = state.today.guests, tk = state.today.tickets; state.minute = 5; state.day = 32;
+    const hist0 = state.history.length, m0 = state.money; let emptied = false;
+    for(let i = 0; i < 900 && !emptied; i++){ tick(1); emptied = !parties.length; }
+    out.closedStopsArrivals = state.today.guests === gc || state.day > 32;
+    out.closedNoTickets = state.today.tickets === tk || state.day > 32;
+    out.closedEmptiesPark = emptied && guestCount() === 0;
+    for(let i = 0; i < DAY_MIN; i++) tick(1);
+    out.closedStillArrivesNobody = parties.length === 0 && state.history.length > hist0 && state.history[state.history.length - 1].guests === 0 && state.history[state.history.length - 1].costs > 0 && state.money < m0;
+    state.parkClosed = false; ui.hud(true);
+    out.hudOpenAgain = document.querySelector("#closedTag").hidden;
+    state.minute = minuteAtClock(21 * 60); nextSize = 1; for(let i = 0; i < 200; i++) tick(1);
+    out.openAgainArrives = parties.length > 0;
+    // the day turns over exactly once a day, at the rollover hour
+    resetParties(); let n = 0, at = []; const de = events.dayEnded; events.dayEnded = r => { n++; at.push(clockMin()); de && de(r); };
+    state.day = 40; state.minute = 0; const wx0 = JSON.stringify(state.weather);
+    for(let i = 0; i < 2 * DAY_MIN; i++) tick(1);
+    events.dayEnded = de;
+    out.rolloverOncePerDay = n === 2 && state.day === 42 && at.every(c => Math.abs(c - ROLLOVER_CLOCK) <= 2) && state.minute === 0;
+    // night looks and animal schedules
+    out.nightWash = nightDark(12 * 60) === 0 && nightDark(2 * 60) === NIGHT.dark && nightDark(20 * 60 - 30) > 0 && nightDark(20 * 60 - 30) < NIGHT.dark;
+    out.nocturnalAtNight = awake(SPECIES_BY_ID.ornw, minuteAtClock(2 * 60)) === 1 && awake(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) <= .2 && awake(SPECIES_BY_ID.plat, minuteAtClock(2 * 60)) < .5 && awake(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) >= .55;
+    // old saves: the minute shifts so science stamps stay exact, and the park starts open
+    const oldS = JSON.parse(JSON.stringify(state)); delete oldS.clockV; delete oldS.parkClosed; oldS.day = 3; oldS.minute = 540;
+    const nowOld = (oldS.day - 1) * 720 + (oldS.minute - 480), up = upgradeSave(oldS);
+    out.oldSaveClock = up.clockV === 2 && up.parkClosed === false && up.minute === 60 && (up.day - 1) * DAY_MIN + up.minute === nowOld;
+    const wrapped = JSON.parse(JSON.stringify(state)); delete wrapped.clockV; wrapped.minute = 1199.5; out.oldSaveEdge = upgradeSave(wrapped).minute < DAY_MIN;
+    const cur = upgradeSave(JSON.parse(JSON.stringify(state))); out.newSaveKeepsMinute = cur.minute === state.minute && cur.parkClosed === false;
+    Object.assign(state, {day:keep.day, minute:keep.minute, rating:keep.rating, money:keep.money, over:keep.over, sandbox:keep.sandbox, parkClosed:keep.closed}); resetParties(); recompute();
+    return out;
+  });
+  for(const [k, v] of Object.entries(clk)) checks[k] = v;
 
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
@@ -2572,7 +2622,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const wx = (w, m) => { state.weather = {today:w, next:"fair", from:999}; state.minute = m; };
 
     // a storm sends them in, up to the room the shelter has (a small barn holds 10 slots, and each of these takes a few)
-    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 142, 178);
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 142, 178);
     const probe = e.animals[0], hp = herd.get(probe.id), ab = animalBox(hp);
     const tap = () => { const r = svg.getBoundingClientRect(); return animalAt(r.left + view.tx + hp.x * view.k, r.top + view.ty + hp.y * ky() + ab.oy * view.k); };
     const before = tap();
@@ -2589,28 +2639,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // the exhibit report says so
     out.reportSaysSheltering = exhibitReport(e).issues.some(i => /inside a shelter/.test(i.text));
     // fair weather brings them out again
-    wx("fair", OPEN_MIN + 140); step(); step(); animateAnimals(.016);
+    wx("fair", DAWN_MIN + 140); step(); step(); animateAnimals(.016);
     out.fairWeatherBringsOut = inside().length === 0 && gh.el.style.display !== "none";
     // a bulldozed shelter lets them out
-    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 142, 178); step(); const was = inside().length;
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 142, 178); step(); const was = inside().length;
     e.land = e.land.filter(f => f !== barn); step(); out.bulldozedShelterReleases = was > 0 && inside().length === 0; e.land.push(barn);
     // a hot day and a cold snap too, but not a canopy in the cold
-    reset(); wx("hot", OPEN_MIN + 120); place(e.animals, 142, 178); step(); out.heatSendsIn = inside().length > 0 && /heat/i.test(actLabel(inside()[0]));
-    e.land = [{id:"l-c", type:"canopysm", x:142, y:178}]; reset(); wx("cold", OPEN_MIN + 120); place(e.animals, 142, 178); step(); out.coldSkipsCanopy = inside().length === 0;
-    reset(); wx("hot", OPEN_MIN + 120); step(); out.heatUsesCanopy = inside().length > 0; e.land = [barn];
+    reset(); wx("hot", DAWN_MIN + 120); place(e.animals, 142, 178); step(); out.heatSendsIn = inside().length > 0 && /heat/i.test(actLabel(inside()[0]));
+    e.land = [{id:"l-c", type:"canopysm", x:142, y:178}]; reset(); wx("cold", DAWN_MIN + 120); place(e.animals, 142, 178); step(); out.coldSkipsCanopy = inside().length === 0;
+    reset(); wx("hot", DAWN_MIN + 120); step(); out.heatUsesCanopy = inside().length > 0; e.land = [barn];
 
     // asleep at night
     reset(); wx("fair", 23 * 60); place(e.animals, 142, 178); step();
     out.nightSleepsInside = inside().length === cap && inside().every(a => a.inside === "sleep") && /sleeping inside/i.test(actLabel(inside()[0]));
-    wx("fair", OPEN_MIN + 120); step(); step(); out.wakesAndComesOut = inside().length === 0;
+    wx("fair", DAWN_MIN + 120); step(); step(); out.wakesAndComesOut = inside().length === 0;
     // a nap
     reset(); wx("fair", 13 * 60); place(e.animals, 142, 178); e.animals.forEach(a => { a.act = "rest"; a.actFor = 0; a.napFor = 200; }); step(); out.napGoesInside = inside().length > 0 && inside().every(a => a.inside === "sleep");
     // frightened ones hide inside, and come out calm
-    reset(); wx("fair", OPEN_MIN + 120); place(e.animals, 142, 178); const shy = e.animals[0]; shy.need.stress = 95; step();
+    reset(); wx("fair", DAWN_MIN + 120); place(e.animals, 142, 178); const shy = e.animals[0]; shy.need.stress = 95; step();
     out.frightenedHideInside = shy.inside === "hide" && actLabel(shy) === "Hiding inside";
     shy.need.stress = 2; for(let i = 0; i < 12; i++){ shy.need.stress = 2; step(); } out.calmComesOut = !shy.inside;
     // far from the shelter it has to walk first; it goes in on arrival
-    reset(); wx("storm", OPEN_MIN + 120); place(e.animals, 110, 130); step();
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 110, 130); step();
     const walkers = e.animals.filter(a => shelterRun.has(a.id) && !shelterRun.get(a.id).in);
     place(walkers, 142, 178); animateAnimals(.016);
     out.walksThenEnters = walkers.length > 0 && inside().length === cap && e.animals.every(a => !shelterRun.has(a.id) || shelterRun.get(a.id).in || !a.inside);
@@ -2618,9 +2668,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const snap = JSON.parse(JSON.stringify(state)); upgradeSave(snap); out.insideNotKept = snap.exhibits.find(x => x.id === "e-sh").animals.every(a => !("inside" in a));
 
     // guests: animals that hide let a visit down; sleeping at night doesn't count, and sheltering from weather counts little
-    reset(); wx("fair", OPEN_MIN + 120);
+    reset(); wx("fair", DAWN_MIN + 120);
     const w = k => { e.animals.forEach(a => a.inside = null); e.animals.slice(0, 8).forEach(a => a.inside = k); return visibleShare(e); };
-    const vh = w("hide"), vw = w("weather"), vs = w("sleep"); state.minute = 23 * 60; const vn = w("sleep"); state.minute = OPEN_MIN + 120;
+    const vh = w("hide"), vw = w("weather"), vs = w("sleep"); state.minute = minuteAtClock(23 * 60); const vn = w("sleep"); state.minute = DAWN_MIN + 120;
     out.hidingCountsMost = vh < vs && vs < vw && vw < 1 && vn === 1;
     e.animals.forEach(a => a.inside = null);
     const mkP = (pers, edu) => { const p = newParty(2); p.pers = pers; p.edu = edu || 0; delete p.fxc; p.mood = 60; p.seen = new Set(); p.thought = new Set(); return p; };

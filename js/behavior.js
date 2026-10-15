@@ -36,16 +36,16 @@ const traitText = s => { const t = traitsOf(s); return `${TRAIT_TEXT[t.active]},
 const matesWanted = s => { const t = traitsOf(s); return t.social === "solitary" ? 0 : t.social === "pair" ? 1 : Math.max(1, s.group[0] - 1); };
 // How awake it is at this time of day, 0 to 1
 function awake(s, min = state.minute){
-  const h = min / 60, a = traitsOf(s).active;
-  if(isNight(min) && a !== "nocturnal") return a === "diurnal" ? .2 : .3;   // the park is shut: day animals sleep
-  if(a === "nocturnal") return h < 9 || h >= 18.5 ? .7 : .2;
-  if(a === "crepuscular") return h < 10 || h >= 18 ? 1 : .45;
+  const h = clockMin(min) / 60, a = traitsOf(s).active;   // min is state.minute; h is the hour on the 24 h clock
+  if(a === "nocturnal") return isNight(min) ? 1 : h < 8 || h >= 18 ? .5 : .2;   // up all night, winding down at dawn, asleep by day
+  if(a === "crepuscular") return h >= 4 && h < 9 || h >= 17 && h < 22 ? 1 : isNight(min) ? .3 : .45;   // dawn and dusk
+  if(isNight(min)) return a === "diurnal" ? .2 : .3;   // dark: day animals sleep
   // diurnal: a nap in the heat of a hot afternoon
   return state.weather && state.weather.today === "hot" && h >= 12 && h < 15 ? .55 : 1;
 }
 // How ready an awake animal is for a nap: 0 outside midday, up to 1 halfway through the nap hours, more in a heat wave
 function napLull(s, min = state.minute){
-  const h = min / 60, N = BEHAVIOR.nap;
+  const h = clockMin(min) / 60, N = BEHAVIOR.nap;
   if(awake(s, min) <= .7 || h < N.from || h >= N.to) return 0;
   return Math.min(1, Math.sin(Math.PI * (h - N.from) / (N.to - N.from)) * (state.weather && state.weather.today === "hot" ? N.hot : 1));
 }
@@ -466,7 +466,7 @@ function actsSummary(list){
 //   shelterRun  animal id -> {f: the shelter, why: "hide" | "sleep" | "weather", in: is it inside yet, since: park minutes spent walking there, take: slots it uses}
 //   hideAvg     exhibit id -> the share of its animals guests could see, averaged over HIDING.window
 const shelterRun = new Map(), hideAvg = new Map();
-const isNight = (min = state.minute) => min < OPEN_MIN || min >= CLOSE_MIN;
+const isNight = (min = state.minute) => min < DAWN_MIN || min >= DUSK_MIN;   // dark, from DUSK_CLOCK to DAWN_CLOCK
 const insideText = a => { const w = a.inside, t = SHELTER.text[w]; return typeof t === "string" ? t : t ? t[state.weather && t[state.weather.today] ? state.weather.today : "storm"] : "Inside"; };
 const shelterFits = (t, s) => !!t.slots && (t.only ? t.only.includes(s.id) : (t.fits || 99) >= coverSlots(s));
 const shelterTake = (t, s) => Math.min(coverSlots(s), t.slots);

@@ -147,7 +147,7 @@ function geneDone(c){
 
 // Old plant-eaters eating plants they never evolved for (see grassShare), 0 to 1
 const grassSick = (e, s) => GRASS_INTOLERANT.includes(s.period) ? grassShare(e, s) : 0;
-const hungerShare = e => clamp((e.hungryMin || 0) / (CLOSE_MIN - OPEN_MIN), 0, 1);
+const hungerShare = e => clamp((e.hungryMin || 0) / DAY_MIN, 0, 1);
 const medicated = (e, s) => !!e.medFedOk && canTreat(s);
 
 // Chance a day this animal falls ill, and what's raising it

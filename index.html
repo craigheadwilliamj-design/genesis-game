@@ -356,7 +356,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
       <div class="ro hide-sm"><small>In the park</small><span id="inpark" class="num">0</span></div>
       <div class="ro"><small>Rating</small><span id="rating"></span></div>    </div>
     <div class="clock">
-      <div class="ro"><small id="dayLabel">1 Jan Y1</small><span id="clock" class="num">8:00 AM</span><div class="daybar"><i id="dayFill"></i></div></div>
+      <div class="ro"><small id="dayLabel">1 Jan Y1</small><span id="clock" class="num">8:00 AM</span><b id="closedTag" hidden style="color:var(--bad);font:600 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase">Closed</b><div class="daybar"><i id="dayFill"></i></div></div>
       <div class="speed" role="group" aria-label="Game speed">
         <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
         <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
@@ -372,6 +372,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 
   <main>
     <div class="mapwrap" id="mapwrap">
+      <div id="nightWash" style="position:absolute;inset:0;z-index:2;pointer-events:none;background:#0b1640;mix-blend-mode:multiply;opacity:0"></div>
       <svg id="map" aria-label="Your park">
         <defs>
           <pattern id="contours" width="240" height="240" patternUnits="userSpaceOnUse">

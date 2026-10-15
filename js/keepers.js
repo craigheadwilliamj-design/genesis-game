@@ -18,7 +18,7 @@ const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph &
 const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b));
 function ceresRate(){ return dept("ceres") && hasTech("paleoflora") && anyPlantDna() ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
 function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLORA.storeDays; }
-function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / (CLOSE_MIN - OPEN_MIN)); }
+function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / DAY_MIN); }
 // Keepers only go for Paleoflora when CERES has some to give
 const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && anyPlantDna() && state.ceres.stock >= 1;
 // Where keepers pick up a food: Paleoflora at CERES, everything else from a store that has some.
@@ -457,7 +457,7 @@ function dirtPerDay(e){
 // Dirt removed per minute of work
 function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("shovels") ? 1 : CLEAN.bareFactor) * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
 function dirtTick(dtMin){
-  for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / (CLOSE_MIN - OPEN_MIN));
+  for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / DAY_MIN);
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
 function cleanJob(c, k, min = CLEAN.dirtyAt){
@@ -737,7 +737,7 @@ function eatTick(dtMin){
     for(const t of Object.keys(need)){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
       // groves in the exhibit feed part of it; keepers bring the rest
-      let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN) * (1 - browseShare(e, t, need[t]));
+      let eat = need[t] * dtMin / DAY_MIN * (1 - browseShare(e, t, need[t]));
       eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
       want += eat; cover = Math.min(cover, clamp(has / ((need[t] || 1) * PACK.pile), 0, 1));

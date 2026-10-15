@@ -125,7 +125,7 @@ function guestBuildingHtml(b){
   } else if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
-    h += `<div class="meta" style="margin-top:4px">Guests with a wrapper or cup throw it in a bin within ${LITTER.binReach} m. ${full ? "This one is full, so trash spills onto the path. " : ""}The night crew empties bins after closing.</div></section>`;
+    h += `<div class="meta" style="margin-top:4px">Guests with a wrapper or cup throw it in a bin within ${LITTER.binReach} m. ${full ? "This one is full, so trash spills onto the path. " : ""}The night crew empties bins at the daily rollover.</div></section>`;
   } else if(!t.slots) h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   else {
     h += `<dl class="kv"><dt>${t.seats && !t.kind ? "Sitting here now" : "Serving now"}</dt><dd>${q.busy} of ${t.slots} parties</dd>`;
@@ -137,7 +137,7 @@ function guestBuildingHtml(b){
   if(b.type === "restroom"){
     const dirt = b.dirt || 0;
     h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= RESTROOM.avoid ? "var(--bad)" : dirt >= RESTROOM.gross ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
-    h += `<div class="meta" style="margin-top:4px">${dirt >= RESTROOM.avoid ? "Filthy. Only desperate guests will use it." : dirt >= RESTROOM.gross ? "Getting grubby. Guests complain." : "Clean."} It gets dirtier with every visitor, and the night crew scrubs it after closing. More restrooms means each one stays cleaner.</div></section>`;
+    h += `<div class="meta" style="margin-top:4px">${dirt >= RESTROOM.avoid ? "Filthy. Only desperate guests will use it." : dirt >= RESTROOM.gross ? "Getting grubby. Guests complain." : "Clean."} It gets dirtier with every visitor, and the night crew scrubs it at the daily rollover. More restrooms means each one stays cleaner.</div></section>`;
   }
   const text = {
     restroom:"Free to use. Guests who can't find one in time go home upset.",

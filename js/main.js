@@ -64,7 +64,7 @@ events.dayEnded = r => {
 events.gameOver = () => {
   setSpeed(0);
   $("#dlgOver h2").textContent = "The park went bankrupt";
-  $("#overText").textContent = `${state.name} went bankrupt on ${fmtDate(state.day)}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
+  $("#overText").textContent = `${state.name} went bankrupt on ${fmtDate(state.day)}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the daily bills.`;
   $("#dlgOver").showModal();
 };
 
