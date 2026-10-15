@@ -30,3 +30,9 @@ Profile the cell flood fill, graph rebuilds and render with a big park; incremen
 - Bulldoze is a drag-box: with the Bulldoze tool, press and drag across paths; the chunks inside the box are highlighted as you drag; releasing deletes them (one refund, one undo-less confirm only if it is large). A tap on a single chunk deletes just that chunk.
 - No Crossing tile. A staff path chunk that touches a guest/bridge chunk (or a building door, exhibit gate, depot) is automatically connected for STAFF; guests still never use staff chunks. Staff paths touching guest paths stay visually distinct (clean edge).
 - New session P1b (chunk conversion + drag-bulldoze + built-in crossings) runs after P2 and before P3/P4/P5, converting the cell code, the migration and P2's flood fill to chunks and removing the Crossing tile. P3, P4 and P5 are then written against chunks.
+
+## P1b notes (landed)
+- Storage is `state.pathChunks` (chunk key `"cx,cy"`, 5 m chunks, kinds g/s/b); `pathSquares()` lists them for the renderer. js/pathcells.js keeps its filename. Old 1 m `pathCells` saves migrate by area (`chunksFromCells`: more than half of a chunk, or a fifth of it if staff, since staff roads were 3 m wide).
+- The entrance moved to `ENTRANCE_X` = 207.5 (the middle of chunk column 41) so the gate, its building and the one-chunk-wide entrance walk (rows 47 to 60) line up with the chunk grid. Parcel borders were already multiples of 5.
+- Crossing tile removed. Staff reach floods every chunk kind from the gate; guest reach floods g/b only.
+- Bulldoze drag-box lights chunks live and removes them with one refund and one toast. The compatibility layer still expands chunks to 1 m cells to derive strips; P3 deletes it.

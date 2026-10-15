@@ -161,9 +161,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
     const H = Math.PI / 2;
-    state.buildings.push({id:"b-st", type:"station", points:rectPts(196, 290, 14, 10, H)});
+    state.buildings.push({id:"b-st", type:"station", points:rectPts(198, 290, 14, 10, H)});
     state.buildings.push({id:"b-pmc", type:"pmc", points:rectPts(215, 255, 20, 14, H)});
-    const viv = {id:"e-v", name:"Bug house", viv:"L", points:rectPts(196, 255, 16, 10, H), animals:[{id:"a-s", sp:"arth"}, {id:"a-t", sp:"arth"}], happy:70};
+    const viv = {id:"e-v", name:"Bug house", viv:"L", points:rectPts(198, 255, 16, 10, H), animals:[{id:"a-s", sp:"arth"}, {id:"a-t", sp:"arth"}], happy:70};
     state.exhibits.push(viv);
     recompute(); buildKeeperGraph();
     out.pmcOnGraph = !!kGraph.anchors["b-pmc"] && !!kGraph.anchors["e-v"];
@@ -313,8 +313,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99; state.health.from = 999;
     const H = Math.PI / 2;
-    state.buildings.push({id:"b-st", type:"station", points:rectPts(196, 290, 14, 10, H)});
-    state.buildings.push({id:"b-dock", type:"dock", points:rectPts(196, 268, 16, 10, H)});
+    state.buildings.push({id:"b-st", type:"station", points:rectPts(198, 290, 14, 10, H)});
+    state.buildings.push({id:"b-dock", type:"dock", points:rectPts(198, 268, 16, 10, H)});
     const viv = {id:"e-v", name:"Bugs", viv:"L", points:rectPts(214, 284, 16, 10, H), animals:[1,2,3,4,5,6].map(i => ({id:"a" + i, sp:"arth"})), happy:70};
     state.exhibits.push(viv);
     recompute(); buildKeeperGraph();
@@ -429,7 +429,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = state.exhibits.filter(e => e !== lone); dropZone("z-e"); state.zones = state.zones.filter(z => z.id !== "z-e");
 
     // production fills its own store through the day, and stops when full
-    const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
+    const farm = {id:"b-farm", type:"farm", points:rectPts(198, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();
     logiTick(DAY_MIN);
     out.farmMakes = Math.round(stockOf(farm, "plants")) === BUILDINGS.farm.makes.plants;
@@ -453,14 +453,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     startWith(newPark(), false); setSpeed(0);
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.staff.feedFrom = 0; state.safety.escapesFrom = 999; state.health.from = 999;
-    state.paths.push({id:"p-k1", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
-    state.paths.push({id:"s-k1", type:"service", points:[[205,235],[205,140]]});
-    state.paths.push({id:"s-k2", type:"service", points:[[205,140],[205,60],[380,60]]});
+    state.paths.push({id:"p-k1", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
+    state.paths.push({id:"s-k1", type:"service", points:[[207.5,235],[207.5,140]]});
+    state.paths.push({id:"s-k2", type:"service", points:[[207.5,140],[207.5,60],[380,60]]});
     const ex = (id, pts, sp, n, gate) => state.exhibits.push({id, name:id, points:pts, gate, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100, stock:{}});
     ex("e-k1", [[104,124],[204,124],[204,231],[104,231]], "lyst", 4, [204,180]);
     ex("e-k2", [[206,124],[296,124],[296,231],[206,231]], "dime", 2, [206,180]);
     const B = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, 0)});
-    B("b-kst", "station", 214, 265); B("b-kdock", "dock", 380, 67); B("b-kbr", "breakroom", 197, 265);
+    B("b-kst", "station", 214, 265); B("b-kdock", "dock", 380, 67); B("b-kbr", "breakroom", 199, 265);
     afterChange();
     const dock = buildingById("b-kdock"), st = buildingById("b-kst");
     out.dockLayout = ["b-kst", "b-kdock", "b-kbr", "e-k1", "e-k2"].every(id => !!kGraph.anchors[id]);
@@ -538,7 +538,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const out = {};
     startWith(newPark(), false); setSpeed(0);
     state.money = 1e6; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
-    state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    state.paths.push({id:"p-loop", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
     const ex = (id, pts, sp, n) => state.exhibits.push({id, name:id, points:pts, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100});
     ex("e-g1", [[104,124],[180,124],[180,231],[104,231]], "lyst", 4);
     ex("e-g2", [[220,124],[296,124],[296,231],[220,231]], "dryo", 4);
@@ -696,7 +696,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.demandNotStarved = guestDemand("drinks") >= Math.ceil(derived.demand * GUEST_USE.drinks) && guestDemand("drinks") > 1;
     state.logi.usedLast = ul;
     // supply trucks top up the dock while the park is open
-    const tdk = {id:"b-tdk", type:"dock", points:rectPts(196, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
+    const tdk = {id:"b-tdk", type:"dock", points:rectPts(198, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
     const tm = state.minute; state.minute = DAWN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
     out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
     state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
@@ -1039,7 +1039,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings.push({id:"b-gh", type:"ghost",  points:rectPts(180, 262, 28, 20, H)});
     state.buildings.push({id:"b-ta", type:"tar",    points:rectPts(230, 290, 26, 18, H)});
     state.buildings.push({id:"b-ce", type:"ceres",  points:rectPts(180, 290, 26, 18, H)});
-    state.paths.push({id:"p-t", name:"t", points:[[205,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[205,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[205,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[205,290],[193,290]]});
+    state.paths.push({id:"p-t", name:"t", points:[[207.5,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[207.5,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[207.5,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[207.5,290],[193,290]]});
     recompute(); buildKeeperGraph();
     out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
     const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= DAY_MIN - 2){ state.day++; state.minute = 0; } tick(1); if(fn && fn()) return true; } return false; };
@@ -1241,7 +1241,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     {
       const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, money:state.money, tech:state.science.tech.slice(), done:state.goalsDone.slice(), zones:state.zones};
       state.exhibits = []; state.buildings = []; state.zones = []; state.decor = []; state.water = []; state.fences = []; state.money = 1e6;
-      state.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-l", points:[[205,235],[100,235]]}];
+      state.paths = [{id:"p-main", name:"Main walk", points:[[207.5,305],[207.5,235]], fixed:true}, {id:"p-l", points:[[207.5,235],[100,235]]}];
       recompute();
       // modern plants grow anywhere; other periods' plants need sterile prehistoric plants first
       out.decorPlantOutside = landSpot(150, 220, "q-white-oak").ok && landSpot(150, 220, "qua-temperate-large").ok;
@@ -1642,150 +1642,188 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     Object.assign(state, {paths:trSaved.paths, buildings:trSaved.buildings, money:trSaved.money}); state.science.tech = trSaved.tech; state.today.fares = trSaved.fares;
     recompute(); buildGuestGraph(); buildKeeperGraph(); render(); drawTrams();
 
-    // paths are cells: drag-and-drop swaths, true-size ghost, bulldoze, migration, costs, and guests still get around
+    // paths are 5 m chunks: drag-and-drop runs, true-size ghost, drag-box bulldoze, migration, costs, and guests still get around
     {
-      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, cells:state.pathCells, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
-      state.gate = [205, 305]; state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
-      state.pathCells = JSON.parse(JSON.stringify(keep.cells)); state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = keep.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
-      const ncells = () => Object.keys(state.pathCells).length;
-      out.cellsDefaultWalk = ncells() === 5 * 70 && Object.keys(state.pathFixed).length === 350 && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0 && !JSON.parse(JSON.stringify(state)).paths.some(p => p.d);
-      out.cellCosts = pathCellCost("g") === COST.pathPerMeter / 5 && pathCellCost("s") === SERVICE_ROAD.perMeter / 5 && pathCellCost("b") === BRIDGE.perMeter / 5;
-      // a straight drag: 21 columns by 5 rows, 3 of the cells already part of the walk
-      const A = [205, 233], B = [225, 233], plan = planPath(A, B, "g");
-      out.cellDragStraight = plan.cells.length === 21 * 5 && plan.todo.length === 21 * 5 - 3 && !plan.why && plan.cost === plan.todo.length * pathCellCost("g") && !plan.todo.some(k => state.pathCells[k]);
-      // the ghost shows exactly the cells that will be laid
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
+      state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
+      state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = keep.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+      const nch = () => Object.keys(state.pathChunks).length;
+      // the entrance walk is one chunk wide, centered under the entrance
+      const wk = Object.keys(state.pathFixed).map(chunkXY);
+      out.chunksDefaultWalk = nch() === 14 && wk.length === 14 && wk.every(([cx]) => cx === 41) && Math.min(...wk.map(c => c[1])) === 47 && Math.max(...wk.map(c => c[1])) === 60
+        && state.gate[0] === 207.5 && state.gate[0] === 41 * CHUNK + CHUNK / 2 && state.gate[1] === SOUTH_LINE && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0;
+      out.entranceAligned = state.gate[0] === ENTRANCE_X && chunkAt(state.gate[0] - 2.4, 300)[0] === 41 && chunkAt(state.gate[0] + 2.4, 300)[0] === 41 && pathAt(state.gate[0], state.gate[1] - 1) === "g";
+      out.platesOnGrid = [...PARCELS.xs, ...PARCELS.ys, ...PARCELS.home, ...LEGACY_SOUTH_YS, ...PARK_PLOT.flat()].every(v => v % CHUNK === 0);
+      out.chunkCosts = pathChunkCost("g") === COST.pathPerMeter * 5 && pathChunkCost("s") === SERVICE_ROAD.perMeter * 5 && pathChunkCost("b") === BRIDGE.perMeter * 5 && !PATH_CELLS.kinds.x && !PATH_TOOLS.crossing;
+      // a straight drag: 11 chunks along the row beside the walk's far end
+      const A = [41, 46], B = [51, 46], plan = planPath(A, B, "g");
+      out.chunkDragStraight = plan.chunks.length === 11 && plan.todo.length === 11 && !plan.why && plan.cost === 11 * pathChunkCost("g") && plan.chunks.every((k, i) => k === chunkKey(41 + i, 46));
+      // the ghost shows exactly the chunks that will be laid
       setTool("path"); cdrag = {a:A, b:B, kind:"g"}; pathDragStat(); renderOverlay();
-      const ghostCells = ($("#overlay").innerHTML.match(/#4CD964[^>]*>/) ? 1 : 0) && [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="#4CD964"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
-      out.cellGhostMatches = ghostCells === plan.todo.length && /\d+ m²/.test($("#dStat").textContent);
-      const m0 = state.money, n0 = ncells(); endPathDrag();
-      out.cellLaid = ncells() === n0 + plan.todo.length && plan.todo.every(k => state.pathCells[k] === "g") && Math.abs(m0 - state.money - plan.cost) < 1e-6 && derived.joined.size > 0;
-      // a diagonal drag lays a 5 m swath along the 45 degree run
-      const D1 = [225, 233], D2 = [235, 223], dp = planPath(D1, D2, "g"), has = (x, y) => dp.cells.includes(cellKey(x, y));
-      out.cellDragDiagonal = !dp.why && has(225, 233) && has(235, 223) && has(230, 228) && has(228, 228) && has(232, 228) && !has(230, 233) && !has(230, 223) && dp.cells.length > 60 && dp.cells.length < 90;
+      const ghostN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="#4CD964"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
+      out.chunkGhostMatches = ghostN === plan.todo.length && /11 chunks/.test($("#dStat").textContent);
+      const m0 = state.money, n0 = nch(); endPathDrag();
+      out.chunkLaid = nch() === n0 + 11 && plan.todo.every(k => state.pathChunks[k] === "g") && Math.abs(m0 - state.money - plan.cost) < 1e-6 && derived.joined.size > 0 && chunkReached(51, 46, true);
+      // a diagonal drag lays a stair: the 45 degree chunks and the one beside each step that keeps them edge to edge
+      const D1 = [51, 46], D2 = [56, 41], dp = planPath(D1, D2, "g"), has = (x, y) => dp.chunks.includes(chunkKey(x, y));
+      out.chunkDragDiagonal = !dp.why && dp.chunks.length === 11 && has(51, 46) && has(56, 41) && has(53, 44) && has(52, 46) && !has(51, 45)
+        && dp.chunks.every(k => { const [x, y] = chunkXY(k); return dp.chunks.some(j => { const [u, v] = chunkXY(j); return Math.abs(u - x) + Math.abs(v - y) === 1; }); });
       layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
-      out.cellDiagJoined = cellsJoined(dp.cells, true) && derived.joined.size > 0 && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
+      out.chunkDiagJoined = chunksJoined(dp.chunks, true) && chunkReached(56, 41, true) && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
+      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 14;
       // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
       state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
-      const pe = planPath([290, 110], [330, 110], "g");
-      out.cellBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && layPath([290, 110], [330, 110], "g") === null;
+      const pe = planPath([58, 21], [66, 21], "g");
+      out.chunkBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && layPath([58, 21], [66, 21], "g") === null;
       state.exhibits = []; state.water = [{id:"w-cp", points:[[300,100],[320,100],[320,120],[300,120]]}];
-      out.cellWaterBridge = /water/.test(planPath([290, 110], [330, 110], "g").why) && planPath([290, 110], [330, 110], "b").why === "" && planPath([290, 110], [330, 110], "b").bad.size === 0;
+      out.chunkWaterBridge = /water/.test(planPath([58, 21], [66, 21], "g").why) && planPath([58, 21], [66, 21], "b").why === "" && planPath([58, 21], [66, 21], "b").bad.size === 0;
       state.water = [];
-      out.cellOffLand = /boundary/.test(planPath([-60, 110], [-40, 110], "g").why);
-      state.fenceGrid = {[pieceKey(300, 100, "v")]:{}}; 
-      out.cellBlockedFence = /fence/.test(planPath([290, 100], [310, 100], "g").why);
+      out.chunkOffLand = /boundary/.test(planPath([-12, 22], [-8, 22], "g").why);
+      state.fenceGrid = {[pieceKey(300, 100, "v")]:{}};
+      out.chunkBlockedFence = /fence/.test(planPath([58, 20], [62, 20], "g").why);
       state.fenceGrid = {};
-      // too dear
-      state.money = 5; out.cellTooDear = /Costs/.test(planPath([100, 100], [140, 100], "g").why); state.money = 1e6;
-      // bulldoze: a tap takes one cell, a box takes the cells in it, the entrance walk stays
+      state.money = 5; out.chunkTooDear = /Costs/.test(planPath([20, 20], [28, 20], "g").why); state.money = 1e6;
+      // bulldoze: a tap takes one chunk, a drag box takes exactly the chunks lit, the entrance walk stays
       setTool("bulldoze");
-      const tapAt = (x, y) => { fdrag = {a:[x, y], b:[x, y], lift:true, box:true, swept:new Set(), last:{x, y}}; endFenceDrag(); };
-      const c0 = ncells(), mm = state.money; tapAt(220.5, 233.5);
-      out.cellBulldozeTap = ncells() === c0 - 1 && !state.pathCells["220,233"] && state.money > mm;
-      const c1 = ncells(); fdrag = {a:[212, 231], b:[218, 236], lift:true, box:true, swept:new Set(), last:{x:218, y:236}}; endFenceDrag();
-      out.cellBulldozeBox = ncells() < c1 && !state.pathCells["214,232"] && !!state.pathCells["205,260"];
-      const c2 = ncells(); tapAt(205.5, 260.5);
-      out.cellBulldozeFixed = ncells() === c2 && !!state.pathCells["205,260"];
-      setTool("select");
-      // old saves: line paths become cells (tram stays a line), the same width they had
-      const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathCells; delete oldS.pathFixed;
+      const boxAt = (a, b) => { fdrag = {a, b, lift:true, box:true, swept:new Set(), last:{x:b[0], y:b[1]}}; };
+      const toastKeep = ui.toast; let toasted = ""; ui.toast = t => { toasted = t; };
+      const c0 = nch(), mm = state.money; boxAt([227.5, 232.5], [227.5, 232.5]); endFenceDrag();
+      out.chunkBulldozeTap = nch() === c0 - 1 && !state.pathChunks["45,46"] && state.money - mm === Math.round(pathChunkCost("g") * COST.refundShare) && /Removed 1 path chunk, refunded/.test(toasted);
+      const c1 = nch(), m1 = state.money; boxAt([236, 226], [246, 236]);
+      const lit = bulldozeChunkKeys(fdrag).slice().sort(); renderOverlay();
+      const litN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="var\(--bad\)" fill-opacity="\.45"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
+      endFenceDrag();
+      out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare) && /Removed 3 path chunks, refunded \$/.test(toasted);
+      const c2 = nch(); boxAt([207.5, 280], [207.5, 280]); endFenceDrag();
+      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,56"];
+      boxAt([200, 270], [215, 300]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
+      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,56"];
+      ui.toast = toastKeep; setTool("select");
+      // the same through real pointer events: drag the path tool, then drag a bulldoze box that lights the chunks as it grows
+      {
+        const r = svg.getBoundingClientRect(), scr = (wx, wy) => ({clientX:r.left + view.tx + wx * view.k, clientY:r.top + view.ty + wy * ky()});
+        const fire = (type, wx, wy, extra) => svg.dispatchEvent(new PointerEvent(type, {pointerId:7, pointerType:"mouse", button:0, buttons:type === "pointerup" ? 0 : 1, bubbles:true, ...scr(wx, wy), ...extra}));
+        svg.setPointerCapture = () => {}; svg.releasePointerCapture = () => {};   // synthetic pointers can't be captured
+        state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); pathVer++; recompute();
+        const base = nch();
+        setTool("path"); fire("pointerdown", 52.5 * CHUNK + 2, 40.5 * CHUNK); fire("pointermove", 55.5 * CHUNK, 40.5 * CHUNK); fire("pointermove", 58.5 * CHUNK, 40.5 * CHUNK);
+        const shown = cdrag && cdrag.plan && cdrag.plan.todo.length; fire("pointerup", 58.5 * CHUNK, 40.5 * CHUNK);
+        out.chunkPointerLay = shown === 7 && nch() === base + 7 && ["52,40", "58,40"].every(k => state.pathChunks[k] === "g") && !state.pathChunks["51,40"] && !state.pathChunks["59,40"];
+        setTool("bulldoze"); fire("pointerdown", 53.1 * CHUNK, 39.6 * CHUNK); fire("pointermove", 55 * CHUNK, 40.5 * CHUNK); fire("pointermove", 56.5 * CHUNK, 41.2 * CHUNK);
+        const lit2 = fdrag ? bulldozeChunkKeys(fdrag).sort().join(" ") : "";
+        fire("pointerup", 56.5 * CHUNK, 41.2 * CHUNK);
+        out.chunkPointerBulldoze = lit2 === "53,40 54,40 55,40 56,40" && nch() === base + 3 && ["52,40", "57,40", "58,40"].every(k => state.pathChunks[k]) && ["53,40", "54,40", "55,40", "56,40"].every(k => !state.pathChunks[k]);
+        fire("pointerdown", 57.5 * CHUNK, 40.5 * CHUNK); fire("pointerup", 57.5 * CHUNK, 40.5 * CHUNK);
+        out.chunkPointerTap = nch() === base + 2 && !state.pathChunks["57,40"] && !!state.pathChunks["58,40"];
+        setTool("select"); delete svg.setPointerCapture; delete svg.releasePointerCapture;
+        state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+      }
+      // old saves from the 1 m cell build: a chunk is path where most of its area was; the gate and the walk move to the chunk grid
+      const oldC = JSON.parse(JSON.stringify(state)); delete oldC.pathChunks; delete oldC.pathFixed; oldC.gate = [205, 305]; oldC.paths = oldC.paths.filter(p => !p.d);
+      oldC.pathCells = {}; oldC.pathFixed = {};
+      for(let x = 203; x < 208; x++) for(let y = 235; y < 305; y++){ oldC.pathCells[x + "," + y] = "g"; oldC.pathFixed[x + "," + y] = 1; }
+      for(let x = 208; x < 240; x++) for(let y = 233; y < 238; y++) oldC.pathCells[x + "," + y] = "g";   // rows 233 to 237: three in chunk row 47, two in 46
+      for(let x = 150; x < 200; x++) for(let y = 248; y < 251; y++) oldC.pathCells[x + "," + y] = "s";   // a 3 m staff road
+      oldC.pathCells["199,250"] = "x";
+      upgradeSave(oldC);
+      const cnt = k => Object.keys(oldC.pathChunks).filter(k).length;
+      out.chunkMigrateCells = !oldC.pathCells && oldC.gate[0] === 207.5 && oldC.gate[1] === 305 && oldC.pathChunks["41,47"] === "g" && oldC.pathChunks["42,47"] === "g" && !oldC.pathChunks["42,46"] && !oldC.pathChunks["40,56"] && oldC.pathChunks["41,60"] === "g" && !oldC.pathChunks["41,61"]
+        && Object.keys(oldC.pathFixed).length === 14 && Object.keys(oldC.pathFixed).every(k => /^41,/.test(k)) && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
+        && cnt(k => oldC.pathChunks[k] === "s") === 20;
+      const againC = upgradeSave(JSON.parse(JSON.stringify(oldC)));
+      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).length === 14;
+      // old saves from line paths (tram stays a line)
+      const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathChunks; delete oldS.pathFixed; oldS.gate = [205, 305];
       oldS.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o1", points:[[205,235],[300,235]]}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}, {id:"p-o3", type:"wide", points:[[250,200],[250,150]]}, {id:"p-o4", type:"bridge", points:[[300,235],[300,200]]}, {id:"p-tr", type:"tram", points:[[250,312],[480,312]]}, {id:"x", d:1, points:[[0,0],[5,0]]}];
       upgradeSave(oldS);
-      const colN = (cells, x, kind) => Object.keys(cells).filter(k => k.startsWith(x + ",") && (!kind || cells[k] === kind)).length;
-      const rowN = (cells, y, x0, x1, kind) => Object.keys(cells).filter(k => { const [cx, cy] = k.split(",").map(Number); return cy === y && cx >= x0 && cx <= x1 && cells[k] === kind; }).length;
-      out.cellMigrate = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathCells["203,260"] === "g" && oldS.pathCells["207,260"] === "g" && !oldS.pathCells["202,260"] && !oldS.pathCells["208,260"]
-        && Object.keys(oldS.pathFixed).length > 300 && oldS.pathFixed["205,260"] === 1 && !oldS.pathFixed["250,200"]
-        && rowN(oldS.pathCells, 250, 150, 200, "s") >= 150 / 50 && colN(oldS.pathCells, 175, "s") === 3 && colN(oldS.pathCells, 250, "g") > 0 && Object.keys(oldS.pathCells).filter(k => oldS.pathCells[k] === "b").length > 0
-        && !Object.keys(oldS.pathCells).some(k => +k.split(",")[1] >= 305);
-      out.cellMigrateWide = Object.keys(oldS.pathCells).filter(k => k.startsWith("245,") || k.startsWith("254,")).length > 0 && !oldS.pathCells["244,170"] && !!oldS.pathCells["245,170"] && !!oldS.pathCells["254,170"] && !oldS.pathCells["255,170"];
-      const again = upgradeSave(JSON.parse(JSON.stringify(oldS)));
-      out.cellMigrateOnce = Object.keys(again.pathCells).length === Object.keys(oldS.pathCells).length;
+      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).length === 14
+        && oldS.pathChunks["50,47"] === "g" && oldS.pathChunks["35,50"] === "s" && oldS.pathChunks["49,35"] === "g" && oldS.pathChunks["50,35"] === "g" && !oldS.pathChunks["48,35"] && !oldS.pathChunks["51,35"]
+        && Object.keys(oldS.pathChunks).some(k => oldS.pathChunks[k] === "b") && !Object.keys(oldS.pathChunks).some(k => chunkXY(k)[1] >= 61) && oldS.gate[0] === 207.5;
       // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
       layPath(A, B, "g");   // mend the gap the bulldoze left
       state.exhibits = [{id:"e-cp2", name:"CP2", points:[[212,222],[222,222],[222,229],[212,229]], animals:[], land:[], water:[], cond:100}];
-      layPath([208, 250], [230, 250], "s"); layCrossing([208, 250]); recompute(); buildGuestGraph(); buildKeeperGraph();
-      const gw = walkFrom(gGraph.anchors.gate, false);
-      out.cellGuestsReach = isReachable(state.exhibits[0]) && !!gGraph.anchors["e-cp2"] && gw.dist.has(gGraph.anchors["e-cp2"]);
-      out.cellStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
-      // a party walks it end to end
+      layPath([42, 50], [47, 50], "s"); recompute(); buildGuestGraph(); buildKeeperGraph();
+      const gw = gGraph.anchors.gate ? walkFrom(gGraph.anchors.gate, false) : {dist:new Map()};
+      out.chunkGuestsReach = isReachable(state.exhibits[0]) && !!gGraph.anchors["e-cp2"] && gw.dist.has(gGraph.anchors["e-cp2"]);
+      out.chunkStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
       render();
-      out.cellRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
-      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathCells:keep.cells, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
+      out.chunkRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
       pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
     }
 
-    // path connectivity: a flood fill over the cells, edge to edge, from the entrance walk
+    // path connectivity: a flood fill over the chunks, edge to edge, from the entrance walk; staff chunks that touch a guest chunk join for staff only
     {
-      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, cells:state.pathCells, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
-      state.gate = [205, 305]; state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
+      state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
       state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = [];   // no loose lines from earlier checks
-      const reset = () => { state.pathCells = {}; for(const k in state.pathFixed) state.pathCells[k] = "g"; pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
+      const reset = () => { state.pathChunks = {}; for(const k in state.pathFixed) state.pathChunks[k] = "g"; pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
       const redo = () => { recompute(); buildGuestGraph(); buildKeeperGraph(); };
-      const G = (x, y) => cellReached(x, y, true), S = (x, y) => cellReached(x, y, false);
+      const G = (x, y) => chunkReached(x, y, true), S = (x, y) => chunkReached(x, y, false);
       reset();
-      out.reachWalk = G(205, 260) && S(205, 260) && pathReach() === pathReach();
+      out.reachWalk = G(41, 55) && S(41, 55) && pathReach() === pathReach();
       // a path touching the walk is joined, a gap breaks it, a corner touch is not an edge
-      layPath([205, 233], [225, 233], "g");
-      out.reachTouch = G(224, 233) && S(224, 233);
-      layPath([100, 100], [140, 100], "g");
-      out.reachFar = !G(120, 100) && !S(120, 100);
-      reset(); layPath([205, 229], [225, 229], "g");   // cells y 227 to 231, the walk starts at 235: a gap of three rows
-      out.reachGap = !G(215, 229) && !S(215, 229);
-      layPath([205, 234], [205, 231], "g");   // fills the gap
-      out.reachGapMended = G(215, 229);
-      reset(); state.pathCells["208,234"] = "g"; pathVer++;
-      out.reachCorner = !G(208, 234);
-      state.pathCells["208,235"] = "g"; pathVer++;
-      out.reachEdge = G(208, 234) && G(208, 235);
-      // two swaths side by side merge into one network
-      reset(); layPath([205, 233], [225, 233], "g"); layPath([205, 226], [225, 226], "g");   // y 231 to 235 and y 224 to 228, then the rows between
-      out.reachSideGap = !G(220, 226);
-      layPath([225, 230], [245, 230], "g");
-      out.reachSideBySide = G(240, 230) && G(240, 228);
-      // the cache follows the cells
+      layPath([42, 47], [47, 47], "g");
+      out.reachTouch = G(47, 47) && S(47, 47);
+      layPath([20, 20], [28, 20], "g");
+      out.reachFar = !G(24, 20) && !S(24, 20);
+      reset(); layPath([41, 44], [46, 44], "g");   // the walk starts at row 47: a gap of two rows
+      out.reachGap = !G(44, 44) && !S(44, 44);
+      layPath([41, 46], [41, 45], "g");   // fills the gap
+      out.reachGapMended = G(44, 44);
+      reset(); state.pathChunks["42,46"] = "g"; pathVer++;
+      out.reachCorner = !G(42, 46);
+      state.pathChunks["42,47"] = "g"; pathVer++;
+      out.reachEdge = G(42, 46) && G(42, 47);
+      // two runs side by side merge into one network
+      reset(); layPath([42, 47], [47, 47], "g"); layPath([42, 45], [47, 45], "g");
+      out.reachSideGap = !G(44, 45);
+      layPath([42, 46], [42, 46], "g");
+      out.reachSideBySide = G(44, 45) && G(47, 45);
+      // the cache follows the chunks
       const r0 = pathReach(); pathVer++;
       out.reachCache = pathReach() !== r0 && pathReach() === pathReach();
-      // a bridge cell joins like a guest path, and guests walk it
-      reset(); layPath([205, 233], [225, 233], "g"); layPath([225, 233], [240, 233], "b"); redo();
-      out.reachBridge = G(238, 233) && pathKind(238, 233) === "b" && [...gGraph.nodes.values()].some(n => n.x > 236);
-      // staff and guest paths that merely touch stay apart; a crossing joins them for staff only
-      reset(); layPath([208, 260], [230, 260], "s"); redo();
-      const farNode = () => { let b = null, bd = 1e9; for(const n of kGraph.nodes.values()){ const d = Math.hypot(n.x - 231, n.y - 261); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
-      out.staffApart = !S(220, 260) && !G(220, 260) && !pathReach().A.has(pnum(220, 260)) && farNode().d > 3 && !state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id));
-      const xr = layCrossing([208, 260]); redo();
-      const start = [...kGraph.nodes.values()].reduce((a, n) => Math.hypot(n.x - 205, n.y - 290) < Math.hypot(a.x - 205, a.y - 290) ? n : a);
-      out.crossingJoinsStaff = !!xr && pathKind(208, 260) === "x" && S(220, 260) && !G(220, 260) && !G(208, 260) && farNode().d < 3 && walkFrom(start, null).dist.has(farNode().b);
-      out.crossingNoGuests = !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && ![...gGraph.nodes.values()].some(n => Math.hypot(n.x - 231, n.y - 261) < 2);
-      out.crossingCosts = Math.abs(planCrossing([300, 300]).cost - pathCellCost("x")) < 1 && layCrossing([208, 260]) === null;
-      // taking the crossing away splits them again
-      removeCells(["208,260"]); redo();
-      out.crossingBulldoze = !state.pathCells["208,260"] && !S(220, 260) && farNode().d > 3;
-      // a crossing in the middle of nowhere joins nothing
-      layCrossing([300, 300]); out.crossingAlone = !S(300, 300);
-      // an exhibit gate on a cell edge reads as connected only when its path reaches the entrance
-      reset(); layPath([208, 260], [230, 260], "s"); layCrossing([208, 260]); redo();
-      const ex = { id:"e-gt", name:"GT", points:[[214,245],[226,245],[226,258],[214,258]], animals:[], land:[], water:[], cond:100, gate:[215, 258] };
+      // a bridge chunk joins like a guest path, and guests walk it
+      reset(); layPath([42, 47], [47, 47], "g"); layPath([48, 47], [51, 47], "b"); redo();
+      out.reachBridge = G(50, 47) && pathKind(50, 47) === "b" && [...gGraph.nodes.values()].some(n => n.x > 251);
+      // a path dragged out of the entrance walk joins
+      reset(); layPath([41, 46], [41, 40], "g"); redo();
+      out.reachFromEntrance = G(41, 40) && [...gGraph.nodes.values()].some(n => n.y < 205);
+      // a staff chunk touching a guest chunk (or the entrance walk) is joined for staff only
+      reset(); layPath([42, 50], [47, 50], "s"); redo();
+      const nodeNear = (G2, x, y) => { let b = null, bd = 1e9; for(const n of G2.nodes.values()){ const d = Math.hypot(n.x - x, n.y - y); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
+      const start = [...kGraph.nodes.values()].reduce((a, n) => Math.hypot(n.x - 207, n.y - 290) < Math.hypot(a.x - 207, a.y - 290) ? n : a);
+      out.staffTouchJoins = S(47, 50) && !G(47, 50) && !G(42, 50) && nodeNear(kGraph, 237.5, 252.5).d < 4 && walkFrom(start, null).dist.has(nodeNear(kGraph, 237.5, 252.5).b);
+      out.guestsNeverStaff = !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && nodeNear(gGraph, 237.5, 252.5).d > 5 && state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id));
+      // ...also where it meets the end of a guest path away from the walk
+      reset(); layPath([42, 47], [46, 47], "g"); layPath([47, 47], [50, 47], "s"); redo();
+      out.staffTouchGuest = S(49, 47) && !G(49, 47) && G(46, 47) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id));
+      // a staff chunk with no path to it joins nothing; a guest chunk that only a staff chunk reaches is not a guest path
+      layPath([20, 20], [24, 20], "s"); out.staffAlone = !S(22, 20);
+      reset(); layPath([42, 50], [44, 50], "s"); layPath([45, 50], [48, 50], "g"); redo();
+      out.guestBehindStaff = S(46, 50) && !G(46, 50) && !G(43, 50) && nodeNear(gGraph, 232.5, 252.5).d > 5;
+      // taking the touching chunk away splits them again
+      reset(); layPath([42, 50], [47, 50], "s"); removeChunks(["42,50"]); redo();
+      out.staffSplit = !S(47, 50) && nodeNear(kGraph, 237.5, 252.5).d > 5;
+      // an exhibit gate on a chunk edge reads as connected only when its path reaches the entrance
+      reset(); layPath([42, 51], [47, 51], "s");
+      const ex = { id:"e-gt", name:"GT", points:[[214,240],[226,240],[226,255],[214,255]], animals:[], land:[], water:[], cond:100, gate:[215, 255] };
       state.exhibits = [ex]; redo();
       out.gateOnEdge = gateCheck(ex).ok;
-      ex.gate = [215, 250]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
-      ex.gate = [215, 258]; removeCells(["208,260"]); redo();
+      ex.gate = [215, 245]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
+      ex.gate = [215, 255]; removeChunks(["42,51"]); redo();
       out.gateUnjoined = !gateCheck(ex).ok && /join/.test(gateCheck(ex).text);
-      // an exhibit beside a guest path is open to guests, one beside a staff road is not
-      layCrossing([208, 260]); redo();
+      // an exhibit beside a guest path is open to guests, one beside only a staff road is not
+      layPath([42, 51], [42, 51], "s"); redo();
       out.exhibitStaffOnly = !isReachable(ex);
-      layPath([205, 239], [225, 239], "g"); redo();
+      layPath([42, 47], [47, 47], "g"); redo();
       out.exhibitGuestOpen = isReachable(ex) && !!gGraph.anchors["e-gt"];
       // buildings: a backstage one needs only staff reach, a guest one needs a guest path
-      state.exhibits = []; reset(); layPath([208, 260], [230, 260], "s"); layCrossing([208, 260]);
+      state.exhibits = []; reset(); layPath([42, 52], [47, 52], "s");
       state.buildings = [{id:"b-ws", type:"workshop", points:rectPts(222, 270, BUILDINGS.workshop.w, BUILDINGS.workshop.d, 0), cond:100}, {id:"b-rr", type:"restroom", points:rectPts(222, 252, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0), cond:100}]; redo();
       out.buildingReach = isReachable(state.buildings[0]) && !isReachable(state.buildings[1]);
-      // old saves: a staff road touching a guest path gets a crossing so keepers keep their road
-      const oldX = {paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}], parcels:[], boundary:state.boundary, gate:[205,305]};
-      migratePaths(oldX); oldX.crossingsV = 0; addCrossings(oldX);
-      const xs = Object.keys(oldX.pathCells).filter(k => oldX.pathCells[k] === "x");
-      out.crossingMigrate = xs.length === 1 && ["g", "b"].some(g => [[1,0],[-1,0],[0,1],[0,-1]].some(([dx, dy]) => { const [x, y] = xs[0].split(",").map(Number); return oldX.pathCells[(x+dx) + "," + (y+dy)] === g; }));
       state.buildings = []; state.exhibits = [];
-      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathCells:keep.cells, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
       pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
     }
 
@@ -2561,7 +2599,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const had = {money:state.money, day:state.day, minute:state.minute, over:state.over, sandbox:state.sandbox};
     state.buildings = state.buildings.filter(b => !["oracle", "ghost", "tar", "ceres"].includes(b.type));
     state.buildings.push({id:"s12-or", type:"oracle", points:rectPts(230, 262, 24, 16, H)}, {id:"s12-gh", type:"ghost", points:rectPts(180, 262, 28, 20, H)}, {id:"s12-ta", type:"tar", points:rectPts(230, 290, 26, 18, H)}, {id:"s12-ce", type:"ceres", points:rectPts(180, 290, 26, 18, H)});
-    state.paths.push({id:"s12-p0", name:"s", points:[[state.gate[0],state.gate[1]],[205,290],[205,262]]}, {id:"s12-p1", name:"s", points:[[205,262],[222,262]]}, {id:"s12-p2", name:"s", points:[[205,262],[193,262]]}, {id:"s12-p3", name:"s", points:[[205,290],[217,290]]}, {id:"s12-p4", name:"s", points:[[205,290],[193,290]]});
+    state.paths.push({id:"s12-p0", name:"s", points:[[state.gate[0],state.gate[1]],[207.5,290],[207.5,262]]}, {id:"s12-p1", name:"s", points:[[207.5,262],[222,262]]}, {id:"s12-p2", name:"s", points:[[207.5,262],[193,262]]}, {id:"s12-p3", name:"s", points:[[207.5,290],[217,290]]}, {id:"s12-p4", name:"s", points:[[207.5,290],[193,290]]});
     recompute(); buildKeeperGraph(); state.sandbox = false; state.over = false; state.money = 1e9;
     const sc = () => state.science;
     for(const k of ["paleo", "temporal", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
@@ -2773,7 +2811,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const out = {};
     startWith(newPark(), false); setSpeed(0);
     state.money = 1e9; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
-    state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    state.paths.push({id:"p-loop", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
     const sp = SPECIES.filter(s => !s.viv && !COLD_HARDY.includes(s.id) && traitsOf(s).active === "diurnal" && traitsOf(s).temper === "skittish").sort((x, y) => coverSlots(x) - coverSlots(y))[0], cap = Math.floor(LAND.shelter.slots / coverSlots(sp));
     const e = {id:"e-sh", name:"Shy", points:[[104,124],[180,124],[180,231],[104,231]], animals:Array.from({length:12}, (_, i) => ({id:"sh" + i, sp:sp.id})), happy:80, cond:100, stock:{}, land:[]};
     state.exhibits.push(e);
@@ -2942,7 +2980,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
       const H = Math.PI / 2, add = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, H)});
       add("m-pmc", "pmc", 230, 262); add("m-ce", "ceres", 180, 262); add("m-cl", "closet", 205, 230);
-      state.paths.push({id:"m1", name:"m1", points:[[205,230],[205,262]]}, {id:"m2", name:"m2", points:[[205,262],[222,262]]}, {id:"m3", name:"m3", points:[[205,262],[193,262]]});
+      state.paths.push({id:"m1", name:"m1", points:[[207.5,230],[207.5,262]]}, {id:"m2", name:"m2", points:[[207.5,262],[222,262]]}, {id:"m3", name:"m3", points:[[207.5,262],[193,262]]});
       state.science.tech.push("medmeso");
       recompute(); buildKeeperGraph(); buildGuestGraph(); hireCustodian(); syncCustodians();
       const pm = state.buildings.find(b => b.id === "m-pmc"); pm.store = {medmes:2}; state.ceres.meds = {medpal:0, medmes:30, medcen:0};
