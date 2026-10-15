@@ -170,9 +170,11 @@ function teaseTick(p, dt){
   const x = p.at.x, y = p.at.y, H = PERS.hooligan;
   for(const e of state.exhibits){
     if(e.viv || !e.animals.length || distToEdge(x, y, e.points) > THROWN.reach * .7) continue;
-    const chance = H.tease * (isHooligan(p) ? 1 : PERS.second) * deterrence(x, y);
+    const spare = 1 - SCREEN.teaseCut * screenShare(e);   // privacy screens block the view, so there's less to bang on and less to fear
+    const chance = H.tease * (isHooligan(p) ? 1 : PERS.second) * deterrence(x, y) * spare;
     if(Math.random() < 1 - Math.pow(1 - Math.min(.5, chance), dt)){
-      for(const a of e.animals) if(a.need) a.need.stress = Math.min(100, a.need.stress + H.stress);
+      for(const a of e.animals) if(a.need && !a.inside) a.need.stress = Math.min(100, a.need.stress + H.stress * spare);
+      e.teasedAt = nowMin();   // so the Behavior tab can say why they're stressed (a spike isn't in stressTarget)
       p.vandal = true;
       if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); }
       state.today.teased = (state.today.teased || 0) + 1;

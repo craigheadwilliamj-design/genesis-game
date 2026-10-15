@@ -558,7 +558,7 @@ const PERS = {
   escortRadius:30,     // a guard this close to a waiting party can take it to the gate
   activeActs:["hunt", "patrol", "pace", "play"],   // what animals do that counts as visibly active
   rarePrice:9000,      // a species this dear counts as rare
-  hooligan:{sneak:.35, tease:.03, stress:18},   // chance a hooligan party skips the ticket; chance each minute at a fence of banging on the glass; stress it gives the animals
+  hooligan:{sneak:.35, tease:.03, stress:8},   // chance a hooligan party skips the ticket; chance each minute at a fence of banging on the glass; stress it gives the animals (animals inside a shelter feel none; privacy screens cut both the chance and the stress)
 };
 const PERSONALITIES = {
   thrill:{label:"Thrill Seeker", color:"#E5484D", weight:.16,
@@ -1374,7 +1374,8 @@ const BEHAVIOR = {
   comfortDrift:60,
   hideCalm:.5,         // stress shed a minute hiding in cover (a third of it with no cover)
   huntMin:20,          // meat eaters stalk this long before they eat
-  shyGuests:35,        // stress skittish animals take from a busy path, halved with cover to retreat to
+  teaseMemory:240,     // park minutes the Behavior tab still blames guests banging on the glass (the spike drains slowly)
+  shyGuests:35,       // stress skittish animals take from a busy path, halved with cover to retreat to
   busyAt:150,          // guests in the park for "busy"
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
@@ -1388,7 +1389,11 @@ const SHELTER = {
   needLine:70,         // hunger or thirst over this and a weather-sheltering animal comes out to eat or drink
   giveUp:90,           // park minutes of walking before an animal that can't find its way to its shelter just goes in
   weather:{storm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
-  hideCalm:1.5,        // hiding behind walls sheds stress this many times as fast as hiding in the open
+  hideCalm:4,          // hiding behind walls sheds stress this many times as fast as hiding in the open
+  restCalm:.8,         // stress shed a minute resting or sleeping inside (in the open it's .1)
+  stressLine:55,       // a stressed animal (any temper) heads straight for a shelter over this much stress, and stays in until it is down to calmLine
+  calmLine:25,
+  hurry:2.2,           // how fast it walks there, as a multiple of its usual pace
   text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
 };
 // Guests who come to see animals that are all indoors are let down (seeExhibit in guests.js; hideBother in behavior.js)
@@ -1402,8 +1407,8 @@ const HIDING = {
   eduCut:.8,           // a guest who has learned a lot (p.edu of eduFull or more) feels this much less of it
   eduFull:40,
 };
-// Privacy screens (LAND `screen`): each shields this many animals from the path's view. It cuts the guest stress they take (ctx.seen) by `cut` for that share of the herd.
-const SCREEN = {holds:4, cut:.6, fenceReach:7};
+// Privacy screens (LAND `screen`): each shields this many animals from the path's view. It cuts the guest stress they take (ctx.seen) by `cut` for that share of the herd, and hooligan teasing by `teaseCut`.
+const SCREEN = {holds:8, cut:.85, teaseCut:.8, fenceReach:7};   // teaseCut: how much of a hooligan's banging (the chance and the stress) a fully screened herd is spared
 // Quiet signs (BUILDINGS.quiet): guests within `hear` of a working one, which stands within `reach` of an exhibit's fence, count `cut` less toward the crowd the exhibit's animals feel (rowdy parties only `rowdy` as much).
 const QUIET = {reach:20, hear:14, cut:.6, rowdy:.3};
 // Animal-on-animal attacks (behavior.js, "attacks"). Hurt animals get an injury (a.sick, kind "injury") that vets treat; a bad enough one kills.

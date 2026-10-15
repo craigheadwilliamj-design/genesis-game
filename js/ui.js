@@ -425,7 +425,7 @@ function propsHtml(e){
   }
   if(sub === "shelters"){
     const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold. Animals walk in to hide, sleep and wait out bad weather, as many as the shelter has room for, and guests can't see them while they are inside. A Privacy Screen (${SCREEN.holds} animals each, within ${SCREEN.fenceReach} m of the fence) blocks their view of the path: shy animals stress less, and stay in sight.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold. Animals walk in to hide, sleep and wait out bad weather, as many as the shelter has room for, and guests can't see them while they are inside. A Privacy Screen (${SCREEN.holds} animals each, within ${SCREEN.fenceReach} m of the fence) blocks their view of the path: shy animals stress less, hooligans bang on the glass far less, and the animals stay in sight. Stressed animals head for a shelter and calm down much faster inside.</div>`;
     if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
       h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
@@ -468,11 +468,15 @@ function behaviorHtml(e){
     h += `<div class="meta" style="margin-top:2px">${ACTIVE_TEXT[t.active]} ${SOCIAL_TEXT[t.social]} ${TEMPER_TEXT[t.temper]}</div>`;
     h += `<div style="margin-top:6px">${NEED_KEYS.map(k => { const v = list.reduce((n, a) => n + needsOf(a)[k], 0) / list.length; return `<div class="factor" style="grid-template-columns:90px 1fr 44px"><span>${NEED_TEXT[k]}</span>${meter(v, col(v))}<span>${Math.round(v)}%</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">${esc(actsSummary(list))}.</div>`;
-    const pacing = list.filter(a => a.act === "pace");
-    if(pacing.length){ const why = pacing[0].why || "bored"; h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Pacing because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[why]}. ${esc(WHY_FIX[why])}</div>`; }
     const worst = list.reduce((m, a) => needsOf(a).stress > needsOf(m).stress ? a : m, list[0]), why = [];
     stressTarget(e, worst, s, ctx, why);
-    if(needsOf(worst).stress >= 30 && why.length) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Stressed because ${esc([...new Set(why)].join(", "))}.</div>`;
+    const reasons = [...new Set(why)], stressed = needsOf(worst).stress >= 30;
+    const pacing = list.filter(a => a.act === "pace");
+    if(pacing.length){
+      const pw = pacing[0].why || "bored";
+      h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Pacing because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[pw]}.${pw === "stressed" ? "" : " " + esc(WHY_FIX[pw])}</div>`;
+    }
+    if(stressed) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">${reasons.length ? `Stressed because ${esc(reasons.join(", "))}.` : "Stress is still draining from something earlier (a fight, a scare or a sick herd mate) and nothing in the exhibit is adding to it now. It should ease on its own."}</div>`;
     h += `</section>`;
   }
   return h;

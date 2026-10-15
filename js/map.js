@@ -1413,7 +1413,7 @@ function animalWander(h, e){
 }
 
 /* What each act looks like (behavior.js picks the act): where the animal heads, how fast, and whether it stays once there */
-const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1};
+const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1, hide:SHELTER.hurry};
 const ACT_STAYS = new Set(["eat", "drink", "rest", "hide"]);
 // The edge of a land feature nearest the animal, or its middle for shelters it can walk into
 function featSpot(h, f, into){
