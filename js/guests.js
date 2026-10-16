@@ -487,9 +487,11 @@ function standNear(p, pts, e, bld){
   const cand = [];
   for(let i = 0; i < pts.length; i++){
     const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    // acrylic is for looking through: guests come from farther along the path and crowd it, so a run of it makes a viewing gallery
+    const glass = e && pts === e.points && (e.grid ? sideKinds(e)[i] : e.barrier) === "acrylic", reach = glass ? SIGHT.glassReach : SIGHT.standReach, pull = glass ? SIGHT.glassPull : SIGHT.standPull, wt = glass ? SIGHT.glassWeight : 1;
     for(let t = 0; t <= L; t += 1){
       const x = a[0] + (b[0] - a[0]) * t / L, y = a[1] + (b[1] - a[1]) * t / L, d = Math.hypot(x - n.x, y - n.y);
-      if(d > SIGHT.standReach) continue;
+      if(d > reach) continue;
       // one step out from the fence, on the side that isn't inside
       let nx = -(b[1] - a[1]) / L, ny = (b[0] - a[0]) / L;
       if(inPoly(x + nx * .8, y + ny * .8, pts)){ nx = -nx; ny = -ny; }
@@ -498,7 +500,7 @@ function standNear(p, pts, e, bld){
       for(let g = .6; g <= SIGHT.standGap; g += .4){
         const X = x + nx * g, Y = y + ny * g;
         if(offPath(X, Y)) continue;
-        if(Math.hypot(X - n.x, Y - n.y) <= SIGHT.standReach) cand.push([X, Y, 1 / (1 + d / SIGHT.standPull)]);
+        if(Math.hypot(X - n.x, Y - n.y) <= reach) cand.push([X, Y, wt / (1 + d / pull)]);
         break;
       }
     }
