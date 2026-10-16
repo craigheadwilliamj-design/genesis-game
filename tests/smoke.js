@@ -2140,11 +2140,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // stopping can start it at once, and eating never does
       RIG_IDLE.chance = 1; const f3 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f3.el.innerHTML = rigSvg("plat", f3); tick2(f3);
       const atStop = f3.rg.lock; f3.rg.mode = "walk"; f3.rg.idleT = 1; f3.rg.lock = false; f3.act = "eat"; tick2(f3);
-      // a rig with several idle clips (the Coelophysis: idle and idle2) picks one at random each time, and eases into it rather than jumping
+      // a rig with a stand loop (the Coelophysis) loops it while standing; with RIG_IDLE.dyn 0 no idle clip plays, and with 1 one of its idle clips (idle, idle2, picked at random) plays at each loop's end, eased in, locked till done, then back to the loop
       const f5 = {r:3, sp:"coel", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f5.el.innerHTML = rigSvg("coel", f5);
-      RIG_IDLE.chance = 0; tick2(f5); const seen = new Set(); let eased = true;
-      for(let k = 0; k < 30; k++){ f5.rg.gap = 0; const before = f5.rg.cur.slice(); tick2(f5); seen.add(f5.rg.idleC); if(f5.rg.blend >= 1 || Math.max(...f5.rg.cur.map((v, i) => Math.abs(v - before[i]))) > 15) eased = false; for(let i = 0; i < 60; i++) tick2(f5); }
-      out.rigIdles = (RIGS.coel && RIGS.coel.clips.idle2 ? true : false) && seen.has("idle") && seen.has("idle2") && eased && !f5.rg.lock;
+      const keepDyn = RIG_IDLE.dyn; RIG_IDLE.dyn = 0; let loops = 0, prevT = 0, standLock = false;
+      for(let k = 0; k < 40; k++){ tick2(f5); if(f5.rg.standT < prevT) loops++; prevT = f5.rg.standT; if(f5.rg.lock || f5.rg.idleT < 1) standLock = true; }
+      RIG_IDLE.dyn = 1; const seen = new Set(); let eased = true, playLock = true, backToStand = false;
+      for(let k = 0; k < 30; k++){
+        f5.rg.standT = .999; const before = f5.rg.cur.slice(); tick2(f5); seen.add(f5.rg.idleC);
+        if(f5.rg.idleT >= 1 || !f5.rg.lock || f5.rg.blend >= 1 || Math.max(...f5.rg.cur.map((v, i) => Math.abs(v - before[i]))) > 15) eased = false;
+        RIG_IDLE.dyn = 0; for(let i = 0; i < 60; i++){ tick2(f5); if(f5.rg.idleT < 1 && !f5.rg.lock) playLock = false; } backToStand = f5.rg.idleT >= 1 && !f5.rg.lock; RIG_IDLE.dyn = 1;
+      }
+      RIG_IDLE.dyn = keepDyn;
+      out.rigIdles = !!(RIGS.coel && RIGS.coel.clips.stand && RIGS.coel.clips.idle2) && loops >= 2 && !standLock && seen.has("idle") && seen.has("idle2") && eased && playLock && backToStand;
       RIG_IDLE.chance = keepChance;
       out.rigIdleHold = holds && started && locked > 10 && locked < 30 && moved > 10 && done && atStop && !f3.rg.lock;
       // lying down finishes before it lets go

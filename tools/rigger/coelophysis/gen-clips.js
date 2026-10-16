@@ -1,3 +1,4 @@
+// SUPERSEDED: coelophysis-clips.json now holds clips animated by hand in the rigger (see CLAUDE.md); running this overwrites them.
 // Builds the Coelophysis walk and rest clips on the hand-made rig in coelophysis-rig.json (parts, joints and both idles made in the rigger; the parts are flat, so it first runs tools/pixelcoel_rig_shade.py on them for the shading and texture).
 //   node tools/rigger/coelophysis/gen-clips.js [OUT_DIR] ['{"S":10,"lift":3}']
 // Writes coelophysis-clips.json (the project with walk, idle, idle2 and rest), contact sheets of each clip, and in the repo
