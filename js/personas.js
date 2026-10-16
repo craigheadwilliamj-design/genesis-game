@@ -55,7 +55,7 @@ function hooliganShare(){
 const sightCache = new Map();
 // What guests can see in an exhibit right now. Cached for a park minute.
 function exhibitTraits(e){
-  const c = sightCache.get(e.id), stamp = Math.floor(state.minute);
+  const c = sightCache.get(e.id), stamp = state.day * DAY_MIN + Math.floor(state.minute);
   if(c && c.stamp === stamp && c.n === e.animals.length) return c;
   const n = Math.max(1, e.animals.length), spp = [...speciesCounts(e).keys()].map(id => SPECIES_BY_ID[id]).filter(Boolean);
   const share = f => e.animals.filter(a => f(a, SPECIES_BY_ID[a.sp])).length / n;
@@ -170,9 +170,11 @@ function teaseTick(p, dt){
   const x = p.at.x, y = p.at.y, H = PERS.hooligan;
   for(const e of state.exhibits){
     if(e.viv || !e.animals.length || distToEdge(x, y, e.points) > THROWN.reach * .7) continue;
-    const chance = H.tease * (isHooligan(p) ? 1 : PERS.second) * deterrence(x, y);
+    const spare = 1 - SCREEN.teaseCut * screenShare(e);   // privacy screens block the view, so there's less to bang on and less to fear
+    const chance = H.tease * (isHooligan(p) ? 1 : PERS.second) * deterrence(x, y) * spare;
     if(Math.random() < 1 - Math.pow(1 - Math.min(.5, chance), dt)){
-      for(const a of e.animals) if(a.need) a.need.stress = Math.min(100, a.need.stress + H.stress);
+      for(const a of e.animals) if(a.need && !a.inside) a.need.stress = Math.min(100, a.need.stress + H.stress * spare);
+      e.teasedAt = nowMin();   // so the Behavior tab can say why they're stressed (a spike isn't in stressTarget)
       p.vandal = true;
       if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); }
       state.today.teased = (state.today.teased || 0) + 1;
@@ -213,12 +215,13 @@ function ejectTick(p){
   if(state.minute - p.ejectTry >= 2 && !gcrew.some(c => c.chase === p)){ p.ejectTry = state.minute; dispatchGuard(p); }
 }
 // A guard has reached a waiting party: walk it to the gate, unhappy
-function escortOut(p, c){
+function escortOut(p, c, quiet){
   p.hold = false; p.ejecting = "escort"; p.wanted = false;
   leaveQueue(p); p.home = true; p.dest = null; p.why = null; p.lastStop = p.shopped = true;
   moodAdd(p, -PERS.ejectMood); thinks(p, "ejected");
   if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
-  events.toast(`${(guardRec(c) || {}).name || "A guard"} walked the ${p.name} to the gate.`, "good");
+  c.escort = p;
+  if(!quiet) events.toast(`${(guardRec(c) || {}).name || "A guard"} walked the ${p.name} to the gate.`, "good");
 }
 
 /* ---------- what a party is doing, for its panel ---------- */

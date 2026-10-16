@@ -47,7 +47,7 @@ function dockHtml(b){
       <button class="buy" data-action="rush" data-t="${t}"${canAfford(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup)) ? "" : " disabled"} title="Delivered now">Rush ${LOGI.rushLot}, ${money(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup))}</button>
       <span class="need">${isGuestGood(t) ? `$${unitPrice(t).toFixed(2)}` : money(Math.round(unitPrice(t)))} a unit. Tonight: ${n} units${n && price ? ` (${money(Math.round(n * price))})` : ""}.</span></li>`;
   }).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? `Partner parks pay for deliveries until day ${state.staff.feedFrom}.` : `Tonight's delivery costs about ${money(Math.round(cost))}.`} Farms and ranches make food cheaper once you have researched food production.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? `Partner parks pay for deliveries until ${fmtDate(state.staff.feedFrom)}.` : `Tonight's delivery costs about ${money(Math.round(cost))}.`} Farms and ranches make food cheaper once you have researched food production.</div></section>`;
   return h;
 }
 
@@ -59,7 +59,7 @@ function warehouseHtml(b){
     const full = storeTotal(b) >= storeCap(b) - .5;
     h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Custodians carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
   } else {
-    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => t !== "meds").map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => !MED_GOODS.includes(t)).map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
   }
   return h + `</section>`;
 }
@@ -130,7 +130,7 @@ function addRow(z, items, label){
 
 function logiOverviewHtml(){
   const any = state.exhibits.some(e => e.animals.length), hasStores = storesBuilt().length;
-  if(!any && !hasStores && !zones().length) return "";
+  if(!any && !hasStores) return "";
   const sum = stockSummary();
   let h = `<section><h3>Supplies</h3>`;
   const warns = logiWarnings();
@@ -142,9 +142,26 @@ function logiOverviewHtml(){
     h += `<div class="meta fnote">Eats ${Math.round(x.need)} a day${x.make ? `, farms make ${x.make}` : ""}. ${x.need ? (days < 1 ? `<b style="color:var(--bad)">Under a day in stores.</b>` : `${days >= 10 ? "10+" : days.toFixed(1)} days in stores.`) : ""}</div>`;
   }
   if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at CERES`);
+  // medicine: one row an era (PMC, stores and CERES) and the contemporary doses the suppliers keep topped up
+  if(hasDept("pmc") || hasDept("ceres")){
+    for(const t of MED_GOODS){
+      const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
+      if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
+      h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
+      h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at CERES.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
+    }
+    h += bar3(goodName(CMED), sum.cmed.have / sum.cmed.want * 100, GOOD_COLOR[CMED], `${Math.floor(sum.cmed.have)} stored`);
+    h += `<div class="meta fnote">${Math.floor(sum.cmed.pmc)} at the PMC. Order it at the dock, ${money(MODERN.cost)} a dose.</div>`;
+  }
   const L = state.logi;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;
-  h += `<h3 style="margin-top:12px">Work zones</h3>`;
+  return h + `</section>`;
+}
+
+// The work zones section, shown in the park office Staff tab
+function zonesSectionHtml(){
+  let h = `<section id="zonesSection">`;
+  h += `<h3>Work zones</h3>`;
   if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
   else h += `<div class="meta">Zones group keepers with the exhibits and stores around them. Draw one to split the park into work areas.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="zoneTool">Draw a zone</button><button class="btn" data-action="supplyToggle">${supplyOn ? "Hide" : "Show"} supply lines</button></div></section>`;
@@ -201,6 +218,7 @@ panelEl.addEventListener("change", ev => {
 
 // A zone's theme tints the ground and styles what gets built inside it; the button restyles what is already there
 function zoneThemeHtml(z){
+  if(!devMode()) return "";
   const key = THEMES[z.theme] ? z.theme : "genesis", T = THEMES[key], plan = zoneThemePlan(z, key);
   let h = `<section><h3>Theme</h3><label class="field"><span>Zone style</span><select id="zoneThemeSel">${Object.entries(THEMES).map(([k, X]) => `<option value="${k}"${k === key ? " selected" : ""}${themeHave(k) ? "" : " disabled"}>${esc(X.label)}${themeHave(k) ? "" : ` (${esc(X.unlock.hint)})`}</option>`).join("")}</select></label>`;
   h += `<div class="meta" style="margin-top:4px">${key === "genesis" ? "Pick a theme to tint this part of the map and style new paths, buildings and exhibits built here." : `${esc(T.blurb)} New builds inside this zone use it.`}</div>`;

@@ -15,17 +15,20 @@ const ui = {
     $("#roMoney").classList.toggle("neg", state.money < 0);
     set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
-    set("clock", fmtClock(state.minute));
-    set("dayLabel", `Day ${state.day} · ${weatherNow().label}`);
+    set("clock", fmtClock(clockMin()));
+    $("#closedTag").hidden = !state.parkClosed;
+    const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; drawLights(); }
+    set("dayLabel", `${fmtDate(state.day)} · ${weatherNow().label}`);
     set("parkName", state.name);
     const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
     if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
-    $("#dayFill").style.width = ((state.minute - OPEN_MIN) / (CLOSE_MIN - OPEN_MIN) * 100).toFixed(1) + "%";
+    $("#dayFill").style.width = (state.minute / DAY_MIN * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
     if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 16); $("#rating").setAttribute("aria-label", `${r} stars`); }
   },
 
   panel(){
+    if(document.querySelector(".app.focus")) return;
     const it = selItem();
     if(sel && !it) sel = null;
     let h;
@@ -36,6 +39,7 @@ const ui = {
     else if(sel.kind === "fence") h = fenceLineHtml(it);
     else if(sel.kind === "guest") h = guestHtml(it);
     else if(sel.kind === "staff") h = staffHtml(it);
+    else if(sel.kind === "animal") h = animalHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
@@ -44,6 +48,7 @@ const ui = {
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
+    if(sel && sel.kind === "animal") animalLive(true);
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
   },
 
@@ -74,21 +79,31 @@ let officeTab = "office";   // which tab the park office shows
 function grantsHtml(goal){
   const n = state.goalsDone.length;
   let h = goal
-    ? `<div class="card goal"><div class="step">Grant ${GOALS.indexOf(goal) + 1} of ${GOALS.length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Grant ${grantPrize(goal)}</div></div>`
+    ? `<div class="card goal"><div class="step">Grant ${activeGoals().indexOf(goal) + 1} of ${activeGoals().length}</div><b>${esc(goal.text)}</b><div class="meta">${esc(goal.hint)}</div><div class="reward">Grant ${grantPrize(goal)}</div></div>`
     : `<div class="card goal"><div class="step">All grants awarded</div><b>Keep growing your park</b><div class="meta">Try for 5 stars, or see how many guests you can bring in.</div></div>`;
-  h += `<section><h3>Grants <span class="num">${n} of ${GOALS.length}</span></h3><ul class="checklist">${GOALS.map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
+  h += `<section><h3>Grants <span class="num">${activeGoals().filter(g => state.goalsDone.includes(g.id)).length} of ${activeGoals().length}</span></h3><ul class="checklist">${activeGoals().map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
   return h;
+}
+function officeTabs(){
+  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Money", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
+}
+function mainMenuHtml(){
+  return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
+    <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
+    <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
+    <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
+    <div class="row"><button class="btn" data-action="howTo">How to play</button><button class="btn danger" data-action="restart">Restart</button></div>`;
 }
 function overviewHtml(){
   const d = derived, t = state.today, goal = currentGoal();
-  let h = `<h2>${esc(state.name)}</h2>`;
-
-  h += tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#B8860B"}], officeTab);
+  if(officeTab === "menu") return mainMenuHtml();
+  let h = `<h2 id="officeTitle">${esc(state.name)}</h2>`;
+  h += officeTabs();
   if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
 
+  if(officeTab === "money"){
   const c = dailyCosts();
-  const inc = t.tickets + t.food + t.shop;
   h += `<section><h3>Today so far</h3><dl class="kv">
     <dt>Guests</dt><dd>${t.guests.toLocaleString()}</dd>
     <dt>Tickets</dt><dd>${money(t.tickets)}</dd>
@@ -96,9 +111,17 @@ function overviewHtml(){
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Research and expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
     ${t.supplies ? `<dt>Food and gift stock</dt><dd>−${money(t.supplies)}</dd>` : ""}
-    <dt class="sum">Bills at closing</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
+    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
   </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
+  h += logiOverviewHtml();
+  const expected = Math.round(d.demand);
+  h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
+    <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
+
+    return h;
+  }
+  if(officeTab === "science"){
   // science at a glance
   const sc = state.science;
   if(["oracle", "ghost", "tar", "ceres"].some(hasDept)){
@@ -107,17 +130,22 @@ function overviewHtml(){
     h += `<section><h3>Science</h3><ul class="deptlist">
       ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} unlocked.`)}
       ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.crew.temporal} teams out. Next back in ${leftText(next(sc.trips))}.` : `${sc.crew.temporal} team${sc.crew.temporal === 1 ? "" : "s"} home and ready.`)}
-      ${line("tar", sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : sc.ready.length ? `${sc.ready.length} clone${sc.ready.length === 1 ? "" : "s"} waiting for an exhibit.` : "Incubators empty.")}
+      ${line("tar", sc.clones.some(c => c.failed) ? `${sc.clones.filter(c => c.failed).length} failed clone${sc.clones.filter(c => c.failed).length === 1 ? "" : "s"} to discard.` : sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : sc.ready.length ? `${sc.ready.length} clone${sc.ready.length === 1 ? "" : "s"} waiting for an exhibit.` : "Incubators empty.")}
       ${line("ceres", state.ceres.beds.length ? `${state.ceres.beds.length} batch${state.ceres.beds.length === 1 ? "" : "es"} growing. Next ready in ${leftText(next(state.ceres.beds))}.` : "Beds empty.")}
     </ul></section>`;
   }
 
+    if(!["oracle", "ghost", "tar", "ceres"].some(hasDept)) h += `<section><h3>Science</h3><div class="meta">Build a science department to start research.</div></section>`;
+    return h;
+  }
+  if(officeTab === "guests"){
   h += guestsOverviewHtml();
-  h += logiOverviewHtml();
-  const expected = Math.round(d.demand);
-  h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
-    <div class="meta" style="margin-top:6px">Guests think about ${money(Math.round(d.fair))} is fair at your rating. ${state.ticket > d.fair * 1.3 ? "At this price fewer come, and the ones who do complain." : state.ticket < d.fair * .7 ? "Cheap tickets bring more guests but less money each." : ""} Right now you can expect about <b>${expected.toLocaleString()}</b> guests a day.</div></section>`;
+    return h;
+  }
 
+  h += `<section><h3>Gate</h3><div class="row"><button class="btn${state.parkClosed ? " primary" : ""}" data-action="toggleClosed">${state.parkClosed ? "Open the park" : "Close park"}</button></div>
+    <div class="meta" style="margin-top:6px">${state.parkClosed ? "The park is closed: no new guests, no tickets, and everyone inside is heading for the exit. Wages and upkeep still run." : "The park is open round the clock, busiest by day, with a thin trickle of guests at night. Close it to send everyone home."}</div></section>`;
+  h += `<section><h3>Park name</h3><label class="field"><span>Name</span><input id="officeName" maxlength="40" value="${esc(state.name)}"></label></section>`;
   h += `<section><h3>Rating ${starsSvg(state.rating, 15)} <span class="num">${starTxt(state.rating)}</span></h3>`;
   if(!d.parts.length) h += `<div class="meta">Your park needs animals before it can earn stars.</div>`;
   for(const p of d.parts){
@@ -130,9 +158,10 @@ function overviewHtml(){
 
   if(state.history.length){
     const rows = state.history.slice(-7).reverse();
-    h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Day</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${r.day}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
+    h += `<section><h3>Recent days</h3><table class="hist"><thead><tr><th>Date</th><th>Guests</th><th>Earned</th><th>Profit</th></tr></thead><tbody>${rows.map(r => `<tr><td>${fmtDate(r.day)}</td><td>${r.guests.toLocaleString()}</td><td>${money(r.income)}</td><td class="${r.net >= 0 ? "pos" : "neg"}">${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>`).join("")}</tbody></table></section>`;
   }
 
+  h += `<div class="row" style="margin-top:12px"><button class="btn" data-action="otab2" data-k="menu">Main Menu</button></div>`;
   h += themesOverview();
   return h;
 }
@@ -146,6 +175,7 @@ function themeOptions(kind, it){
   }).join("");
 }
 function themeHtml(kind, it){
+  if(!devMode()) return "";
   const T = themeOf(it);
   let h = `<section><h3>Theme</h3><label class="field"><span>Style</span><select id="themeSel">${themeOptions(kind, it)}</select></label>`;
   if(kind !== "exhibit") h += `<div class="meta" style="margin-top:4px">${esc(T.blurb)} Changing it has no refund.</div>`;
@@ -160,6 +190,7 @@ function themeHtml(kind, it){
   return h + `</section>`;
 }
 function themesOverview(){
+  if(!devMode()) return "";
   let h = `<section><h3>Themes</h3><label class="field"><span>Build new things as</span><select id="brushSel">${themeOptions("", null)}</select></label>`;
   h += `<ul class="issues" style="margin-top:6px">${Object.entries(THEMES).map(([k, T]) => `<li class="${themeHave(k) ? "" : "bad"}">${esc(T.label)}: ${themeHave(k) ? "unlocked." : esc(T.unlock.hint)}${T.fits.length ? ` Suits ${T.fits.map(id => esc(SPECIES_BY_ID[id].name)).join(", ")}.` : ""}</li>`).join("")}</ul>`;
   return h + `<div class="meta" style="margin-top:4px">Match an exhibit with the paths, shops and restrooms near it for an appeal bonus. Animals that suit a theme are happier. Tap any path, building or exhibit to change its theme.</div></section>`;
@@ -186,11 +217,12 @@ function exhibitHtml(e){
   if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
+  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"animals", label:"Animals", color:"#4E7F2E"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
   if((exTabs.tab === "land" || exTabs.tab === "props") && e.viv) exTabs.tab = "main";
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
@@ -201,7 +233,7 @@ function exhibitHtml(e){
       <div class="meta" style="margin-top:4px">${Math.abs(trend) < 2 ? "Holding steady." : trend > 0 ? `Rising toward ${Math.round(rep.target)}%.` : `Falling toward ${Math.round(rep.target)}%.`}</div>`;
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
-    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
+    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
       ${movesHtml(e)}
       <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
       <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
@@ -210,7 +242,7 @@ function exhibitHtml(e){
   // barriers, moats, and aviary netting
   if(!e.viv){
     const cur = e.barrier || "wood";
-    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).map(([key, b]) => {
+    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).filter(([key, b]) => !b.deco || key === cur).map(([key, b]) => {
       const locked = b.tech && !hasTech(b.tech), cost = key === cur ? 0 : upgradeCost(e, key);
       return `<option value="${key}"${key === cur ? " selected" : ""}${locked ? " disabled" : ""}>${b.label}, strength ${b.strength}${locked ? " (research at ORACLE)" : key === cur ? " (current)" : cost ? `, ${money(cost)}` : ", free"}</option>`;
     }).join("")}</select></label>`;
@@ -245,7 +277,7 @@ function exhibitHtml(e){
   }
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
-    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until day ${state.staff.feedFrom}.` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
   }
   h += `</section>`;
 
@@ -258,13 +290,13 @@ function cloneHtml(e, rep){
   const sc = state.science;
   let h = "";
   if(sc.ready.length){
-    h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
+    h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${sexMark(r)} ${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
-  const ready = SPECIES.filter(s => sc.dna[s.id] && sc.dna[s.id].genome >= 100 && fitsHabitat(s, e));
-  const forSale = SPECIES.filter(s => isStarter(s) && fitsHabitat(s, e));
+  const ready = SPECIES.filter(s => speciesAvailable(s.id) && cloneOpen(s.id) && fitsHabitat(s, e));
+  const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
   h += `<section><h3>Add animals</h3>`;
-  if(coming.length) h += `<div class="meta" style="margin-bottom:8px">Growing for this exhibit: ${coming.map(c => `${esc(SPECIES_BY_ID[c.sp].name)} (${whenText(c.end)})`).join(", ")}.</div>`;
+  if(coming.length) h += `<div style="margin-bottom:8px">${coming.map(c => cloneCard(c)).join("")}</div>`;
   if(!ready.length && !forSale.length){
     h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
       : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
@@ -282,13 +314,18 @@ function cloneHtml(e, rep){
 function biomeHtml(e){
   let h = "";
   const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
+  const fits = () => kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
+    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
+  if(!e.viv){
+    // open exhibits are painted with the Paint Ground tool; the biome with the most ground wins
+    const sh = paintShare(e), parts = Object.entries(sh.counts).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${esc(BIOMES[k].label)} ${Math.round(n / sh.n * 100)}%`).join(", ");
+    return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button><p class="meta">The biome with the most ground in the exhibit is the one the animals and plants count.</p>${fits()}</section>`;
+  }
   h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
     const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
     return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
   }).join("")}</select></label>`;
-  h += kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
-    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
-  h += `</section>`;
+  h += fits() + `</section>`;
   return h;
 }
 // A vivarium's plants: the biome's plants by period (the animals' own periods first), what's in there, and a remove button for each
@@ -311,6 +348,7 @@ function vivPlantsHtml(e){
 // Vivarium enrichment: pick one from the list and it's set in the glass wherever there's room
 const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy);
 function vivToysHtml(e){
+  if(!devMode()) return "";
   const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy), need = enrichNeed(e), have = toyPoints(e);
   let h = `<section><h3>Enrichment</h3><div class="meta">Things to hide under, climb, dig in and hunt from. Bored animals with nothing to do pace.</div>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
@@ -356,8 +394,11 @@ function landHtml(e){
   const lb = landTabs.biome, periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][lb]);
   if(!periods.includes(landTabs.period)) landTabs.period = periods[0];
   const lp = landTabs.period;
-  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("");
-  const plantBtns = PLANTS_OF[lp][lb].concat(lp === "Quaternary" ? PARK_PLANTS_OF[lb] || [] : []).map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
+  // each rock kind: its place button, then a Random button and one thumbnail per picture of this biome's stone (the same pickers as the build menu)
+  const rockBtns = ROCKS.map(k => { const t = LAND[k], why = landLock(t), list = (ROCK_SPRITES[lb] || {})[k] || [], sel = rockPicOf(k, lb);
+    const shapes = list.length ? `<div class="shapes" style="padding:4px 0 0"><button class="shape rnd" data-action="rockShape" data-type="${k}" data-pic="" aria-pressed="${sel == null}" title="Random shape">?</button>${list.map((_, i) => `<button class="shape" data-action="rockShape" data-type="${k}" data-pic="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${k}-${lb}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("")}</div>` : "";
+    return `<div style="width:100%;margin-bottom:6px"><button class="btn" data-action="landTool" data-key="${k}" data-biome="${lb}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}</button>${shapes}</div>`; }).join("");
+  const plantBtns = PLANTS_OF[lp][lb].concat(lp === "Quaternary" ? PARK_PLANTS_OF[lb] || [] : []).map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${PLANT_SPRITES[k] ? `<img src="${spriteUrl(`sprites/plants/${k}.png`)}" alt="" style="height:22px;vertical-align:middle;margin-right:4px;image-rendering:pixelated">` : ""}<b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("");
   const sub = ["plants", "rocks", "water"].includes(landTabs.sub) ? landTabs.sub : "plants";
   const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
   const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
@@ -375,7 +416,7 @@ function propsHtml(e){
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
   let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
-    const list = HABITAT_PROPS.filter(isToy), counts = speciesCounts(e);
+    const list = HABITAT_PROPS.filter(k => isToy(k) && !toyHidden(k)), counts = devMode() ? speciesCounts(e) : [];
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to chase, chew, rub on and dig through keeps animals busy. Bored animals with nothing to do pace. Some toys only interest some diets, and frozen treats and hay bales get used up.</div>`;
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
@@ -383,8 +424,8 @@ function propsHtml(e){
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
   }
   if(sub === "shelters"){
-    const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k));
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold.</div>`;
+    const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies don't help in the cold. Animals walk in to hide, sleep and wait out bad weather, as many as the shelter has room for, and guests can't see them while they are inside. A Privacy Screen (${SCREEN.holds} animals each, within ${SCREEN.fenceReach} m of the fence) blocks their view of the path: shy animals stress less, hooligans bang on the glass far less, and the animals stay in sight. Stressed animals head for a shelter and calm down much faster inside.</div>`;
     if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
       h += `<div class="meta" style="margin-top:6px">Shelters cover ${c.shelter} of the ${c.need} slots these animals take${c.idle ? `, and ${c.idle} slots of room can't be used by them` : ""}${c.shade ? `, and groves add ${Math.round(c.shade)} more today` : ""}. Bigger animals take more, and each shelter only takes animals up to its size (burrows only take the burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf). Today: ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, and ${Math.round(x * 100)}% of the herd has no cover` : ", and everyone has cover") : ""}. Tomorrow: ${esc(weatherNext().label.toLowerCase())}.</div>`; }
     return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
@@ -402,7 +443,7 @@ function propsHtml(e){
 }
 
 // Behavior tab: what the animals are doing, how each species' needs stand, and what's stressing them
-const ACTIVE_TEXT = {diurnal:"Up all day.", nocturnal:"Sleeps through most of the day. Busiest at opening and closing.", crepuscular:"Busiest in the first and last two hours of the day, and drowsy in between."};
+const ACTIVE_TEXT = {diurnal:"Up all day, asleep at night.", nocturnal:"Sleeps through the day. Up all night.", crepuscular:"Busiest at dawn and dusk, and drowsy in between."};
 const SOCIAL_TEXT = {solitary:"Wants no company, and rivals need room to keep apart.", pair:"Wants a partner of its own kind.", herd:"Feels safe in a herd, and nervous with too few.", pack:"Lives in a pack. Left alone it paces."};
 const TEMPER_TEXT = {skittish:"Busy paths stress it. Cover to retreat to helps.", curious:"Bores fast, loves to play, and likes watching people.", aggressive:"Crowding stresses it, and a stressed one tests the fence."};
 function behaviorHtml(e){
@@ -411,18 +452,31 @@ function behaviorHtml(e){
   let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
   h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
   h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Exhibit tab), plants from their own period" : "enrichment props (Habitat Props), the rocks, plants and water they like"}, and room to roam.</div></section>`;
+  if(!e.viv){
+    const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
+    h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;
+    h += `<div class="meta" style="margin-top:4px;color:${gone > HIDING.from ? "var(--bad)" : "inherit"}">${gone > HIDING.from ? `${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests who see an empty exhibit are let down, though well-informed ones forgive it.` : "Most of the animals are out where guests can see them."}</div>`;
+    h += `<div class="meta" style="margin-top:4px">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%${quietSigns(e).length ? `, with ${quietSigns(e).length} quiet sign${quietSigns(e).length === 1 ? "" : "s"} by the fence` : ""}${screenShare(e) ? `, ${Math.round(screenShare(e) * 100)}% of the herd behind a privacy screen` : ""}. ${shy ? "Shy animals feel it most. " : ""}Animals inside a shelter are out of sight, sleeping at night doesn't count against you, and weather shelter only a little.</div></section>`;
+  }
+  const soc = [...ctx.soc.values()];
+  if(soc.length) h += `<section><h3>Social</h3>${soc.map(i => `<div class="meta" style="color:${i.bad ? "var(--bad)" : "var(--good)"}">${esc(i.text)}</div>`).join("")}</section>`;
   for(const [sp, c] of speciesCounts(e)){
     const s = SPECIES_BY_ID[sp], t = traitsOf(s), list = e.animals.filter(a => a.sp === sp), aw = awake(s);
     h += `<section><h3><span class="dot" style="background:${PERIOD_COLOR[s.period]};display:inline-block;margin-right:6px"></span>${esc(s.name)} × ${c}</h3>`;
     h += `<div class="meta">${esc(traitText(s))}. ${aw >= .9 ? "Wide awake now." : aw >= .5 ? "A little drowsy now." : "Mostly asleep now."}</div>`;
+    if((t.social === "herd" || t.social === "pack") && !e.viv && list.length > 1) h += `<div class="meta" style="margin-top:2px">Alpha: ${esc(list.slice().sort(byRank)[0].name || "?")}.</div>`;
     h += `<div class="meta" style="margin-top:2px">${ACTIVE_TEXT[t.active]} ${SOCIAL_TEXT[t.social]} ${TEMPER_TEXT[t.temper]}</div>`;
     h += `<div style="margin-top:6px">${NEED_KEYS.map(k => { const v = list.reduce((n, a) => n + needsOf(a)[k], 0) / list.length; return `<div class="factor" style="grid-template-columns:90px 1fr 44px"><span>${NEED_TEXT[k]}</span>${meter(v, col(v))}<span>${Math.round(v)}%</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">${esc(actsSummary(list))}.</div>`;
-    const pacing = list.filter(a => a.act === "pace");
-    if(pacing.length){ const why = pacing[0].why || "bored"; h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Pacing because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[why]}. ${esc(WHY_FIX[why])}</div>`; }
     const worst = list.reduce((m, a) => needsOf(a).stress > needsOf(m).stress ? a : m, list[0]), why = [];
     stressTarget(e, worst, s, ctx, why);
-    if(needsOf(worst).stress >= 30 && why.length) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Stressed because ${esc([...new Set(why)].join(", "))}.</div>`;
+    const reasons = [...new Set(why)], stressed = needsOf(worst).stress >= 30;
+    const pacing = list.filter(a => a.act === "pace");
+    if(pacing.length){
+      const pw = pacing[0].why || "bored";
+      h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Pacing because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[pw]}.${pw === "stressed" ? "" : " " + esc(WHY_FIX[pw])}</div>`;
+    }
+    if(stressed) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">${reasons.length ? `Stressed because ${esc(reasons.join(", "))}.` : "Stress is still draining from something earlier (a fight, a scare or a sick herd mate) and nothing in the exhibit is adding to it now. It should ease on its own."}</div>`;
     h += `</section>`;
   }
   return h;
@@ -445,7 +499,7 @@ function healthHtml(e){
   if(!e.animals.length && !away.length) return "";
   const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
   let h = `<section><h3>Health</h3>`;
-  if(!healthActive()) items.push(hli("ok", `Animals start falling ill on day ${state.health.from}.`));
+  if(!healthActive()) items.push(hli("ok", `Animals start falling ill on ${fmtDate(state.health.from)}.`));
   if(hr.sick.length){
     const worst = Math.max(...hr.sick.map(a => a.sick.sev));
     items.push(hli(worst >= 40 ? "bad" : "warn", `${hr.sick.length} sick or injured.`));
@@ -472,8 +526,8 @@ function healthHtml(e){
   if(e.animals.length && hasTech("genetherapy")){
     const low = e.animals.filter(a => (a.q ?? 90) < 100);
     h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
-      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${genomeDone(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${genomeDone(a.sp) ? "Lab genome isn't better" : "Needs full genome"}</span>`}</li>`; }).join("")}</ul>`;
-    h += `<div class="meta">A vet rewrites the animal's DNA up to the lab's quality for its species, at most ${GENE.step} points a go. To go further, send GHOST for better samples. Healthier DNA means fewer illnesses.</div>`;
+      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${cloneOpen(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${cloneOpen(a.sp) ? "Lab genome isn't better" : `Needs ${CLONE_GENOME.min}% genome`}</span>`}</li>`; }).join("")}</ul>`;
+    h += `<div class="meta">A vet rewrites the animal's DNA up to what the lab's genome gives a clone today, at most ${GENE.step} points a go. To go further, send GHOST for more of the genome. Healthier DNA means fewer illnesses.</div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){
@@ -508,6 +562,8 @@ function openMoveDialog(e, sp){
   $("#moveGo").onclick = () => {
     const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
     const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n); ui.toast(`${made} ${s.name} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
+    const mix = mixWarning(s, to);
+    if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
     if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
     else go();
   };
@@ -533,10 +589,10 @@ function animalCard(s, rep, mode){
   if(locked) h += `<span class="meta">Needs ${starsNeed(s)}★ (you have ${starTxt(state.rating)})</span>`;
   else if(mode === "clone"){
     const why = cloneProblem(s.id);
-    h += `<button class="buy" data-action="clone" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone ${money(s.price)}</button>`;
-  } else h += `<button class="buy" data-action="buy" data-sp="${s.id}"${canAfford(s.price) ? "" : " disabled"}>${money(s.price)}</button>`;
+    h += `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>`;
+  } else { const off = canAfford(s.price) ? "" : " disabled"; h += `<button class="buy" data-action="buy" data-sex="male" data-sp="${s.id}"${off}>Buy M ${money(s.price)}</button><button class="buy" data-action="buy" data-sex="female" data-sp="${s.id}"${off}>Buy F ${money(s.price)}</button>`; }
   h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
-  if(mode === "clone") h += ` DNA quality ${state.science.dna[s.id].quality}%. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
+  if(mode === "clone") h += ` Genome ${state.science.dna[s.id].genome}% complete, clones ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% failure risk` : ""}. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
   h += `</span>`;
   if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build TAR to clone it.</span>`;
   else if(mode === "clone" && !dept("tar")) h += `<span class="warn">TAR isn't connected to a path or service road.</span>`;
@@ -566,7 +622,7 @@ function stationHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>` + zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
   h += staffNote("keeper");
-  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until day ${state.staff.feedFrom}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
+  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until ${fmtDate(state.staff.feedFrom)}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
   h += `</section>`;
@@ -620,11 +676,11 @@ function pmcHtml(b){
   h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
   h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
   h += `<div class="meta" style="margin-top:6px">Patients don't get worse here. Each treatment uses ${HEALTH.dose} doses.</div></section>`;
-  const cm = Math.floor(state.health.cmeds || 0);
-  h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / MODERN.stock * 100, "#B0384F")}<span>${cm}/${MODERN.stock}</span></div>`;
-  h += `<div class="meta" style="margin-top:4px">Suppliers restock it every night at ${money(MODERN.cost)} a dose. It eases any illness but never cures it fully: animals go home with a chronic case. It works best on Cenozoic animals and worst on Paleozoic ones.</div>`;
+  const cm = Math.floor(pmcStock(CMED));
+  h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
+  h += `<div class="meta" style="margin-top:4px">Order it at a Delivery Dock, ${money(MODERN.cost)} a dose, and custodians carry it here. It eases any illness but never cures it fully: animals go home with a chronic case. It works best on Cenozoic animals and worst on Paleozoic ones.</div>`;
   h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "fully curable once ORACLE refines the medicine for their period" : `contemporary medicine gets them to ${100 - MODERN.floor[era]}% at best. Research ${ERA_LABEL[era]} medicine at ORACLE, and refine it for each period, for a full cure`}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(state.ceres.meds || 0)} of ${medCap()}. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:6px"><span>On site</span>${meter(pmcStock() / storeCap(b) * 100, "#B0384F")}<span>${Math.floor(pmcStock())}/${storeCap(b)}</span></div>` : ""}</section>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())} of ${medCap()}. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
@@ -640,6 +696,10 @@ function greenhouseHtml(b){
 }
 
 function depotHtml(b){
+  if(!devMode()){
+    const k = knownCond(b);
+    return deptHead(b) + zoneRow("building", b) + `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div><div class="meta">Wears about ${VEHICLES.wear}% a day. A mechanic keeps it up.</div>`;
+  }
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.depot.blurb)}</div>` + zoneRow("building", b);
   const working = depotWorking(b), k = knownCond(b);
   h += `<div class="row" style="margin-top:6px"><span class="status ${working ? "ok" : "no"}">${!hasTech("vehicles") ? "Needs research" : working ? `${VEHICLES.perDepot} ATVs on site` : "ATVs grounded"}</span></div>`;
@@ -747,6 +807,11 @@ panelEl.addEventListener("click", e => {
     state.tramFare = clamp(tramFare() + (+b.dataset.d), 1, TRAM.maxFare);
     recompute(); ui.panel(); saveSoon(); return;
   }
+  if(a === "toggleClosed"){
+    state.parkClosed = !state.parkClosed;
+    ui.toast(state.parkClosed ? "Park closed. Guests are heading for the exit." : "Park open again.", state.parkClosed ? "bad" : "good");
+    ui.hud(); ui.panel(); saveSoon(); return;
+  }
   if(a === "ticket"){
     state.ticket = clamp(state.ticket + (+b.dataset.d), 1, 150);
     recompute(); ui.panel(); saveSoon(); return;
@@ -761,13 +826,20 @@ panelEl.addEventListener("click", e => {
       return;
     }
   }
+  // putting a predator in with its prey (or prey in with one) needs a yes first
+  if((a === "buy" || a === "clone" || a === "place") && it && sel.kind === "exhibit" && b.dataset.sureMix !== "1"){
+    const sp = a === "place" ? (sc.ready.find(r => r.id === b.dataset.id) || {}).sp : b.dataset.sp, s = SPECIES_BY_ID[sp], w = s && mixWarning(s, it);
+    if(w){ askConfirm(`Predator and prey`, w, "Yes, mix them", () => { b.dataset.sureMix = "1"; b.click(); }); return; }
+  }
   if(a === "moat"){ const c = moatCost(it); if(canAfford(c)){ spend(c, "built"); it.moat = true; done(); } return; }
   if(a === "aviary"){ const c = aviaryCost(it); if(canAfford(c)){ spend(c, "built"); it.aviary = true; done(); } return; }
   if(a === "net"){ const c = netCost(it); if(canAfford(c)){ spend(c, "built"); it.net = true; done(); } return; }
   if(a === "netOff"){ it.net = false; done(); return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
+  if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
+  if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; ui.panel(); return; }
   if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "vivPlant"){ const why = vivPlantProblem(it, b.dataset.key); if(why){ ui.toast(why, "bad"); return; } addVivPlant(it, b.dataset.key); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
@@ -775,12 +847,15 @@ panelEl.addEventListener("click", e => {
   if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }
+  if(a === "animalOpen"){ const an = animalById(b.dataset.id); if(an){ animalSelName = an.name; select("animal", an.id); } return; }
+  if(a === "animalBack"){ select("exhibit", b.dataset.id); return; }
+  if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null)) done(); return; }
+  if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
@@ -795,6 +870,8 @@ panelEl.addEventListener("click", e => {
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
+  if(a === "howTo"){ $("#dlgIntro").showModal(); return; }
+  if(a === "restart"){ askConfirm("Restart?", "This leaves the park you're in and returns to the start screen. Anything not saved is lost, and a new park replaces your save when you start it.", "Restart", () => { setSpeed(0); showStart(); }); return; }
   if(a === "gotoDept"){ const d = state.buildings.find(x => x.type === b.dataset.t); if(d) select("building", d.id); return; }
   if(!it) return;
   if(a === "center") centerOn(it);
@@ -803,7 +880,8 @@ panelEl.addEventListener("click", e => {
     if(!canAfford(s.price) || state.rating + 1e-9 < starsNeed(s)) return;
     spend(s.price, "animals");
     if(!it.animals.length) it.happy = 70;
-    it.animals.push({id:uid("a-"), sp:s.id});
+    const sex = b.dataset.sex === "male" || b.dataset.sex === "female" ? b.dataset.sex : undefined;
+    it.animals.push(nameAnimal({id:uid("a-"), sp:s.id, ...(sex ? {sex} : {})}));
     afterChange(); render();
   }
   if(a === "sell"){
@@ -855,6 +933,7 @@ panelEl.addEventListener("change", ev => {
   if(ev.target.id !== "barrierSel") return;
   const e = selItem(), key = ev.target.value; if(!e) return;
   const b = BARRIERS[key], cost = upgradeCost(e, key);
+  if(b.deco){ ui.toast(DECO_WHY, "bad"); ui.panel(); return; }
   if((b.tech && !hasTech(b.tech)) || !canAfford(cost)){ ui.toast(!canAfford(cost) ? `That costs ${money(cost)}.` : "Research it at ORACLE first.", "bad"); ui.panel(); return; }
   spend(cost, "built"); if(e.grid) refenceExhibit(e, key); else e.barrier = key;
   ui.toast(`${e.name} now has ${b.label.toLowerCase()}${cost ? ` (${money(cost)})` : ""}.`);
@@ -878,9 +957,9 @@ function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
-  if(d && d.genome >= 100) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome complete. Clone at TAR for ${money(s.price)}. DNA quality ${d.quality}%.`, lock};
+  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at TAR for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete, quality ${d.quality}%. Send GHOST for more.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send GHOST for more.`, lock};
   if(researching("species", s.id)) return {group:"progress", cls:"wait", how:`ORACLE is unlocking it now. ${leftText(sc.projects.find(p => p.kind === "species" && p.id === s.id).end)} left.`, lock};
   if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Unlocked. Send GHOST to collect its DNA.`, lock};
   return {group:"locked", cls:"no", how:`Unlock it at ORACLE (${unlockPoints(s)} research points), then send GHOST.`, lock};
@@ -892,7 +971,7 @@ function catalogHtml(){
   const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
   let h = "", shown = 0;
   for(const per of order){
-    const list = SPECIES.filter(s => s.period === per).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
+    const list = SPECIES.filter(s => s.period === per && speciesAvailable(s.id)).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
     if(!list.length) continue;
     shown += list.length;
     const p = PERIOD_BY_ID[per];

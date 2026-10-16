@@ -10,10 +10,14 @@
 // A parcel costs its area times the rate for its ring, and can be bought once it touches land you own.
 const PARCELS = {
   xs:[-280,-140,0,140,280,420,560,700],
-  ys:[-200,-100,0,100,200,305,405,505],
+  ys:[-200,-100,0,100,200,305],  // 305 is the entrance line (state.gate): nothing is for sale south of it
   home:[0,0,420,305],
   rates:[0, 0.8, 1.4],  // dollars per m² by ring (1 touches the home plot, 2 is the next one out)
 };
+
+const MAX_PARCELS = 15;  // most plots a park can buy
+// Rows south of the entrance line. Never for sale; only here so old saves that bought them keep their land.
+const LEGACY_SOUTH_YS = [405, 505];
 
 const START = {
   money: 150000,
@@ -22,15 +26,27 @@ const START = {
 };
 
 // How fast time passes. At 1x speed, one real second is this many park minutes.
-// The park is open 8:00 AM to 8:00 PM (720 minutes), so 12 means a day lasts 60 seconds.
-const MINUTES_PER_SECOND = 12;
+// The park is open 8:00 AM to 8:00 PM (720 minutes), so 3 means a day lasts 240 seconds.
+const MINUTES_PER_SECOND = 3;
 
-// How fast people walk on screen at 1x speed, in meters per real second. Guests, keepers, and mechanics all use it.
-const WALK_SPEED = 40;
+// How fast full-pace walkers go on screen at 1x speed, in meters per real second at the OLD 6 minutes a second (half that now, with 3). Guests, keepers, and mechanics all use it.
+const WALK_SPEED = 20;
 // The same speed in meters per park minute, which is what the simulation counts in
-const WALK_PER_MIN = WALK_SPEED / MINUTES_PER_SECOND;
-const OPEN_MIN = 8 * 60, CLOSE_MIN = 20 * 60;
-const DAY_MIN = CLOSE_MIN - OPEN_MIN;   // park minutes in one open day. Research, trips, and growing are counted in these.
+const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, so a longer day doesn't change how far anyone gets in a park minute (on screen that halves WALK_SPEED)
+// Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN (1 = the old sim speed; the longer day is what slows them on screen)
+const STAFF_PACE = 1;
+// The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
+const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
+// Time runs around the clock. The sim counts in PARK minutes (DAY_MIN of them make one day, MINUTES_PER_SECOND a second on screen, so a day is still 240 s);
+// the 24 h clock is only how a park minute is shown: CLOCK_SCALE clock minutes each. state.minute is park minutes since the daily rollover,
+// which happens at ROLLOVER_HOUR on the clock (endDay and every *Night function run then). clockMin/minuteAtClock (sim.js) convert.
+const DAY_MIN = 720;                    // park minutes in one day. Research, trips, and growing are counted in these.
+const CLOCK_SCALE = 1440 / DAY_MIN;     // clock minutes in a park minute
+const ROLLOVER_HOUR = 4;                // the quiet hour the day turns over: weather rolls, bills are paid, staff reset
+const ROLLOVER_CLOCK = ROLLOVER_HOUR * 60;
+// Daylight on the clock (animals' awake schedules, the night wash on the map). Park-minute versions DAWN_MIN/DUSK_MIN are state.minute values.
+const DAWN_CLOCK = 6 * 60, DUSK_CLOCK = 20 * 60;
+const DAWN_MIN = (DAWN_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE, DUSK_MIN = (DUSK_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE;
 
 // Building costs
 const COST = {
@@ -239,17 +255,16 @@ const VIVARIUMS = {
 //   trip       what one expedition costs for a mid-size animal
 //   days       how long an expedition takes, in open days
 //   risk       extra chance an expedition comes back with nothing. Big animals add more (see TRIP).
-//   quality    [worst, best] DNA quality a sample can have. Deeper time gives worse DNA.
 const TIME_PERIODS = [
-  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05, quality:[70,100]},
-  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07, quality:[65,98]},
-  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10, quality:[60,96]},
-  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15, quality:[55,95]},
-  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15, quality:[50,90]},
-  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12, quality:[45,88]},
-  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12, quality:[40,85]},
-  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10, quality:[35,80]},
-  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10, quality:[30,75]},
+  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05},
+  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07},
+  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10},
+  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15},
+  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15},
+  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12},
+  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12},
+  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10},
+  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10},
 ];
 
 // Science staff, hired at their department's building
@@ -297,28 +312,27 @@ const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.
 
 // Events from deep time. GHOST records each one on trips (like a genome: sc.dna[id]), and a finished record unlocks a museum
 // attraction for the Education Center. A trip's place is the event itself, so it carries what a TIME_PERIODS entry does.
-//   ago/trip/days/risk/quality/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
+//   ago/trip/days/risk/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
 //   price/upkeep   installing it in an Education Center, and its cost a day
-//   learn   extra learning a visit gives (0 to 100 per guest), scaled by the record's quality
+//   learn   extra learning a visit gives (0 to 100 per guest)
 //   joy     mood it adds or takes away. appeal: how much keener guests are to visit the center for it
 const MUSEUM_EVENTS = [
-  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, quality:[30,75], space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
+  {id:"ev-oxygen",    name:"Great Oxygenation Event", ago:"2.4 billion years ago",  trip:6500,  days:3,   risk:.20, space:600,  price:6000,  upkeep:60,  learn:6,  joy:1, appeal:4,
    text:"Walk through a glowing blue-green sea as the first oxygen-makers poison the old air and the iron rusts red."},
-  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, quality:[25,70], space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
+  {id:"ev-hadean",    name:"Hadean Earth",            ago:"4.5 billion years ago",  trip:9000,  days:3.5, risk:.25, space:1500, price:9000,  upkeep:90,  learn:7,  joy:3, appeal:9,
    text:"A hall of lava seas, a sky full of rocks, and the Moon hanging huge and close. Nothing lives here yet."},
-  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, quality:[35,80], space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
+  {id:"ev-cambrian",  name:"Cambrian Explosion",      ago:"539 million years ago",  trip:7000,  days:2.5, risk:.15, space:800,  price:8000,  upkeep:80,  learn:8,  joy:3, appeal:8,
    text:"A reef tank of trilobites, spined worms and Anomalocaris, when nearly every kind of body suddenly appeared."},
-  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, quality:[35,80], space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
+  {id:"ev-tetrapods", name:"Evolution of Tetrapods",  ago:"375 million years ago",  trip:5500,  days:2,   risk:.12, space:700,  price:7000,  upkeep:70,  learn:7,  joy:2, appeal:6,
    text:"Follow a Tiktaalik-like fish from the shallows up onto the mud, as fins turn into legs."},
-  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, quality:[40,85], space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
+  {id:"ev-dying",     name:"The Great Dying",         ago:"252 million years ago",  trip:7500,  days:2.5, risk:.18, space:1000, price:9000,  upkeep:90,  learn:10, joy:-3, appeal:7,
    text:"The worst mass extinction there ever was, told in a dim hall of volcanoes and a dying sea. Sobering."},
-  {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, quality:[45,90], space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
+  {id:"ev-kpg",       name:"K-Pg Impact",             ago:"66 million years ago",   trip:8000,  days:2.5, risk:.15, space:1200, price:10000, upkeep:100, learn:9,  joy:1, appeal:12,
    text:"A shaking floor, a fireball overhead, and the end of the dinosaurs. A crowd favorite."},
 ];
 const MUSEUM_BY_ID = Object.fromEntries(MUSEUM_EVENTS.map(e => [e.id, e]));
 const MUSEUM = {
   slots:3,             // attractions one Education Center can show at once
-  minQuality:.6,       // an attraction built on the worst record teaches this share of its learning (the best teaches all of it)
   needTech:"education",// GHOST can start recording events once ORACLE has researched this
 };
 
@@ -365,8 +379,22 @@ const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 const CLONE_DAYS_PER_SPACE = 1000;
 // TAR upgrades, researched at ORACLE: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
-// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level, and quality points added to every sample
-const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5], quality:[0, 8, 16]};
+// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level
+const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
+// Cloning from a partial genome: TAR clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
+// runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
+const CLONE_GENOME = {min:60, q0:40, failMax:.35};
+// Clones from a partial genome can die in the incubator: `failMax` chance at the minimum, none once the genome is whole. A failed clone stops
+// partway (between `failFrom` and `failTo` of its time), keeps its bay and fee, and sits there until the player discards it.
+const CLONE_FAIL = {from:.2, to:.9, causes:[
+  "Embryonic cell cascade failure",
+  "Developmental gene sequence missing from the genome",
+  "Chromosome mismatch in the gap regions",
+  "Zygotic genome activation failed",
+  "Telomere collapse during cell division",
+  "Culture rejected: incomplete regulatory code",
+  "Organ-field patterning arrested",
+]};
 
 // What CERES grows in its beds. Works like TAR's incubators, but with plants.
 //   days    how long one batch takes, in open days
@@ -393,7 +421,9 @@ const PERIOD_COLOR = {
 // walk is how many frames sprites/<id>-walk.png has, side by side, each the same size as the standing picture.
 // idle is how many frames sprites/<id>-idle.png has (same strip format) and ms how long each shows. A picture with both walks on the walk strip and plays idle while it holds still;
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
-const SPRITES = {coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.105}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}};
+// People drawn as pixel figures: each strip is `n` frames of 16 x 32 px side by side, facing right (flipped to face left). `walk` plays while moving (a frame every `step` meters), `work` while standing at a job in `jobs` (a frame every `ms`), and `wait` plays while standing with nothing to do (a frame every `ms`). `h` is how tall the 32 px cell is in meters (about 1.9 m of person; a bit larger than true pixel size so they read).
+const HUMAN_SPRITES = {keeper:{walk:{src:"sprites/human/keeper-walk.png", n:4}, work:{src:"sprites/human/keeper-work.png", n:4, ms:180, jobs:["mucking", "filling"]}, wait:{src:"sprites/human/keeper-wait.png", n:4, ms:450}, carry:{src:"sprites/human/keeper-carry.png", n:4}}, vet:{walk:{src:"sprites/human/vet-walk.png", n:4}, work:{src:"sprites/human/vet-work.png", n:4, ms:180, jobs:["checking", "treating", "darting", "splicing"]}, wait:{src:"sprites/human/vet-wait.png", n:4, ms:450}, carry:{src:"sprites/human/vet-carry.png", n:4}}, mechanic:{walk:{src:"sprites/human/mechanic-walk.png", n:4}, work:{src:"sprites/human/mechanic-work.png", n:4, ms:180, jobs:["repairing", "inspecting"]}, wait:{src:"sprites/human/mechanic-wait.png", n:4, ms:450}, carry:{src:"sprites/human/mechanic-carry.png", n:4}}, guard:{walk:{src:"sprites/human/guard-walk.png", n:4}, work:{src:"sprites/human/guard-escort.png", n:4, ms:180, jobs:["escorting"]}, wait:{src:"sprites/human/guard-wait.png", n:4, ms:450}}, custodian:{walk:{src:"sprites/human/custodian-walk.png", n:4}, work:{src:"sprites/human/custodian-work.png", n:4, ms:180, jobs:["scrubbing", "emptying", "sweeping"]}, wait:{src:"sprites/human/custodian-wait.png", n:4, ms:450}, carry:{src:"sprites/human/custodian-carry.png", n:4}}, guest:{walk:{src:"sprites/human/guest-walk.png", n:4}, wait:{src:"sprites/human/guest-wait.png", n:4, ms:450}}, guest2:{walk:{src:"sprites/human/guest2-walk.png", n:4}, wait:{src:"sprites/human/guest2-wait.png", n:4, ms:450}}, guest3:{walk:{src:"sprites/human/guest3-walk.png", n:4}, wait:{src:"sprites/human/guest3-wait.png", n:4, ms:450}}, guest4:{walk:{src:"sprites/human/guest4-walk.png", n:4}, wait:{src:"sprites/human/guest4-wait.png", n:4, ms:450}}, guest5:{walk:{src:"sprites/human/guest5-walk.png", n:4}, wait:{src:"sprites/human/guest5-wait.png", n:4, ms:450}}, w:16, ht:32, h:3.6, step:.8, feet:30};
+const SPRITES = {scut:{ratio:100/75, rig:1, rstep:.0354}, coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.032}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.031}, tikt:{ratio:100/75, foot:.57, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.07}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}, mega:{ratio:100/75, size:.67, idle:4, ms:50}, arth:{ratio:100/75, foot:.63, idle:6, ms:167}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
 // (appeal 6 to 8, so one herd actually draws a crowd while the rest of the starters barely do).
@@ -425,8 +455,10 @@ const BUILDINGS = {
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
   lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true, onPath:true},
   camera:    {label:"Security camera", one:"a security camera", glyph:"", color:"#2B3F6B", price:900, upkeep:4, tech:"cameras", w:1.2, d:1.2, prop:true, onPath:true},
+  donate:    {label:"Donation box", one:"a donation box", glyph:"", color:"#2F6B4A", price:350, upkeep:2, w:1.4, d:1.4, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
+  quiet:     {label:"Quiet sign",  one:"a quiet sign",  glyph:"",  color:"#3E7C8C", price:200,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
   lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:18, d:14, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300},
   resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700},
@@ -452,14 +484,22 @@ const BUILDINGS = {
    GUESTS
    Guests come in parties. Needs run from 0 (fine) to 100 (desperate).
    --------------------------------------------------------------------- */
+// The night wash over the map: strongest opacity of the dark-blue layer, and clock hours dusk and dawn take to fade in and out
+const NIGHT = {dark:.35, fade:2.5};
 const GUEST = {
   drawPivot:25,        // species appeal is stretched around this: speciesDraw = pivot * (appeal / pivot) ^ drawPower, so a T. rex counts in full and cheap animals count for little
   drawPower:1.6,
+  arriveFrom:5, arriveTo:21,   // clock hours the day's crowd arrives in (a hump, busiest at 1 PM)
+  trickle:6,           // guests a day who keep arriving round the clock, even at night, at a 5-star park (a few stay the night); fewer at fewer stars
+  curfew:21,           // clock hour most daytime guests plan to be out by (they were all sent home at closing before)
+  overnight:.06,       // share of daytime parties who stay on past it anyway
+  nightStay:240,       // the most park minutes a party that arrives after hours stays
+  trickleLow:.3,       // the share of that trickle a 0-star park still gets
   maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
   stay:[180, 360],     // minutes a party plans to spend before heading home, before dividing by pace (slower guests stay longer, so they see the same amount)
   cash:[20, 45],       // money each guest brings to spend inside
-  speed:[.85, 1.15],   // each party's own pace, times pace, times WALK_PER_MIN
+  speed:[1.02, 1.38],  // each party's own pace, times pace, times WALK_PER_MIN (about 20% over the old .85 to 1.15, so guests walk a bit quicker without changing their needs)
   pace:.5,             // guests live at this share of staff pace: they walk, get hungry and tired, and tire of crowds this much slower, so you can click one before it's gone but a trip still feels the same
   startMood:62,        // mood on arrival, plus 4 for each star
   quitBelow:20,        // a party this unhappy heads home early
@@ -480,6 +520,24 @@ const GUEST = {
   goodMood:75,         // an average leaving mood this high gets full marks for guest comfort
   badMood:30,          // and this low gets none
 };
+// How guests spend time on the paths: stopping at exhibits, strolling, and acting on impulse. Times are guest minutes (divided by GUEST.pace in the park clock).
+// What a party notices while it stands watching an exhibit: one thing every so often (guest minutes between), each with its own small effect on mood
+const OBS = {gap:[2.5, 6], learn:.35, chance:{exhibit:.2}};
+const SIGHT = {
+  dwell:[10, 26],       // minutes a party stands watching an exhibit: the short end for a dull one, the long end for a showstopper
+  glance:.9,           // top chance of stopping for an unseen exhibit they walk past (scaled by its appeal and their taste)
+  glanceAppeal:12,     // appeal at which that chance is half of the top
+  whim:[.35, 1.65],    // each party's own random liking for each exhibit when choosing where to head
+  distPull:45,         // meters at which an exhibit's pull is halved when choosing (smaller means they stick closer to where they are)
+  strollChance:.4,     // chance, when they have nothing planned, of drifting along the paths instead of picking an exhibit
+  strollLen:[3, 9],    // corners a stroll lasts
+  standReach:12,       // meters of fence either side of the path a party might pick to stand at
+  standGap:7,          // meters out from a fence a party will look for paving to stand on
+  standPull:6,         // meters at which a fence spot's chance is halved, so the crowd spreads out but favors what's close
+  deckShare:.8,        // chance a party stands on a viewing platform for the exhibit when there's one close
+  deckReach:16,        // meters from the path stop to the platform's middle
+  impulse:{frac:.55, near:55, chance:.6, shop:.2, shopNear:45, gap:40},   // a need over this share of its seek line, and a stop this close: chance of going; chance of popping into a shop; minutes between tries
+};
 /* ---------------------------------------------------------------------
    GUEST PERSONALITIES
    Every party has a primary and a secondary personality. The primary pulls in full and the
@@ -489,7 +547,8 @@ const GUEST = {
              food, shop, museum (will buy), donate, learn, infra (mood lost to needs, litter, crowds),
              ticket (how dear a ticket can be before they grumble), price (price sensitivity), patience,
              walk (mood lost to being on their feet), decor, broken, toilet (filthy restrooms), litter,
-             flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build)
+             flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build),
+             hideTol (how well they take animals hiding indoors: it divides the let-down, so higher is more forgiving)
      n       numbers its exhibit tastes and reactions use (see personas.js)
    --------------------------------------------------------------------- */
 const PERS = {
@@ -499,7 +558,7 @@ const PERS = {
   escortRadius:30,     // a guard this close to a waiting party can take it to the gate
   activeActs:["hunt", "patrol", "pace", "play"],   // what animals do that counts as visibly active
   rarePrice:9000,      // a species this dear counts as rare
-  hooligan:{sneak:.35, tease:.03, stress:18},   // chance a hooligan party skips the ticket; chance each minute at a fence of banging on the glass; stress it gives the animals
+  hooligan:{sneak:.35, tease:.03, stress:8},   // chance a hooligan party skips the ticket; chance each minute at a fence of banging on the glass; stress it gives the animals (animals inside a shelter feel none; privacy screens cut both the chance and the stress)
 };
 const PERSONALITIES = {
   thrill:{label:"Thrill Seeker", color:"#E5484D", weight:.16,
@@ -508,15 +567,15 @@ const PERSONALITIES = {
     n:{danger:7, active:4, platform:3, tame:3, slow:2, tasteDanger:1.5, tasteActive:.5, tasteTame:.5, center:1, spectacle:1.6}},
   conserv:{label:"Conservationist", color:"#3E9B4F", weight:.12,
     text:"Cares how the animals are treated: roomy, well-kept exhibits, rare species, research and education. Gives to conservation. Hates a park that feels like pure entertainment.",
-    fx:{donate:3, learn:1.3, shop:.9},
+    fx:{donate:3, learn:1.3, shop:.9, hideTol:2},
     n:{well:5, poor:8, rare:5, stress:4, showy:6, showyBelow:15, tasteWelfare:.8, tasteRare:.5, center:1.8}},
   paleo:{label:"Paleo-Nerd", color:"#8A5CC2", weight:.14,
     text:"Wants variety and accuracy: many species across the eras, complete genomes, signs and museum shows. Bored by repeats and by low-genome clones.",
-    fx:{learn:1.4, museum:1.4, food:.9},
+    fx:{learn:1.4, museum:1.4, food:.9, hideTol:2.5},
     n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
   family:{label:"Family Focused", color:"#2F86C8", weight:.26,
     text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
-    fx:{infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, need:{energy:1.25, bladder:1.15}},
+    fx:{dark:1.6, infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
     n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
   fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
     text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
@@ -524,7 +583,7 @@ const PERSONALITIES = {
     n:{variety:2}},
   hooligan:{label:"Hooligan", color:"#E0509B", weight:.06,
     text:"Here to cause trouble. May sneak in without paying, drops litter, vandalizes, throws trash at the animals and bangs on the glass. Security has to catch them.",
-    fx:{food:.8, shop:.5, learn:.5, litter:3},
+    fx:{dark:.3, food:.8, shop:.5, learn:.5, litter:3},
     n:{}},
 };
 const NEEDS = {
@@ -580,6 +639,12 @@ const MENU = {
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
 // Litter lies on the paths in squares this many meters across
+const DONATE = {
+  reach:12,            // guests passing a working box this close may give
+  chance:.14,          // chance a party gives at a box it passes; learning raises it
+  amount:1.2,          // dollars a guest gives, more if they learned something
+  eduBoost:1.5,        // a guest who learned everything gives this much more, and is more likely to
+};
 const LITTER = {
   cell:8,              // size of a litter square
   binReach:20,         // guests use a bin this close
@@ -614,6 +679,7 @@ const THOUGHTS = {
   playful:    {text:"We watched the animals play!", good:true},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
+  dark:       {text:"The paths were too dark at night."},
   noSeat:     {text:"My feet hurt and there's nowhere to sit."},
   litter:     {text:"There's trash all over the paths."},
   grossLoo:   {text:"The restrooms were disgusting."},
@@ -647,6 +713,9 @@ const THOUGHTS = {
   scary:      {text:"That was far too scary for the kids."},
   gory:       {text:"We watched an animal hunting. Not for kids."},
   ejected:    {text:"Security threw us out!"},
+  hiding:     {text:"Where are the animals? They're all hiding."},
+  feeding:    {text:"It was great watching them eat.", good:true},
+  sickly:     {text:"Some of those animals looked unwell."},
 };
 
 // Each vivarium size is also a building you can place
@@ -660,7 +729,7 @@ const KEEPER = {
   hireCost:2000,       // one-time cost to hire a keeper
   wage:120,            // each keeper's pay per day
   carry:40,            // food units a keeper can carry by hand
-  speed:WALK_PER_MIN,  // keepers walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // keepers walk at STAFF_PACE of full walking speed
   tirePerMeter:.03,    // stamina lost per meter walked
   tirePerDelivery:2,   // stamina lost loading or unloading
   restBelow:25,        // keepers take a break when stamina drops under this
@@ -710,7 +779,7 @@ const UPGRADES = [
 const CUSTODIAN = {
   hireCost:1500,
   wage:100,
-  speed:WALK_PER_MIN,  // custodians walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // custodians walk at STAFF_PACE of full walking speed
   carry:100,           // units of stock they carry per trip
   scrubPerMin:4,       // restroom dirt cleaned each minute
   sweepPerMin:2,       // pieces of litter picked up each minute
@@ -719,6 +788,23 @@ const CUSTODIAN = {
   binAt:.6,            // they empty a bin this full
   litterAt:3,          // they sweep a square with this much litter
   reach:30,            // they sweep litter this close to where they stand
+};
+// Lamp posts light the paths at night (dusk to dawn, following the map's night wash)
+const LAMP = {
+  radius:14,           // meters of ground a working lamp lights
+  lean:1.5,            // the pool leans this far toward the way the lamp faces
+  litAt:.25,           // a path corner this lit counts as lit (0 to 1)
+  visRadius:8,         // meters of pool drawn round a lamp (the gameplay radius above is wider)
+  steps:[[1, .62], [.66, .36], [.33, .16]],   // [share of visRadius, share of night left] per step, outer to inner
+  glow:"#FFC96B",      // warm light
+  tint:.07,            // opacity of the warm tint over the pool
+  headH:3.0,           // meters up the glow hangs: just under the lamp head, so the head itself stays visible
+  headR:.8,            // meters across the glow under the lamp head
+  fear:.05,            // mood lost a minute on an unlit stretch in full dark (times how much the guest minds)
+  pull:.5,             // share of an exhibit's pull lost at night when no lit path sees it
+  nightCut:.35,        // a lamp nearby multiplies vandalism by this at night (VANDAL.lampCut by day)
+  darkBoost:1.3,       // unlit spots at night make vandalism this much likelier
+  darkCam:.5,          // chance a camera sees a spot no lamp lights, at night
 };
 // Rowdy guests break things when they're unhappy
 const VANDAL = {
@@ -783,13 +869,14 @@ const LODGING = {
   dirtyCut:.6,         // a filthy hotel books this much less
   cleanAt:20,          // custodians clean a hotel this dirty
   cashBoost:1.3,       // hotel guests bring more money
+  outAt:(8 * 60 - ROLLOVER_CLOCK) / CLOCK_SCALE,   // hotel guests come out at 8 AM (a state.minute)
   stayBoost:120,       // and stay this many minutes longer
 };
 // Security guards patrol the paths, put vandals off, and throw out the ones they catch
 const SECURITY = {
   hireCost:2000,
   wage:140,
-  speed:WALK_PER_MIN,  // guards walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // guards walk at STAFF_PACE of full walking speed
   deterRadius:25,      // vandalism near a guard is much rarer
   deterCut:.3,
   catchRadius:15,      // a guard catches a vandal this close
@@ -825,9 +912,10 @@ const CLEAN = {
 //   perMeter   cost to upgrade, per meter of fence
 //   view       how well guests can see in (concrete hides the animals)
 //   tech       what ORACLE has to research first
+//   deco       decoration only (hedge, rope): it marks off ground and guests like it, but it can't hold animals, so it never becomes an exhibit's wall
 const BARRIERS = {
   wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
-  hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true},
+  hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true, deco:true},
   bars:     {label:"Metal bars",        strength:45,  perMeter:40,  view:.95,  tech:"bars",     color:"#4A4F57"},
   electric: {label:"Electrified fence", strength:65,  perMeter:60,  view:.95,  tech:"electric", color:"#D8B04A"},
   acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
@@ -840,13 +928,14 @@ const BARRIERS = {
   drystone: {label:"Dry-stone wall",    strength:35,  perMeter:20,  view:.95,  tech:"masonry",  color:"#98927F"},
   adobe:    {label:"Adobe wall",        strength:80,  perMeter:40,  view:.5,   tech:"masonry",  color:"#CC9862"},
   stake:    {label:"Stake fence",       strength:40,  perMeter:10,  view:.9,   tech:null,       color:"#B8925C"},
+  rope:     {label:"Rope fence",        strength:8,   perMeter:2,   view:1.2,  tech:null,       color:"#B8905A", deco:true},
   bone:     {label:"Bone fence",        strength:65,  perMeter:35,  view:.8,   tech:null,       color:"#E2D4B0"},
 };
 
 // Fence laid piece by piece on the 1 m grid (js/fences.js)
 //   minArea     smallest fenced-off region that becomes an exhibit (m²)
 //   keepShare   an exhibit keeps a region holding at least this share of its old ground
-const FENCE_GRID = {minArea:60, keepShare:.25};
+const FENCE_GRID = {minArea:60, keepShare:.25, sideGap:.18, sideDead:.2};   // sideGap: m each wall of a shared pair is nudged into its own pen so both show; sideDead: m the pointer can stray from a wall and still change both sides of it
 
 // What a new fence costs to build, per meter: the base fence plus the barrier's own cost
 const fenceRate = key => COST.fencePerMeter + BARRIERS[key].perMeter;
@@ -869,13 +958,14 @@ Object.assign(BARRIERS.drystone, {wear:1.0, repair:8});    // low, mortarless an
 Object.assign(BARRIERS.adobe,    {wear:2.0, repair:10});   // mud erodes in the rain
 Object.assign(BARRIERS.stake,    {wear:2.5, repair:6});
 Object.assign(BARRIERS.bone,     {wear:1.8, repair:12});
+Object.assign(BARRIERS.rope,     {wear:3.0, repair:3});    // decoration only (deco): a keep-out line for guests that frays; it never holds animals
 
-// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py, pixelfence_concrete.py, pixelfence_masonry.py, pixelfence_more.py and pixelfence_themed.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
-// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge, concrete, brick, stone, bamboo, palisade, iron, drystone, adobe, stake and bone. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
+// Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py, pixelfence_concrete.py, pixelfence_masonry.py, pixelfence_more.py, pixelfence_themed.py and pixelfence_rope.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
+// One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge, concrete, brick, stone, bamboo, palisade, iron, drystone, adobe, stake, bone and rope. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.
 //   worn     below this condition (percent) the fence shows its rusted picture; at 0 it is broken, trampled flat
 //   minRun   a side that runs mostly north-south is seen edge-on, so it is drawn as a column when less than this share of its length runs across the screen
 //   edge     how many pixels wide that column is
-const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, brick:{w:23, h:17, gate:true}, stone:{w:23, h:20, gate:true}, bamboo:{w:23, h:15, gate:true}, palisade:{w:23, h:22, gate:true}, iron:{w:23, h:17, gate:true}, drystone:{w:23, h:11, gate:true}, adobe:{w:23, h:16, gate:true}, stake:{w:23, h:12, gate:true}, bone:{w:23, h:18, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
+const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, brick:{w:23, h:17, gate:true}, stone:{w:23, h:20, gate:true}, bamboo:{w:23, h:15, gate:true}, palisade:{w:23, h:22, gate:true}, iron:{w:23, h:17, gate:true}, drystone:{w:23, h:11, gate:true}, adobe:{w:23, h:16, gate:true}, stake:{w:23, h:12, gate:true}, bone:{w:23, h:18, gate:true}, rope:{w:23, h:10, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
 // A keeper gate swings open when a keeper, vet or mechanic is within `reach` meters: `speed` is how much of its swing (0 shut, 1 open) it covers a second, shown in `frames` pictures (<kind>-gate.png, then -1, -2, -3).
 const GATE_OPEN = {reach:3, speed:3, frames:4};
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};
@@ -889,7 +979,7 @@ const MAINT = {
   repairBelow:85,      // mechanics fix fences under this condition
   inspectMinutes:5,    // time to inspect a fence
   repairPerMinute:4,   // condition restored per minute of work
-  speed:WALK_PER_MIN,  // mechanics walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // mechanics walk at STAFF_PACE of full walking speed
   hireCost:2000,
   wage:150,
 };
@@ -966,7 +1056,10 @@ const GOODS = {
   meat:   {label:"Meat",     spoil:.15},
   fish:   {label:"Fish",     spoil:.20},
   insects:{label:"Insects",  spoil:.10},
-  meds:   {label:"Medicine", spoil:.02},
+  medpal: {label:"Paleozoic medicine", spoil:.02},
+  medmes: {label:"Mesozoic medicine",  spoil:.02},
+  medcen: {label:"Cenozoic medicine",  spoil:.02},
+  medmod: {label:"Contemporary medicine", spoil:.02},   // bought at the dock, never grown
   // what food stands and gift shops sell from: a unit is $1 of wholesale stock
   snacks: {label:"Snacks",      spoil:.08},
   drinks: {label:"Drinks",      spoil:.01},
@@ -974,8 +1067,12 @@ const GOODS = {
 };
 const FEED_GOODS = ["plants", "meat", "fish", "insects"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
-const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS);   // what the dock buys
-const GOOD_COLOR = {...FOOD_COLOR, meds:"#B0384F", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
+const CMED = "medmod";   // contemporary medicine: bought at the dock
+const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS, [CMED]);   // what the dock buys
+// CERES medicine is kept per era. Contemporary medicine (CMED) is a good of its own: the dock orders it, custodians carry it to the PMC
+const MED_GOOD = {paleozoic:"medpal", mesozoic:"medmes", cenozoic:"medcen"};
+const MED_GOODS = ["medpal", "medmes", "medcen"];
+const GOOD_COLOR = {...FOOD_COLOR, medpal:"#7A2E5C", medmes:"#B0384F", medcen:"#D9674A", medmod:"#8C8C96", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
 // Units of guest goods a day each guest gets through when the shelves stay full. Ordering never plans for less,
 // because a day of empty shelves sells little and would otherwise shrink the next order.
 const GUEST_USE = {snacks:1, drinks:.7, merch:1.5};
@@ -987,7 +1084,7 @@ const LOGI = {
   coolerCut:.6,        // cooler boxes multiply spoilage
   forklift:3,          // a forklift multiplies a restock trip's load
   urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
-  pmcDoses:20,         // doses the PMC keeps on hand
+  pmcDoses:150,        // doses the PMC keeps on hand
   dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
   rushMarkup:1.75,     // a rush order costs this much
   rushLot:50,          // units in a rush order
@@ -1006,7 +1103,7 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:14, d:10, dept:true,
-                       store:{cap:400, holds:["meat", "fish", "meds", "snacks"], spoil:1, cold:true, bulk:true},
+                       store:{cap:600, holds:["meat", "fish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:16, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
@@ -1077,8 +1174,6 @@ const TECH = [
   {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:80, needs:"ghostcost1", text:"Trips cost about a third less."},
   {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:35, text:"Expeditions take three quarters of the time."},
   {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:80, needs:"ghostspeed1", text:"Expeditions take about half the time."},
-  {id:"ghostq1",   group:"ghost", label:"Careful sampling",     points:40, text:"Every DNA sample comes back 8 points better in quality."},
-  {id:"ghostq2",   group:"ghost", label:"Cryo-preserved samples", points:90, needs:"ghostq1", text:"Every DNA sample comes back 16 points better in quality."},
   // Genetics
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
@@ -1100,9 +1195,10 @@ const NET_PER_METER = 25;   // catch netting along the fence
 // Flying animals. Outside an aviary or vivarium they escape almost at once.
 const FLYERS = ["quet", "pter", "dimo", "mega", "arch", "micr", "yiqi", "arge", "ppig", "rmlo"];
 
+const BANKRUPT = 25000;   // the park goes bankrupt (the only game over) when debt passes this; a warning comes at half
+
 const ESCAPE = {
   lawsuit:75000,       // cost of each guest killed
-  shutdownDeaths:5,    // this many deaths and the park is shut down
   sedateMinutes:10,    // how long a vet (or a keeper, if there are no vets) takes to dart and sedate an escaped animal
   looseSpeed:WALK_PER_MIN * .75,   // escaped animals wander a bit slower than people walk
   bigHerbivore:1500,   // herbivores needing this much room or more are dangerous when loose
@@ -1160,8 +1256,8 @@ const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
 // Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
 // but can't cure prehistoric illness for good: the animal goes home with a chronic case.
 const MODERN = {
-  stock:30,            // doses the PMC keeps on hand
-  cost:25,             // price of each dose
+  stock:30,            // doses the dock keeps on order (auto-ordering)
+  cost:25,             // price of each dose at the dock
   heal:{cenozoic:.9, mesozoic:.7, paleozoic:.5},     // how well it works, as a share of the era's own medicine
   floor:{cenozoic:5, mesozoic:10, paleozoic:15},    // how sick it leaves an animal, at best
   chronicHappy:.25,     // a chronic case counts as this much of a sick animal for happiness
@@ -1170,13 +1266,13 @@ const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoi
 const VET = {
   hireCost:3000,
   wage:200,
-  speed:WALK_PER_MIN,  // vets walk at the same pace as guests
+  speed:WALK_PER_MIN * STAFF_PACE,  // vets walk at STAFF_PACE of full walking speed
   patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:14, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
 
-BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:["meds"], spoil:1, sink:true};
+BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:MED_GOODS.concat(CMED), spoil:1, sink:true};
 
 // Viewing platforms snap onto an exhibit's fence
 BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platform", glyph:"V", color:"#B08654", price:20000, upkeep:80, tech:"platform", w:14, d:7};
@@ -1185,7 +1281,7 @@ BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platf
 const WATER = {
   perSqM:20,       // cost per square meter
   minArea:12,      // smallest body of water, in square meters
-  margin:.5,       // gap kept between the water and the fence, in meters
+  margin:0,        // gap kept between the water and the fence, in meters (none: water may border the fence)
   oldPondR:6,      // radius of the round ponds older saves had; they become drawn water
 };
 
@@ -1208,6 +1304,8 @@ const LAND = {
   cavelg: {label:"Large Cave",     one:"a large cave",      price:8500, r:6, color:"#5B5750", slots:40, fits:12, look:"cave"},
   canopysm:{label:"Small Canopy",  one:"a small canopy",    price:1400, r:3, color:"#B9A77E", slots:8, fits:8,  look:"canopy", noCold:true},
   canopylg:{label:"Large Canopy",  one:"a large canopy",    price:4200, r:5, color:"#A8946A", slots:24, fits:19, look:"canopy", noCold:true},
+  // a privacy screen (screen): a reed panel near the fence that shields up to SCREEN.holds animals from the path's view. It calms shy animals without hiding them from guests.
+  screen: {label:"Privacy Screen", one:"a privacy screen", price:900, r:1.8, color:"#8C9A4B", screen:true},
   traysm: {label:"Small Food Tray",  one:"a small food tray",  price:400,  r:1.2, color:"#8A8F96", tray:12},
   traymd: {label:"Medium Food Tray", one:"a medium food tray", price:1000, r:2,   color:"#8A8F96", tray:30},
   traylg: {label:"Large Food Tray",  one:"a large food tray",  price:2500, r:3,   color:"#8A8F96", tray:80},
@@ -1230,7 +1328,7 @@ const LAND = {
   vbranch:{label:"Climbing Branches",  one:"climbing branches",    price:500,  r:.9, color:"#8A6A48", toy:2, vivToy:true, look:"vbranch"},
   vdig:   {label:"Dig Box",            one:"a dig box",            price:700,  r:.8, color:"#6B5236", toy:2, vivToy:true, look:"vdig"},
   vfeed:  {label:"Live-Feed Dispenser",one:"a live-feed dispenser",price:900,  r:.6, color:"#8A8F96", toy:3, vivToy:true, look:"vfeed"},
-  vmist:  {label:"Misting Pool",       one:"a misting pool",       price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
+  vmist:  {label:"Misters",             one:"misters",              price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
 };
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
@@ -1304,13 +1402,101 @@ const BEHAVIOR = {
   comfortDrift:60,
   hideCalm:.5,         // stress shed a minute hiding in cover (a third of it with no cover)
   huntMin:20,          // meat eaters stalk this long before they eat
-  shyGuests:35,        // stress skittish animals take from a busy path, halved with cover to retreat to
+  teaseMemory:240,     // park minutes the Behavior tab still blames guests banging on the glass (the spike drains slowly)
+  shyGuests:35,       // stress skittish animals take from a busy path, halved with cover to retreat to
   busyAt:150,          // guests in the park for "busy"
   happy:{calm:4, stress:.12, bored:.06, pace:8},   // happiness: up to +calm, less stress and boredom, less the share pacing
   stressIll:1.35,      // illness chance multiplier for an animal over 60 stress
   escape:1.5,          // a stressed aggressive animal tries the fence up to this much more
-  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:150, max:270},   // a midday nap (park time runs 12 minutes a second, so this is 12 to 22 seconds): the hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
+  nap:{from:10, to:16, share:.7, chance:.1, hot:1.5, min:60, max:120},   // a midday nap (a park minute is 2 clock minutes, so this is 2 to 4 hours): the clock hours it can start (peaking halfway), the share of animals that nap on a given day, each step's chance of starting once they do (at the peak), hot days' boost, and how long they stay down (minutes)
   lively:[.85, 1.1],   // guest appeal from a sleeping, hiding herd to a busy, playful one
+};
+// Going inside (behavior.js, "going inside"). Animals walk into a shelter with room (LAND slots; a shelter holds animals up to its slots, each taking coverSlots) to hide, sleep or wait out bad weather, and aren't drawn or seen while in.
+const SHELTER = {
+  sleepBelow:.5,       // an animal this drowsy (awake() at or under it) that is resting goes in to sleep; so does a napper
+  needLine:70,         // hunger or thirst over this and a weather-sheltering animal comes out to eat or drink
+  giveUp:90,           // park minutes of walking before an animal that can't find its way to its shelter just goes in
+  weather:{storm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
+  hideCalm:4,          // hiding behind walls sheds stress this many times as fast as hiding in the open
+  restCalm:.8,         // stress shed a minute resting or sleeping inside (in the open it's .1)
+  stressLine:55,       // a stressed animal (any temper) heads straight for a shelter over this much stress, and stays in until it is down to calmLine
+  calmLine:25,
+  hurry:2.2,           // how fast it walks there, as a multiple of its usual pace
+  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
+};
+// Guests who come to see animals that are all indoors are let down (seeExhibit in guests.js; hideBother in behavior.js)
+const HIDING = {
+  window:120,          // park minutes the share of animals in view is averaged over, so a quick scramble doesn't count
+  from:.4,             // guests only mind when more than this share of the animals are out of sight (averaged)
+  mood:10,             // mood a visit loses when nearly every animal is out of sight, at full bother
+  appeal:.5,           // and how much of the visit's pleasure in the exhibit goes
+  thought:.2,          // bother at which they say so
+  weights:{hide:1, sleep:.5, weather:.25, screen:.2},   // how far out of sight each kind counts: hiding fully, sleeping inside by day half (none at night), sheltering from weather a quarter, an outside animal behind a screen a fifth
+  eduCut:.8,           // a guest who has learned a lot (p.edu of eduFull or more) feels this much less of it
+  eduFull:40,
+};
+// Privacy screens (LAND `screen`): each shields this many animals from the path's view. It cuts the guest stress they take (ctx.seen) by `cut` for that share of the herd, and hooligan teasing by `teaseCut`.
+const SCREEN = {holds:8, cut:.85, teaseCut:.8, fenceReach:7};   // teaseCut: how much of a hooligan's banging (the chance and the stress) a fully screened herd is spared
+// Quiet signs (BUILDINGS.quiet): guests within `hear` of a working one, which stands within `reach` of an exhibit's fence, count `cut` less toward the crowd the exhibit's animals feel (rowdy parties only `rowdy` as much).
+const QUIET = {reach:20, hear:14, cut:.6, rowdy:.3};
+// Animal-on-animal attacks (behavior.js, "attacks"). Hurt animals get an injury (a.sick, kind "injury") that vets treat; a bad enough one kills.
+//   Loose predators strike animals in an exhibit they can get into (a breach, or a fence weaker than they are) from the fence line.
+//   A predator housed with prey stalks it (the hunt act) and strikes once it is close. Stressed aggressive (or crowded) animals fight each other.
+const ATTACK = {
+  reach:8,             // meters from the fence a loose predator can strike at
+  looseRate:.05,       // chance a park minute that a loose predator in reach attacks
+  gap:25,              // park minutes between one attacker's attacks
+  bite:[25, 60],       // severity a predator's attack adds (0 to 100; 100 kills)
+  kill:.12,            // chance a predator's attack kills outright
+  scare:25,            // stress the victim takes
+  stalk:10,            // minutes a predator has been hunting before it can strike
+  strike:5,            // meters from its prey (plus its own size) it must close to strike
+  huntChance:.5,       // chance each behavior step it strikes once in range (a third if positions are unknown)
+  hungry:55,           // a predator only goes after prey when its hunger is this high, or its stress or boredom is over the lines below
+  huntStress:60, huntBored:75,
+  drive:40,            // pull of the hunt act with prey in the exhibit, plus half its hunger
+  fightStress:60,      // an aggressive animal over this stress picks fights (a crowded one of any kind, 15 higher)
+  fightRate:.006,      // chance each behavior step at the top of that range
+  crowded:2,           // fights are this many times likelier in a cramped exhibit
+  fightHurt:[8, 22],   // severity a fight adds
+};
+// Sex (a.sex, "male" or "female"). No breeding in v1.0; these are light effects. Tunable.
+const SEX = {
+  balance:.8,          // chance a new animal takes the sex its species has fewer of in the park (else a coin flip)
+  maleFight:1.3,       // males of aggressive species pick fights this much likelier (see fightBias in behavior.js)
+};
+// Social life in open exhibits (behavior.js, "social"; vivariums ignore all of it). Driven by traitsOf(s).social.
+//   a.rank is a saved status number, 0 for the alpha up to 1 for the bottom of the pecking order (sorted ascending = alpha first).
+//   Herds: all-male (bachelor) and all-female (matriarchal) groups are stable and happy; one male with females is stable;
+//   two or more males with females fight, more with more males and less room. Solitary species dislike company (same sex most).
+//   Pairs: one male and one female is ideal. Stress numbers are 0 to 100 added to the animal's stress target.
+const SOCIAL = {
+  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, DNA quality (a.q), and being male
+  bachelor:3, matriarch:3,           // happiness bonus for a stable all-male / all-female herd or pack
+  soloSame:30, soloOpp:8, soloCap:60,// a loner's stress per same-sex / opposite-sex animal sharing the pen, and the most
+  soloHappy:.25,                     // happiness lost per point of that stress (averaged over the loners)
+  relief:{room:.4, rock:.2, cover:.25}, max:.75, roomFull:3,   // what eases it: space per animal (full at this many times the room it needs), hiding rocks, shelter cover; never more than max
+  pairBonus:2, pairMild:3, pairStress:12,   // pairs: happiness for a male and a female, lost when animals are left over, and their stress
+  rivalStress:14, rivalCap:3,        // males in a mixed group: stress per extra rival (up to this many)...
+  rivalHappy:3,                      // ...and happiness lost per rival
+  spaceRef:1.5,                      // room per animal (1 is just enough) at which rivalry is as it is; cramped is worse, roomy better
+  fightRate:.01, upset:.2,           // chance each behavior step per extra male that rivals fight; chance the lower rank wins
+  hurt:[6, 16], lowHurt:.8,          // injury a fight adds, up to this much more to the lowest rank
+  loseStress:20,                     // extra stress on the loser, more the lower its rank
+};
+// Packs (traitsOf(s).social === "pack": group predators) are family units, not herds, and skip the herd rules above (open exhibits only; vivariums ignore all of it).
+//   The two best-ranked animals are the alpha pair (ideally one male and one female: the alpha plus the best-ranked of the other sex); the rest are subordinates.
+//   A pack under its species' group[0] is stressed and lonely, one alone worst. The alpha pair eats first (keepers.js eatTick), so shortages hit subordinates first.
+//   Pack mates hunt together (more strike chance with more hunters). Rank challenges are rare and only happen under stress (hungry subordinates, a crowded pen, no alpha pair).
+const PACK = {
+  settled:2, smallHappy:6, aloneMult:2, noPairHappy:3,   // happiness: a full pack with an alpha pair; lost per missing animal share (alone doubled); lost with no alpha pair
+  smallStress:30, aloneStress:55, noPairStress:12,       // stress: pack under its minimum (scaled by how short it is), a pack animal alone, subordinates with no alpha pair
+  lonelyExtra:1.5,                                       // extra loneliness a minute (times the base rate) in a too-small pack, doubled when alone
+  pile:.5,                                               // food on hand under this share of a day's need counts as a shortage; the alphas eat first
+  lackHunger:1.2, lackBlock:.6,                          // a hungry rank gains hunger this many times faster, and eating helps this much less (both times its share of the shortage)
+  huntJoin:25, huntBonus:.5, huntMax:.95,                // pull to join a hunt per hunting mate; strike chance gain per extra hunter; the most
+  challengeRate:.004, hungerLine:60, stressLine:55,      // chance each behavior step per driver (hungry subordinates, crowding, no alpha pair); subordinates count as hungry or stressed over these
+  upset:.3, hurt:[4, 12], loseStress:15,                 // chance the challenger wins (then they swap ranks); injury a clash adds; stress on the loser
 };
 // What animals can be doing. idle marks what they fall back on with nothing pressing.
 const ACTS = {
@@ -1355,12 +1541,12 @@ const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepu
 const BIOMES = {
   desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#DFC48A", park:"#DFC48A", perSqM:.5, rock:1.6, plants:0.01},
   tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#002104", park:"#002104", perSqM:1, rock:0.6, plants:0.12},
-  grassland:{label:"Grassland", ground:"open plains",                 color:"#A9C76A", park:"#B7C995", perSqM:.3, rock:0.6, plants:0.03},
+  grassland:{label:"Grassland", ground:"open plains",                 color:"#C3CC76", park:"#C3CC76", perSqM:.3, rock:0.6, plants:0.03},
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#BFA96C", park:"#BFA96C", perSqM:.4, rock:1.3, plants:0.03},
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#7DAA68", park:"#7DAA68", perSqM:.6, rock:0.8, plants:0.08},
-  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#5E8070", park:"#8FA694", perSqM:.8, rock:1, plants:0.08},
-  tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#AEB9A2", park:"#CBD2C2", perSqM:.6, rock:1.4, plants:0.02},
+  boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#587260", park:"#587260", perSqM:.8, rock:1, plants:0.08},
+  tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#B3BDA3", park:"#B3BDA3", perSqM:.6, rock:1.4, plants:0.02},
 };
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
@@ -1379,11 +1565,11 @@ const PLANT_TABLE = {
   Cretaceous:{tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
     temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
   Paleogene:{tropical:"Climbing Fern|Nipa Palm|Dipterocarp Tree", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
-    boreal:"Osmunda|Betula|Larix", scrubland:"Hopbush|Acacia|Eucalyptus", desert:"Tamarisk|Saxaul|Honey Mesquite"},
-  Neogene:{grassland:"Poa|Themeda|Cortaderia", tropical:"Heliconia|Banana|Kapok", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Sagebrush|Saltbush|Juniper",
-    temperate:"Anemone|Acer|Fagus", boreal:"Vaccinium|Alnus|Picea", desert:"Cholla|Century Plant|Saguaro", tundra:"Eriophorum|Empetrum|Salix arctica"},
-  Quaternary:{grassland:"Festuca|Bouteloua|Andropogon", tropical:"Philodendron|Palm|Big-leaf Mahogany", wetland:"Peat Moss|Sedge|Willow", scrubland:"Sage|Chamise|Manzanita",
-    temperate:"Trillium|Corylus|Tilia", boreal:"Cladonia|Ledum|Pinus", desert:"Creosote Bush|Barrel Cactus|Joshua Tree", tundra:"Saxifraga|Dryas|Betula nana"},
+    boreal:"Royal Fern|Birch|Larch", scrubland:"Hopbush|Acacia|Eucalyptus", desert:"Tamarisk|Saxaul|Honey Mesquite"},
+  Neogene:{grassland:"Bluegrass|Kangaroo Grass|Pampas Grass", tropical:"Heliconia|Banana|Kapok", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Sagebrush|Saltbush|Juniper",
+    temperate:"Anemone|Acer|Fagus", boreal:"Blueberry|Alder|Spruce", desert:"Cholla|Century Plant|Saguaro", tundra:"Cottongrass|Crowberry|Arctic Willow"},
+  Quaternary:{grassland:"Fescue|Grama|Bluestem", tropical:"Philodendron|Palm|Big-leaf Mahogany", wetland:"Peat Moss|Sedge|Willow", scrubland:"Sage|Chamise|Manzanita",
+    temperate:"Trillium|Corylus|Tilia", boreal:"Reindeer Lichen|Marsh Rosemary|Pine", desert:"Creosote Bush|Barrel Cactus|Joshua Tree", tundra:"Saxifrage|Mountain Avens|Dwarf Birch"},
 };
 // Leaf colors by biome, small to large
 const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
@@ -1524,6 +1710,40 @@ const PLANT_SPRITES = {
   "qua-temperate-small":    {ratio:44/40, size:1.27},
   "qua-temperate-medium":   {ratio:64/52, size:1.05},
   "qua-temperate-large":    {ratio:72/92, size:0.83},
+  "neo-grassland-small":    {ratio:44/38, size:1.27},
+  "neo-grassland-medium":   {ratio:64/52, size:1.05},
+  "neo-grassland-large":    {ratio:72/92, size:0.83},
+  "qua-grassland-small":    {ratio:44/32, size:1.27},
+  "qua-grassland-medium":   {ratio:64/48, size:1.05},
+  "qua-grassland-large":    {ratio:72/92, size:0.83},
+  "q-prairie-wildflowers": {ratio:48/40, size:1.38},
+  "neo-tundra-small":       {ratio:44/38, size:1.27},
+  "neo-tundra-medium":      {ratio:64/52, size:1.05},
+  "neo-tundra-large":       {ratio:72/92, size:0.83},
+  "qua-tundra-small":       {ratio:44/32, size:1.27},
+  "qua-tundra-medium":      {ratio:64/48, size:1.05},
+  "qua-tundra-large":       {ratio:72/92, size:0.83},
+  "q-labrador-tea":         {ratio:48/40, size:1.38},
+  "per-boreal-small":       {ratio:44/38, size:1.27},
+  "per-boreal-medium":      {ratio:64/54, size:1.05},
+  "per-boreal-large":       {ratio:72/92, size:0.83},
+  "jur-boreal-small":       {ratio:44/38, size:1.27},
+  "jur-boreal-medium":      {ratio:64/54, size:1.05},
+  "jur-boreal-large":       {ratio:72/92, size:0.83},
+  "cre-boreal-small":       {ratio:44/38, size:1.27},
+  "cre-boreal-medium":      {ratio:64/54, size:1.05},
+  "cre-boreal-large":       {ratio:72/92, size:0.83},
+  "pal-boreal-small":       {ratio:44/38, size:1.27},
+  "pal-boreal-medium":      {ratio:64/54, size:1.05},
+  "pal-boreal-large":       {ratio:72/92, size:0.83},
+  "neo-boreal-small":       {ratio:44/38, size:1.27},
+  "neo-boreal-medium":      {ratio:64/52, size:1.05},
+  "neo-boreal-large":       {ratio:72/92, size:0.83},
+  "qua-boreal-small":       {ratio:44/30, size:1.27},
+  "qua-boreal-medium":      {ratio:64/46, size:1.05},
+  "qua-boreal-large":       {ratio:72/92, size:0.83},
+  "q-black-spruce":         {ratio:56/92, size:0.64},
+  "q-quaking-aspen":        {ratio:64/92, size:0.74},
   "q-white-oak":           {ratio:72/92, size:0.83},
   "q-sugar-maple":         {ratio:64/92, size:0.74},
   "q-dawn-redwood":        {ratio:64/92, size:0.74},
@@ -1568,6 +1788,18 @@ const ROCK_SPRITES = {
     boulder:[[59, 54], [73, 52], [33, 52], [56, 49]],
     rock:[[42, 30], [35, 29], [36, 31], [30, 27], [41, 29]],
   },
+  grassland:{
+    boulder:[[60, 57], [69, 49], [37, 46], [50, 44]],
+    rock:[[40, 29], [29, 29], [35, 32], [29, 28], [39, 27], [35, 25]],
+  },
+  boreal:{
+    boulder:[[61, 56], [74, 49], [36, 52], [60, 41]],
+    rock:[[40, 30], [29, 30], [33, 31], [29, 27], [39, 27], [37, 26]],
+  },
+  tundra:{
+    boulder:[[68, 50], [73, 47], [37, 51], [56, 40]],
+    rock:[[37, 29], [28, 29], [35, 24], [25, 27], [36, 28], [34, 26]],
+  },
   tropical:{
     boulder:[[68, 46], [32, 57], [73, 49], [62, 37]],
     rock:[[38, 25], [23, 29], [42, 20], [28, 18], [39, 27], [36, 26]],
@@ -1587,6 +1819,9 @@ const SPRITE_HIT = {
   "car-wetland-large":[64,92,6.5,22.5,"24-40,17-47,11-53,10-54,13-51,18-46,26-38,30-34,30-34,30-34,30-34,30-34,30-34,30-34,30-34,30-34,30-34,30-34,30-34,29-35,29-35,29-35,26-38"],
   "car-wetland-medium":[64,50,2.5,29.5,",,,,22-43,15-53,10-55,9-56,4-61,3-59,30-34,30-34,30-34"],
   "car-wetland-small":[40,46,8.5,12.5,"16-24,15-25,13-27,13-27,11-29,12-28,9-31,11-29,8-32,15-25,19-21,19-21"],
+  "cre-boreal-large":[72,92,10.5,36,",,,26-46,21-55,14-60,10-67,5-68,5-68,2-71,0-71,0-71,0-71,0-70,2-58,33-39,33-39,33-39,33-39,33-39,33-39,33-39,26-46"],
+  "cre-boreal-medium":[64,54,24.5,24.5,",,,,21-43,20-44,12-49,12-52,14-50,11-53,8-56,8-56,29-35,24-40"],
+  "cre-boreal-small":[44,38,7,19.5,",18-26,8-36,3-41,3-39,11-32,13-31,15-29,16-28,16-28"],
   "cre-desert-large":[64,92,12.5,28.5,"23-41,21-43,13-51,10-54,7-57,7-57,8-56,5-59,4-60,25-39,25-39,25-39,25-39,24-40,25-39,24-40,24-40,24-40,23-41,22-42,22-42,22-42,20-44"],
   "cre-desert-medium":[64,46,31.5,31.5,",,,,,,31-33,12-52,7-57,4-60,2-62,1-63"],
   "cre-desert-small":[44,38,5.5,13,",21-25,13-31,13-31,10-34,10-35,13-31,15-29,18-26,18-26"],
@@ -1617,6 +1852,9 @@ const SPRITE_HIT = {
   "dev-wetland-large":[64,92,4.5,32,"18-48,13-53,8-58,7-59,4-62,4-62,1-63,1-63,1-63,0-63,0-63,2-63,1-34,31-33,31-33,31-33,30-34,30-34,30-34,30-34,30-34,30-34,28-36"],
   "dev-wetland-medium":[64,40,32,32,"28-47,16-52,9-54,9-61,5-61,1-62,2-63,9-54,0-63,0-63"],
   "dev-wetland-small":[40,44,6,19,"11-24,4-32,4-35,6-39,2-39,2-33,8-30,11-27,14-26,15-25,16-24"],
+  "jur-boreal-large":[72,92,30,30,"35-37,33-39,31-41,26-46,25-45,25-47,22-50,20-51,20-52,18-53,18-53,18-53,14-58,13-57,12-59,12-59,12-59,7-65,6-64,6-65,6-64,6-64,6-60"],
+  "jur-boreal-medium":[64,54,13,24.5,",26-37,25-39,21-45,17-47,16-50,12-52,12-51,9-55,8-56,9-54,30-34,30-34,27-37"],
+  "jur-boreal-small":[44,38,15,22,",18-26,10-31,5-40,2-40,0-43,3-43,1-43,15-29,16-28"],
   "jur-desert-large":[64,92,19.5,19.5,"30-34,30-34,27-37,25-39,24-40,21-43,21-43,18-46,18-46,16-48,16-48,14-50,14-50,13-51,13-51,13-51,13-51,13-51,15-49,15-49,29-35,29-35,26-38"],
   "jur-desert-medium":[66,54,6.5,28,"37-38,22-38,22-52,10-52,8-61,9-61,6-61,7-60,9-59,31-36,31-35,31-35,31-35,27-39"],
   "jur-desert-small":[44,36,16.5,16.5,",,,20-24,12-32,7-37,6-38,6-38,6-38"],
@@ -1632,9 +1870,15 @@ const SPRITE_HIT = {
   "jur-wetland-large":[70,92,6.5,32.5,",,,,21-50,11-60,9-62,6-64,5-67,3-67,3-37,33-37,33-37,33-37,33-37,33-37,33-37,33-37,33-37,33-37,33-37,33-37,29-41"],
   "jur-wetland-medium":[70,50,3.5,31.5,",,,,22-49,15-59,11-60,12-61,5-66,4-66,27-43,34-36,33-37"],
   "jur-wetland-small":[54,40,17.5,23.5,",,,21-33,21-42,12-42,15-38,6-50,4-50,23-31"],
+  "neo-boreal-large":[72,92,21.5,21.5,"35-37,33-39,33-39,30-42,29-43,28-44,28-44,26-46,25-47,25-47,24-48,23-49,22-50,21-51,21-51,20-52,19-53,18-54,17-55,18-55,16-56,15-57,30-42"],
+  "neo-boreal-medium":[64,52,9.5,30,",26-39,15-48,13-52,7-59,4-59,4-61,2-61,5-60,8-57,23-41,24-40,24-40"],
+  "neo-boreal-small":[44,38,9.5,20.5,"10-27,9-31,3-38,3-40,1-41,2-40,3-34,10-30,13-28,16-28"],
   "neo-desert-large":[64,92,8.5,19,",,27-37,15-38,14-38,14-38,14-38,14-49,14-51,14-51,14-51,14-51,14-51,26-51,26-51,26-38,26-38,26-38,26-38,26-38,26-38,26-38,24-40"],
   "neo-desert-medium":[64,50,25.5,26.5,",,32-33,20-44,20-44,10-54,12-52,14-50,6-58,7-57,12-52,8-56,7-57"],
   "neo-desert-small":[44,40,8.5,17,",10-12,7-37,6-39,8-38,8-37,9-36,13-31,14-30,18-26"],
+  "neo-grassland-large":[72,92,31.5,32.5,",35-35,34-38,23-39,22-50,21-51,11-52,10-60,9-63,9-64,9-64,17-64,19-55,14-56,14-63,6-63,6-68,4-67,4-65,7-63,10-59,16-54,24-48"],
+  "neo-grassland-medium":[64,52,24.5,26.5,"23-38,21-47,14-48,12-55,12-56,15-57,21-57,15-49,6-58,6-58,8-55,13-51,18-46"],
+  "neo-grassland-small":[44,38,15,16,"18-22,11-30,8-35,8-38,10-38,12-36,10-37,7-37,8-33,14-30"],
   "neo-scrubland-large":[64,92,18.5,31.5,",,29-35,25-39,24-40,14-50,9-55,8-56,9-55,8-56,2-62,1-63,2-62,6-58,5-59,6-58,11-53,10-54,14-50,30-35,30-36,29-36,27-37"],
   "neo-scrubland-medium":[66,48,9.5,29.5,"19-47,14-53,10-57,6-58,5-62,8-63,16-59,19-47,21-45,24-42,26-40,29-37"],
   "neo-scrubland-small":[48,34,8.5,23,"24-32,12-35,10-41,4-44,3-43,2-47,4-45,17-30,20-28"],
@@ -1644,9 +1888,15 @@ const SPRITE_HIT = {
   "neo-tropical-large":[72,92,14.5,36,",21-52,19-54,20-53,7-65,0-71,0-71,0-71,0-71,8-64,4-68,32-40,33-39,32-40,33-39,32-40,33-39,31-41,30-42,28-44,26-46,24-48,22-50"],
   "neo-tropical-medium":[64,54,17.5,32,",,28-36,28-52,12-53,11-53,6-62,0-63,0-63,15-49,15-49,15-49,15-49,15-49"],
   "neo-tropical-small":[44,38,9.5,17.5,",,11-33,12-33,5-39,5-39,7-37,10-34,15-29,17-27"],
+  "neo-tundra-large":[72,92,18.5,30.5,",39-46,37-46,34-55,33-56,30-63,29-64,29-64,27-65,28-65,28-66,27-61,25-55,24-65,24-66,25-66,7-64,6-50,6-39,20-29,21-28,22-29,18-34"],
+  "neo-tundra-medium":[64,52,26.5,30.5,",,,,,18-42,12-50,6-55,4-59,1-60,1-61,6-58,7-57"],
+  "neo-tundra-small":[44,38,14.5,16.5,"18-23,8-30,9-32,8-38,13-39,15-34,10-37,7-36,9-33,14-30"],
   "neo-wetland-large":[64,92,7.5,30.5,",16-48,14-50,15-49,8-56,4-60,3-61,6-58,5-59,3-61,2-62,4-60,14-50,29-33,29-34,29-35,29-35,29-35,29-35,29-35,29-35,29-35,25-39"],
   "neo-wetland-medium":[64,56,17,24.5,"26-37,19-44,19-44,12-51,12-51,13-49,15-48,8-56,8-54,12-52,15-48,17-45,21-42,25-39"],
   "neo-wetland-small":[44,46,9.5,14.5,"18-20,18-27,13-30,13-30,8-36,8-36,9-35,11-33,12-32,14-30,16-28,19-25"],
+  "pal-boreal-large":[72,92,29.5,29.5,"34-38,32-40,31-42,25-47,23-48,23-50,22-50,20-51,20-52,20-54,18-53,16-54,17-57,15-57,13-57,13-59,14-61,11-60,9-59,11-64,9-64,6-62,7-62"],
+  "pal-boreal-medium":[64,54,8.5,25.5,"23-45,19-47,14-52,10-54,9-56,7-57,8-55,22-52,23-38,23-38,23-38,24-37,24-37,24-40"],
+  "pal-boreal-small":[44,38,10.5,18.5,"19-23,12-32,10-34,5-39,4-40,6-38,9-35,12-32,16-28,17-27"],
   "pal-desert-large":[72,90,7.5,36,",,,,18-46,6-59,8-62,0-70,0-71,0-71,0-71,0-71,0-71,10-65,11-41,34-41,32-40,31-39,31-38,31-38,32-39,32-39,29-43"],
   "pal-desert-medium":[64,56,9,25,",,,,24-50,12-54,7-55,6-55,6-53,9-49,15-49,18-44,26-34,26-38"],
   "pal-desert-small":[44,40,19,22,",,21-23,8-36,6-38,4-40,2-41,0-43,0-37,18-26"],
@@ -1662,6 +1912,9 @@ const SPRITE_HIT = {
   "pal-wetland-large":[64,92,24.5,24.5,",,29-35,30-34,26-38,22-42,21-43,20-44,19-45,18-46,16-48,16-48,14-50,13-51,12-52,11-53,10-54,9-55,8-56,18-46,18-43,14-48,14-48"],
   "pal-wetland-medium":[60,28,21.5,28.5,",30-30,5-54,2-58,3-57,9-51"],
   "pal-wetland-small":[44,20,14.5,20.5,",8-36,2-42,3-41,11-33"],
+  "per-boreal-large":[72,92,9.5,35.5,"34-38,28-44,27-64,8-65,4-71,2-71,1-71,1-71,10-66,4-68,4-69,3-69,3-56,18-52,22-49,26-45,31-40,33-39,33-39,33-39,33-39,33-39,27-45"],
+  "per-boreal-medium":[64,54,12.5,31,",,,,10-24,10-53,4-53,2-58,1-60,1-61,1-61,20-62,21-43,23-41"],
+  "per-boreal-small":[44,38,19.5,19.5,",,,11-32,10-33,5-39,4-40,3-41,3-41,16-28"],
   "per-desert-large":[72,92,7.5,32.5,"21-51,18-54,21-51,11-61,12-60,14-58,6-66,7-65,8-64,4-68,5-67,6-66,27-45,34-38,34-38,34-38,33-39,33-39,33-39,33-39,33-39,33-39,29-43"],
   "per-desert-medium":[66,54,6.5,31.5,",21-43,15-49,11-53,5-59,3-61,6-58,1-63,2-62,30-35,31-35,31-35,31-35,27-39"],
   "per-desert-small":[44,36,19.5,19.5,",15-29,11-33,7-37,4-40,3-41,3-41,3-41,3-41"],
@@ -1681,6 +1934,7 @@ const SPRITE_HIT = {
   "q-bald-cypress":[64,92,26.5,26.5,",,29-35,29-35,30-34,24-39,21-43,21-47,19-45,19-45,14-48,16-48,14-50,14-50,11-53,11-53,9-55,9-55,6-58,6-58,16-44,13-49,13-49"],
   "q-bamboo":[60,56,15.5,29,"29-33,18-38,13-46,12-50,13-48,8-56,3-59,2-58,3-47,14-46,15-45,15-45,16-44,16-44"],
   "q-banana":[64,52,10,24.5,",18-41,18-41,6-54,6-54,13-47,10-50,6-54,6-54,26-38,26-42,26-42,23-37"],
+  "q-black-spruce":[56,92,7.5,15.5,"25-31,26-30,24-32,23-33,21-35,19-37,19-37,17-39,17-39,15-41,15-41,14-42,14-42,13-43,21-34,22-33,20-34,26-35,26-37,26-30,26-30,26-30,23-33"],
   "q-cattails":[44,46,11,16,"16-21,16-25,15-32,11-34,7-38,7-38,8-37,10-36,12-34,13-31,16-29,18-27"],
   "q-cypress-knees":[40,34,18.5,18.5,",19-21,19-21,13-22,11-28,5-34,4-36,3-37,2-38"],
   "q-dawn-redwood":[64,92,25.5,25.5,"30-34,30-34,30-34,26-38,24-40,24-40,22-42,21-43,20-44,19-45,18-46,17-47,15-48,14-50,14-50,12-52,11-53,10-54,9-55,8-56,7-57,8-56,25-39"],
@@ -1688,11 +1942,14 @@ const SPRITE_HIT = {
   "q-ginkgo":[64,52,5.5,27,"25-39,18-47,14-51,11-55,7-56,6-58,5-58,9-54,20-45,30-34,30-34,30-34,27-37"],
   "q-hibiscus":[48,40,19.5,20.5,",20-28,14-34,11-37,11-37,9-42,6-42,4-44,5-43,13-35"],
   "q-japanese-cherry":[64,50,6.5,31,"25-39,14-51,11-54,5-59,3-61,2-63,3-62,20-45,26-37,29-34,30-35,30-36,26-38"],
+  "q-labrador-tea":[48,40,13.5,20.5,"19-33,13-36,9-39,3-41,3-43,3-42,6-41,8-38,11-35,12-34"],
   "q-lilac":[56,50,20.5,22.5,",31-31,21-32,20-39,14-41,12-42,11-45,8-47,7-49,6-50,8-48,16-41,20-35"],
   "q-mahogany":[72,92,11.5,26.5,"29-43,26-46,24-48,16-56,15-57,14-58,11-61,10-62,12-60,11-61,12-60,10-62,33-39,33-39,33-39,33-39,33-39,33-39,33-39,31-41,30-42,27-45,25-47"],
   "q-mangrove":[64,56,25.5,27.5,",24-41,14-51,13-52,7-57,5-59,6-58,8-56,17-47,14-50,11-53,9-55,8-56,7-57"],
   "q-mesquite":[64,52,6.5,32,",23-41,11-53,8-56,3-61,0-63,1-63,2-62,23-41,29-35,29-34,29-34,26-38"],
+  "q-prairie-wildflowers":[48,40,19,22,"29-30,3-44,2-45,6-41,6-40,11-36,7-44,4-44,5-42,12-36"],
   "q-prickly-pear":[48,44,12.5,20,",19-25,12-29,8-39,5-43,5-44,6-43,10-40,11-37,12-36,16-32"],
+  "q-quaking-aspen":[64,92,6.5,24,",28-38,17-43,13-48,13-53,11-54,10-54,9-56,9-55,12-53,11-51,16-50,18-46,25-36,30-34,30-34,30-34,30-34,30-34,30-34,30-34,29-35,26-38"],
   "q-rose-bush":[56,44,18.5,24.5,",,,26-28,19-43,10-46,5-51,4-52,5-51,8-48,15-42"],
   "q-sagebrush":[48,40,16,21.5,",,20-30,13-33,7-41,4-44,3-45,5-43,8-39,10-38"],
   "q-strangler-fig":[72,92,13.5,36,"27-45,21-52,15-58,14-59,15-58,3-69,0-71,0-71,2-70,0-71,0-71,1-71,4-68,27-45,25-47,23-49,22-50,23-49,23-49,25-47,25-47,24-48,23-49"],
@@ -1700,9 +1957,15 @@ const SPRITE_HIT = {
   "q-water-lily":[48,26,22,23,",,18-40,16-39,3-45,2-47,17-47"],
   "q-weeping-willow":[72,92,7.5,29,",,,,,24-48,21-51,14-58,11-61,8-63,7-64,7-64,7-64,7-64,7-64,7-64,11-60,15-56,23-51,32-38,32-39,33-39,29-43"],
   "q-white-oak":[72,92,9.5,36,",36-36,26-46,24-48,19-54,17-56,16-57,4-68,1-71,0-71,3-69,1-71,0-71,2-70,6-66,31-40,32-39,32-39,33-39,33-39,33-39,33-39,27-45"],
+  "qua-boreal-large":[72,92,7.5,36,"25-49,20-55,21-61,15-62,11-61,10-67,10-70,5-70,3-70,3-71,1-71,0-70,2-50,23-39,35-39,35-39,35-39,35-39,35-39,34-39,33-39,33-39,29-43"],
+  "qua-boreal-medium":[64,46,22.5,25,",32-38,21-45,21-50,11-54,11-59,12-59,14-51,11-53,10-54,10-54,11-52"],
+  "qua-boreal-small":[44,30,19.5,19.5,",12-25,12-34,7-36,5-38,3-41,3-41,8-36"],
   "qua-desert-large":[72,92,8.5,36,"26-34,20-40,17-56,14-66,4-65,5-69,1-63,7-66,2-71,0-71,0-71,0-70,2-63,10-57,16-50,32-40,32-39,33-40,33-40,33-39,33-40,33-40,28-44"],
   "qua-desert-medium":[56,52,12.5,14.5,",,,19-37,17-39,15-41,14-42,14-42,14-42,14-42,15-41,17-39,20-36"],
   "qua-desert-small":[44,40,12,20.5,"25-25,13-27,4-37,3-38,5-37,1-41,2-41,5-38,12-32,16-25"],
+  "qua-grassland-large":[72,92,28.5,29.5,"26-47,18-48,17-57,22-58,9-56,8-65,11-66,13-64,15-61,15-60,16-59,17-58,18-57,18-57,19-56,15-57,10-62,8-62,8-64,10-64,13-62,17-57,25-49"],
+  "qua-grassland-medium":[64,48,23.5,26.5,",41-44,28-48,19-55,13-56,13-48,16-40,17-44,4-49,4-52,8-52,16-46"],
+  "qua-grassland-small":[44,32,14.5,17.5,"14-27,13-36,14-35,15-33,7-37,5-39,8-36,13-31"],
   "qua-scrubland-large":[70,92,11,32.5,",23-43,16-53,15-55,9-57,5-63,4-67,7-68,7-65,6-63,7-64,10-62,10-53,10-64,14-64,18-61,22-56,26-51,28-48,29-45,30-43,32-40,29-41"],
   "qua-scrubland-medium":[68,54,13.5,28.5,",29-39,18-50,12-56,9-59,7-61,6-62,7-61,8-60,11-57,17-51,23-47,26-43,29-39"],
   "qua-scrubland-small":[48,44,12.5,15,"22-24,16-32,15-32,15-32,15-32,15-32,16-34,10-39,12-37,15-34,20-29"],
@@ -1712,6 +1975,9 @@ const SPRITE_HIT = {
   "qua-tropical-large":[72,92,14.5,36,",29-43,26-46,19-54,17-56,16-57,7-65,0-71,0-71,1-71,0-71,0-71,1-71,4-68,14-57,15-57,14-57,33-39,30-42,29-43,26-46,24-48,22-50"],
   "qua-tropical-medium":[64,54,15.5,31.5,"25-39,20-44,19-45,10-48,5-54,4-59,1-60,1-63,17-63,17-47,18-46,18-46,18-46,16-46"],
   "qua-tropical-small":[44,38,17.5,18.5,",17-27,17-27,13-30,9-35,8-36,5-39,4-40,11-33,13-31"],
+  "qua-tundra-large":[72,92,12.5,31,"42-42,41-47,24-51,7-58,6-66,6-65,10-63,5-66,5-63,8-63,9-65,11-65,13-60,15-57,15-54,21-51,22-50,24-48,25-47,26-46,27-45,29-43,27-45"],
+  "qua-tundra-medium":[64,48,27,27.5,",,,33-41,16-42,14-45,12-44,11-53,14-52,5-56,7-59,15-53"],
+  "qua-tundra-small":[44,32,18.5,19.5,",,,10-34,5-39,4-40,3-41,5-39"],
   "qua-wetland-large":[72,92,6.5,26.5,",,,,,27-45,23-49,16-57,12-61,12-62,11-63,11-63,11-63,11-63,11-63,11-63,17-58,24-51,32-43,32-38,32-39,33-39,30-42"],
   "qua-wetland-medium":[64,50,15.5,28.5,",26-33,23-41,15-49,18-48,21-46,8-56,15-49,4-60,11-53,18-46,23-41,27-37"],
   "qua-wetland-small":[44,28,19.5,20.5,",,9-35,4-40,3-41,2-42,4-40"],
@@ -1730,10 +1996,18 @@ const SPRITE_HIT = {
   "tri-wetland-large":[64,92,26.5,32,",,,,31-35,22-40,19-49,16-52,13-54,10-57,8-59,6-61,4-61,3-63,2-63,0-62,0-63,3-63,1-58,0-47,0-34,30-34,28-36"],
   "tri-wetland-medium":[72,50,4.5,34.5,",,,,28-46,18-55,9-65,8-65,5-69,2-70,13-54,35-37,35-37"],
   "tri-wetland-small":[44,44,12,21.5,"31-31,29-33,11-33,12-43,1-43,2-41,4-39,7-37,9-34,12-32,15-29"],
+  "boulder-boreal-1":[61,56,25.5,26.5,",22-43,16-49,12-53,9-55,8-55,6-55,6-56,5-56,4-56,4-55,4-54,12-45"],
+  "boulder-boreal-2":[74,49,31.5,33,",39-61,34-65,32-67,10-68,7-68,5-69,4-69,4-68,4-65,7-57,16-21"],
+  "boulder-boreal-3":[36,52,14,14,",12-25,10-28,8-29,7-30,6-31,6-31,4-31,4-31,4-31,4-31,6-30"],
+  "boulder-boreal-4":[60,41,25.5,26,",17-45,10-51,7-53,5-55,4-55,4-55,5-55,7-51,21-35"],
   "boulder-desert-1":[72,61,31,32,",25-55,16-59,10-61,10-62,8-63,6-64,5-64,4-65,4-66,4-67,6-67,8-67,10-56,28-46"],
   "boulder-desert-2":[36,60,13.5,14,",18-29,14-30,12-31,10-31,8-31,7-31,7-31,6-31,5-31,4-30,4-30,4-29,8-26"],
   "boulder-desert-3":[76,63,33,34,",42-63,37-66,34-69,31-70,15-70,10-71,7-71,6-71,5-71,4-71,4-70,4-66,4-52,11-29"],
   "boulder-desert-4":[53,64,21,22.5,",12-38,7-42,7-44,5-47,5-47,4-48,4-48,4-48,4-48,4-48,5-48,6-46,7-42,21-39"],
+  "boulder-grassland-1":[60,57,25.5,26,",21-43,14-48,10-52,8-53,5-54,4-54,4-54,4-55,4-55,4-55,6-54,11-49,22-40"],
+  "boulder-grassland-2":[69,49,30.5,30.5,",34-56,31-60,28-62,11-63,7-64,5-64,4-64,4-64,4-64,7-54,16-24"],
+  "boulder-grassland-3":[37,46,14.5,14.5,",12-27,9-30,7-31,5-32,4-32,4-32,4-32,4-32,5-32,10-27"],
+  "boulder-grassland-4":[50,44,21,21,",12-38,8-42,6-43,4-44,4-44,4-45,4-45,4-44,10-39"],
   "boulder-scrubland-1":[68,66,30,30.5,",21-51,14-57,11-60,10-60,9-61,9-62,8-62,7-63,5-63,5-63,3-63,3-62,3-60,7-55,23-41"],
   "boulder-scrubland-2":[37,59,14.5,15,",16-29,13-30,10-31,9-31,8-31,6-32,6-32,6-31,5-31,3-31,3-31,4-31,7-26"],
   "boulder-scrubland-3":[74,62,33,33,",38-64,34-66,32-67,32-68,15-68,9-69,8-69,6-69,5-69,5-69,4-69,4-65,7-57,12-34"],
@@ -1746,15 +2020,31 @@ const SPRITE_HIT = {
   "boulder-tropical-2":[32,57,15,15,"13-25,9-27,7-29,5-29,3-30,2-30,1-30,1-30,1-30,1-30,1-30,2-30,6-30,10-28"],
   "boulder-tropical-3":[73,49,33,35.5,"36-57,30-65,26-69,12-71,6-71,3-71,1-71,1-71,1-71,1-67,1-63,6-29"],
   "boulder-tropical-4":[62,37,22,30,"14-44,3-55,1-60,1-60,2-60,2-60,9-57,12-55,16-52"],
+  "boulder-tundra-1":[68,50,28.5,30,",13-42,10-50,5-57,5-59,5-59,4-63,4-63,5-63,7-63,9-53,10-45"],
+  "boulder-tundra-2":[73,47,30,33,",39-54,31-62,26-65,9-68,5-68,5-68,3-68,3-64,4-59,7-29"],
+  "boulder-tundra-3":[37,51,14,14.5,",11-25,8-26,8-29,7-29,4-29,4-32,5-32,4-32,4-31,5-30,9-28"],
+  "boulder-tundra-4":[56,40,24,24,",10-39,6-46,6-48,4-51,4-51,4-51,4-51,4-43"],
   "boulder-wetland-1":[60,54,26,26,",16-47,11-50,9-51,8-53,6-53,5-54,4-54,4-55,4-55,4-55,9-47,14-42"],
   "boulder-wetland-2":[76,53,32.5,34,",40-59,33-65,31-68,31-70,9-70,8-70,6-71,5-71,4-69,4-66,4-56,16-22"],
   "boulder-wetland-3":[55,46,22.5,23.5,",15-42,12-46,7-49,7-49,5-50,4-50,4-50,4-50,8-46,13-42"],
+  "rock-boreal-1":[40,30,13.5,16,",10-32,5-34,4-35,4-35,5-33,11-26"],
+  "rock-boreal-2":[29,30,9.5,10.5,",6-22,5-24,4-24,4-24,5-23,10-18"],
+  "rock-boreal-3":[33,31,12,12.5,",7-26,5-28,4-28,4-28,4-28,7-27"],
+  "rock-boreal-4":[29,27,10.5,10.5,",6-21,5-23,4-24,4-24,5-22"],
+  "rock-boreal-5":[39,27,15.5,15.5,",19-31,8-34,5-34,4-34,6-34"],
+  "rock-boreal-6":[37,26,14,14.5,",9-27,5-32,4-32,4-32,7-27"],
   "rock-desert-1":[43,31,16.5,17.5,",7-31,6-36,5-38,4-38,4-37,10-35"],
   "rock-desert-2":[33,32,11.5,12.5,",7-24,5-26,4-28,4-28,4-28,4-25"],
   "rock-desert-3":[32,39,11.5,12,",10-22,7-25,5-26,5-26,4-27,4-27,4-26,7-24"],
   "rock-desert-4":[31,29,11,11.5,",7-22,5-25,4-26,4-26,5-26,12-19"],
   "rock-desert-5":[34,32,13,13,",7-24,4-27,4-28,4-29,4-29,7-25"],
   "rock-desert-6":[40,29,15,16,",18-32,4-34,4-35,4-35,4-33,9-23"],
+  "rock-grassland-1":[40,29,16,16,",10-29,6-33,4-35,4-35,4-35,13-28"],
+  "rock-grassland-2":[29,29,10.5,10.5,",7-21,5-23,4-24,4-24,4-24,10-19"],
+  "rock-grassland-3":[35,32,12.5,13.5,",9-26,6-28,4-30,4-30,4-30,6-28"],
+  "rock-grassland-4":[29,28,10.5,10.5,",8-21,5-23,4-23,4-24,5-24"],
+  "rock-grassland-5":[39,27,14.5,15.5,",18-32,8-33,4-34,4-34,6-31"],
+  "rock-grassland-6":[35,25,13,13.5,",8-28,4-30,4-30,4-29,10-22"],
   "rock-scrubland-1":[44,30,17,18,",5-38,4-39,4-39,4-39,5-38,14-29"],
   "rock-scrubland-2":[33,31,10.5,12.5,",8-25,5-27,4-28,4-28,5-28,7-23"],
   "rock-scrubland-3":[31,38,11.5,11.5,",10-22,7-25,5-25,5-26,4-26,4-26,5-25,8-24"],
@@ -1772,6 +2062,12 @@ const SPRITE_HIT = {
   "rock-tropical-4":[28,18,11.5,13,"4-24,1-25,1-26,1-25,2-21"],
   "rock-tropical-5":[39,27,12.5,18.5,"7-17,2-32,1-36,1-37,1-37,7-31,15-23"],
   "rock-tropical-6":[36,26,17,17,"8-30,4-32,2-33,1-34,1-34,1-34,8-29"],
+  "rock-tundra-1":[37,29,13.5,14.5,",10-30,6-31,4-32,4-32,6-32,13-19"],
+  "rock-tundra-2":[28,29,9.5,10,",6-19,4-23,4-23,4-23,4-22,12-19"],
+  "rock-tundra-3":[35,24,11,13.5,",6-27,4-30,4-30,5-30"],
+  "rock-tundra-4":[25,27,8,8.5,",6-17,5-20,4-20,4-20,4-19"],
+  "rock-tundra-5":[36,28,13.5,14,",16-28,6-31,5-31,4-31,4-30"],
+  "rock-tundra-6":[34,26,10.5,13,",6-23,5-28,4-29,4-29,8-24"],
   "rock-wetland-1":[43,31,15.5,17.5,",6-34,4-36,4-38,4-38,4-37,10-33"],
   "rock-wetland-2":[30,30,11,11,",6-22,5-25,4-25,4-25,4-25,8-24"],
   "rock-wetland-3":[39,31,14,16,",9-29,5-33,3-34,3-34,3-34,9-30"],
@@ -1861,6 +2157,9 @@ const STATUES = {
   marsh: {label:"O.C. Marsh",   initials:"OCM", text:"Named Stegosaurus, Triceratops and Apatosaurus in the Bone Wars."},
   cope:  {label:"E.D. Cope",    initials:"EDC", text:"Named over a thousand species, Dimetrodon among them, in the Bone Wars."},
 };
+// Species a non-dev player can see and get; everything else in SPECIES is hidden (saves that already own one keep it)
+const LAUNCH_ROSTER = ["arth","mega","pulm","dcau","comp","lyst","dryo","hyps","ovir","psit","coel","sile","orni","hete","mosc","scut","este","desm","scel","plat","gall","para","macr","aepy","mglo","pach","tric","trex","dipl","apat","mamm","smil","kele","icht","eryo","inos","diic","plhy","long","eryt","kent","cryo","allo","beel","simo","igua","velo","pter","paki","ambu","andr","chal","dgal","dodo","elas","prio","carc","spin","coty","dime","tikt"];
+const speciesAvailable = id => devMode() || LAUNCH_ROSTER.includes(id);
 const STATUE_PRICE = {animal:4000, person:7500};
 for(const [id, st] of Object.entries(STATUES)){
   const sp = st.sp && SPECIES.find(s => s.id === st.sp), name = sp ? sp.name : st.label;
@@ -1976,7 +2275,6 @@ const THEMES = {
       ridge:[[{c:"#10261A", w:3.6}, {c:"#C9A24B", w:1.5}], null, null],
       units:[null, {c:"#B3AEA1", c2:"#6F6B61", n:3, min:150}, null]},
     eave:{c:"#14281C", w:1.8},
-    emblem:["oracle", "ghost", "tar", "ceres"],
     // dark green steel rail: two rails with a small gold cap on each post. Dangerous animals get a tall steel panel wall on a concrete base with a gold band along the top.
     bord:{c:"#1F3D2B", w:5, trim:[{c:"#C9A24B", w:1}],
       more:[{c:"#CBC5B4", w:1.5}, {c:"#14281C", w:6.5, dash:"0 34", cap:"round"}, {c:"#C9A24B", w:3, dash:"0 34", cap:"round"}],
@@ -2249,6 +2547,12 @@ const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 
 // Service roads are for staff. Guests don't walk on them, but they connect backstage buildings.
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
+// Paths are 5 m x 5 m chunks (js/pathcells.js). A chunk is 5 m of path, so it costs perMeter times 5.
+const PATH_CELLS = {width:5, kinds:{
+  g:{label:"Guest path",     perMeter:COST.pathPerMeter,   upkeepPerMeter:UPKEEP.pathPerMeter,         color:"#C9BFA8"},
+  s:{label:"Staff path",     perMeter:SERVICE_ROAD.perMeter, upkeepPerMeter:SERVICE_ROAD.upkeepPerMeter, color:"#5A5F64"},
+  b:{label:"Wooden bridge",  perMeter:BRIDGE.perMeter,     upkeepPerMeter:BRIDGE.upkeepPerMeter,      color:"#A9825A"}
+}};
 const WIDE_PATH = {perMeter:30, upkeepPerMeter:0.4, halfWidth:5, crowdMult:2};   // a 10 m promenade: twice the walkers before it feels packed
 // Tram track is drawn like a path, but guests only get on and off at a tram station. The tram runs speedMult times faster than walking.
 const TRAM = {
@@ -2297,11 +2601,22 @@ const GOALS = [
   {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once ORACLE has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
-  {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report after closing.", theme:"gilded", check:g=>g.state.money>=1000000},
+  {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at ORACLE. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},
 ];
+// Held back from the v1.0 game (shown only in dev-mode): hotels, Education Centers and their modules, the tram. Placed ones in old saves keep working.
+const DEV_BUILDINGS = ["campground", "lodge", "resort", "edcenter", "tramstop", "depot"];
+const DEV_TECH = ["vehicles", "hotels", "transit", "education", "edtheater", "edfossils", "edauditorium", "edlabwindow", "ednursery", "edbotanical", "edsimroom", "ediorama", "edtouch"];
+const DEV_GOALS = ["camp", "hotel", "resort"];
+const devHidden = (list, id) => !devMode() && list.includes(id);
+const buildingHidden = type => devHidden(DEV_BUILDINGS, type);
+const techHidden = id => devHidden(DEV_TECH, id);
+// Statues are dev-mode only for v1.0: no buying, no grant rewards. Placed ones in old saves keep drawing and working.
+const statuesOn = () => devMode();
+const grantStatue = g => statuesOn() ? g.statue || null : null;
+const activeGoals = () => GOALS.filter(g => !devHidden(DEV_GOALS, g.id));
 // What a grant pays: cash, or a theme
-const grantPrize = g => (g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward)) + (g.statue ? ` and ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue` : "");
+const grantPrize = g => (g.theme ? `${THEMES[g.theme].label} theme` : money(g.reward)) + (grantStatue(g) ? ` and ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue` : "");

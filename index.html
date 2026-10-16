@@ -1,4 +1,4 @@
-<title>Genesis Park Tycoon</title>
+<title>PALEO-TYCOON</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,6 +47,7 @@ button:disabled{cursor:default}
 /* ----- top bar ----- */
 .hud{display:flex;align-items:center;gap:18px;padding:8px 14px;background:var(--forest);color:var(--on-forest);flex-wrap:wrap;row-gap:6px}
 .brand{display:flex;align-items:center;gap:9px;min-width:0}
+.brand small{font:600 10px/1 "Barlow Condensed",sans-serif;opacity:.55;cursor:default;user-select:none;-webkit-user-select:none}
 .brand b{font:700 19px/1 "Barlow Condensed",sans-serif;letter-spacing:.01em;white-space:nowrap}
 .readouts{display:flex;gap:18px;align-items:center;flex-wrap:wrap;row-gap:4px}
 .ro{display:flex;flex-direction:column;line-height:1.05}
@@ -68,10 +69,12 @@ button:disabled{cursor:default}
 /* ----- map ----- */
 main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0}
 .mapwrap{position:relative;min-width:0;min-height:0;background:var(--outside)}
+#wxfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
 #map{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
 .mapwrap.tool-exhibit #map,.mapwrap.tool-path #map,.mapwrap.tool-wide #map{cursor:crosshair}
 .mapwrap.tool-bulldoze #map{cursor:not-allowed}
-.tools{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:8px;z-index:5;max-height:calc(100% - 24px);overflow-y:auto;scrollbar-width:thin;padding-bottom:2px}
+.mapwrap.tool-paint #map{cursor:crosshair}
+.tools{position:absolute;top:12px;left:12px;display:flex;flex-direction:column;gap:8px;z-index:5;max-height:calc(100% - 64px);overflow-y:auto;scrollbar-width:thin}
 .tgroup{display:flex;flex-direction:column;background:var(--chrome);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.14)}
 .tgroup{flex-shrink:0}
 .tgroup button{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:center;border:0;background:none;padding:5px 12px 5px 9px;text-align:left;white-space:nowrap}
@@ -111,6 +114,10 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .srow .tl b{font-weight:600}
 .srow .price{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
 .srow.locked{opacity:.55}
+.shapes{display:flex;flex-wrap:wrap;gap:4px;padding:2px 12px 6px 14px}
+.shapes .shape{width:34px;height:34px;padding:2px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line,#999);border-radius:4px;background:var(--chrome-2);font-weight:700}
+.shapes .shape[aria-pressed="true"]{background:var(--forest);border-color:var(--forest);color:var(--on-forest)}
+.shapes img{max-width:100%;max-height:100%;image-rendering:pixelated}
 .ssub{display:none;flex-direction:column;border-left:2px solid var(--line);margin:0 0 4px 22px}
 .sitem.open>.ssub{display:flex}
 .srow.sub{padding-left:10px}
@@ -123,6 +130,9 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .tgroup.zoom{flex-direction:row}
 .tgroup.zoom button{display:block;text-align:center;font-size:17px;padding:5px 0;width:44px}
 .tgroup.zoom button+button{border-top:0;border-left:1px solid var(--line)}
+.zoombar{position:absolute;left:12px;bottom:12px;z-index:6;width:max-content}
+.tgroup.zoom.zoombar button{width:38px;padding:4px 0}
+.tgroup.zoom.zoombar #zfit{width:42px}
 
 .drawbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:14px;background:var(--forest);color:var(--on-forest);border-radius:10px;padding:8px 8px 8px 14px;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:calc(100% - 24px)}
 .drawbar.on{display:flex}
@@ -269,6 +279,11 @@ dialog.catalog[open]{display:flex}
 .deptlist .btn{font-weight:600;font-size:13px}
 
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--chrome);color:var(--ink);padding:20px;width:min(520px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog.parkmap{width:fit-content;max-width:94vw;padding:14px}
+dialog.parkmap .cat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+dialog.parkmap .cat-head h2{margin:0}
+#parkMapCv{display:block;max-width:100%;height:auto;image-rendering:pixelated;cursor:crosshair;border-radius:6px}
+dialog.parkmap p{margin:8px 0 0;font-size:13px}
 dialog::backdrop{background:rgba(0,0,0,.5)}
 .biomepick{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin:4px 0 14px}
 .biomepick button{display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:5px;border:1px solid var(--line);border-radius:10px;background:var(--field);text-align:left;font-size:13px;font-weight:600}
@@ -277,6 +292,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 .biomepick small{font-weight:400;color:var(--ink-2);font-size:11.5px;line-height:1.2}
 .setup{margin-bottom:6px}
 .setup .field{margin-bottom:10px}
+.startTitle{font-size:40px!important;letter-spacing:.04em}
 dialog h2{margin:0 0 8px;font:700 26px/1.1 "Barlow Condensed",sans-serif;text-wrap:balance}
 dialog p{margin:0 0 10px;color:var(--ink-2)}
 dialog ol,dialog ul{margin:0 0 14px;padding-left:20px;display:flex;flex-direction:column;gap:6px}
@@ -311,14 +327,15 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .side{width:min(252px,calc(100vw - 72px))}
   .sidebody{max-height:calc(100vh - 230px)}
   .mapwrap.side-open .drawbar{left:62px}
-  .tgroup.zoom{flex-direction:column}
-  .tgroup.zoom button{width:40px}
-  .tgroup.zoom button+button{border-left:0;border-top:1px solid var(--line)}
+  .zoombar{left:8px;bottom:58px}
+  .tools{max-height:calc(100% - 112px)}
   .toasts{bottom:58px}
   .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:none;width:auto;flex-wrap:wrap;gap:8px}
   .drawbar .dbtns{width:100%}
   .drawbar .dbtns button{flex:1}
 }
+.app.focus main{grid-template-columns:1fr}
+.app.focus #aside,.app.focus #sideMenu{display:none}
 @media (prefers-reduced-motion: reduce){aside{transition:none}}
 </style>
 
@@ -330,7 +347,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <path d="M6 30 Q8 14 20 12 Q32 14 34 30 Z" fill="#0E1912"/>
         <path d="M8 22 L4 16 L11 18 L10 10 L16 14 L20 6 L24 14 L30 10 L29 18 L36 16 L32 22" fill="#0E1912"/>
       </svg>
-      <b id="parkName">Genesis Park</b>
+      <b id="parkName" style="cursor:pointer" title="Open the park office">Genesis Park</b>
+      <small id="verLabel" title="Version">v0.9</small>
     </div>
     <div class="readouts">
       <div class="ro money" id="roMoney"><small>Bank</small><span id="money" class="num">$0</span></div>
@@ -338,20 +356,24 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
       <div class="ro hide-sm"><small>In the park</small><span id="inpark" class="num">0</span></div>
       <div class="ro"><small>Rating</small><span id="rating"></span></div>    </div>
     <div class="clock">
-      <div class="ro"><small id="dayLabel">Day 1</small><span id="clock" class="num">8:00 AM</span><div class="daybar"><i id="dayFill"></i></div></div>
+      <div class="ro"><small id="dayLabel">1 Jan Y1</small><span id="clock" class="num">8:00 AM</span><b id="closedTag" hidden style="color:var(--bad);font:600 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase">Closed</b><div class="daybar"><i id="dayFill"></i></div></div>
       <div class="speed" role="group" aria-label="Game speed">
         <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
         <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
         <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
         <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
       </div>
+      <button class="hbtn" id="focusBtn" aria-pressed="false" title="Hide the menus to see only the map (H)">Hide menus</button>
       <button class="hbtn" id="animalsBtn">Animals</button>
+      <button class="hbtn" id="mapBtn" title="See the whole park (M)">Park Map</button>
       <button class="hbtn" id="menuBtn">Park</button>
     </div>
   </header>
 
   <main>
     <div class="mapwrap" id="mapwrap">
+      <svg id="nightWash" style="position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;mix-blend-mode:multiply;opacity:0"><defs><mask id="washMask" maskUnits="userSpaceOnUse" x="-3000" y="-3000" width="8000" height="8000"><rect x="-3000" y="-3000" width="8000" height="8000" fill="#fff"/><g id="washHoles"></g></mask></defs><g id="washCam"><rect x="-3000" y="-3000" width="8000" height="8000" fill="#0b1640" mask="url(#washMask)"/></g></svg>
+      <svg id="lightSvg" style="position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;mix-blend-mode:screen"><g id="lightCam"><g id="lightPools" opacity="0"></g></g></svg>
       <svg id="map" aria-label="Your park">
         <defs>
           <pattern id="contours" width="240" height="240" patternUnits="userSpaceOnUse">
@@ -371,56 +393,31 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
             <circle cx="1.5" cy="2" r=".9" fill="#5A3E1E"/><circle cx="5" cy="5.2" r="1.1" fill="#6B4A24"/><circle cx="5.6" cy="1.2" r=".5" fill="#4A3218"/>
           </pattern>
           <!-- biome textures, drawn over each open exhibit's biome color -->
-          <pattern id="b-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-grassland" width="12" height="12" patternUnits="userSpaceOnUse">
-            <path d="M1.5 4.2L2 2.4L2.4 4.2M2 4.2L2.9 2.8M7.5 10.2L8 8.4L8.4 10.2M8 10.2L8.9 8.8M9.5 3.6L10 2.2L10.3 3.6M3.5 9.6L3.9 8.4L4.2 9.6" fill="none" stroke="#6E8A3A" stroke-width=".32" stroke-linecap="round"/>
-            <path d="M5 6.5h1.2M10.5 6.8h.9M.5 11h1" stroke="#C9DB8E" stroke-width=".3" stroke-linecap="round" stroke-opacity=".8"/>
-            <circle cx="6" cy="2.5" r=".3" fill="#E8D45A"/><circle cx="11" cy="10.5" r=".25" fill="#F2F0E4"/>
-          </pattern>
-          <pattern id="b-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-boreal" width="16" height="16" patternUnits="userSpaceOnUse">
-            <path d="M4 1.2l.7 1.8 1.8.3-1.4 1.1.6 1.8L4 5.1 2.3 6.2l.6-1.8-1.4-1.1 1.8-.3z" fill="#2F5446" fill-opacity=".75"/>
-            <path d="M12 9.2l.6 1.5 1.5.2-1.2.9.5 1.5L12 12.5l-1.4.8.5-1.5-1.2-.9 1.5-.2z" fill="#2F5446" fill-opacity=".7"/>
-            <path d="M8 4.5l.9.5M9.5 7l.8-.6M2 10l.9.2M14 3.5l.5.8M6 14l.9-.4" stroke="#6A5A3A" stroke-width=".25" stroke-linecap="round" stroke-opacity=".7"/>
-            <circle cx="11" cy="2.5" r=".4" fill="#F2F5F4"/><circle cx="3" cy="12.5" r=".45" fill="#F2F5F4"/><circle cx="14.5" cy="14.5" r=".3" fill="#F2F5F4"/>
-          </pattern>
-          <pattern id="b-tundra" width="18" height="18" patternUnits="userSpaceOnUse">
-            <path d="M0 6L5 5L9 7L14 5.5L18 6M5 5L4.5 0M9 7L10 12.5L6 18M10 12.5L16 12L18 13M16 12L14 5.5" fill="none" stroke="#7E8A78" stroke-width=".3" stroke-opacity=".65"/>
-            <circle cx="3" cy="11" r="1.3" fill="none" stroke="#E4E6CF" stroke-width=".4" stroke-opacity=".8"/><circle cx="13" cy="2.5" r=".9" fill="none" stroke="#E4E6CF" stroke-width=".35" stroke-opacity=".8"/>
-            <circle cx="14" cy="15.5" r="1.1" fill="#8A9A62" fill-opacity=".55"/><circle cx="7" cy="2.5" r=".8" fill="#8A9A62" fill-opacity=".5"/>
-            <circle cx="12" cy="9" r=".35" fill="#6E726C"/><circle cx="1.5" cy="16" r=".3" fill="#6E726C"/>
-          </pattern>
+          <pattern id="b-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-grassland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-boreal" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tundra" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <!-- park ground textures: the open land between the exhibits, by the park's biome (larger and softer than an exhibit's floor) -->
-          <pattern id="p-grassland" width="64" height="64" patternUnits="userSpaceOnUse">
-            <ellipse cx="18" cy="20" rx="14" ry="8" fill="#9DB574" fill-opacity=".16"/><ellipse cx="48" cy="48" rx="12" ry="7" fill="#C6D6A2" fill-opacity=".16"/>
-            <path d="M8 40l.7-1.8.6 1.8M30 10l.7-1.8.6 1.8M44 22l.7-1.8.6 1.8M56 34l.7-1.8.6 1.8M22 56l.7-1.8.6 1.8M38 36l.7-1.8.6 1.8M4 8l.7-1.8.6 1.8" fill="none" stroke="#7E9A4A" stroke-width=".4" stroke-linecap="round"/>
-            <circle cx="34" cy="52" r=".5" fill="#E8D45A"/><circle cx="58" cy="12" r=".5" fill="#F2F0E4"/>
-          </pattern>
-          <pattern id="p-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="w-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/water/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="w-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/water/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="w-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/water/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="w-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/water/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="w-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/water/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-boreal" width="64" height="64" patternUnits="userSpaceOnUse">
-            <ellipse cx="20" cy="40" rx="14" ry="9" fill="#7A9480" fill-opacity=".16"/>
-            <path d="M44 10l1.2 3 3 .5-2.4 1.8 1 3-2.8-1.6-2.8 1.6 1-3-2.4-1.8 3-.5z" fill="#3C6250" fill-opacity=".55"/>
-            <path d="M14 14l.9 2.2 2.2.4-1.8 1.4.8 2.2-2.1-1.2-2.1 1.2.8-2.2-1.8-1.4 2.2-.4z" fill="#3C6250" fill-opacity=".45"/>
-            <circle cx="52" cy="40" r="1.4" fill="#F2F5F4" fill-opacity=".7"/><circle cx="30" cy="56" r="1" fill="#F2F5F4" fill-opacity=".7"/><circle cx="6" cy="30" r=".8" fill="#F2F5F4" fill-opacity=".6"/>
-            <path d="M34 28l1 .6M38 32l.9-.7M26 24l1 .3" stroke="#6A5A3A" stroke-width=".35" stroke-linecap="round" stroke-opacity=".6"/>
-          </pattern>
-          <pattern id="p-tundra" width="64" height="64" patternUnits="userSpaceOnUse">
-            <path d="M0 20L16 16L30 22L46 17L64 20M16 16L14 0M30 22L33 40L22 64M33 40L52 38L64 42M52 38L46 17" fill="none" stroke="#97A08F" stroke-width=".5" stroke-opacity=".6"/>
-            <circle cx="10" cy="36" r="3" fill="none" stroke="#EEEFDF" stroke-width=".7" stroke-opacity=".8"/><circle cx="44" cy="8" r="2" fill="none" stroke="#EEEFDF" stroke-width=".6" stroke-opacity=".8"/>
-            <ellipse cx="48" cy="52" rx="4" ry="3" fill="#9AA874" fill-opacity=".45"/><circle cx="22" cy="8" r="1.8" fill="#9AA874" fill-opacity=".4"/><circle cx="40" cy="28" r=".6" fill="#7A7E78"/>
-          </pattern>
+          <pattern id="p-grassland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-grassland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/grassland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-boreal" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/boreal.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-tundra" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/tundra.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-scrubland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/scrubland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-desert" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/desert.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="w-tropical" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/tropical.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-boreal" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tundra" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <!-- theme textures, laid over paths, buildings, exhibit border bands and zone ground -->
           <pattern id="t-gilded" width="12" height="6" patternUnits="userSpaceOnUse">
             <path d="M0 .25H12M0 3.25H12M3 .25V3.25M9 3.25V6.25" fill="none" stroke="#2B1D18" stroke-width=".5" stroke-opacity=".5"/><rect x="4" y="3.7" width="4" height="2" fill="#D9A07F" fill-opacity=".25"/><rect x="9.5" y=".6" width="2" height="2.3" fill="#000" fill-opacity=".12"/>
@@ -731,18 +728,20 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <g id="tramLayer"></g>
           <g id="keeperLayer"></g>
           <g id="looseLayer"></g>
+          <g id="fxLayer" pointer-events="none"></g>
           <g id="overlay"></g>
         </g>
       </svg>
+      <canvas id="wxfx" aria-hidden="true" data-kind="fair"></canvas>
 
       <div class="tools">
         <nav id="sideMenu" class="side" aria-label="Build menu"></nav>
-        <div class="tgroup zoom">
-          <button id="zin" aria-label="Zoom in">+</button>
-          <button id="zout" aria-label="Zoom out">−</button>
-          <button id="zfit" aria-label="Show the whole park" style="font-size:13px">Fit</button>
-          <button id="ztilt" aria-label="Switch the 3/4 view on or off" style="font-size:12px">3/4</button>
-        </div>
+      </div>
+
+      <div class="tgroup zoom zoombar">
+        <button id="zin" aria-label="Zoom in">+</button>
+        <button id="zout" aria-label="Zoom out">−</button>
+        <button id="zfit" aria-label="Show the whole park" style="font-size:13px">Fit</button>
       </div>
 
       <div class="drawbar" id="drawbar" role="status">
@@ -766,14 +765,21 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   </main>
 </div>
 
-<dialog id="dlgIntro">
-  <h2>Welcome to Genesis Park</h2>
-  <p>You have $150,000 and an empty plot. Turn it into a park people will pay to see.</p>
-  <div class="setup" id="introSetup" hidden>
-    <label class="field"><span>Name your park</span><input id="introName" maxlength="40" placeholder="Genesis Park"></label>
-    <div class="field"><span>Where it's set</span></div>
-    <div class="biomepick" id="introBiomes" role="radiogroup" aria-label="Park biome"></div>
+<dialog id="dlgStart">
+  <h2 class="startTitle">PALEO-TYCOON</h2>
+  <p>Bring the past back to life and build a park people will pay to see.</p>
+  <div class="row" style="margin-bottom:14px"><button class="btn primary" id="startContinue" hidden>Continue</button><button class="btn" id="startNew">New park</button></div>
+  <div class="setup" id="startSetup" hidden>
+    <label class="field"><span>Name your park</span><input id="startName" maxlength="40" placeholder="Genesis Park"></label>
+    <div class="field"><span>Where it's set (this can't be changed later)</span></div>
+    <div class="biomepick" id="startBiomes" role="radiogroup" aria-label="Park biome"></div>
+    <div class="row"><button class="btn primary" id="startGo">Open the park</button></div>
   </div>
+</dialog>
+
+<dialog id="dlgIntro">
+  <h2>Welcome to PALEO-TYCOON</h2>
+  <p>You have $150,000 and an empty plot. Turn it into a park people will pay to see.</p>
   <ol>
     <li><b>Draw an exhibit</b> from Build, Exhibit Tools, Fence Types. Pick a fence, tap corners on the map, then tap the first corner to close it.</li>
     <li><b>Connect it with a path</b> that starts from the entrance at the bottom. Guests only see exhibits beside a path.</li>
@@ -799,6 +805,12 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <div id="catalogBody" class="cat-body"></div>
 </dialog>
 
+<dialog id="dlgParkMap" class="parkmap">
+  <div class="cat-head"><h2>Park Map</h2><button class="btn" id="closeParkMap">Close</button></div>
+  <canvas id="parkMapCv" aria-label="Map of the whole park. Click to look there."></canvas>
+  <p class="snote">Grey is land you don't own. The white box is what the main view shows. Click the map to look there.</p>
+</dialog>
+
 <dialog id="dlgMove">
   <h2 id="moveTitle">Move animals</h2>
   <div id="moveBody"></div>
@@ -809,20 +821,6 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <h2 id="confirmTitle"></h2>
   <p id="confirmText"></p>
   <div class="row"><button class="btn danger" id="confirmYes">Yes</button><button class="btn primary" id="confirmNo" style="margin-left:auto">Cancel</button></div>
-</dialog>
-
-<dialog id="dlgMenu">
-  <h2>Park office</h2>
-  <label class="field" style="margin-bottom:14px"><span>Park name</span><input id="nameInput" maxlength="40"></label>
-  <div class="field"><span>Park biome</span></div>
-  <div class="biomepick" id="menuBiomes" role="radiogroup" aria-label="Park biome"></div>
-  <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
-  <p id="saveInfo"></p>
-  <div class="row">
-    <button class="btn" id="howBtn">How to play</button>
-    <button class="btn danger" id="newGame">Start a new park</button>
-    <button class="btn" id="closeMenu" style="margin-left:auto">Close</button>
-  </div>
 </dialog>
 
 <dialog id="dlgDeaths">
@@ -837,6 +835,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <div class="row"><button class="btn primary" id="overNew">Start a new park</button></div>
 </dialog>
 
+<script src="js/spritepack.js"></script>
 <script src="js/data.js"></script>
 <script src="js/geometry.js"></script>
 <script src="js/sim.js"></script>
@@ -848,6 +847,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/medicine.js"></script>
 <script src="js/landscape.js"></script>
 <script src="js/fences.js"></script>
+<script src="js/pathcells.js"></script>
 <script src="js/themes.js"></script>
 <script src="js/behavior.js"></script>
 <script src="js/logistics.js"></script>
@@ -860,11 +860,15 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/lodging.js"></script>
 <script src="js/menu.js"></script>
 <script src="js/rigs.js"></script>
+<script src="js/biomepaint.js"></script>
 <script src="js/map.js"></script>
+<script src="js/propart.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/scienceui.js"></script>
 <script src="js/logiui.js"></script>
 <script src="js/guestui.js"></script>
 <script src="js/staffui.js"></script>
+<script src="js/animalui.js"></script>
+<script src="js/parkmap.js"></script>
 <script src="js/main.js"></script>
 

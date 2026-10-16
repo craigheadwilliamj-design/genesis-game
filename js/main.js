@@ -22,6 +22,7 @@ events.toast = (t, kind) => ui.toast(t, kind);
 // Deaths pile up while the day rolls over, then show once in a dialog that pauses the game
 let deathQueue = [];
 events.died = d => deathQueue.push(d);
+events.fx = (kind, x, y) => fxAdd(kind, x, y);
 function showDeaths(){
   if(!deathQueue.length) return;
   const n = deathQueue.length;
@@ -37,7 +38,7 @@ $("#dlgDeaths").addEventListener("cancel", e => e.preventDefault());   // Esc do
 events.dayEnded = r => {
   const L = r.ledger, row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
   const stars = r.rating - r.ratingBefore;
-  ui.toast("", "day", `<h4>Day ${r.day} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
+  ui.toast("", "day", `<h4>${fmtDate(r.day)} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
     ${row("Tickets", money(L.tickets))}
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
     ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
@@ -62,13 +63,8 @@ events.dayEnded = r => {
 };
 events.gameOver = () => {
   setSpeed(0);
-  if(state.over === "shutdown"){
-    $("#dlgOver h2").textContent = "The park has been shut down";
-    $("#overText").textContent = `After ${state.safety.deaths} guest deaths from escaped animals, the authorities closed ${state.name} on day ${state.day}. Stronger barriers, moats, and enough keepers with dart guns keep animals where they belong.`;
-  } else {
-    $("#dlgOver h2").textContent = "The park went bankrupt";
-    $("#overText").textContent = `You ran out of money on day ${state.day - 1}, with ${money(state.money)} in the bank. Try building fewer things before the guests arrive, and keep an eye on the bills at closing.`;
-  }
+  $("#dlgOver h2").textContent = "The park went bankrupt";
+  $("#overText").textContent = `${state.name} went bankrupt on ${fmtDate(state.day)}, ${money(-state.money)} in debt. Try building fewer things before the guests arrive, and keep an eye on the daily bills.`;
   $("#dlgOver").showModal();
 };
 
@@ -93,16 +89,20 @@ function step(now){
   drawParties();
   if(sel && sel.kind === "guest") guestLive();
   if(sel && sel.kind === "staff") staffLive();
+  if(sel && sel.kind === "animal") animalLive();
+  cloneLive();
   drawTrams();
   drawKeepers();
   drawGates(now);
-  drawStaffRing();
+  drawWeather(now);
+  drawStaffRing(); drawAnimalRing();
   drawLoose();
+  drawFx(now);
   ui.hud();
   sinceDraw += dt; sincePanel += dt;
   if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }
   // refresh the side panel now and then, but not while the mouse is over it (so buttons don't jump)
-  if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
+  if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff" || sel.kind === "animal")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement) && !panelEl.querySelector("[data-armed='1']")){ sincePanel = 0; ui.panel(); }
 }
 
 /* ---------- saving ---------- */
@@ -135,51 +135,74 @@ function startWith(s, fresh){
   recompute(); buildGuestGraph(); buildKeeperGraph();
   fit(); ui.panel(); ui.hud(true); refreshMenu();
   setSpeed(state.over ? 0 : 1);
-  // a new park starts with a name and the biome it's set in
-  $("#introSetup").hidden = !fresh;
-  if(fresh){ $("#introName").value = ""; biomeCards($("#introBiomes")); setSpeed(0); $("#dlgIntro").showModal(); }
+  if(fresh){ setSpeed(0); $("#dlgIntro").showModal(); }   // a new park opens with the how-to
 }
 
-/* ---------- the park's biome: picked when it opens, and changed any time in the park office ---------- */
+/* ---------- the start screen, and the park's biome: picked when a new park opens and locked for its life ---------- */
 // One card per biome: a swatch of the park's ground in it, its name, and what it looks like
-function biomeCards(el){
-  const cur = parkBiome();
+function biomeCards(el, cur){
   el.innerHTML = Object.entries(BIOMES).map(([k, b]) => `<button type="button" data-biome="${k}" role="radio" aria-checked="${k === cur}" aria-pressed="${k === cur}"><svg viewBox="0 0 48 22" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="48" height="22" fill="${b.park}"/><rect width="48" height="22" fill="url(#p-${k})"/></svg>${esc(b.label)}<small>${esc(b.ground[0].toUpperCase() + b.ground.slice(1))}</small></button>`).join("");
 }
+// only the start screen picks a biome, and only for the park about to open (never state.biome)
+let startBiome = DEFAULT_PARK_BIOME;
 function pickBiome(e){
   const b = e.target.closest("[data-biome]"); if(!b || !BIOMES[b.dataset.biome]) return;
-  state.biome = b.dataset.biome;
-  biomeCards(e.currentTarget); render(); saveSoon();
+  startBiome = b.dataset.biome; biomeCards(e.currentTarget, startBiome);
 }
-$("#introBiomes").addEventListener("click", pickBiome);
-$("#menuBiomes").addEventListener("click", pickBiome);
+function showStart(){
+  $("#startSetup").hidden = true; $("#startNew").hidden = false;
+  const c = $("#startContinue"); c.hidden = !savedGame; if(savedGame) c.textContent = `Continue: ${savedGame.name}`;
+  if(!$("#dlgStart").open) $("#dlgStart").showModal();
+}
+// Click the version label 5 times in a row (each within 1.5 s of the last) to flip dev-mode.
+{ let n = 0, last = 0;
+  $("#verLabel").addEventListener("click", () => {
+    const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
+    if(n < 5) return;
+    n = 0;
+    const on = !devMode();
+    try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
+    ui.toast(on ? "Dev mode on. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
+  });
+}
+$("#startBiomes").addEventListener("click", pickBiome);
+$("#dlgStart").addEventListener("cancel", e => e.preventDefault());
+$("#startContinue").onclick = () => { $("#dlgStart").close(); startWith(savedGame, false); };
+$("#startNew").onclick = () => { startBiome = DEFAULT_PARK_BIOME; biomeCards($("#startBiomes"), startBiome); $("#startName").value = ""; $("#startSetup").hidden = false; $("#startNew").hidden = true; };
+$("#startGo").onclick = () => {
+  const s = newPark(); s.name = $("#startName").value.trim().slice(0, 40) || "Genesis Park"; s.biome = startBiome;
+  $("#dlgStart").close(); startWith(s, true); saveNow();
+};
 
 /* ---------- dialogs ---------- */
-$("#introGo").onclick = () => {
-  if(!$("#introSetup").hidden){ state.name = $("#introName").value.trim().slice(0, 40) || "Genesis Park"; $("#introSetup").hidden = true; ui.hud(true); ui.panel(); saveSoon(); }
-  $("#dlgIntro").close(); setSpeed(1);
-};
+$("#introGo").onclick = () => { $("#dlgIntro").close(); setSpeed(1); };
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
-$("#menuBtn").onclick = () => { $("#nameInput").value = state.name; $("#sandboxToggle").checked = !!state.sandbox; biomeCards($("#menuBiomes")); saveInfo(saveMsg || "Saved in this browser."); $("#dlgMenu").showModal(); };
-$("#closeMenu").onclick = () => $("#dlgMenu").close();
-$("#nameInput").addEventListener("input", e => { state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true); if(!sel) ui.panel(); saveSoon(); });
-$("#sandboxToggle").addEventListener("change", e => { state.sandbox = e.target.checked; if(state.sandbox){ state.money = SANDBOX_MONEY; state.science.points = SANDBOX_POINTS; } ui.hud(true); ui.panel(); saveSoon(); });
-$("#howBtn").onclick = () => { $("#dlgMenu").close(); $("#introSetup").hidden = true; $("#dlgIntro").showModal(); };
-$("#newGame").onclick = () => {
-  const b = $("#newGame");
-  if(b.dataset.armed !== "1"){ b.dataset.armed = "1"; b.textContent = "Tap again. This erases your park"; setTimeout(() => { b.dataset.armed = ""; b.textContent = "Start a new park"; }, 3500); return; }
-  b.dataset.armed = ""; b.textContent = "Start a new park";
-  $("#dlgMenu").close();
-  startWith(newPark(), true); saveNow();
-};
-$("#overNew").onclick = () => { $("#dlgOver").close(); startWith(newPark(), true); saveNow(); };
+function openParkOffice(tab){
+  if(focusMode()) setFocus(false);
+  officeTab = typeof tab === "string" ? tab : "office"; select(null);
+  $("#aside").classList.add("open");
+}
+$("#menuBtn").onclick = () => openParkOffice();
+$("#parkName").onclick = () => openParkOffice();
+panelEl.addEventListener("input", e => {
+  if(e.target.id !== "officeName") return;
+  state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true);
+  const t = $("#officeTitle"); if(t) t.textContent = state.name;
+  saveSoon();
+});
+panelEl.addEventListener("change", e => {
+  if(e.target.id !== "sandboxToggle") return;
+  state.sandbox = e.target.checked; if(state.sandbox){ state.money = SANDBOX_MONEY; state.science.points = SANDBOX_POINTS; }
+  ui.hud(true); ui.panel(); saveSoon();
+});
+$("#overNew").onclick = () => { $("#dlgOver").close(); setSpeed(0); showStart(); };
 
 document.addEventListener("visibilitychange", () => { if(document.hidden) saveNow(); });
 window.addEventListener("resize", () => { if(state) render(); });
 
 /* ---------- start ---------- */
-const saved = loadLocal();
-startWith(saved || newPark(), !saved);
+let savedGame = loadLocal();
+startWith(savedGame || newPark(), false); setSpeed(0); showStart();
 requestAnimationFrame(frame);
 
 // If this page is running on claude.ai, also keep the save in your account so it follows you between devices
@@ -196,6 +219,7 @@ requestAnimationFrame(frame);
     if(data && typeof data.json === "string"){
       const remote = JSON.parse(data.json);
       if(remote && remote.version === 1 && (remote.savedAt || 0) > (state.savedAt || 0) + 5000){
+        if($("#dlgStart").open){ savedGame = remote; showStart(); return; }   // still on the start screen: offer it to Continue
         const wasIntro = $("#dlgIntro").open; if(wasIntro) $("#dlgIntro").close();
         startWith(remote, false);
         ui.toast(`Welcome back to ${remote.name}.`, "good");

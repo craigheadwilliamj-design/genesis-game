@@ -6,36 +6,38 @@
    ===================================================================== */
 
 // What each group holds. {tool} picks a tool, {sub} opens a dropdown of tools, {fence} picks a fence.
-const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay", "pbale"];
+const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "screen", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay", "pbale"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
-    {label:"Guest Paths", tool:"path", price:() => `${money(COST.pathPerMeter)}/m`},
-    {label:"Wide Paths", tool:"wide", price:() => `${money(WIDE_PATH.perMeter)}/m`, note:"10 m wide. Holds twice the crowd before guests feel packed. Use it where the walk is busy."},
-    {label:"Wooden Bridges", tool:"bridge", price:() => `${money(BRIDGE.perMeter)}/m`, note:"The only path that crosses water. Draw it like a path, from one bank over to the other."},
-    {label:"Staff Paths", tool:"service", price:() => `${money(SERVICE_ROAD.perMeter)}/m`, note:"Staff paths always layer under guest paths where they meet."},
+    {label:"Guest Paths", tool:"path", price:() => `${money(pathChunkCost("g"))}/chunk`, note:"A 5 m square a chunk. Drag along the grid, straight or diagonal. Lay paths side by side for a wider walk."},
+    {label:"Wooden Bridges", tool:"bridge", price:() => `${money(pathChunkCost("b"))}/chunk`, note:"The only path that crosses water. Drag it over the water, from one bank to the other."},
+    {label:"Staff Paths", tool:"service", price:() => `${money(pathChunkCost("s"))}/chunk`, note:"Staff only: guests won't walk it. A staff path that touches a guest path or the entrance walk is joined to it for staff."},
     {label:"Tram Track", tool:"tram", tech:"transit", price:() => `${money(TRAM.perMeter)}/m`, note:"Guests ride it between tram stations, six times faster than walking. Draw it beside your paths and put a station at each stop."},
     {label:"Bins", tool:"bin"},
     {label:"Benches", tool:"bench"},
     {label:"Picnic Areas", tool:"picnic"},
     {label:"Lamp Posts", tool:"lamp"},
     {label:"Security Cameras", tool:"camera", tech:"cameras", note:"Watches the paths within a short radius and sends the nearest guard to any vandal it sees. Needs a Security Office with guards."},
+    {label:"Donation Boxes", tool:"donate", note:"Guests who pass one may drop a little in, more if they learned something. A small bonus, counted under Donations."},
     {label:"Info Signs", tool:"sign"},
     {label:"Do Not Feed Signs", tool:"nofeed", note:"Guests are less likely to throw trash into an exhibit with one beside its fence. Put it on the path within 20 m of the fence."},
+    {label:"Quiet Signs", tool:"quiet", note:"Guests near one keep their voices down (rowdy ones mostly don't), so shy animals in exhibits within 20 m of the sign feel less crowded and hide less. Put it on the path within 20 m of the fence."},
   ]},
   {id:"land-buy", label:"Land", items:[
-    {label:"Buy Land", tool:"parcels", price:() => `from ${money(Math.min(...PARCEL_CELLS.filter(([i, j]) => !parcelHome(i, j)).map(([i, j]) => parcelPrice(i, j))))}`, note:"Buy the plots around your park to build further out. Each costs a daily property tax."},
+    {label:"Buy Land", tool:"parcels", price:() => `from ${money(Math.min(...SALE_CELLS.filter(([i, j]) => !parcelHome(i, j)).map(([i, j]) => parcelPrice(i, j))))}`, note:"Buy the plots around your park to build further out. Each costs a daily property tax."},
   ]},
   {id:"exhibits", label:"Exhibit Tools", items:[
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
-    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold. Keepers walk in to fill food trays, which each hold one kind of food. Rubbing posts, log piles and mud wallows give bored animals something to do."},
-    {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges are weak, but guests love them."},
+    {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold. Animals walk inside to hide, sleep and wait out bad weather, and aren't seen there. A privacy screen by the fence shields shy animals from the path's view without hiding them. Keepers walk in to fill food trays, which each hold one kind of food. Rubbing posts, log piles and mud wallows give bored animals something to do."},
+    {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges and rope fences are only for show: guests like them, but they can't hold animals."},
   ]},
   {id:"land", label:"Landscaping", items:[
-    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it like a fence: tap the shore corners, then the first one again. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
-    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, price:() => money(t.price),
+    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Drag a box to lay it in 5 m chunks, like a path. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
+    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
+    {label:"Paint Ground", tool:"paint", price:() => "Free in the park", note:"Drag a box to paint ground in another biome, pick the biome in the bar. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
     {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES. Out in the park, only Quaternary plants grow until ORACLE researches sterile prehistoric plants." : undefined})),
@@ -58,9 +60,9 @@ const BUILD_MENU = [
     {label:"Security Office", tool:"security"},
     {label:"Tool Shed", tool:"toolshed"},
     {label:"Generator", tool:"generator"},
+    {label:"Draw Work Zone", tool:"zone", price:() => "Free"},
   ]},
   {id:"mgmt", label:"Park Management", items:[
-    {label:"Draw Work Zone", tool:"zone", price:() => "Free"},
     {label:"ORACLE", tool:"oracle"},
     {label:"GHOST", tool:"ghost"},
     {label:"TAR", tool:"tar"},
@@ -108,6 +110,7 @@ const ICON_LINES = {
   "land-traylg":'<circle cx="12" cy="12" r="10" fill="#8A8F96" stroke="#6E737A" stroke-width="1.4"/><circle cx="12" cy="12" r="7.8" fill="#4B4F55"/><circle cx="12" cy="12" r="5.2" fill="#6BAA3A"/>',
   "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
   parcels:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/><rect x="9" y="9" width="6" height="6" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.2"/>',
+  paint:'<rect x="3" y="5" width="18" height="14" rx="2" fill="#BFA96C"/><path d="M3 12l6-7h6l-9 14H5a2 2 0 0 1-2-2z" fill="#7DAA68"/><path d="M15 19l6-8v6a2 2 0 0 1-2 2z" fill="#DFC48A"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
   grid:'<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/>',
@@ -133,9 +136,10 @@ const toolLabel = t => BUILD_NAMES[t] || BUILDINGS[t].label;
 
 function menuRow(it){
   if(it.props){
-    const rows = it.props.map(k => { const t = LAND[k];
+    const props = it.props.filter(k => !toyHidden(k));
+    const rows = props.map(k => { const t = LAND[k];
       return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}</span></span></button>`; }).join("");
-    return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + it.props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(it.props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.fences){
     const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${b.hedge ? menuIcon("hedge") : menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
@@ -143,37 +147,57 @@ function menuRow(it){
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.parkPlants){
-    const rows = PLANT_SIZES.slice().reverse().map(size => `<p class="snote">${size[0].toUpperCase() + size.slice(1)}</p>` + parkPlantKeys(size).map(k => plantRow(k, "biome")).join("")).join("");
-    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
+    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.statues){
-    const keys = Object.keys(LAND).filter(k => LAND[k].statue), row = k => { const t = LAND[k], g = statueGrant(k);
+    const keys = Object.keys(LAND).filter(k => LAND[k].statue && (!LAND[k].sp || speciesAvailable(LAND[k].sp))), row = k => { const t = LAND[k], g = statueGrant(k);
       return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="" data-lock="${k}"${g ? ` title="${esc(statueHint(k))}"` : ""}>${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${t.free ? "" : ", grant"}</span></span></button>`; };
     const rows = `<p class="snote">Animals</p>${keys.filter(k => !LAND[k].initials).map(row).join("")}<p class="snote">People</p>${keys.filter(k => LAND[k].initials).map(row).join("")}`;
     return `<div class="sitem" data-open="statues"><button class="srow head" aria-expanded="false">${menuIcon("land-st-owen")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(keys)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.period){
     const quat = it.period === "Quaternary", biomes = quat ? Object.keys(BIOMES).filter(b => PLANTS_OF.Quaternary[b] || PARK_PLANTS_OF[b]) : Object.keys(PLANTS_OF[it.period]);
-    const rows = biomes.map(biome => `<p class="snote">${esc(BIOMES[biome].label)}</p>` + (PLANTS_OF[it.period][biome] || []).concat(quat ? (PARK_PLANTS_OF[biome] || []).slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size)) : []).map(k => plantRow(k, "size")).join("")).join("");
+    const rows = biomes.map(biome => `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
     const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
-    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
+    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.sub){
-    const rows = it.sub.map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
+    const rows = it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
     return `<div class="sitem" data-open="${it.sub[0]}"><button class="srow head" aria-expanded="false">${menuIcon(it.sub[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange(it.sub)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${rows}</div></div>`;
   }
   const b = BUILDINGS[it.tool], price = it.price ? it.price() : money(b.price);
-  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
+  return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.shapes ? `<div class="shapes" data-shapes="${it.shapes}"></div>` : ""}${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
 }
 
 // A plant's row in the build menu. Park plants and Quaternary plants are listed in both the Park Plants and the Quaternary dropdowns (both grow in exhibits and out in the park).
+const bySize = ks => ks.slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size));
 const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name)).concat(
   Object.keys(PLANTS_OF.Quaternary).length ? Object.keys(PLANTS_OF.Quaternary).map(b => PLANTS_OF.Quaternary[b][PLANT_SIZES.indexOf(size)]) : []);
+// A plant's menu icon: its real sprite when it has one (pixelated, fitted to the icon box), else the drawn icon
+const plantIcon = k => PLANT_SPRITES[k] ? `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><image href="${spriteUrl(`sprites/plants/${k}.png`)}" x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet" style="image-rendering:pixelated"/></svg>` : menuIcon("land-" + k);
+// The biome dropdown at the top of every plant list. It only filters what the lists show (a plant's biome is part of the plant), and one pick covers all the lists.
+const plantBiomeSelect = () => `<select class="plantbiome" aria-label="Biome" title="Show one biome's plants"><option value="">All biomes</option>${Object.keys(BIOMES).map(k => `<option value="${k}">${esc(BIOMES[k].label)}</option>`).join("")}</select><p class="snote" data-pnone hidden>No plants of this biome here.</p>`;
+let plantBiomeMenu = null;
+function refreshPlantBiome(){
+  document.querySelectorAll("#sideMenu [data-pbiome]").forEach(el => { el.hidden = !!plantBiomeMenu && el.dataset.pbiome !== plantBiomeMenu; });
+  document.querySelectorAll("#sideMenu .plantbiome").forEach(sel => {
+    sel.value = plantBiomeMenu || "";
+    const box = sel.parentNode, none = box.querySelector("[data-pnone]");
+    if(none) none.hidden = !plantBiomeMenu || !!box.querySelector("button[data-pbiome]:not([hidden])");
+  });
+}
+document.addEventListener("change", ev => {
+  if(!ev.target.matches || !ev.target.matches("#sideMenu .plantbiome")) return;
+  plantBiomeMenu = ev.target.value || null; refreshPlantBiome();
+});
 const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in water" : t.wet ? ", land or water" : "", where = tail === "biome" ? esc(BIOMES[t.biome].label.toLowerCase()) : t.size;
-  return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="${t.tech || ""}">${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
+  return `<button class="srow sub" data-tool="land-${k}" data-pbiome="${t.biome}" aria-pressed="false" data-tech="${t.tech || ""}">${plantIcon(k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${potKey(t) ? " + plant" : ""}, ${where}${water}</span></span></button>`; };
 
+// Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
+const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
 function buildMenu(){
-  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.map(menuRow).join("")}</div></section>`).join("");
+  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
   const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>
     <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
   $("#sideMenu").innerHTML = `<div class="sidebar-top"><button class="sidetab" id="sideTab" aria-expanded="false" aria-controls="sideBody">${menuIcon("path").replace("ticon", "ticon tab")}<span class="tl"><b>Build</b></span></button>
@@ -184,7 +208,29 @@ function buildMenu(){
 }
 
 // Grey out what isn't researched yet. Called after anything changes.
+// The shape pickers under Rock and Boulder: a Random button and one thumbnail per picture of the biome in use (rockBiomeNow), redrawn when that changes
+function refreshShapes(){
+  const b = rockBiomeNow();
+  document.querySelectorAll("#sideMenu [data-shapes]").forEach(box => {
+    const type = box.dataset.shapes, list = (ROCK_SPRITES[b] || {})[type] || [], sel = rockPicOf(type, b), key = b + "|" + sel + "|" + rockBiomeMenu;
+    if(box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = `<select class="shapebiome" aria-label="Stone biome" title="Which biome's stone to place"><option value="">Biome: auto (${esc(BIOMES[b].label)})</option>${Object.keys(BIOMES).map(k => `<option value="${k}"${k === rockBiomeMenu ? " selected" : ""}>${esc(BIOMES[k].label)}</option>`).join("")}</select>`
+      + (list.length ? `<button class="shape rnd" data-shape="" aria-pressed="${sel == null}" title="Random shape">?</button>` + list.map((_, i) => `<button class="shape" data-shape="${i}" aria-pressed="${sel === i}" title="Shape ${i + 1}"><img src="${spriteUrl(`sprites/rocks/${type}-${b}-${i + 1}.png`)}" alt="Shape ${i + 1}"></button>`).join("") : "");
+  });
+}
+document.addEventListener("change", ev => {
+  if(!ev.target.matches || !ev.target.matches("#sideMenu .shapebiome")) return;
+  rockBiomeMenu = ev.target.value || null; refreshShapes(); if(landGhost) renderOverlay();
+});
+document.addEventListener("click", ev => {
+  const btn = ev.target.closest && ev.target.closest("#sideMenu [data-shape]"); if(!btn) return;
+  const type = btn.parentNode.dataset.shapes; rockPick[type] = btn.dataset.shape === "" ? null : +btn.dataset.shape;
+  if(tool !== "land-" + type) setTool("land-" + type);
+  refreshShapes(); if(landGhost) renderOverlay();
+});
 function refreshMenu(){
   if(!state) return;
+  refreshShapes(); refreshPlantBiome();
   document.querySelectorAll("#sideMenu [data-tech]").forEach(b => { const t = b.dataset.tech, k = b.dataset.lock; b.classList.toggle("locked", (!!t && !hasTech(t)) || (!!k && !statueOpen(k))); });
 }

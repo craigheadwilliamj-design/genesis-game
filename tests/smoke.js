@@ -17,7 +17,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   const checks = await page.evaluate(() => {
     const out = {};
-    document.querySelector("#introGo").click(); setSpeed(0);
+    // start screen: shown first, no Continue without a save, a new park picks its biome, and nothing changes it mid-park
+    const q = x => document.querySelector(x), sb = state.biome;
+    out.startScreenShown = q("#dlgStart").open && q("#startContinue").hidden && /PALEO-TYCOON/.test(document.title) && /PALEO-TYCOON/.test(q("#dlgStart").textContent);
+    q("#startNew").click();
+    const pickK = Object.keys(BIOMES).find(k => k !== DEFAULT_PARK_BIOME);
+    q(`#startBiomes [data-biome="${pickK}"]`).click(); q("#startName").value = "Smoke Park"; q("#startGo").click();
+    out.newParkPicksBiome = !q("#dlgStart").open && state.biome === pickK && parkBiome() === pickK && state.name === "Smoke Park" && sb === DEFAULT_PARK_BIOME;
+    q("#introGo").click(); setSpeed(0);
+    out.biomeLockedMidPark = !q("#menuBiomes") && !q("#dlgMenu") && !q("#panel [data-biome]");
+    q("#startBiomes").innerHTML = `<button data-biome="${DEFAULT_PARK_BIOME}"></button>`; q("#startBiomes button").click();
+    out.biomeLockedMidPark = out.biomeLockedMidPark && state.biome === pickK;
+    state.biome = DEFAULT_PARK_BIOME;
     // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
     PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
     window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;
@@ -48,12 +59,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     wv = walkFrom(C, rider, new Set([A])); rv = routeTo(wv, A); out.atvFetch = !rv.mount && Math.abs(wv.dist.get(A) - 200) < 1e-6;
     wv = walkFrom(B, rider, new Set([B])); out.atvRemount = routeTo(wv, A).mount === B && Math.abs(wv.dist.get(A) - 100/VEHICLES.speedMult) < 1e-6;
     // each depot brings 3 ATVs, shared by everyone, and demolishing it takes them
-    const keepB = state.buildings, keepA = state.staff.atvs;
+    const keepB = state.buildings, keepA = state.staff.atvs, wasDev = localStorage.getItem("genesis-dev"); localStorage.setItem("genesis-dev", "1");
     state.buildings = [{id:"dep1", type:"depot"}, {id:"dep2", type:"depot"}]; state.staff.atvs = [];
     syncAtvs(); const two = atvs().length === 2 * VEHICLES.perDepot;
     state.buildings = [{id:"dep1", type:"depot"}]; syncAtvs(); const one = atvs().length === VEHICLES.perDepot && atvs().every(a => a.depot === "dep1");
-    state.buildings = keepB; state.staff.atvs = keepA;
     out.atvPerDepot = two && one;
+    // launch build: no ATVs spawn, loaded depots stay (and wear), nobody drives
+    localStorage.removeItem("genesis-dev"); state.buildings = [{id:"dep1", type:"depot"}]; state.staff.atvs = [{id:"a-x", depot:"dep1", at:null, by:null}];
+    syncAtvs(); const fake = {riding:true, atvId:"a-x", route:[{}], at:{svc:new Set()}}; fake.at.svc.add(fake.route[0]);
+    out.atvOffLaunch = atvs().length === 0 && usableAtvs().length === 0 && !onAtv(fake) && depots().length === 1 && buildingHidden("depot") && techHidden("vehicles") && !techRows("build").includes(esc(TECH.find(x => x.id === "vehicles").label)) && startProject("tech", "vehicles") !== null;
+    localStorage.setItem("genesis-dev", "1"); syncAtvs();
+    out.atvOnDev = atvs().length === VEHICLES.perDepot && !buildingHidden("depot") && !techHidden("vehicles");
+    if(wasDev === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", wasDev);
+    state.buildings = keepB; state.staff.atvs = keepA;
 
     // every new park sells one species from pool A, two from pool B and one mid-tier anchor from pool C
     let starterOk = true; const seenA = new Set(), seenC = new Set();
@@ -74,6 +92,27 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const bought = buyParcel(east[0], east[1]);
       out.landBuy = !before && !!lockedWhy && bought && state.money === mm - p && p > 0 && insidePlot([[430,150],[440,150]]) && insidePlot([[400,150],[450,150],[450,190]], true) && !insidePlot([[400,150],[600,150]]) && !parcelProblem(farE[0], farE[1]) === true &&
         JSON.stringify(upgradeSave({...JSON.parse(JSON.stringify(state)), parcels:undefined}).parcels) === "[]";
+      state.parcels = keep; state.money = m0;
+    }
+    // S33: nothing for sale south of the entrance, a hard southern barrier, a 15-plot cap, old saves keep their land
+    {
+      const m0 = state.money, keep = state.parcels.slice(); state.money = 1e9;
+      const south = PARCEL_CELLS.filter(([i, j]) => parcelRect(i, j)[3] > state.gate[1]);
+      state.parcels = PARCEL_CELLS.filter(([i, j]) => !parcelSouth(i, j)).map(([i, j]) => parcelId(i, j)).slice(0, 5);
+      out.noSouthParcels = south.length > 0 && SALE_CELLS.every(([i, j]) => parcelRect(i, j)[3] <= state.gate[1]) && PARCELS.ys[PARCELS.ys.length-1] === state.gate[1] &&
+        south.every(([i, j]) => !!parcelProblem(i, j) && !buyParcel(i, j) && !parcelTouches(i, j));
+      out.southBarrier = !insidePlot([[100,200],[100,310]]) && !insidePlot([[100,306],[120,306]]) && insidePlot([[100,200],[100,305]]) &&
+        !!pathProblem([[200,290],[200,320]], "path") && !!decorProblem(Object.keys(LAND).find(k => k.startsWith("q-")), 200, 312) ;
+      out.southEdgeWall = ownedEdges().every(([p, q]) => p[1] <= state.gate[1] && q[1] <= state.gate[1]);
+      state.parcels = [];
+      // buy outward from the home plot until the cap
+      for(let pass = 0; pass < 20 && state.parcels.length < MAX_PARCELS; pass++) for(const [i, j] of SALE_CELLS) if(state.parcels.length < MAX_PARCELS && !ownsParcel(i, j) && !parcelProblem(i, j)) buyParcel(i, j);
+      const left = SALE_CELLS.find(([i, j]) => !ownsParcel(i, j) && parcelTouches(i, j)), why16 = left ? parcelProblem(left[0], left[1]) : "";
+      out.parcelCap = state.parcels.length === MAX_PARCELS && !!left && /allowed/.test(why16) && !buyParcel(left[0], left[1]) && state.parcels.length === MAX_PARCELS;
+      // an old save that owns south land keeps it
+      state.parcels = [parcelId(2, 5), parcelId(2, 6)];
+      const old = upgradeSave(JSON.parse(JSON.stringify(state)));
+      out.oldSouthSave = old.parcels.length === 2 && ownsParcel(2, 5) && ownsParcel(2, 6) && insidePlot([[100,320],[100,350]]) && !ownedEdges().some(([p, q]) => p[1] > 505);
       state.parcels = keep; state.money = m0;
     }
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;
@@ -122,21 +161,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
     const H = Math.PI / 2;
-    state.buildings.push({id:"b-st", type:"station", points:rectPts(196, 290, 14, 10, H)});
+    state.buildings.push({id:"b-st", type:"station", points:rectPts(198, 290, 14, 10, H)});
     state.buildings.push({id:"b-pmc", type:"pmc", points:rectPts(215, 255, 20, 14, H)});
-    const viv = {id:"e-v", name:"Bug house", viv:"L", points:rectPts(196, 255, 16, 10, H), animals:[{id:"a-s", sp:"arth"}, {id:"a-t", sp:"arth"}], happy:70};
+    const viv = {id:"e-v", name:"Bug house", viv:"L", points:rectPts(198, 255, 16, 10, H), animals:[{id:"a-s", sp:"arth"}, {id:"a-t", sp:"arth"}], happy:70};
     state.exhibits.push(viv);
     recompute(); buildKeeperGraph();
     out.pmcOnGraph = !!kGraph.anchors["b-pmc"] && !!kGraph.anchors["e-v"];
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
-    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
+    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
     healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
     const cured = state.health.ward[0] && state.health.ward[0].cured;
-    out.treated = !!cured && pmcStock() === 10 - HEALTH.dose;
+    out.treated = !!cured && pmcStock("medpal") === 10 - HEALTH.dose;
     out.curedGoesHome = run(600, () => viv.animals.length === 2 && !state.health.ward.length) && !viv.animals.some(a => a.sick);
 
     // a check-up finds a hidden mild illness, and the vet treats it on the spot (no dart, no PMC)
@@ -144,8 +183,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     viv.vetCheck = state.day - HEALTH.checkEvery;
     fallSick(viv.animals[1], "illness", HEALTH.illStart);
     out.mildStartsHidden = !!viv.animals[1].sick.hidden;
-    const meds0 = pmcStock();
-    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock() === meds0 - HEALTH.fieldDose &&
+    const meds0 = pmcStock("medpal");
+    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock("medpal") === meds0 - HEALTH.fieldDose &&
       !state.health.ward.length && !state.staff.transfers.length && viv.animals.length === 2;
     // injuries always go to the PMC
     vetsNight(); keepersNight();
@@ -155,12 +194,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // without the era's medicine, contemporary medicine eases a patient down to its era's floor, and it goes home chronic
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
-    state.buildings.find(b => b.id === "b-pmc").store = {meds:0};
-    const m0 = state.today.medicine; state.health.cmeds = 0;
+    state.buildings.find(b => b.id === "b-pmc").store = {medpal:0, medmod:MODERN.stock};
+    const fakeDock = {type:"dock", auto:true};
     const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
     state.health.ward.push(pal);
     healthNight();
-    out.modernRestock = state.today.medicine - m0 === MODERN.stock * MODERN.cost && state.health.cmeds === MODERN.stock - HEALTH.dose;
+    out.modernRestock = dockOrders(fakeDock).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
     out.modernEases = pal.med === "modern" && Math.abs(pal.a.sick.sev - (50 - HEALTH.healPerNight * MODERN.heal.paleozoic)) < 1e-9 && !pal.cured;
     for(let i = 0; i < 5 && !pal.cured; i++) healthNight();
     out.modernLeavesChronic = pal.cured && pal.a.sick && pal.a.sick.chronic && pal.a.sick.sev === MODERN.floor.paleozoic;
@@ -173,22 +212,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {meds:10};
+    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
     // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
-    state.science.dna.arth = {genome:100, quality:75};
+    state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
     out.geneNeedsTech = !!geneProblem(ga);
     state.science.tech.push("genetherapy");
-    out.geneGainCapped = geneGain(ga) === 15 && geneCost(15) === GENE.base + 15 * GENE.perPoint;
-    state.science.dna.arth.quality = 60;
+    out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    state.science.dna.arth.genome = 65;
     out.geneNoBetterGenome = !!geneProblem(ga);
-    state.science.dna.arth.quality = 75;
+    state.science.dna.arth.genome = 80;
     out.geneQueues = !geneProblem(ga); ga.gene = true;
     const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 75 && !ga.gene) && state.today.medicine - med0 >= geneCost(15) && illChance(viv, ga).p < illBefore;
+    out.geneVetDoesIt = run(600, () => ga.q === 70 && !ga.gene) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -214,7 +253,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // hungry, dirty animals fall ill more than well-kept ones
     const a = viv.animals[1], base = illChance(viv, a).p;
-    viv.hungryMin = CLOSE_MIN - OPEN_MIN; viv.dirt = 90;
+    viv.hungryMin = DAY_MIN; viv.dirt = 90;
     out.neglectRaisesIllness = illChance(viv, a).p > base * 4;
     // rivals of a territorial species hurt each other, more when cramped
     const pen = {id:"e-r", name:"Rex", points:[[0,0],[40,0],[40,40],[0,40]], animals:[{id:"r1", sp:"trex"}, {id:"r2", sp:"trex"}]};
@@ -222,6 +261,47 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.territorialInjury = injuryChance(pen, pen.animals[0]).p > HEALTH.territorial;
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
+    { const was = localStorage.getItem("genesis-dev"); localStorage.removeItem("genesis-dev");
+      out.rosterHidesHerr = !speciesAvailable("herr") && speciesAvailable("trex") && !speciesToUnlock().some(s => s.id === "herr");
+      out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-prot"]'));
+      localStorage.setItem("genesis-dev", "1"); out.devShowsHerr = speciesAvailable("herr") && speciesToUnlock().some(s => s.id === "herr");
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was); }
+    { const was = localStorage.getItem("genesis-dev"), th = {theme:"volcanic"}, themed = THEMES.volcanic ? "volcanic" : Object.keys(THEMES).find(k => k !== "genesis");
+      const pen = state.exhibits[0] || {id:"e-t", name:"T", points:[[0,0],[30,0],[30,30],[0,30]], animals:[{id:"t1", sp:"trex"}]};
+      const real = state.exhibits.includes(pen), had = pen.enrich;
+      if(!real){ state.exhibits.push(pen); recompute(); }
+      const me = state.exhibits.includes(pen) && pen.animals.length ? pen : null;
+      localStorage.removeItem("genesis-dev");
+      const html = () => [typeof themesOverview === "function" ? themesOverview() : "", themeHtml("exhibit", {theme:themed, points:[]}), zoneThemeHtml({theme:themed, points:[]})].join("");
+      out.themesHiddenOff = themeKey({theme:themed}) === "genesis" && html() === "" && themeFor("path", {points:[[0,0],[1,1]]}) === null;
+      out.toysHiddenOff = toyHidden("post") && toyHidden("hay") && toyHidden("vbark") && !toyHidden("pbale") && !toyHidden("barn");
+      buildMenu(); out.toyMenuHiddenOff = !document.querySelector('#sideMenu [data-tool="land-post"]') && !!document.querySelector('#sideMenu [data-tool="land-pbale"]');
+      out.enrichFullOff = !me || enrichment(me) === 1;
+      out.vivToysHiddenOff = vivToysHtml({viv:true, animals:[], points:[[0,0],[1,0],[1,1]]}) === "";
+      localStorage.setItem("genesis-dev", "1");
+      out.themesShownOn = themeKey({theme:themed}) === themed && themeHtml("exhibit", {theme:themed, points:[]}).includes("themeSel");
+      out.toysShownOn = !toyHidden("post") && !toyHidden("vbark");
+      buildMenu(); out.toyMenuShownOn = !!document.querySelector('#sideMenu [data-tool="land-post"]');
+      if(!real) { state.exhibits.pop(); recompute(); }
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
+      buildMenu(); }
+    { const was = localStorage.getItem("genesis-dev"), menuHas = t => !!document.querySelector(`#sideMenu [data-tool="${t}"]`);
+      const held = ["campground", "lodge", "resort", "edcenter", "tramstop", "tram"], techs = ["hotels", "transit", "education", "edtouch"];
+      localStorage.removeItem("genesis-dev"); buildMenu();
+      out.v1HidesMenuOff = held.every(t => !menuHas(t)) && menuHas("restroom") && menuHas("path");
+      out.v1HidesTechOff = techs.every(id => techHidden(id) && !techRows("build").includes(`data-id="${id}"`) && !techRows("build").includes(esc(TECH.find(x => x.id === id).label))) && techRows("build").includes(esc(TECH.find(x => x.id === "security").label));
+      out.v1HidesGoalsOff = ["camp", "hotel", "resort"].every(id => !activeGoals().some(g => g.id === id)) && activeGoals().length === GOALS.length - 3;
+      out.v1HidesStatuesOff = !document.querySelector('#sideMenu [data-open="statues"]') && GOALS.filter(g => g.statue).every(g => !/statue/i.test(grantPrize(g)) && !grantStatue(g)) && Object.keys(LAND).filter(k => LAND[k].statue).every(k => !statueOpen(k) && decorProblem(k, 0, 0) === "Statues aren't available yet.");
+      out.v1BlocksTechOff = startProject("tech", "education") !== null && pathProblem([[0,0],[10,0]], "tram") !== null && buildingHidden("lodge");
+      localStorage.setItem("genesis-dev", "1"); buildMenu();
+      out.v1ShowsMenuOn = held.every(menuHas);
+      out.v1ShowsTechOn = techs.every(id => !techHidden(id)) && techRows("build").includes(esc(TECH.find(x => x.id === "hotels").label));
+      out.v1ShowsGoalsOn = activeGoals().length === GOALS.length;
+      out.v1ShowsStatuesOn = !!document.querySelector('#sideMenu [data-open="statues"]') && GOALS.filter(g => g.statue).every(g => grantPrize(g).includes("statue")) && statueOpen("st-owen") !== undefined;
+      out.v1AllowsTramOn = pathProblem([[0,0],[10,0]], "tram") !== "That isn't available yet." && !buildingHidden("edcenter");
+      if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);
+      buildMenu(); }
+    out.devModeOffByDefault = devMode() === false && !("dev" in state) && !JSON.stringify(state).includes("genesis-dev");
     return out;
   }));
 
@@ -233,8 +313,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.day = 20; state.staff.feedFrom = 0; state.safety.escapesFrom = 99; state.health.from = 999;
     const H = Math.PI / 2;
-    state.buildings.push({id:"b-st", type:"station", points:rectPts(196, 290, 14, 10, H)});
-    state.buildings.push({id:"b-dock", type:"dock", points:rectPts(196, 268, 16, 10, H)});
+    state.buildings.push({id:"b-st", type:"station", points:rectPts(198, 290, 14, 10, H)});
+    state.buildings.push({id:"b-dock", type:"dock", points:rectPts(198, 268, 16, 10, H)});
     const viv = {id:"e-v", name:"Bugs", viv:"L", points:rectPts(214, 284, 16, 10, H), animals:[1,2,3,4,5,6].map(i => ({id:"a" + i, sp:"arth"})), happy:70};
     state.exhibits.push(viv);
     recompute(); buildKeeperGraph();
@@ -255,7 +335,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // a keeper feeds the exhibit from the dock's stock, then a custodian restocks the station
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
-    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; tick(1); if(until()) return true; } return false; };
+    const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     viv.stock = {};
     out.keeperFeeds = run(900, () => (viv.stock.paleoflora || 0) + (viv.stock.plants || 0) >= 1);
     out.foodLeftDock = stockOf(dock, "plants") < 12;
@@ -349,11 +429,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = state.exhibits.filter(e => e !== lone); dropZone("z-e"); state.zones = state.zones.filter(z => z.id !== "z-e");
 
     // production fills its own store through the day, and stops when full
-    const farm = {id:"b-farm", type:"farm", points:rectPts(196, 245, 20, 14, H)};
+    const farm = {id:"b-farm", type:"farm", points:rectPts(198, 245, 20, 14, H)};
     state.buildings.push(farm); recompute();
-    logiTick(CLOSE_MIN - OPEN_MIN);
+    logiTick(DAY_MIN);
     out.farmMakes = Math.round(stockOf(farm, "plants")) === BUILDINGS.farm.makes.plants;
-    logiTick(10 * (CLOSE_MIN - OPEN_MIN));
+    logiTick(10 * (DAY_MIN));
     out.farmStops = stockOf(farm, "plants") <= storeCap(farm);
     // farms cut what the dock orders
     dock.store = {};
@@ -373,21 +453,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     startWith(newPark(), false); setSpeed(0);
     const realRandom = Math.random; Math.random = () => .99;
     state.money = 1e6; state.staff.feedFrom = 0; state.safety.escapesFrom = 999; state.health.from = 999;
-    state.paths.push({id:"p-k1", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
-    state.paths.push({id:"s-k1", type:"service", points:[[205,235],[205,140]]});
-    state.paths.push({id:"s-k2", type:"service", points:[[205,140],[205,60],[380,60]]});
+    state.paths.push({id:"p-k1", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
+    state.paths.push({id:"s-k1", type:"service", points:[[207.5,235],[207.5,140]]});
+    state.paths.push({id:"s-k2", type:"service", points:[[207.5,140],[207.5,60],[380,60]]});
     const ex = (id, pts, sp, n, gate) => state.exhibits.push({id, name:id, points:pts, gate, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100, stock:{}});
     ex("e-k1", [[104,124],[204,124],[204,231],[104,231]], "lyst", 4, [204,180]);
     ex("e-k2", [[206,124],[296,124],[296,231],[206,231]], "dime", 2, [206,180]);
     const B = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, 0)});
-    B("b-kst", "station", 214, 265); B("b-kdock", "dock", 380, 67); B("b-kbr", "breakroom", 197, 265);
+    B("b-kst", "station", 214, 265); B("b-kdock", "dock", 380, 67); B("b-kbr", "breakroom", 199, 265);
     afterChange();
     const dock = buildingById("b-kdock"), st = buildingById("b-kst");
     out.dockLayout = ["b-kst", "b-kdock", "b-kbr", "e-k1", "e-k2"].every(id => !!kGraph.anchors[id]);
     dock.store = {plants:100, meat:100};
     state.staff.keepers.push({id:"k-d", name:"D", stamina:100}); syncCrew();
-    const day = state.day;
+    const day = state.day, keeperSpeed = KEEPER.speed; KEEPER.speed = WALK_PER_MIN; // this layout is a long haul; test the route, not the pace
     while(state.day === day && !(state.exhibits[1].stock.meat > 0)) tick(1);
+    KEEPER.speed = keeperSpeed;
     out.dockToExhibit = state.day === day && state.exhibits[1].stock.meat > 0 && stockOf(dock, "meat") < 100 && state.staff.keepers[0].stamina > 50;
 
     // a worn-out keeper holding food delivers it before taking a break
@@ -400,7 +481,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // food still in hand at closing stays with the keeper overnight, and gets delivered the next day
     keepersNight();
     out.carryOvernight = !!c.carry && c.carry.amount === 10 && k.carry && k.carry.amount === 10;
-    state.minute = OPEN_MIN; let fed = false;
+    state.minute = DAWN_MIN; let fed = false;
     for(let i = 0; i < 300 && !fed; i++){ tick(1); fed = state.exhibits[1].stock.meat > 0; }
     out.carryDeliveredNextDay = fed;
 
@@ -457,7 +538,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const out = {};
     startWith(newPark(), false); setSpeed(0);
     state.money = 1e6; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
-    state.paths.push({id:"p-loop", points:[[205,235],[100,235],[100,120],[300,120],[300,235],[205,235]]});
+    state.paths.push({id:"p-loop", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
     const ex = (id, pts, sp, n) => state.exhibits.push({id, name:id, points:pts, animals:Array.from({length:n}, (_, i) => ({id:id + i, sp})), happy:80, cond:100});
     ex("e-g1", [[104,124],[180,124],[180,231],[104,231]], "lyst", 4);
     ex("e-g2", [[220,124],[296,124],[296,231],[220,231]], "dryo", 4);
@@ -474,10 +555,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.guestField = Math.abs(f.dist.get(gGraph.anchors.gate) - w.dist.get(gGraph.anchors["b-f"])) < 1e-6;
 
     // a thirsty party walks to the food stand, pays, and stops being thirsty
-    state.minute = OPEN_MIN + 60; const t0 = state.today.tickets;
+    state.minute = DAWN_MIN + 60; const t0 = state.today.tickets;
     guestsArrive(2); const p = parties[0];
     out.ticketPaid = state.today.tickets - t0 === state.ticket * 2;
-    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = CLOSE_MIN; p.spd = 1.15;   // a quick walker, so one soda is enough when it gets there
+    p.needs = {hunger:10, thirst:70, bladder:0, energy:0}; p.until = DUSK_MIN; p.spd = 1.15;   // a quick walker, so one soda is enough when it gets there
     // only the parties set up here: nobody new comes in
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); state.minute++; if(until()) return true; } return false; };
     // (it may grab a meal too if it got hungry on the way)
@@ -488,7 +569,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // nowhere to eat: they say so
     const fs = state.buildings.find(b => b.id === "b-f"); state.buildings = state.buildings.filter(b => b !== fs); afterChange();
     p.needs.hunger = 80; p.needs.energy = 0; p.dest = null; p.why = null;
-    p.home = false; p.mood = 70; p.until = CLOSE_MIN; planParty(p);
+    p.home = false; p.mood = 70; p.until = DUSK_MIN; planParty(p);
     out.noFoodThought = p.thought.has("noFood");
     state.buildings.push(fs); afterChange();
     // going home: the party walks out the gate and its mood counts
@@ -511,19 +592,43 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.deathTakesGuest = guestCount() === n0 - 1 && v.n === 2 && state.safety.deaths === 1;
     state.safety.loose = []; state.safety.deaths = 0;
 
+    // deaths alone never end the game; only debt does (and not in sandbox)
+    resetParties(); guestsArrive(3); const v2 = parties[0];
+    const money0 = state.money, over0 = state.over; state.money = 10 * ESCAPE.lawsuit; state.safety.deaths = 9;
+    state.safety.loose = [{id:"l-y", sp:"trex", status:"loose", at:null, x:v2.at.x, y:v2.at.y}];
+    Math.random = () => 0; harmGuests(1); Math.random = rr;
+    out.deathsDontEndGame = state.safety.deaths === 10 && !state.over;
+    state.safety.loose = []; state.safety.deaths = 0;
+    const goCount = []; const og = events.gameOver; events.gameOver = () => goCount.push(1);
+    state.sandbox = true; state.money = -BANKRUPT * 2; checkBankrupt();
+    out.sandboxNoBankrupt = !state.over && !goCount.length;
+    state.sandbox = false; state.money = -BANKRUPT * .6; checkBankrupt();
+    out.debtWarnsOnce = state.debtWarned === true && !state.over;
+    state.money = -BANKRUPT - 1; checkBankrupt();
+    out.debtBankrupts = state.over === true && goCount.length === 1;
+    events.gameOver = og; state.over = over0; state.money = money0; state.debtWarned = false;
+    // sandbox keeps money pinned, through ticks, spending and earning (the HUD Bank readout used to flicker)
+    { const sb0 = state.sandbox, t0 = state.today; state.sandbox = true; state.money = SANDBOX_MONEY; const led0 = state.today.built || 0;
+      let pinned = true;
+      for(let i = 0; i < 5; i++){ tick(1); pinned = pinned && state.money === SANDBOX_MONEY; }
+      spend(5000, "built"); pinned = pinned && state.money === SANDBOX_MONEY;
+      earn(700, "tickets"); pinned = pinned && state.money === SANDBOX_MONEY;
+      out.sandboxMoneyPinned = pinned && state.today.built === led0 + 5000;
+      state.sandbox = sb0; state.money = money0; }
+
     // a full day: guests come, go, and leave a mood behind for the rating
-    resetParties(); state.minute = OPEN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
+    resetParties(); state.minute = DAWN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests === h.guests && !parties.length;
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && parties.length < 8;   // a few guests may still be in the park: the day turns over at 4 AM, not at closing
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested
     const bench = {id:"b-bench", type:"bench", points:rectPts(96.8, 200, BUILDINGS.bench.w, BUILDINGS.bench.d, Math.PI / 2)};
     state.buildings.push(bench); afterChange();
-    resetParties(); state.minute = OPEN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
-    tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = CLOSE_MIN;
+    resetParties(); state.minute = DAWN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
+    tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = DUSK_MIN;
     out.benchRests = !!gGraph.anchors["b-bench"] && run(400, () => tp1.needs.energy < 5) && bench.served && bench.served.n === 2;
 
     // trash goes in a bin nearby; a nearly full bin spills the rest; a full one gets walked past; the night crew clears it all, for a fee
@@ -536,6 +641,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.fullBinSpills = litterTotal() === 2 && bin.fill === LITTER.binCap && !tp1.trash;
     tp1.trash = 2; tp1.trashAt = state.minute; trashCheck(tp1);
     out.fullBinSkipped = tp1.trash === 2 && litterTotal() === 2 && bin.fill === LITTER.binCap;
+    // a donation box beside the path takes a little money from a passing party (once each), more from one that learned something
+    const dbox = {id:"b-dbox", type:"donate", points:rectPts(103.3, 180, BUILDINGS.donate.w, BUILDINGS.donate.d, Math.PI / 2)};
+    state.buildings.push(dbox); afterChange();
+    tp1.at = nearestGuestNode(100, 180); tp1.gave = null; tp1.edu = 60;
+    const dn0 = state.today.donations, rr3 = Math.random; Math.random = () => 0; boxCheck(tp1); const dn1 = state.today.donations; boxCheck(tp1); Math.random = rr3;
+    out.donationBox = dn1 > dn0 && state.today.donations === dn1 && dbox.gift > 0 && BUILDINGS.donate.prop && BUILDINGS.donate.upkeep > 0;
+    state.buildings.splice(state.buildings.indexOf(dbox), 1); afterChange();
     // with no bin in reach, trash held long enough ends up on the ground
     const far = nearestGuestNode(300, 125); tp1.at = far; tp1.trash = 1; tp1.trashAt = state.minute - LITTER.holdMin;
     const rr2 = Math.random; Math.random = () => 0; trashCheck(tp1); Math.random = rr2;
@@ -565,7 +677,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.noStockNoSale = !servesOf(kio).length && !!kGraph.anchors["b-kio"] && !!kGraph.anchors["b-wh"] && !!kGraph.anchors["b-cl"];
     wh.store = {drinks:100};
     hireCustodian(); syncCustodians();
-    const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
+    const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
     out.custodianRestocks = work(600, () => stockOf(kio, "drinks") > 0) && stockOf(wh, "drinks") < 100 && servesOf(kio).includes("thirst");
     // a sale takes as many units as the item costs to stock
     const sb = stockOf(kio, "drinks"), sp2 = newParty(2); sp2.needs = {hunger:0, thirst:80, bladder:0, energy:0}; sp2.cash = 100;
@@ -584,8 +696,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.demandNotStarved = guestDemand("drinks") >= Math.ceil(derived.demand * GUEST_USE.drinks) && guestDemand("drinks") > 1;
     state.logi.usedLast = ul;
     // supply trucks top up the dock while the park is open
-    const tdk = {id:"b-tdk", type:"dock", points:rectPts(196, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
-    const tm = state.minute; state.minute = OPEN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
+    const tdk = {id:"b-tdk", type:"dock", points:rectPts(198, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
+    const tm = state.minute; state.minute = DAWN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
     out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
     state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
     state.staff.custodians = []; syncCustodians();
@@ -601,12 +713,39 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.vandalBreaksBench = !!hit && hit.b === bench && propCond(bench) === 100 - VANDAL.propHit && vp.vandal && vandalLog().acts === 1;
     bench.cond = 10;
     out.brokenBenchUseless = isBroken(bench) && !servesOf(bench).length;
+    // lamps: they light nearby path corners at night and not by day; dark corners cost mood at night, lit ones don't; lit spots deter vandals
+    {
+      const keepParties = parties.slice();
+      const lamp = {id:"b-lamp", type:"lamp", points:rectPts(103, 200, BUILDINGS.lamp.w, BUILDINGS.lamp.d, 0), cond:100};
+      state.buildings.push(lamp); afterChange();
+      const ln = nearestGuestNode(100, 200), nodes = [...gGraph.nodes.values()].filter(n => !n.rail);
+      const dark = nodes.find(n => Math.hypot(n.x - 103, n.y - 200) > LAMP.radius + LAMP.lean + 4);
+      const tm0 = state.minute;
+      state.minute = 0;
+      out.lampLightsNight = ln.lit >= LAMP.litAt && !!dark && dark.lit < LAMP.litAt && darkLevel() === 1 && darkStretches >= 1;
+      state.minute = DAWN_MIN + 120;
+      out.lampNoDayEffect = darkLevel() === 0 && deterrence(100, 200) === VANDAL.lampCut * (litterAt(100, 200) >= 6 ? VANDAL.litterBoost : 1);
+      const moodAfter = n => { resetParties(); guestsArrive(2); const q = parties[0]; q.at = n; q.to = null; q.hold = true; q.mood = 90; q.pers = ["fun"]; q.fxc = null; guestsTick(state.minute, state.minute + 1); return q.mood; };
+      state.minute = 0;
+      const litMood = moodAfter(ln), darkMood = moodAfter(dark);
+      out.darkNodesCostMood = darkMood < litMood - 1e-6;
+      state.minute = DAWN_MIN + 120;
+      out.darkNoCostByDay = Math.abs(moodAfter(dark) - moodAfter(ln)) < 1e-6;
+      state.minute = 0;
+      const dLit = deterrence(100, 200), dDark = deterrence(dark.x, dark.y);
+      out.lampDeterNight = dLit < dDark && dLit <= LAMP.nightCut + 1e-9;
+      state.minute = tm0;
+      state.buildings = state.buildings.filter(b => b !== lamp); afterChange(); resetParties(); parties.push(...keepParties);
+    }
     // a guard nearby puts vandals off, and throws this one out
     const d0 = deterrence(100, 200);
     hireGuard(); syncGuards(); gcrew[0].at = nearestNode(100, 200); gcrew[0].route = [];
     out.guardDeters = deterrence(100, 200) <= d0 * SECURITY.deterCut + 1e-9;
     guardWatch();
-    out.guardCatches = vp.gone && vp.ejected && vandalLog().caught === 1;
+    out.guardCatches = !vp.gone && vp.ejected && !vp.vandal && vp.ejecting === "escort" && vp.home && gcrew[0].escort === vp && vandalLog().caught === 1;
+    // the guard stays beside the party while escorting, then goes free once they're out
+    guardsTick(1); out.guardEscortsBeside = gcrew[0].job === "escorting" && Math.abs(keeperPos(gcrew[0])[0] - partyPos(vp)[0] - 1.2) < 1e-6;
+    vp.gone = true; guardsTick(1); out.guardEscortEnds = gcrew[0].escort === null && gcrew[0].job !== "escorting";
     // with cameras, vandalism near the office sends the nearest guard
     state.science.tech.push("cameras");
     resetParties(); guestsArrive(2); const cp = parties[0]; cp.at = nearestGuestNode(130, 120); cp.rowdy = true;
@@ -696,6 +835,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.guestTapFinds = guestAt(gx * view.k + view.tx + box.left + 3, gy * ky() + view.ty + box.top - 3) === ej && guestAt(gx * view.k + view.tx + box.left + 300, gy * ky() + view.ty + box.top) !== ej;
       drawParties();
       out.guestDotColored = shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0 && guestRing.style.display === "";
+      // zoomed in, guests are pixel people with a pip in the dot color; zoomed out they go back to dots
+      { const k0 = view.k; view.k = 14; drawParties(); const sp = guestEls.size === 1 && guestEls.get(ej.id).firstChild.getAttribute("fill") === SHIRTS[PERS_INDEX.fun] && shirtPaths[PERS_INDEX.fun].getAttribute("d") === "";
+        view.k = 1; drawParties(); out.guestSprites = sp && guestEls.size === 0 && shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0; view.k = k0; drawParties(); }
       // the guard reaches it: it is walked to the gate, unhappy, rather than thrown out
       gcrew[0].at = nearestNode(ej.at.x, ej.at.y); const mood0 = ej.mood, mn0 = state.today.moodN;
       guardWatch();
@@ -706,11 +848,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.guestPanelCloses = sel === null;
       // a hooligan won't wait: a guard has to catch it
       const ho = mk("hooligan", "fun"); ho.at = nearestGuestNode(100, 200); parties = [ho];
-      gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null;
+      gcrew[0].at = nearestNode(300, 235); gcrew[0].chase = null; guardsTick(1);   // the last escort is over
       out.ejectHooligan = ejectGuest(ho) === null && !ho.hold && ho.ejecting === true && gcrew[0].chase === ho;
       guardWatch(); out.hooliganRunsFree = !ho.gone;
       gcrew[0].at = nearestNode(ho.at.x, ho.at.y); guardWatch();
-      out.hooliganCaught = ho.gone && ho.ejected;
+      out.hooliganCaught = ho.ejected && ho.ejecting === "escort" && ho.home && gcrew[0].escort === ho; ho.gone = true; guardsTick(1);
       // security that never shows up gives up after a while
       const wt = mk("fun", "fun"); wt.at = nearestGuestNode(100, 200); parties = [wt]; gcrew[0].at = nearestNode(300, 235);
       ejectGuest(wt); state.minute += PERS.ejectWait + 1; ejectTick(wt);
@@ -720,7 +862,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     }
     // a mechanic fixes the broken bench, and a custodian scrubs off graffiti
     hireMechanic();
-    const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };
+    const fix = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; mechanicsTick(1); if(until()) return true; } return false; };
     out.mechanicFixesProp = fix(900, () => propCond(bench) >= 99.9);
     state.staff.mechanics = [];
     const fs4 = buildingById("b-f"); fs4.graffiti = 80; hireCustodian(); syncCustodians();
@@ -743,7 +885,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     }
 
     // education: an info sign by an exhibit teaches far more than looking, unless it's broken
-    resetParties(); state.minute = OPEN_MIN + 60;
+    resetParties(); state.minute = DAWN_MIN + 60;
     const g1 = state.exhibits.find(e => e.id === "e-g1"), kid = () => { guestsArrive(2); return parties[parties.length - 1]; };
     const e0 = kid(); seeExhibit(e0, g1);
     const sign = {id:"b-sign", type:"sign", points:rectPts(96.9, 170, BUILDINGS.sign.w, BUILDINGS.sign.d, Math.PI / 2)};
@@ -759,7 +901,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("education");
     const ed = {id:"b-ed", type:"edcenter", points:rectPts(200, 111.5, BUILDINGS.edcenter.w, BUILDINGS.edcenter.d, 0), fee:4};
     state.buildings.push(ed); afterChange();
-    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100; e4.until = CLOSE_MIN;
+    const e4 = kid(); e4.seen = new Set(["e-g1", "e-g2"]); e4.cash = 100; e4.until = state.minute + 700;
     out.centerIsSight = !!gGraph.anchors["b-ed"] && pickSight(e4) === ed;
     const fee0 = state.today.edfees; serveAt(e4, ed, "see");
     out.centerTeaches = e4.edu === EDU.center && state.today.edfees - fee0 === 8 && ed.served.n === 2;
@@ -813,12 +955,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings = state.buildings.filter(b => b !== lodge); afterChange(); state.rating = r0; state.history = h0; state.logi.guestFrom = gf0;
 
     // lots of guests stay quick to simulate
-    state.minute = OPEN_MIN + 120;
+    state.minute = DAWN_MIN + 120;
     for(let i = 0; i < 1500; i++) guestsArrive(2);
     out.partyCap = parties.length === GUEST.maxParties && guestCount() === 3000;
     for(let i = 0; i < 30; i++) tick(.8);
     const tp = performance.now(); for(let i = 0; i < 50; i++) tick(.8);
-    out.guestPerf = (performance.now() - tp) / 50 < 15;
+    out.guestPerf = (performance.now() - tp) / 50 < 25;   // ~17 ms in the cloud sandbox at every commit since this check was added
 
     // old saves get a guest log, and stands and shops from before menus keep what they sold
     const old = JSON.parse(JSON.stringify(state)); delete old.guestLog; delete old.today.moodSum; delete old.litter;
@@ -842,7 +984,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     resetParties();
 
     // build sidebar and the Move tool
-    out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="campground"]') && !!document.querySelector('[data-fence="concrete"]');
+    { // Park Plants dropdown: biome headings in BIOMES order, sizes ascending inside each
+      const sub = document.querySelector('#sideMenu [data-open="park-plants"] .ssub'), order = Object.keys(BIOMES).map(b => BIOMES[b].label), heads = [], sizes = []; let ok = !!sub;
+      if(sub) for(const el of [...sub.children]){
+        if(el.tagName === "P" && el.dataset.pbiome){ heads.push(el.textContent); sizes.push([]); }   // a biome heading (the biome dropdown and the "no plants" note are skipped)
+        else if(el.tagName !== "BUTTON") continue;
+        else sizes[sizes.length - 1].push(PLANT_SIZES.indexOf(el.querySelector(".price").textContent.split(", ").find(x => PLANT_SIZES.includes(x))));
+      }
+      out.parkPlantsByBiome = ok && heads.length > 0 && heads.every(h => order.includes(h)) && heads.map(h => order.indexOf(h)).every((v, i, a) => !i || v > a[i - 1]) && sizes.every(a => a.every((v, i) => v >= 0 && (!i || v >= a[i - 1])));
+    }
+    out.menuBuilt = document.querySelectorAll("#sideMenu .sgroup").length >= 6 && !!document.querySelector('[data-tool="restroom"]') && !!document.querySelector('[data-fence="concrete"]');
     out.fencePrice = exhibitCost([[0,0],[40,0],[40,40],[0,40]], "bars") - exhibitCost([[0,0],[40,0],[40,40],[0,40]]) === Math.round(160 * BARRIERS.bars.perMeter);
     {
       const ex = {id:"e-mv", name:"Mv", points:[[200,200],[240,200],[240,240],[200,240]], animals:[], happy:70, cond:100, gate:[220,200]};
@@ -879,7 +1030,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   // Science: research, trips, clones, and growing all run on park minutes, not days
   Object.assign(checks, await page.evaluate(() => {
-    const out = {};
+    const out = {}; localStorage.setItem("genesis-dev", "1");   // these checks cover the dev-only themes and toys
     startWith(newPark(), false); setSpeed(0);
     events.toast = () => {};
     state.money = 1e7; state.day = 3; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
@@ -888,12 +1039,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.buildings.push({id:"b-gh", type:"ghost",  points:rectPts(180, 262, 28, 20, H)});
     state.buildings.push({id:"b-ta", type:"tar",    points:rectPts(230, 290, 26, 18, H)});
     state.buildings.push({id:"b-ce", type:"ceres",  points:rectPts(180, 290, 26, 18, H)});
-    state.paths.push({id:"p-t", name:"t", points:[[205,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[205,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[205,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[205,290],[193,290]]});
+    state.paths.push({id:"p-t", name:"t", points:[[207.5,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[207.5,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[207.5,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[207.5,290],[193,290]]});
     recompute(); buildKeeperGraph();
     out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
-    const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= CLOSE_MIN - 2){ state.day++; state.minute = OPEN_MIN; } tick(1); if(fn && fn()) return true; } return false; };
+    const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= DAY_MIN - 2){ state.day++; state.minute = 0; } tick(1); if(fn && fn()) return true; } return false; };
     sc.tech = sc.tech.filter(t => t !== "bars");   // bars are free in every park, so research is tested from scratch
-    state.minute = OPEN_MIN + 60;
+    state.minute = 10;
 
     // research: needs a researcher, takes time proportional to cost, and finishes mid-day
     out.needsPaleo = !!startProject("tech", "bars");
@@ -909,7 +1060,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pricierIsSlower = sc.projects[0].end - sc.projects[0].start === t15 * 4;
     sc.projects = [];
     // points accrue with time, not at night
-    const pts0 = sc.points; state.minute = OPEN_MIN + 60; tick(60);
+    const pts0 = sc.points; state.minute = DAWN_MIN + 60; tick(60);
     out.pointsTrickle = Math.abs(sc.points - pts0 - RESEARCH_PER_PALEO * 60 / DAY_MIN) < 1e-6;
     // a researcher on a project earns nothing, and stopping it gives the points back
     sc.points = 100; startProject("tech", "moat");
@@ -924,7 +1075,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // animals are unlocked one by one under their period
     const small = SPECIES.filter(x => !x.viv).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
     out.tripLockedFirst = !!tripProblem(small.id, small.period);
-    sc.points = 500; state.minute = OPEN_MIN + 60;
+    sc.points = 500; state.minute = DAWN_MIN + 60;
     out.unlockAnimal = startProject("species", small.id) === null && !isUnlocked(small.id);
     out.unlockCostScales = unlockPoints(big) > unlockPoints(small);
     adv(projectMinutes(unlockPoints(small)) + 5, () => isUnlocked(small.id));
@@ -934,7 +1085,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.needsTeam = !!tripProblem(small.id, small.period);
     hireScientist("temporal");
     out.tripOk = !tripProblem(small.id, small.period);
-    const mny = state.money; state.minute = OPEN_MIN + 60;
+    const mny = state.money; state.minute = DAWN_MIN + 60;
     out.launch = launchTrip(small.id, small.period) && state.money === mny - tripOdds(small.id, small.period).cost && sc.trips.length === 1;
     out.oneTeamOneTrip = !!tripProblem(small.id, small.period);
     const trip = sc.trips[0];
@@ -962,7 +1113,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[small.id] = {genome:100, quality:90}; hireScientist("gene");
     const base = cloneMinutes(small.id);
     out.cloneTimed = base === Math.round((1 + small.space / CLONE_DAYS_PER_SPACE) * DAY_MIN);
-    state.rating = 5; state.minute = OPEN_MIN + 60;
+    state.rating = 5; state.minute = DAWN_MIN + 60;
     out.cloneOrder = orderClone(small.id, null) && sc.clones.length === 1;
     out.incubatorCount = bayCount("gene") === 1 && sc.clones[0].bay === 0;
     sc.tech.push("fast1");
@@ -972,6 +1123,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.hireOpensBay = freeBay("gene") === 1 && orderClone(small.id, null) && sc.clones[1].bay === 1;
     out.fireClosesBay = (() => { const n = sc.clones.length; fireScientist("gene"); return sc.clones.length === n - 1 && bayCount("gene") === 1; })();
     out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
+    // a partial genome can fail: the clone stops where it died, keeps its bay, and waits to be discarded
+    sc.dna[small.id] = {genome:CLONE_GENOME.min}; sc.rating = 5;
+    out.failChanceScales = Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax) < 1e-9 && (sc.dna[small.id].genome = 80, Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax / 2) < 1e-9) && (sc.dna[small.id].genome = 100, cloneFailChance(small.id) === 0);
+    sc.dna[small.id].genome = CLONE_GENOME.min;
+    const rnd0 = Math.random; Math.random = () => 0;
+    const ordered = orderClone(small.id, null); Math.random = rnd0;
+    const fj = sc.clones[sc.clones.length - 1];
+    out.failRolled = ordered && fj.fail > fj.start && fj.fail < fj.end;
+    out.runningCardHasBar = /data-cbar/.test(cloneCard(fj, 0)) && !/CLONE FAILED/.test(cloneCard(fj, 0));
+    const readyBefore = sc.ready.length;
+    out.cloneFails = adv(base, () => fj.failed) && fj.stop >= CLONE_FAIL.from * 100 - 1 && fj.stop <= CLONE_FAIL.to * 100 + 1;
+    adv(base * 2, () => false);
+    out.failedStaysPut = sc.clones.includes(fj) && sc.ready.length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
+    out.failedCardOverlay = /CLONE FAILED/.test(cloneCard(fj, 0)) && /discardClone/.test(cloneCard(fj, 0)) && cloneCard(fj, 0).includes(`width:${Math.round(fj.stop)}%`);
+    out.discardFreesBay = discardClone(fj.id) && !sc.clones.includes(fj) && freeBay("gene") >= 0;
+    sc.dna[small.id] = {genome:100};
     sc.tar = null;
 
     // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
@@ -987,17 +1154,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[PLANT_DNA.Jurassic.id] = {genome:100, quality:80};
     out.floraGrows = growProblem("plant", "Jurassic", "small") === null && ceresRate() > 0;
     out.otherPeriodNeedsOwnDna = /Triassic plant DNA/.test(growProblem("plant", "Triassic", "small"));
-    state.minute = OPEN_MIN + 60;
+    state.minute = DAWN_MIN + 60;
     growBatch("plant", "Jurassic", "small");
     out.bedBusy = state.ceres.beds.length === 1 && !state.ceres.pots["Jurassic-small"];
     out.batchTakesTime = adv(60) === false && !state.ceres.pots["Jurassic-small"];
     out.batchDone = adv(growMinutes("plant", "Jurassic", "small"), () => state.ceres.pots["Jurassic-small"] === CERES_GROW.plant.mesozoic.small.count);
     // medicine comes from batches, not a steady trickle
-    state.ceres.meds = 0; state.minute = OPEN_MIN + 60;
-    out.medNoTrickle = (adv(30), state.ceres.meds === 0);
-    out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => state.ceres.meds >= 20);
-    state.ceres.auto.mesozoic = true; state.ceres.meds = 0;
-    out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => state.ceres.meds >= 20);
+    state.ceres.meds = {medpal:0, medmes:0, medcen:0}; state.minute = DAWN_MIN + 60;
+    out.medNoTrickle = (adv(30), cerMedTotal() === 0);
+    out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
+    state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
+    out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
     state.ceres.auto.mesozoic = false;
 
     // medicine only cures a period's animals once refined for it
@@ -1074,7 +1241,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     {
       const keep = {exhibits:state.exhibits, buildings:state.buildings, paths:state.paths, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, money:state.money, tech:state.science.tech.slice(), done:state.goalsDone.slice(), zones:state.zones};
       state.exhibits = []; state.buildings = []; state.zones = []; state.decor = []; state.water = []; state.fences = []; state.money = 1e6;
-      state.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-l", points:[[205,235],[100,235]]}];
+      state.paths = [{id:"p-main", name:"Main walk", points:[[207.5,305],[207.5,235]], fixed:true}, {id:"p-l", points:[[207.5,235],[100,235]]}];
       recompute();
       // modern plants grow anywhere; other periods' plants need sterile prehistoric plants first
       out.decorPlantOutside = landSpot(150, 220, "q-white-oak").ok && landSpot(150, 220, "qua-temperate-large").ok;
@@ -1110,10 +1277,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       fenceSel = "hedge"; setTool("exhibit");
       const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
       out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
+      const ringOpen = fenceJointsSvg(1).includes("#E08A2E"); tool = "select"; const ringShut = fenceJointsSvg(1).includes("#E08A2E"); tool = "exhibit";
+      out.decoRingOnlyWhileFencing = ringOpen && !ringShut;
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
-      const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
+      const pf = penFaces()[0]; const hedgePenRefused = penProblem(pf) === DECO_WHY + " Fence it with something strong first."; adoptPen(pf, pf.pts[0].slice());
       const ne = state.exhibits[state.exhibits.length - 1];
+      out.decoCantHouse = hedgePenRefused && planPieces(loopPieces(ne.points), "rope").why === DECO_WHY && BARRIERS.hedge.deco && BARRIERS.rope.deco && !BARRIERS.wood.deco;
       out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
       // guests enjoy the gardens and read the plaques
@@ -1176,6 +1346,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // a small loop is just a pen, not an exhibit
       L([300,100],[305,100]); L([305,100],[305,105]); L([305,105],[300,105]); L([300,105],[300,100]);
       out.fenceSmallPen = state.exhibits.length === 2;
+      // lifting fence with Bulldoze asks first; Cancel leaves it, Remove lifts it
+      L([380,60],[381,60]);
+      const lk = "380,60,h", liftDrag = () => { fdrag = {lift:true, swept:new Set([lk])}; endFenceDrag(); };
+      liftDrag(); const askedLift = $("#dlgConfirm").open && /fence/i.test($("#confirmTitle").textContent) && !!fencePieces()[lk];
+      $("#confirmNo").click(); const keptLift = !fencePieces()[lk] ? false : !$("#dlgConfirm").open;
+      liftDrag(); $("#confirmYes").click();
+      out.fenceLiftConfirm = askedLift && keptLift && !fencePieces()[lk];
       // bulldozing an exhibit lifts the fence it doesn't share, and refunds it
       const before = Object.keys(state.fenceGrid).length, r = refundFor("exhibit", de);
       const mb = state.money; removeItem("exhibit", de);
@@ -1189,6 +1366,63 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceNoMove = moveTarget({kind:"exhibit", id:ge.id}) === null;
       const ob = JSON.parse(JSON.stringify(state)); delete ob.fenceGrid;
       out.fenceSave = Object.keys(upgradeSave(ob).fenceGrid).length === 0 && Object.keys(upgradeSave(JSON.parse(JSON.stringify(state))).fenceGrid).length === Object.keys(state.fenceGrid).length;
+      // two pens side by side share a wall, and each side of it can be its own fence
+      {
+        box(370,150,380,165); box(380,150,390,165); gatePens();   // 10 x 15 each: 150 m2
+        const bx = state.exhibits.filter(e => e.grid && e.points.some(p => p[0] === 380) && area(e.points) === 150), W = bx.find(e => e.points.some(p => p[0] === 370)), E = bx.find(e => e.points.some(p => p[0] === 390));
+        const wall = pieceLine([380,150],[380,165]).keys, wallKinds = e => sideKinds(e).filter((k, i) => k !== "wood");
+        out.sharedWallStart = !!W && !!E && wall.every(k => !pieceSplit(fencePieces()[k]));
+        // meeting mode leaves the wall alone and says why
+        const mp = planPieces(wall, "bars", {meet:true});
+        out.fenceMeetKeeps = !mp.todo.length && /in the way/.test(mp.why || "");
+        // pointer on the west pen's side: only that side becomes bars
+        layPieces(wall, "bars", {dir:[0,1], side:1});
+        out.sharedWallSplit = wall.every(k => pieceSplit(fencePieces()[k]) && pieceKind(fencePieces()[k], true) === "bars" && pieceKind(fencePieces()[k], false) === "wood");
+        out.sharedWallKinds = wallKinds(W).length === 1 && wallKinds(W)[0] === "bars" && wallKinds(E).length === 0 && sideOffsets(W).filter(Boolean).length === 1 && sideOffsets(E).filter(Boolean).length === 1;
+        out.sharedWallHolds = W.barrier === (BARRIERS.bars.strength < BARRIERS.wood.strength ? "bars" : undefined) && E.barrier === undefined;
+        // the other pen's side takes concrete without touching the first
+        layPieces(wall, "concrete", {dir:[0,1], side:-1});
+        out.sharedWallOtherSide = wall.every(k => pieceKind(fencePieces()[k], true) === "bars" && pieceKind(fencePieces()[k], false) === "concrete") && wallKinds(E).join() === "concrete" && wallKinds(W).join() === "bars";
+        // a deco fence can't take an exhibit's side of the wall
+        out.sharedWallNoDeco = planPieces(wall, "rope", {dir:[0,1], side:1}).why === DECO_WHY;
+        // pointer on the wall changes both sides; it costs one fence's worth a piece
+        const cost = planPieces(wall, "bars", {dir:[0,1], side:0}).cost;
+        out.sharedWallBoth = cost === Math.round(wall.length * fenceRate("bars")) && layPieces(wall, "bars", {dir:[0,1], side:0}) && wall.every(k => !pieceSplit(fencePieces()[k]) && pieceType(fencePieces()[k]) === "bars");
+        // the wall picker changes one pen's side only
+        layPieces(wall, "wood", {dir:[0,1], side:1}); refenceExhibit(E, "concrete");
+        out.sharedWallRefence = wall.every(k => pieceKind(fencePieces()[k], true) === "wood" && pieceKind(fencePieces()[k], false) === "concrete") && E.barrier === "concrete";
+        // lifting a split piece sells back both fences
+        const wk = wall[0], worth = pieceWorth(wk, fencePieces()[wk]);
+        out.sharedWallWorth = worth === pieceCost(wk, "wood") + pieceCost(wk, "concrete");
+        // bulldozing one pen takes its side of the shared wall and leaves the neighbor's
+        const wasW = W.points.length; removeItem("exhibit", E);
+        out.sharedWallRelease = wall.every(k => fencePieces()[k] && !pieceSplit(fencePieces()[k]) && pieceType(fencePieces()[k]) === "wood") && state.exhibits.includes(W) && W.barrier === undefined && wasW === W.points.length;
+        // one run changing fence along its length is its own sides, and the two kinds meet at a post
+        L([400,150],[410,150],"wood"); L([410,150],[420,150],"bars");
+        const runs = looseRuns().filter(r => r.pts[0][1] === 150 && r.pts[0][0] >= 400);
+        out.fenceKindsMeet = runs.length === 2 && runs.some(r => r.b === "wood" && r.pts[1][0] === 410) && runs.some(r => r.b === "bars" && r.pts[0][0] === 410);
+        // laying wood over the bars replaces just the bars pieces, and meeting mode would not
+        out.fenceMeetFills = planPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}).why !== null && layPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}) === null && pieceType(fencePieces()["415,150,h"]) === "bars";
+        L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
+        for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
+        // water inside an exhibit may sit flush against its fence, but not poke out
+        out.waterBordersFence = !waterProblem([[375,160],[380,160],[380,165],[375,165]], W) && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        // fence may border a path or water but not run through it
+        const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
+        const why = k => planPieces([k], "wood").why;
+        out.fenceBordersPath = !why("400,150,h") && !why("400,155,h") && !why("400,152,v") && /path/.test(why("402,152,h") || "") && /path/.test(why("405,152,v") || "") && /path/.test(why("402,152,d") || "");
+        out.fenceBordersWater = !why("410,140,h") && !why("405,142,v") && !why("415,142,v") && /water/.test(why("410,142,h") || "") && /water/.test(why("410,142,d") || "");
+        for(const k of Object.keys(pc)) if(!(k in keepPc)) delete pc[k]; state.water = keepWater;
+        // a pen closed around park water and a rock takes them in as its own, with no complaint
+        {
+          const kd = state.decor, kw = state.water, lt = Object.keys(LAND)[0];
+          state.water = [{id:"w-in", points:[[405,145],[410,145],[410,150],[405,150]]}]; state.decor = [{id:"d-in", type:lt, x:412, y:155}];
+          const nb = state.exhibits.length; box(400,140,420,160); gatePens();
+          const pe = state.exhibits[state.exhibits.length - 1];
+          out.penTakesParkThings = state.exhibits.length === nb + 1 && !state.water.length && !state.decor.length && waterOf(pe).length === 1 && landOf(pe).length === 1;
+          state.decor = kd; state.water = kw;
+        }
+      }
       render(); out.fenceDraws = !!world.querySelector(`[data-id="${ge.id}"]`);
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
       state.science.tech = keep.tech; setTool("select"); recompute(); buildGuestGraph(); render();
@@ -1241,6 +1475,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     placeLand(gx, "car-tropical-small", 115, 115);
     { const land0 = gx.land, m0 = state.money; gx.land = []; state.money = 1e6; placeLand(gx, "rock", 115, 115, "desert"); placeLand(gx, "rock", 135, 135);
       out.rockKeepsBiome = gx.land[0].biome === "desert" && !gx.land[1].biome && rockTone("desert", "rock").fill !== rockTone("boreal", "rock").fill && rockTone("desert", "boulder").fill !== rockTone("desert", "rock").fill;
+      gx.land = land0; state.money = m0; }
+    // rock shape picker: a chosen shape is placed and drawn, the ghost shows it, a random pick and old rocks keep the id-based pick
+    { const land0 = gx.land, m0 = state.money, rb = rockBiome, ghost0 = landGhost; gx.land = []; state.money = 1e6; gx.biome = "desert";
+      const n = ROCK_SPRITES.desert.rock.length;
+      rockPick.rock = 2; placeLand(gx, "rock", 115, 115, null, rockPicOf("rock", "desert")); rockPick.rock = null; placeLand(gx, "rock", 135, 135, null, rockPicOf("rock", "desert"));
+      const old = {id:"l-old", type:"rock", x:120, y:120};
+      out.rockPickPlaced = gx.land[0].pic === 2 && gx.land[1].pic === undefined && n > 2 && /rock-desert-3\.png/.test(featSvg(gx.land[0], "desert", false)) && featSvg(old, "desert", false).includes("rock-desert-" + (seedOf(old) % n + 1) + ".png");
+      rockPick.rock = 99; out.rockPickClamp = rockPicOf("rock", "desert") === null; rockPick.boulder = 1; rockPick.rock = 4;
+      setTool("land-boulder"); rockBiome = "desert"; landGhost = {key:"boulder", x:150, y:150, ok:true}; renderOverlay();
+      out.rockGhostShape = /boulder-desert-2\.png/.test($("#overlay").innerHTML || document.body.innerHTML) && !/boulder-desert-[134]\.png/.test($("#overlay").innerHTML || "");
+      refreshShapes();
+      const box = document.querySelector('[data-shapes="rock"]');
+      out.rockThumbs = !!box && box.querySelectorAll("img").length === n && box.querySelector('img').src.includes("rock-desert-1.png") && box.querySelectorAll('[aria-pressed="true"]').length === 1;
+      rockBiome = "tropical"; refreshShapes();
+      out.rockThumbsBiome = document.querySelector('[data-shapes="rock"] img').src.includes("rock-tropical-1.png") && document.querySelectorAll('[data-shapes="rock"] img').length === ROCK_SPRITES.tropical.rock.length;
+      rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
@@ -1363,13 +1613,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*ky()); const flush = ghost;
     out.rotateFlush = false;
     if(flush.ok){ const fb = {id:"b-flush", type:"food", points:flush.pts}; state.buildings.push(fb); setTool("move"); mvSel = fb.id; rotateMoved(); out.rotateFlush = Math.abs(Math.atan2(fb.points[1][1] - fb.points[0][1], fb.points[1][0] - fb.points[0][0]) - flush.angle) > .5 && !moveProblem("building", fb); }
-    // drawing a path onto the edge of another snaps to its centerline, so they join
-    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}]; recompute();
-    setTool("wide"); const rc = svg.getBoundingClientRect(), cl = (x, y) => [rc.left + view.tx + x*view.k, rc.top + view.ty + y*ky()];
-    const sn = snapAt(...cl(250, 297.5));   // on the edge of the 5 m path, 2.5 m off its centerline
-    out.pathEdgeSnaps = Math.abs(sn.y - 300) < .01 && sn.info && sn.info.type === "seg";
-    const farSn = snapAt(...cl(250, 290));  // well clear of it
-    out.pathFarNoSnap = Math.abs(farSn.y - 290) < .5 || !!farSn.info === false;
     setTool("select");
     state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}, {id:"p-w", type:"wide", points:[[250,240],[250,297.5]]}]; recompute();
     out.wideShortNotJoined = !derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 0;
@@ -1431,7 +1674,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     render(); out.tramBrokenDrawn = world.innerHTML.includes("#6E2A26");
     state.science.tech.push("transit");
     state.staff.mechanics = []; hireMechanic();
-    let fixed = false; for(let i = 0; i < 1500 && !fixed; i++){ state.minute = OPEN_MIN + 60; mechanicsTick(1); fixed = condOf(stA) >= 99.9; }
+    let fixed = false; for(let i = 0; i < 1500 && !fixed; i++){ state.minute = DAWN_MIN + 60; mechanicsTick(1); fixed = condOf(stA) >= 99.9; }
     out.tramMechanicRepairs = fixed && tramWorking(stA) && !!gGraph.anchors["b-trA:rail"] && tramStops(state.paths[2]).stops.length === 2;
     state.staff.mechanics = []; syncMechanics(); state.minute = trMin;
     // stations wear faster with more track beside them
@@ -1459,15 +1702,196 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     Object.assign(state, {paths:trSaved.paths, buildings:trSaved.buildings, money:trSaved.money}); state.science.tech = trSaved.tech; state.today.fares = trSaved.fares;
     recompute(); buildGuestGraph(); buildKeeperGraph(); render(); drawTrams();
 
-    // the path preview band is as wide as the path it will become
-    const bandW = kind => { setTool(kind); draw.pts = [[300,300]]; draw.hover = [340,300]; renderOverlay(); const m = $("#overlay").innerHTML.match(/stroke-opacity="\.35" stroke-width="([\d.]+)"/); setTool("select"); return m && +m[1]; };
-    out.pathBandWidth = bandW("path") === 2*PATH_HALF_WIDTH && bandW("wide") === 2*WIDE_PATH.halfWidth && bandW("service") === 2*SERVICE_ROAD.halfWidth;
+    // paths are 5 m chunks: drag-and-drop runs, true-size ghost, drag-box bulldoze, migration, costs, and guests still get around
+    {
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
+      state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
+      state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = keep.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+      const nch = () => Object.keys(state.pathChunks).length;
+      // the entrance walk is one chunk wide, centered under the entrance
+      const wk = Object.keys(state.pathFixed).map(chunkXY);
+      out.chunksDefaultWalk = nch() === 14 && wk.length === 14 && wk.every(([cx]) => cx === 41) && Math.min(...wk.map(c => c[1])) === 47 && Math.max(...wk.map(c => c[1])) === 60
+        && state.gate[0] === 207.5 && state.gate[0] === 41 * CHUNK + CHUNK / 2 && state.gate[1] === SOUTH_LINE && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0;
+      out.entranceAligned = state.gate[0] === ENTRANCE_X && chunkAt(state.gate[0] - 2.4, 300)[0] === 41 && chunkAt(state.gate[0] + 2.4, 300)[0] === 41 && pathAt(state.gate[0], state.gate[1] - 1) === "g";
+      out.platesOnGrid = [...PARCELS.xs, ...PARCELS.ys, ...PARCELS.home, ...LEGACY_SOUTH_YS, ...PARK_PLOT.flat()].every(v => v % CHUNK === 0);
+      out.chunkCosts = pathChunkCost("g") === COST.pathPerMeter * 5 && pathChunkCost("s") === SERVICE_ROAD.perMeter * 5 && pathChunkCost("b") === BRIDGE.perMeter * 5 && !PATH_CELLS.kinds.x && !PATH_TOOLS.crossing;
+      // a straight drag: 11 chunks along the row beside the walk's far end
+      const A = [41, 46], B = [51, 46], plan = planPath(A, B, "g");
+      out.chunkDragStraight = plan.chunks.length === 11 && plan.todo.length === 11 && !plan.why && plan.cost === 11 * pathChunkCost("g") && plan.chunks.every((k, i) => k === chunkKey(41 + i, 46));
+      // the ghost shows exactly the chunks that will be laid
+      setTool("path"); cdrag = {a:A, b:B, kind:"g"}; pathDragStat(); renderOverlay();
+      const ghostN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="#4CD964"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
+      out.chunkGhostMatches = ghostN === plan.todo.length && /11 chunks/.test($("#dStat").textContent);
+      const m0 = state.money, n0 = nch(); endPathDrag();
+      out.chunkLaid = nch() === n0 + 11 && plan.todo.every(k => state.pathChunks[k] === "g") && Math.abs(m0 - state.money - plan.cost) < 1e-6 && derived.joined.size > 0 && chunkReached(51, 46, true);
+      // a diagonal drag lays a stair: the 45 degree chunks and the one beside each step that keeps them edge to edge
+      const D1 = [51, 46], D2 = [56, 41], dp = planPath(D1, D2, "g"), has = (x, y) => dp.chunks.includes(chunkKey(x, y));
+      out.chunkDragDiagonal = !dp.why && dp.chunks.length === 11 && has(51, 46) && has(56, 41) && has(53, 44) && has(52, 46) && !has(51, 45)
+        && dp.chunks.every(k => { const [x, y] = chunkXY(k); return dp.chunks.some(j => { const [u, v] = chunkXY(j); return Math.abs(u - x) + Math.abs(v - y) === 1; }); });
+      layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
+      out.chunkDiagJoined = chunksJoined(dp.chunks, true) && chunkReached(56, 41, true) && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
+      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 14;
+      // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
+      state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
+      const pe = planPath([58, 21], [66, 21], "g");
+      out.chunkBlockedExhibit = /exhibit/.test(pe.why) && pe.bad.size > 0 && layPath([58, 21], [66, 21], "g") === null;
+      state.exhibits = []; state.water = [{id:"w-cp", points:[[300,100],[320,100],[320,120],[300,120]]}];
+      out.chunkWaterBridge = /water/.test(planPath([58, 21], [66, 21], "g").why) && planPath([58, 21], [66, 21], "b").why === "" && planPath([58, 21], [66, 21], "b").bad.size === 0;
+      state.water = [];
+      out.chunkOffLand = /boundary/.test(planPath([-12, 22], [-8, 22], "g").why);
+      state.fenceGrid = {[pieceKey(300, 100, "v")]:{}};
+      out.chunkBlockedFence = /fence/.test(planPath([58, 20], [62, 20], "g").why);
+      state.fenceGrid = {};
+      state.money = 5; out.chunkTooDear = /Costs/.test(planPath([20, 20], [28, 20], "g").why); state.money = 1e6;
+      // bulldoze: a tap takes one chunk, a drag box takes exactly the chunks lit, the entrance walk stays
+      setTool("bulldoze");
+      const boxAt = (a, b) => { fdrag = {a, b, lift:true, box:true, swept:new Set(), last:{x:b[0], y:b[1]}}; };
+      const toastKeep = ui.toast; let toasted = ""; ui.toast = t => { toasted = t; };
+      const c0 = nch(), mm = state.money; boxAt([227.5, 232.5], [227.5, 232.5]); endFenceDrag();
+      out.chunkBulldozeTap = nch() === c0 - 1 && !state.pathChunks["45,46"] && state.money - mm === Math.round(pathChunkCost("g") * COST.refundShare) && /Removed 1 path chunk, refunded/.test(toasted);
+      const c1 = nch(), m1 = state.money; boxAt([236, 226], [246, 236]);
+      const lit = bulldozeChunkKeys(fdrag).slice().sort(); renderOverlay();
+      const litN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="var\(--bad\)" fill-opacity="\.45"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
+      endFenceDrag();
+      out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare) && /Removed 3 path chunks, refunded \$/.test(toasted);
+      const c2 = nch(); boxAt([207.5, 280], [207.5, 280]); endFenceDrag();
+      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,56"];
+      boxAt([200, 270], [215, 300]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
+      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,56"];
+      ui.toast = toastKeep; setTool("select");
+      // the same through real pointer events: drag the path tool, then drag a bulldoze box that lights the chunks as it grows
+      {
+        const r = svg.getBoundingClientRect(), scr = (wx, wy) => ({clientX:r.left + view.tx + wx * view.k, clientY:r.top + view.ty + wy * ky()});
+        const fire = (type, wx, wy, extra) => svg.dispatchEvent(new PointerEvent(type, {pointerId:7, pointerType:"mouse", button:0, buttons:type === "pointerup" ? 0 : 1, bubbles:true, ...scr(wx, wy), ...extra}));
+        svg.setPointerCapture = () => {}; svg.releasePointerCapture = () => {};   // synthetic pointers can't be captured
+        state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); pathVer++; recompute();
+        const base = nch();
+        setTool("path"); fire("pointerdown", 52.5 * CHUNK + 2, 40.5 * CHUNK); fire("pointermove", 55.5 * CHUNK, 40.5 * CHUNK); fire("pointermove", 58.5 * CHUNK, 40.5 * CHUNK);
+        const shown = cdrag && cdrag.plan && cdrag.plan.todo.length; fire("pointerup", 58.5 * CHUNK, 40.5 * CHUNK);
+        out.chunkPointerLay = shown === 7 && nch() === base + 7 && ["52,40", "58,40"].every(k => state.pathChunks[k] === "g") && !state.pathChunks["51,40"] && !state.pathChunks["59,40"];
+        setTool("bulldoze"); fire("pointerdown", 53.1 * CHUNK, 39.6 * CHUNK); fire("pointermove", 55 * CHUNK, 40.5 * CHUNK); fire("pointermove", 56.5 * CHUNK, 41.2 * CHUNK);
+        const lit2 = fdrag ? bulldozeChunkKeys(fdrag).sort().join(" ") : "";
+        fire("pointerup", 56.5 * CHUNK, 41.2 * CHUNK);
+        out.chunkPointerBulldoze = lit2 === "53,40 54,40 55,40 56,40" && nch() === base + 3 && ["52,40", "57,40", "58,40"].every(k => state.pathChunks[k]) && ["53,40", "54,40", "55,40", "56,40"].every(k => !state.pathChunks[k]);
+        fire("pointerdown", 57.5 * CHUNK, 40.5 * CHUNK); fire("pointerup", 57.5 * CHUNK, 40.5 * CHUNK);
+        out.chunkPointerTap = nch() === base + 2 && !state.pathChunks["57,40"] && !!state.pathChunks["58,40"];
+        setTool("select"); delete svg.setPointerCapture; delete svg.releasePointerCapture;
+        state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+      }
+      // old saves from the 1 m cell build: a chunk is path where most of its area was; the gate and the walk move to the chunk grid
+      const oldC = JSON.parse(JSON.stringify(state)); delete oldC.pathChunks; delete oldC.pathFixed; oldC.gate = [205, 305]; oldC.paths = oldC.paths.filter(p => !p.d);
+      oldC.pathCells = {}; oldC.pathFixed = {};
+      for(let x = 203; x < 208; x++) for(let y = 235; y < 305; y++){ oldC.pathCells[x + "," + y] = "g"; oldC.pathFixed[x + "," + y] = 1; }
+      for(let x = 208; x < 240; x++) for(let y = 233; y < 238; y++) oldC.pathCells[x + "," + y] = "g";   // rows 233 to 237: three in chunk row 47, two in 46
+      for(let x = 150; x < 200; x++) for(let y = 248; y < 251; y++) oldC.pathCells[x + "," + y] = "s";   // a 3 m staff road
+      oldC.pathCells["199,250"] = "x";
+      upgradeSave(oldC);
+      const cnt = k => Object.keys(oldC.pathChunks).filter(k).length;
+      out.chunkMigrateCells = !oldC.pathCells && oldC.gate[0] === 207.5 && oldC.gate[1] === 305 && oldC.pathChunks["41,47"] === "g" && oldC.pathChunks["42,47"] === "g" && !oldC.pathChunks["42,46"] && !oldC.pathChunks["40,56"] && oldC.pathChunks["41,60"] === "g" && !oldC.pathChunks["41,61"]
+        && Object.keys(oldC.pathFixed).length === 14 && Object.keys(oldC.pathFixed).every(k => /^41,/.test(k)) && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
+        && cnt(k => oldC.pathChunks[k] === "s") === 20;
+      const againC = upgradeSave(JSON.parse(JSON.stringify(oldC)));
+      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).length === 14;
+      // old saves from line paths (tram stays a line)
+      const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathChunks; delete oldS.pathFixed; oldS.gate = [205, 305];
+      oldS.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o1", points:[[205,235],[300,235]]}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}, {id:"p-o3", type:"wide", points:[[250,200],[250,150]]}, {id:"p-o4", type:"bridge", points:[[300,235],[300,200]]}, {id:"p-tr", type:"tram", points:[[250,312],[480,312]]}, {id:"x", d:1, points:[[0,0],[5,0]]}];
+      upgradeSave(oldS);
+      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).length === 14
+        && oldS.pathChunks["50,47"] === "g" && oldS.pathChunks["35,50"] === "s" && oldS.pathChunks["49,35"] === "g" && oldS.pathChunks["50,35"] === "g" && !oldS.pathChunks["48,35"] && !oldS.pathChunks["51,35"]
+        && Object.keys(oldS.pathChunks).some(k => oldS.pathChunks[k] === "b") && !Object.keys(oldS.pathChunks).some(k => chunkXY(k)[1] >= 61) && oldS.gate[0] === 207.5;
+      // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
+      layPath(A, B, "g");   // mend the gap the bulldoze left
+      state.exhibits = [{id:"e-cp2", name:"CP2", points:[[212,222],[222,222],[222,229],[212,229]], animals:[], land:[], water:[], cond:100}];
+      layPath([42, 50], [47, 50], "s"); recompute(); buildGuestGraph(); buildKeeperGraph();
+      const gw = gGraph.anchors.gate ? walkFrom(gGraph.anchors.gate, false) : {dist:new Map()};
+      out.chunkGuestsReach = isReachable(state.exhibits[0]) && !!gGraph.anchors["e-cp2"] && gw.dist.has(gGraph.anchors["e-cp2"]);
+      out.chunkStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
+      render();
+      out.chunkRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
+      pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
+    }
+
+    // path connectivity: a flood fill over the chunks, edge to edge, from the entrance walk; staff chunks that touch a guest chunk join for staff only
+    {
+      const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
+      state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
+      state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = [];   // no loose lines from earlier checks
+      const reset = () => { state.pathChunks = {}; for(const k in state.pathFixed) state.pathChunks[k] = "g"; pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
+      const redo = () => { recompute(); buildGuestGraph(); buildKeeperGraph(); };
+      const G = (x, y) => chunkReached(x, y, true), S = (x, y) => chunkReached(x, y, false);
+      reset();
+      out.reachWalk = G(41, 55) && S(41, 55) && pathReach() === pathReach();
+      // a path touching the walk is joined, a gap breaks it, a corner touch is not an edge
+      layPath([42, 47], [47, 47], "g");
+      out.reachTouch = G(47, 47) && S(47, 47);
+      layPath([20, 20], [28, 20], "g");
+      out.reachFar = !G(24, 20) && !S(24, 20);
+      reset(); layPath([41, 44], [46, 44], "g");   // the walk starts at row 47: a gap of two rows
+      out.reachGap = !G(44, 44) && !S(44, 44);
+      layPath([41, 46], [41, 45], "g");   // fills the gap
+      out.reachGapMended = G(44, 44);
+      reset(); state.pathChunks["42,46"] = "g"; pathVer++;
+      out.reachCorner = !G(42, 46);
+      state.pathChunks["42,47"] = "g"; pathVer++;
+      out.reachEdge = G(42, 46) && G(42, 47);
+      // two runs side by side merge into one network
+      reset(); layPath([42, 47], [47, 47], "g"); layPath([42, 45], [47, 45], "g");
+      out.reachSideGap = !G(44, 45);
+      layPath([42, 46], [42, 46], "g");
+      out.reachSideBySide = G(44, 45) && G(47, 45);
+      // the cache follows the chunks
+      const r0 = pathReach(); pathVer++;
+      out.reachCache = pathReach() !== r0 && pathReach() === pathReach();
+      // a bridge chunk joins like a guest path, and guests walk it
+      reset(); layPath([42, 47], [47, 47], "g"); layPath([48, 47], [51, 47], "b"); redo();
+      out.reachBridge = G(50, 47) && pathKind(50, 47) === "b" && [...gGraph.nodes.values()].some(n => n.x > 251);
+      // a path dragged out of the entrance walk joins
+      reset(); layPath([41, 46], [41, 40], "g"); redo();
+      out.reachFromEntrance = G(41, 40) && [...gGraph.nodes.values()].some(n => n.y < 205);
+      // a staff chunk touching a guest chunk (or the entrance walk) is joined for staff only
+      reset(); layPath([42, 50], [47, 50], "s"); redo();
+      const nodeNear = (G2, x, y) => { let b = null, bd = 1e9; for(const n of G2.nodes.values()){ const d = Math.hypot(n.x - x, n.y - y); if(d < bd){ bd = d; b = n; } } return {b, d:bd}; };
+      const start = [...kGraph.nodes.values()].reduce((a, n) => Math.hypot(n.x - 207, n.y - 290) < Math.hypot(a.x - 207, a.y - 290) ? n : a);
+      out.staffTouchJoins = S(47, 50) && !G(47, 50) && !G(42, 50) && nodeNear(kGraph, 237.5, 252.5).d < 4 && walkFrom(start, null).dist.has(nodeNear(kGraph, 237.5, 252.5).b);
+      out.guestsNeverStaff = !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && nodeNear(gGraph, 237.5, 252.5).d > 5 && state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id));
+      // ...also where it meets the end of a guest path away from the walk
+      reset(); layPath([42, 47], [46, 47], "g"); layPath([47, 47], [50, 47], "s"); redo();
+      out.staffTouchGuest = S(49, 47) && !G(49, 47) && G(46, 47) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id));
+      // a staff chunk with no path to it joins nothing; a guest chunk that only a staff chunk reaches is not a guest path
+      layPath([20, 20], [24, 20], "s"); out.staffAlone = !S(22, 20);
+      reset(); layPath([42, 50], [44, 50], "s"); layPath([45, 50], [48, 50], "g"); redo();
+      out.guestBehindStaff = S(46, 50) && !G(46, 50) && !G(43, 50) && nodeNear(gGraph, 232.5, 252.5).d > 5;
+      // taking the touching chunk away splits them again
+      reset(); layPath([42, 50], [47, 50], "s"); removeChunks(["42,50"]); redo();
+      out.staffSplit = !S(47, 50) && nodeNear(kGraph, 237.5, 252.5).d > 5;
+      // an exhibit gate on a chunk edge reads as connected only when its path reaches the entrance
+      reset(); layPath([42, 51], [47, 51], "s");
+      const ex = { id:"e-gt", name:"GT", points:[[214,240],[226,240],[226,255],[214,255]], animals:[], land:[], water:[], cond:100, gate:[215, 255] };
+      state.exhibits = [ex]; redo();
+      out.gateOnEdge = gateCheck(ex).ok;
+      ex.gate = [215, 245]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
+      ex.gate = [215, 255]; removeChunks(["42,51"]); redo();
+      out.gateUnjoined = !gateCheck(ex).ok && /join/.test(gateCheck(ex).text);
+      // an exhibit beside a guest path is open to guests, one beside only a staff road is not
+      layPath([42, 51], [42, 51], "s"); redo();
+      out.exhibitStaffOnly = !isReachable(ex);
+      layPath([42, 47], [47, 47], "g"); redo();
+      out.exhibitGuestOpen = isReachable(ex) && !!gGraph.anchors["e-gt"];
+      // buildings: a backstage one needs only staff reach, a guest one needs a guest path
+      state.exhibits = []; reset(); layPath([42, 52], [47, 52], "s");
+      state.buildings = [{id:"b-ws", type:"workshop", points:rectPts(222, 270, BUILDINGS.workshop.w, BUILDINGS.workshop.d, 0), cond:100}, {id:"b-rr", type:"restroom", points:rectPts(222, 252, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0), cond:100}]; redo();
+      out.buildingReach = isReachable(state.buildings[0]) && !isReachable(state.buildings[1]);
+      state.buildings = []; state.exhibits = [];
+      Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
+      pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
+    }
 
     // themes: old saves get defaults, themes unlock by play, a matched area draws more, animals that suit a theme are happier
     const old = JSON.parse(JSON.stringify(state)); delete old.themes; upgradeSave(old);
     out.themesDefault = old.themes.brush === "genesis" && old.themes.have.length === 1;
     // the Range theme was renamed Homestead: old saves move over
-    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
+    const rg = JSON.parse(JSON.stringify(state)); rg.themes = {brush:"range", have:["genesis", "range", "western"]}; rg.paths = [{id:"p-rg", type:"tram", theme:"range", points:[[0, 0], [9, 0]]}, {id:"p-we", type:"tram", theme:"western", points:[[0, 0], [9, 0]]}]; upgradeSave(rg);
     out.themeRangeRenamed = rg.paths[0].theme === "homestead" && rg.themes.brush === "homestead" && rg.themes.have.includes("homestead") && !THEMES.range;
     out.themeWesternRenamed = rg.paths[1].theme === "mesa" && rg.themes.have.includes("mesa") && !rg.themes.have.includes("western") && !THEMES.western;
     // the Classic theme became Japanese Garden: old saves move over
@@ -1498,8 +1922,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute();
     out.themeMatchedBonus = derived.themes["e-t"].ok && derived.appeal > appealMixed && themeFitShare(e0) === 1;
     out.themeFitHappier = exhibitReport(e0).target > (e0.theme = "genesis", exhibitReport(e0).target);
-    e0.theme = "volcanic"; const tl0 = tilt; tilt = false; render(); tilt = tl0;   // the exhibit rail is flat-view only
-    out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live) && world.innerHTML.includes(THEMES.volcanic.accent);
+    e0.theme = "volcanic"; render();
+    out.themeRenders = world.innerHTML.includes(THEMES.volcanic.path.live);   // the accent rail was flat-view only
     state.themes.brush = "volcanic"; state.money = 1e6;
     const bp = {id:"p-n", points:[[260,300],[300,300]]}; themeNew("path", bp);
     out.themeBrush = bp.theme === "volcanic" && state.money < 1e6;
@@ -1511,7 +1935,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const it of [...state.paths, ...state.buildings, ...state.exhibits]) delete it.theme;
     const nz = zoneThemePlan(state.zones[0], "volcanic").length, rz = restyleZone(state.zones[0], "volcanic");
     render();
-    out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
+    out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.filter(p => !p.d).concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
     // vivariums take plants of their biome, scaled down, and regrading clears them
     {
       const v = {id:"e-vp", name:"Fern house", viv:"L", biome:"tropical", points:[[0,0],[16,0],[16,10],[0,10]].map(p => [p[0] + 900, p[1] + 900]), animals:[{id:"a-vp", sp:"arth"}], happy:70};
@@ -1537,7 +1961,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const keep = {exhibits:state.exhibits, minute:state.minute, day:state.day}, sq = (x, y, w) => [[x, y], [x + w, y], [x + w, y + w], [x, y + w]];
       const lone = {id:"bh1", name:"Lone", points:sq(0, 0, 40), animals:[{id:"bl", sp:"velo"}], happy:70, cond:100, stock:{meat:999}};
       const pack = {id:"bh2", name:"Pack", points:sq(100, 0, 60), animals:[0, 1, 2, 3].map(i => ({id:"bp" + i, sp:"velo"})), happy:70, cond:100, stock:{meat:999}};
-      state.exhibits = [lone, pack]; state.minute = 18 * 60; state.day = 1;
+      state.exhibits = [lone, pack]; state.minute = minuteAtClock(18 * 60); state.day = 1;
       for(let i = 0; i < 60; i++) behaviorTick(BEHAVIOR.step);
       out.behaviorLonelyPaces = lone.animals[0].act === "pace" && lone.animals[0].why === "lonely" && pack.animals.every(a => a.act !== "pace") && lone.animals[0].need.lonely > pack.animals[0].need.lonely;
       out.behaviorTell = exhibitReport(lone).issues.some(i => i.bad && i.text.startsWith("Pacing.")) && behaviorHtml(lone).includes("Pacing because");
@@ -1548,15 +1972,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.behaviorNight = [...lone.animals, ...pack.animals].every(a => a.act === "rest" && a.need.bored === 20);
       // midday naps: a fed plant eater lies down once in the nap hours for 30 to 80 minutes and stays down, none at night or outside the hours, and not every animal naps
       const nx = {id:"bh3", name:"Nap", points:sq(200, 0, 80), animals:Array.from({length:20}, (_, i) => ({id:"bn" + i, sp:"plat"})), happy:70, cond:100, stock:{paleoflora:999, grass:999}};
-      state.exhibits = [nx]; state.day = 5; state.minute = 9 * 60; behaviorNight();
+      state.exhibits = [nx]; state.day = 5; state.minute = minuteAtClock(9 * 60); behaviorNight();
       let before = 0, longest = {}; const napped = new Set();
-      for(let t = 9 * 60; t < 22 * 60; t += BEHAVIOR.step){
+      for(let t = minuteAtClock(9 * 60); t < minuteAtClock(22 * 60); t += BEHAVIOR.step){
         state.minute = t; for(const a of nx.animals) a.need.hunger = 20, a.need.thirst = 15, a.need.stress = 10;
         behaviorTick(BEHAVIOR.step);
-        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(t < BEHAVIOR.nap.from * 60 - 1) before++; }
+        for(const a of nx.animals) if(a.napFor && a.act === "rest"){ napped.add(a.id); longest[a.id] = Math.max(longest[a.id] || 0, a.actFor + BEHAVIOR.step); if(clockMin(t) < BEHAVIOR.nap.from * 60 - 1) before++; }
       }
       const lens = Object.values(longest);
-      out.behaviorNap = napped.size >= 6 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, 8 * 60) === 0 && napLull(SPECIES_BY_ID.plat, 13 * 60) > 0 && napLull(SPECIES_BY_ID.ornw, 13 * 60) === 0;
+      out.behaviorNap = napped.size >= 6 && napped.size < 20 && before === 0 && lens.every(l => l >= BEHAVIOR.nap.min - BEHAVIOR.step && l <= BEHAVIOR.nap.max + BEHAVIOR.step) && napLull(SPECIES_BY_ID.plat, minuteAtClock(8 * 60)) === 0 && napLull(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) > 0 && napLull(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) === 0;
       // diet toys: a shank thrills a meat eater and bores a plant eater; hay feeds plant eaters; treats run out, frozen ones faster in a heat wave
       {
         const T = SPECIES_BY_ID.trex, H = SPECIES_BY_ID.tric, m = SPECIES_BY_ID.mamm;
@@ -1727,6 +2151,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const f4 = {r:3, sp:"plat", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f4.el.innerHTML = rigSvg("plat", f4);
       const rs = () => { f4.rg.last = performance.now() - 100; rigStep(f4, "rest"); }; rs(); const lockedRest = f4.rg.lock; for(let i = 0; i < 80; i++) rs();
       out.rigRestLock = lockedRest && !f4.rg.lock;
+      // swapped parts (o:1, a frame's v): the Cotylorhynchus shows one of its three heads, open while it walks, shut once it has lain down to sleep
+      const shownHeads = f => [...f.el.querySelector(".rig").children].map((im, i) => [RIGS.coty.parts[i].n, im.style.display !== "none"]).filter(([n, on]) => /HEAD/.test(n) && on).map(([n]) => n).join();
+      const f6 = {r:3, sp:"coty", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f6.el.innerHTML = rigSvg("coty", f6);
+      const openAtFirst = shownHeads(f6) === "COTY_HEAD";
+      for(let i = 0; i < 200; i++){ f6.rg.last = performance.now() - 100; rigStep(f6, "rest"); }
+      const asleep = shownHeads(f6) === "COTY_HEAD_CLOSED";
+      f6.stride = 1; f6.rg.last = performance.now() - 100; rigStep(f6, "walk");
+      out.rigSwap = openAtFirst && asleep && shownHeads(f6) === "COTY_HEAD";
       // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
@@ -1773,7 +2205,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.masonryFence = ["brick", "stone"].every(k => BARRIERS[k].strength > BARRIERS.acrylic.strength && BARRIERS[k].strength < BARRIERS.concrete.strength && BARRIERS[k].tech === "masonry" && TECH.some(t => t.id === "masonry")
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png") && !fm(k, 100, [0, 0], [7, 0]).includes("<polygon")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:1}).includes(k + "-gate-1.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
-      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
+      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone", "rope"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:3}).includes(k + "-gate-3.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
       // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave
@@ -1803,6 +2235,852 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       setRigs(false); const swStrip = spriteSvg("prio", {r:3, face:1, swim:true}); setRigs(true);
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
+    }
+    {   // weather overlay: exists, ignores clicks, follows state.weather.today
+      const cv = document.getElementById("wxfx"), keep = state.weather.today, seen = {};
+      for(const k of ["fair", "hot", "cold", "storm"]){ state.weather.today = k; drawWeather(performance.now()); const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = d.some(v => v) ; seen[k + "k"] = cv.dataset.kind; }
+      state.weather.today = keep; drawWeather(performance.now());
+      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.stormk === "storm" && seen.fairk === "fair";
+    }
+    // dust puff: the hook adds squares that don't take clicks, then they clear and nothing lands in state
+    {
+      const fl = document.querySelector("#fxLayer"), before = JSON.stringify(state).length;
+      events.fx("dust", 10, 10); drawFx(performance.now());
+      const shown = fl.querySelectorAll("rect").length >= 4 && getComputedStyle(fl).pointerEvents === "none";
+      drawFx(performance.now() + FX_DUST.life + 50);
+      out.dustPuff = shown && fl.childElementCount === 0 && fxList.length === 0 && JSON.stringify(state).length === before;
+    }
+    {   // animal names: default tag + counter per species, migration, rename from the panel
+      const seqKeep = state.animalSeq, exKeep = state.exhibits;
+      state.animalSeq = {}; state.exhibits = [{id:"e-nm", name:"Name Test", points:[[0,0],[40,0],[40,40],[0,40]], animals:[], happy:70, cond:100}];
+      const e = state.exhibits[0], mk = id => nameAnimal({id, sp:"coty"});
+      const a1 = mk("a-n1"), a2 = mk("a-n2"), d1 = nameAnimal({id:"a-n3", sp:"coel"});
+      e.animals.push(a1, a2, d1);
+      out.animalDefaultNames = a1.name === "COTY-001" && a2.name === "COTY-002" && d1.name === "COEL-001" && state.animalSeq.coty === 2;
+      // numbers are never reused, even after one leaves
+      e.animals.splice(1, 1);
+      out.animalNamesNotReused = mk("a-n4").name === "COTY-003";
+      // an old save with unnamed animals (and no counter) gets names, and keeps counting after the highest one
+      const old = JSON.parse(JSON.stringify(state)); delete old.animalSeq;
+      old.exhibits[0].animals.forEach(a => { delete a.name; }); old.exhibits[0].animals.push({id:"a-n5", sp:"coty", name:"COTY-007"}, {id:"a-n6", sp:"coty"});
+      const up = upgradeSave(old);
+      out.animalMigration = up.exhibits[0].animals.every(a => /^[A-Z]+-\d{3}$/.test(a.name)) && new Set(up.exhibits[0].animals.map(a => a.name)).size === up.exhibits[0].animals.length && up.exhibits[0].animals.find(a => a.id === "a-n6").name === "COTY-009" && up.animalSeq.coty === 9;
+      // the panel: open, shows the name escaped, rename in place, blank keeps the old name
+      select("animal", a1.id); animalLive(true);
+      const inp = document.getElementById("aName");
+      out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
+      inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");
+      inp.value = "x".repeat(60); inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRenameMax = a1.name.length === 24;
+      inp.value = "   "; inp.dispatchEvent(new Event("change", {bubbles:true}));
+      out.animalRenameBlank = a1.name === "x".repeat(24) && inp.value === a1.name;
+      select(null); state.animalSeq = seqKeep; state.exhibits = exKeep; syncAnimals();
+    }
+    {   // animal attacks: loose predators raid exhibits they can get into, stressed animals fight, predators hunt their prey
+      const exKeep = state.exhibits, looseKeep = state.safety.loose, fxKeep = events.fx, diedKeep = events.died, tKeep = events.toast;
+      const fx = [], died = []; events.fx = (k, x, y) => fx.push([k, x, y]); events.died = d => died.push(d); events.toast = () => {};
+      const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
+      const hurtCount = e => e.animals.filter(a => a.sick && a.sick.hit).length;
+      // 1. a loose Dimetrodon beside a pen of Cotylorhynchus: it gets in through a breach, not through a strong fence
+      let e = pen("e-at1", ["coty", "coty", "coty"]); state.exhibits = [e];
+      const dm = SPECIES_BY_ID.dime, lo = () => ({id:"l-at", sp:"dime", status:"loose", at:null, x:46, y:20});
+      state.safety.loose = [lo()];
+      e.barrier = "concrete"; e.cond = 100;
+      for(let i = 0; i < 20; i++) looseAttacks(60);
+      out.attackFenceHolds = !canGetIn(e, dm) && hurtCount(e) === 0 && !fx.length;
+      e.cond = 0;
+      for(let i = 0; i < 20 && !hurtCount(e); i++){ state.safety.loose[0].biteAt = undefined; looseAttacks(60); }
+      const hit = e.animals.find(a => a.sick && a.sick.hit);
+      out.looseAttacks = !!hit && hit.sick.kind === "injury" && hit.sick.hit.by === dm.name && hit.sick.hit.how === "loose" && fx.length >= 1 && fx[0][0] === "dust" && state.safety.loose[0].biteAt != null;
+      // out of reach, or with the gap between bites not yet passed, it leaves them be
+      const before = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0);
+      looseAttacks(60); state.safety.loose[0].x = 200; state.safety.loose[0].biteAt = undefined; looseAttacks(60);
+      out.looseNeedsReach = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0) === before;
+      // a bite can kill outright, and the death dialog names the attacker
+      const vic = e.animals[0]; died.length = 0; vic.sick = {kind:"injury", sev:90}; hurtAnimal(e, vic, dm.name, "loose", [30, 30], 0);
+      out.attackKills = !e.animals.includes(vic) && died.length === 1 && died[0].cause === "Killed by a Dimetrodon" && died[0].exhibit === e.name;
+      // 2. fights: a stressed, crowded herd hurts itself; a calm one doesn't
+      e = pen("e-at2", ["coel", "coel", "coel", "coel"]); state.exhibits = [e];
+      const ctxOf = ratio => ({counts:speciesCounts(e), ratio});
+      for(const a of e.animals) a.need = {...freshNeeds(), stress:10};
+      for(let i = 0; i < 400; i++){ for(const a of e.animals) delete a.hitAt; attackStep(e, ctxOf(.5)); }
+      out.calmNoFights = hurtCount(e) === 0;
+      for(const a of e.animals) a.need.stress = 100;
+      for(let i = 0; i < 400 && !hurtCount(e); i++){ for(const a of e.animals) delete a.hitAt; attackStep(e, ctxOf(.5)); }
+      const fought = e.animals.find(a => a.sick && a.sick.hit);
+      out.fightsInjure = !!fought && fought.sick.hit.how === "fight" && fought.sick.kind === "injury" && needsOf(fought).stress >= 100 - 1;
+      // an aggressive animal that is not crowded still fights at high stress, and the cause reads right if it dies
+      const f2 = e.animals.find(a => a !== fought); died.length = 0; f2.sick = {kind:"injury", sev:95}; hurtAnimal(e, f2, "Coelophysis", "fight", [10, 10], 0);
+      out.fightDeathCause = died.length === 1 && /fight/.test(died[0].cause);
+      // 3. a predator housed with prey stalks it (the hunt act) and strikes
+      e = pen("e-at3", ["dime", "coty", "coty"]); state.exhibits = [e];
+      const pred = e.animals[0], ctx3 = behaviorCtx(e);
+      for(const a of e.animals) a.need = {...freshNeeds(), hunger:10};
+      // a fed, calm predator leaves its prey alone, however long it hunts; a hungry (or stressed, or bored) one stalks it
+      out.fedLeavesPrey = pickAct(e, pred, dm, ctx3) !== "hunt" && !huntDriven(pred);
+      pred.act = "hunt"; pred.actFor = ATTACK.stalk;
+      for(let i = 0; i < 300; i++){ delete pred.hitAt; attackStep(e, ctx3); }
+      out.noMindlessAttacks = hurtCount(e) === 0;
+      pred.need.hunger = 80;
+      out.predatorStalks = huntDriven(pred) && pickAct(e, pred, dm, ctx3) === "hunt" && pickAct(e, e.animals[1], SPECIES_BY_ID.coty, ctx3) !== "hunt";
+      pred.need.hunger = 10; pred.need.stress = 70; out.stressDrivesHunt = huntDriven(pred);
+      pred.need.stress = 15; pred.need.bored = 90; out.boredDrivesHunt = huntDriven(pred);
+      pred.need.bored = 20; pred.need.hunger = 80;
+      pred.act = "hunt"; pred.actFor = 0;
+      attackStep(e, ctx3); out.noStrikeBeforeStalk = hurtCount(e) === 0;
+      pred.actFor = ATTACK.stalk;
+      // the mix warning names who hunts whom, and stays quiet for a compatible herd
+      out.mixWarns = /Dimetrodon will hunt Cotylorhynchus/.test(mixWarning(dm, pen("e-mx", ["coty"])) || "") && mixWarning(SPECIES_BY_ID.coty, pen("e-mx2", ["coty"])) === null && !!mixWarning(SPECIES_BY_ID.coty, pen("e-mx3", ["dime"]));
+      for(let i = 0; i < 100 && !hurtCount(e); i++){ delete pred.hitAt; attackStep(e, ctx3); }
+      const prey = e.animals.find(a => a.sick && a.sick.hit);
+      out.predatorStrikes = !!prey && prey.sp === "coty" && prey.sick.hit.how === "hunt" && pred.hitAt != null;
+      // it keeps its distance while the gap between strikes runs, and its own kind is never prey
+      const sevs = JSON.stringify(e.animals.map(a => a.sick)); attackStep(e, ctx3);
+      out.huntGapHolds = JSON.stringify(e.animals.map(a => a.sick)) === sevs;
+      out.noCannibals = preyIn(e, dm, speciesCounts(e)).join() === "coty";
+      // old saves: no new fields are needed
+      const oldE = JSON.parse(JSON.stringify(pen("e-at4", ["coty"]))); out.attackOldSave = !oldE.animals[0].sick && !oldE.animals[0].hitAt;
+      state.exhibits = exKeep; state.safety.loose = looseKeep; events.fx = fxKeep; events.died = diedKeep; events.toast = tKeep; syncAnimals();
+    }
+    {   // sex: ordered clones carry the chosen sex, old saves get one, a single-sex herd is lonelier and less happy
+      const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
+      events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
+      const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
+      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator).id;
+      const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
+      state.science.clones = []; state.science.ready = [];
+      const dest = pen("e-sx0", []); state.exhibits = [dest];
+      orderClone(herd, dest.id, "female"); orderClone(herd, null, "male"); orderClone(herd);
+      const jobs = state.science.clones.slice();
+      out.cloneStoresSex = jobs[0].sex === "female" && jobs[1].sex === "male" && (jobs[2].sex === "male" || jobs[2].sex === "female");
+      for(const j of jobs.slice(0, 2)) finishClone(j);
+      out.cloneHatchKeepsSex = dest.animals[0].sex === "female" && state.science.ready[0].sex === "male";
+      // old saves: animals everywhere, including holding and clones in the incubator, get a sex
+      const old = JSON.parse(JSON.stringify(state)); old.exhibits = [pen("e-sx1", [herd, herd, herd, herd])];
+      for(const a of old.exhibits[0].animals) delete a.sex;
+      old.science.ready = [{id:"rd", sp:herd, q:90}]; old.science.clones = [{id:"cl", sp:herd, q:90}];
+      const up = upgradeSave(old);
+      out.sexMigrated = up.exhibits[0].animals.every(a => a.sex === "male" || a.sex === "female") && up.science.ready[0].sex && up.science.clones[0].sex;
+      let m = 0; for(let i = 0; i < 200; i++) m += pickSex(herd, {exhibits:[{animals:[{sp:herd, sex:"male"}, {sp:herd, sex:"male"}]}], science:{ready:[]}}) === "male";
+      out.sexBalances = m < 60;
+      // social rules: sexes and species social type decide stability, fights and loner stress
+      const mk = (id, sp, sexes) => { const p = pen(id, sexes.map(() => sp)); p.animals.forEach((x, i) => x.sex = sexes[i]); return p; };
+      const M = "male", F = "female", info = (e, id) => socialInfo(e).get(id);
+      const sp = SPECIES_BY_ID[herd];
+      const bach = mk("e-sx2", herd, [M, M, M, M]), mat = mk("e-sx3", herd, [F, F, F, F]), one = mk("e-sx4", herd, [M, F, F, F]), two = mk("e-sx5", herd, [M, M, F, F]);
+      state.exhibits = [bach, mat, one, two];
+      out.ranksAssigned = two.animals.every(a => typeof a.rank === "number" && a.rank >= 0 && a.rank <= 1);
+      out.socialBachelor = !info(bach, herd).bad && info(bach, herd).delta === SOCIAL.bachelor && !info(bach, herd).fights;
+      out.socialMatriarch = !info(mat, herd).bad && info(mat, herd).delta === SOCIAL.matriarch && !info(mat, herd).fights;
+      out.socialOneMale = !info(one, herd).bad && !info(one, herd).fights;
+      out.socialTwoMales = info(two, herd).fights && info(two, herd).bad && /fighting/.test(info(two, herd).text) && info(two, herd).delta < 0;
+      for(const p of [bach, two]) p.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+      out.socialBonusInReport = behaviorScore(bach).delta > behaviorScore(two).delta && behaviorScore(two).issues.some(i => /Social\. .*fighting/.test(i.text));
+      // more males fight more; less room fights more
+      const three = mk("e-sx6", herd, [M, M, M, F]), tight = mk("e-sx7", herd, [M, M, F, F]); tight.points = [[0,0],[8,0],[8,8],[0,8]];
+      out.fightsScaleWithMales = info(three, herd).delta < info(two, herd).delta;
+      out.fightsScaleWithRoom = info(tight, herd).spaceMult > info(two, herd).spaceMult && info(tight, herd).delta < info(two, herd).delta;
+      // a fight hurts the loser, makes dust, and hits the lowest rank harder
+      const ds = []; const fxKeep2 = events.fx; events.fx = (k) => ds.push(k);
+      const alpha = two.animals.filter(a => a.sex === M).sort(byRank)[0], bottom = two.animals.filter(a => a.sex === M).sort(byRank)[1];
+      const reset = () => two.animals.forEach(a => { a.hitAt = undefined; a.sick = null; a.need = freshNeeds(); });
+      let hurtN = 0, tries = 0; reset();
+      const rk = Math.random; Math.random = () => rk() * .01;   // rolls always succeed
+      while(!hurtN && tries++ < 50){ rivalFight(two, info(two, herd), nowAbs()); hurtN = two.animals.filter(a => a.sick && a.sick.kind === "injury").length; }
+      Math.random = rk;
+      out.fightInjuresAndDusts = hurtN === 1 && ds.includes("dust") && two.animals.some(a => a.sick && a.sick.hit && a.sick.hit.how === "fight");
+      events.fx = fxKeep2;
+      const lowAnimal = bottom, hiAnimal = alpha;
+      const ib = info(two, herd);
+      out.rankLosesMore = socialStress(lowAnimal, ib)[0] > socialStress(hiAnimal, ib)[0] && ib.low.get(lowAnimal.id) > ib.low.get(hiAnimal.id);
+      // loners: same-sex company is worst, opposite sex is tolerated, alone is best; room and cover ease it
+      const loner = SPECIES.find(s => traitsOf(s).social === "solitary" && !s.predator) || SPECIES.find(s => traitsOf(s).social === "solitary"), lid = loner.id;
+      const ls = mk("e-sx8", lid, [M, M]), lo = mk("e-sx9", lid, [M, F]), lbig = mk("e-sx10", lid, [M, M]); lbig.points = [[0,0],[400,0],[400,400],[0,400]]; ls.points = [[0,0],[6,0],[6,6],[0,6]];
+      state.exhibits = [ls, lo, lbig];
+      const iS = info(ls, lid), iO = info(lo, lid), iB = info(lbig, lid);
+      out.lonerSameWorse = iS.pen(ls.animals[0]) > iO.pen(lo.animals[0]) && iO.pen(lo.animals[0]) > 0 && iS.delta < iO.delta;
+      out.lonerAloneBest = socialInfo(mk("e-sx11", lid, [M])).size === 0 && socialStress(ls.animals[0], null)[0] === 0;
+      out.lonerRoomEases = iB.pen(lbig.animals[0]) < iS.pen(ls.animals[0]) && iB.relief > iS.relief;
+      const stressOf = (e, c) => stressTarget(e, e.animals[0], loner, c);
+      out.lonerStressHigher = stressOf(ls, behaviorCtx(ls)) > stressOf(lo, behaviorCtx(lo));
+      // pairs: male and female is ideal, two of a sex is a mild penalty
+      const pairSp = SPECIES.find(s => traitsOf(s).social === "pair" && !s.predator) || SPECIES.find(s => traitsOf(s).social === "pair"), pid = pairSp.id;
+      const pgood = mk("e-sx12", pid, [M, F]), pbad = mk("e-sx13", pid, [M, M]);
+      state.exhibits = [pgood, pbad];
+      out.pairIdeal = !info(pgood, pid).bad && info(pgood, pid).delta > 0 && info(pbad, pid).bad && info(pbad, pid).delta < 0 && info(pbad, pid).delta > -SOCIAL.pairMild - .01;
+      // vivariums ignore all of it
+      const viv = mk("e-sx14", lid, [M, M]); viv.viv = true; state.exhibits = [viv];
+      out.vivariumImmune = socialInfo(viv).size === 0 && behaviorScore(viv).issues.every(i => !/^Social/.test(i.text)) && rankPos(viv, viv.animals[0]) === null;
+      // packs: family units with an alpha pair, not herds
+      {
+        const pk = SPECIES.find(s => traitsOf(s).social === "pack" && s.group[0] >= 3), kid = pk.id, min = pk.group[0];
+        const pin = (e, id) => socialInfo(e).get(id);
+        const full = mk("e-pk1", kid, [M, F, M, F, M]), bach2 = mk("e-pk2", kid, [M, M, M, M]), mat2 = mk("e-pk3", kid, [F, F, F, F]), two2 = mk("e-pk4", kid, [M, M, F, F]);
+        state.exhibits = [full, bach2, mat2, two2];
+        const ps = [full, bach2, mat2, two2].map(e => pin(e, kid));
+        out.packNotHerd = ps.every(i => i.kind === "pack" && !i.fights) && pin(bach2, kid).delta !== SOCIAL.bachelor && pin(mat2, kid).delta !== SOCIAL.matriarch && !/bachelor|fighting/.test(pin(two2, kid).text);
+        // alpha pair: a male and a female lead when both sexes are there; a single-sex pack has none
+        const o = pin(full, kid).order;
+        out.packAlphaPair = pin(full, kid).pair && o[0].sex !== o[1].sex && o[0].rank <= o.slice(2).reduce((m, a) => Math.min(m, a.rank), 1) + 1e-9 && !pin(full, kid).bad
+          && !pin(bach2, kid).pair && /No alpha pair/.test(pin(bach2, kid).text) && /No alpha pair/.test(pin(mat2, kid).text);
+        out.packRankShown = rankPos(full, o[1]).pack && rankPos(full, o[1]).i === 1 && rankPos(full, o[0]).i === 0;
+        // too small: stressed and lonely, one alone is the worst case
+        const alone = mk("e-pk5", kid, [M]), few = mk("e-pk6", kid, [M, F]);
+        state.exhibits = [full, alone, few];
+        const st = (e) => socialStress(e.animals[0], pin(e, kid))[0];
+        out.packTooSmall = pin(alone, kid) && /Pack too small/.test(pin(alone, kid).text) && (min === 2 || /Pack too small/.test(pin(few, kid).text)) && st(alone) > st(few) && st(few) >= 0 && st(full) === 0 && pin(alone, kid).delta < pin(few, kid).delta && pin(few, kid).delta <= pin(full, kid).delta;
+        for(const e of [alone, full]) e.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const lone0 = needsOf(alone.animals[0]).lonely, lone1 = needsOf(full.animals[0]).lonely;
+        const ctxA = behaviorCtx(alone), ctxF = behaviorCtx(full);
+        needsStep(alone, alone.animals[0], pk, ctxA, 30); needsStep(full, full.animals[0], pk, ctxF, 30);
+        out.packLonely = needsOf(alone.animals[0]).lonely - lone0 > needsOf(full.animals[0]).lonely - lone1 && /Pack too small/.test(behaviorScore(alone).issues.map(i => i.text).join(" "));
+        // the alpha pair eats first: a shortage lands on subordinates, and they get hungrier sooner
+        const fk = {day:state.day, from:state.staff.feedFrom, stock:full.stock};
+        state.staff.feedFrom = 0; full.stock = {};
+        const foodKind = Object.keys(dailyNeed(full))[0];
+        full.stock[foodKind] = (dailyNeed(full)[foodKind] || 1) * .1; eatTick(1);
+        const fd = packFeed.get(full.id);
+        out.packEatsFirst = !!fd && fd.sub > fd.top && fd.sub > 0;
+        full.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const ctxS = behaviorCtx(full), alphaA = pin(full, kid).order[0], subA = pin(full, kid).order[3];
+        needsStep(full, alphaA, pk, ctxS, 30); needsStep(full, subA, pk, ctxS, 30);
+        out.packLowRankHungrier = needsOf(subA).hunger > needsOf(alphaA).hunger;
+        full.stock = {[foodKind]:(dailyNeed(full)[foodKind] || 1) * 3}; eatTick(1);
+        out.packFedNoShortage = !packFeed.has(full.id);
+        state.staff.feedFrom = fk.from; full.stock = fk.stock;
+        // hunting together: more hunters, better odds; a joint hunt pulls mates in
+        full.animals.forEach(a => a.act = "rest");
+        const c1 = behaviorCtx(full); full.animals[0].act = "hunt"; const c2 = behaviorCtx(full); full.animals[1].act = "hunt"; full.animals[2].act = "hunt"; const c3 = behaviorCtx(full);
+        out.packHuntsTogether = packHuntBoost(full, full.animals[0], c1) === 1 && packHuntBoost(full, full.animals[0], c2) === 1 && packHuntBoost(full, full.animals[0], c3) > 1 && ATTACK.huntChance * packHuntBoost(full, full.animals[0], c3) <= PACK.huntMax + 1e-9;
+        full.animals.forEach(a => a.act = "rest");
+        // challenges: none without stress, rare with it
+        full.animals.forEach(a => { a.need = freshNeeds(); a.hitAt = -1e9; }); const calm = behaviorCtx(full);
+        const rk = full.animals.map(a => a.rank), toastKeep = events.toast, fxKeep2 = events.fx; events.toast = () => {}; events.fx = () => {};
+        let calmN = 0; for(let i = 0; i < 3000; i++) if(packChallenge(full, pin(full, kid), calm, 1e6 + i * 100)) calmN++;
+        out.packCalmNoChallenge = calmN === 0 && full.animals.every((a, i) => a.rank === rk[i]);
+        const roomy = {...calm, ratio:.5}; let hotN = 0;
+        for(let i = 0; i < 3000; i++){ full.animals.forEach(a => { delete a.sick; a.hitAt = -1e9; }); if(packChallenge(full, pin(full, kid), roomy, 1e6 + i * 100)) hotN++; }
+        const noPairN = (() => { let n = 0; for(let i = 0; i < 3000; i++){ bach2.animals.forEach(a => { delete a.sick; a.hitAt = -1e9; }); if(packChallenge(bach2, pin(bach2, kid), calm, 1e6 + i * 100)) n++; } return n; })();
+        out.packChallengesRareUnderStress = hotN > 0 && hotN < 3000 * .05 && noPairN > 0 && noPairN < 3000 * .05;
+        events.toast = toastKeep; events.fx = fxKeep2;
+        // vivariums ignore all of it
+        const pv = mk("e-pk7", kid, [M, M, F]); pv.viv = true; state.exhibits = [pv];
+        pv.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
+        const pvc = behaviorCtx(pv), pvStress = stressTarget(pv, pv.animals[0], pk, pvc);
+        packFeedStep(pv, .8);
+        out.packVivariumImmune = socialInfo(pv).size === 0 && rankPos(pv, pv.animals[0]) === null && !packFeed.has(pv.id) && packHuntBoost(pv, pv.animals[0], {hunting:new Map([[kid, 3]])}) === 1
+          && behaviorScore(pv).issues.every(i => !/^Social/.test(i.text)) && pvc.hunting.size === 0;
+        const pvAlone = mk("e-pk8", kid, [M]); pvAlone.viv = true; state.exhibits = [pvAlone];
+        out.packVivariumAloneFine = socialInfo(pvAlone).size === 0;
+        // old saves load: nothing new is saved
+        const oldP = JSON.parse(JSON.stringify(state)); oldP.exhibits = [mk("e-pk9", kid, [M, F])]; for(const a of oldP.exhibits[0].animals) delete a.rank;
+        out.packOldSave = upgradeSave(oldP).exhibits[0].animals.every(a => typeof a.rank === "number");
+       
+        state.exhibits = [alone]; out.packPanelShows = /Social/.test(behaviorHtml(alone)) && /Pack too small/.test(behaviorHtml(alone));
+      }
+      // old saves get ranks
+      const old2 = JSON.parse(JSON.stringify(state)); old2.exhibits = [mk("e-sx15", herd, [M, F])]; for(const a of old2.exhibits[0].animals) delete a.rank;
+      out.rankMigrated = upgradeSave(old2).exhibits[0].animals.every(a => typeof a.rank === "number");
+      out.socialPanelShows = (state.exhibits = [two], /Social/.test(behaviorHtml(two)) && /fighting/.test(behaviorHtml(two)));
+      state.exhibits = [one, two];
+      out.fightBiasMale = fightBias({sp:"dime", sex:"male"}) > 1 && fightBias({sp:"dime", sex:"female"}) === 1;
+      out.sexShown = sexSplit(two, herd).includes("2 M, 2 F") && sexMark({sex:"male"}) === "M";
+      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.science.ready = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
+    }
+    localStorage.removeItem("genesis-dev");
+    return out;
+  }));
+
+  // tapping the entrance in select mode opens the Park Office, same as the menu button
+  for(const tl of [true]){
+    const pos = await page.evaluate(tl => {
+      officeTab = "staff"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
+      document.querySelectorAll("dialog[open]").forEach(d => d.close());
+      setTool("select"); view.k = Math.max(view.k, 4); const [gx, gy] = state.gate; view.tx = innerWidth / 2 - gx * view.k; view.ty = innerHeight / 2 - gy * view.k * (tilt ? TILT : 1); render();
+      const el = document.querySelector('[data-kind="entrance"]'); if(!el) return null;
+      const r = el.querySelector("rect").getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + r.height - 3, tilt};
+    }, tl);
+    let opened = false;
+    if(pos){ await page.mouse.click(pos.x, pos.y); await page.waitForTimeout(150); opened = await page.evaluate(() => !sel && officeTab === "office" && !!document.querySelector("#officeName")); }
+    checks.entranceTapOpensOffice = opened;
+  }
+  // the 3/4 toggle is gone; the Park Map dialog opens, draws the park, recenters on a click and closes
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, q = x => document.querySelector(x), d = q("#dlgParkMap");
+    document.querySelectorAll("dialog[open]").forEach(x => x.close());
+    out.noTiltButton = !q("#ztilt") && tilt === true;
+    out.mapButtonThere = !!q("#mapBtn.hbtn");
+    q("#mapBtn").click();
+    out.mapOpens = d.open;
+    const cv = q("#parkMapCv"), g = cv.getContext("2d"), {b, S} = pmapGeo;
+    const px = (x, y) => { const c = g.getImageData(Math.round((x - b.x0) * S), Math.round((y - b.y0) * S), 1, 1).data; return "#" + [...c.slice(0, 3)].map(v => v.toString(16).padStart(2, "0")).join("").toUpperCase(); };
+    const data = g.getImageData(0, 0, cv.width, cv.height).data, seen = new Set();
+    for(let i = 0; i < data.length; i += 4 * 17) seen.add(data[i] + "," + data[i + 1] + "," + data[i + 2]);
+    out.mapNotBlank = cv.width > 100 && seen.size >= 4;
+    const p = state.paths.find(p => !isService(p) && !isWide(p) && !isBridge(p) && !isTram(p));
+    const exs = state.exhibits; state.exhibits = [{id:"e-pm", name:"PM", points:[[200,205],[240,205],[240,240],[200,240]], animals:[], happy:70, cond:100}]; drawParkMap(cv); const e = state.exhibits[0];
+    out.mapShowsPath = !!p && p.points.length > 1 && px((p.points[0][0] + p.points[1][0]) / 2, (p.points[0][1] + p.points[1][1]) / 2).toUpperCase() === PMAP.path.toUpperCase();
+    out.mapShowsExhibit = !!e && (() => { const c = centroid(e.points); return px(c[0], c[1]) === BIOMES[biomeOf(e)].color.toUpperCase(); })(); state.exhibits = exs;
+    // a click recenters the main camera on that spot and closes it
+    const r = cv.getBoundingClientRect(), tx = 150, ty = 100, before = {...view};
+    cv.dispatchEvent(new MouseEvent("click", {clientX: r.left + (tx - b.x0) * S * r.width / cv.width, clientY: r.top + (ty - b.y0) * S * r.height / cv.height, bubbles: true}));
+    const sz = svgSize(), cx = (sz.w / 2 - view.tx) / view.k, cy = (sz.h / 2 - view.ty) / ky();
+    out.mapClickRecenters = !d.open && Math.abs(cx - tx) < 6 && Math.abs(cy - ty) < 6 || (!d.open && (view.tx !== before.tx || view.ty !== before.ty));
+    // Esc and M: open with the key, close with the key; the camera stays
+    document.dispatchEvent(new KeyboardEvent("keydown", {key:"m", bubbles:true})); out.mapKeyOpens = d.open;
+    const v2 = {...view}; document.dispatchEvent(new KeyboardEvent("keydown", {key:"M", bubbles:true})); out.mapKeyCloses = !d.open && view.tx === v2.tx && view.ty === v2.ty && view.k === v2.k;
+    q("#mapBtn").click(); q("#closeParkMap").click(); out.mapCloseButton = !d.open;
+    return out;
+  }));
+  // Park Office: brand and Park button open it, every tab renders, renaming updates the HUD, Restart asks first
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, q = x => document.querySelector(x), nm = state.name;
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    for(const [id, key] of [["#parkName", "brandOpensOffice"], ["#menuBtn", "parkBtnOpensOffice"]]){
+      officeTab = "grants"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
+      q(id).click(); out[key] = !sel && officeTab === "office" && !!q("#officeName") && !q("#dlgMenu") && !q("dialog#dlgMenu[open]");
+    }
+    out.officeTabsRender = ["office", "money", "science", "guests", "staff", "grants"].every(t => {
+      officeTab = t; ui.panel(); return !!q('#panel [data-action="otab2"][aria-selected="true"][data-k="' + t + '"]') && panelEl.textContent.length > 40;
+    }) && !!(officeTab = "money", ui.panel(), q("#ticketOut")) && !!(officeTab = "guests", ui.panel(), q("#panel section"));
+    officeTab = "office"; ui.panel();
+    const inp = q("#officeName"); inp.value = "Renamed <b>Park</b>"; inp.dispatchEvent(new Event("input", {bubbles:true}));
+    out.renameUpdatesHud = state.name === "Renamed <b>Park</b>" && q("#parkName").textContent === state.name && !q("#parkName b") && !q("#officeTitle b");
+    inp.value = "x".repeat(60); inp.dispatchEvent(new Event("input", {bubbles:true})); out.renameCapped = state.name.length === 40;
+    state.name = nm; ui.hud(true);
+    officeTab = "office"; ui.panel(); q('[data-action="otab2"][data-k="menu"]').click();
+    out.mainMenuHasButtons = !!q('#panel [data-action="restart"]') && !!q('#panel [data-action="howTo"]') && !!q("#sandboxToggle");
+    q('#panel [data-action="restart"]').click();
+    out.restartAsks = q("#dlgConfirm").open && /Restart/.test(q("#confirmYes").textContent) && !q("#dlgStart").open;
+    q("#confirmNo").click(); out.restartCancelKeeps = !q("#dlgConfirm").open && !q("#dlgStart").open && state.name === nm;
+    // work zones live in the Staff tab, not the supplies overview; their buttons work from there
+    officeTab = "staff"; ui.panel();
+    out.zonesInStaffTab = !!q("#panel #zonesSection") && !!q('#panel [data-action="zoneTool"]') && !!q('#panel [data-action="supplyToggle"]');
+    q('#panel [data-action="zoneTool"]').click(); out.staffZoneToolWorks = tool === "zone"; setTool("select");
+    officeTab = "money"; ui.panel();
+    out.noZonesInSupplies = !/Work zones/.test(q("#panel").textContent) && !q('#panel [data-action="zoneTool"]');
+    out.zoneToolInStaffMenu = BUILD_MENU.find(g => g.id === "staff").items.some(i => i.tool === "zone") && !BUILD_MENU.find(g => g.id === "mgmt").items.some(i => i.tool === "zone");
+    officeTab = "office"; ui.panel();
+    return out;
+  }));
+  // the DNA + leaf campus emblem is gone: no helper, no theme field, no emblem circle in the entrance or a science roof (both views)
+  checks.noEmblem = await page.evaluate(() => {
+    render();
+    const els = [...document.querySelectorAll('[data-kind="entrance"], [data-kind="building"]')];
+    return typeof emblemSvg === "undefined" && typeof emblemOn === "undefined" && !Object.values(THEMES).some(T => "emblem" in T) && els.every(el => !el.querySelector('circle[r="1.08"]'));
+  });
+
+  // tapping an animal: the target is the visible sprite, not just its ground spot
+  checks.animalTapOnSprite = await page.evaluate(() => {
+    const keep = new Map(herd), t0 = tilt, k0 = view.k; let ok = true;
+    const mk = (id, sp, spr, x, y, r) => ({id, sp, placed:true, spr, viv:false, r, x, y, exhibitId:"none", face:1});
+    const exh = state.exhibits.find(e => e.animals.length), a = exh && exh.animals[0];
+    if(!a) return true;
+    for(const k of [1.5, 5, 14]){
+      view.k = k; herd.clear();
+      const [gx, gy] = state.gate;
+      for(const [sp, spr] of [["dime", true], ["mega", false], ["coel", true]]){
+        const h = mk(a.id, sp, spr, gx, gy - 20, sp === "mega" ? 1.2 : Math.max(animalRadius("dime"), 4 / k)); herd.clear(); herd.set(a.id, h);
+        view.tx = innerWidth / 2 - gx * k; view.ty = innerHeight / 2 - (gy - 20) * k * (tilt ? TILT : 1);
+        const b = animalBox(h), r = svg.getBoundingClientRect(), sx = r.left + view.tx + h.x * k, sy = r.top + view.ty + h.y * ky() + b.oy * k;
+        const rx = Math.max(12, b.hw * k), ry = Math.max(12, b.hh * k);
+        const hit = (dx, dy) => { const g = animalAt(sx + dx, sy + dy); return !!g && g.id === a.id; };
+        ok = ok && hit(0, 0) && hit(rx * .8, 0) && hit(-rx * .8, 0) && hit(0, -ry * .8) && !hit(rx * 1.6, 0);
+        // a bigger sprite's box is bigger than the old 12px reach
+        if(spr && b.hw * k > 40) ok = ok && hit(b.hw * k * .8, 0);
+      }
+    }
+    herd.clear(); for(const [id, h] of keep) herd.set(id, h);
+    view.k = k0; render();
+    return ok;
+  });
+
+  // Animals tab: alphabetical list, click opens the animal, Sell removes just that one and pays resale
+  const at = await page.evaluate(() => {
+    let money0;
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    const e = {id:"e-animtab", name:"Tab test", viv:"L", points:rectPts(400, 400, 16, 10, 0), animals:[], happy:70};
+    for(let i = 0; i < 4; i++) e.animals.push({id:"a-tab" + i, sp:"arth"});
+    state.exhibits.push(e); money0 = state.money; state.money = 1e6;
+    e.animals.forEach((a, i) => a.name = ["zed", "Bob", "alice", "Carl"][i % 4] + i);
+    select("exhibit", e.id); exTabs.tab = "animals"; ui.panel();
+    const names = [...panelEl.querySelectorAll(".animal-row b:first-child")].map(x => x.textContent);
+    const sorted = [...e.animals].map(a => a.name).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    const listed = names.length === e.animals.length && names.join() === sorted.join();
+    const target = e.animals.find(a => a.name === sorted[0]);
+    panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
+    const opened = sel && sel.kind === "animal" && sel.id === target.id;
+    const back = panelEl.querySelector(".back"); back.click();
+    const backOk = sel && sel.kind === "exhibit" && sel.id === e.id && exTabs.tab === "animals";
+    panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
+    const n0 = e.animals.length, m0 = state.money = 1e6, pay = sellValue(target);
+    state.staff.transfers.push({id:"tr-smoke", animalId:target.id, sp:target.sp, from:e.id, to:e.id});
+    sellAnimal(target.id);
+    const sold = e.animals.length === n0 - 1 && !e.animals.some(a => a.id === target.id) && !herd.has(target.id) && state.money - m0 === pay && !state.staff.transfers.some(t => t.animalId === target.id) && !sel;
+    exTabs.tab = "main"; select(null); state.exhibits.splice(state.exhibits.indexOf(e), 1); state.money = money0; recompute();
+    return {listed, opened, sold, backOk};
+  });
+  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
+
+  // focus mode: H hides the build menu and side panel, the button/H brings them back
+  const fm = await page.evaluate(() => {
+    document.querySelectorAll("dialog[open]").forEach(d => d.close());
+    const vis = id => document.querySelector(id).getClientRects().length > 0, w = () => svg.getBoundingClientRect().width;
+    document.activeElement?.blur?.(); const w0 = w(), both0 = vis("#sideMenu") && vis("#aside");
+    document.dispatchEvent(new KeyboardEvent("keydown", {key:"h"}));
+    const hidden = !vis("#sideMenu") && !vis("#aside") && w() > w0 && localStorage.getItem("genesis-focus") === "1";
+    ui.panel(); select("exhibit", state.exhibits[0]?.id);
+    document.querySelector("#focusBtn").click();
+    const back = vis("#sideMenu") && vis("#aside") && localStorage.getItem("genesis-focus") === "0";
+    select(null);
+    return {both0, hidden, back};
+  });
+  checks.focusModeStartsShown = fm.both0;
+  checks.focusModeHides = fm.hidden;
+  checks.focusModeRestores = fm.back;
+
+  const cal = await page.evaluate(() => {
+    const f = fmtDate, dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length, yr = dpm * mpy;
+    const old = JSON.parse(JSON.stringify(state)); delete old.calendar;
+    let loads = true; try{ upgradeSave(old); }catch{ loads = false; }
+    return {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
+  });
+  checks.dateFirstDay = cal.first === "1 Jan Y1";
+  checks.dateMonthRollover = cal.eom === "30 Jan Y1" && cal.next === "1 Feb Y1";
+  checks.dateYearRollover = cal.eoy === "30 Dec Y1" && cal.ny === "1 Jan Y2" && cal.y3 === "1 Jan Y3";
+  checks.dateBadDay = cal.zero === "1 Jan Y1";
+  checks.dateOldSaveLoads = cal.loads;
+  checks.dateInHud = cal.hud;
+
+  // S12: every science job finishes exactly when its `end` passes, however long the step, across closing, and across a reload
+  const sci = await page.evaluate(() => {
+    const out = {}, H = Math.PI / 2;
+    const had = {money:state.money, day:state.day, minute:state.minute, over:state.over, sandbox:state.sandbox};
+    state.buildings = state.buildings.filter(b => !["oracle", "ghost", "tar", "ceres"].includes(b.type));
+    state.buildings.push({id:"s12-or", type:"oracle", points:rectPts(230, 262, 24, 16, H)}, {id:"s12-gh", type:"ghost", points:rectPts(180, 262, 28, 20, H)}, {id:"s12-ta", type:"tar", points:rectPts(230, 290, 26, 18, H)}, {id:"s12-ce", type:"ceres", points:rectPts(180, 290, 26, 18, H)});
+    state.paths.push({id:"s12-p0", name:"s", points:[[state.gate[0],state.gate[1]],[207.5,290],[207.5,262]]}, {id:"s12-p1", name:"s", points:[[207.5,262],[222,262]]}, {id:"s12-p2", name:"s", points:[[207.5,262],[193,262]]}, {id:"s12-p3", name:"s", points:[[207.5,290],[217,290]]}, {id:"s12-p4", name:"s", points:[[207.5,290],[193,290]]});
+    recompute(); buildKeeperGraph(); state.sandbox = false; state.over = false; state.money = 1e9;
+    const sc = () => state.science;
+    for(const k of ["paleo", "temporal", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
+    const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
+    // log the park minute each job actually finishes
+    const seen = {}, real = {fp:finishProject, tr:tripReturns, fc:finishClone, fb:finishBatch};
+    finishProject = p => { seen.proj = nowMin(); real.fp(p); }; tripReturns = t => { seen.trip = nowMin(); real.tr(t); };
+    finishClone = c => { seen.clone = nowMin(); real.fc(c); }; finishBatch = b => { seen.bed = nowMin(); real.fb(b); };
+    const era = Object.keys(CERES_GROW.medicine)[0];
+    const run = (startDay, startMinute, dts, reload) => {
+      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; s.ready = [];
+      for(const k of Object.keys(seen)) delete seen[k];
+      state.day = startDay; state.minute = startMinute; s.points = 1e6; s.tech = s.tech.filter(t => t !== "moat"); s.tech.push("medpaleo");
+      state.rating = 5; startProject("tech", "moat"); launchTrip(sp.id, sp.period); orderClone(sp.id, null); growBatch("med", era);
+      const jobs = {proj:sc().projects[0], trip:sc().trips[0], clone:sc().clones[0], bed:state.ceres.beds[0]};
+      if(Object.values(jobs).some(j => !j)) return null;
+      const ends = Object.fromEntries(Object.entries(jobs).map(([k, j]) => [k, j.end]));
+      const last = Math.max(...Object.values(ends)), t0 = nowMin();
+      let i = 0, reloaded = false;
+      while(nowMin() < last + 5 && i++ < 100000){
+        tick(dts[i % dts.length]);
+        if(reload && !reloaded && nowMin() - t0 > 100){ reloaded = true; state = upgradeSave(JSON.parse(JSON.stringify(state))); recompute(); buildKeeperGraph(); }
+      }
+      return Math.max(...Object.keys(ends).map(k => k in seen ? Math.abs(seen[k] - ends[k]) : 1e9));
+    };
+    let ok = true, why = "";
+    for(const [label, startMinute, dts, reload] of [["morning 1m", DAWN_MIN + 5, [1], false], ["morning 4.8m (4x)", DAWN_MIN + 5, [4.8], false], ["before rollover, 7m", DAY_MIN - 100, [7], false], ["3 minutes before rollover, 100m", DAY_MIN - 3, [100], false], ["a day at once", DAWN_MIN + 200, [720, 1500], false], ["uneven steps", DAWN_MIN + 301, [0.3, 11, 2.2, 58], false], ["reload mid-job", DAY_MIN - 50, [3.3], true]]){
+      const d = run(4, startMinute, dts, reload);
+      if(d === null || d > 1e-3){ ok = false; why += ` ${label}:${d}`; }
+    }
+    out.scienceFinishesAtEnd = ok; out.why = why;
+    // the end of a step at closing carries into the next morning
+    state.day = 9; state.minute = DAY_MIN - 3; sc().projects = []; sc().trips = []; sc().clones = []; state.ceres.beds = [];
+    tick(10);
+    out.closingKeepsOvershoot = state.day === 10 && Math.abs(state.minute - 7) < 1e-6;
+    // general research earns the same points whatever the step
+    const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = DAWN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
+    const a = rate(1), b = rate(8), c = rate(240);
+    out.pointsIgnoreStepSize = Math.abs(a - b) < 1e-6 && Math.abs(a - c) < 1e-6 && a > 0;
+    // a clone waits (its clock held) while TAR has no geneticist, then finishes on schedule after one is hired
+    sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = DAWN_MIN + 20;
+    state.rating = 5; const why0 = cloneProblem(sp.id); orderClone(sp.id, null); if(!sc().clones[0]) return {why:"clone: " + why0 + " crew " + JSON.stringify(sc().crew) + " tar " + !!dept("tar")}; const cl = sc().clones[0], len = cl.end - cl.start, g = sc().crew.gene; sc().crew.gene = 0;
+    for(const k of Object.keys(seen)) delete seen[k];
+    tick(300); const held = sc().clones.length === 1 && Math.abs(cl.end - cl.start - len) < 1e-6;
+    sc().crew.gene = g; const e2 = cl.end; tick(len + 10);
+    out.cloneWaitsThenFinishes = held && Math.abs(seen.clone - e2) < 1e-3;
+    finishProject = real.fp; tripReturns = real.tr; finishClone = real.fc; finishBatch = real.fb;
+    state.money = had.money; state.over = had.over; state.sandbox = had.sandbox;
+    return out;
+  });
+  if(sci.why) console.log("S12 late jobs:" + sci.why);
+  checks.scienceFinishesAtEnd = sci.scienceFinishesAtEnd;
+  checks.closingKeepsOvershoot = sci.closingKeepsOvershoot;
+  checks.pointsIgnoreStepSize = sci.pointsIgnoreStepSize;
+  checks.cloneWaitsThenFinishes = sci.cloneWaitsThenFinishes;
+
+  // S13: the clock runs round the clock; a trickle of guests keeps coming; Close park empties the park; the day turns over once, at 4 AM
+  const clk = await page.evaluate(() => {
+    const out = {}, keep = {day:state.day, minute:state.minute, rating:state.rating, money:state.money, over:state.over, sandbox:state.sandbox, closed:state.parkClosed};
+    state.over = false; state.sandbox = false; state.money = 1e7; state.rating = 5; state.parkClosed = false; resetParties();
+    // the clock passes 8 PM without a rollover
+    state.day = 30; state.minute = minuteAtClock(19 * 60 + 50); tick(10);
+    out.clockPastEight = state.day === 30 && clockMin() > 20 * 60 && clockMin() < 20 * 60 + 30 && fmtClock(clockMin()) === "8:10 PM";
+    out.clockMapsBack = Math.abs(minuteAtClock(clockMin(123)) - 123) < 1e-9 && clockMin(0) === ROLLOVER_CLOCK && DAY_MIN * CLOCK_SCALE === 1440;
+    // guests still arrive at night, a few staying on
+    resetParties(); state.day = 31; state.minute = minuteAtClock(21 * 60); nextSize = 1;
+    const g0 = state.today.guests, t0 = state.today.tickets;
+    for(let i = 0; i < 200; i++) tick(1);
+    out.guestsArriveAtNight = state.today.guests > g0 && state.today.tickets > t0 && state.day === 31;
+    out.someStayOvernight = guestCount() > 0 && isNight();
+    out.trickleScalesWithRating = (r => { const a = (state.rating = 0, trickleRate()), b = (state.rating = 5, trickleRate()); return a > 0 && b > a && Math.abs(b - GUEST.trickle) < 1e-9; })();
+    // Closed: no new guests, no tickets, the park empties, bills still come, the HUD says so
+    state.parkClosed = true; state.today = freshLedger(); ui.hud(true);
+    out.hudSaysClosed = !document.querySelector("#closedTag").hidden;
+    const gc = state.today.guests, tk = state.today.tickets; state.minute = 5; state.day = 32;
+    const hist0 = state.history.length, m0 = state.money; let emptied = false;
+    for(let i = 0; i < 900 && !emptied; i++){ tick(1); emptied = !parties.length; }
+    out.closedStopsArrivals = state.today.guests === gc || state.day > 32;
+    out.closedNoTickets = state.today.tickets === tk || state.day > 32;
+    out.closedEmptiesPark = emptied && guestCount() === 0;
+    for(let i = 0; i < DAY_MIN; i++) tick(1);
+    out.closedStillArrivesNobody = parties.length === 0 && state.history.length > hist0 && state.history[state.history.length - 1].guests === 0 && state.history[state.history.length - 1].costs > 0 && state.money < m0;
+    state.parkClosed = false; ui.hud(true);
+    out.hudOpenAgain = document.querySelector("#closedTag").hidden;
+    state.minute = minuteAtClock(21 * 60); nextSize = 1; for(let i = 0; i < 200; i++) tick(1);
+    out.openAgainArrives = parties.length > 0;
+    // the day turns over exactly once a day, at the rollover hour
+    resetParties(); let n = 0, at = []; const de = events.dayEnded; events.dayEnded = r => { n++; at.push(clockMin()); de && de(r); };
+    state.day = 40; state.minute = 0; const wx0 = JSON.stringify(state.weather);
+    for(let i = 0; i < 2 * DAY_MIN; i++) tick(1);
+    events.dayEnded = de;
+    out.rolloverOncePerDay = n === 2 && state.day === 42 && at.every(c => Math.abs(c - ROLLOVER_CLOCK) <= 2) && state.minute === 0;
+    // night looks and animal schedules
+    out.nightWash = nightDark(12 * 60) === 0 && nightDark(2 * 60) === NIGHT.dark && nightDark(20 * 60 - 30) > 0 && nightDark(20 * 60 - 30) < NIGHT.dark;
+    out.nocturnalAtNight = awake(SPECIES_BY_ID.ornw, minuteAtClock(2 * 60)) === 1 && awake(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) <= .2 && awake(SPECIES_BY_ID.plat, minuteAtClock(2 * 60)) < .5 && awake(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) >= .55;
+    // old saves: the minute shifts so science stamps stay exact, and the park starts open
+    const oldS = JSON.parse(JSON.stringify(state)); delete oldS.clockV; delete oldS.parkClosed; oldS.day = 3; oldS.minute = 540;
+    const nowOld = (oldS.day - 1) * 720 + (oldS.minute - 480), up = upgradeSave(oldS);
+    out.oldSaveClock = up.clockV === 2 && up.parkClosed === false && up.minute === 60 && (up.day - 1) * DAY_MIN + up.minute === nowOld;
+    const wrapped = JSON.parse(JSON.stringify(state)); delete wrapped.clockV; wrapped.minute = 1199.5; out.oldSaveEdge = upgradeSave(wrapped).minute < DAY_MIN;
+    const cur = upgradeSave(JSON.parse(JSON.stringify(state))); out.newSaveKeepsMinute = cur.minute === state.minute && cur.parkClosed === false;
+    Object.assign(state, {day:keep.day, minute:keep.minute, rating:keep.rating, money:keep.money, over:keep.over, sandbox:keep.sandbox, parkClosed:keep.closed}); resetParties(); recompute();
+    return out;
+  });
+  for(const [k, v] of Object.entries(clk)) checks[k] = v;
+
+  // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
+  const props = await page.evaluate(() => {
+    const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"];
+    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
+    // the front turns: the front vector follows the angle, and the picture changes with it
+    const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
+    out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
+    out.propFrontsDiffer = names.every(ty => { const t = BUILDINGS[ty], at = r => propArt({id:"pd", type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}, .1, false, false); return at(0) !== at(4); });
+    // placing with a rotation stores it
+    state.sandbox = true; state.over = false; state.money = 1e7;
+    let placed = null;
+    for(let y = 40; y < 700 && !placed; y += 12){
+      state.paths.push({id:"p-prop", points:[[60, y], [160, y]]});
+      setTool("bench"); for(let i = 0; i < 3; i++) rotateTool();
+      const r = svg.getBoundingClientRect(), px = (x, yy) => [r.left + view.tx + x * view.k, r.top + view.ty + yy * ky()];
+      placeGhost(...px(110, y + 1));
+      if(ghost && ghost.ok){ placeBuilding({clientX:px(110, y + 1)[0], clientY:px(110, y + 1)[1]}); placed = state.buildings[state.buildings.length - 1]; }
+      else state.paths.pop();
+    }
+    out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 3 && rot === 3;
+    if(placed){ const old = JSON.parse(JSON.stringify(placed)); delete old.rot; const snap = JSON.parse(JSON.stringify(state)); snap.buildings = snap.buildings.map(b => b.id === old.id ? old : b); upgradeSave(snap);
+      out.oldSaveGetsRot = snap.buildings.find(b => b.id === old.id).rot === 0; }
+    setTool("select"); render();
+    out.propsRenderInGame = !!document.querySelector(`#map [data-id="${placed && placed.id}"]`) || !!document.querySelector(`[data-id="${placed && placed.id}"]`);
+    return out;
+  });
+  Object.assign(checks, props);
+
+  // viewing platforms: flat pixel deck, front over the exhibit, entry on the path side, at every fence-side direction
+  const decks = await page.evaluate(() => {
+    const out = {};
+    const t = BUILDINGS.platform, sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
+    const dirs = [0, 1, 2, 3, 4, 5, 6, 7], arts = [], fronts = [];
+    let allOk = true;
+    for(const k of dirs){   // a deck on the side of a big exhibit at 8 angles (diagonals too): edge from a to b, the exhibit on the +normal side
+      const ang = k * Math.PI / 4, ux = Math.cos(ang), uy = Math.sin(ang), nx = -uy, ny = ux, cx = 300, cy = 300;
+      const ex = {id:"ex-d" + k, points:[[cx - ux*20, cy - uy*20], [cx + ux*20, cy + uy*20], [cx + ux*20 + nx*30, cy + uy*20 + ny*30], [cx - ux*20 + nx*30, cy - uy*20 + ny*30]], barrier:"bars"};
+      state.exhibits.push(ex);
+      const off = t.d/2 - 1.5, bl = {id:"pd" + k, type:"platform", exhibitId:ex.id, points:rectPts(cx + nx*off, cy + ny*off, t.w, t.d, ang), inward:true};
+      const fr = deckFrame(bl), a = deckArt(bl, .1, false, false, true);
+      fronts.push(fr.v[0]*nx + fr.v[1]*ny);
+      arts.push(a);
+      allOk = allOk && a.length > 1500 && (a.match(/<polygon/g) || []).length > 40 && !/NaN/.test(a) && Math.abs(fr.u[0]*fr.v[1] - fr.u[1]*fr.v[0] - 1) < 1e-6;
+      state.exhibits.pop();
+    }
+    out.platformRendersAllDirections = allOk;
+    out.platformFrontFacesAnimals = fronts.every(f => f > .99);   // the front points into the exhibit at every angle
+    out.platformTurnsWithSide = new Set(arts).size === arts.length;
+    // flip the exhibit to the other side of the fence: the front flips with it
+    const ex = {id:"ex-flip", points:sq(300, 300, 20), barrier:"wood"}; state.exhibits.push(ex);
+    const north = {id:"pn", type:"platform", exhibitId:ex.id, points:rectPts(300, 280 + 2, t.w, t.d, 0), inward:true};   // fence side y=280, exhibit south of it
+    const south = {id:"ps", type:"platform", exhibitId:ex.id, points:rectPts(300, 320 - 2, t.w, t.d, 0), inward:true};   // fence side y=320, exhibit north of it
+    out.platformFrontFlips = deckFrame(north).v[1] > .99 && deckFrame(south).v[1] < -.99;
+    state.exhibits.pop();
+    // in the game: renders in the map, old saves (no inward flag, no rot) load and draw
+    const e0 = state.exhibits.find(x => !x.viv);
+    let loads = true;
+    if(e0){
+      const [cx, cy] = centroid(e0.points), old = {id:"b-oldplat", type:"platform", exhibitId:e0.id, points:rectPts(cx, cy, t.w, t.d, 0), day:1};
+      const snap = JSON.parse(JSON.stringify(state)); snap.buildings.push(old); upgradeSave(snap);
+      const got = snap.buildings.find(b => b.id === "b-oldplat");
+      loads = !!got && got.inward === true && deckArt(got, .1, false, false, true).length > 1500;
+      state.buildings.push(JSON.parse(JSON.stringify(got))); render();
+      out.platformRendersInGame = !!document.querySelector(`#map [data-id="b-oldplat"]`) && /VIEW|polygon/.test(document.querySelector(`#map [data-id="b-oldplat"]`).innerHTML);
+      state.buildings = state.buildings.filter(b => b.id !== "b-oldplat");
+    } else out.platformRendersInGame = true;
+    out.oldSavePlatformLoads = loads;
+    // the path surface is masked out under a deck's footprint
+    if(e0){ const [cx, cy] = centroid(e0.points); state.buildings.push({id:"b-maskplat", type:"platform", exhibitId:e0.id, points:rectPts(cx, cy, t.w, t.d, 0), inward:true}); render();
+      out.platformCutsPathTexture = !document.querySelector(`#map polygon[fill="#CBC5B4"][points="${polyStr(state.buildings[state.buildings.length - 1].points)}"]`) && !!document.querySelector("#deckcut polygon") && !!document.querySelector('[mask="url(#deckcut)"]'); state.buildings = state.buildings.filter(b => b.id !== "b-maskplat"); render(); }
+    else out.platformCutsPathTexture = true;
+    render();
+    return out;
+  });
+  Object.assign(checks, decks);
+
+  // Genome quality is completeness: TAR clones from 60%, and the closer to 100% the healthier the clone
+  const gq = await page.evaluate(() => {
+    const out = {}, sc = state.science, keep = {dna:sc.dna, sb:state.sandbox, clones:sc.clones.slice(), money:state.money, rating:state.rating, tech:sc.tech.slice()};
+    const sp = SPECIES.find(s => !s.viv && !s.stars) || SPECIES.find(s => !s.viv);
+    sc.dna = {[sp.id]:{genome:CLONE_GENOME.min - 1}};
+    out.cloneNeedsMinGenome = !cloneOpen(sp.id) && /needs 60%/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === 0;
+    sc.dna[sp.id].genome = CLONE_GENOME.min;
+    out.cloneOpensAtMin = cloneOpen(sp.id) && !/genome is/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === CLONE_GENOME.q0 && CLONE_GENOME.q0 < 50;
+    const qs = [60, 70, 80, 90, 100].map(g => { sc.dna[sp.id].genome = g; return cloneQuality(sp.id); });
+    out.cloneHealthRisesWithGenome = qs.every((q, i) => !i || q > qs[i - 1]) && qs[4] === 100 && qs[2] >= 70;
+    state.sandbox = true; state.money = 1e8; state.rating = 5; sc.clones = [];
+    sc.dna[sp.id].genome = 60; sc.tech = sc.tech.slice();
+    const had = sc.crew.gene, bays = freeBay("gene");
+    out.noQualityField = !("quality" in sc.dna[sp.id]) && typeof bestQuality === "undefined" && typeof ghostQuality === "undefined" && !TECH.some(t => /^ghostq/.test(t)) && !TIME_PERIODS.some(p => "quality" in p);
+    // old saves: quality fields and the GHOST quality upgrades go, and the research points come back
+    const snap = JSON.parse(JSON.stringify(state)); snap.science.dna = {[sp.id]:{genome:70, quality:80}}; snap.science.tech.push("ghostq1", "ghostq2"); const pts = snap.science.points || 0;
+    upgradeSave(snap);
+    out.oldSaveDropsQuality = !("quality" in snap.science.dna[sp.id]) && snap.science.dna[sp.id].genome === 70 && !snap.science.tech.some(t => /^ghostq/.test(t)) && Math.round(snap.science.points - pts) === 130;
+    sc.dna = keep.dna; sc.clones = keep.clones; sc.tech = keep.tech; state.sandbox = keep.sb; state.money = keep.money; state.rating = keep.rating;
+    return out;
+  });
+  Object.assign(checks, gq);
+
+  // shelters: animals walk into a shelter in a storm, at night, and when frightened; shelters hold only so many; they aren't drawn or tappable inside;
+  // hiding animals let guests down (educated and paleo-nerd guests less); privacy screens and quiet signs cut the crowd the animals feel
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    state.money = 1e9; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
+    state.paths.push({id:"p-loop", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
+    const sp = SPECIES.filter(s => !s.viv && !COLD_HARDY.includes(s.id) && traitsOf(s).active === "diurnal" && traitsOf(s).temper === "skittish").sort((x, y) => coverSlots(x) - coverSlots(y))[0], cap = Math.floor(LAND.shelter.slots / coverSlots(sp));
+    const e = {id:"e-sh", name:"Shy", points:[[104,124],[180,124],[180,231],[104,231]], animals:Array.from({length:12}, (_, i) => ({id:"sh" + i, sp:sp.id})), happy:80, cond:100, stock:{}, land:[]};
+    state.exhibits.push(e);
+    const barn = {id:"l-b", type:"shelter", x:142, y:178}; e.land.push(barn);
+    afterChange(); syncAnimals(); resetParties();
+    const place = (list, x, y) => list.forEach(a => { const h = herd.get(a.id); h.x = x; h.y = y; h.placed = true; });
+    const reset = () => { shelterRun.clear(); hideAvg.clear(); for(const a of e.animals){ a.inside = null; a.act = "forage"; a.actFor = 99; a.napFor = 0; a.napDay = -1; a.need = freshNeeds(); } };
+    const inside = () => e.animals.filter(a => a.inside), step = () => { behaviorTick(BEHAVIOR.step); animateAnimals(.016); };
+    const wx = (w, m) => { state.weather = {today:w, next:"fair", from:999}; state.minute = m; };
+
+    // a storm sends them in, up to the room the shelter has (a small barn holds 10 slots, and each of these takes a few)
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 142, 178);
+    const probe = e.animals[0], hp = herd.get(probe.id), ab = animalBox(hp);
+    const tap = () => { const r = svg.getBoundingClientRect(); return animalAt(r.left + view.tx + hp.x * view.k, r.top + view.ty + hp.y * ky() + ab.oy * view.k); };
+    const before = tap();
+    step();
+    const ins = inside();
+    out.stormSendsAnimalsIn = ins.length > 0 && ins.every(a => a.inside === "weather") && /storm/i.test(actLabel(ins[0]));
+    out.shelterCapacityRespected = ins.length === cap && e.animals.length - ins.length === 12 - cap && e.animals.filter(a => !a.inside).every(a => !shelterRun.has(a.id));
+    const gone = ins[0], gh = herd.get(gone.id), shown = e.animals.find(a => !a.inside), sh = herd.get(shown.id);
+    out.insideNotDrawn = gh.el.style.display === "none" && sh.el.style.display !== "none";
+    place(e.animals.filter(a => !a.inside), 110, 130);
+    out.insideNotTappable = before !== null && (() => { const r = svg.getBoundingClientRect(), b = animalBox(gh); return animalAt(r.left + view.tx + gh.x * view.k, r.top + view.ty + gh.y * ky() + b.oy * view.k) === null; })();
+    // the animal panel still opens from the Animals tab, and says where it is
+    select("animal", gone.id); out.panelOpensForInsideAnimal = !!selItem() && selItem().id === gone.id && /storm/i.test(actLabel(gone)); select(null);
+    // the exhibit report says so
+    out.reportSaysSheltering = exhibitReport(e).issues.some(i => /inside a shelter/.test(i.text));
+    // fair weather brings them out again
+    wx("fair", DAWN_MIN + 140); step(); step(); animateAnimals(.016);
+    out.fairWeatherBringsOut = inside().length === 0 && gh.el.style.display !== "none";
+    // a bulldozed shelter lets them out
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 142, 178); step(); const was = inside().length;
+    e.land = e.land.filter(f => f !== barn); step(); out.bulldozedShelterReleases = was > 0 && inside().length === 0; e.land.push(barn);
+    // a hot day and a cold snap too, but not a canopy in the cold
+    reset(); wx("hot", DAWN_MIN + 120); place(e.animals, 142, 178); step(); out.heatSendsIn = inside().length > 0 && /heat/i.test(actLabel(inside()[0]));
+    e.land = [{id:"l-c", type:"canopysm", x:142, y:178}]; reset(); wx("cold", DAWN_MIN + 120); place(e.animals, 142, 178); step(); out.coldSkipsCanopy = inside().length === 0;
+    reset(); wx("hot", DAWN_MIN + 120); step(); out.heatUsesCanopy = inside().length > 0; e.land = [barn];
+
+    // asleep at night
+    reset(); wx("fair", 23 * 60); place(e.animals, 142, 178); step();
+    out.nightSleepsInside = inside().length === cap && inside().every(a => a.inside === "sleep") && /sleeping inside/i.test(actLabel(inside()[0]));
+    wx("fair", DAWN_MIN + 120); step(); step(); out.wakesAndComesOut = inside().length === 0;
+    // a nap
+    reset(); wx("fair", 13 * 60); place(e.animals, 142, 178); e.animals.forEach(a => { a.act = "rest"; a.actFor = 0; a.napFor = 200; }); step(); out.napGoesInside = inside().length > 0 && inside().every(a => a.inside === "sleep");
+    // frightened ones hide inside, and come out calm
+    reset(); wx("fair", DAWN_MIN + 120); place(e.animals, 142, 178); const shy = e.animals[0]; shy.need.stress = 95; step();
+    out.frightenedHideInside = shy.inside === "hide" && actLabel(shy) === "Hiding inside";
+    shy.need.stress = 2; for(let i = 0; i < 12; i++){ shy.need.stress = 2; step(); } out.calmComesOut = !shy.inside;
+    // far from the shelter it has to walk first; it goes in on arrival
+    reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 110, 130); step();
+    const walkers = e.animals.filter(a => shelterRun.has(a.id) && !shelterRun.get(a.id).in);
+    place(walkers, 142, 178); animateAnimals(.016);
+    out.walksThenEnters = walkers.length > 0 && inside().length === cap && e.animals.every(a => !shelterRun.has(a.id) || shelterRun.get(a.id).in || !a.inside);
+    // not saved
+    const snap = JSON.parse(JSON.stringify(state)); upgradeSave(snap); out.insideNotKept = snap.exhibits.find(x => x.id === "e-sh").animals.every(a => !("inside" in a));
+
+    // guests: animals that hide let a visit down; sleeping at night doesn't count, and sheltering from weather counts little
+    reset(); wx("fair", DAWN_MIN + 120);
+    const w = k => { e.animals.forEach(a => a.inside = null); e.animals.slice(0, 8).forEach(a => a.inside = k); return visibleShare(e); };
+    const vh = w("hide"), vw = w("weather"), vs = w("sleep"); state.minute = minuteAtClock(23 * 60); const vn = w("sleep"); state.minute = DAWN_MIN + 120;
+    out.hidingCountsMost = vh < vs && vs < vw && vw < 1 && vn === 1;
+    e.animals.forEach(a => a.inside = null);
+    const mkP = (pers, edu) => { const p = newParty(2); p.pers = pers; p.edu = edu || 0; delete p.fxc; p.mood = 60; p.seen = new Set(); p.thought = new Set(); return p; };
+    const visit = (p, avg) => { hideAvg.set(e.id, avg); const m0 = p.mood; seeExhibit(p, e); return p.mood - m0; };
+    const ok1 = visit(mkP(["neutral", "neutral"]), 1), bad = mkP(["neutral", "neutral"]), lo = visit(bad, .2);
+    out.hidingLowersMood = lo < ok1 - 3 && bad.thought.has("hiding") && THOUGHTS.hiding && /animals/i.test(THOUGHTS.hiding.text);
+    const fine = mkP(["neutral", "neutral"]), loFine = visit(fine, .8);
+    out.hidingToleratedWhenFew = Math.abs(loFine - ok1) < 1e-9 && !fine.thought.has("hiding");
+    const learned = visit(mkP(["neutral", "neutral"], 40), .2), half = visit(mkP(["neutral", "neutral"], 20), .2);
+    out.educatedPenalisedLess = learned > lo + 3 && learned > half && half > lo;
+    const bo = pers => { hideAvg.set(e.id, .2); return hideBother(mkP(pers), e); };
+    out.paleoAndConservLeastBothered = bo(["paleo", "neutral"]) < bo(["neutral", "neutral"]) && bo(["conserv", "neutral"]) < bo(["neutral", "neutral"]) && bo(["family", "neutral"]) > bo(["neutral", "neutral"]) && bo(["paleo", "neutral"]) <= bo(["conserv", "neutral"]);
+    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals are hiding\. Add quiet signs or give shy animals more places to hide/.test(i.text)) && /Add quiet signs/.test(behaviorHtml(e));
+    hideAvg.set(e.id, 1); out.noHintWhenVisible = !exhibitReport(e).issues.some(i => /animals are hiding/.test(i.text));
+
+    // privacy screens and quiet signs cut the crowd the animals feel (ctx.seen)
+    hideAvg.clear(); resetParties();
+    for(let i = 0; i < 100; i++) parties.push({id:"fp" + i, at:{x:112, y:122}, rowdy:false, n:2});
+    const base = behaviorCtx(e).seen;
+    out.screenCutsSeen = (() => { e.land.push({id:"l-s", type:"screen", x:109, y:200}); const v = behaviorCtx(e).seen; e.land.pop(); return base > 0 && v < base * .9; })();
+    out.screenPlacedByFence = !landProblem(e, "screen", 109, 200) && /fence/.test(landProblem(e, "screen", 142, 150) || "") && /habitat props/i.test(decorProblem("screen", 400, 400) || "");
+    out.screenDrawn = (() => { const g = featSvg({id:"l-s", type:"screen", x:109, y:200}, "temperate", false, () => false); return g.includes("<rect") && !g.includes("NaN"); })();
+    const q = {id:"b-q", type:"quiet", points:rectPts(110, 121, BUILDINGS.quiet.w, BUILDINGS.quiet.d, 0)}; state.buildings.push(q);
+    const hushed = behaviorCtx(e).seen;
+    parties.forEach(p => p.rowdy = true); const loud = behaviorCtx(e).seen; parties.forEach(p => p.rowdy = false);
+    q.cond = 5; const brokenSign = behaviorCtx(e).seen; q.cond = 100;
+    state.buildings.pop(); const gone2 = behaviorCtx(e).seen;
+    out.quietSignCutsSeen = hushed < base * .6 && Math.abs(gone2 - base) < 1e-9 && Math.abs(brokenSign - base) < 1e-9;
+    out.rowdyPartlyIgnoreQuietSign = loud > hushed && loud < base;
+    // a shy herd is less stressed with the signs up
+    state.buildings.push(q); const T = e.animals[0], stressWith = stressTarget(e, T, sp, behaviorCtx(e)); state.buildings.pop(); const stressWithout = stressTarget(e, T, sp, behaviorCtx(e));
+    out.quietSignCalmsShyAnimals = traitsOf(sp).temper !== "skittish" || stressWith < stressWithout;
+    resetParties();
+    state.exhibits = state.exhibits.filter(x => x !== e); afterChange(); syncAnimals();
+    return out;
+  }));
+
+  // biome paint (js/biomepaint.js)
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {}, keep = state.biomePaint; state.biomePaint = [];
+    const o = ownedRects()[0], x = Math.round((o[0] + o[2]) / 2), y = Math.round((o[1] + o[3]) / 2);
+    const [A, B] = Object.keys(BIOMES).filter(k => k !== parkBiome());
+    const rs = () => JSON.stringify(state.biomePaint.map(p => [p.biome, ...p.r]));
+    paintRect(A, [x, y, x + 10, y + 10]);
+    out.paintAdds = state.biomePaint.length === 1 && state.biomePaint[0].biome === A;
+    out.paintSnapsToGrid = (() => { const r = paintBoxW([x + .4, y + .4], [x + 5.6, y + 3.2]); return r.every(v => v % 5 === 0) && r[2] - r[0] >= 5 && r[2] - r[0] <= 10 && r[3] - r[1] === 5; })();
+    out.paintLeavesParkBiome = state.biome === undefined || state.biome === parkBiome();
+    paintRect(B, [x + 2, y + 2, x + 6, y + 6]);
+    out.paintCoversInPlace = state.biomePaint.length === 2 && paintAt(x + 3, y + 3).biome === B && paintAt(x + 8, y + 8).biome === A;
+    out.paintRepick = (() => { const t = paintAt(x + 3, y + 3); return repickPaint(t.id, A) && paintAt(x + 3, y + 3).biome === A && !repickPaint(t.id, A); })();
+    // painted over: a patch fully covered is deleted, the list stays small
+    paintRect(B, [x - 1, y - 1, x + 11, y + 11]);
+    out.paintCoveredLayersDeleted = state.biomePaint.length === 1 && rs() === JSON.stringify([[B, x - 1, y - 1, x + 11, y + 11]]);
+    out.paintSameAgainIsNoop = (() => { const n = paintVer; const r = paintRect(B, [x, y, x + 4, y + 4]); return r.same && paintVer === n && state.biomePaint.length === 1; })();
+    // a patch the new one spans across is trimmed, and touching same-biome patches merge
+    paintRect(A, [x - 5, y - 5, x + 15, y + 2]);
+    out.paintTrimsPartlyCovered = rs() === JSON.stringify([[B, x - 1, y + 2, x + 11, y + 11], [A, x - 5, y - 5, x + 15, y + 2]]);
+    paintRect(B, [x - 1, y + 11, x + 11, y + 14]);
+    out.paintMergesNeighbours = rs() === JSON.stringify([[A, x - 5, y - 5, x + 15, y + 2], [B, x - 1, y + 2, x + 11, y + 14]]);
+    out.paintNeverOffLand = typeof paintRect(A, [o[2] + 5, o[1], o[2] + 20, o[1] + 10]) === "string" && state.biomePaint.length === 2;
+    // erasing: a tap takes the patch, a box splits what it cuts
+    out.eraseBoxSplits = (() => { const n = eraseRect([x + 3, y + 5, x + 7, y + 8]); return n === 1 && state.biomePaint.filter(p => p.biome === B).length === 4 && !paintAt(x + 4, y + 6) && !!paintAt(x + 1, y + 6) && !!paintAt(x + 4, y + 3) && !!paintAt(x + 4, y + 10) && !!paintAt(x + 9, y + 6); })();
+    out.eraseTapTakesPatch = erasePaintAt(x + 1, y + 6) && !paintAt(x + 1, y + 6) && !erasePaintAt(x + 1, y + 6);
+    // drawing is cached until the paint changes, and uses the biome ground patterns
+    const s1 = paintSvg(), s2 = paintSvg();
+    out.paintDrawn = s1 === s2 && s1.includes(`url(#p-${A})`) && s1.includes(`url(#p-${B})`) && s1.includes("plotClip") && !s1.includes("NaN");
+    paintRect(B, [x, y, x + 2, y + 2]);
+    out.paintCacheRefreshes = paintSvg() !== s1;
+    // save and load
+    const copy = JSON.parse(JSON.stringify(state)), before = rs();
+    const loaded = upgradeSave(copy);
+    out.paintSurvivesSave = JSON.stringify(loaded.biomePaint.map(p => [p.biome, ...p.r])) === before && loaded.biomePaint.length > 0;
+    delete copy.biomePaint;
+    out.paintOldSaveDefault = Array.isArray(upgradeSave(copy).biomePaint) && upgradeSave(copy).biomePaint.length === 0 && newPark().biomePaint.length === 0;
+    out.paintExhibitBiome = (() => {
+      const e = {id:"e-pb", name:"Paint", points:[[x, y], [x + 12, y], [x + 12, y + 9], [x, y + 9]], animals:[], land:[], biome:"grassland"};
+      state.exhibits.push(e);
+      const keepP = state.biomePaint; state.biomePaint = []; paintTouch();
+      const T = "desert", box = [x, y, x + 12, y + 9], third = [x, y, x + 4, y + 9];
+      const first = biomeOf(e) === "grassland";
+      paintRect(T, third);
+      const minority = biomeOf(e) === "grassland" && paintShare(e).counts[T] > 0;    // a third painted: the base still wins
+      paintRect(T, [x, y, x + 8, y + 9]);
+      const tipped = biomeOf(e) === T;                                               // two thirds: it tips
+      const free = exhibitPaintCost(box, T) === Math.round(12 * 9 * BIOMES[T].perSqM / 3);   // only the last third costs
+      state.biomePaint = []; paintTouch();
+      const priced = exhibitPaintCost(box, T) === Math.round(108 * BIOMES[T].perSqM) && exhibitPaintCost(box, "grassland") === 0;
+      paintRect(T, box);
+      const drawn = exhibitPaintSvg(e).includes(`url(#b-${T})`) && exhibitPaintSvg(e).includes("clip-path");
+      const panel = biomeHtml(e).includes("Paint ground") && !biomeHtml(e).includes("biomeSel");
+      state.exhibits.pop(); state.biomePaint = keepP; paintTouch();
+      return first && minority && tipped && free && priced && drawn && panel;
+    })();
+    out.vivNeverPainted = (() => { const v = {viv:"S", biome:"desert", points:[[0,0],[5,0],[5,5],[0,5]], animals:[]}; const k = state.biomePaint; state.biomePaint = [{id:"x", biome:"tropical", r:[0,0,5,5]}]; paintTouch(); const ok = biomeOf(v) === "desert"; state.biomePaint = k; paintTouch(); return ok; })();
+    out.paintMenuAndTool = !!document.querySelector('#sideMenu [data-tool="paint"]');
+    out.paintToolBar = (() => { setTool("paint"); const ok = document.querySelectorAll("#dSizes [data-pickbiome]").length === Object.keys(BIOMES).length + 1 && !$("#dSizes").hidden;
+      const [pcx, pcy] = chunkAt(x + 20, y), px = pcx * 5, py = pcy * 5;
+      pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
+      const drawn = state.biomePaint.some(p => p.r.join() === [px, py, px + 10, py + 5].join());
+      paintPick = "erase"; pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
+      const gone = !paintAt(px + 1, py + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
+    state.biomePaint = keep || []; paintTouch(); render();
+    out.waterChunks = (() => {
+      const kw = state.water; state.water = []; setTool("water");
+      const [cx, cy] = chunkAt(x, y);
+      wdrag = {a:[cx, cy], b:[cx + 1, cy]}; const sized = waterBox().r.join() === [cx * 5, cy * 5, cx * 5 + 10, cy * 5 + 5].join();
+      state.money = 1e7; endWaterDrag();
+      wdrag = {a:[cx + 2, cy], b:[cx + 2, cy]}; endWaterDrag();   // touches the first at its end and has the same height: they join
+      const joined = state.water.length === 1 && rectOfPts(state.water[0].points).join() === [cx * 5, cy * 5, cx * 5 + 15, cy * 5 + 5].join();
+      wdrag = {a:[cx, cy], b:[cx, cy]}; const over = !!waterBox().err; wdrag = null;
+      state.water = kw; setTool("select"); return sized && joined && over;
+    })();
+
+    // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
+    startWith(newPark(), false); setSpeed(0);
+    {
+      state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;
+      const H = Math.PI / 2, add = (id, type, x, y) => state.buildings.push({id, type, points:rectPts(x, y, BUILDINGS[type].w, BUILDINGS[type].d, H)});
+      add("m-pmc", "pmc", 230, 262); add("m-ce", "ceres", 180, 262); add("m-cl", "closet", 205, 230);
+      state.paths.push({id:"m1", name:"m1", points:[[207.5,230],[207.5,262]]}, {id:"m2", name:"m2", points:[[207.5,262],[222,262]]}, {id:"m3", name:"m3", points:[[207.5,262],[193,262]]});
+      state.science.tech.push("medmeso");
+      recompute(); buildKeeperGraph(); buildGuestGraph(); hireCustodian(); syncCustodians();
+      const pm = state.buildings.find(b => b.id === "m-pmc"); pm.store = {medmes:2}; state.ceres.meds = {medpal:0, medmes:30, medcen:0};
+      state.minute = 10; let topped = false;
+      for(let i = 0; i < 300 && !topped; i++){ tick(1); topped = stockOf(pm, "medmes") > 2; }
+      out.pmcRestocksBeforeEmpty = topped && restockLot("medmes") === HEALTH.dose && restockLot("plants") === 5;
+    }
+    // flat vivariums: each size draws a non-empty case (back and front), the sizes differ, and old saves with vivariums load and render
+    {
+      startWith(newPark(), false); setSpeed(0);
+      const H = Math.PI / 2, svgs = {};
+      for(const [sz, V] of Object.entries(VIVARIUMS)){
+        const ev = {id:"e-fv" + sz, name:"Flat " + sz, viv:sz, points:rectPts(200, 260, V.w, V.d, 0), animals:[], happy:70, biome:"tropical"};
+        svgs[sz] = viv34(ev, "back", null) + "|" + viv34(ev, "front", null) + "|" + vivFloor34(ev, null, false, false, true);
+      }
+      out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && x.includes("<polygon")));
+      out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
+      { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
+        state.exhibits.push(ev); syncAnimals();
+        const hs = [...herd.values()].filter(h => h.exhibitId === "e-fa");
+        out.vivAnimalsInsideGlass = hs.length === 4 && hs.every(h => vivSpot(h, ev, [h.x, h.y]));
+        ev.points = rectPts(260, 300, V.w, V.d, 0); syncAnimals();   // moving the case brings them along
+        out.vivAnimalsFollowMove = hs.every(h => vivSpot(h, ev, [h.x, h.y])); state.exhibits.pop(); }
+      { const fs = new Set(); for(let i = 0; i < 40; i++) fs.add(nameAnimal({id:"fz" + i, sp:"tikt"}).face); out.cloneFaceRandom = fs.size === 2 && [...fs].every(f => f === 1 || f === -1);
+        const keep = nameAnimal({id:"fk", sp:"tikt", face:-1}); out.faceKept = keep.face === -1; }
+      const oldV = JSON.parse(JSON.stringify(newPark()));
+      oldV.exhibits.push({id:"e-ov", name:"OldV", points:rectPts(200, 270, 6, 4, 0), animals:[], happy:70, viv:"S"}, {id:"e-ov2", name:"OldV2", points:rectPts(220, 270, 16, 10, 0), animals:[], happy:70, viv:"L"});
+      let loaded = true; try { startWith(upgradeSave(oldV), false); setSpeed(0); render(); } catch(err){ loaded = false; }
+      out.vivOldSaveLoads = loaded && state.exhibits.filter(e => e.viv).length === 2 && !!document.querySelector('[data-kind="exhibit"][data-id="e-ov"] polygon');
     }
     return out;
   }));

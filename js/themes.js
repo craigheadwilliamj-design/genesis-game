@@ -1,5 +1,6 @@
 /* Themes: colors for paths, buildings and exhibits, matched areas, species fit, and unlocks. Data is THEMES in data.js. */
-const themeKey = it => THEMES[it.theme] ? it.theme : "genesis";
+// Without dev mode every item draws and counts as Genesis (saved themes stay in the data, unused)
+const themeKey = it => devMode() && THEMES[it.theme] ? it.theme : "genesis";
 const themeOf = it => THEMES[themeKey(it)];
 function mixHex(a, b, t){
   if(!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return a;
@@ -28,6 +29,7 @@ function themedZoneAt(it){
 }
 // The theme a new thing gets: its zone's, else the brush's, if it's unlocked and you can afford the extra (null for Genesis)
 function themeFor(kind, it){
+  if(!devMode()) return null;
   const z = themedZoneAt(it), key = z ? z.theme : state.themes && state.themes.brush;
   if(!key || key === "genesis" || !THEMES[key] || !themeHave(key) || !canAfford(themeFee(kind, it, key))) return null;
   return key;
@@ -41,7 +43,7 @@ function themeNew(kind, it){
 // Everything whose middle is inside the zone that isn't already in a theme: guest paths, buildings and exhibits
 function zoneThemePlan(z, key){
   const out = [], inside = it => it.points && it.points.length && inPoly(...itemSpot(it), z.points);
-  for(const p of state.paths) if(!isService(p) && !isTram(p) && inside(p) && themeKey(p) !== key) out.push(["path", p]);
+  for(const p of state.paths) if(!p.d && !isService(p) && !isTram(p) && inside(p) && themeKey(p) !== key) out.push(["path", p]);
   for(const b of state.buildings) if(inside(b) && themeKey(b) !== key) out.push(["building", b]);
   for(const e of state.exhibits) if(inside(e) && themeKey(e) !== key) out.push(["exhibit", e]);
   return out;
@@ -67,7 +69,7 @@ function checkThemes(){
   for(const [k, T] of Object.entries(THEMES)){
     if(state.themes.have.includes(k) || !T.unlock.check()) continue;
     state.themes.have.push(k);
-    events.toast(`New theme unlocked: ${T.label}. Pick it in the park office or on any path, building or exhibit.`, "good");
+    if(devMode()) events.toast(`New theme unlocked: ${T.label}. Pick it in the park office or on any path, building or exhibit.`, "good");
   }
 }
 
@@ -80,7 +82,7 @@ function themeFitShare(e){
 // The themed area around an exhibit: guest paths and shops/restrooms nearby. Consistent when they all match the exhibit.
 function themeZone(e){
   const key = themeKey(e), near = [];
-  for(const p of state.paths) if(!isService(p) && !isTram(p) && lineShapeDist(p.points, e.points) <= THEME.radius) near.push(p);
+  for(const p of state.paths) if(!p.d && !isService(p) && !isTram(p) && lineShapeDist(p.points, e.points) <= THEME.radius) near.push(p);
   for(const b of state.buildings){
     const t = BUILDINGS[b.type];
     if(t.dept || t.prop || !(t.serves || []).length || b.exhibitId) continue;
@@ -198,7 +200,6 @@ function themeBuildSvg(bl, pts, trimPts){
   for(const L of trims) s += bl.points ? along(L, bl.points) : strokeSvg("polygon", trimPts, L, ns);
   const UN = H >= 0 && T.roofs.units && T.roofs.units[H];
   if(UN && bl.points && bl.points.length === 4 && area(bl.points) >= UN.min) s += unitsSvg(bl, UN, ns);
-  if(T.emblem && T.emblem.includes(bl.type) && bl.points && bl.points.length === 4) s += emblemOn(bl);
   const X = H >= 0 && T.roofs.brace, tp = trimPts.split(" ");
   if(X && X.of.includes(H) && tp.length === 4 && area(bl.points) >= X.min) for(const L of X.lines) s += strokeSvg("polyline", `${tp[0]} ${tp[2]}`, L, ns) + strokeSvg("polyline", `${tp[1]} ${tp[3]}`, L, ns);
   // stepped blocks: big buildings get a smaller upper story pushed toward the back corner, with a shadow cast down and to the right, and its own trim
@@ -241,19 +242,4 @@ function unitsSvg(bl, U, ns){
       + `<circle cx="${p[0].toFixed(2)}" cy="${p[1].toFixed(2)}" r="${(sh * .6).toFixed(2)}" fill="${U.c2}" fill-opacity=".55" stroke="${U.c2}" stroke-width=".7" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
   return s;
-}
-// the campus mark: a gold helix with a leaf, drawn in a -1 to 1 box (lines and dots only)
-function emblemSvg(cx, cy, r){
-  const g = `fill="none" stroke="#C9A24B" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
-  return `<g transform="translate(${cx.toFixed(2)} ${cy.toFixed(2)}) scale(${r.toFixed(2)})" pointer-events="none">`
-    + `<circle r="1.08" stroke-width="1.3" stroke-opacity=".85" ${g.replace('fill="none"', 'fill="#10261A" fill-opacity=".45"')}/>`
-    + `<path d="M-.42 -.78C.5 -.5 .5 -.2 0 0C-.5 .2 -.5 .5 .42 .78M.42 -.78C-.5 -.5 -.5 -.2 0 0C.5 .2 .5 .5 -.42 .78" stroke-width="1.5" ${g}/>`
-    + `<path d="M-.3 -.5H.3M-.3 .5H.3" stroke-width="1" ${g}/>`
-    + `<path d="M.1 .1C.5 .05 .8 -.25 .78 -.62C.4 -.6 .1 -.35 .1 .1Z" stroke-width="1.1" ${g.replace('fill="none"', 'fill="#1F3D2B"')}/>`
-    + `<circle cx="-.42" cy="-.78" r=".02" stroke-width="3" ${g}/><circle cx="-.42" cy=".78" r=".02" stroke-width="3" ${g}/></g>`;
-}
-// the mark on a landmark roof, up in the back corner so the name still reads
-function emblemOn(bl){
-  const [cx, cy] = centroid(bl.points), bk = bl.points.reduce((a, p) => p[0] + p[1] < a[0] + a[1] ? p : a), r = Math.max(1.6, Math.sqrt(area(bl.points)) / 9.5);
-  return emblemSvg(cx + (bk[0] - cx) * .68, cy + (bk[1] - cy) * .66, r);
 }

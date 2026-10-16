@@ -71,6 +71,7 @@ function escapesTick(dtMin){
     if(Math.random() < 1 - Math.pow(1 - p, dtMin)) breakOut(e, worst);
   }
   moveLoose(dtMin);
+  looseAttacks(dtMin);
   harmGuests(dtMin);
 }
 
@@ -85,7 +86,7 @@ function breakOut(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
   const n = kGraph.anchors[e.id] || nearestNode(cx, cy);   // the gate stop is on the staff network; the nearest stop might be on a path nobody can walk to
-  state.safety.loose.push({id:a.id, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
+  state.safety.loose.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
   state.rating = Math.max(0, state.rating - .05);
   events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} ${vetsOnDuty() ? "Vets with dart guns are on the way." : "Keepers with dart guns are on the way."}`, "bad");
   events.changed();
@@ -126,11 +127,11 @@ function harmGuests(dtMin){
       if(at) for(const q of parties){ const d = q.at ? Math.hypot(q.at.x - at[0], q.at.y - at[1]) : Infinity; if(d < vd){ vd = d; v = q; } }
       if(--v.n <= 0){ leaveQueue(v); v.gone = true; parties = parties.filter(q => q !== v); }
       else { thinks(v, "scared"); goHome(v); }
+      if(at) events.fx("dust", at[0], at[1]);
       sf.deaths++;
       spend(ESCAPE.lawsuit, "fines");
       state.rating = Math.max(0, state.rating - .3);
-      events.toast(`A guest was killed by the escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}. ${sf.deaths} of ${ESCAPE.shutdownDeaths} deaths before the park is shut down.`, "bad");
-      if(sf.deaths >= ESCAPE.shutdownDeaths){ state.over = "shutdown"; events.gameOver(); return; }
+      events.toast(`A guest was killed by the escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}.`, "bad");
     }
   }
 }
@@ -146,8 +147,8 @@ function fearFactor(){
 function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
-  if(e){ e.animals.push({id:l.id, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
-  else { state.science.ready.push({id:l.id, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in holding. Tap an exhibit to move it in.`, "good"); }
+  if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
+  else { state.science.ready.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in holding. Tap an exhibit to move it in.`, "good"); }
   events.changed();
 }
 

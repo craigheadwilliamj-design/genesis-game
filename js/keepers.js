@@ -18,7 +18,7 @@ const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph &
 const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b));
 function ceresRate(){ return dept("ceres") && hasTech("paleoflora") && anyPlantDna() ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
 function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLORA.storeDays; }
-function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / (CLOSE_MIN - OPEN_MIN)); }
+function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / DAY_MIN); }
 // Keepers only go for Paleoflora when CERES has some to give
 const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && anyPlantDna() && state.ceres.stock >= 1;
 // Where keepers pick up a food: Paleoflora at CERES, everything else from a store that has some.
@@ -82,8 +82,11 @@ function freeFeeding(){ return state.day < state.staff.feedFrom; }
 function gateCheck(e){
   if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
   if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
-  const near = (p, list) => list.some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
-  if(!near(e.gate, state.paths.filter(p => !isTram(p)))) return {ok:false, text:"The gate doesn't touch a path or service road."};
+  // the gate is on a path when it is within GATE_REACH of its middle, which is GATE_REACH - 2.5 m from its edge
+  const d = GATE_REACH - PATH_HALF_WIDTH, sq = [[e.gate[0] - .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] + .05], [e.gate[0] - .05, e.gate[1] + .05]];
+  const loose = state.paths.filter(p => !p.d && !isTram(p)).some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
+  if(!loose && !nearCells(sq, d, false, true)) return {ok:false, text:"The gate doesn't touch a path or service road."};
+  if(!loose && !nearCells(sq, d, false)) return {ok:false, text:"The path at the gate doesn't join the entrance. Staff paths join the entrance by touching a guest path or the entrance walk."};
   return {ok:true, text:"Gate opens onto a path."};
 }
 
@@ -252,8 +255,8 @@ function returnCarry(c){
   const h = c.carry;
   if(h && h.amount > 0){
     if(h.type === "paleoflora") state.ceres.stock = Math.min(ceresCap(), state.ceres.stock + h.amount);
-    else if(h.type === "meds" && !stashGood("meds", h.amount, null) && cereses().length) state.ceres.meds = Math.min(medCap(), (state.ceres.meds || 0) + h.amount);
-    else if(h.type !== "meds") stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : c.plan && c.plan.src));
+    else if(MED_GOODS.includes(h.type)){ if(!stashGood(h.type, h.amount, null) && cereses().length) cerMeds()[h.type] = Math.min(medCap(), (cerMeds()[h.type] || 0) + h.amount); }
+    else stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : c.plan && c.plan.src));
   }
   c.haul = null;
   setCarry(c, null);
@@ -299,7 +302,7 @@ function huntJob(c){
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
-function keeperPos(c){ const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at.x) * c.t, c.at.y + (nx.y - c.at.y) * c.t] : [c.at.x, c.at.y]; }
+function keeperPos(c){ if(c.escort && c.escort.at && !c.escort.gone){ const [x, y] = partyPos(c.escort); return [x + 1.2, y]; } const nx = c.route[0]; return nx ? [c.at.x + (nx.x - c.at.x) * c.t, c.at.y + (nx.y - c.at.y) * c.t] : [c.at.x, c.at.y]; }
 
 function chase(c, l){
   // a vet already darted it: walk over and pick it up
@@ -442,7 +445,7 @@ function dropOff(t, a){
   delete a.darted;
   const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp];
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); events.toast(`Keepers moved a ${s.name} into ${e.name}.`, "good"); }
-  else { state.science.ready.push({id:a.id, sp:a.sp, q:a.q ?? 90}); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in holding.`, "bad"); }
+  else { state.science.ready.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q ?? 90}); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in holding.`, "bad"); }
   events.changed();
 }
 
@@ -457,7 +460,7 @@ function dirtPerDay(e){
 // Dirt removed per minute of work
 function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("shovels") ? 1 : CLEAN.bareFactor) * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
 function dirtTick(dtMin){
-  for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / (CLOSE_MIN - OPEN_MIN));
+  for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / DAY_MIN);
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
 function cleanJob(c, k, min = CLEAN.dirtyAt){
@@ -731,20 +734,33 @@ function eatTick(dtMin){
     e.stock = e.stock || {};
     const need = dailyNeed(e);
     e.grassFed = false;
+    let want = 0, unmet = 0, cover = 1;   // for the pack pecking order below
     // time spent with some food run out makes animals more likely to fall ill
     if(!free && Object.keys(need).some(t => stockFor(e, t) <= 0.01)) e.hungryMin = (e.hungryMin || 0) + dtMin;
     for(const t of Object.keys(need)){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
       // groves in the exhibit feed part of it; keepers bring the rest
-      let eat = need[t] * dtMin / (CLOSE_MIN - OPEN_MIN) * (1 - browseShare(e, t, need[t]));
+      let eat = need[t] * dtMin / DAY_MIN * (1 - browseShare(e, t, need[t]));
       eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
-      e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat);
+      want += eat; cover = Math.min(cover, clamp(has / ((need[t] || 1) * PACK.pile), 0, 1));
+      e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat); unmet += Math.max(0, eat);
       // out of Paleoflora: they eat the grass hay instead
       if(t === "paleoflora" && eat > 0 && (e.stock.plants || 0) > 0 && !need.plants){ e.stock.plants = Math.max(0, e.stock.plants - eat); e.grassFed = true; }
       else if(t === "paleoflora" && (e.stock.paleoflora || 0) <= 0 && (e.stock.plants || 0) > 0) e.grassFed = true;
     }
+    packFeedStep(e, free ? 0 : Math.max(want ? unmet / want : 0, 1 - cover));
   }
+}
+// Packs eat in rank order: the alpha pair first, then the rest. The shortage (0 to 1, of what the whole exhibit wants: food unmet this tick, or a pile under
+// PACK.pile of a day's need) lands on the subordinates first. packFeed: exhibit id -> {sub, top}, the share each tier goes without. Open exhibits only.
+const packFeed = new Map();
+function packFeedStep(e, lack){
+  if(e.viv || lack <= 0){ packFeed.delete(e.id); return; }
+  const n = e.animals.length, top = Math.min(2, n), subs = n - top;
+  if(!subs){ packFeed.set(e.id, {sub:0, top:lack}); return; }
+  const miss = lack * n;   // animal-shares of food missing
+  packFeed.set(e.id, {sub:Math.min(1, miss / subs), top:Math.min(1, Math.max(0, miss - subs) / top)});
 }
 
 // Each night keepers go home and come back rested
@@ -795,7 +811,7 @@ const atvs = () => state.staff.atvs;
 const allStaffList = () => state.staff.keepers.concat(state.staff.mechanics, state.staff.vets, state.staff.custodians || [], state.staff.guards || []);
 // A broken depot grounds its own ATVs wherever they are parked
 function usableAtvs(){
-  if(!hasTech("vehicles")) return [];
+  if(!devMode() || !hasTech("vehicles")) return [];
   const ok = new Set(depots().filter(depotWorking).map(b => b.id));
   return atvs().filter(a => ok.has(a.depot));
 }
@@ -809,7 +825,13 @@ function freeAtvNodes(c){
 }
 // Each depot holds its set of ATVs; demolishing one takes them with it
 function syncAtvs(){
-  const list = atvs(), ids = new Set(depots().map(b => b.id));
+  const list = atvs();
+  if(!devMode()){   // launch build: no ATVs, staff just walk
+    list.length = 0;
+    for(const c of [...crew, ...mcrew, ...vcrew, ...ccrew, ...gcrew]) if(c.atvId || c.riding || c.mountAt || c.parkAt) resetAtv(c);
+    return;
+  }
+  const ids = new Set(depots().map(b => b.id));
   for(let i = list.length - 1; i >= 0; i--) if(!ids.has(list[i].depot)) list.splice(i, 1);
   for(const b of depots()){ let n = list.filter(a => a.depot === b.id).length; while(n++ < VEHICLES.perDepot) list.push({id:uid("a-"), depot:b.id, at:null, by:null}); }
   const have = new Set(list.map(a => a.id)), held = new Set();
@@ -820,4 +842,4 @@ function syncAtvs(){
   for(const a of list) if(a.by && !held.has(a.id)) a.by = null;
 }
 // Is this person driving right now? Only while on an ATV, and only on a service road.
-function onAtv(c){ const nx = c.route && c.route[0]; return !!(c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }
+function onAtv(c){ if(!devMode()) return false; const nx = c.route && c.route[0]; return !!(c.riding && nx && c.at && c.at.svc && c.at.svc.has(nx)); }

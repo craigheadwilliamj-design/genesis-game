@@ -16,9 +16,15 @@ const OLD_PLOT = [[0,18],[150,0],[410,8],[420,300],[-6,306]];
 
 /* ---------- land for sale ---------- */
 // Parcel (i, j) is the cell between PARCELS.xs[i..i+1] and ys[j..j+1]. The home plot's cells are always owned.
-const parcelRect = (i, j) => [PARCELS.xs[i], PARCELS.ys[j], PARCELS.xs[i+1], PARCELS.ys[j+1]];
+const PARCEL_YS = PARCELS.ys.concat(LEGACY_SOUTH_YS);
+const ENTRANCE_X = 207.5;   // the middle of chunk column 41 (x 205 to 210), so the entrance building and its walk sit on one 5 m chunk
+const SOUTH_LINE = PARCELS.ys[PARCELS.ys.length - 1];   // the entrance line: the park's hard southern edge
+const parcelRect = (i, j) => [PARCELS.xs[i], PARCEL_YS[j], PARCELS.xs[i+1], PARCEL_YS[j+1]];
+const parcelSouth = (i, j) => PARCEL_YS[j+1] > SOUTH_LINE;   // south of the entrance: never for sale
 const parcelId = (i, j) => i + "," + j;
-const PARCEL_CELLS = (() => { const out = []; for(let i = 0; i < PARCELS.xs.length - 1; i++) for(let j = 0; j < PARCELS.ys.length - 1; j++) out.push([i, j]); return out; })();
+const PARCEL_CELLS = (() => { const out = []; for(let i = 0; i < PARCELS.xs.length - 1; i++) for(let j = 0; j < PARCEL_YS.length - 1; j++) out.push([i, j]); return out; })();
+// Cells that can ever be offered: everything but the legacy rows south of the entrance
+const SALE_CELLS = PARCEL_CELLS.filter(([i, j]) => !parcelSouth(i, j));
 function parcelHome(i, j){ const [x0, y0, x1, y1] = parcelRect(i, j), h = PARCELS.home; return x0 >= h[0] && x1 <= h[2] && y0 >= h[1] && y1 <= h[3]; }
 const ownsParcel = (i, j) => parcelHome(i, j) || (state.parcels || []).includes(parcelId(i, j));
 const parcelArea = (i, j) => { const [x0, y0, x1, y1] = parcelRect(i, j); return (x1 - x0) * (y1 - y0); };
@@ -29,9 +35,12 @@ function parcelRing(i, j){
   return best;
 }
 const parcelPrice = (i, j) => Math.round(parcelArea(i, j) * (PARCELS.rates[Math.min(parcelRing(i, j), PARCELS.rates.length - 1)]) / 100) * 100;
-const parcelTouches = (i, j) => [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCELS.ys.length - 1 && ownsParcel(i + a, j + b));
+const parcelTouches = (i, j) => !parcelSouth(i, j) && [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCEL_YS.length - 1 && ownsParcel(i + a, j + b));
+const parcelsBought = () => (state.parcels || []).length;
 function parcelProblem(i, j){
   if(ownsParcel(i, j)) return "You already own this land.";
+  if(parcelSouth(i, j)) return "No land is for sale south of the entrance.";
+  if(parcelsBought() >= MAX_PARCELS) return `You own the most land allowed (${MAX_PARCELS} of ${MAX_PARCELS} plots).`;
   if(!parcelTouches(i, j)) return "Not for sale yet. Buy the land next to it first.";
   const cost = parcelPrice(i, j);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -47,7 +56,7 @@ function ownedRects(){
   const key = state.parcels.join("|");
   if(ownedCache && ownedCache.state === state && ownedCache.key === key) return ownedCache.rects;
   const rects = [];
-  for(let j = 0; j < PARCELS.ys.length - 1; j++){
+  for(let j = 0; j < PARCEL_YS.length - 1; j++){
     let run = null;
     for(let i = 0; i < PARCELS.xs.length - 1; i++){
       if(ownsParcel(i, j)){ const r = parcelRect(i, j); if(run) run[2] = r[2]; else run = r.slice(); }
@@ -60,7 +69,7 @@ function ownedRects(){
 const inOwned = (x, y, tol = .5) => ownedRects().some(r => x >= r[0] - tol && x <= r[2] + tol && y >= r[1] - tol && y <= r[3] + tol);
 // The park's outer fence line as segments [[x,y],[x,y]]: cell edges with no owned land on the far side
 function ownedEdges(){
-  const out = [], has = (a, c) => a >= 0 && c >= 0 && a < PARCELS.xs.length - 1 && c < PARCELS.ys.length - 1 && ownsParcel(a, c);
+  const out = [], has = (a, c) => a >= 0 && c >= 0 && a < PARCELS.xs.length - 1 && c < PARCEL_YS.length - 1 && ownsParcel(a, c);
   for(const [i, j] of PARCEL_CELLS){
     if(!ownsParcel(i, j)) continue;
     const [x0, y0, x1, y1] = parcelRect(i, j);
@@ -78,7 +87,7 @@ let derived = null;   // numbers worked out from the saved game, rebuilt when it
 let arrivalCarry = 0; // fractions of a guest carried between frames
 
 // Hooks other files fill in, so the simulation can tell the screen what happened
-const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){}, died(){} };
+const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){}, died(){}, fx(){} };
 
 // Starter species partner parks sell in this park: random picks from each pool
 function pickStarters(){
@@ -92,6 +101,31 @@ function pickStarters(){
 const isStarter = s => !!(state && state.starters && state.starters.includes(s.id));
 // stars the park needs for an animal: none for the starting pool
 const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
+// A new animal's default name: its species tag and a 3-digit counter per species (never reused)
+// Random but roughly balanced: usually the sex its species has fewer of across the park
+function pickSex(sp, st){
+  const s = st || state, n = {male:0, female:0};
+  for(const a of [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
+  if(n.male !== n.female && Math.random() < SEX.balance) return n.male < n.female ? "male" : "female";
+  return Math.random() < .5 ? "male" : "female";
+}
+const sexMark = a => a.sex === "male" ? "M" : a.sex === "female" ? "F" : "";
+// " (2 M, 1 F)" for one species in an exhibit's animal list
+function sexSplit(e, sp){
+  const l = e.animals.filter(a => a.sp === sp && a.sex), m = l.filter(a => a.sex === "male").length;
+  return l.length ? ` <span class="meta">(${m} M, ${l.length - m} F)</span>` : "";
+}
+// Status in the pecking order, 0 (alpha) to 1: luck, DNA quality and being male
+const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 90) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
+function nameAnimal(a, st){
+  if(!a.sex) a.sex = pickSex(a.sp, st);
+  if(a.rank == null) a.rank = pickRank(a);
+  if(!a.face) a.face = Math.random() < .5 ? -1 : 1;   // which way its picture faces to start (1 right, -1 left), kept on the animal
+  if(a.name) return a;
+  const seq = (st || state).animalSeq || ((st || state).animalSeq = {}), n = (seq[a.sp] || 0) + 1;
+  seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
+  return a;
+}
 function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
 
 function freshScience(){
@@ -101,7 +135,7 @@ function freshScience(){
     tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
     projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals ORACLE has unlocked, so GHOST can look for their DNA
-    dna:{},            // species id (or plant DNA id) -> {genome: 0-100, quality: 0-100}
+    dna:{},            // species id (or plant DNA id) -> {genome: 0-100}
     trips:[],          // expeditions in the field: {period, sp, start, end}
     clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
@@ -110,22 +144,23 @@ function freshScience(){
 }
 
 // CERES: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
-function freshCeres(){ return {stock:0, meds:0, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
+function freshCeres(){ return {stock:0, meds:{medpal:0, medmes:0, medcen:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
 // Themes: the one new builds use, and which are unlocked
 function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
+    animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:OPEN_MIN,
+    day:1, minute:DAWN_MIN + 60, clockV:2, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
-    gate:[205,305],
+    gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
-    paths:[{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}],
+    paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
     buildings:[],
-    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
+    science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
 }
@@ -146,11 +181,34 @@ function linesFromTiles(T){
 }
 
 function upgradeSave(s){
+  // the day became a 24 h clock: minute is park minutes since the 4 AM rollover. Old saves counted from opening at 8, so shift by that to keep every science stamp exact.
+  if(s.clockV !== 2){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 2; }
+  if(s.parkClosed === undefined) s.parkClosed = false;
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
+  // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
+  s.paths = (s.paths || []).filter(p => !p.d);
+  if(!s.pathChunks){
+    if(s.pathCells) s.pathChunks = chunksFromCells(s.pathCells);   // from the 1 m cell build: a chunk is path where most of its area was
+    else migratePaths(s);
+    delete s.pathCells; delete s.crossingsV;
+  }
+  if(!s.pathFixed) s.pathFixed = {};
+  // the entrance sits in the middle of a 5 m chunk column, and the entrance walk is that one chunk wide (nothing the player built moves)
+  if(!s.gate || s.gate[0] !== ENTRANCE_X){
+    s.gate = [ENTRANCE_X, s.gate ? s.gate[1] : 305];
+    const m = mainWalkChunks(s.gate);
+    s.pathFixed = m.F;
+    for(const k in m.C) s.pathChunks[k] = "g";
+  } else if(!Object.keys(s.pathFixed).length || Object.keys(s.pathFixed).some(k => !s.pathChunks[k])){
+    const m = mainWalkChunks(s.gate); s.pathFixed = m.F;
+    for(const k in m.C) s.pathChunks[k] = "g";
+  }
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
   if(s.sandbox === undefined) s.sandbox = false;
+  if(s.over === "shutdown") s.over = false;   // the deaths shutdown is gone
+  if(s.debtWarned === undefined) s.debtWarned = false;
   if(!s.fenceGrid) s.fenceGrid = {};
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
@@ -197,6 +255,7 @@ function upgradeSave(s){
   for(const k of ["decor", "water", "fences"]) if(!Array.isArray(s[k])) s[k] = [];
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
+  for(const b of s.buildings) if(BUILDINGS[b.type] && BUILDINGS[b.type].prop && b.rot === undefined) b.rot = 0;   // path objects: 45° turns the player gave them (see propart.js)
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
   if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
   for(const b of s.buildings) if(b.type === "edcenter" && !b.mods) b.mods = [];   // modules and focus, see services.js   // museum attractions, see services.js
@@ -226,7 +285,7 @@ function upgradeSave(s){
   if(!s.safety){ s.safety = freshSafety(); s.safety.escapesFrom = s.day + 3; }
   // parks from before medicine existed get 5 days before animals start falling ill
   if(!s.health){ s.health = freshHealth(); s.health.from = Math.max(HEALTH.startDay, s.day + 5); }
-  if(s.ceres.meds === undefined) s.ceres.meds = 0;
+  if(s.ceres.meds === undefined) s.ceres.meds = {medpal:0, medmes:0, medcen:0};
   // science became timed and per animal. Time periods already unlocked become their animals, and trips and clones keep their finish time.
   const sc = s.science;
   if(!sc.projects){
@@ -240,7 +299,7 @@ function upgradeSave(s){
   if(sc.crew.botanist === undefined) sc.crew.botanist = s.buildings.some(b => b.type === "ceres") ? 1 : 0;
   // plant DNA and medicine refinement became things to collect and research: parks already using them have them
   if(!sc.dna) sc.dna = {};
-  const hasT = id => sc.tech.includes(id), giveDna = era => { for(const f of Object.values(PLANT_DNA)) if(f.era === era && !sc.dna[f.id]) sc.dna[f.id] = {genome:100, quality:90}; };
+  const hasT = id => sc.tech.includes(id), giveDna = era => { for(const f of Object.values(PLANT_DNA)) if(f.era === era && !sc.dna[f.id]) sc.dna[f.id] = {genome:100}; };
   if(hasT("mesoplant")) giveDna("mesozoic");
   if(hasT("paleoplant")) giveDna("paleozoic");
   if(hasT("paleoflora") && !Object.values(PLANT_DNA).some(f => sc.dna[f.id] && sc.dna[f.id].genome >= 100)) giveDna("mesozoic");
@@ -249,6 +308,13 @@ function upgradeSave(s){
   // science jobs moved into bays, one per scientist. Running jobs keep a bay; queued ones and extra incubators are cancelled and paid back.
   let back = 0;
   for(const k of ["projects", "trips", "clones", "log"]) if(!sc[k]) sc[k] = [];
+  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back the GHOST quality upgrades
+  for(const d of Object.values(sc.dna)) delete d.quality;
+  for(const [id, pts] of [["ghostq1", 40], ["ghostq2", 90]]){
+    if(sc.tech.includes(id)){ sc.tech = sc.tech.filter(t => t !== id); sc.points = (sc.points || 0) + pts; }
+    const live = sc.projects.filter(p => p.kind === "tech" && p.id === id);
+    for(const p of live){ sc.points = (sc.points || 0) + (p.cost || pts); sc.projects.splice(sc.projects.indexOf(p), 1); }
+  }
   for(const [kind, jobs] of Object.entries({paleo:sc.projects, temporal:sc.trips, gene:sc.clones, botanist:s.ceres.beds})){
     const n = sc.crew[kind] || 0, taken = new Set(jobs.filter(j => j.bay !== undefined).map(j => j.bay));
     for(const j of jobs.filter(x => x.bay === undefined).sort((a, c) => a.start - c.start)){
@@ -283,12 +349,12 @@ function upgradeSave(s){
     }
   }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
-  if(s.health.cmeds === undefined) s.health.cmeds = 0;
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at CERES moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
+  if(!Array.isArray(s.biomePaint)) s.biomePaint = [];   // ground paint (js/biomepaint.js)
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
   if(s.guestLog.edu === undefined) s.guestLog.edu = null;
@@ -303,8 +369,19 @@ function upgradeSave(s){
     const pmc = s.buildings.find(b => b.type === "pmc");
     if(pmc && s.ceres.meds){ const n = Math.min(s.ceres.meds, BUILDINGS.pmc.store.cap); pmc.store = {meds:n}; s.ceres.meds -= n; }
   }
+  // contemporary medicine used to be a counter the suppliers refilled; now it is stock in the PMC
+  if(s.health.cmeds !== undefined){ const pmc = s.buildings.find(b => b.type === "pmc"); if(pmc && s.health.cmeds > 0){ pmc.store = pmc.store || {}; pmc.store[CMED] = (pmc.store[CMED] || 0) + s.health.cmeds; } delete s.health.cmeds; }
+  // medicine used to be one good. Split what's on hand across the eras ORACLE has researched (else Cenozoic), so nothing is lost.
+  {
+    const eras = Object.keys(MED_TECH).filter(e => s.science.tech.includes(MED_TECH[e])), into = (eras.length ? eras : ["cenozoic"]).map(e => MED_GOOD[e]);
+    const split = (n, put) => { const each = Math.floor(n / into.length); into.forEach((g, i) => put(g, i === 0 ? n - each * (into.length - 1) : each)); };
+    for(const b of s.buildings) if(b.store && b.store.meds !== undefined){ const n = b.store.meds; delete b.store.meds; split(n, (g, v) => { b.store[g] = (b.store[g] || 0) + v; }); }
+    if(typeof s.ceres.meds !== "object" || s.ceres.meds === null){ const n = s.ceres.meds || 0; s.ceres.meds = {medpal:0, medmes:0, medcen:0}; split(n, (g, v) => { s.ceres.meds[g] += v; }); }
+    for(const g of MED_GOODS) if(s.ceres.meds[g] === undefined) s.ceres.meds[g] = 0;
+    for(const r of s.staff.keepers.concat(s.staff.custodians || [])) if(r.carry && r.carry.type === "meds") r.carry.type = into[0];
+  }
   // stock for stands and shops became physical: older parks get a few more days of direct deliveries
-  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor((s.minute - OPEN_MIN) / LOGI.truckMin));
+  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor(s.minute / LOGI.truckMin));
   if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
@@ -314,7 +391,16 @@ function upgradeSave(s){
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   // animals from before behavior get a fresh set of needs (behavior.js)
-  for(const e of s.exhibits) for(const a of e.animals) if(!a.need) a.need = freshNeeds();
+  for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; }   // who is indoors isn't saved: the shelters fill up again as the day goes
+  // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
+  if(!s.animalSeq) s.animalSeq = {};
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
+    for(const a of all) if(a.name) { const m = /^(.*)-(\d+)$/.exec(a.name); if(m && m[1] === a.sp.toUpperCase()) s.animalSeq[a.sp] = Math.max(s.animalSeq[a.sp] || 0, +m[2]); }
+    for(const a of all) if(!a.name) nameAnimal(a, s); }
+  // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
+    for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
+    for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
   return s;
 }
 
@@ -361,8 +447,10 @@ function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
 function connectedPathIds(guestsOnly){
-  const usable = state.paths.filter(p => !isTram(p) && !(guestsOnly && isService(p)));
-  const joined = new Set(), queue = [];
+  // path cells: the derived strips are joined by a flood fill over the cells; any loose line paths join the old way
+  const strips = state.paths.filter(p => p.d), joined = new Set(joinedStrips(guestsOnly)), queue = strips.filter(p => joined.has(p.id));
+  const usable = state.paths.filter(p => !p.d && !isTram(p) && !(guestsOnly && isService(p)));
+  if(!usable.length) return joined;
   for(const p of usable) if(p.points.some(v => dist(v, state.gate) < 2)){ joined.add(p.id); queue.push(p); }
   const touches = (p, q) => p.points.some(v => q.points.some((w,i) => i>0 && segProj(v[0], v[1], q.points[i-1], w).d < 1.5));
   while(queue.length){
@@ -469,14 +557,18 @@ function exhibitReport(e){
 
 // Rebuild all the worked-out numbers. Called whenever the park changes.
 function recompute(){
+  syncPathStrips();
   updatePower();
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);
-  const guestPaths = state.paths.filter(p => joined.has(p.id)), anyPaths = state.paths.filter(p => joinedAll.has(p.id));
-  const near = (shape, list) => list.some(p => lineShapeDist(p.points, shape) <= REACH);
+  const loose = p => !p.d && !isTram(p);   // loose lines (tests push them) still count the old way; cells are done by nearCells
+  const guestPaths = state.paths.filter(p => joined.has(p.id) && loose(p)), anyPaths = state.paths.filter(p => joinedAll.has(p.id) && loose(p));
+  // path cells: a shape is on the path when it is within REACH of a path's middle, which is REACH - 2.5 m (half the width) from its edge
+  const nearG = shape => nearCells(shape, REACH - PATH_HALF_WIDTH, true), nearA = shape => nearCells(shape, REACH - PATH_HALF_WIDTH, false);
+  const near = (shape, list, staff) => (staff ? nearA : nearG)(shape) || list.some(p => lineShapeDist(p.points, shape) <= REACH);
   const reach = {}, reports = {}, themes = {};
   // Guests reach exhibits and shops by footpath. Staff reach backstage buildings by footpath or service road.
-  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
-  for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths);
+  for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths, false); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
+  for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths, !!BUILDINGS[b.type].dept);
 
   // How much guests want to visit
   let appeal = 0, animals = 0, happySum = 0;
@@ -499,7 +591,7 @@ function recompute(){
 
   // How well the park looks after its guests: how happy they are when they leave.
   // Before anyone has left, guess from how many food stands and restrooms there are.
-  const cap = need => state.buildings.filter(b => reach[b.id] && servesOf(b).includes(need)).reduce((s, b) => s + BUILDINGS[b.type].slots * (CLOSE_MIN - OPEN_MIN) / BUILDINGS[b.type].serveMin * 2.5, 0);
+  const cap = need => state.buildings.filter(b => reach[b.id] && servesOf(b).includes(need)).reduce((s, b) => s + BUILDINGS[b.type].slots * DAY_MIN / BUILDINGS[b.type].serveMin * 2.5, 0);
   const last = state.history.length ? state.history[state.history.length-1].guests : 0;
   const ref = Math.max(last, demand);
   const cover = c => ref > 0 ? Math.min(1, c / ref) : (c > 0 ? 1 : 0);
@@ -545,8 +637,18 @@ const goalApi = { get state(){ return state; }, isReachable, speciesShown };
 // Sandbox mode (state.sandbox, toggled in the park office): everything is free and money never drops
 const SANDBOX_MONEY = 999999999, SANDBOX_POINTS = 999999;
 function canAfford(cost){ return state.sandbox || state.money >= cost; }
-function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; }
-function earn(amount, kind){ state.money += amount; state.today[kind] += amount; }
+function spend(cost, kind){ if(!state.sandbox) state.money -= cost; state.today[kind] += cost; checkBankrupt(); }
+function earn(amount, kind){ if(!state.sandbox) state.money += amount; state.today[kind] += amount; }
+// Bankruptcy is the only game over: debt past BANKRUPT. One warning at half of it.
+function checkBankrupt(){
+  if(state.sandbox || state.over) return;
+  if(state.money <= -BANKRUPT){ state.over = true; events.gameOver(); return; }
+  if(state.money > -BANKRUPT / 2) state.debtWarned = false;
+  else if(!state.debtWarned){
+    state.debtWarned = true;
+    events.toast(`Careful: you're ${money(-state.money)} in debt. The park goes bankrupt at ${money(BANKRUPT)}.`, "bad");
+  }
+}
 
 function exhibitCost(pts, barrier){ return Math.round(perimeter(pts) * fenceRate(barrier || "wood") + area(pts) * COST.landPerSqM); }
 function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "service" ? SERVICE_ROAD.perMeter : type === "wide" ? WIDE_PATH.perMeter : type === "tram" ? TRAM.perMeter : type === "bridge" ? BRIDGE.perMeter : COST.pathPerMeter)); }
@@ -567,10 +669,21 @@ function refundFor(kind, item){
 
 let sinceRecompute = 0;
 
-// Move the park forward by dtMin park minutes
+// Move the park forward by dtMin park minutes. A big step is cut at the daily rollover (the rest carries into the next day, not lost)
+// and at the next science job's end, so every job finishes at the minute its `end` passes, however long the step is.
 function tick(dtMin){
   if(state.over) return;
-  const m0 = state.minute, m1 = Math.min(CLOSE_MIN, m0 + dtMin);
+  if(!(dtMin > 0)) return tickStep(dtMin);
+  let left = dtMin;
+  for(let guard = 0; left > 1e-9 && !state.over && guard < 5000; guard++){
+    let st = Math.min(left, DAY_MIN - state.minute);
+    const next = scienceNext();
+    if(next > 1e-6 && next < st) st = next;
+    tickStep(st); left -= st;
+  }
+}
+function tickStep(dtMin){
+  const m0 = state.minute, m1 = Math.min(DAY_MIN, m0 + dtMin);
   state.minute = m1;
 
   sinceRecompute += m1 - m0;
@@ -603,7 +716,7 @@ function tick(dtMin){
   // Guests arrive, walk around, eat, and go home
   guestsTick(m0, m1);
 
-  if(m1 >= CLOSE_MIN) endDay();
+  if(m1 >= DAY_MIN) endDay();
 }
 
 function dailyCosts(){
@@ -613,7 +726,8 @@ function dailyCosts(){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
     upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
   }
-  for(const p of state.paths) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
+  for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
+  for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
@@ -640,7 +754,6 @@ function deptProblem(type){
 function logScience(text, ok){ state.science.log.unshift({day:state.day, text, ok}); state.science.log.length = Math.min(state.science.log.length, 8); }
 
 function endDay(){
-  flushParties();
   recompute();
 
   const c = dailyCosts();
@@ -682,11 +795,12 @@ function endDay(){
   for(const e of state.exhibits) if(e.animals.length && e.happy < 30) events.toast(`${e.name}: the animals are unhappy. Tap the exhibit to see why.`, "bad");
 
   state.day++;
-  state.minute = OPEN_MIN;
+  state.minute = 0;
+  shiftStamps(DAY_MIN);
   state.today = freshLedger();
   checkGoals();
 
-  if(state.money < -25000){ state.over = true; events.gameOver(); }
+  checkBankrupt();
   recompute();
   events.dayEnded(report);
   events.changed();
@@ -694,16 +808,16 @@ function endDay(){
 
 /* ---------- goals ---------- */
 
-function currentGoal(){ return GOALS.find(g => !state.goalsDone.includes(g.id)) || null; }
+function currentGoal(){ return activeGoals().find(g => !state.goalsDone.includes(g.id)) || null; }
 function checkGoals(){
   if(!derived) recompute();
   checkThemes();
-  for(const g of GOALS){
+  for(const g of activeGoals()){
     if(state.goalsDone.includes(g.id)) continue;
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);
       if(g.reward) earn(g.reward, "rewards");
-      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${g.statue ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
+      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${grantStatue(g) ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
     }
   }
   checkThemes();   // a grant can unlock a theme
@@ -711,8 +825,24 @@ function checkGoals(){
 
 /* ---------- formatting shared by the screen ---------- */
 
+// Hidden dev-mode switch. Lives in localStorage only, never in `state`, so a shared save can't carry it.
+function devMode(){ try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
 function money(n){ const s = "$" + Math.abs(Math.round(n)).toLocaleString(); return n < 0 ? "−" + s : s; }
 function fmtArea(m2){ return `${Math.round(m2).toLocaleString()} m²`; }
+// state.day to a calendar date: {d, m (1 based), y}, and "3 Mar Y2" for the HUD and logs. Days before 1 count as day 1.
+function dateOf(day){
+  const n = Math.max(0, Math.floor(day) - 1), dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length;
+  return {d:n % dpm + 1, m:Math.floor(n / dpm) % mpy + 1, y:CALENDAR.startYear + Math.floor(n / (dpm * mpy))};
+}
+function fmtDate(day){ const t = dateOf(day); return `${t.d} ${CALENDAR.months[t.m - 1]} Y${t.y}`; }
+// The 24 h clock, in clock minutes of the day, for a state.minute (park minutes since the rollover), and back
+const clockMin = (m = state.minute) => (ROLLOVER_CLOCK + m * CLOCK_SCALE) % 1440;
+const minuteAtClock = c => (((c - ROLLOVER_CLOCK) % 1440) + 1440) % 1440 / CLOCK_SCALE;
+// How dark it is, 0 (day) to NIGHT.dark (night), in steps so the map overlay only changes now and then. Dusk and dawn each fade over NIGHT.fade clock hours.
+function nightDark(c = clockMin()){
+  const h = c / 60, f = NIGHT.fade, d = Math.max(0, Math.min(1, h < DAWN_CLOCK / 60 + f ? (DAWN_CLOCK / 60 + f - h) / f : h >= DUSK_CLOCK / 60 - f ? (h - (DUSK_CLOCK / 60 - f)) / f : 0));
+  return Math.round(d * NIGHT.dark * 40) / 40;
+}
 function fmtClock(min){
   const h = Math.floor(min / 60), m = Math.floor(min % 60);
   const h12 = ((h + 11) % 12) + 1;

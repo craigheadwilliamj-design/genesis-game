@@ -29,8 +29,8 @@ const lineDist = (x, y, line) => { let m = Infinity; for(let i = 1; i < line.len
 const linesCross = (a, b) => { for(let i = 1; i < a.length; i++) for(let j = 1; j < b.length; j++) if(segCross(a[i-1], a[i], b[j-1], b[j])) return true; return false; };
 const lineLineDist = (a, b) => { let m = Infinity; for(let i = 1; i < a.length; i++) for(let j = 1; j < b.length; j++) m = Math.min(m, segSegDist(a[i-1], a[i], b[j-1], b[j])); return m; };
 // Statues: a few are open from the start, the rest come with grants
-const statueGrant = key => GOALS.find(g => g.statue && "st-" + g.statue === key) || null;
-const statueOpen = key => { const t = LAND[key]; if(!t || !t.statue) return true; if(t.free) return true; const g = statueGrant(key); return !!g && state.goalsDone.includes(g.id); };
+const statueGrant = key => !statuesOn() ? null : GOALS.find(g => g.statue && "st-" + g.statue === key) || null;
+const statueOpen = key => { const t = LAND[key]; if(!t || !t.statue) return true; if(!statuesOn()) return false; if(t.free) return true; const g = statueGrant(key); return !!g && state.goalsDone.includes(g.id); };
 const statueHint = key => { const g = statueGrant(key); return g ? `Earn it with the grant "${g.text}".` : ""; };
 const circlePts = (x, y, r, n = 14) => Array.from({length:n}, (_, i) => [x + r * Math.cos(i * 2 * Math.PI / n), y + r * Math.sin(i * 2 * Math.PI / n)]);
 const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
@@ -64,7 +64,7 @@ function spriteHitPath(name, x, y, k){
 }
 const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
 // The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome
-const biomeOf = e => BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;
+const biomeOf = e => { const b = paintedBiome(e); return BIOMES[b] ? b : DEFAULT_BIOME; };   // open exhibits: the biome with the most ground, painted or not (js/biomepaint.js)
 function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l[0] === b ? "home" : l.includes(b) ? "near" : "away"; }
 const regradeCost = (e, b) => Math.round(area(e.points) * BIOMES[b].perSqM);
 function regradeProblem(e, b){
@@ -244,20 +244,45 @@ function habitatScore(e){
 function insideFence(pts, fence, m){
   for(let i = 0; i < pts.length; i++){
     const a = pts[i], b = pts[(i + 1) % pts.length];
-    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!deepInside(x, y, fence, m)) return false; }
+    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!(m > 0 ? deepInside(x, y, fence, m) : inPoly(x, y, fence) || distToEdge(x, y, fence) < .02)) return false; }   // m 0: the shore may sit right on the fence
   }
-  return !fence.some(p => inPoly(p[0], p[1], pts));
+  return !fence.some(p => inPoly(p[0], p[1], pts) && distToEdge(p[0], p[1], pts) > .02);
+}
+// Water drawn as chunk boxes is an axis-aligned rectangle: [x0, y0, x1, y1], else null
+function rectOfPts(p){
+  if(p.length !== 4) return null;
+  const sq = (p[0][0] === p[1][0] && p[1][1] === p[2][1] && p[2][0] === p[3][0] && p[3][1] === p[0][1]) || (p[0][1] === p[1][1] && p[1][0] === p[2][0] && p[2][1] === p[3][1] && p[3][0] === p[0][0]);
+  return sq ? [Math.min(p[0][0], p[2][0]), Math.min(p[0][1], p[2][1]), Math.max(p[0][0], p[2][0]), Math.max(p[0][1], p[2][1])] : null;
+}
+// Do two water shapes overlap? Two rectangles that only share an edge don't.
+function waterHit(a, b){
+  const ra = rectOfPts(a), rb = rectOfPts(b);
+  return ra && rb ? rectOverlap(ra, rb) : shapesOverlap(a, b) || shapesOverlap(b, a);
+}
+// Join a new rectangle of water to a neighbouring one of the same width or height in the same place, so the shore has no seam
+function mergeWater(e, w){
+  const list = e ? e.water : state.water;
+  for(let again = true; again;){
+    again = false;
+    const rw = rectOfPts(w.points); if(!rw) return w;
+    for(const o of list){
+      const ro = o !== w && o.kind === w.kind && rectOfPts(o.points), u = ro && paintUnion(ro, rw); if(!u) continue;
+      o.points = [[u[0], u[1]], [u[2], u[1]], [u[2], u[3]], [u[0], u[3]]]; list.splice(list.indexOf(w), 1); w = o; again = true; break;
+    }
+  }
+  return w;
 }
 // The open exhibit a new body of water starts in (null: out in the park)
 const waterHost = pts => pts.length ? state.exhibits.find(e => !e.viv && inPoly(pts[0][0], pts[0][1], e.points)) || null : null;
 // Why this water shape won't work in exhibit e (or out in the park, with no e), or null. skip is the water being reshaped; cost is what it would cost now.
-function waterProblem(pts, e, skip, cost){
+// over: laying a new box of water, which may go over water already there (it covers it, like paint).
+function waterProblem(pts, e, skip, cost, over){
   if(pts.length < 3) return "Needs at least 3 corners.";
-  if(!e) return parkWaterProblem(pts, skip, cost);
+  if(!e) return parkWaterProblem(pts, skip, cost, over);
   if(selfCrosses(pts)) return "The shore crosses itself.";
   if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";
   if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
-  if(waterOf(e).some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
+  if(!over && waterOf(e).some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && shapesOverlap(circlePts(f.x, f.y, footR(LAND[f.type])), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
@@ -265,25 +290,55 @@ function waterProblem(pts, e, skip, cost){
   return null;
 }
 // Water out in the park: clear of exhibits, buildings and paths (a wooden bridge can cross it), and of plants that don't like their feet wet
-function parkWaterProblem(pts, skip, cost){
+function parkWaterProblem(pts, skip, cost, over){
   if(selfCrosses(pts)) return "The shore crosses itself.";
   if(!insidePlot(pts, true)) return "Keep it inside the park boundary.";
   if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
   if(state.exhibits.some(e => shapesOverlap(pts, e.points) || shapesOverlap(e.points, pts))) return "It runs into an exhibit. Draw water for the animals inside the fence.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points) || shapesOverlap(b.points, pts))) return "It runs into a building.";
   if(state.paths.some(p => !isBridge(p) && lineShapeDist(p.points, pts) < halfWidth(p))) return "It runs into a path. Only a wooden bridge can cross water.";
-  if(parkWater().some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
+  if(!over && parkWater().some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .6))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(inPoly(state.gate[0], state.gate[1], pts) || distToEdge(state.gate[0], state.gate[1], pts) < 9) return "Keep clear of the entrance.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
 }
-function addWater(e, pts){
-  spend(waterCost(pts), "built");
+function addWater(e, pts, kind, cost){
+  spend(cost === undefined ? waterCost(pts) : cost, "built");
   const w = {id:uid("w-"), points:pts};
+  if(kind) w.kind = kind;   // the water's look (a WATER_TEX key); none means the biome it sits in
   if(e) (e.water = e.water || []).push(w); else (state.water = state.water || []).push(w);
   return w;
+}
+// Water works like ground paint: a new box covers what is under it. Older boxes are cut around it (so boxes never overlap),
+// and only the area that wasn't already the same water is paid for. kind undefined = the biome's own water.
+const waterList = e => e ? (e.water = e.water || []) : (state.water = state.water || []);
+const rectPtsOf = r => [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]];
+function waterNetCost(e, pts, kind){
+  const r = rectOfPts(pts); if(!r) return waterCost(pts);
+  let same = 0;
+  for(const o of waterList(e)){
+    const q = rectOfPts(o.points); if(!q || o.kind !== kind) continue;
+    same += Math.max(0, Math.min(r[2], q[2]) - Math.max(r[0], q[0])) * Math.max(0, Math.min(r[3], q[3]) - Math.max(r[1], q[1]));
+  }
+  return Math.round(Math.max(0, area(pts) - same) * WATER.perSqM);
+}
+// Is every part of this box already that water? (nothing to lay)
+function waterCovered(e, pts, kind){ const r = rectOfPts(pts); return !!r && waterNetCost(e, pts, kind) === 0; }
+function layWater(e, pts, kind){
+  const r = rectOfPts(pts), cost = waterNetCost(e, pts, kind), list = waterList(e);
+  if(r) for(const o of list.slice()){
+    const q = rectOfPts(o.points); if(!q || !rectOverlap(q, r)) continue;
+    const y0 = Math.max(q[1], r[1]), y1 = Math.min(q[3], r[3]);
+    const top = [q[0], q[1], q[2], Math.max(q[1], r[1])], bottom = [q[0], Math.min(q[3], r[3]), q[2], q[3]];   // above and below the new box, full width
+    const pieces = [top, bottom, [q[0], y0, Math.max(q[0], r[0]), y1], [Math.min(q[2], r[2]), y0, q[2], y1]].filter(p => p[2] - p[0] > 0 && p[3] - p[1] > 0);
+    const at = list.indexOf(o);
+    if(!pieces.length){ list.splice(at, 1); continue; }
+    o.points = rectPtsOf(pieces[0]);
+    list.splice(at + 1, 0, ...pieces.slice(1).map(p => ({id:uid("w-"), points:rectPtsOf(p), ...(o.kind ? {kind:o.kind} : {})})));
+  }
+  return mergeWater(e, addWater(e, pts, kind, cost));
 }
 const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(e)) if(w.id === id) return {e, w}; const w = parkWater().find(x => x.id === id); return w ? {e:null, w} : null; };
 
@@ -427,6 +482,7 @@ function landProblem(e, key, x, y){
   if(t.aquatic && !waterOf(e).some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Place it in the exhibit's water.`;
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && Math.hypot(e.gate[0] - x, e.gate[1] - y) < r + 3) return "Keep clear of the gate.";
+  if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
@@ -441,8 +497,8 @@ function landSpot(x, y, key){
 function decorProblem(key, x, y){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  if(t.slots || t.tray || t.toy || t.toyFor) return "Habitat props go inside an open exhibit.";
-  if(t.statue && !statueOpen(key)) return `${t.label} is locked. ${statueHint(key)}`;
+  if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
+  if(t.statue && !statueOpen(key)) return statuesOn() ? `${t.label} is locked. ${statueHint(key)}` : "Statues aren't available yet.";
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
@@ -460,16 +516,17 @@ function decorProblem(key, x, y){
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
-function placeLand(e, key, x, y, biome){
+function placeLand(e, key, x, y, biome, pic){
   const t = LAND[key];
   spend(t.price, "built");
   if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
   if(t.ceres) state.ceres.stock = Math.max(0, state.ceres.stock - t.ceres);
   const f = {id:uid("l-"), type:key, x, y};
   if(biome && !t.flora && !t.slots && !t.tray && !t.statue) f.biome = biome;   // a rock keeps the stone color of the biome it was bought under
+  if(pic != null && ROCK_SPRITES[biome || (e ? biomeOf(e) : parkBiome())] && (ROCK_SPRITES[biome || (e ? biomeOf(e) : parkBiome())][key] || [])[pic]) f.pic = pic;   // a chosen rock shape; none means random by id
   if(e){ (e.land = e.land || []).push(f); return f; }
   // a statue's plinth is paved in the theme where it stands (its zone's, or the brush)
-  if(t.statue){ const z = themedZoneAt({points:[[x, y]]}), k = z ? z.theme : state.themes && state.themes.brush; if(k && k !== "genesis" && THEMES[k] && themeHave(k)) f.theme = k; }
+  if(t.statue && devMode()){ const z = themedZoneAt({points:[[x, y]]}), k = z ? z.theme : state.themes && state.themes.brush; if(k && k !== "genesis" && THEMES[k] && themeHave(k)) f.theme = k; }
   (state.decor = state.decor || []).push(f);
   return f;
 }
@@ -498,48 +555,86 @@ const WATER_TEX = {
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
   desert:   {damp:"#CDB178", mud:"#B89A60", lit:"#7CCFC0", dark:"#2C7C86"},
+  grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},
   tropical: {damp:"#0A3A14", mud:"#4A3520", lit:"#3FC2A8", dark:"#0A5A5C"},
+  tundra:   {damp:"#C6CFBD", mud:"#E6EEEE", lit:"#9CD0DC", dark:"#4A8294"},
+  boreal:   {damp:"#4A6A52", mud:"#3A3830", lit:"#A8C6C8", dark:"#2A4854"},
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.
+// polys is every body of water that shares a shore (all of an exhibit's, or all of the park's): their runs are joined row by row, so shapes that touch or overlap
+// become one lake with a single shoreline and no wall between them.
 const waterMasks = new Map();
-function waterMask(points){
-  const key = points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); let m = waterMasks.get(key); if(m) return m;
-  const P = ROCK_MPP, ys = points.map(p => p[1]), r0 = Math.floor(Math.min(...ys) / P), r1 = Math.ceil(Math.max(...ys) / P), rows = new Map();
-  for(let r = r0; r <= r1; r++){
-    const cy = (r + .5) * P, xs = [];
-    for(let i = 0; i < points.length; i++){ const [ax, ay] = points[i], [bx, by] = points[(i + 1) % points.length]; if((ay <= cy) !== (by <= cy)) xs.push(ax + (cy - ay) / (by - ay) * (bx - ax)); }
-    xs.sort((p, q) => p - q); const runs = [];
-    for(let i = 0; i + 1 < xs.length; i += 2){ const a = Math.ceil(xs[i] / P - .5), b = Math.ceil(xs[i + 1] / P - .5); if(b > a) runs.push([a, b]); }
-    rows.set(r, runs);
+// items are the textured boxes {points, kind}; each kind (a WATER_TEX key) is drawn in its own texture. Boxes of one kind that touch are joined row by row,
+// and the shoreline (lit and dark rims, mud and damp banks) is cut against ALL the water, so water touching water of any kind has no border between it.
+// Returns {kinds, by:{kind:{body, lit, dark, mud, damp}}}.
+function waterMask(items){
+  const key = items.map(it => it.kind + ":" + it.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ")).join("|"); let m = waterMasks.get(key); if(m) return m;
+  const P = ROCK_MPP, ys = items.flatMap(it => it.points.map(p => p[1])), r0 = Math.floor(Math.min(...ys) / P), r1 = Math.ceil(Math.max(...ys) / P);
+  const join = runs => { runs.sort((p, q) => p[0] - q[0]); const out = []; for(const s of runs){ const t = out[out.length - 1]; if(t && s[0] <= t[1]) t[1] = Math.max(t[1], s[1]); else out.push([...s]); } return out; };
+  const kinds = [...new Set(items.map(it => it.kind))], rowsOf = {}, all = new Map();
+  for(const k of kinds){
+    const rows = new Map(), polys = items.filter(it => it.kind === k).map(it => it.points);
+    for(let r = r0; r <= r1; r++){
+      const cy = (r + .5) * P, runs = [];
+      for(const points of polys){
+        const xs = [];
+        for(let i = 0; i < points.length; i++){ const [ax, ay] = points[i], [bx, by] = points[(i + 1) % points.length]; if((ay <= cy) !== (by <= cy)) xs.push(ax + (cy - ay) / (by - ay) * (bx - ax)); }
+        xs.sort((p, q) => p - q);
+        for(let i = 0; i + 1 < xs.length; i += 2){ const a = Math.ceil(xs[i] / P - .5), b = Math.ceil(xs[i + 1] / P - .5); if(b > a) runs.push([a, b]); }
+      }
+      rows.set(r, join(runs));
+    }
+    rowsOf[k] = rows;
   }
+  for(let r = r0; r <= r1; r++) all.set(r, join(kinds.flatMap(k => rowsOf[k].get(r).map(s => [...s]))));
+  const covered = (r, x) => (all.get(r) || []).some(([a, b]) => x >= a && x < b);
   const minus = (run, others) => { let out = [run]; for(const [oa, ob] of others) out = out.flatMap(([a, b]) => oa >= b || ob <= a ? [[a, b]] : [[a, Math.min(b, oa)], [Math.max(a, ob), b]].filter(([x, y]) => y > x)); return out; };
   const rect = (a, b, r) => `M${(a * P).toFixed(3)} ${(r * P).toFixed(3)}h${((b - a) * P).toFixed(3)}v${P}h${(-(b - a) * P).toFixed(3)}z`;
-  const dilate = d => { const out = new Map(); for(let r = r0 - d; r <= r1 + d; r++){
+  const dilate = (rows, d) => { const out = new Map(); for(let r = r0 - d; r <= r1 + d; r++){
     const spans = []; for(let k = r - d; k <= r + d; k++) for(const [a, b] of rows.get(k) || []) spans.push([a - d, b + d]);
-    spans.sort((p, q) => p[0] - q[0]); const merged = []; for(const s of spans){ const t = merged[merged.length - 1]; if(t && s[0] <= t[1]) t[1] = Math.max(t[1], s[1]); else merged.push([...s]); }
-    out.set(r, merged); } return out; };
+    out.set(r, join(spans)); } return out; };
   const paint = map => { let s = ""; for(const [r, runs] of map) for(const [a, b] of runs) s += rect(a, b, r); return s; };
-  let body = "", lit = "", dark = "";
-  for(const [r, runs] of rows) for(const run of runs){
-    const [a, b] = run; body += rect(a, b, r);
-    for(const [x, y] of minus(run, rows.get(r - 1) || [])) lit += rect(x, y, r);
-    for(const [x, y] of minus(run, rows.get(r + 1) || [])) dark += rect(x, y, r);
-    lit += rect(a, a + 1, r); dark += rect(b - 1, b, r);
+  const by = {};
+  for(const k of kinds){
+    const rows = rowsOf[k]; let body = "", lit = "", dark = "";
+    for(const [r, runs] of rows) for(const [a, b] of runs){
+      body += rect(a, b, r);
+      for(const [x, y] of minus([a, b], all.get(r - 1) || [])) lit += rect(x, y, r);    // top edge, only where no water of any kind is above
+      for(const [x, y] of minus([a, b], all.get(r + 1) || [])) dark += rect(x, y, r);  // bottom edge, likewise
+      if(!covered(r, a - 1)) lit += rect(a, a + 1, r);                                  // left and right ends, only against dry ground
+      if(!covered(r, b)) dark += rect(b - 1, b, r);
+    }
+    by[k] = {body, lit, dark, mud:paint(dilate(rows, 2)), damp:paint(dilate(rows, 3))};
   }
-  m = {body, lit, dark, mud:paint(dilate(2)), damp:paint(dilate(3))}; waterMasks.set(key, m); if(waterMasks.size > 200) waterMasks.delete(waterMasks.keys().next().value);
+  m = {kinds, by}; waterMasks.set(key, m); if(waterMasks.size > 200) waterMasks.delete(waterMasks.keys().next().value);
   return m;
 }
-function waterSvg(w, pick, isDead, biome){
-  const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
-  if(WATER_TEX[biome]){
-    const m = waterMask(w.points), tx = WATER_TEX[biome];
-    return `<g${pickAt(pick, "water", w.id)} shape-rendering="crispEdges"><path d="${m.damp}" fill="${tx.damp}"/><path d="${m.mud}" fill="${tx.mud}"/><path d="${m.body}" fill="url(#w-${biome})"/><path d="${m.lit}" fill="${tx.lit}"/><path d="${m.dark}" fill="${tx.dark}"/>`
-      + (dead ? `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` : "") + `</g>`;
+// All the water of one exhibit (or of the park). A box's look is its own kind (the water type picked when it was laid), else the biome it sits in.
+// Textured water is drawn as ONE body: touching boxes share a shoreline, while bulldoze still picks them one box at a time (an invisible hit shape each)
+// and a doomed box gets its red outline.
+function watersSvg(list, pick, isDead, biome){
+  if(!list.length) return "";
+  const items = [], flat = [];
+  for(const w of list){ const k = WATER_TEX[w.kind] ? w.kind : WATER_TEX[biome] ? biome : null; if(k) items.push({w, kind:k, points:w.points}); else flat.push(w); }
+  let s = flat.map(w => flatWaterSvg(w, pick, isDead)).join("");
+  if(!items.length) return s;
+  const m = waterMask(items), T = WATER_TEX, layer = (part, fill) => m.kinds.map(k => `<path d="${m.by[k][part]}" fill="${fill(k)}"/>`).join("");
+  s += `<g pointer-events="none" shape-rendering="crispEdges">` + layer("damp", k => T[k].damp) + layer("mud", k => T[k].mud) + layer("body", k => `url(#w-${k})`)
+    + layer("lit", k => T[k].lit) + layer("dark", k => T[k].dark) + `</g>`;
+  if(pick) for(const {w} of items){
+    const pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "), dead = isDead("water", w.id);
+    s += `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="#000" fill-opacity="0"${dead ? ` stroke="var(--bad)" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"` : ""}/></g>`;
   }
+  return s;
+}
+function flatWaterSvg(w, pick, isDead){
+  const dead = pick && isDead("water", w.id), pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
   return `<g${pickAt(pick, "water", w.id)}><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="${dead ? "var(--bad)" : "#2F6F9F"}" stroke-width="${dead ? 3 : 1.5}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
     + `<polygon points="${pts}" fill="none" stroke="#7DB6DD" stroke-opacity=".7" stroke-width="2.5" stroke-linejoin="round" transform="translate(${centroid(w.points).map(c => c * .12).join(" ")}) scale(.88)"/></g>`;
 }
+// One body of water, in an exhibit or out in the park
+const waterSvg = (w, pick, isDead, biome) => watersSvg([w], pick, isDead, biome);
 // A plant seen from above, by its look (LAND[x].look): a leafy clump unless it says otherwise, dotted with its blossoms or fall color
 function plantSvg(f, t, edge, sw){
   const sd = seedOf(f), rnd = rngOf(sd ^ 0x9E37), r = t.r, x = f.x, y = f.y, ns = `vector-effect="non-scaling-stroke"`, n2 = v => v.toFixed(2);
@@ -609,14 +704,21 @@ const hitShape = (name, x, y, k, pick, dead) => pick || dead ? `<path d="${sprit
 function plantSpriteSvg(f, t, S, dead, pick){
   const w = t.r * 2 * (S.size || 1), ht = w / S.ratio, flip = seedOf(f) & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + ht * .05 : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .06)}" cy="${n2(f.y)}" rx="${n2(w * .38)}" ry="${n2(w * .12)}" fill="#1D2B22" fill-opacity=".2"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/plants/${t.key}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(t.key, x, y, w / SPRITE_HIT[t.key][0], pick, dead)}</g>`;
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="${spriteUrl(`sprites/plants/${t.key}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(t.key, x, y, w / SPRITE_HIT[t.key][0], pick, dead)}</g>`;
 }
 // A rock or boulder from its picture (ROCK_SPRITES): a soft shadow, then the stone sitting on its spot, one of the biome's shapes picked and flipped by its id
 const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biome] || {})[f.type];
+// The shape the player picked in the build menu for rocks and boulders (null: random, by id). f.pic on a placed rock is its picture's index; old rocks have none and keep the id-based pick.
+const rockPick = {rock:null, boulder:null};
+// The biome a rock is being placed under: the biome tab it was picked from, the build menu's biome pick, the exhibit under the cursor, or the park's
+let rockBiomeMenu = null;   // stone biome chosen in the build menu's Rock and Boulder pickers (null: the exhibit's, or the park's)
+const rockBiomeNow = () => rockBiome || rockBiomeMenu || (landGhost && landGhost.e ? biomeOf(landGhost.e) : parkBiome());
+// The picked picture's index for this kind of rock, or null when it's random or the biome has fewer pictures than that
+function rockPicOf(type, biome){ const n = rockPick[type], l = (ROCK_SPRITES[biome] || {})[type]; return l && n != null && n < l.length ? n : null; }
 function rockSpriteSvg(f, list, biome, dead, pick){
-  const sd = seedOf(f), i = sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
+  const sd = seedOf(f), i = f.pic != null && f.pic >= 0 && f.pic < list.length ? f.pic : sd % list.length, [pw, ph] = list[i], b = BIOMES[f.biome] ? f.biome : biome, w = pw * ROCK_MPP, ht = ph * ROCK_MPP, flip = sd >> 5 & 1 ? -1 : 1, up = tilted(), x = f.x - w / 2, y = up ? f.y - ht + 4 * ROCK_MPP : f.y - ht / 2, n2 = v => v.toFixed(2);
   return (up ? `<ellipse cx="${n2(f.x + w * .08)}" cy="${n2(f.y + .1)}" rx="${n2(w * .46)}" ry="${n2(w * .13)}" fill="#1D2B22" fill-opacity=".22"/>` : "")
-    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="sprites/rocks/${f.type}-${b}-${i + 1}.png" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
+    + `<g transform="translate(${n2(f.x)} 0) scale(${flip} 1) translate(${n2(-f.x)} 0)"><image href="${spriteUrl(`sprites/rocks/${f.type}-${b}-${i + 1}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(ht)}"/>${hitShape(`${f.type}-${b}-${i + 1}`, x, y, ROCK_MPP, pick, dead)}</g>`;
 }
 // A statue: a stone plinth paved like its theme's paths, and a bronze disc with the animal's letter (the size of its dot on the map) or the person's initials
 function statueSvg(f, t, edge, dead){
@@ -669,6 +771,19 @@ function shelter34(f, t, edge, sw){
   return `<polygon points="${polyStr(P.map(([a, b]) => [a + wall*.3, b + wall*.25]))}" fill="#1D2B22" fill-opacity=".2"/>` + w.s
     + (w.main >= 0 ? quad34(P, w.main, .18, .82, 0, wall * .85, "#2A211A") : "") + hipRoof34(P, wall, t.r * .45, "#6B5A44", null, line, "ns", t.color);
 }
+// a privacy screen: a woven reed panel on two posts, flat pixel style (light from the top left: lit left edges, dark gaps between canes, lashings and a shadow under it)
+function screen34(f, t, dead){
+  const px = ROCK_MPP, q = v => Math.round(v / px + 1e-4) * px, hw = q(t.r * (f.k || 1)), hy = q(2.2 / TILT), x0 = q(f.x - hw), x1 = x0 + hw * 2, yb = q(f.y), yt = yb - hy, n2 = v => v.toFixed(2);
+  const R = (a, b, c, d, fill, o) => `<rect x="${n2(a)}" y="${n2(c)}" width="${n2(b - a)}" height="${n2(d - c)}" fill="${fill}"${o ? ` fill-opacity="${o}"` : ""}/>`;
+  const reed = ["#A7B461", "#8C9A4B", "#6B7838"], wood = ["#8A6538", "#6A4A2B", "#4A311B"];
+  let s = R(x0 + px * 2, x1 + px * 4, yb - px, yb + px * 2, "#1D2B22", ".22");
+  for(let x = x0 + px * 2; x + px * 3 <= x1 - px * 2; x += px * 3){ s += R(x, x + px * 2, yt + px * 2, yb, reed[1]) + R(x, x + px, yt + px * 2, yb, reed[0]) + R(x + px * 2, x + px * 3, yt + px * 2, yb, reed[2]); }
+  for(const g of [.34, .68]) s += R(x0, x1, q(yb - hy * g), q(yb - hy * g) + px, wood[1]);
+  s += R(x0, x1, yt, yt + px * 2, wood[0]) + R(x0, x1, yt + px * 2, yt + px * 3, wood[2]);
+  for(const x of [x0, x1 - px * 2]) s += R(x, x + px * 2, yt - px * 2, yb, wood[1]) + R(x, x + px, yt - px * 2, yb, wood[0]) + R(x + px, x + px * 2, yb - px * 2, yb, wood[2]);
+  if(dead) s += `<rect x="${n2(x0)}" y="${n2(yt - px * 2)}" width="${n2(hw * 2)}" height="${n2(hy + px * 2)}" fill="none" stroke="var(--bad)" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+  return s;
+}
 // a canopy: a round shade cloth on poles, peaked in the middle
 function canopy34(f, t, edge, sw){
   const r = t.r * .9, x = f.x, y = f.y, H = t.r * .55, top = y - H / TILT, peak = y - (H + t.r * .22) / TILT, n2 = v => v.toFixed(2), ns = `vector-effect="non-scaling-stroke"`;
@@ -703,6 +818,7 @@ function featSvg(f, biome, pick, isDead){
   else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
   else if(up && t.look === "canopy") s += canopy34(f, t, edge, dead ? 3 : 1.5);
   else if(up && t.slots && !t.look) s += shelter34(f, t, edge, dead ? 3 : 1.5);
+  else if(t.screen) s += screen34(f, t, dead);
   else if(t.tray){
     // a round steel tray, filled to the level of the food in it
     const fill = t.tray ? clamp(trayHas(f) / t.tray, 0, 1) : 0, main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0];
@@ -789,10 +905,10 @@ const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 function landSvg(e, pick, isDead){
   const feats = byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features go in their own group, where map.js slots the animals in among them by depth (place34)
-  return waterOf(e).map(w => waterSvg(w, pick, isDead, biomeOf(e))).join("") + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
+  return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
-const parkWaterSvg = (pick, isDead) => parkWater().map(w => waterSvg(w, pick, isDead, parkBiome())).join("");
+const parkWaterSvg = (pick, isDead) => watersSvg(parkWater(), pick, isDead, parkBiome());
 const decorSvg = (pick, isDead) => byDepth(decorOf()).map(f => featSvg(f, parkBiome(), pick, isDead)).join("");
 // A hedge: a dark base, the leafy body, and lighter clumps along the top (in meters, so it's as wide as a real hedge)
 const hedgeSvg = (tag, pts) => { const lj = `fill="none" stroke-linejoin="round" stroke-linecap="round" pointer-events="none"`; return `<${tag} points="${pts}" stroke="#24461F" stroke-width="2.6" ${lj}/><${tag} points="${pts}" stroke="#4E8A3E" stroke-width="2" ${lj}/><${tag} points="${pts}" stroke="#6BA851" stroke-width="1.2" stroke-dasharray="0 1.6" ${lj}/>`; };

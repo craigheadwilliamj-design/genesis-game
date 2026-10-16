@@ -11,9 +11,10 @@ const mapwrap = $("#mapwrap");
 
 const KMIN = 0.4, KMAX = 27.3;      // zoom limits, in screen pixels per meter
 let view = {k:2, tx:0, ty:0};
-// 3/4 view (prototype): the ground is squashed by TILT top to bottom, so it reads as seen at an angle
+// 3/4 view (the only main view): the ground is squashed by TILT top to bottom, so it reads as seen at an angle.
+// The `!tilt` branches below are the old flat top-down drawing; they are dead code now and can be removed piece by piece.
 const TILT = .7;
-let tilt = (() => { try { return localStorage.getItem("gp-tilt") !== "0"; } catch(e){ return true; } })();
+const tilt = true;
 function tf(){ return tilt ? TILT : 1; }
 function ky(){ return view.k * tf(); }   // screen pixels per meter, top to bottom
 function upright(){ return tilt ? ` scale(1 ${(1/TILT).toFixed(4)})` : ""; }   // added to a sprite's transform so it isn't squashed
@@ -26,7 +27,13 @@ let landGhost = null;               // rock, grove or shelter being placed: {key
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
+let wdrag = null;                   // water box being dragged: {a, b} (chunks, like paint)
+let waterPick = "auto";             // what the water tool lays: a WATER_TEX key (a water type), or "auto" for the biome's own water
+let pdrag = null;                   // biome paint box being dragged: {a, b} (grid points, js/biomepaint.js)
+let paintPick = null;               // what the paint tool does: a biome id, or "erase"
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
+let cdrag = null;                   // path run being laid: {a, b, kind, plan} (chunks, js/pathcells.js)
+let chover = null;                  // path tool or bulldoze: the chunk [cx, cy] under the pointer
 let fhover = null;                  // bulldoze: the fence piece under the pointer
 let parcelSel = null;               // plot picked with the Buy Land tool: [i, j]
 
@@ -37,13 +44,16 @@ const FAMILIES = {
   eat:  {tools:["kiosk", "food", "restaurant"], labels:["Cart", "Stand", "Restaurant"]},
   gifts:{tools:["cart", "shop", "megastore"], labels:["Cart", "Stand", "Shop"]},
   lodging:{tools:["campground", "lodge", "resort"], labels:["Campground", "Safari Lodge", "Resort Hotel"]},
-  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "sign", "nofeed"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Info sign", "No-feed"]},
+  props:{tools:["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"], labels:["Bin", "Bench", "Picnic", "Lamp", "Camera", "Donations", "Info sign", "No-feed", "Quiet"]},
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
+let fenceMeet = false;             // the fence tool keeps other fence where it stands and lays against it, instead of replacing it
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
-const isDrawTool = t => t === "path" || t === "service" || t === "wide" || t === "tram" || t === "bridge" || t === "zone" || t === "water";
+const isDrawTool = t => t === "tram" || t === "zone";
+const PATH_TOOLS = {path:"g", service:"s", bridge:"b"};   // drag-and-drop path tools and the chunk kind each lays (js/pathcells.js)
+const isPathTool = t => !!PATH_TOOLS[t];
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
@@ -52,7 +62,7 @@ let lastPtr = null;                 // where the pointer last was while placing,
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
 let zedit = null;                   // zone being reshaped: {id, orig, sel, done}               // show supply lines on the map
-const halfWidth = p => isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
+const halfWidth = p => p.hw !== undefined ? p.hw : isService(p) ? SERVICE_ROAD.halfWidth : isWide(p) ? WIDE_PATH.halfWidth : isTram(p) ? TRAM.halfWidth : isBridge(p) ? BRIDGE.halfWidth : PATH_HALF_WIDTH;
 // Where a wide path's flat end meets another guest path, run it through to that path's far edge and cut it flush there,
 // so the join is a clean T instead of a slanted notch. Returns the points to draw and a half-plane clip for each joined end.
 function wideJoin(p){
@@ -95,7 +105,7 @@ function wideJoin(p){
 function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
   : kind === "land" ? state.exhibits.flatMap(landOf).concat(decorOf()) : kind === "water" ? state.exhibits.flatMap(waterOf).concat(parkWater()) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
-function selItem(){ return !sel ? null : sel.kind === "guest" ? parties.find(p => p.id === sel.id) || null : sel.kind === "staff" ? (staffById(sel.id) || {}).s || null : findItem(sel.kind, sel.id); }
+function selItem(){ return !sel ? null : sel.kind === "guest" ? parties.find(p => p.id === sel.id) || null : sel.kind === "staff" ? (staffById(sel.id) || {}).s || null : sel.kind === "animal" ? animalById(sel.id) : findItem(sel.kind, sel.id); }
 
 function exhibitColor(e){
   const counts = speciesCounts(e); let best = null, bn = 0;
@@ -119,6 +129,9 @@ function render(){
   const pb = parkBiome();
   s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/><path d="${rd}" fill="var(--ground-shade)"/>`;
 
+  // painted biome ground, over the park ground and under the grid, paths, buildings and exhibits
+  s += paintSvg();
+
   // grid: 10 m squares, darker every 50 m. Closer in, 5 m squares, then the 1 m snap grid.
   const st = k > 7 ? GRID_STEP : k > 2.5 ? 5 : 10;
   let dMin = "", dMaj = "";
@@ -128,7 +141,16 @@ function render(){
   for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
   s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   const bd = ownedEdges().map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
-  s += `<path d="${bd}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  // the southern edge (the entrance line) is a hard wall, open only at the entrance; the other edges stay a dashed property line
+  const wall = [];
+  const bd2 = ownedEdges().filter(([p, q]) => { if(p[1] === SOUTH_LINE && q[1] === SOUTH_LINE){ wall.push([Math.min(p[0], q[0]), Math.max(p[0], q[0])]); return false; } return true; }).map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
+  s += `<path d="${bd2}" fill="none" stroke="var(--boundary)" stroke-width="2" stroke-dasharray="10 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(wall.length){
+    const gx = state.gate[0], gap = 6, cuts = [];
+    for(const [a, c] of wall){ if(gx - gap > a && gx + gap < c){ cuts.push([a, gx - gap], [gx + gap, c]); } else cuts.push([a, c]); }
+    const wd = cuts.map(([a, c]) => `M${a} ${SOUTH_LINE}H${c}`).join("");
+    s += `<path d="${wd}" fill="none" stroke="#4A4A42" stroke-width="1.3" stroke-linecap="butt" pointer-events="none"/><path d="${wd}" fill="none" stroke="#8C8C80" stroke-width=".5" transform="translate(0 -.4)" pointer-events="none"/><path d="${wd}" fill="none" stroke="#2E2E28" stroke-width=".4" stroke-dasharray="1.3 1.3" transform="translate(0 .4)" pointer-events="none"/>`;
+  }
 
   const isDoomed = (kind, id) => (doomed && doomed.kind === kind && doomed.id === id) || (tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id);
   const isSel = (kind, id) => sel && sel.kind === kind && sel.id === id;
@@ -136,7 +158,7 @@ function render(){
   // work zones: a tinted wash and a dashed edge, under everything else
   for(const z of state.zones){
     const on = isSel("zone", z.id), dead = isDoomed("zone", z.id);
-    const ZT = z.theme && THEMES[z.theme] && THEMES[z.theme].ground ? THEMES[z.theme] : null;
+    const ZT = devMode() && z.theme && THEMES[z.theme] && THEMES[z.theme].ground ? THEMES[z.theme] : null;
     if(ZT) s += `<polygon points="${polyStr(z.points)}" fill="${ZT.ground}" fill-opacity=".6" stroke="none" pointer-events="none"/>` + (groundTex(ZT) ? `<polygon points="${polyStr(z.points)}" fill="url(#t-${groundTex(ZT)})" fill-opacity="${ZT.gtex ? .75 : .45}" stroke="none" pointer-events="none"/>` : "");
     s += `<polygon points="${polyStr(z.points)}" fill="${z.color}" fill-opacity="${on ? .22 : ZT ? .04 : .1}" stroke="${dead ? "var(--bad)" : z.color}" stroke-width="${on || dead ? 3 : 1.6}" stroke-dasharray="9 6" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
@@ -144,80 +166,7 @@ function render(){
   // ponds and lakes out in the park, under everything built
   s += parkWaterSvg(tool === "bulldoze", isDoomed);
 
-  // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
-  const tanks = [];
-  for(const e of state.exhibits){
-    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
-    const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
-    s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
-    if(e.viv){
-      // a glass box: pale blue-green fill, dark frame, and a lighter inner pane
-      s += `<polygon points="${pts}" fill="#A9D3DA" fill-opacity=".85" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) !== "genesis" ? themeOf(e).edge : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      if(c) s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${c}" fill-opacity=".35" pointer-events="none"/>`;
-      // the biome shows through the glass
-      s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".35" pointer-events="none"/><polygon points="${polyStr(insetRect(e.points, .9))}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
-      const bb = bbox(e.points), [vx, vy] = centroid(e.points);
-      if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
-    } else {
-      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
-      // a moat is a band of water around the outside of the fence
-      if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
-      // the floor shows the biome: its color, with its texture over it
-      s += `<polygon points="${pts}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
-      // a hedge row is drawn as a real hedge, as wide as it is
-      if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
-      // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
-      if(e.grid){
-        s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "none"}" stroke-width="3.5" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-        if(!e.open && !tilt) s += gridFenceSvg(e);
-      } else {
-      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : hedge ? (reach ? "none" : "#24461F") : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      // a live electric fence has a dark zigzag over yellow; with no power it goes dull gray
-      if(themeKey(e) === "genesis"){}   // Genesis shows power as amber lights on the posts, drawn below
-      else if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      else if(e.barrier === "electric" && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#1D2B22" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      if(e.barrier === "bars" && !on && !dead && themeKey(e) !== "genesis") s += `<polygon points="${pts}" fill="none" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      }
-      if(e.aviary) s += `<polygon points="${pts}" fill="url(#mesh)" pointer-events="none"/>`;
-      if(isBreached(e)) s += `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="4" stroke-dasharray="10 6" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
-      else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-    }
-    // a themed exhibit gets a trim line just inside its fence (flat view only: in 3/4 the fence stands up and draws itself)
-    if(!tilt && (!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
-    // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
-    // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
-    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
-    const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
-    const gi = tilt ? gateSide34(e, kinds34) : -1;
-    if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
-    if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, kinds34, "back", fo34);
-    if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
-      const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
-      if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
-      else s += `<polygon points="${pp}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFC25E" stroke-width="3.6" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFF1CC" stroke-width="1.4" stroke-dasharray="0 34" ${ns}/>`;
-    }
-    // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
-    if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
-    if(tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;   // under the animals in the 3/4 view
-    s += landSvg(e, tool === "bulldoze", isDoomed);
-    if(tilt && !e.open) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, kinds34, "front", fo34);
-    if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
-    // muck builds up visibly once an exhibit is getting dirty
-    if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
-    if(e.gate){   // a gate with its own picture only shows the marker when it has a problem
-      const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
-      if(gi < 0 || !ok) s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-    }
-    s += `</g>`;
-    if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
-  }
-
-  // open fences and hedge rows
-  for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
-  for(const r of looseRuns()) s += fenceRunSvg(r.pts, r.b, false);
-  s += fenceJointsSvg(inv);
-
+  // paths and path chunks lie flat on the ground, so they go under every fence, exhibit and building (the 3/4 view stands those up)
   // paths: dark edges drawn first under every path, so joins look like one surface
   const joined = derived ? derived.joined : new Set(), joinedAll = derived ? derived.joinedAll : new Set();
   let under = "", over = "", clipDefs = "", wjN = 0;
@@ -225,6 +174,7 @@ function render(){
   // tram track goes under everything, then staff roads
   const pathRank = p => isTram(p) ? 2 : isService(p) ? 1 : 0;
   for(const p of [...state.paths].sort((a, b) => pathRank(b) - pathRank(a))){
+    if(p.d) continue;   // derived strips stand in for the cells in the sim; the cells are drawn below
     if(isTram(p)){
       const pts = polyStr(p.points), w = Math.max(2*halfWidth(p), 3*inv), lj = `stroke-linejoin="round" stroke-linecap="butt" fill="none"`, on = isSel("path", p.id), dead = isDoomed("path", p.id);
       if(on || dead) under += `<polyline points="${pts}" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="${w + 5*inv}" ${lj}/>`;
@@ -275,18 +225,98 @@ function render(){
   }
   // Genesis buildings get a narrow pale gravel strip so they stand off the grass; all strips go in one pass under the paths and every roof, so none paints over a neighbor
   for(const bl of state.buildings){
-    if(BUILDINGS[bl.type].prop || themeKey(bl) !== "genesis") continue;
+    if(BUILDINGS[bl.type].prop || bl.type === "platform" || themeKey(bl) !== "genesis") continue;   // a platform juts over the habitat, so no path-like gravel under it
     s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
   }
-  s += clipDefs + under + over;
+  // path surface doesn't show under a viewing platform's deck: mask the footprints out of the paths
+  const decks = state.buildings.filter(b => b.type === "platform");
+  if(decks.length) s += `<mask id="deckcut" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect x="-100000" y="-100000" width="200000" height="200000" fill="#fff"/>${decks.map(b => `<polygon points="${polyStr(b.points)}" fill="#000"/>`).join("")}</mask>`;
+  under = chunksSvg() + under;
+  s += clipDefs + (decks.length ? `<g mask="url(#deckcut)">${under}${over}</g>` : under + over);
+
+  // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  const tanks = [];
+  for(const e of state.exhibits){
+    const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
+    const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
+    s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
+    if(e.viv){
+      if(tilt) s += vivFloor34(e, c, dead, on, reach);   // the 3/4 view: a flat substrate floor; the case itself is viv34
+      else {
+      // (flat view) a glass box: pale blue-green fill, dark frame, and a lighter inner pane
+      s += `<polygon points="${pts}" fill="#A9D3DA" fill-opacity=".85" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) !== "genesis" ? themeOf(e).edge : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      if(c) s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${c}" fill-opacity=".35" pointer-events="none"/>`;
+      // the biome shows through the glass
+      s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".35" pointer-events="none"/><polygon points="${polyStr(insetRect(e.points, .9))}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
+      }
+      const bb = bbox(e.points), [vx, vy] = centroid(e.points);
+      if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
+    } else {
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
+      // a moat is a band of water around the outside of the fence
+      if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
+      // the floor shows the biome: its color, with its texture over it
+      const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
+      s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${fb})" pointer-events="none"/>` + exhibitPaintSvg(e);
+      // a hedge row is drawn as a real hedge, as wide as it is
+      if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
+      // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
+      if(e.grid){
+        s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "none"}" stroke-width="3.5" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+        if(!e.open && !tilt) s += gridFenceSvg(e);
+      } else {
+      s += `<polygon points="${pts}" fill="transparent" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : hedge ? (reach ? "none" : "#24461F") : themeKey(e) === "genesis" ? "#26402F" : bar.color}" stroke-width="${on || dead ? 3.5 : bw}" ${reach ? "" : `stroke-dasharray="6 4"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+      // a live electric fence has a dark zigzag over yellow; with no power it goes dull gray
+      if(themeKey(e) === "genesis"){}   // Genesis shows power as amber lights on the posts, drawn below
+      else if(e.barrier === "electric" && e.powered === false && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#8A8F95" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      else if(e.barrier === "electric" && !on && !dead) s += `<polygon points="${pts}" fill="none" stroke="#1D2B22" stroke-width="1" stroke-dasharray="3 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      if(e.barrier === "bars" && !on && !dead && themeKey(e) !== "genesis") s += `<polygon points="${pts}" fill="none" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      }
+      if(e.aviary) s += `<polygon points="${pts}" fill="url(#mesh)" pointer-events="none"/>`;
+      if(isBreached(e)) s += `<polygon points="${pts}" fill="none" stroke="var(--bad)" stroke-width="4" stroke-dasharray="10 6" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+      // worn fences (as of the last inspection) show cracks: orange when worn, red when badly worn
+      else if(knownCond(e) < 60) s += `<polygon points="${pts}" fill="none" stroke="${knownCond(e) < 30 ? "#E5484D" : "#E08A2E"}" stroke-width="2" stroke-dasharray="2 5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    }
+    // a themed exhibit gets a trim line just inside its fence (flat view only: in 3/4 the fence stands up and draws itself)
+    if(!tilt && (!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
+    // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
+    // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
+    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered, off:e.grid && !e.open ? sideOffsets(e) : null};
+    const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
+    const gi = tilt ? gateSide34(e, kinds34) : -1;
+    if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
+    if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, kinds34, "back", fo34);
+    if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
+      const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
+      if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
+      else s += `<polygon points="${pp}" stroke="#FFB547" stroke-opacity=".35" stroke-width="9" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFC25E" stroke-width="3.6" stroke-dasharray="0 34" ${ns}/><polygon points="${pp}" stroke="#FFF1CC" stroke-width="1.4" stroke-dasharray="0 34" ${ns}/>`;
+    }
+    // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
+    if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
+    if(tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;   // under the animals in the 3/4 view
+    s += landSvg(e, tool === "bulldoze", isDoomed);
+    if(tilt && !e.open) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, kinds34, "front", fo34);
+    if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
+    // muck builds up visibly once an exhibit is getting dirty
+    if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
+    if(e.gate){   // a gate with its own picture only shows the marker when it has a problem
+      const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
+      if(gi < 0 || !ok) s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    }
+    s += `</g>`;
+    if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
+  }
+
+  // open fences and hedge rows
+  for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
+  for(const r of looseRuns()) s += fenceRunSvg(r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, r.b, false);
+  s += fenceJointsSvg(inv);
+
   // plants, rocks and statues out in the park stand over the path edges
   s += decorSvg(tool === "bulldoze", isDoomed);
 
-  // entrance gate
-  const [gx, gy] = state.gate;
-  s += `<g pointer-events="none"><rect x="${gx-9}" y="${gy-3}" width="18" height="6" rx="1" fill="#1F3A2B"/><rect x="${gx-9}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/><rect x="${gx+6}" y="${gy-3}" width="3" height="6" fill="#D8B04A"/>`;
-  s += emblemSvg(gx, gy - 9, 3.6);
-  s += `<text class="lbl" x="${gx}" y="${gy + 3 + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}">Entrance</text></g>`;
+  // entrance building
+  s += entrance34(inv);
 
   // litter on the paths
   const specks = litterSpecks();
@@ -309,16 +339,17 @@ function render(){
       s += `<g data-kind="building" data-id="${esc(bl.id)}" style="cursor:pointer"><circle cx="${cx}" cy="${cy}" r="${r * 1.3}" fill="transparent"/>`;
       // a vandalized prop goes dark red; a broken one gets a cross through it
       const fill = isBroken(bl) ? "#6E2A26" : full ? "var(--bad)" : themeFill(bl, t.color), sw = on || dead ? 2.5 : 1.2;
-      if(tilt){ s += prop34(bl, t, r, fill, edge, sw) + (isBroken(bl) ? `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "") + `</g>`; continue; }
-      if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
+      if(tilt){ s += propArt(bl, inv, on, dead) + `</g>`; continue; }
+      if(bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate") s += `<circle cx="${cx}" cy="${cy}" r="${r * .75}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"/>`;
       else s += `<polygon points="${polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))))}" fill="${fill}" stroke="${edge}" stroke-width="${sw}" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
+      if(!isBroken(bl) && !full) s += bl.type === "bin" || bl.type === "lamp" || bl.type === "camera" || bl.type === "donate" ? themeProp(bl, {round:true, cx, cy, r:r * .75}) : themeProp(bl, {pts:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)))), trim:polyStr(insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d)) * .7))});
       if(bl.type === "lamp" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#FFF6C8" pointer-events="none"/>`;
       if(bl.type === "camera" && !isBroken(bl)) s += `<circle cx="${cx}" cy="${cy}" r="${r * .3}" fill="#E8F0FF" pointer-events="none"/>`;
       if(bl.type === "sign" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">i</text>`;
       if(bl.type === "nofeed" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">⊘</text>`;
+      if(bl.type === "quiet" && !isBroken(bl)) s += `<text class="glyph" x="${cx}" y="${cy}" font-size="${r * .9}" pointer-events="none">~</text>`;
       if(isBroken(bl)) s += `<path d="M${cx - r*.6} ${cy - r*.6}L${cx + r*.6} ${cy + r*.6}M${cx + r*.6} ${cy - r*.6}L${cx - r*.6} ${cy + r*.6}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-      s += `</g>`;
+      s += propFrontMark(bl, r) + `</g>`;
       continue;
     }
     const down = t.tram && !tramWorking(bl);   // a worn-out tram station goes dark red with a cross
@@ -381,6 +412,7 @@ function render(){
   renderOverlay();
   syncAnimals();
   applyTransform();
+  drawLights();
 }
 
 // Shrink a shape toward its middle (used for a vivarium's inner glass pane)
@@ -491,6 +523,7 @@ const FENCE34 = {
   adobe:   {h:2.1, col:"#CC9862", solid:1, sprite:"adobe"},
   stake:   {h:1.5, col:"#B8925C", sprite:"stake"},
   bone:    {h:2.4, col:"#E2D4B0", sprite:"bone"},
+  rope:    {h:1.3, col:"#B8905A", sprite:"rope"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -505,7 +538,7 @@ function fenceSpriteSvg(kind, a, b, cond, gate, powered){
   if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
   const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st0 = fenceState(cond), off = !!FENCE_SPRITES[kind].power && powered === false, st = off && st0 !== "broken" ? st0 + "-off" : st0, Lp = L / ROCK_MPP;
   // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
-  const put = (at, w, pic = st, attr = "") => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image ${attr}href="sprites/fence/${kind}-${pic}.png" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
+  const put = (at, w, pic = st, attr = "") => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image ${attr}href="${spriteUrl(`sprites/fence/${kind}-${pic}.png`)}" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
   let s = "";
   if(gate){
     // the fence runs up to the gate's left post and starts again under its right one; the gate goes on top
@@ -535,6 +568,7 @@ const FENCE_EDGE = {
   drystone:{steel:{hi:"#B5AFA0", mid:"#98927F", lo:"#706B5D", deep:"#4A463B"}, rust:{hi:"#A4B060", mid:"#616F22", lo:"#46501A", deep:"#2E3410"}},   // rust is moss
   adobe:{steel:{hi:"#E0B88E", mid:"#CC9862", lo:"#95703F", deep:"#6A4E2C"}, rust:{hi:"#C78A56", mid:"#B06C3C", lo:"#84502C", deep:"#5C381E"}},   // rust is bare brick
   stake:{steel:{hi:"#D6B684", mid:"#B8925C", lo:"#8A6C44", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is weathered grey
+  rope:{steel:{hi:"#D2AE7C", mid:"#B8905A", lo:"#8A6A40", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is frayed grey rope
   bone:{steel:{hi:"#F2E8CC", mid:"#E2D4B0", lo:"#B4A584", deep:"#867A5E"}, rust:{hi:"#DCC884", mid:"#C4AC70", lo:"#9A8450", deep:"#6E5C34"}},   // rust is yellowed bone
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
@@ -584,6 +618,41 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
 const gateOpen = {};
 let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
+// Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
+const WX_SCALE = 3, WX_N = {cold:36, storm:60};
+const WX_TINT = {hot:"rgba(255,150,40,.08)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
+let wxKind = "fair", wxFlash = 0, wxNext = 0;
+function drawWeather(now){
+  const k = state.weather ? state.weather.today : "fair";
+  if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
+  if(k === "fair") return;
+  const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
+  if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
+  const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
+  c.clearRect(0, 0, w, h);
+  c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
+  if(k === "hot"){   // gentle shimmer: a few faint pale rows that slide sideways
+    c.fillStyle = "rgba(255,230,160,.07)";
+    for(let i = 0; i < 6; i++){ const y = Math.floor(((now / 40 + i * h / 6) % h)), x = Math.floor(Math.sin(now / 700 + i) * 4 + 6); c.fillRect(x, y, w - 12, 1); }
+    return;
+  }
+  const n = WX_N[k];
+  while(wxPool.length < n) wxPool.push({x:Math.random() * 400, y:Math.random() * 300, z:.6 + Math.random() * .6});
+  for(let i = 0; i < n; i++){
+    const p = wxPool[i];
+    if(k === "storm"){ p.x -= 90 * p.z * dt; p.y += 260 * p.z * dt; }
+    else { p.x += Math.sin(now / 900 + i) * 8 * dt; p.y += 14 * p.z * dt; }
+    if(p.y > h){ p.y = -4; p.x = Math.random() * (w + 40); }
+    if(p.x < -6) p.x = w + Math.random() * 20; else if(p.x > w + 6) p.x = 0;
+    if(k === "storm"){ c.fillStyle = "rgba(190,210,255,.55)"; const x = Math.floor(p.x), y = Math.floor(p.y); c.fillRect(x, y, 1, 2); c.fillRect(x - 1, y + 2, 1, 2); }
+    else { c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1); }
+  }
+  if(k === "storm"){
+    if(now > wxNext){ wxFlash = .35; wxNext = now + 4000 + Math.random() * 9000; }
+    if(wxFlash > 0){ c.fillStyle = `rgba(255,255,255,${wxFlash.toFixed(2)})`; c.fillRect(0, 0, w, h); wxFlash -= dt * 2.5; }
+  }
+}
 // Every frame: swing each gate on screen toward open if a keeper, vet or mechanic is at it, else toward shut, and show the matching picture.
 function drawGates(now){
   const dt = Math.max(0, Math.min(.1, (now - gateT) / 1000)); gateT = now;
@@ -602,7 +671,7 @@ function drawGates(now){
     if(el.dataset.f === String(f)) continue;
     el.dataset.f = f;
     if(el.dataset.edge){ el.querySelector("[data-gc]").setAttribute("display", f >= 2 ? "none" : ""); el.querySelector("[data-go]").setAttribute("display", f >= 2 ? "" : "none"); }
-    else el.setAttribute("href", `sprites/fence/${el.dataset.pic}-gate${el.dataset.off ? "-off" : ""}${f ? "-" + f : ""}.png`);
+    else el.setAttribute("href", spriteUrl(`sprites/fence/${el.dataset.pic}-gate${el.dataset.off ? "-off" : ""}${f ? "-" + f : ""}.png`));
   }
 }
 function gateSide34(e, kinds){
@@ -617,22 +686,24 @@ function gateSide34(e, kinds){
 function fence34(P, closed, kinds, which, o = {}){
   const n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
   const segs = [];
-  for(let i = 0; i < n; i++){ const a = P[i], b = P[(i+1) % P.length], ny = closed ? norm34(P, i)[1] : 0;
-    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue; segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
+  for(let i = 0; i < n; i++){ let a = P[i], b = P[(i+1) % P.length]; const ny = closed ? norm34(P, i)[1] : 0, off = o.off && o.off[i];
+    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue;
+    if(off){ a = [a[0] + off[0], a[1] + off[1]]; b = [b[0] + off[0], b[1] + off[1]]; }   // a wall shared with another pen's fence stands a little inside, so both show
+    segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
   segs.sort((p, q) => p.y - q.y);
   const up = h => lift34(h), M = ([x, y]) => `M${n2(x)} ${n2(y)}`, Lto = ([x, y]) => `L${n2(x)} ${n2(y)}`, at = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
   let s = "";
   for(const {i, a, b, ny, kind} of segs){
     const F = FENCE34[kind] || FENCE34.wood, H = F.h, q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
     if(F.hedge && !F.sprite){
-      s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
+      s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, i) : [0, 1]) * .5);
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="#6BA851" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
     if(F.solid && !F.sprite){
       const op = F.solid * (front ? .55 : 1);
-      s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .4) : "");
+      s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, i) : [0, 1]) * .4) : "");
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
@@ -658,35 +729,95 @@ function fence34(P, closed, kinds, which, o = {}){
   }
   return `<g pointer-events="none">${s}</g>`;
 }
-// A vivarium in the 3/4 view: a glass tank in a steel frame. "back" draws the far panes (before what's inside),
-// "front" the near panes, the frame, the glass lid and its heat lamp, all see-through.
-function viv34(e, which, hi){
-  const P = e.points, V = VIVARIUMS[e.viv], H = V.d * .45, frame = hi || "#24414A", n2 = v => v.toFixed(2), up = lift34(H);
-  const fr = w => `stroke="${frame}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" fill="none"`;
-  let s = "", d = "";
-  for(let i = 0; i < P.length; i++){
-    const a = P[i], b = P[(i+1) % P.length], ny = norm34(P, i)[1];
-    if(which === "back" ? ny > .05 : ny <= .05) continue;
-    const q = [a, b, up(b), up(a)];
-    s += `<polygon points="${polyStr(q)}" fill="#A9D3DA" fill-opacity="${which === "back" ? .38 : .16}"/>`;
-    if(which === "front"){
-      // the substrate shows through the bottom of the glass, then a soft glare streak across the pane
-      const sub = [a, b, lift34(H * .18)(b), lift34(H * .18)(a)];
-      s += `<polygon points="${polyStr(sub)}" fill="#6B4F33" fill-opacity=".75"/><path d="M${n2(sub[3][0])} ${n2(sub[3][1])}L${n2(sub[2][0])} ${n2(sub[2][1])}" stroke="#8A6B47" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
-      const g = f => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
-      s += `<polygon points="${polyStr([g(.12), g(.2), lift34(H)(g(.32)), lift34(H)(g(.24))])}" fill="#fff" fill-opacity=".22"/>`;
-      d += `M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}`;
+// A vivarium in the flat pixel style (3/4 view): a glass case in a frame, one flat tone a face (left lightest, front base, right darkest), snapped to the 0.13 m pixel.
+// S is a light aluminium case, M a dark wood one, L a dark aluminium case with a middle post and two lamp bars. Each size has its own label plate.
+const VIV34 = {
+  S:{frame:["#DDE2E5", "#B4BCC1", "#89939A"], top:"#EEF1F3", sill:.35, post:.22, lamps:1, label:"S"},
+  M:{frame:["#7A5638", "#5E402A", "#432D1E"], top:"#94694A", sill:.45, post:.28, lamps:1, label:"M"},
+  L:{frame:["#6F7980", "#4F575D", "#363C41"], top:"#8793A0", sill:.55, post:.34, lamps:2, mullion:true, label:"L"}};
+const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
+function vivMix34(a, b, t){
+  const h = c => /^#[0-9a-f]{6}$/i.test(c) ? [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) : null, x = h(a), y = h(b);
+  return x && y ? "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("") : a;
+}
+const vivFace34 = nx => nx < -.3 ? 0 : nx > .3 ? 2 : 1;
+const vivSubCache = {};
+// the floor of a vivarium: the biome's substrate, flat, with rows of darker and lighter dashes and a lit strip along the far sides
+function vivFloor34(e, c, dead, on, reach){
+  const P = e.points, bio = BIOMES[biomeOf(e)].color, sub = vivMix34(bio, "#5A4630", .4), key = e.viv + "|" + sub + "|" + polyStr(P);
+  let det = vivSubCache[key];
+  if(!det){
+    const bb = bbox(P), inner = insetRect(P, .9), dark = vivMix34(sub, "#000000", .2), light = vivMix34(sub, "#FFFFFF", .18);
+    let dk = "", lt = "";
+    for(let r = 0, y = bb.y0 + .45; y < bb.y1; r++, y += .52){
+      for(let x = bb.x0 + ((r * 7) % 5) * .35 + .3; x < bb.x1; x += 1.7){
+        if(!inPoly(x + .26, y, inner)) continue;
+        const a = flatSnap34([x, y]), b = flatSnap34([x + .52, y + .13]), d = `M${a[0].toFixed(2)} ${a[1].toFixed(2)}H${b[0].toFixed(2)}V${b[1].toFixed(2)}H${a[0].toFixed(2)}z`;
+        if(r % 3 === 2) lt += d; else dk += d;
+      }
     }
-    d += `M${n2(up(a)[0])} ${n2(up(a)[1])}L${n2(up(b)[0])} ${n2(up(b)[1])}`;
+    const [cx, cy] = centroid(P); let strips = "";
+    for(let i = 0; i < P.length; i++){   // a lit strip just inside each far side
+      const n = norm34(P, i); if(n[1] > -.05) continue;
+      const a = P[i], b = P[(i + 1) % P.length], w = .26;
+      strips += flatPoly34([a, b, [b[0] - n[0]*w, b[1] - n[1]*w], [a[0] - n[0]*w, a[1] - n[1]*w]], light, "", true);
+    }
+    det = vivSubCache[key] = `${strips}<path d="${dk}" fill="${dark}" shape-rendering="crispEdges" pointer-events="none"/><path d="${lt}" fill="${light}" shape-rendering="crispEdges" pointer-events="none"/>`;
   }
-  // corner posts: the back ones behind, the front ones in front
-  const [, cy] = centroid(P);
-  for(const p of P) if(which === "back" ? p[1] <= cy : p[1] > cy) d += `M${n2(p[0])} ${n2(p[1])}L${n2(up(p)[0])} ${n2(up(p)[1])}`;
-  s += `<path d="${d}" ${fr(hi ? 3 : 2)}/>`;
-  if(which === "front"){
-    const L = P.map(up), [lx, ly] = centroid(L), r = Math.min(V.w, V.d) * .09;
-    s += `<polygon points="${polyStr(L)}" fill="#DDEFF2" fill-opacity=".12" ${fr(hi ? 3 : 1.5)}/>`;
-    s += `<circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * 2.2)}" fill="#FFC25E" fill-opacity=".18"/><rect x="${n2(lx - r)}" y="${n2(ly - r * .6)}" width="${n2(r * 2)}" height="${n2(r * 1.2)}" rx="${n2(r * .3)}" fill="#3A3A34"/><circle cx="${n2(lx)}" cy="${n2(ly)}" r="${n2(r * .4)}" fill="#FFE2A0"/>`;
+  const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
+  return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
+}
+// "back" draws the far panes, posts and rim (before what's inside); "front" the near panes, sill, posts, label plate, the lid and its lamp bars, all see-through but the frame
+function viv34(e, which, hi){
+  const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
+  const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
+  const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
+  let s = "", front = -1;
+  for(let i = 0; i < P.length; i++){
+    const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
+    const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
+    s += wallQ(i, 0, 1, 0, H, VIV_GLASS34[f], back ? .42 : .17);
+    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]) + wallQ(i, 0, 1, H - rim, H, fr[ft]);
+    else {
+      const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
+      s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
+      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]) + wallQ(i, 0, 1, H - rim, H, fr[f]);
+      if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
+    }
+  }
+  // corner posts: the far ones behind, the near ones in front; the left ones catch the light
+  for(const p of P){
+    if(back ? p[1] > cy : p[1] <= cy) continue;
+    const t = p[0] < cx - .01 ? 0 : p[0] > cx + .01 ? 2 : 1, w = K.post / 2;
+    s += flatPoly34([[p[0] - w, p[1]], [p[0] + w, p[1]], [p[0] + w, up(p)[1]], [p[0] - w, up(p)[1]]], fr[t], "", true);
+  }
+  if(!back){
+    if(front >= 0){
+      const L = edgeLen34(P, front), fl = P[(front + 1) % P.length][0] < P[front][0], e1 = FLAT34.px / L;
+      const Q = (f0, f1, h0, h1, fill) => wallQ(front, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
+      if(K.mullion) s += Q(.5 - K.post / 2 / L, .5 + K.post / 2 / L, 0, H - rim, fr[1]) + Q(.5 - K.post / 2 / L, .5 - K.post / 2 / L + e1, K.sill, H - rim, fr[0]);
+      const pw = Math.min(.45 / L, .12), pf = .22;   // the label plate: a dark plate with a pale rim and the size's letter
+      s += Q(pf - pw - e1, pf + pw + e1, .38, 1.37, "#C9CFD3") + Q(pf - pw, pf + pw, .38 + FLAT34.px, 1.37 - FLAT34.px, "#2B3338") + flatText34(Q, L, pf, .55, K.label, "#F1E7C4");
+    }
+    // the lid: clear glass in the frame's rim, and the lamp bars standing on it
+    s += flatPoly34(P.map(up), "#DDEFF2", op(.16), true);
+    for(let i = 0; i < P.length; i++){
+      const a = P[i], b = P[(i + 1) % P.length], n = norm34(P, i), w = K.post;
+      s += flatPoly34([up(a), up(b), up([b[0] - n[0]*w, b[1] - n[1]*w]), up([a[0] - n[0]*w, a[1] - n[1]*w])], K.top, "", true);
+    }
+    let m = 0; for(let i = 1; i < P.length; i++) if(edgeLen34(P, i) > edgeLen34(P, m)) m = i;
+    const A = P[m], B = P[(m + 1) % P.length], ln = edgeLen34(P, m); let u = [(B[0] - A[0]) / ln, (B[1] - A[1]) / ln]; if(u[0] < 0) u = [-u[0], -u[1]];
+    let v = [-u[1], u[0]]; if(v[1] < 0) v = [-v[0], -v[1]];
+    const span = Math.min(...[...Array(P.length).keys()].map(i => edgeLen34(P, i))), l = ln * .55, t = .45, bh = .22;
+    for(let k = 0; k < K.lamps; k++){
+      const off = K.lamps === 1 ? 0 : (k ? .22 : -.22) * span, c0 = [cx + v[0]*off, cy + v[1]*off];
+      const at = (su, sv, h) => lift34(h)([c0[0] + u[0]*l/2*su + v[0]*t/2*sv, c0[1] + u[1]*l/2*su + v[1]*t/2*sv]);
+      s += flatPoly34([at(1, -1, H), at(1, 1, H), at(1, 1, H + bh), at(1, -1, H + bh)], vivMix34(K.frame[2], "#000000", .2), "", true);   // right end
+      s += flatPoly34([at(-1, 1, H), at(1, 1, H), at(1, 1, H + bh), at(-1, 1, H + bh)], K.frame[1], "", true);   // front face
+      s += flatPoly34([at(-1, -1, H + bh), at(1, -1, H + bh), at(1, 1, H + bh), at(-1, 1, H + bh)], K.top, "", true);   // top
+      s += flatPoly34([at(-.9, 1, H + .02), at(.9, 1, H + .02), at(.9, 1, H + .15), at(-.9, 1, H + .15)], "#FFD98A", "", true);   // the lens
+    }
+    if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(up))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   }
   return `<g pointer-events="none">${s}</g>`;
 }
@@ -742,7 +873,7 @@ function block34(bl, t, S, P, col, line, inv){
     if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
       s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
   }
-  // the roof: the same art as the flat map (rooftop units, the campus emblem), just lifted
+  // the roof: the same art as the flat map (rooftop units), just lifted
   const R = P.map(lift34(W)), [rx, ry] = centroid(R), k = 1/inv;
   if(S.glass){
     s += `<polygon points="${polyStr(R)}" fill="${S.glassCol || "#BFE3D9"}" fill-opacity=".92" ${line}/>`;
@@ -835,7 +966,8 @@ function flatWalls34(P, h1, ln){
 }
 // letters painted on a wall, one wall pixel at a time (a tiny 5 row font)
 const FLAT_FONT34 = {R:["##.", "#.#", "##.", "#.#", "#.#"], E:["###", "#..", "##.", "#..", "###"], S:["###", "#..", "###", "..#", "###"], T:["###", ".#.", ".#.", ".#.", ".#."],
-  O:["###", "#.#", "#.#", "#.#", "###"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"]};
+  O:["###", "#.#", "#.#", "#.#", "###"], V:["#.#", "#.#", "#.#", "#.#", ".#."], I:["###", ".#.", ".#.", ".#.", "###"], W:["#...#", "#...#", "#.#.#", "##.##", "#...#"], M:["#...#", "##.##", "#.#.#", "#...#", "#...#"],
+  L:["#..", "#..", "#..", "#..", "###"], N:["#.#", "###", "###", "#.#", "#.#"], A:[".#.", "#.#", "###", "#.#", "#.#"], C:["###", "#..", "#..", "#..", "###"]};
 // door pictograms, 5 wide and 8 tall: a man and a woman
 const FLAT_ICON34 = {man:[".XXX.", ".XXX.", "XXXXX", "XXXXX", ".XXX.", ".X.X.", ".X.X.", ".X.X."], woman:["..X..", ".XXX.", "..X..", ".XXX.", "XXXXX", "XXXXX", ".X.X.", ".X.X."]};
 function flatText34(Q, L, f, h, str, fill){
@@ -872,6 +1004,40 @@ function flatRoof34(P, wall, rise, ln){
   const [vx, vy] = lerp(ridge[0], ridge[1], .32), vh = .95 / TILT;   // a plumbing vent on the ridge
   return s + flatPoly34([[vx - FLAT34.px, vy], [vx + FLAT34.px, vy], [vx + FLAT34.px, vy - vh], [vx - FLAT34.px, vy - vh]], FLAT34.vent, "", true) + flatPoly34([[vx - FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh], [vx + FLAT34.px * 2, vy - vh - FLAT34.px / TILT], [vx - FLAT34.px * 2, vy - vh - FLAT34.px / TILT]], FLAT34.ventHi, "", true);
 }
+// The park entrance: two ticket pillars under a lintel with the name on it, the path running through. Front-facing like the other flat buildings; the flat view gets a top-down version.
+const ENTRANCE = {half:7, gap:4.6, depth:1.1, pillar:5, beam:3.3};   // meters: half the width, half the opening, half the depth, pillar height, where the lintel starts
+function entrance34(inv){
+  const [gx, gy] = state.gate, E = ENTRANCE, hit = `<g data-kind="entrance" data-id="gate" style="cursor:pointer">`;
+  const W = FLAT34.wall, R = FLAT34.roof, up = h => lift34(h);
+  const rect = (x0, x1, y0, y1, h) => [[gx + x0, gy + y0], [gx + x1, gy + y0], [gx + x1, gy + y1], [gx + x0, gy + y1]].map(up(h));   // a horizontal slab at height h
+  const face = (x0, x1, h0, h1, y, fill) => flatPoly34([[gx + x0, gy + y], [gx + x1, gy + y], [gx + x1, gy + y], [gx + x0, gy + y]].map((p, i) => up(i < 2 ? h0 : h1)(p)), fill, "", true);
+  if(!tilt){   // top-down: two green capped pillars and the lintel across, no side faces
+    let f = `<rect x="${gx - E.half - 1}" y="${gy - E.depth - 1}" width="${2 * E.half + 2}" height="${2 * E.depth + 2}" fill="transparent"/>`;
+    for(const [x0, x1] of [[-E.half, -E.gap], [E.gap, E.half]]) f += flatPoly34(rect(x0, x1, -E.depth, E.depth, 0), R[1], "", true) + flatPoly34(rect(x0 + .26, x1 - .26, -E.depth + .26, E.depth - .26, 0), R[0], "", true);
+    f += flatPoly34(rect(-E.half, E.half, -E.depth * .45, E.depth * .45, 0), R[1], "", true) + flatPoly34(rect(-E.half, E.half, -.13, .13, 0), FLAT34.gold, "", true);
+    return hit + f + `<text class="lbl" x="${gx}" y="${gy + E.depth + 9*inv}" font-size="${12*inv}" stroke-width="${3*inv}" pointer-events="none">Entrance</text></g>`;
+  }
+  let s = hit + `<rect x="${gx - E.half - 1}" y="${gy - E.depth - (E.pillar + 3) / TILT}" width="${2 * E.half + 2}" height="${2 * E.depth + (E.pillar + 3) / TILT + 1}" fill="transparent"/>`;
+  s += flatPoly34(rect(-E.half - .7, E.half + .7, -E.depth + .4, E.depth + .8, 0), "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".22"');   // the shadow the whole thing throws
+  s += flatPoly34(rect(-E.gap, E.gap, -E.depth, E.depth, 0), "#1D2B22", "", true).replace('fill="#1D2B22"', 'fill="#1D2B22" fill-opacity=".3"');   // and the darker shade under the lintel
+  const px = FLAT34.px;
+  for(const [x0, x1, sgn] of [[-E.half, -E.gap, 1], [E.gap, E.half, -1]]){   // a pillar: plinth, front, lit and shaded edge columns, a gold band, a ticket window, a green cap
+    const mid = (x0 + x1) / 2, ww = 1.5;
+    s += face(x0, x1, 0, E.pillar, E.depth, W[1]) + face(x0, x0 + .26, 0, E.pillar, E.depth, W[0]) + face(x1 - .26, x1, 0, E.pillar, E.depth, W[2]);
+    s += face(x0, x1, 0, .5, E.depth, FLAT34.plinth) + face(x0, x1, .9, .9 + px * 2, E.depth, FLAT34.gold);
+    s += face(mid - ww / 2, mid + ww / 2, 1.4, 3, E.depth, FLAT34.door) + face(mid - ww / 2, mid - ww / 2 + px, 1.4, 3, E.depth, FLAT34.doorEdge) + face(mid - ww / 2 - .2, mid + ww / 2 + .2, 1.3, 1.3 + px * 2, E.depth, FLAT34.eave);
+    s += face(x0 - .3, x1 + .3, E.pillar - .3, E.pillar, E.depth + .3, FLAT34.eave) + flatPoly34(rect(x0 - .3, x1 + .3, -E.depth - .3, E.depth + .3, E.pillar), R[1], "", true);   // the cap's shade, then its roof
+    s += flatPoly34(rect(x0 - .3, x1 + .3 - (x1 - x0 + .6) * .5, -E.depth - .3, E.depth + .3, E.pillar), R[0], "", true) + flatPoly34(rect(mid - px, mid + px, -E.depth + .5, E.depth - .5, E.pillar + px), FLAT34.gold, "", true);
+  }
+  // the lintel across the top of the opening: shade under it, the front in the type color with the name, a green slab on top
+  s += face(-E.gap, E.gap, E.beam - .3, E.beam, E.depth, "#14281C") + face(-E.half, E.half, E.beam, E.pillar, E.depth, W[1]);
+  s += face(-E.half + .3, E.half - .3, E.beam + .25, E.pillar - .25, E.depth, R[1]) + face(-E.half + .3, E.half - .3, E.pillar - .25 - px, E.pillar - .25, E.depth, FLAT34.gold);
+  const Q = (f0, f1, h0, h1, fill) => face(f0, f1, h0, h1, E.depth, fill);
+  s += flatText34((f0, f1, h0, h1, fill) => Q(f0, f1, E.beam + .3 + (h0 - 0), E.beam + .3 + (h1 - 0), fill), 1, 0, 0, "ENTRANCE", W[0]);
+  s += flatPoly34(rect(-E.half - .3, E.half + .3, -E.depth - .3, E.depth + .3, E.pillar + .3), R[1], "", true) + flatPoly34(rect(-E.half - .3, 0, -E.depth - .3, E.depth + .3, E.pillar + .3), R[0], "", true);
+  s += face(-E.half - .3, E.half + .3, E.pillar, E.pillar + .3, E.depth + .3, FLAT34.eave) + flatLine34(up(E.pillar + .3)([gx - E.half - .3, gy + E.depth + .3]), up(E.pillar + .3)([gx + E.half + .3, gy + E.depth + .3]), FLAT34.gold, px);
+  return s + `</g>`;
+}
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
   const edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? T.edge : "var(--bad)";
@@ -896,16 +1062,7 @@ function building34(bl, t, on, dead, reach, inv){
     if(down){ const [x, y] = centroid(C), r = Math.min(t.w, t.d) * .3; s += `<path d="M${x - r} ${y - r}L${x + r} ${y + r}M${x + r} ${y - r}L${x - r} ${y + r}" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
     return s;
   }
-  if(S.front === "deck"){
-    // a wooden deck on stilts with a rail all round, looking out over the animals (no shadow pad: it juts over the exhibit)
-    s = `<polygon points="${polyStr(P.map(([x, y]) => [x + .8, y + .7]))}" fill="#1D2B22" fill-opacity=".18" pointer-events="none"/>`;
-    const D = P.map(lift34(S.wall)), rail = P.map(lift34(S.wall + 1.1)), post = `stroke="#5A4128" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"`;
-    s += insetRect(P, .9).map(p => { const a = lift34(0)(p), b = lift34(S.wall)(p); return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
-    s += walls34(P, S.wall - .35, S.wall, col, line).s + `<polygon points="${polyStr(D)}" fill="${col}" ${line}/>` + shade34(D, .3);
-    for(let k = 1; k < 7; k++){ const f = k / 7, a = [D[0][0] + (D[1][0] - D[0][0])*f, D[0][1] + (D[1][1] - D[0][1])*f], b = [D[3][0] + (D[2][0] - D[3][0])*f, D[3][1] + (D[2][1] - D[3][1])*f]; s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#5A4128" stroke-opacity=".35" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
-    s += P.map((p, j) => { const a = D[j], b = rail[j]; return `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" ${post}/>`; }).join("");
-    return s + `<polygon points="${polyStr(rail)}" fill="none" stroke="#5A4128" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
-  }
+  if(S.front === "deck") return deckArt(bl, inv, on, dead, reach);   // flat pixel style, propart.js
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
   const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
@@ -960,45 +1117,11 @@ function building34(bl, t, on, dead, reach, inv){
   return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)));
 }
 
-// Path props standing up in the 3/4 view: bins, lamps, cameras, signs, benches and picnic tables.
-// r is the prop's drawn radius, which never shrinks below a tappable size.
-function prop34(bl, t, r, fill, edge, sw){
-  const [cx, cy] = centroid(bl.points), up = h => cy - h / TILT, ln = `stroke="${edge}" stroke-width="${sw}" vector-effect="non-scaling-stroke"`;
-  const shadow = (rx, h) => `<ellipse cx="${(cx + h*.22).toFixed(2)}" cy="${(cy + h*.18).toFixed(2)}" rx="${rx.toFixed(2)}" ry="${(rx*.7).toFixed(2)}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
-  const pole = (h, w) => `<rect x="${(cx - w/2).toFixed(2)}" y="${up(h).toFixed(2)}" width="${w.toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="#3A3A34" pointer-events="none"/>`;
-  const R = r * .75;
-  if(bl.type === "bin"){ const h = R * 1.6;
-    return shadow(R, h) + `<rect x="${(cx - R).toFixed(2)}" y="${up(h).toFixed(2)}" width="${(2*R).toFixed(2)}" height="${(h / TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${cy.toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="${fill}" ${ln}/><ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${R.toFixed(2)}" ry="${(R*TILT).toFixed(2)}" fill="#1D2B22" ${ln}/>`; }
-  if(bl.type === "lamp" || bl.type === "camera"){ const h = R * 5, w = Math.max(.15, R*.25);
-    return shadow(R*.7, h*.3) + pole(h, w) + (bl.type === "lamp" ? `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.8).toFixed(2)}" ry="${(R*.8 / TILT).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${cx}" cy="${up(h).toFixed(2)}" rx="${(R*.4).toFixed(2)}" ry="${(R*.4 / TILT).toFixed(2)}" fill="#FFF6C8" pointer-events="none"/>`}`
-      : `<rect x="${(cx - R*.9).toFixed(2)}" y="${up(h + R*.4).toFixed(2)}" width="${(R*1.8).toFixed(2)}" height="${(R*.9 / TILT).toFixed(2)}" rx="${(R*.2).toFixed(2)}" fill="${fill}" ${ln}/>${isBroken(bl) ? "" : `<ellipse cx="${(cx + R*.9).toFixed(2)}" cy="${up(h).toFixed(2)}" rx="${(R*.25).toFixed(2)}" ry="${(R*.25 / TILT).toFixed(2)}" fill="#E8F0FF" pointer-events="none"/>`}`); }
-  if(bl.type === "sign" || bl.type === "nofeed"){ const h = R * 3, w = Math.max(.12, R*.2), bw = R * 1.6, bh = R * 1.3;
-    return shadow(R*.6, h*.3) + pole(h, w) + `<rect x="${(cx - bw/2).toFixed(2)}" y="${up(h + bh*.5).toFixed(2)}" width="${bw.toFixed(2)}" height="${(bh / TILT).toFixed(2)}" rx="${(R*.15).toFixed(2)}" fill="${fill}" ${ln}/>` +
-      (isBroken(bl) ? "" : `<text class="glyph" x="${cx}" y="${up(h).toFixed(2)}" font-size="${(bh*.85).toFixed(2)}" pointer-events="none">${bl.type === "sign" ? "i" : "⊘"}</text>`); }
-  // benches and picnic tables: slats on thin legs, drawn back to front
-  const P = insetRect(bl.points, Math.max(1, r * 2 / Math.max(t.w, t.d))), line = `${ln} stroke-linejoin="round"`, dark = "#3A3A34";
-  const [px, py] = centroid(P), U = [(P[1][0] - P[0][0])/2, (P[1][1] - P[0][1])/2], V = [(P[3][0] - P[0][0])/2, (P[3][1] - P[0][1])/2];
-  const [L, W] = Math.hypot(...U) >= Math.hypot(...V) ? [U, V] : [V, U], north = W[1] <= 0 ? 1 : -1;   // which way along the short axis is north
-  const box = (sl, sw, dw) => [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [px + L[0]*a*sl + W[0]*(b*sw + dw), py + L[1]*a*sl + W[1]*(b*sw + dw)]);
-  const slab = (Q, h0, h1) => walls34(Q, h0, h1, fill, line).s + `<polygon points="${polyStr(Q.map(lift34(h1)))}" fill="${fill}" ${line}/>` + shade34(Q.map(lift34(h1)), .5);
-  let out = `<polygon points="${polyStr(P.map(([x, y]) => [x + .25, y + .2]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/>`;
-  const leg = (f, d, h) => { const x = px + L[0]*f + W[0]*d, y = py + L[1]*f + W[1]*d; return `<path d="M${x.toFixed(2)} ${y.toFixed(2)}V${(y - h / TILT).toFixed(2)}" stroke="${dark}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; };
-  if(bl.type === "bench"){
-    // the backrest goes on the far side, so the seat faces the viewer
-    out += leg(-.85, 0, .42) + leg(.85, 0, .42) + slab(box(1, .38, north*.62), .5, .95) + slab(box(1, .55, -north*.2), .42, .5);
-    return out;
-  }
-  // picnic table: a bench each side and the top in between
-  out += slab(box(.9, .17, north*.78), .4, .47);
-  out += leg(-.8, 0, .72) + leg(.8, 0, .72) + slab(box(1, .42, 0), .72, .8);
-  return out + slab(box(.9, .17, -north*.78), .4, .47);
-}
-
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
 function parcelOverlay(){
   const inv = 1/view.k; let s = "";
-  for(const [i, j] of PARCEL_CELLS){
+  for(const [i, j] of SALE_CELLS){
     if(ownsParcel(i, j)) continue;
     const [x0, y0, x1, y1] = parcelRect(i, j), open = parcelTouches(i, j), on = parcelSel && parcelSel[0] === i && parcelSel[1] === j;
     s += `<rect x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="${on ? "var(--sel)" : open ? "var(--good)" : "var(--ink)"}" fill-opacity="${on ? .3 : open ? .16 : .1}" stroke="${on ? "var(--sel)" : "var(--boundary)"}" stroke-width="${on ? 3 : 1}" stroke-dasharray="${open ? "none" : "6 4"}" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -1009,20 +1132,20 @@ function parcelOverlay(){
   return s;
 }
 // The construction ghost of fence being laid (or lifted): in 3/4 a translucent wall as tall as the fence will stand, with a post line at every piece; flat, a wide band. Green when it can go down, red when it can't.
-function fenceGhostSvg(keys, kind, bad, inv){
+function fenceGhostSvg(keys, kind, bad, inv, shift){
   if(!keys.length) return "";
   const c = bad ? "#E5484D" : "#4CD964", n2 = v => v.toFixed(2), H = (FENCE34[kind] || FENCE34.wood).h;
   const dash = `stroke-dasharray="${5*inv} ${3*inv}"`, ln = `stroke="${c}" stroke-width="1.4" ${dash} vector-effect="non-scaling-stroke"`;
   let s = `<g pointer-events="none" stroke-linejoin="round">`;
   for(const k of keys){
-    const [a, b] = pieceEnds(k);
+    let [a, b] = pieceEnds(k); const sh = shift && shift[k]; if(sh){ a = [a[0] + sh[0], a[1] + sh[1]]; b = [b[0] + sh[0], b[1] + sh[1]]; }
     if(tilt){
       const ta = lift34(H)(a), tb = lift34(H)(b);
       s += `<polygon points="${polyStr([a, b, tb, ta])}" fill="${c}" fill-opacity=".3" ${ln}/>`;
       s += `<line x1="${n2(a[0])}" y1="${n2(a[1])}" x2="${n2(ta[0])}" y2="${n2(ta[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
     } else s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-opacity=".35" stroke-width="${Math.max(10, 1.2 * view.k)}" stroke-linecap="butt" vector-effect="non-scaling-stroke"/>`;
   }
-  const last = pieceEnds(keys[keys.length - 1])[1];
+  let last = pieceEnds(keys[keys.length - 1])[1]; const shl = shift && shift[keys[keys.length - 1]]; if(shl) last = [last[0] + shl[0], last[1] + shl[1]];
   if(tilt){ const tl = lift34(H)(last); s += `<line x1="${n2(last[0])}" y1="${n2(last[1])}" x2="${n2(tl[0])}" y2="${n2(tl[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`; }
   return s + `</g>`;
 }
@@ -1051,20 +1174,35 @@ function renderOverlay(){
       s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(first ? 7 : 4.5)*inv}" fill="${first ? "var(--sel)" : "#fff"}" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
     });
   }
+  if(cdrag && cdrag.plan) s += pathGhostSvg(cdrag.plan, inv);
+  else if(chover) s += `<rect x="${chover[0] * CHUNK}" y="${chover[1] * CHUNK}" width="${CHUNK}" height="${CHUNK}" fill="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" fill-opacity=".35" stroke="${tool === "bulldoze" ? "var(--bad)" : "var(--sel)"}" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(fdrag && fdrag.box){   // the path chunks a bulldoze box will take, lit as the box grows
+    let d = "";
+    for(const k of bulldozeChunkKeys(fdrag)){ const [cx, cy] = chunkXY(k); d += `M${cx * CHUNK} ${cy * CHUNK}h${CHUNK}v${CHUNK}h-${CHUNK}z`; }
+    if(d) s += `<path d="${d}" fill="var(--bad)" fill-opacity=".45" stroke="var(--bad)" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  }
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
-    const keys = fenceDragKeys();
-    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv);
-    for(const k of keys){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
+    const keys = !fdrag.lift && fdrag.todo ? fdrag.todo : fenceDragKeys(), sh = fdrag.lift ? null : fdrag.shift;
+    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv, sh);
+    for(const k of keys){ const [a, b] = pieceEnds(k), o = sh && sh[k] || [0, 0]; s += `<line x1="${a[0] + o[0]}" y1="${a[1] + o[1]}" x2="${b[0] + o[0]}" y2="${b[1] + o[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
     if(fdrag.box) s += `<rect x="${Math.min(fdrag.a[0], fdrag.b[0])}" y="${Math.min(fdrag.a[1], fdrag.b[1])}" width="${Math.abs(fdrag.b[0] - fdrag.a[0])}" height="${Math.abs(fdrag.b[1] - fdrag.a[1])}" fill="var(--bad)" fill-opacity=".12" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
     else s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  }
+  if(pdrag){
+    const r = paintBox(pdrag.a, pdrag.b), er = paintPick === "erase", c = er ? "var(--bad)" : "var(--sel)";
+    s += `<rect x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}" fill="${er ? c : BIOMES[paintPick].park}" fill-opacity="${er ? .15 : .7}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+  }
+  if(wdrag){
+    const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
+    s += `<rect x="${b.r[0]}" y="${b.r[1]}" width="${b.r[2] - b.r[0]}" height="${b.r[3] - b.r[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? `url(#w-${b.look})` : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
     // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
-    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
-    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
+    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb, pic:gp != null ? gp : undefined}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
     else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
@@ -1073,8 +1211,16 @@ function renderOverlay(){
     const col = ghost.ok ? "var(--sel)" : "var(--bad)", t = BUILDINGS[tool];
     const gk = themeFor("building", {type:tool, points:ghost.pts}), gb = gk ? {theme:gk} : null;
     if(gb) s += `<g opacity=".8"><polygon points="${polyStr(ghost.pts)}" fill="${themeFill(gb, t.color)}"/>${themeBuildSvg(gb, polyStr(ghost.pts), polyStr(insetRect(ghost.pts, .86)))}</g>`;
-    s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
-    s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
+    if(t.prop && tilt){
+      // a path object: the pixel picture with its footprint dashed round it and an arrow out of its front
+      const gi = {id:"ghost", type:tool, points:ghost.pts, theme:gk}, [fx, fy] = propFront(gi), [gx, gy] = centroid(ghost.pts), fr = Math.max(t.w, t.d) / 2 + .5;
+      s += `<g opacity=".85" pointer-events="none">${propArt(gi, inv, false, false)}</g><polygon points="${polyStr(ghost.pts)}" fill="none" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+      s += `<path d="M${gx} ${gy}L${gx + fx*fr} ${gy + fy*fr}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${gx + fx*fr}" cy="${gy + fy*fr}" r="${Math.max(.3, 4*inv)}" fill="${col}"/>`;
+    } else {
+      s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
+      s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
+      if(t.prop) s += propFrontMark({points:ghost.pts}, Math.max(t.w, t.d) / 2);
+    }
   }
   if(gateGhost && !gateGhost.loose){
     const gr = Math.max(1.6, 5*inv);
@@ -1106,7 +1252,24 @@ function renderOverlay(){
   overlay.innerHTML = s;
 }
 
-function applyTransform(){ cam.setAttribute("transform", `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`); }
+function applyTransform(){ const t = `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`; cam.setAttribute("transform", t); const lc = $("#lightCam"); if(lc) lc.setAttribute("transform", t); const wc = $("#washCam"); if(wc) wc.setAttribute("transform", t); }
+// Lamp light: the night wash gets stepped holes cut in it round each working lamp (the ground shows at its day color), a faint warm tint
+// over the pool, and a small glow at the lamp head. Each step is one group at a single opacity, so overlapping pools never add up. Redrawn only when the lamp set changes.
+let lightKey = "";
+function drawLights(){
+  const g = $("#lightPools"), h = $("#washHoles"); if(!g || !h) return;
+  const spots = lampSpots(), key = spots.map(s => `${s.id}:${s.x.toFixed(1)},${s.y.toFixed(1)}`).join("|");
+  if(key !== lightKey){
+    lightKey = key;
+    const R = LAMP.visRadius, c = (s, r, fill) => `<circle cx="${s.x.toFixed(2)}" cy="${s.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${fill}"/>`;
+    let left = 1, holes = "";   // the share of night left in each step; a step's group opacity cuts it from what the step before left
+    LAMP.steps.forEach(([share, wash]) => { holes += `<g opacity="${(1 - wash / left).toFixed(3)}">${spots.map(s => c(s, R * share, "#000")).join("")}</g>`; left = wash; });
+    h.innerHTML = holes;
+    const head = s => `<circle cx="${s.hx.toFixed(2)}" cy="${(s.hy - LAMP.headH / TILT).toFixed(2)}" r="${LAMP.headR}" fill="${LAMP.glow}"/>`;
+    g.innerHTML = `<g opacity="${LAMP.tint}">${spots.map(s => c(s, R, LAMP.glow)).join("")}</g><g opacity=".4">${spots.map(head).join("")}</g>`;
+  }
+  const o = darkLevel().toFixed(2); if(g.getAttribute("opacity") !== o) g.setAttribute("opacity", o);
+}
 
 /* ---------- animals wandering in their exhibits ---------- */
 const herd = new Map();   // animal id -> {el, x, y, path, key, wait, spd, exhibitId}
@@ -1133,11 +1296,11 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
 function spriteSvg(sp, h){
   if(!h.viv && rigOf(sp) && !(h.swim && SPRITES[sp].swim && !rigSwims(sp))) return rigSvg(sp, h);   // drawn from parts, not a strip (rigs.js); a swimmer in a pond keeps its swim strip unless its rig has a swim clip
-  const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="sprites/${sp}.png" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
-    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="sprites/${sp}-${kind}.png" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
-    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 || f <= -100 ? ` display="none"` : ""}><image href="sprites/${sp}-idle.png" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
-    + (!idl && !swm && S.walk && S.rest ? `<svg class="rs" ${box} viewBox="${Math.max(-100 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -100 ? ` display="none"` : ""}><image href="sprites/${sp}-rest.png" style="image-rendering:pixelated" width="${S.rest}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
+  const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht * (S.foot || 1)).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
+  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${spriteUrl(`sprites/${sp}.png`)}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
+    + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-${kind}.png`)}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 || f <= -100 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-idle.png`)}" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
+    + (!idl && !swm && S.walk && S.rest ? `<svg class="rs" ${box} viewBox="${Math.max(-100 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -100 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-rest.png`)}" style="image-rendering:pixelated" width="${S.rest}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
 }
 // A picture's idle frame in a vivarium (or an idle-only picture): its idle strip loops at `ms`. With `dyn` (a list of [first frame, count]), only the first `base` frames loop,
 // and every `dynGap` seconds (min, max) one of the dyn clips plays once at `dynMs` a frame, a small movement (the Tiktaalik's look-around and push-up), then it settles back.
@@ -1190,6 +1353,11 @@ function restPose(h, S){
   return -2 - Math.floor(performance.now() / (S.ms || 250) + h.phase) % S.idle;
 }
 
+// Can a vivarium animal stand at p with its picture wholly inside the case? Its width clears the side walls and posts, and its feet stay behind the sill (the front glass's frame covers the bottom of the floor).
+function vivSpot(h, e, p){
+  const K = VIV34[e.viv] || VIV34.M, S = SPRITES[h.sp], hw = (S ? 2 * (S.size || 1) : 1) * (h.r || 1) + K.post, m = K.sill / TILT + .15, P = e.points;
+  return inPoly(p[0], p[1], P) && inPoly(p[0] - hw, p[1], P) && inPoly(p[0] + hw, p[1], P) && inPoly(p[0], p[1] + m, P) && inPoly(p[0] - hw, p[1] + m, P) && inPoly(p[0] + hw, p[1] + m, P);
+}
 // a vivarium animal stays put, so keep new ones a couple of bodies apart
 function cramped(h, p){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * 4) return true; return false; }
 
@@ -1206,7 +1374,7 @@ function syncAnimals(){
         const [x, y] = randomInside(e.points);
         const el = document.createElementNS("http://www.w3.org/2000/svg", "g");
         el.setAttribute("pointer-events", "none");
-        h = {el, x, y, path:null, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp};
+        h = {el, x, y, path:null, wait:Math.random()*3, spd:.6 + Math.random()*.8, exhibitId:e.id, sp:a.sp, face:a.face || 1};
         herd.set(a.id, h);
         animalLayer.appendChild(el);
       }
@@ -1215,7 +1383,9 @@ function syncAnimals(){
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? (SPRITES[a.sp] ? VIVARIUMS[e.viv].d / 7 : Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
       h.r = r; h.spr = sprite; h.viv = !!e.viv;
-      if(!h.placed){ h.placed = true; const A = walkArea(h, e); for(let i = 0; i < 20; i++){ const p = randomInside(e.points); if(standable(p, A) && !(e.viv && cramped(h, p))){ [h.x, h.y] = p; break; } } }   // a new animal starts somewhere it fits
+      if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
+      if(!h.placed){ h.placed = true; const A = walkArea(h, e); let ok = false; for(let i = 0; i < (e.viv ? 80 : 20); i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) : standable(p, A)){ [h.x, h.y] = p; ok = true; break; } }   // a new animal starts somewhere it fits
+        if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
@@ -1357,7 +1527,7 @@ function animalWander(h, e){
 }
 
 /* What each act looks like (behavior.js picks the act): where the animal heads, how fast, and whether it stays once there */
-const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1};
+const ACT_GAIT = {pace:1.6, play:1.8, patrol:.9, hunt:.55, social:1.1, hide:SHELTER.hurry};
 const ACT_STAYS = new Set(["eat", "drink", "rest", "hide"]);
 // The edge of a land feature nearest the animal, or its middle for shelters it can walk into
 function featSpot(h, f, into){
@@ -1393,6 +1563,7 @@ function bankSpot(h, e){
 // Where the act takes it, or null to stay where it is
 function actGoal(h, e, a){
   const land = landOf(e).filter(f => LAND[f.type]), of = k => land.filter(f => LAND[f.type][k]);
+  const sr = shelterRun.get(a.id); if(sr && !sr.in && land.includes(sr.f)) return featSpot(h, sr.f, true);   // on its way into the shelter it was given a place in
   switch(a.act){
     case "eat": {
       const t = trays(e).filter(f => trayHas(f) > 0);
@@ -1425,7 +1596,13 @@ function actGoal(h, e, a){
       const s = SPECIES_BY_ID[a.sp], f = pickOne(of("flora").concat(eats(s, "herbivore") ? of(foodType(s) === "paleoflora" ? "paleo" : "hay") : [], land.filter(f => f.type === "buglog" && toyFor(LAND[f.type], s) > 0)));
       return f ? featSpot(h, f) : null;
     }
-    case "hunt": { const s = SPECIES_BY_ID[a.sp], f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null; }
+    case "hunt": {
+      // prey in the exhibit: stalk the nearest one, stopping a body short
+      const s = SPECIES_BY_ID[a.sp]; let prey = null, bd = Infinity;
+      for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && huntDriven(a) && attackReason(s, SPECIES_BY_ID[o.sp])){ const d = Math.hypot(o.x - h.x, o.y - h.y); if(d < bd){ bd = d; prey = o; } }
+      if(prey){ const r = (h.r || 1) + (prey.r || 1), dx = h.x - prey.x, dy = h.y - prey.y, d = Math.hypot(dx, dy) || 1; return d <= r ? null : [prey.x + dx / d * r, prey.y + dy / d * r]; }
+      const f = pickOne(land.filter(f => LAND[f.type].look === "ice" && toyFor(LAND[f.type], s) > 0)); return f && Math.random() < .5 ? featSpot(h, f) : null;
+    }
     case "play": { const s = SPECIES_BY_ID[a.sp], ws = waterOf(e); if(swims(s) && ws.length && Math.random() < .6) return centroid(pickOne(ws).points); const f = pickOne(land.filter(f => toyFor(LAND[f.type], s) > 0).concat(of("cover"))); return f && Math.random() < .7 ? featSpot(h, f) : null; }
     case "social": {
       let mate = null, bd = Infinity;
@@ -1492,6 +1669,11 @@ function swimCheck(h, e){
 function animateAnimals(dt){
   for(const h of herd.values()){
     const e = state.exhibits.find(x => x.id === h.exhibitId); if(!e) continue;
+    // an animal heading for a shelter goes in the moment it gets there; one inside isn't drawn or moved, and walks back out when it comes out
+    const run = h.a && shelterRun.get(h.a.id); if(run && !run.in) shelterArrive(h.a, run);
+    const ins = !!(h.a && h.a.inside);
+    if(ins !== !!h.ins){ h.ins = ins; h.el.style.display = ins ? "none" : ""; if(!ins){ h.path = null; h.wait = 0; } }
+    if(ins) continue;
     if(!e.viv) swimCheck(h, e);   // in a pond or not, even if it never moves (it may be napping where it spawned)
     // a clip that has started (the idle one, lying down) finishes first, whatever the animal's AI now wants, then it carries on
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
@@ -1555,20 +1737,36 @@ const nodeKey = p => Math.round(p[0]*4) + ":" + Math.round(p[1]*4);
 function partyPos(p){
   if(p.to){
     const dx = p.to.x - p.at.x, dy = p.to.y - p.at.y, L = Math.hypot(dx, dy) || 1;
-    return [p.at.x + dx*p.t - dy/L*p.off, p.at.y + dy*p.t + dx/L*p.off];
+    return [p.at.x + dx*p.t + (p.ox || 0), p.at.y + dy*p.t + (p.oy || 0)];
   }
-  const a = p.off * 4.4;
-  return [p.at.x + Math.cos(a) * Math.abs(p.off) * 1.5, p.at.y + Math.sin(a) * Math.abs(p.off) * 1.5];
+  return [p.at.x + (p.ox || 0), p.at.y + (p.oy || 0)];
 }
+// Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
+const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
+  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
+    const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;
+    if(spr){
+      let el = guestEls.get(p.id);
+      if(!el){
+        el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
+        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(guestKind(p), hm, null);
+        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el);
+      }
+      const col = cols[ci] || SHIRTS[ci];
+      if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
+      humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y); seen.add(p.id);
+      continue;
+    }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
-    d[moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0].push(m); all.push(m);
+    d[ci].push(m); all.push(m);
   }
+  for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
@@ -1618,7 +1816,6 @@ function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx -
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
   // water stays clear of fences and paths, so it only snaps to the grid
-  if(draw && draw.kind === "water") return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
   const R = 12 / view.k;
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
   // tram track only ever joins other tram track, and nothing else snaps to it
@@ -1669,6 +1866,7 @@ function insidePlot(pts, closed){
 }
 
 function pathProblem(pts, type){
+  if(type === "tram" && !devMode()) return "That isn't available yet.";
   if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`;
   if(pts.length < 2) return "Needs at least 2 points.";
   if(lineLength(pts) < 2) return "Too short.";
@@ -1683,20 +1881,15 @@ function pathProblem(pts, type){
 
 /* ---------- drawing exhibits and paths ---------- */
 const DRAW_TEXT = {
-  path:["New path", "Tap to add points. Start on the entrance or another path. Tap the last point again to finish."],
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
-  wide:["New wide path", "A 10 m promenade for busy stretches. Twice the room before guests feel packed. Start on the entrance or another path, then tap the last point again to finish."],
-  service:["New service road", "Staff only. Guests won't walk it. Start on any path, then tap the last point again to finish."],
   tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
-  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."],
-  bridge:["New wooden bridge", "A footpath that can cross water. Start on a path or the entrance, run it over the water, then tap the last point again to finish."]
 };
-const drawType = () => draw && (draw.kind === "service" || draw.kind === "wide" || draw.kind === "tram" || draw.kind === "bridge") ? draw.kind : undefined;
+const drawType = () => draw && draw.kind === "tram" ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; fdrag = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -1705,9 +1898,12 @@ function setTool(t){
   if(fam){
     $("#dSizes").innerHTML = FAMILIES[fam].tools.map((x, i) => `<button data-pick="${x}" aria-pressed="${x === t}">${FAMILIES[fam].labels[i]}</button>`).join("");
   }
+  if(t === "paint"){ paintBar(); }
+  if(t === "water"){ waterBar(); }
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "exhibit") fenceBar();
+  else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(landKey(t)){
     const L = LAND[landKey(t)];
@@ -1724,6 +1920,7 @@ function setTool(t){
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
       : b.tram ? `Point beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
       : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
+      : b.type === "lamp" ? `Point at a path and tap. After dark it lights about ${LAMP.radius} m around it: guests feel safe on lit paths, and vandals and cameras notice it.${spin}`
       : b.onPath ? `Point at a path and tap. It sits on the edge you point at.${spin}`
       : b.prop ? `Point beside a path and it snaps on.${free}${spin}`
       : `Point beside a path and it turns to face it.${free}${spin}`,
@@ -1733,6 +1930,7 @@ function setTool(t){
     showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
     updateZoneEditBar();
   }
+  else if(t === "paint" || t === "water"){}
   else if(t === "parcels"){ parcelSel = null; fit(); updateParcelBar(); }
   else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
@@ -1740,7 +1938,7 @@ function setTool(t){
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit, path, or building to remove it, tap an exhibit's gate to un-make it (the fence stays), drag along a fence to lift what you sweep over, or drag a box over empty ground to lift all the fence in it. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift what you sweep over. On bare ground, a tap takes the path chunk under it and a drag box takes every path chunk it touches (lit red as you drag) and lifts the fence in it; with no path or fence in it, it takes off painted biome ground. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -1760,7 +1958,8 @@ function startDraw(kind){
   const [t, hint] = DRAW_TEXT[kind];
   showBar(t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
   updateDrawbar();
-  if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
+  if(kind === "tram" && !devMode()) setStat("That isn't available yet.", true);
+  else if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -1771,15 +1970,13 @@ function updateDrawbar(){
   let stat = "", err = null;
   if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
-  } else if(draw.kind === "water"){
-    if(all.length >= 3){ const h = waterHost(all); stat = `${fmtArea(area(all))} of water ${h ? "in " + h.name : "out in the park"}. ${money(waterCost(all))}`; err = waterProblem(all, h, null, waterCost(all)); }
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
   draw.error = err;
   setStat(err || stat, !!err);
   $("#dUndo").disabled = !draw.pts.length;
-  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "water" ? !waterProblem(draw.pts, waterHost(draw.pts), null, waterCost(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
+  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
   $("#dFinish").disabled = !ready;
 }
 
@@ -1818,14 +2015,14 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function updateParcelBar(){
-  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${fmtArea(ownedBox() ? PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0) : 0)} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
+  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${parcelsBought()} of ${MAX_PARCELS} plots bought. ${fmtArea(PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0))} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
   const [i, j] = parcelSel, why = parcelProblem(i, j);
-  showBar("Buy this plot", `${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
+  showBar("Buy this plot", `Plot ${parcelsBought() + 1} of ${MAX_PARCELS}. ${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
   $("#dFinish").disabled = !!why; setStat(why || "", !!why);
 }
 function parcelTap(e){
   const p = toWorld(e.clientX, e.clientY);
-  const c = PARCEL_CELLS.find(([i, j]) => { const r = parcelRect(i, j); return p.x >= r[0] && p.x < r[2] && p.y >= r[1] && p.y < r[3]; });
+  const c = SALE_CELLS.find(([i, j]) => { const r = parcelRect(i, j); return p.x >= r[0] && p.x < r[2] && p.y >= r[1] && p.y < r[3]; });
   parcelSel = c && !ownsParcel(c[0], c[1]) ? c : null;
   updateParcelBar(); renderOverlay();
 }
@@ -1837,7 +2034,7 @@ function buyLand(){
   ui.toast(`Bought ${fmtArea(parcelArea(i, j))} of land for ${money(price)}.`, "good");
 }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "exhibit"){ fenceMeet = !fenceMeet; fenceBar(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
   if(tool === "parcels"){ buyLand(); return; }
@@ -1846,18 +2043,8 @@ function finishDraw(){
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = d.pts.map(p => [p[0], p[1]]);
-  const host = d.kind === "water" ? waterHost(pts) : null;
-  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "water" ? waterProblem(pts, host, null, waterCost(pts)) : pathProblem(pts, type);
+  const problem = d.kind === "zone" ? zoneProblem(pts) : pathProblem(pts, type);
   if(problem){ setStat(problem, true); return; }
-  if(d.kind === "water"){
-    const cost = waterCost(pts);
-    addWater(host, pts);
-    afterChange();
-    // keep the tool going so you can draw the next one
-    startDraw("water"); render();
-    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host ? host.name : "the park"} for ${money(cost)}.`, "good");
-    return;
-  }
   if(d.kind === "zone"){
     const used = new Set(state.zones.map(x => x.name));
     let n = 1; while(used.has(`Zone ${n}`)) n++;
@@ -1887,11 +2074,82 @@ function finishDraw(){
   ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
 }
 
+/* ---------- painting ground (js/biomepaint.js) ---------- */
+function paintBar(){
+  if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+  $("#dSizes").hidden = false;
+  $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
+}
+$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickbiome]"); if(b && tool === "paint"){ paintPick = b.dataset.pickbiome; paintBar(); } });
+function paintDragStat(){
+  if(!pdrag) return;
+  const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
+  const cost = w && h && paintPick !== "erase" ? exhibitPaintCost(r, paintPick) : 0;
+  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}` : "", cost > 0 && !canAfford(cost));
+}
+function endPaintDrag(){
+  const d = pdrag; pdrag = null; renderOverlay();
+  const r = paintBox(d.a, d.b);
+  if(paintPick === "erase"){
+    if(!eraseRect(r)){ setStat("No paint there."); return; }
+    setStat(""); afterChange(); render(); return;
+  }
+  const c = exhibitPaintCost(r, paintPick);
+  if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
+  const res = paintRect(paintPick, r);
+  if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
+  if(c) spend(c, "built");
+  setStat(""); afterChange(); render();
+}
+// Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
+function bulldozePaint(d){
+  const tap = d.a[0] === d.b[0] && d.a[1] === d.b[1];
+  const hit = tap ? erasePaintAt(d.a[0], d.a[1]) : eraseRect(paintBoxW(d.a, d.b)) > 0;
+  if(hit){ setStat(""); afterChange(); render(); }
+  return hit;
+}
+
+/* ---------- laying water in chunks ---------- */
+// The water types to pick from: one for each biome with a water texture, plus the biome's own
+const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
+function waterBar(){
+  if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
+  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Bulldoze takes a box away.", "", {undo:false, finish:false, cancel:"Done"});
+  $("#dSizes").hidden = false;
+  $("#dSizes").innerHTML = `<button data-pickwater="auto" aria-pressed="${waterPick === "auto"}" title="The water that goes with the ground it's laid on">Own biome</button>`
+    + waterTypes().map(k => `<button data-pickwater="${k}" aria-pressed="${k === waterPick}" title="${esc(BIOMES[k].ground)}">${esc(BIOMES[k].label)}</button>`).join("");
+}
+$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickwater]"); if(b && tool === "water"){ waterPick = b.dataset.pickwater; waterBar(); renderOverlay(); } });
+// the kind (water type) a new box is laid with: undefined means the biome of where it goes
+const waterKindPick = () => waterPick !== "auto" && WATER_TEX[waterPick] ? waterPick : undefined;
+// the box being dragged: its meters, outline, the exhibit it's in (null: out in the park), price and why not
+function waterBox(){
+  const r = paintBox(wdrag.a, wdrag.b), pts = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), kind = waterKindPick();
+  const cost = waterNetCost(host, pts, kind), same = waterCovered(host, pts, kind);
+  // the look of the ghost: the picked type, else the biome it would sit in
+  const look = kind || (host ? biomeOf(host) : parkBiome());
+  return {r, pts, host, kind, cost, same, look, err:same ? "That water is already there." : waterProblem(pts, host, null, cost, true)};
+}
+function waterDragStat(){
+  if(!wdrag) return;
+  const b = waterBox();
+  setStat(b.err || `${b.r[2] - b.r[0]} × ${b.r[3] - b.r[1]} m of water ${b.host ? "in " + b.host.name : "out in the park"}. ${money(b.cost)}`, !!b.err);
+}
+function endWaterDrag(){
+  const b = waterBox(); wdrag = null; renderOverlay();
+  if(b.err){ setStat(b.err, true); if(!b.same) ui.toast(b.err, "bad"); return; }
+  layWater(b.host, b.pts, b.kind);
+  setStat(""); afterChange(); render();
+  ui.toast(`Laid ${fmtArea(area(b.pts))} of water in ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
+}
+
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
 const gridAt = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math.round(w.x / GRID_STEP) * GRID_STEP, Math.round(w.y / GRID_STEP) * GRID_STEP]; };
 function fenceBar(stat){
   const B = BARRIERS[fenceSel];
-  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
+  $("#dUndo").disabled = false;
   setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.` : stat || `${money(fenceRate(fenceSel))} a meter.`, !!(B.tech && !hasTech(B.tech)));
 }
 // The pieces the current drag covers
@@ -1916,20 +2174,118 @@ function segHitsRect(p, q, a, b){
 }
 function fenceDragStat(){
   const keys = fenceDragKeys();
-  if(fdrag.lift){ const back = Math.round(keys.reduce((n, k) => n + pieceCost(k, pieceType(fencePieces()[k])) * COST.refundShare, 0)); setStat(`Lift ${keys.length} piece${keys.length === 1 ? "" : "s"} of fence for ${money(back)} back.`); return; }
-  const plan = planPieces(keys, fenceSel), m = Math.round(keys.reduce((n, k) => n + pieceLen(k), 0));
-  fdrag.why = plan.why;
-  setStat(plan.why || `${m} m, ${money(plan.cost)}.`, !!plan.why);
+  if(fdrag.lift){
+    const back = Math.round(keys.reduce((n, k) => n + pieceWorth(k, fencePieces()[k]) * COST.refundShare, 0)), ch = fdrag.box ? bulldozeChunkKeys(fdrag) : [];
+    const chBack = Math.round(ch.reduce((n, k) => n + pathChunkCost(pathChunks()[k]) * COST.refundShare, 0));
+    const parts = [];
+    if(ch.length) parts.push(`${ch.length} path chunk${ch.length === 1 ? "" : "s"}`);
+    if(keys.length || !ch.length) parts.push(`${keys.length} piece${keys.length === 1 ? "" : "s"} of fence`);
+    setStat(`Remove ${parts.join(" and ")} for ${money(back + chBack)} back.`);
+    return;
+  }
+  const opts = fenceOpts(), plan = planPieces(keys, fenceSel, opts), m = Math.round(plan.todo.reduce((n, k) => n + pieceLen(k), 0));
+  fdrag.why = plan.why; fdrag.todo = plan.todo; fdrag.side = opts.side; fdrag.shift = {};
+  // a shared wall that changes on one side only is shown nudged to that side
+  for(const k of plan.todo){
+    const old = fencePieces()[k], nx = plan.next[k]; if(!old || !pieceSplit(nx)) continue;
+    const a = pieceKind(nx, true) !== pieceKind(old, true), b = pieceKind(nx, false) !== pieceKind(old, false); if(a === b) continue;
+    const [e0, e1] = pieceEnds(k), L = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]), sg = a ? 1 : -1;
+    fdrag.shift[k] = [-(e1[1] - e0[1]) / L * sg * FENCE_GRID.sideGap, (e1[0] - e0[0]) / L * sg * FENCE_GRID.sideGap];
+  }
+  setStat(plan.why || `${m} m, ${money(plan.cost)}.${plan.note ? " " + plan.note : ""}`, !!plan.why);
+}
+// How the drag is laid: which way it runs, which side of it the pointer is on (for a wall two pens share), and whether to leave other fence alone
+function fenceOpts(){
+  const L = pieceLine(fdrag.a, fdrag.b), dx = Math.sign(L.end[0] - fdrag.a[0]), dy = Math.sign(L.end[1] - fdrag.a[1]);
+  let side = 0;
+  if((dx || dy) && fdrag.w){ const d = (-(fdrag.w.x - fdrag.a[0]) * dy + (fdrag.w.y - fdrag.a[1]) * dx) / Math.hypot(dx, dy); side = Math.abs(d) < FENCE_GRID.sideDead ? 0 : Math.sign(d); }
+  return {dir:[dx, dy], side, meet:fenceMeet};
 }
 function endFenceDrag(){
-  const keys = fenceDragKeys(), lift = fdrag.lift; fdrag = null;
-  if(!keys.length){ renderOverlay(); return; }
-  const r = lift ? liftPieces(keys) : layPieces(keys, fenceSel);
+  const keys = fenceDragKeys(), lift = fdrag.lift, box = fdrag.box && fdrag, opts = lift ? null : fenceOpts(); fdrag = null;
+  const tookPath = box ? bulldozeChunks(box) : false;   // the chunks lit in the box go at once, with one refund and one toast
+  if(!keys.length){ if(box && !tookPath) bulldozePaint(box); renderOverlay(); return; }
+  if(lift){
+    askConfirm("Remove this fence?", "Animals inside can escape.", "Remove", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
+    renderOverlay(); return;
+  }
+  finishFenceDrag(keys, false, opts);
+}
+function finishFenceDrag(keys, lift, opts){
+  const r = lift ? liftPieces(keys) : layPieces(keys, fenceSel, opts);
   if(!r){ renderOverlay(); return; }   // the stat line already says why
   afterChange(); render();
   if(lift) setStat(""); else fenceBar();
   const what = lift ? `Lifted ${r.n} piece${r.n === 1 ? "" : "s"} of fence for ${money(r.back)} back.` : `Laid ${r.n} piece${r.n === 1 ? "" : "s"} of fence for ${money(r.cost)}.`;
   ui.toast([what].concat(r.notes).join(" "), r.notes.some(n => /gap/.test(n)) ? "bad" : "good");
+}
+
+/* ---------- laying paths on the chunk grid (js/pathcells.js) ---------- */
+const chunkAtEv = ev => { const w = toWorld(ev.clientX, ev.clientY); return chunkAt(w.x, w.y); };
+const PATH_HINT = {
+  g:"Drag to lay 5 m path chunks, straight or diagonal. Start on the entrance walk or another path. Lay paths side by side for a wider walk. Bulldoze takes chunks away.",
+  s:"Staff only: guests won't walk it. Drag to lay staff chunks from any path; one that touches a guest path or the entrance walk is joined to it for staff. Bulldoze takes chunks away.",
+  b:"The only path that crosses water. Drag it over the water, from one bank to the other. Bulldoze takes chunks away."
+};
+function pathBar(){
+  const k = PATH_TOOLS[tool], K = PATH_CELLS.kinds[k];
+  showBar(`Lay ${K.label.toLowerCase()}`, PATH_HINT[k], "", {undo:false, finish:false, cancel:"Done"});
+  setStat(`${money(pathChunkCost(k))} a 5 m chunk, ${money(K.perMeter)} a meter of path.`);
+}
+function pathDragStat(){
+  const d = cdrag, K = PATH_CELLS.kinds[d.kind], plan = d.plan = planPath(d.a, d.b, d.kind);
+  setStat(plan.why || `${plan.todo.length} chunk${plan.todo.length === 1 ? "" : "s"}, ${money(plan.cost)}.`, !!plan.why);
+}
+// The chunks a drag will lay at their true size: green where it can go, red where it can't, grey where it's already there
+function pathGhostSvg(plan, inv){
+  const d = {ok:"", bad:"", has:""}, C = pathChunks();
+  for(const k of plan.chunks){
+    const [cx, cy] = chunkXY(k), seg = `M${cx * CHUNK} ${cy * CHUNK}h${CHUNK}v${CHUNK}h-${CHUNK}z`;
+    if(plan.bad.has(k)) d.bad += seg; else if(C[k] === plan.kind || !plan.todo.includes(k)) d.has += seg; else d.ok += seg;
+  }
+  const f = (c, op, path) => path ? `<path d="${path}" fill="${c}" fill-opacity="${op}" stroke="${c}" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "";
+  return `<g pointer-events="none">${f("#8A8F96", .25, d.has)}${f("#4CD964", .4, d.ok)}${f("#E5484D", .5, d.bad)}</g>`;
+}
+function endPathDrag(){
+  const d = cdrag; cdrag = null;
+  if(!d.plan || !d.plan.chunks.length){ renderOverlay(); return; }
+  const K = PATH_CELLS.kinds[d.kind], r = layPath(d.a, d.b, d.kind);
+  if(!r){ renderOverlay(); if(d.plan.why) ui.toast(d.plan.why, "bad"); return; }
+  afterChange(); render(); pathBar();
+  const joined = chunksJoined(d.plan.todo, d.kind !== "s");
+  ui.toast(joined ? `Laid ${r.n} chunk${r.n === 1 ? "" : "s"} of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
+}
+// The chunks a bulldoze box (or tap) takes: the lit ones, never the entrance walk
+function bulldozeChunkKeys(box){ const F = pathFixedChunks(); return chunksInBox(box.a, box.b).filter(k => !F[k]); }
+// Bulldoze on bare ground: a tap takes the chunk under it, a box takes every chunk it touches. Returns true if it dealt with path.
+function bulldozeChunks(box){
+  const all = chunksInBox(box.a, box.b);
+  if(!all.length) return false;
+  const r = removeChunks(all);
+  if(!r.n){ setStat("The main walk from the entrance can't be removed.", true); return true; }
+  afterChange(); render();
+  setStat("");
+  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The main walk from the entrance stays." : ""}`, "good");
+  return true;
+}
+// Chunks for the map: runs along each row, one path a kind
+let chunksCache = null;
+function chunksSvg(){
+  const C = pathChunks(), size = Object.keys(C).length;
+  if(chunksCache && chunksCache.chunks === C && chunksCache.ver === pathVer && chunksCache.size === size) return chunksCache.svg;
+  const rows = {s:new Map(), g:new Map(), b:new Map()};
+  for(const q of pathSquares()){ const m = rows[q.kind]; if(!m) continue; if(!m.has(q.cy)) m.set(q.cy, []); m.get(q.cy).push(q.cx); }
+  let svg = "";
+  for(const kind of ["s", "g", "b"]){
+    let d = "";
+    for(const [cy, xs] of rows[kind]){
+      xs.sort((a, b) => a - b);
+      for(let i = 0; i < xs.length;){ let j = i; while(j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++; const w = (xs[j] - xs[i] + 1) * CHUNK; d += `M${xs[i] * CHUNK} ${cy * CHUNK}h${w}v${CHUNK}h-${w}z`; i = j + 1; }
+    }
+    if(d) svg += `<path d="${d}" fill="${PATH_CELLS.kinds[kind].color}" shape-rendering="crispEdges" pointer-events="none"/>`;
+  }
+  chunksCache = {chunks:C, ver:pathVer, size, svg};
+  return svg;
 }
 
 function toolDone(newSel){
@@ -1964,6 +2320,7 @@ function placeGhost(clientX, clientY){
   }
   let x = p.x, y = p.y, angle = 0, why = null;
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
+  if(!why && buildingHidden(tool)) why = "That isn't available yet.";
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && !state.sandbox && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
@@ -1978,14 +2335,14 @@ function placeGhost(clientX, clientY){
     const nx = -dy/L, ny = dx/L;
     // a sign goes on the edge of the path that faces the exhibit fence closest to where you point (so you can pick either side of a path); everything else on the side you point at
     let fx = p.x, fy = p.y;
-    if(tool === "sign" || tool === "nofeed"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+    if(tool === "sign" || tool === "nofeed" || tool === "quiet"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
     const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
     const ra = rot*Math.PI/4, dn = Math.abs(t.w*Math.sin(ra)) + Math.abs(t.d*Math.cos(ra));   // how deep it is across the path once turned
     let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
     // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
     if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + ra), e.points))) off = Math.max(0, off - .1);
     x = best.x + nx*side*off; y = best.y + ny*side*off;
-    angle = Math.atan2(dy, dx);
+    angle = Math.atan2(dy, dx) + (t.prop && side > 0 ? Math.PI : 0);   // a path object's front (+v) faces the path it stands by
   } else if(t.onPath) why = why || "Move it next to a path.";
   angle += rot * Math.PI/4;
   if(!best){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
@@ -2024,6 +2381,7 @@ function rotateMoved(){
     for(const [dx, dy] of offs){ it.points = shiftPts(turned, dx, dy); if(!moveProblem("building", it)){ why = null; nudged = true; break; } }
   }
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
+  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + 1) % 8;
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
   setStat(reach ? (nudged ? "Turned, and nudged to fit." : "Turned.") : "Turned, but it has no path to the entrance, so it won't work.", !reach);
@@ -2047,6 +2405,7 @@ function placeBuilding(e){
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
+  if(t.prop) b.rot = rot;   // how many 45° turns the player gave it; its front is read off the points (propFront)
   autoZone(b);
   themeNew("building", b);
   state.buildings.push(b);
@@ -2072,6 +2431,7 @@ function findGateSpot(clientX, clientY){
     const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
     return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
   }
+  if(best.pen && penProblem(best.pen)) return {...best, ok:false, deco:true, why:penProblem(best.pen)};   // a hedge or rope pen can't be an exhibit
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
@@ -2091,7 +2451,7 @@ function gateHover(e){
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
   if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
-  if(g.loose){ setStat(g.why, true); return; }
+  if(g.loose || g.deco){ setStat(g.why, true); return; }
   const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
   if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
@@ -2104,6 +2464,27 @@ function gateTap(e){
 /* ---------- keepers on the map ---------- */
 const keeperEls = new Map();
 function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; }
+// A person drawn from strips (HUMAN_SPRITES): the walk frame follows distance walked, the work strip plays on the clock while standing at a job, and it faces the way it last moved
+// The feed crate held out in front of the carrying pose (sprite pixels, right of the body, at hand height; drawn in every pose while the keeper has food, so it looks the same walking, working and standing)
+function carryBox(col){
+  return `<g class="hcb"><rect x="11" y="18" width="5" height="5" fill="${col}"/><rect x="11" y="18" width="5" height="1" fill="#fff" opacity=".35"/><rect x="11" y="18" width="1" height="5" fill="#fff" opacity=".2"/><rect x="11" y="22" width="5" height="1" fill="#000" opacity=".3"/><rect x="15" y="18" width="1" height="5" fill="#000" opacity=".25"/></g>`;
+}
+function humanSvg(kind, hm, food){
+  const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k, V = H[kind];
+  const im = (cls, a) => `<image class="${cls}" href="${spriteUrl(a.src)}" width="${H.w * a.n}" height="${H.ht}" style="image-rendering:pixelated"/>`;
+  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}${V.carry ? im("hc", V.carry) : ""}${V.carry && food ? carryBox(food) : ""}</svg></g>`;
+}
+function humanStep(el, kind, c, x, y){
+  const H = HUMAN_SPRITES, V = H[kind], dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy), now = performance.now();
+  el._hx = x; el._hy = y;
+  if(d > 1e-4){ el._hd = (el._hd || 0) + d; el._hmove = now; if(Math.abs(dx) > 1e-4) el._hface = dx < 0 ? -1 : 1; }
+  const moving = now - (el._hmove || 0) < 250, mode = moving ? (V.carry && c.carry ? "hc" : "hw") : V.work && V.work.jobs.includes(c.job) ? "hk" : V.wait ? "hs" : "hw";
+  const A = {hw:V.walk, hk:V.work, hs:V.wait, hc:V.carry}[mode], g = el.querySelector(".hf"); if(!g) return;
+  const f = moving ? Math.floor((el._hd || 0) / H.step) % A.n : mode === "hw" ? 0 : Math.floor(now / A.ms) % A.n;
+  if(el._hf !== el._hface){ el._hf = el._hface; g.setAttribute("transform", el._hface < 0 ? "scale(-1 1)" : ""); }
+  if(el._hm !== mode){ el._hm = mode; for(const m of ["hw", "hk", "hs", "hc"]){ const im = el.querySelector("." + m); if(im) im.style.display = m === mode ? "" : "none"; } el._hfr = -1; }
+  if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); }
+}
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
   for(const c of crew){
@@ -2115,72 +2496,74 @@ function drawKeepers(){
     const fp = fillPos(c);   // filling trays: inside the fence
     const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
     const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
-    const drive = onAtv(c), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}`;
+    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
       // an animal being moved rides along beside its keeper; on a service road with an ATV, they ride it
       el.innerHTML = atvSvg(r, drive) + (cargo ? `<circle cx="${-r*1.6}" cy="${-r*.6}" r="${r*1.1}" fill="${cargo}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : "") +
-        `<circle r="${r}" fill="#2E6B3A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
-        (food ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${food}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "");
+        humanSvg("keeper", hm, food);
     }
+    humanStep(el, "keeper", c, x, y);
     walker34(el, x, y);
   }
-  // mechanics: orange with a white wrench-dot
+  // mechanics: pixel people in orange coveralls, ringed while inspecting or repairing
   for(const c of mcrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const nx = c.route[0], x = nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
-    const r = Math.max(1.3, 5*inv), working = c.job === "repairing" || c.job === "inspecting", drive = onAtv(c), key = `m${r.toFixed(3)}|${working}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "repairing" || c.job === "inspecting", drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `m${r.toFixed(3)}|${working}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#C8642A" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><circle r="${r*.35}" fill="#fff"/>` +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("mechanic", hm, null) +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "mechanic", c, x, y);
     walker34(el, x, y);
   }
-  // vets: white with a red cross
+  // vets: pixel people in green scrubs, ringed while darting
   for(const c of vcrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "darting", drive = onAtv(c), key = `v${r.toFixed(3)}|${working}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "darting", drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `v${r.toFixed(3)}|${working}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#fff" stroke="#B0384F" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${-r*.55} 0H${r*.55}M0 ${-r*.55}V${r*.55}" stroke="#B0384F" stroke-width="${r*.35}"/>` +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("vet", hm, null) +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "vet", c, x, y);
     walker34(el, x, y);
   }
-  // custodians: teal, with a square of whatever stock they're carrying
+  // custodians: pixel people; the crate in their hands is whatever stock they carry
   for(const c of ccrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), key = `c${r.toFixed(3)}|${good}|${busy}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `c${r.toFixed(3)}|${good}|${busy}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2E8B8B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>` +
-        (good ? `<rect x="${r*.4}" y="${-r*1.5}" width="${r*1.1}" height="${r*1.1}" fill="${good}" stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"/>` : "") +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("custodian", hm, good) +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "custodian", c, x, y);
     walker34(el, x, y);
   }
-  // security guards: navy, with a white badge; a dashed ring while chasing
+  // security guards: pixel people in navy, ringed while chasing; the escort strip plays while walking a party out
   for(const c of gcrew){
     if(!c.at) continue;
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), chasing = !!c.chase, drive = onAtv(c), key = `g${r.toFixed(3)}|${chasing}|${drive}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), chasing = !!c.chase, drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `g${r.toFixed(3)}|${chasing}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
-      el.dataset.key = key;
-      el.innerHTML = atvSvg(r, drive) + `<circle r="${r}" fill="#2B3F6B" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M0 ${-r*.55}l${r*.45} ${r*.2}v${r*.3}c0 ${r*.3} ${-r*.2} ${r*.5} ${-r*.45} ${r*.6}c${-r*.25} ${-r*.1} ${-r*.45} ${-r*.3} ${-r*.45} ${-r*.6}v${-r*.3}z" fill="#fff"/>` +
+      el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
+      el.innerHTML = atvSvg(r, drive) + humanSvg("guard", hm, null) +
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
+    humanStep(el, "guard", c, x, y);
     walker34(el, x, y);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
@@ -2201,21 +2584,71 @@ function drawKeepers(){
 function atvSvg(r, on){ return on ? `<rect x="${-r*1.9}" y="${-r*1.2}" width="${r*3.8}" height="${r*2.4}" rx="${r*.6}" fill="#4F6273" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ""; }
 
 /* ---------- escaped animals on the map ---------- */
+// Dust puffs where an attack lands: a few flat square pixels that spread and fade (about 0.6 s). Not saved, never clickable.
+const FX_DUST = {life: 600, n: 6, cols: ["#C9B089", "#A8946F", "#B7B0A2", "#8F8A7E"]};
+const fxList = [];
+function fxAdd(kind, x, y){ if(fxList.length < 24) fxList.push({kind, x, y, t0: performance.now(), seed: Math.random() * 6.28}); }
+function drawFx(now){
+  const layer = $("#fxLayer"); if(!layer) return;
+  for(let i = fxList.length - 1; i >= 0; i--) if(now - fxList[i].t0 >= FX_DUST.life) fxList.splice(i, 1);
+  if(!fxList.length){ if(layer.childElementCount) layer.innerHTML = ""; return; }
+  const inv = 1 / view.k, px = Math.max(ROCK_MPP * 2, 2.5 * inv);   // squares stay a few screen pixels at any zoom
+  let s = "";
+  for(const f of fxList){
+    const t = (now - f.t0) / FX_DUST.life, spread = (.8 + 5 * t) * px, sz = px * (1 + t), snap = v => Math.round(v / px) * px;
+    for(let i = 0; i < FX_DUST.n; i++){
+      const a = f.seed + i * 6.28 / FX_DUST.n, x = f.x + snap(Math.cos(a) * spread) - sz / 2, y = f.y + snap(Math.sin(a) * spread * .7) - sz / 2 - t * px;
+      s += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${sz.toFixed(2)}" height="${sz.toFixed(2)}" fill="${FX_DUST.cols[i % FX_DUST.cols.length]}" fill-opacity="${(1 - t).toFixed(2)}"/>`;
+    }
+  }
+  layer.innerHTML = s;
+}
+// Escaped animals outside an exhibit: a species with a picture is drawn like it is in its pen (walk strip or rig, facing the way it goes, idle when it stops),
+// with the red ring and the ! / z marker over it; otherwise (or zoomed far out) the old dot. Each loose animal keeps one element group (looseEls), so the rig and strip can animate.
+const looseEls = new Map();
 function drawLoose(){
   const layer = $("#looseLayer"), inv = 1/view.k;
-  if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; return; }
-  let s = "";
+  if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; looseEls.clear(); return; }
+  const seen = new Set(), pulse = 1 + .25 * Math.sin(performance.now() / 180);
   for(const l of state.safety.loose){
     let p = loosePos(l);
     if(l.status === "carried"){ const c = crew.find(x => x.hunt === l); if(c && c.at) p = keeperPos(c); }
     if(!p) continue;
-    const sp = SPECIES_BY_ID[l.sp], r = Math.max(2.5, 7*inv), pulse = 1 + .25 * Math.sin(performance.now() / 180);
-    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${upright()}">`;
-    if(l.status === "loose") s += `<circle r="${r * 1.8 * pulse}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    s += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    s += `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text></g>`;
+    seen.add(l);
+    const sp = SPECIES_BY_ID[l.sp], S = SPRITES[l.sp];
+    let h = looseEls.get(l);
+    if(!h){
+      const wrap = document.createElementNS("http://www.w3.org/2000/svg", "g"), art = document.createElementNS("http://www.w3.org/2000/svg", "g"), mark = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      wrap.setAttribute("pointer-events", "none"); wrap.append(art, mark); layer.appendChild(wrap);
+      h = {wrap, el:art, mark, sp:l.sp, x:p[0], y:p[1], face:1, stride:0, pose:null, spr:null, viv:false, key:""};
+      looseEls.set(l, h);
+    }
+    const dx = p[0] - h.x, dy = p[1] - h.y, step = Math.hypot(dx, dy);
+    h.x = p[0]; h.y = p[1];
+    const spr = !!S && animalRadius(l.sp) * view.k >= 6, r = spr ? animalRadius(l.sp) : Math.max(2.5, 7*inv), moving = step > .002 && l.status === "loose";
+    h.r = r; h.act = null;
+    if(spr !== h.spr || (spr && Math.abs(r - h.rr) > 1e-6)){   // picture appears, vanishes or resizes with zoom: draw it again
+      h.spr = spr; h.rr = r; h.pose = null; h.rg = null;
+      h.el.innerHTML = spr ? spriteSvg(l.sp, h) : "";
+    }
+    if(spr){
+      if(moving && Math.abs(dx) > .0005){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
+      if(moving){
+        h.stride += step;
+        if(rigOf(l.sp)) rigStep(h, "walk"); else if(S.walk) setPose(h, Math.floor(h.stride / (r * (S.step || .5))) % S.walk);
+      }else if(rigOf(l.sp)) rigStep(h, "idle"); else setPose(h, restPose(h, S));
+    }
+    h.wrap.setAttribute("transform", `translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${spr ? animalUp(h) : upright()}`);
+    let m = "";
+    const rr = Math.max(r, 2.5);
+    if(l.status === "loose") m += `<circle r="${(rr * 1.8 * pulse).toFixed(2)}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    if(!spr){
+      m += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`
+        + `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text>`;
+    }else m += `<text class="glyph" y="${(-r * 1.9).toFixed(2)}" font-size="${(r*1.1).toFixed(2)}" style="fill:${l.status === "loose" ? "#E5484D" : "#fff"}">${l.status === "loose" ? "!" : "z"}</text>`;
+    if(m !== h.key){ h.key = m; h.mark.innerHTML = m; }
   }
-  layer.innerHTML = s;
+  for(const [l, h] of looseEls) if(!seen.has(l)){ h.wrap.remove(); looseEls.delete(l); }
 }
 
 /* ---------- viewing platforms ---------- */
@@ -2270,14 +2703,16 @@ function landPoint(ev){
 }
 function landHover(ev){
   const key = landKey(tool), p = landPoint(ev);
+  const hadBiome = rockBiomeNow();
   landGhost = {...landSpot(p.x, p.y, key), key};
+  if(rockBiomeNow() !== hadBiome) refreshShapes();   // the exhibit under the cursor changed the stone biome
   setStat(landGhost.why || `${money(LAND[key].price)}. It goes ${landGhost.e ? "in " + landGhost.e.name : "out in the park"}.`, !landGhost.ok);
   renderOverlay();
 }
 function landTap(ev){
   const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
   if(!g.ok){ setStat(g.why, true); return; }
-  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()));
+  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()), rockPicOf(key, rockBiome || (g.e ? biomeOf(g.e) : parkBiome())));
   afterChange(); render();
   ui.toast(g.e ? `Added ${LAND[key].one} to ${g.e.name}.` : `Added ${LAND[key].one} to the park.`, "good");
 }
@@ -2303,7 +2738,7 @@ function bulldozeTap(kind, id){
 
 // Exhibits hold animals, so bulldozing one asks first
 function confirmExhibitRemoval(e){
-  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park. Are you sure?`, "Yes", () => {
+  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e); doomed = null; setStat("");
   }, "No");
@@ -2319,6 +2754,7 @@ function confirmGateRemoval(e){
 
 function removeItem(kind, it, opts = {}){
   const lift = kind === "exhibit" && it.grid && !opts.keepFence ? ownPieces(it) : [];
+  if(kind === "exhibit" && it.grid && !opts.keepFence) releaseSides(it);   // its side of a wall it shares goes; the neighbor's stays
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
@@ -2359,7 +2795,7 @@ function moveProblem(kind, it){
   } else if(kind === "building"){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
-    if(BUILDINGS[it.type].onPath){ if(!state.paths.some(p => !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
+    if(BUILDINGS[it.type].onPath){ if(!nearCells(pts, 0, true, true) && !state.paths.some(p => !p.d && !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
     else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
@@ -2488,15 +2924,24 @@ function deleteMoveCorner(){
 function svgSize(){ const r = svg.getBoundingClientRect(); return {w:r.width, h:r.height}; }
 function fit(){
   const {w, h} = svgSize(); if(!w || !h) return;
-  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:PARCELS.ys[PARCELS.ys.length-1]} : ownedBox(), pad = 40;
+  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:SOUTH_LINE} : ownedBox(), pad = 40;
   view.k = clamp(Math.min((w - pad*2)/(b.x1 - b.x0), (h - pad*2)/((b.y1 - b.y0)*tf())), KMIN, KMAX);
   view.tx = (w - (b.x1 - b.x0)*view.k)/2 - b.x0*view.k;
   view.ty = (h - (b.y1 - b.y0)*ky())/2 - b.y0*ky();
   render();
 }
+// Keep the park on screen: the view can't scroll more than a margin past the land you own (a thin one to the south, where there's nothing)
+function clampView(){
+  const {w, h} = svgSize(); if(!w || !h) return;
+  const b = tool === "parcels" ? {x0:PARCELS.xs[0], y0:PARCELS.ys[0], x1:PARCELS.xs[PARCELS.xs.length-1], y1:SOUTH_LINE} : ownedBox(), k = view.k, kk = ky(), m = 60;
+  // world x/y at the screen center must stay within the box plus a margin
+  const cx = (w/2 - view.tx)/k, cy = (h/2 - view.ty)/kk;
+  const nx = clamp(cx, b.x0 - m, b.x1 + m), ny = clamp(cy, b.y0 - m, b.y1 + 20);
+  view.tx = w/2 - nx*k; view.ty = h/2 - ny*kk;
+}
 function zoomAt(mx, my, f){
   const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/ky();
-  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); queueRender();
+  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); clampView(); queueRender();
 }
 function centerOn(it){
   if(!it) return;
@@ -2509,6 +2954,7 @@ function centerOn(it){
 function select(kind, id){
   sel = kind ? {kind, id} : null;
   render(); ui.panel();
+  if(kind && focusMode()){ const it = selItem(); ui.toast(`Selected ${it && (it.name || BUILDINGS[it.type]?.label) || kind}. Press H to show the panel.`); return; }
   if(kind && window.matchMedia("(max-width:760px)").matches) $("#aside").classList.add("open");
 }
 
@@ -2528,7 +2974,7 @@ svg.addEventListener("pointerdown", e => {
   // the middle or right button always pans, whatever the tool
   if(e.button > 0){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, pan:true, hit:{kind:null, id:null}}; return; }
   if(pointers.size === 2){
-    drag = null; if(fdrag){ fdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
+    drag = null; if(fdrag || pdrag || cdrag || wdrag){ fdrag = null; pdrag = null; cdrag = null; wdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
     pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, ky:ky(), tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
     return;
   }
@@ -2555,6 +3001,18 @@ svg.addEventListener("pointerdown", e => {
     if(it){ mvSel = hit.kind === "building" ? it.id : null; updateMoveBar(); drag = {mv:startMove(it, hit.kind, e), sx:e.clientX, sy:e.clientY, moved:false, hit}; render(); return; }
   }
   if(mvSel && tool === "move"){ mvSel = null; updateMoveBar(); render(); }
+  if(isPathTool(tool)){
+    const c = chunkAtEv(e); cdrag = {a:c, b:c, kind:PATH_TOOLS[tool]}; chover = null;
+    drag = {cd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; pathDragStat(); renderOverlay(); return;
+  }
+  if(tool === "paint"){
+    const c = chunkAtEv(e);
+    pdrag = {a:c, b:c}; drag = {pd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; paintDragStat(); renderOverlay(); return;
+  }
+  if(tool === "water"){
+    const c = chunkAtEv(e); wdrag = {a:c, b:c};
+    drag = {wd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; waterDragStat(); renderOverlay(); return;
+  }
   if(tool === "exhibit" || tool === "bulldoze"){
     const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
     if(gx){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:{kind:"gate", id:gx.id}}; return; }
@@ -2563,7 +3021,7 @@ svg.addEventListener("pointerdown", e => {
       fdrag = {a:[w.x, w.y], b:[w.x, w.y], lift:true, box:true, swept:new Set(), last:w}; fhover = null;
       drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return;
     }
-    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
+    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w, w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
@@ -2578,12 +3036,14 @@ svg.addEventListener("pointermove", e => {
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
+    else if(isPathTool(tool)){ chover = chunkAtEv(e); renderOverlay(); }
     else if(tool === "bulldoze"){
       // a fence piece under the pointer wins over the exhibit behind it
       const w = toWorld(e.clientX, e.clientY), gx = gateNear(e.clientX, e.clientY), k = gx ? null : pieceNear(w.x, w.y, Math.max(.6, 10 / view.k));
       if(gx) setStat(`Tap to take out the gate. That removes ${gx.name}, but leaves its fence.`, true);
-      if(k !== fhover){ fhover = k; renderOverlay(); }
       const h = k ? {kind:null} : itemAt(e.target), nh = h.kind ? h : null;
+      const pc = !k && !nh && !gx && pathAt(w.x, w.y) && !pathFixedChunks()[chunkKey(...chunkAt(w.x, w.y))] ? chunkAt(w.x, w.y) : null;
+      if(k !== fhover || String(pc) !== String(chover)){ fhover = k; chover = pc; renderOverlay(); }
       if(JSON.stringify(nh) !== JSON.stringify(hoverItem)){ hoverItem = nh; queueRender(); }
     }
     return;
@@ -2607,6 +3067,9 @@ svg.addEventListener("pointermove", e => {
     queueRender(); return;
   }
   if(!drag) return;
+  if(drag.cd){ const c = chunkAtEv(e); drag.moved = true; if(cdrag && (c[0] !== cdrag.b[0] || c[1] !== cdrag.b[1])){ cdrag.b = c; pathDragStat(); renderOverlay(); } return; }
+  if(drag.pd){ const c = chunkAtEv(e); if(pdrag && (c[0] !== pdrag.b[0] || c[1] !== pdrag.b[1])){ pdrag.b = c; paintDragStat(); renderOverlay(); } return; }
+  if(drag.wd){ const c = chunkAtEv(e); if(wdrag && (c[0] !== wdrag.b[0] || c[1] !== wdrag.b[1])){ wdrag.b = c; waterDragStat(); renderOverlay(); } return; }
   if(drag.fd){
     if(fdrag.box){
       if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
@@ -2625,8 +3088,8 @@ svg.addEventListener("pointermove", e => {
       if(fdrag.swept.size !== before){ fenceDragStat(); renderOverlay(); }
       return;
     }
-    const g = gridAt(e); drag.moved = true;
-    if(g[0] !== fdrag.b[0] || g[1] !== fdrag.b[1]){ fdrag.b = g; fenceDragStat(); renderOverlay(); }
+    const g = gridAt(e), moved = g[0] !== fdrag.b[0] || g[1] !== fdrag.b[1]; drag.moved = true; fdrag.w = toWorld(e.clientX, e.clientY); fdrag.b = g;
+    if(moved || fenceOpts().side !== fdrag.side){ fenceDragStat(); renderOverlay(); }
     return;
   }
   if(drag.rv){
@@ -2645,7 +3108,7 @@ svg.addEventListener("pointermove", e => {
   const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
   if(!drag.moved && Math.hypot(dx, dy) < 6) return;
   drag.moved = true;
-  view.tx = drag.tx + dx; view.ty = drag.ty + dy; applyTransform();
+  view.tx = drag.tx + dx; view.ty = drag.ty + dy; clampView(); applyTransform();
 });
 
 function endPointer(e){
@@ -2653,6 +3116,9 @@ function endPointer(e){
   if(pinch){ if(pointers.size < 2) pinch = null; drag = null; render(); return; }
   if(!drag) return;
   const d = drag; drag = null;
+  if(d.cd){ if(cdrag) endPathDrag(); return; }
+  if(d.pd){ if(pdrag) endPaintDrag(); return; }
+  if(d.wd){ if(wdrag) endWaterDrag(); return; }
   if(d.fd){ if(fdrag) endFenceDrag(); return; }
   if(d.pan){ if(d.moved) render(); return; }
   if(d.mv){ if(d.moved) dropMove(d.mv); return; }
@@ -2686,7 +3152,8 @@ function endPointer(e){
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
-  if(tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } }
+  if(d.hit.kind === "entrance" && (!tool || tool === "select")){ openParkOffice(); return; }
+  if(tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } const an = animalAt(e.clientX, e.clientY); if(an){ animalSelName = an.name; select("animal", an.id); return; } }
   if(d.hit.kind) select(d.hit.kind, d.hit.id); else if(sel) select(null);
 }
 svg.addEventListener("pointerup", endPointer);
@@ -2704,6 +3171,20 @@ svg.addEventListener("wheel", e => {
 }, {passive:false});
 
 /* ---------- toolbar and keys ---------- */
+// Focus mode: hide the build menu and side panel so only the map (and the top bar) shows. Remembered per player.
+const focusMode = () => document.querySelector(".app").classList.contains("focus");
+function setFocus(on, keep){
+  const app = document.querySelector(".app"); if(app.classList.contains("focus") === on) return;
+  const before = svgSize().w;
+  app.classList.toggle("focus", on);
+  const fb = $("#focusBtn"); fb.setAttribute("aria-pressed", on); fb.textContent = on ? "Show menus" : "Hide menus"; fb.title = on ? "Bring the menus back (H)" : "Hide the menus to see only the map (H)";
+  if(!keep){ try{ localStorage.setItem("genesis-focus", on ? "1" : "0"); }catch{} }
+  const after = svgSize().w; if(before && after) view.tx += (after - before)/2;
+  if(!on && state) ui.panel();
+  if(state) render();
+}
+$("#focusBtn").onclick = () => setFocus(!focusMode());
+try{ if(localStorage.getItem("genesis-focus") === "1") setFocus(true, true); }catch{}
 buildMenu();
 const sideOpen = on => {
   $("#sideTab").setAttribute("aria-expanded", on); $("#sideBody").hidden = !on; mapwrap.classList.toggle("side-open", on);
@@ -2735,13 +3216,7 @@ $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
-// flip the 3/4 view, keeping the middle of the screen where it is
-$("#ztilt").onclick = () => {
-  const {w, h} = svgSize(), wy = (h/2 - view.ty)/ky();
-  tilt = !tilt; try { localStorage.setItem("gp-tilt", tilt ? "1" : "0"); } catch(e){}
-  view.ty = h/2 - wy*ky(); $("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt); applyTransform(); render(); syncAnimals();
-};
-$("#ztilt").setAttribute("aria-pressed", tilt); svg.classList.toggle("tilt", tilt);
+svg.classList.add("tilt");
 $("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Green farms, blue stores, gold exhibits" : "Off"; render(); };
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;
@@ -2754,6 +3229,7 @@ document.addEventListener("keydown", e => {
     if(e.key === "Enter"){ e.preventDefault(); finishDraw(); return; }
     if(e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); undoDrawPoint(); return; }
   }
+  if(e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey && !e.altKey){ setFocus(!focusMode()); return; }
   if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sel) select(null); }
   if(e.key === " "){ e.preventDefault(); setSpeed(speed ? 0 : (lastSpeed || 1)); }
   if(e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey){ if(isBuildTool(tool)) rotateTool(); else if(tool === "move" && mvSel) rotateMoved(); }

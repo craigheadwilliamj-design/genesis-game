@@ -21,6 +21,21 @@ MOSSY = ramp((134, 138, 140)); MOSSY["top"] = mix((84, 122, 70), (255, 255, 255)
 LITTER = ramp((128, 130, 128)); LITTER["top"] = mix((140, 98, 52), (255, 255, 255), .1); LITTER["hi"] = mix(LITTER["hi"], (140, 98, 52), .25)   # grey with a leaf-litter cap
 BUFF = ramp((190, 150, 108))   # desert: sandstone strata, buff / rust red / cream, from ROCK_STONE desert
 RUST = ramp((168, 88, 50)); CREAM = ramp((222, 198, 150)); VARNISH = ramp((92, 74, 64))
+FIELD = ramp((142, 145, 136))   # grassland: fieldstone, ROCK_STONE grey-green
+LIME = ramp((208, 202, 180))    # pale limestone
+FSTAIN = ramp((142, 145, 136)); FSTAIN["top"] = mix((142, 145, 136), (176, 150, 90), .35); FSTAIN["hi"] = mix(FSTAIN["hi"], (176, 150, 90), .2)   # fieldstone with an iron-stained, sun-bleached cap
+FMOSS = ramp((142, 145, 136)); FMOSS["top"] = mix((140, 160, 80), (255, 255, 255), .12); FMOSS["hi"] = mix(FMOSS["hi"], (140, 160, 80), .3)   # fieldstone with a lichen-green cap
+SLAB = ramp((127, 135, 128))    # tundra: frost-shattered grey slab, ROCK_STONE grey-green
+DSLAB = ramp((92, 98, 98))      # darker frost-split slate
+PGRAN = ramp((170, 172, 166))   # pale granite
+LICHY = ramp((127, 135, 128)); LICHY["top"] = mix((170, 176, 120), (255, 255, 255), .1); LICHY["hi"] = mix(LICHY["hi"], (170, 176, 120), .3)   # slab with a yellow-green lichen cap
+LICHO = ramp((127, 135, 128)); LICHO["top"] = mix((196, 146, 84), (255, 255, 255), .08); LICHO["hi"] = mix(LICHO["hi"], (196, 146, 84), .28)   # slab with an orange lichen cap
+LICHG = ramp((96, 102, 100)); LICHG["top"] = mix((206, 208, 190), (255, 255, 255), .1); LICHG["hi"] = mix(LICHG["hi"], (206, 208, 190), .3)   # dark slate with a pale grey-white lichen cap
+GRAN = ramp((95, 106, 115))     # boreal: dark wet granite, ROCK_STONE blue-grey
+WETG = ramp((70, 80, 88))       # darker, rain-soaked granite
+BPALE = ramp((138, 146, 150))   # paler weathered granite
+BMOSS = ramp((95, 106, 115)); BMOSS["top"] = mix((78, 120, 72), (255, 255, 255), .1); BMOSS["hi"] = mix(BMOSS["hi"], (78, 120, 72), .35)   # granite under a thick moss cap
+BSTAIN = ramp((95, 106, 115)); BSTAIN["top"] = mix((95, 106, 115), (150, 104, 60), .4); BSTAIN["hi"] = mix(BSTAIN["hi"], (150, 104, 60), .2)   # granite with a rusty tannin-stained top
 WALL = ("hi", "mid", "lo", "deep")
 K = .62   # ground depth to screen height
 LIGHT = (-.7, -.35)
@@ -141,6 +156,38 @@ def shapes():
     S["rock-desert-4"] = render(254, [(0, 0, 11, 9, 6, .12, [(5, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], CREAM)
     S["rock-desert-5"] = render(255, [(0, 0, 14, 10, 5, .18, [(7, 1, 0, 0), (5, .82, .6, 0)])], VARNISH, bands=0)
     S["rock-desert-6"] = render(256, [(-6, 1, 9, 7, 5, .12, [(4, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 11, 8, 6, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], [BUFF, RUST], bands=0)
+    S["boulder-grassland-1"] = render(161, [(0, 0, 26, 20, 9, .07, [(5, 1, 0, 0), (6, .98, .2, 0), (6, .94, .5, 0), (5, .86, .8, 0), (4, .72, 1.2, 0), (3, .5, 1.5, 0)])], FIELD, cracks=1)
+    S["boulder-grassland-2"] = render(162, [(-14, 3, 15, 12, 8, .08, [(5, 1, 0, 0), (5, .95, .3, 0), (4, .84, .6, 0), (3, .65, .8, 0)]), (12, -4, 19, 14, 9, .07, [(6, 1, 0, 0), (6, .97, .3, 0), (5, .9, .6, 0), (4, .78, 1, 0), (3, .58, 1.3, 0)])], FMOSS)
+    S["boulder-grassland-3"] = render(163, [(0, 0, 15, 12, 8, .08, [(5, 1, 0, 0), (5, .98, .3, 0), (5, .93, .6, 0), (4, .85, 1, 0), (4, .72, 1.4, 0), (3, .55, 1.8, 0)])], LIME, cracks=1)
+    S["boulder-grassland-4"] = render(164, [(0, 0, 22, 14, 9, .06, [(6, 1, 0, 0), (6, .96, .3, 0), (5, .88, .7, 0), (4, .7, 1.1, 0)])], FSTAIN, cracks=1)
+    S["rock-grassland-1"] = render(261, [(0, 0, 16, 10, 8, .07, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .62, .7, 0)])], FIELD)
+    S["rock-grassland-2"] = render(262, [(0, 0, 11, 8, 7, .1, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], FSTAIN, bands=0)
+    S["rock-grassland-3"] = render(263, [(0, 0, 13, 9, 8, .08, [(4, 1, 0, 0), (5, .95, .3, 0), (4, .78, .6, 0)])], LIME)
+    S["rock-grassland-4"] = render(264, [(0, 0, 10, 8, 7, .1, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], FMOSS, bands=0)
+    S["rock-grassland-5"] = render(265, [(-6, 1, 8, 6, 7, .1, [(3, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 10, 7, 8, .1, [(4, 1, 0, 0), (4, .92, .3, 0), (3, .7, .5, 0)])], FIELD, bands=0)
+    S["rock-grassland-6"] = render(266, [(0, 0, 14, 7, 8, .08, [(3, 1, 0, 0), (3, .96, .3, 0), (3, .8, .5, 0)])], LIME, bands=0)
+    # tundra: frost-shattered slabs, angular (few sides, big jitter), stacked in shifted plates, with lichen-colored caps
+    S["boulder-tundra-1"] = render(171, [(0, 0, 27, 17, 5, .2, [(6, 1, 0, 0), (5, .97, .8, 0), (6, .9, -.6, 0), (5, .8, 1, 0), (4, .62, -.8, 0), (3, .42, .6, 0)])], LICHY, cracks=2)
+    S["boulder-tundra-2"] = render(172, [(-15, 3, 17, 11, 5, .2, [(5, 1, 0, 0), (5, .94, .5, 0), (4, .82, -.5, 0)]), (13, -4, 20, 13, 5, .2, [(6, 1, 0, 0), (6, .96, .6, 0), (5, .88, -.6, 0), (4, .72, .8, 0)])], SLAB, cracks=1)
+    S["boulder-tundra-3"] = render(173, [(0, 0, 14, 10, 5, .22, [(7, 1, 0, 0), (6, .95, 1, 0), (6, .88, -1, 0), (5, .78, .8, 0), (5, .64, -.8, 0), (4, .5, .6, 0)])], LICHG, cracks=2)
+    S["boulder-tundra-4"] = render(174, [(0, 0, 30, 14, 5, .18, [(5, 1, 0, 0), (5, .98, .6, 0), (4, .92, -.6, 0), (3, .78, .8, 0)])], LICHO, cracks=1)
+    S["rock-tundra-1"] = render(271, [(0, 0, 16, 9, 5, .2, [(4, 1, 0, 0), (4, .9, .5, 0), (3, .66, -.4, 0)])], SLAB)
+    S["rock-tundra-2"] = render(272, [(0, 0, 11, 8, 5, .22, [(5, 1, 0, 0), (4, .92, .5, 0), (3, .7, -.4, 0)])], LICHY, bands=0)
+    S["rock-tundra-3"] = render(273, [(0, 0, 15, 6, 5, .2, [(3, 1, 0, 0), (3, .94, .6, 0), (3, .8, -.5, 0)])], DSLAB)
+    S["rock-tundra-4"] = render(274, [(0, 0, 10, 8, 5, .22, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .7, -.3, 0)])], LICHO, bands=0)
+    S["rock-tundra-5"] = render(275, [(-6, 1, 8, 6, 5, .2, [(3, 1, 0, 0), (3, .88, .4, 0)]), (6, -1, 10, 7, 5, .2, [(4, 1, 0, 0), (4, .92, .4, 0), (3, .7, -.4, 0)])], PGRAN, bands=0)
+    S["rock-tundra-6"] = render(276, [(0, 0, 13, 7, 5, .2, [(4, 1, 0, 0), (3, .95, .5, 0), (3, .78, -.4, 0)])], LICHG, bands=0)
+    # boreal: rounded, dark, rain-wet granite (many sides, small jitter, like glacial erratics) with moss caps
+    S["boulder-boreal-1"] = render(181, [(0, 0, 27, 20, 8, .1, [(6, 1, 0, 0), (6, .98, .3, 0), (6, .94, .6, 0), (5, .86, .9, 0), (4, .7, 1.2, 0), (3, .5, 1.5, 0)])], GRAN, cracks=1)
+    S["boulder-boreal-2"] = render(182, [(-15, 3, 17, 12, 8, .1, [(5, 1, 0, 0), (5, .95, .3, 0), (4, .84, .6, 0), (3, .62, .8, 0)]), (13, -4, 20, 14, 8, .1, [(6, 1, 0, 0), (6, .97, .3, 0), (5, .9, .6, 0), (4, .76, 1, 0), (3, .56, 1.3, 0)])], BMOSS)
+    S["boulder-boreal-3"] = render(183, [(0, 0, 14, 11, 8, .1, [(6, 1, 0, 0), (6, .97, .4, 0), (6, .92, .8, 0), (5, .85, 1.2, 0), (5, .74, 1.6, 0), (4, .6, 2, 0), (3, .42, 2.4, 0)])], WETG, cracks=1)
+    S["boulder-boreal-4"] = render(184, [(0, 0, 25, 15, 8, .09, [(5, 1, 0, 0), (5, .97, .4, 0), (4, .88, .8, 0), (3, .68, 1.2, 0)])], BSTAIN, cracks=1)
+    S["rock-boreal-1"] = render(281, [(0, 0, 16, 10, 8, .1, [(4, 1, 0, 0), (4, .9, .4, 0), (3, .64, .7, 0)])], GRAN)
+    S["rock-boreal-2"] = render(282, [(0, 0, 11, 8, 7, .12, [(5, 1, 0, 0), (4, .92, .4, 0), (3, .7, .6, 0)])], BMOSS, bands=0)
+    S["rock-boreal-3"] = render(283, [(0, 0, 13, 9, 8, .1, [(4, 1, 0, 0), (5, .95, .3, 0), (4, .78, .6, 0)])], BPALE)
+    S["rock-boreal-4"] = render(284, [(0, 0, 10, 8, 7, .12, [(4, 1, 0, 0), (4, .9, .3, 0), (3, .7, .5, 0)])], WETG, bands=0)
+    S["rock-boreal-5"] = render(285, [(-6, 1, 8, 6, 7, .1, [(3, 1, 0, 0), (3, .88, .3, 0)]), (6, -1, 10, 7, 8, .1, [(4, 1, 0, 0), (4, .92, .3, 0), (3, .7, .5, 0)])], BMOSS, bands=0)
+    S["rock-boreal-6"] = render(286, [(0, 0, 14, 7, 8, .1, [(3, 1, 0, 0), (3, .96, .3, 0), (3, .8, .5, 0)])], BSTAIN, bands=0)
     return S
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"

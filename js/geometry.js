@@ -95,6 +95,16 @@ function lineEntersShape(line, shape){
   return false;
 }
 
+// Does the open line run through the shape's inside? Touching it or running along its edge is fine.
+function lineThroughShape(line, shape){
+  for(let i = 1; i < line.length; i++){
+    for(let j = 0; j < shape.length; j++) if(segCross(line[i-1], line[i], shape[j], shape[(j+1) % shape.length])) return true;
+    const mx = (line[i-1][0] + line[i][0]) / 2, my = (line[i-1][1] + line[i][1]) / 2;
+    if(inPoly(mx, my, shape) && distToEdge(mx, my, shape) > .02) return true;
+  }
+  return false;
+}
+
 // Do two closed shapes overlap? Sharing an edge is allowed.
 function shapesOverlap(A, B){
   const closedA = A.concat([A[0]]);

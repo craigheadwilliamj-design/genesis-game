@@ -2,7 +2,7 @@
    GUEST SERVICES
    What food stands and gift shops sell (each one is an empty shell until
    you give it a menu), benches and picnic areas, trash bins and litter,
-   restroom dirt, and the night cleaning crew who tidy up after closing.
+   restroom dirt, and the night cleaning crew who tidy up at the daily rollover.
    ===================================================================== */
 
 let litterPts = new Map();   // litter square -> spots along the footpaths inside it, for drawing specks
@@ -157,9 +157,23 @@ function trashCheck(p){
   if(Math.random() < (LITTER.drop + LITTER.dirtyDrop * litterAt(p.at.x, p.at.y)) * (1 - EDU.litterCut * (p.edu || 0) / 100) * pm(p, "litter")){ addLitter(p.at.x, p.at.y, p.trash); p.trash = 0; }
   else p.trashAt = state.minute;
 }
+// Donation boxes: a party passing a working box may give, more if it learned something and by its personality.
+let boxSpots = [];
+function boxCheck(p){
+  if(!p.at || !boxSpots.length) return;
+  const edu = (p.edu || 0) / 100;
+  for(const s of boxSpots){
+    if(isBroken(s.b) || (p.gave && p.gave.has(s.b.id)) || Math.hypot(s.x - p.at.x, s.y - p.at.y) > DONATE.reach) continue;
+    (p.gave || (p.gave = new Set())).add(s.b.id);
+    if(Math.random() >= DONATE.chance * (1 + DONATE.eduBoost * edu) * pm(p, "donate")) continue;
+    const g = p.n * DONATE.amount * (1 + DONATE.eduBoost * edu) * pm(p, "donate");
+    earn(g, "donations"); s.b.gift = (s.b.gift || 0) + g;
+  }
+}
 // Where along the footpaths each litter square's specks go. Called when the guest map is rebuilt.
 function indexLitterSpots(nodes){
   binSpots = state.buildings.filter(b => b.type === "bin" && isReachable(b)).map(b => { const [x, y] = centroid(b.points); return {b, x, y}; });
+  boxSpots = state.buildings.filter(b => b.type === "donate" && isReachable(b)).map(b => { const [x, y] = centroid(b.points); return {b, x, y}; });
   litterPts = new Map();
   for(const n of nodes.values()) for(const m of n.adj.keys()){
     if(m.k < n.k || (n.ride && n.ride.has(m))) continue;   // no litter on the tram track
@@ -198,7 +212,7 @@ function cleaningBill(){
   }
   return Math.round(bill);
 }
-// After closing, contract cleaners pick up the litter, empty the bins, and scrub the restrooms
+// At the daily rollover, contract cleaners pick up the litter, empty the bins, and scrub the restrooms
 function servicesNight(){
   const bill = cleaningBill();
   if(bill) spend(bill, "cleaning");
@@ -210,10 +224,8 @@ function servicesNight(){
 
 // Each one is an event GHOST has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
 const showsOf = b => (b.shows || []).filter(id => MUSEUM_BY_ID[id]);
-// A better record makes a better show
-const showPower = id => { const d = state.science.dna[id]; return MUSEUM.minQuality + (1 - MUSEUM.minQuality) * clamp((d ? d.quality : 0) / 100, 0, 1); };
-const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn * showPower(id), 0);
-const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy * showPower(id), 0);
+const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn, 0);
+const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy, 0);
 const showsAppeal = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].appeal, 0);
 const showsUpkeep = b => b.type === "edcenter" ? showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].upkeep, 0) : 0;
 // Events GHOST has finished recording that this center isn't showing yet

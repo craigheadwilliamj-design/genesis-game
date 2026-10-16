@@ -4,26 +4,28 @@
    upgrades), GHOST fills genomes, TAR clones animals, and CERES grows
    plants and medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
-   finish mid-day rather than at closing.
+   finish at any hour rather than at the daily rollover.
    ===================================================================== */
 
 /* ---------- time ---------- */
 
-// Park minutes since day 1 opened. Closing on one day and opening the next are the same instant.
-const nowMin = () => (state.day - 1) * DAY_MIN + (state.minute - OPEN_MIN);
-const minAt = (day, minute) => (day - 1) * DAY_MIN + (minute - OPEN_MIN);
+// Park minutes since day 1 began. The rollover hour ending one day and starting the next are the same instant.
+const nowMin = () => (state.day - 1) * DAY_MIN + state.minute;
+const minAt = (day, minute) => (day - 1) * DAY_MIN + minute;
 function whenText(m){
   const r = m % DAY_MIN;
-  return r < 1 && m > 0 ? `closing on day ${Math.round(m / DAY_MIN)}` : `day ${Math.floor(m / DAY_MIN) + 1}, ${fmtClock(OPEN_MIN + r)}`;
+  return `${fmtDate(Math.floor(m / DAY_MIN) + 1)}, ${fmtClock(clockMin(r))}`;
 }
-// A length of time in open days and hours: "1 day 3h", "5h 20m"
+// A length of time in days and hours: "1 day 3h", "5h 20m"
 function spanText(min){
   min = Math.max(0, Math.round(min));
   if(min < 1) return "a moment";
-  const d = Math.floor(min / DAY_MIN), h = Math.floor(min % DAY_MIN / 60), m = min % 60;
+  const c = min * CLOCK_SCALE, d = Math.floor(c / 1440), h = Math.floor(c % 1440 / 60), m = Math.floor(c % 60);   // park minutes shown as clock time
   return d ? `${d} day${d === 1 ? "" : "s"}${h ? ` ${h}h` : ""}` : h ? `${h}h${m ? ` ${m}m` : ""}` : `${m}m`;
 }
 const leftText = end => spanText(end - nowMin());
+// How far a clone got, 0 to 100. A failed one stops where it died.
+const cloneProgress = c => c.failed ? c.stop : doneShare(c);
 const doneShare = j => clamp((nowMin() - j.start) / Math.max(1, j.end - j.start), 0, 1) * 100;
 
 /* ---------- bays: one per scientist ---------- */
@@ -41,7 +43,7 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 function jobRefund(kind, j){
   if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
   if(kind === "temporal") return {money:tripOdds(j.sp, j.period).cost};
-  if(kind === "gene") return {money:SPECIES_BY_ID[j.sp].price};
+  if(kind === "gene") return {money:j.failed ? 0 : SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
 }
 // Let one scientist go. Their bay closes, and so does the job in the highest bay if it was busy (the cost comes back).
@@ -51,7 +53,7 @@ function fireScientist(kind){
   const jobs = BAY_JOBS[kind]();
   for(const j of jobs.filter(x => x.bay >= sc.crew[kind])){
     jobs.splice(jobs.indexOf(j), 1);
-    const r = jobRefund(kind, j); sc.points += r.points || 0; state.money += r.money || 0;
+    const r = jobRefund(kind, j); sc.points += r.points || 0; if(!state.sandbox) state.money += r.money || 0;
     events.toast("Closing that bay stopped the job in it. The cost came back.");
   }
 }
@@ -60,7 +62,7 @@ function fireScientist(kind){
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
 const researching = (kind, id) => state.science.projects.some(p => p.kind === kind && p.id === id);
-const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s));
+const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s) && speciesAvailable(s.id));
 const isUnlocked = id => state.science.unlocked.includes(id);
 
 // What unlocking an animal's genome costs in research points: its period's base plus a share of its price,
@@ -71,7 +73,7 @@ function unlockPoints(s){ return Math.max(4, Math.round((PERIOD_BY_ID[s.period].
 function projectInfo(kind, id){
   if(kind === "tech"){ const t = TECH.find(x => x.id === id); return t ? {label:t.label, points:t.points, needs:t.needs, done:hasTech(id)} : null; }
   if(kind === "refine"){ const era = ERA_OF[id]; return era ? {label:`${id} medicine`, points:REFINE_POINTS[era], needs:MED_TECH[era], done:hasTech("ref-" + id)} : null; }
-  if(kind === "species"){ const s = SPECIES_BY_ID[id]; return s && !isStarter(s) ? {label:s.name, points:unlockPoints(s), done:isUnlocked(id)} : null; }
+  if(kind === "species"){ const s = SPECIES_BY_ID[id]; return s && !isStarter(s) && speciesAvailable(id) ? {label:s.name, points:unlockPoints(s), done:isUnlocked(id)} : null; }
   return null;
 }
 const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);
@@ -89,6 +91,7 @@ function projectProblem(kind, id){
   return null;
 }
 function startProject(kind, id){
+  if(kind === "tech" && techHidden(id)) return "That research isn't available yet.";
   const why = projectProblem(kind, id); if(why) return why;
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
@@ -112,7 +115,7 @@ function finishProject(p){
 
 /* ---------- GHOST: expeditions ---------- */
 
-// Animals and plants both have genomes: sc.dna[id] = {genome: 0-100, quality}
+// Animals and plants both have genomes: sc.dna[id] = {genome: 0-100}, how complete the lab's record is
 function genomeInfo(id){
   const s = SPECIES_BY_ID[id]; if(s) return {id, name:s.name, space:s.space, animal:s};
   const f = PLANT_DNA_BY_ID[id]; if(f) return {id, name:f.name, space:f.space, plant:f};
@@ -135,9 +138,8 @@ function genomeOpen(id){
 // The periods GHOST can look in for a genome
 const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : g.event ? [g.id] : [g.plant.period]; };
 
-// GHOST upgrade multiplier for "cost" or "speed", and the quality points added to every sample
+// GHOST upgrade multiplier for "cost" or "speed"
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
-const ghostQuality = () => GHOST_UPGRADE.quality[hasTech("ghostq2") ? 2 : hasTech("ghostq1") ? 1 : 0];
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
 // What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
@@ -169,37 +171,34 @@ function launchTrip(id, periodId){
 }
 
 // Add a DNA sample to the genome library. Returns how much the genome grew.
-function addSample(sp, gain, q){
+function addSample(sp, gain){
   const dna = state.science.dna;
-  const d = dna[sp] || (dna[sp] = {genome:0, quality:0});
-  if(d.genome >= 100){ const before = d.quality; if(q > d.quality) d.quality = Math.round(d.quality + (q - d.quality) * .5); return {gain:0, better:d.quality - before}; }
+  const d = dna[sp] || (dna[sp] = {genome:0});
   const g = Math.min(gain, 100 - d.genome);
-  d.quality = Math.round((d.quality * d.genome + q * g) / (d.genome + g));
   d.genome = Math.min(100, Math.round(d.genome + g));
-  return {gain:g, better:0};
+  return {gain:g};
 }
 
 function tripReturns(t){
-  const sc = state.science, p = placeOf(t.period), g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
+  const sc = state.science, g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
   if(Math.random() < odds.fail){
     const msg = `GHOST came back from the ${placeName(t.period)} empty-handed. The ${g.name} trail went cold.`;
     logScience(msg, false); events.toast(msg, "bad"); return;
   }
-  const q = Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality());
-  const r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread), q);
+  const was = (sc.dna[t.sp] || {genome:0}).genome, r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread));
   const d = sc.dna[t.sp];
   if(g.event){
-    const m = r.gain ? `GHOST recorded the ${g.name} (${q}% quality). ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
-                     : `GHOST brought back more of the ${g.name}. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than the record the lab already has."}`;
+    const m = r.gain ? `GHOST recorded more of the ${g.name}. ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
+                     : `GHOST brought back more of the ${g.name}, but the record was already complete.`;
     logScience(m, true); events.toast(m, "good"); return;
   }
-  let msg = r.gain ? `GHOST brought back ${g.name} DNA (${q}% quality). Genome ${d.genome}% complete.`
-                   : `GHOST brought back more ${g.name} DNA. ${r.better > 0 ? `Quality improved to ${d.quality}%.` : "It wasn't better than what the lab already has."}`;
+  let msg = r.gain ? `GHOST brought back ${g.name} DNA. Genome ${d.genome}% complete.` : `GHOST brought back more ${g.name} DNA, but the genome was already complete.`;
+  if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) msg += ` TAR can clone it now, though the clones will be frail until the genome is more complete.`;
   // Sometimes the team turns up traces of another animal ORACLE has unlocked
   const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && isUnlocked(x.id) && !genomeDone(x.id));
   if(others.length && Math.random() < TRIP.bonus.chance){
     const o = others[Math.floor(Math.random() * others.length)];
-    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]), Math.min(100, Math.round(rand(p.quality[0], p.quality[1])) + ghostQuality()));
+    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]));
     if(r2.gain) msg += ` They also found ${o.name} traces (+${Math.round(r2.gain)}%).`;
   }
   logScience(msg, true); events.toast(msg, "good");
@@ -212,28 +211,47 @@ const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fa
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
+// TAR can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
+const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
+const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
+// The chance a clone dies in the incubator: CLONE_GENOME.failMax at the minimum genome, nothing at 100%
+const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
+function failClone(j){
+  j.failed = true; j.stop = clamp((j.fail - j.start) / Math.max(1, j.end - j.start) * 100, 0, 100);
+  events.toast(`TAR: the ${SPECIES_BY_ID[j.sp].name} clone failed at ${Math.round(j.stop)}%. ${j.why}. Discard the specimen to free the incubator.`, "bad");
+  events.changed();
+}
+function discardClone(id){
+  const sc = state.science, i = sc.clones.findIndex(c => c.id === id && c.failed); if(i < 0) return false;
+  sc.clones.splice(i, 1); events.toast("Specimen discarded. The incubator bay is clear.");
+  return true;
+}
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
     (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
     (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
-    (!d || d.genome < 100 ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. It needs 100%.` : null) ||
+    (!cloneOpen(sp) ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. TAR needs ${CLONE_GENOME.min}% to clone it.` : null) ||
     (state.rating + 1e-9 < starsNeed(s) ? `Needs a ${starsNeed(s)}-star park. You have ${starTxt(state.rating)}.` : null) ||
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
-function orderClone(sp, exhibitId){
+function orderClone(sp, exhibitId, sex){
   if(cloneProblem(sp)) return false;
-  const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
+  if(sex !== "male" && sex !== "female") sex = pickSex(sp);
+  const s = SPECIES_BY_ID[sp], cq = cloneQuality(sp);
   spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  state.science.clones.push({id:uid("a-"), sp, exhibitId:exhibitId || null, q:clamp(Math.round(d.quality + rand(-5, 5)), 5, 100), bay:freeBay("gene"), start, end});
-  events.toast(`TAR started a ${s.name} clone. Ready ${whenText(end)}.`);
+  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end};
+  // a partial genome can fail partway (never in sandbox)
+  if(!state.sandbox && Math.random() < cloneFailChance(sp)){ job.fail = start + rand(CLONE_FAIL.from, CLONE_FAIL.to) * (end - start); job.why = CLONE_FAIL.causes[Math.floor(Math.random() * CLONE_FAIL.causes.length)]; }
+  state.science.clones.push(job);
+  events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push({id:a.id, sp:a.sp, cl:true, q:a.q});
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:true, q:a.q}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -252,7 +270,7 @@ function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
   if(e){ putAnimal(e, c); events.toast(`TAR finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push({id:c.id, sp:c.sp, q:c.q}); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
+  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
 }
 
 /* ---------- CERES: growing plants and medicine ---------- */
@@ -293,12 +311,24 @@ function growBatch(kind, era, size){
 function finishBatch(b){
   const c = state.ceres;
   if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
-  else { c.meds = Math.min(medCap(), (c.meds || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
+  else { const g = MED_GOOD[b.era]; cerMeds()[g] = (cerMeds()[g] || 0) + growInfo("med", b.era).doses; if(cerMedTotal() > medCap()) cerMeds()[g] -= cerMedTotal() - medCap(); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce((s, b) => s + growInfo("med", b.era).doses, 0);
 
 /* ---------- time passing ---------- */
+
+// Park minutes until the next job that will complete (a waiting clone or bed doesn't count: its clock is held). Infinity if none.
+function scienceNext(){
+  if(state.sandbox) return Infinity;
+  const sc = state.science, c = state.ceres;
+  let m = Infinity;
+  for(const j of sc.projects) m = Math.min(m, j.end);
+  for(const j of sc.trips) m = Math.min(m, j.end);
+  if(sc.clones.length && tarWorking()) for(const j of sc.clones) if(!j.failed) m = Math.min(m, j.fail !== undefined ? j.fail : j.end);
+  if(c.beds.length && beds()) for(const j of c.beds) m = Math.min(m, j.end);
+  return m - nowMin();
+}
 
 // Called every tick. Research points trickle in, and every project, trip, clone and batch checks its own clock.
 function scienceTick(dtMin){
@@ -307,7 +337,8 @@ function scienceTick(dtMin){
   if(state.sandbox){ state.money = SANDBOX_MONEY; sc.points = SANDBOX_POINTS; }
   // researchers with no project are on general research and earn points. Ones running a project don't.
   if(dept("oracle")) sc.points += Math.max(0, sc.crew.paleo - sc.projects.length) * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
-  const now = state.sandbox ? Infinity : nowMin();
+  // a hair of slack: nowMin() is rebuilt from the day and minute, so a step that lands on `end` can read a rounding error short
+  const now = state.sandbox ? Infinity : nowMin() + 1e-6;
   if(sc.projects.length && sc.projects.some(p => p.end <= now)){
     const done = sc.projects.filter(p => p.end <= now);
     sc.projects = sc.projects.filter(p => p.end > now);
@@ -320,11 +351,15 @@ function scienceTick(dtMin){
   }
   // with TAR closed or nobody to run it, every clone waits
   if(sc.clones.length){
-    if(!tarWorking()) for(const j of sc.clones){ j.start += dtMin; j.end += dtMin; }
-    else if(sc.clones.some(j => j.end <= now)){
-      const done = sc.clones.filter(j => j.end <= now);
-      sc.clones = sc.clones.filter(j => j.end > now);
-      done.forEach(finishClone); sc.hatchDay = state.day;
+    if(!tarWorking()) for(const j of sc.clones){ if(j.failed) continue; j.start += dtMin; j.end += dtMin; if(j.fail !== undefined) j.fail += dtMin; }
+    else {
+      // a clone that was going to die stops here, and stays in its bay until the player discards it
+      for(const j of sc.clones) if(!j.failed && j.fail !== undefined && j.fail <= now) failClone(j);
+      if(sc.clones.some(j => !j.failed && j.end <= now)){
+        const done = sc.clones.filter(j => !j.failed && j.end <= now);
+        sc.clones = sc.clones.filter(j => j.failed || j.end > now);
+        done.forEach(finishClone); sc.hatchDay = state.day;
+      }
     }
   }
   // the same goes for the growing beds
@@ -339,7 +374,7 @@ function scienceTick(dtMin){
   // CERES keeps medicine stocked for the types set to "keep stocked"
   if(beds() && freeBay("botanist") >= 0){
     for(const era of Object.keys(c.auto)){
-      if(!c.auto[era] || (c.meds || 0) + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
+      if(!c.auto[era] || cerMedTotal() + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
       if(growBatch("med", era)) break;
     }
   }

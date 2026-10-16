@@ -11,7 +11,7 @@
 
 let vcrew = [];   // vets walking around right now (positions aren't saved)
 
-function freshHealth(){ return {from:HEALTH.startDay, ward:[], cmeds:0}; }
+function freshHealth(){ return {from:HEALTH.startDay, ward:[]}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
 // An era's medicine only cures a period's animals once it has been refined for that period
@@ -21,22 +21,16 @@ const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
 // Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
 function pickMed(s, n){
-  if(canTreat(s) && medOnHand() >= n) return "era";
-  if(dept("pmc") && (state.health.cmeds || 0) >= n) return "modern";
+  if(canTreat(s) && medOnHand(medGoodOf(s)) >= n) return "era";
+  if(dept("pmc") && pmcStock(CMED) >= n) return "modern";
   return null;
 }
-function takeMed(kind, n){ if(kind === "era") useMeds(n); else state.health.cmeds -= n; }
+const medGoodOf = s => MED_GOOD[eraOf(s)];
+function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else useMeds(n, CMED); }
 // Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
 function ease(a){
   const fl = MODERN.floor[eraOf(SPECIES_BY_ID[a.sp])];
   a.sick = {kind:a.sick.kind, sev:Math.min(a.sick.sev, fl), chronic:true};
-}
-// Overnight, suppliers top the PMC up with contemporary medicine
-function modernMedsNight(){
-  const h = state.health;
-  if(!dept("pmc")) return;
-  const n = Math.min(MODERN.stock - (h.cmeds || 0), Math.floor(Math.max(0, state.money) / MODERN.cost));
-  if(n > 0){ h.cmeds = (h.cmeds || 0) + n; spend(n * MODERN.cost, "medicine"); }
 }
 const pmcs = () => state.buildings.filter(b => b.type === "pmc" && kGraph && kGraph.anchors[b.id]);
 const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
@@ -104,9 +98,9 @@ function trashNight(out){
 }
 
 /* ---------- genome therapy ---------- */
-// A vet lifts a clone's DNA quality (a.q) toward the lab's genome for its species (sc.dna), which GHOST can improve.
+// A vet lifts a clone's DNA quality (a.q) toward what the lab's genome for its species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
 // The player queues animals (a.gene), and a free vet does them one by one.
-const labQuality = sp => genomeDone(sp) ? state.science.dna[sp].quality : 0;
+const labQuality = sp => cloneQuality(sp);
 const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
 function geneProblem(a){
@@ -114,8 +108,8 @@ function geneProblem(a){
   if(!hasTech("genetherapy")) return "Research Genome therapy at ORACLE first.";
   if(!dept("pmc")) return "Genome therapy needs a connected Paleo-Medicine Center.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
-  if(!genomeDone(a.sp)) return `The lab needs a complete ${s.name} genome first.`;
-  if(gain < GENE.minGain) return `The lab's ${s.name} genome is only ${labQuality(a.sp)}% quality. Send GHOST for better samples to raise it.`;
+  if(!cloneOpen(a.sp)) return `The lab needs at least ${CLONE_GENOME.min}% of the ${s.name} genome first.`;
+  if(gain < GENE.minGain) return `The lab's ${s.name} genome is only ${state.science.dna[a.sp].genome}% complete, good for ${labQuality(a.sp)}% quality. Send GHOST for more of it.`;
   if(!canAfford(geneCost(gain))) return `The procedure costs ${money(geneCost(gain))}. You have ${money(state.money)}.`;
   return null;
 }
@@ -147,7 +141,7 @@ function geneDone(c){
 
 // Old plant-eaters eating plants they never evolved for (see grassShare), 0 to 1
 const grassSick = (e, s) => GRASS_INTOLERANT.includes(s.period) ? grassShare(e, s) : 0;
-const hungerShare = e => clamp((e.hungryMin || 0) / (CLOSE_MIN - OPEN_MIN), 0, 1);
+const hungerShare = e => clamp((e.hungryMin || 0) / DAY_MIN, 0, 1);
 const medicated = (e, s) => !!e.medFedOk && canTreat(s);
 
 // Chance a day this animal falls ill, and what's raising it
@@ -198,9 +192,11 @@ function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && 
 // Can a vet cure this one where it stands?
 // A chronic case only comes back for a real cure, with the era's own medicine.
 function fieldTreatable(a){
-  if(!noticed(a) || a.darted || a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
-  const k = pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
-  return a.sick.chronic ? k === "era" : !!k;
+  if(!noticed(a) || a.darted) return false;
+  // a chronic case (illness or injury) is already eased, so only the era's own medicine matters
+  if(a.sick.chronic) return pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose) === "era";
+  if(a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
+  return !!pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
 }
 
 // What's happening to one sick animal, in words
@@ -257,7 +253,7 @@ function sendHome(a, homeId){
   delete a.darted;
   const e = state.exhibits.find(x => x.id === homeId);
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); }
-  else state.science.ready.push({id:a.id, sp:a.sp, q:a.q ?? 90});
+  else state.science.ready.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q ?? 90});
 }
 // The PMC was bulldozed: patients go home as they are, and nobody is carried there any more
 function pmcRemoved(b){
@@ -399,7 +395,7 @@ function treatDone(c){
   if(!a || !a.sick) return;
   const s = SPECIES_BY_ID[a.sp], k = pickMed(s, HEALTH.fieldDose);
   if(!k || (a.sick.chronic && k !== "era")){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${s.name} in ${e.name}.`, "bad"); return; }
-  takeMed(k, HEALTH.fieldDose);
+  takeMed(k, HEALTH.fieldDose, s);
   if(k === "era"){ delete a.sick; events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} on the spot.`, "good"); }
   else { ease(a); events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`); }
   events.changed();
@@ -476,13 +472,17 @@ function vetStatus(v){
 
 function healthNight(){
   const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0};
-  modernMedsNight();
   // medicated feed: CERES doses go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
     if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;
     const need = feedDoses(e);
-    if(hungerShare(e) < .5 && medOnHand() >= need){ useMeds(need); e.medFedOk = true; }
+    // the feed is mixed from the era medicines of the animals it can help; take it from whichever the PMC holds
+    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))];
+    if(hungerShare(e) < .5 && goods.reduce((s, g) => s + pmcStock(g), 0) >= need){
+      let left = need; for(const g of goods){ const t = Math.min(left, pmcStock(g)); useMeds(t, g); left -= t; }
+      e.medFedOk = true;
+    }
   }
   if(healthActive()){
     for(const e of state.exhibits){
@@ -506,7 +506,7 @@ function healthNight(){
           if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; out.showing.push({e, a}); }
           continue;
         }
-        if(Math.random() < injuryChance(e, a).p){ fallSick(a, "injury", HEALTH.injuryStart); out.hurt++; }
+        if(Math.random() < injuryChance(e, a).p){ fallSick(a, "injury", HEALTH.injuryStart); out.hurt++; if(typeof herd !== "undefined" && herd.has(a.id) && injuryChance(e, a).why.includes("attacks")) events.fx("dust", herd.get(a.id).x, herd.get(a.id).y); }
         else if(Math.random() < illChance(e, a).p){ fallSick(a, "illness", HEALTH.illStart); if(!a.sick.hidden) out.ill++; }
       }
     }
@@ -519,7 +519,7 @@ function healthNight(){
     if(p.cured || cap <= 0) continue;
     const s = SPECIES_BY_ID[p.a.sp];
     // start a course of medicine, or switch to the era's own once it's available
-    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose); p.med = k; } }
+    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose, s); p.med = k; } }
     if(!p.med) continue;
     cap--;
     const era = eraOf(s), fl = MODERN.floor[era];
@@ -533,7 +533,7 @@ function healthNight(){
       p.cured = true;
       const home = state.exhibits.find(x => x.id === p.home);
       if(home) state.staff.transfers.push({id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmcBuilding().id, to:home.id, med:true});
-      else { discharge(p.a.id); state.science.ready.push({id:p.a.id, sp:p.a.sp, q:p.a.q ?? 90}); }
+      else { discharge(p.a.id); state.science.ready.push({id:p.a.id, name:p.a.name, sex:p.a.sex, rank:p.a.rank, sp:p.a.sp, q:p.a.q ?? 90}); }
       events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in holding."}`, chronic ? "" : "good");
     }
   }
@@ -551,6 +551,6 @@ function animalDies(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.rating = Math.max(0, state.rating - .05);
-  const cause = a.sick.cause === "trash" ? "Ate trash thrown in by guests" : a.sick.kind === "injury" ? "Injuries" : "Illness";
+  const hit = a.sick.hit, cause = a.sick.cause === "trash" ? "Ate trash thrown in by guests" : hit ? (hit.how === "fight" ? `Wounds from a fight with a ${hit.by}` : `Killed by a ${hit.by}`) : a.sick.kind === "injury" ? "Injuries" : "Illness";
   events.died({animal:SPECIES_BY_ID[a.sp].name, exhibit:e.name, cause});
 }
