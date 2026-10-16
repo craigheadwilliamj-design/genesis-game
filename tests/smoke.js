@@ -3257,7 +3257,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   await page.waitForTimeout(800);
   let ok = true;
-  for(const [k, v] of Object.entries(checks)){ console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
+  // Quiet by default (only failures and a count); -v prints every check.
+  const verbose = process.argv.includes("-v"), all = Object.entries(checks);
+  for(const [k, v] of all){ if(verbose || !v) console.log(`${v ? "PASS" : "FAIL"} ${k}`); ok = ok && v; }
+  console.log(`${all.filter(([, v]) => v).length}/${all.length} checks passed.`);
   if(errors.length){ ok = false; console.log("Page errors:\n  " + errors.join("\n  ")); }
   console.log(ok ? "All checks passed." : "Some checks failed.");
   await browser.close();

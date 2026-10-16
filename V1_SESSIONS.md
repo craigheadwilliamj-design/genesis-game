@@ -9,7 +9,7 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 ## Track 1: Launch gate (cheap, do first)
 
 **S1 (S): Dev-mode flag**
-> Add a hidden dev-mode. `devMode()` helper in js/sim.js reading localStorage key `genesis-dev` (try/catch). Toggle it by clicking the version label in the HUD 5 times in a row (add a small version label if none exists), with a toast saying on/off. Not saved in `state`. Add a smoke-test check that it defaults to off. Update CLAUDE.md with one line on `devMode()`.
+> Add a hidden dev-mode. `devMode()` helper in js/sim.js reading localStorage key `genesis-dev` (try/catch). Toggle it by clicking the version label in the HUD 5 times in a row (add a small version label if none exists), with a toast saying on/off. Not saved in `state`. Add a smoke-test check that it defaults to off. Update docs/core.md with one line on `devMode()`.
 
 **S2 (M): Launch roster filter** Needs S1
 > Add `LAUNCH_ROSTER` (ids listed in V1_SESSIONS.md) to js/data.js and `speciesAvailable(id)` (true if dev-mode or in the roster). Apply it to: starter pool picks (`STARTER_POOLS` use in sim.js `newPark`), `speciesToUnlock` in science.js, ORACLE and GHOST species lists in scienceui.js, the exhibit buy lists in ui.js, and the catalog in ui.js (~line 895). Species outside the roster must not appear for a non-dev player, but saves that already own them must keep working. Also filter the animal statues in `STATUES`/menu.js to the roster. Add smoke checks.
@@ -63,7 +63,7 @@ Launch roster (56): Pools A/B/C ids `arth mega pulm dcau comp lyst dryo hyps ovi
 ## Track 4: Biome art (one biome per session)
 
 **S15 (M): Grassland art**   **S16 (M): Tundra art**   **S17 (L): Boreal art**
-> Follow tools/BIOME_ART.md exactly for <biome>: ground tile, rocks and boulders, landscape plants, Park Plants, water, names, CLAUDE.md status lines. Check at game zoom and zoomed in.
+> Follow tools/BIOME_ART.md exactly for <biome>: ground tile, rocks and boulders, landscape plants, Park Plants, water, names, docs/art.md status lines. Check at game zoom and zoomed in.
 
 **S18 (M): Paintable biome texture**
 > Add a paint tool for park biome ground, modelled on the work zones (`state.zones`) without the management side. Free painting over/replacing, editable until painted over, and delete layers that are fully covered. Save defaults in `upgradeSave`, smoke check.
