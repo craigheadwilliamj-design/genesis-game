@@ -42,6 +42,7 @@ h3{margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;c
 .part .grip{color:var(--dim);cursor:grab;padding:0 3px;touch-action:none;user-select:none;-webkit-user-select:none;letter-spacing:-2px}
 .part .grip:hover{color:var(--ink)}
 .part.dragging{opacity:.45;cursor:grabbing}
+.part.gone .nm{opacity:.45;text-decoration:line-through}
 .part.drop-before{box-shadow:0 -2px 0 var(--acc)}
 .part.drop-after{box-shadow:0 2px 0 var(--acc)}
 .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
@@ -70,7 +71,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
   <div class="grp"><button id="bRig" class="on">Rig</button><button id="bPose">Pose</button></div>
   <div class="sep"></div>
   <div class="grp"><button id="bAdd">Add parts…</button><button id="bRef">Reference…</button>
-   <input id="fileParts" type="file" accept="image/*" multiple hidden><input id="fileRef" type="file" accept="image/*" hidden><input id="fileProj" type="file" accept=".json,application/json" hidden></div>
+   <input id="fileParts" type="file" accept="image/*" multiple hidden><input id="fileRef" type="file" accept="image/*" hidden><input id="fileProj" type="file" accept=".json,application/json" hidden><input id="fileSwap" type="file" accept="image/*" hidden></div>
   <div class="sep"></div>
   <div class="grp"><button id="bUndo">Undo</button><button id="bRedo">Redo</button></div>
   <div class="sep"></div>
@@ -103,15 +104,19 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <div class="row rigonly"><span>Rest at</span>x<input id="pLx" type="number">y<input id="pLy" type="number"></div>
    <div class="row rigonly"><span>Mirror</span><select id="pMirror" style="flex:1"></select></div>
    <div class="row rigonly"><span></span><label><input id="pFlip" type="checkbox"> Flip left/right</label></div>
+   <div class="row rigonly"><span></span><label title="For extras like a shut eye or a bubble: hidden in every frame unless that frame shows it"><input id="pOff" type="checkbox"> Hidden unless a frame shows it</label></div>
    <div class="row rigonly"><span></span><button id="bDup">Duplicate</button><button id="bDel">Delete</button></div>
+   <div class="row"><span></span><button id="bSwap" title="Swap this part's PNG for a fixed one. The joint, parent, place and every pose stay as they are">Replace picture…</button></div>
    <div class="row poseonly"><span>Rotate</span><input id="pR" type="range" min="-180" max="180" step="1" style="flex:1"><input id="pRn" type="number" step="0.5"></div>
    <div class="row poseonly"><span>Shift</span>x<input id="pDx" type="number" step="1">y<input id="pDy" type="number" step="1"></div>
+   <div class="row poseonly"><span>Show</span><label title="Shown or hidden in this frame only (V). It switches at the frame, never fades"><input id="pShow" type="checkbox"> In this frame</label></div>
    <div class="row poseonly"><span></span><button id="bResetPart">Reset this part</button></div>
   </div>
   <div class="dim" style="font-size:12px">
    <b>Rig:</b> drag parts into place, set each joint (where it pivots) with the Joint tool, and pick a parent so limbs follow the body.<br>
    <b>Pose:</b> drag a part to rotate it about its joint (Shift snaps 5°). Arrow keys nudge. Duplicate a frame, change the pose, repeat.<br>
-   Keys: R rotate · M move · J joint · H pan · ,/. frames · Space play · Ctrl+Z undo
+   <b>Extras</b> (a shut eye, a bubble): tick "Hidden unless a frame shows it" in Rig, then tick Show on the frames that have it.<br>
+   Keys: R rotate · M move · J joint · H pan · V show/hide in this frame · ,/. frames · Space play · Ctrl+Z undo
   </div>
  </div>
 
@@ -197,6 +202,8 @@ function restPos(n, m = nodeMap()){ let x = 0, y = 0, g = 0; while(n && g++ < 60
 function depth(n){ const m = nodeMap(); let d = 0; while(n.parent && m[n.parent] && d < 40){ n = m[n.parent]; d++; } return d; }
 function isDesc(id, anc){ const m = nodeMap(); let n = m[id], g = 0; while(n && g++ < 60){ if(n.id === anc) return true; n = n.parent ? m[n.parent] : null; } return false; }
 const curPose = () => mode === 'rig' ? {} : (frames()[cur] || {});
+// is a part shown in a pose: the frame's own v (1 shown, 0 hidden) if it has one, else shown unless the part is marked off (hidden unless a frame shows it)
+const shownIn = (n, pose) => { const v = pose[n.id] && pose[n.id].v; return v === undefined ? !n.off : !!v; };
 
 // ---------- assets ----------
 function loadAsset(id, url){
@@ -227,6 +234,13 @@ async function addFiles(files){
   }
   setMode('rig'); save(true);
 }
+// a new PNG for a part, keeping its joint, parent, place and poses (the fix for a sprite error); parts sharing the old picture keep it, and Undo brings it back
+async function swapPicture(n, file){
+  const old = imgs[n.asset], aid = 'a' + (P.seq++), im = await loadAsset(aid, await readURL(file));
+  n.asset = aid; save(true);
+  if(old && (old.width !== im.width || old.height !== im.height))
+    ask('The new picture is ' + im.width + '×' + im.height + ' and the old one was ' + old.width + '×' + old.height + '. The joint stays at the same pixel (' + n.px + ', ' + n.py + '), so check it still sits where the part turns.', {info:true});
+}
 async function setRef(file){
   const aid = 'a' + (P.seq++);
   await loadAsset(aid, await readURL(file));
@@ -248,12 +262,15 @@ function worlds(pose){
 }
 const drawM = (n, m) => n.flip ? mul(m, [-1,0,0,1,0,0]) : m;
 
-function drawPose(ctx, pose, alpha, snap){
+// extra: 'all' draws parts hidden in this pose too (Rig mode), or a part's id to draw just that one faintly (the selected part in Pose mode)
+function drawPose(ctx, pose, alpha, snap, extra){
   const W = worlds(pose);
   ctx.imageSmoothingEnabled = false;
-  const a = ctx.globalAlpha; ctx.globalAlpha = a * alpha;
+  const a = ctx.globalAlpha;
   for(const n of P.nodes){
     if(n.hidden || !imgs[n.asset]) continue;
+    const on = extra === 'all' || shownIn(n, pose); if(!on && extra !== n.id) continue;
+    ctx.globalAlpha = a * alpha * (on ? 1 : .3);
     let m = drawM(n, W[n.id]).slice();
     if(snap){ m[4] = Math.round(m[4]); m[5] = Math.round(m[5]); }
     ctx.save(); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
@@ -266,7 +283,7 @@ function drawPose(ctx, pose, alpha, snap){
 function pickAt(wx, wy){
   const W = worlds(curPose());
   for(let i = P.nodes.length - 1; i >= 0; i--){
-    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset]) continue;
+    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset] || (mode === 'pose' && n.id !== sel && !shownIn(n, curPose()))) continue;
     const [x,y] = apply(inv(drawM(n, W[n.id])), wx, wy);
     const u = Math.floor(x + n.px), v = Math.floor(y + n.py), im = imgs[n.asset];
     if(u < 0 || v < 0 || u >= im.width || v >= im.height) continue;
@@ -314,7 +331,7 @@ function draw(){
       ctx.globalAlpha = 1; drawPose(ctx, p, .22, snap); drawPose(ctx, n, .22, snap);
     }
   }
-  drawPose(ctx, pose, 1, snap);
+  drawPose(ctx, pose, 1, snap, mode === 'rig' ? 'all' : sel);
   // cell border + ground line
   ctx.lineWidth = lw; ctx.strokeStyle = 'rgba(240,160,48,.8)'; ctx.strokeRect(0, 0, P.cell.w, P.cell.h);
   ctx.strokeStyle = 'rgba(92,200,160,.7)'; ctx.setLineDash([4*lw, 3*lw]);
@@ -371,7 +388,7 @@ function buildStrip(){
     const d = document.createElement('div'); d.className = 'fr' + (i === cur ? ' sel' : '');
     d.appendChild(frameCanvas(f, TH));
     const t = document.createElement('div'); t.textContent = i + 1; d.appendChild(t);
-    d.onclick = () => { if(playing) return; cur = i; if(mode === 'rig') setMode('pose'); syncStrip(); fillProps(); draw(); };
+    d.onclick = () => { if(playing) return; cur = i; if(mode === 'rig') setMode('pose'); syncStrip(); buildParts(); fillProps(); draw(); };
     st.appendChild(d);
   });
 }
@@ -411,7 +428,8 @@ function buildParts(){
   const box = $('#parts'); box.innerHTML = '';
   for(let i = P.nodes.length - 1; i >= 0; i--){
     const n = P.nodes[i];
-    const d = document.createElement('div'); d.className = 'part' + (n.id === sel ? ' sel' : '');
+    const d = document.createElement('div'); d.className = 'part' + (n.id === sel ? ' sel' : '') + (mode === 'pose' && !shownIn(n, curPose()) ? ' gone' : '');
+    if(n.off) d.title = 'Hidden unless a frame shows it';
     d.style.paddingLeft = (5 + depth(n)*12) + 'px';
     const eye = document.createElement('button'); eye.textContent = n.hidden ? '○' : '●'; eye.title = 'Show or hide';
     eye.onclick = ev => { ev.stopPropagation(); n.hidden = !n.hidden; save(); };
@@ -432,7 +450,7 @@ function fillProps(){
   const n = sel && nodeOf(sel); $('#props').hidden = !n; if(!n) return;
   const set = (id, v) => { const e = $(id); if(document.activeElement !== e) e.value = v; };
   set('#pName', n.name); set('#pPx', n.px); set('#pPy', n.py); set('#pLx', n.lx); set('#pLy', n.ly);
-  $('#pFlip').checked = !!n.flip;
+  $('#pFlip').checked = !!n.flip; $('#pOff').checked = !!n.off; $('#pShow').checked = shownIn(n, frames()[cur] || {});
   const p = (frames()[cur] || {})[n.id] || {};
   set('#pR', p.r || 0); set('#pRn', Math.round((p.r || 0)*10)/10); set('#pDx', p.dx || 0); set('#pDy', p.dy || 0);
   const sig = P.nodes.map(x => x.id + x.name).join('|') + '#' + n.id + n.parent + n.mirror;
@@ -460,7 +478,7 @@ function setMode(m){
   if(playing) stop();
   mode = m; document.body.dataset.mode = m;
   $('#bRig').classList.toggle('on', m === 'rig'); $('#bPose').classList.toggle('on', m === 'pose');
-  tool = m === 'rig' ? 'move' : 'rotate'; buildTools(); fillProps(); draw();
+  tool = m === 'rig' ? 'move' : 'rotate'; buildTools(); buildParts(); fillProps(); draw();
 }
 function ui(){
   $('#cellW').value = P.cell.w; $('#cellH').value = P.cell.h; $('#ground').value = P.ground; $('#pjName').value = P.name;
@@ -501,6 +519,12 @@ async function openProject(o){
 // ---------- editing actions ----------
 function setPose(id, patch){
   const f = frames()[cur]; f[id] = Object.assign({r:0, dx:0, dy:0}, f[id], patch);
+}
+// show or hide a part in this frame only; a frame that agrees with the part's default keeps no v
+function showPart(n, on){
+  const f = frames()[cur]; setPose(n.id, {v:on ? 1 : 0});
+  if(on === !n.off) delete f[n.id].v;
+  const p = f[n.id]; if(p.v === undefined && !p.r && !p.dx && !p.dy) delete f[n.id];
 }
 function setParent(n, pid){
   const m = nodeMap(), [wx, wy] = restPos(n, m);
@@ -559,6 +583,7 @@ function halfCycle(){
     fs.forEach((f, i) => {
       const t = (i + N/2) % N, i0 = Math.floor(t) % N, i1 = (i0 + 1) % N, u = t - Math.floor(t), A = from[i0], B = from[i1], o = {};
       for(const k of ['r', 'dx', 'dy']) o[k] = Math.round((A[k] + (B[k] - A[k])*u)*10)/10;
+      if(A.v !== undefined) o.v = A.v;
       f[dst.id] = o;
     });
     count++;
@@ -570,6 +595,7 @@ function lerpPose(a, b, t){
   P.nodes.forEach(n => {
     const p = a[n.id] || {}, q = b[n.id] || {}, L = (k) => (p[k]||0) + ((q[k]||0) - (p[k]||0))*t;
     out[n.id] = {r:Math.round(L('r')*10)/10, dx:Math.round(L('dx')*10)/10, dy:Math.round(L('dy')*10)/10};
+    if(p.v !== undefined) out[n.id].v = p.v;   // shown or hidden switches at a frame, it never tweens: the in-betweens keep the first frame's
   });
   return out;
 }
@@ -591,7 +617,7 @@ function partsAt(wx, wy){
     return u >= 0 && v >= 0 && u < im.width && v < im.height && hits[n.asset][(v*im.width + u)*4 + 3] > 16;
   };
   for(let i = P.nodes.length - 1; i >= 0; i--){
-    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset]) continue;
+    const n = P.nodes[i]; if(n.hidden || !imgs[n.asset] || (mode === 'pose' && n.id !== sel && !shownIn(n, curPose()))) continue;
     if(test(n, wx, wy)){ exact.push(n); continue; }
     let ok = false;
     for(const r of [tol/2, tol]){ for(let k = 0; k < 8 && !ok; k++){ const t = k*Math.PI/4; ok = test(n, wx + Math.cos(t)*r, wy + Math.sin(t)*r); } if(ok) break; }
@@ -690,7 +716,11 @@ on('#pLx', 'change', withSel(n => { n.lx = Math.round(+$('#pLx').value || 0); sa
 on('#pLy', 'change', withSel(n => { n.ly = Math.round(+$('#pLy').value || 0); save(); }));
 on('#pMirror', 'change', withSel(n => { setMirror(n, $('#pMirror').value); save(); }));
 on('#pFlip', 'change', withSel(n => { n.flip = $('#pFlip').checked; save(); }));
+on('#pOff', 'change', withSel(n => { n.off = $('#pOff').checked; save(); }));
+on('#pShow', 'change', withSel(n => { showPart(n, $('#pShow').checked); save(); }));
 on('#bDup', 'click', withSel(n => { dupNode(n); save(); }));
+on('#bSwap', 'click', withSel(() => $('#fileSwap').click()));
+on('#fileSwap', 'change', withSel(async n => { const f = $('#fileSwap').files[0]; $('#fileSwap').value = ''; if(!f) return; try{ await swapPicture(n, f); }catch(err){ ask('Could not open that picture: ' + err.message, {info:true}); } }));
 on('#bDel', 'click', withSel(async n => { if(await ask('Delete "' + n.name + '"? Parts attached to it move up to its parent.', {ok:'Delete'})){ delNode(n); save(); } }));
 const rInput = v => withSel(n => { setPose(n.id, {r:clamp(+v() || 0, -360, 360)}); fillProps(); draw(); })();
 on('#pR', 'input', () => rInput(() => $('#pR').value)); on('#pR', 'change', () => { save(); buildStrip(); });
@@ -884,7 +914,8 @@ document.addEventListener('keydown', e => {
   else if(k === 'm'){ tool = 'move'; buildTools(); }
   else if(k === 'j' && mode === 'rig'){ tool = 'pivot'; buildTools(); }
   else if(k === 'h'){ tool = 'pan'; buildTools(); }
-  else if(k === ',' || k === '.'){ const fs = frames(); cur = (cur + (k === '.' ? 1 : -1) + fs.length) % fs.length; if(mode === 'rig') setMode('pose'); syncStrip(); fillProps(); draw(); }
+  else if(k === ',' || k === '.'){ const fs = frames(); cur = (cur + (k === '.' ? 1 : -1) + fs.length) % fs.length; if(mode === 'rig') setMode('pose'); syncStrip(); buildParts(); fillProps(); draw(); }
+  else if(k === 'v' && mode === 'pose' && sel && !playing){ const n = nodeOf(sel); if(n){ showPart(n, !shownIn(n, frames()[cur] || {})); save(); } }
   else if(e.key.startsWith('Arrow') && sel && !playing){
     e.preventDefault(); const n = nodeOf(sel), dx = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0, dy = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
     if(mode === 'rig'){ n.lx += dx; n.ly += dy; }
