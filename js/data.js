@@ -1281,7 +1281,7 @@ BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platf
 const WATER = {
   perSqM:20,       // cost per square meter
   minArea:12,      // smallest body of water, in square meters
-  margin:.5,       // gap kept between the water and the fence, in meters
+  margin:0,        // gap kept between the water and the fence, in meters (none: water may border the fence)
   oldPondR:6,      // radius of the round ponds older saves had; they become drawn water
 };
 

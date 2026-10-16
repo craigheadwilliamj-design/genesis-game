@@ -1405,6 +1405,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.fenceMeetFills = planPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}).why !== null && layPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}) === null && pieceType(fencePieces()["415,150,h"]) === "bars";
         L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
         for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
+        // water inside an exhibit may sit flush against its fence, but not poke out
+        out.waterBordersFence = !waterProblem([[375,160],[380,160],[380,165],[375,165]], W) && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
         // fence may border a path or water but not run through it
         const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
         const why = k => planPieces([k], "wood").why;
