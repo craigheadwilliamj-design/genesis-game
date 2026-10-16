@@ -1778,6 +1778,34 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         setTool("select"); delete svg.setPointerCapture; delete svg.releasePointerCapture;
         state.pathChunks = JSON.parse(JSON.stringify(keep.chunks)); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
       }
+      // P4 rendering: one cached ground layer under everything that stands, cut at the pixel grid with no gaps at junctions
+      {
+        const sq = l => l.map(([cx, cy, kind]) => ({cx, cy, x:cx * 5, y:cy * 5, w:5, h:5, kind}));
+        const pix = (d, set) => { for(const r of d.matchAll(/M([\d.-]+) ([\d.-]+)h([\d.-]+)v([\d.-]+)/g)){ const x0 = Math.round(r[1] / ROCK_MPP), y0 = Math.round(r[2] / ROCK_MPP), w = Math.round(r[3] / ROCK_MPP), h = Math.round(r[4] / ROCK_MPP); for(let y = y0; y < y0 + h; y++) for(let x = x0; x < x0 + w; x++) set.add(x + "," + y); } return set; };
+        const union = list => { const u = new Set(); for(const q of sq(list)) for(let y = Math.round(q.y / ROCK_MPP); y < Math.round((q.y + 5) / ROCK_MPP); y++) for(let x = Math.round(q.x / ROCK_MPP); x < Math.round((q.x + 5) / ROCK_MPP); x++) u.add(x + "," + y); return u; };
+        const covers = list => { const m = pathMask(sq(list)), body = new Set(); for(const k of m.kinds) pix(m.by[k].body, body); const u = union(list); return body.size === u.size && [...u].every(k => body.has(k)); };
+        out.pathMaskTJunction = covers([[1,1,"g"],[2,1,"g"],[3,1,"g"],[2,2,"g"],[2,3,"g"]]);
+        out.pathMaskDiagonal = covers([[1,1,"g"],[2,1,"g"],[2,0,"g"],[3,0,"g"],[3,-1,"g"],[4,-1,"g"]]);
+        out.pathMaskKindsTouch = covers([[1,1,"g"],[2,1,"g"],[3,1,"s"],[4,1,"s"],[3,2,"b"]]);
+        // edges: a lit row on top and a dark row at the bottom of a lone chunk, lit left and dark right, and each kind keeps its own edge where two meet
+        { const m = pathMask(sq([[1,1,"g"],[2,1,"s"]])), lit = pix(m.by.g.lit, new Set()), dark = pix(m.by.g.dark, new Set()), sLit = pix(m.by.s.lit, new Set()), x0 = Math.round(5 / ROCK_MPP), y0 = Math.round(5 / ROCK_MPP), x1 = Math.round(10 / ROCK_MPP), y1 = Math.round(10 / ROCK_MPP);
+          out.pathMaskEdges = lit.has(x0 + "," + y0) && lit.has((x1 - 3) + "," + y0) && lit.has(x0 + "," + (y1 - 3)) && dark.has((x1 - 1) + "," + (y1 - 1)) && dark.has((x1 - 1) + "," + (y0 + 3)) && dark.has((x0 + 3) + "," + (y1 - 1)) && !lit.has((x0 + 3) + "," + (y0 + 3)) && sLit.has(x1 + "," + (y0 + 3)) && !!m.cast; }
+        // the layer is built once and only rebuilt when the squares change
+        recompute(); render(); const b0 = pathLayer.builds; render(); render();
+        const stable = pathLayer.builds === b0;
+        const hadCh = !!state.pathChunks["30,30"]; state.pathChunks["30,30"] = "g"; pathVer++; render();
+        out.pathLayerCached = stable && pathLayer.builds === b0 + 1;
+        if(!hadCh){ delete state.pathChunks["30,30"]; pathVer++; }
+        // layer order: the path layer is first of the things drawn on the ground, before every exhibit, fence, building and plant
+        const ex0 = state.exhibits.length, bl0 = state.buildings.length;
+        const ring = [[150, 150], [170, 150], [170, 170], [150, 170]], pen = state.exhibits[0];
+        state.pathChunks["32,29"] = "g"; state.pathChunks["33,29"] = "g"; pathVer++; recompute(); render();
+        const html = world.innerHTML, at = html.indexOf('id="pathLayer"');
+        const later = ['data-kind="exhibit"', 'data-kind="building"', "<image"].map(t => html.indexOf(t)).filter(i => i >= 0);
+        out.pathLayerBelowStanding = at >= 0 && later.every(i => i > at) && !/data-kind="path"[^>]*>\s*<[^>]*fill="#C9BFA8"/.test(html);
+        delete state.pathChunks["32,29"]; delete state.pathChunks["33,29"]; pathVer++; recompute(); render();
+        out.pathNoBeigeBlocks = typeof chunksSvg === "undefined";
+      }
       // old saves from the 1 m cell build: a chunk is path where most of its area was; the gate and the walk move to the chunk grid
       const oldC = JSON.parse(JSON.stringify(state)); delete oldC.pathChunks; delete oldC.pathFixed; oldC.gate = [205, 305]; oldC.paths = oldC.paths.filter(p => !p.d);
       oldC.pathCells = {}; oldC.pathFixed = {};

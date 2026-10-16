@@ -231,7 +231,7 @@ function render(){
   // path surface doesn't show under a viewing platform's deck: mask the footprints out of the paths
   const decks = state.buildings.filter(b => b.type === "platform");
   if(decks.length) s += `<mask id="deckcut" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect x="-100000" y="-100000" width="200000" height="200000" fill="#fff"/>${decks.map(b => `<polygon points="${polyStr(b.points)}" fill="#000"/>`).join("")}</mask>`;
-  under = chunksSvg() + under;
+  under = pathLayerSvg() + under;
   s += clipDefs + (decks.length ? `<g mask="url(#deckcut)">${under}${over}</g>` : under + over);
 
   // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
@@ -2268,26 +2268,6 @@ function bulldozeChunks(box){
   ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The main walk from the entrance stays." : ""}`, "good");
   return true;
 }
-// Chunks for the map: runs along each row, one path a kind
-let chunksCache = null;
-function chunksSvg(){
-  const C = pathChunks(), size = Object.keys(C).length;
-  if(chunksCache && chunksCache.chunks === C && chunksCache.ver === pathVer && chunksCache.size === size) return chunksCache.svg;
-  const rows = {s:new Map(), g:new Map(), b:new Map()};
-  for(const q of pathSquares()){ const m = rows[q.kind]; if(!m) continue; if(!m.has(q.cy)) m.set(q.cy, []); m.get(q.cy).push(q.cx); }
-  let svg = "";
-  for(const kind of ["s", "g", "b"]){
-    let d = "";
-    for(const [cy, xs] of rows[kind]){
-      xs.sort((a, b) => a - b);
-      for(let i = 0; i < xs.length;){ let j = i; while(j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++; const w = (xs[j] - xs[i] + 1) * CHUNK; d += `M${xs[i] * CHUNK} ${cy * CHUNK}h${w}v${CHUNK}h-${w}z`; i = j + 1; }
-    }
-    if(d) svg += `<path d="${d}" fill="${PATH_CELLS.kinds[kind].color}" shape-rendering="crispEdges" pointer-events="none"/>`;
-  }
-  chunksCache = {chunks:C, ver:pathVer, size, svg};
-  return svg;
-}
-
 function toolDone(newSel){
   setTool("select");
   if(newSel) select(newSel.kind, newSel.id);
