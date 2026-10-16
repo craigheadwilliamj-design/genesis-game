@@ -2639,7 +2639,7 @@ function drawLoose(){
     }
     const dx = p[0] - h.x, dy = p[1] - h.y, step = Math.hypot(dx, dy);
     h.x = p[0]; h.y = p[1];
-    const spr = !!S && animalRadius(l.sp) * view.k >= 6, r = spr ? animalRadius(l.sp) : Math.max(2.5, 7*inv), moving = step > .002 && l.status === "loose";
+    const carried = l.status === "carried", spr = !carried && !!S && animalRadius(l.sp) * view.k >= 6, r = spr ? animalRadius(l.sp) : carried ? Math.max(.3, 4*inv) : Math.max(2.5, 7*inv), moving = step > .002 && l.status === "loose";
     h.r = r; const sed = l.status === "sedated"; h.act = sed ? "rest" : null; if(!sed) h.restAt = null;   // a sedated animal lies down (its rest clip) until a keeper picks it up
     if(spr !== h.spr || (spr && Math.abs(r - h.rr) > 1e-6)){   // picture appears, vanishes or resizes with zoom: draw it again
       h.spr = spr; h.rr = r; h.pose = null; h.rg = null;
@@ -2652,13 +2652,13 @@ function drawLoose(){
         if(rigOf(l.sp)) rigStep(h, "walk"); else if(S.walk) setPose(h, Math.floor(h.stride / (r * (S.step || .5))) % S.walk);
       }else if(rigOf(l.sp)) rigStep(h, sed ? "rest" : "idle"); else setPose(h, restPose(h, S));
     }
-    h.wrap.setAttribute("transform", `translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${spr ? animalUp(h) : upright()}`);
+    h.wrap.setAttribute("transform", `translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${spr ? animalUp(h) : upright()}${carried ? " translate(0 -1.1)" : ""}`);   // carried: a lettered dot about a food crate's size, held at the keeper's hands
     let m = "";
     const rr = Math.max(r, 2.5);
     if(l.status === "loose") m += `<circle r="${(rr * 1.8 * pulse).toFixed(2)}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
     if(!spr){
-      m += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`
-        + `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text>`;
+      m += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="${carried ? 1.5 : 2.5}" vector-effect="non-scaling-stroke"/>`
+        + `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : carried ? esc(sp.name[0]) : "z"}</text>`;
     }else m += `<text class="glyph" y="${(-r * 1.9).toFixed(2)}" font-size="${(r*1.1).toFixed(2)}" style="fill:${l.status === "loose" ? "#E5484D" : "#fff"}">${l.status === "loose" ? "!" : "z"}</text>`;
     if(m !== h.key){ h.key = m; h.mark.innerHTML = m; }
   }
