@@ -326,10 +326,9 @@ function render(){
   // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
   const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze", isDoomed)}));
   for(const q of looseLeft) standing.push(q);
-  s += standing.sort((p, q) => p.y - q.y || p.o - q.o).map(it => it.svg).join("");
-
-  // entrance building
-  s += entrance34(inv);
+  standing.push({y:state.gate[1], o:2, svg:entrance34(inv)});   // the entrance building stands on the south edge, so it sorts in too
+  standing.sort((p, q) => p.y - q.y || p.o - q.o);
+  if(!tilt) while(standing.length) s += standing.shift().svg;   // the flat view has no depth: all of it goes under the buildings
 
   // litter on the paths
   const specks = litterSpecks();
@@ -345,6 +344,7 @@ function render(){
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    while(standing.length && standing[0].y <= cy) s += standing.shift().svg;   // trees, rocks, loose fence behind this building draw first
     while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
@@ -381,6 +381,7 @@ function render(){
     s += `</g>`;
   }
   for(const tk of tanks) s += tk.svg;
+  for(const it of standing) s += it.svg;
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
   if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
