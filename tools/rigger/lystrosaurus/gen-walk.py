@@ -3,11 +3,12 @@
 # A short-legged lateral-sequence walk (near hind, near front, far hind, far front, a quarter cycle apart). Each foot is planted flat and
 # slides back under the body at body speed for `ds` of the cycle, then swings forward lifted; the thigh and leg are solved by 2-bone IK
 # (rigkit.leg) so the ankle goes where it is wanted. The hips are root parts, so each is shifted with the body's bob and rock.
+# It rides low like a lizard, the belly near the ground, with the feet planted wide of the hips (front ones ahead, hind ones behind) so each thigh slopes out and the shin drops from the knee; the shoulders rock as the front feet reach.
 # The body bobs down as each pair of feet take the weight and the head rides against the body's rock so it nods a little less than the body.
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lystkit import *
-K = dict(N=8, fps=8, ds=.6, S=17.0, lift=3.2, bob=.6, pitch=1.2, head=1.5, shift=.0, name='walk')
+K = dict(N=8, fps=8, ds=.6, S=15.0, lift=3.2, bob=.5, pitch=2.4, head=1.5, crouch=2.0, splay=3.5, shift=.0, name='walk')
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); V = View(P)
 rest = {}   # each foot's ankle (the foot part's joint) standing, in the world
@@ -19,7 +20,7 @@ for i in range(K['N']):
   f = i/K['N']; pose = {}
   bob = K['bob']*math.sin(4*math.pi*f + .6)            # down twice a cycle
   rb = K['pitch']*math.sin(4*math.pi*(f + .125))       # rocks nose down as a front foot lands, up as a hind one does
-  body = {'r': rd(rb), 'dx': 0, 'dy': rd(bob)}
+  body = {'r': rd(rb), 'dx': 0, 'dy': rd(K['crouch'] + bob)}
   pose[BODY] = body
   pose[HEAD] = {'r': rd(-.6*rb + K['head']*math.sin(4*math.pi*(f + .25))), 'dx': 0, 'dy': 0}
   pose[JAW] = {'r': 0, 'dx': 0, 'dy': 0}
@@ -31,7 +32,7 @@ for i in range(K['N']):
     if fl < K['ds']: ox = K['S']/2 - K['S']*fl/K['ds']
     else:
       t = (fl - K['ds'])/(1 - K['ds']); ox = -K['S']/2 + K['S']*sm(t); lift = K['lift']*math.sin(math.pi*t)
-    V.leg(pose, th, lg, ft, (rest[th][0] + ox + K['shift'], rest[th][1] - lift), 0.0, 1)
+    V.leg(pose, th, lg, ft, (rest[th][0] + ox + K['shift'] + (K['splay'] if th in (FAR_FRONT[0], NEAR_FRONT[0]) else -K['splay']), rest[th][1] - lift), 0.0, 1)
   frames.append(pose)
 unwrap(frames)
 clip = {'name': K['name'], 'fps': K['fps'], 'frames': frames}
