@@ -277,7 +277,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.toysHiddenOff = toyHidden("post") && toyHidden("hay") && toyHidden("vbark") && !toyHidden("pbale") && !toyHidden("barn");
       buildMenu(); out.toyMenuHiddenOff = !document.querySelector('#sideMenu [data-tool="land-post"]') && !!document.querySelector('#sideMenu [data-tool="land-pbale"]');
       out.enrichFullOff = !me || enrichment(me) === 1;
-      out.vivToysHiddenOff = vivToysHtml({viv:true, animals:[], points:[[0,0],[1,0],[1,1]]}) === "";
+      out.vivToysHiddenOff = !vivToysHtml({viv:"S", animals:[], points:[[0,0],[1,0],[1,1]]}).includes("Enrichment");
       localStorage.setItem("genesis-dev", "1");
       out.themesShownOn = themeKey({theme:themed}) === themed && themeHtml("exhibit", {theme:themed, points:[]}).includes("themeSel");
       out.toysShownOn = !toyHidden("post") && !toyHidden("vbark");
@@ -337,10 +337,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     viv.stock = {};
-    out.keeperFeeds = run(900, () => (viv.stock.paleoflora || 0) + (viv.stock.plants || 0) >= 1);
+    // a vivarium is fed from dishes: give the case two (six animals, VIV_DISH.perDish each)
+    const giveDishes = (e, n) => { const [cx, cy] = centroid(e.points); e.land = (e.land || []).filter(f => !LAND[f.type].tray); for(let i = 0; i < n; i++) e.land.push({id:uid("l-"), type:"vdish", x:cx - 2 + i * 4, y:cy, cap:VIV_DISH.cap[e.viv], food:{}}); };
+    giveDishes(viv, 2);
+    out.keeperFeeds = run(900, () => trayFood(viv, "paleoflora") + trayFood(viv, "plants") >= 1);
     out.foodLeftDock = stockOf(dock, "plants") < 12;
     dock.store = {plants:60};
-    viv.stock = {plants:storeMax(viv, "paleoflora"), paleoflora:storeMax(viv, "paleoflora")};
+    for(const f of viv.land) f.food = {plants:trayCap(f)};   // full dishes: keepers have nothing to bring
     // keepers leave restocking to custodians: nothing moves to the station until one is hired
     out.keeperNoRestock = !run(300, () => stockOf(st, "plants") >= 5);
     state.buildings.push({id:"b-cl2", type:"closet", points:rectPts(210, 250, BUILDINGS.closet.w, BUILDINGS.closet.d, H)});
@@ -372,6 +375,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.zones.push({id:"z-1", name:"North", color:"#E0A030", points:[[185,275],[225,275],[225,295],[185,295]]});
     autoZone(viv); autoZone(st);
     out.autoZone = viv.zone === "z-1" && st.zone === "z-1" && !far.zone;
+    giveDishes(far, 1); for(const f of viv.land) f.food = {};
     recompute(); buildKeeperGraph(); viv.stock = {}; far.stock = {};
     const jobsFor = z => shortages(z ? {zone:z} : null).map(j => j.e.id);
     out.zonedKeepersStay = jobsFor("z-1").includes("e-v") && !jobsFor("z-1").includes("e-far") && jobsFor(null).includes("e-far");
@@ -381,7 +385,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // a keeper with nothing else to do cleans a dirty exhibit, even with no shovels
     state.staff.keepers = [{id:"k-1", name:"K", stamina:100}]; crew = []; syncCrew();
-    viv.stock = {plants:storeMax(viv, "paleoflora"), paleoflora:storeMax(viv, "paleoflora")}; viv.dirt = 80;
+    for(const f of viv.land) f.food = {plants:trayCap(f)};   // full dishes: keepers have nothing to bring viv.dirt = 80;
     out.cleansBareHanded = run(900, () => viv.dirt < 60) && !hasUpgrade("shovels");
     keepersNight();
 
@@ -3116,6 +3120,86 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       oldV.exhibits.push({id:"e-ov", name:"OldV", points:rectPts(200, 270, 6, 4, 0), animals:[], happy:70, viv:"S"}, {id:"e-ov2", name:"OldV2", points:rectPts(220, 270, 16, 10, 0), animals:[], happy:70, viv:"L"});
       let loaded = true; try { startWith(upgradeSave(oldV), false); setSpeed(0); render(); } catch(err){ loaded = false; }
       out.vivOldSaveLoads = loaded && state.exhibits.filter(e => e.viv).length === 2 && !!document.querySelector('[data-kind="exhibit"][data-id="e-ov"] polygon');
+    }
+    // vivarium props, dishes, lamp and pool
+    {
+      startWith(newPark(), false); setSpeed(0); state.money = 1e6; state.staff.feedFrom = 0;
+      const V = VIVARIUMS.M, mk = (id, n, x) => ({id, name:id, viv:"M", points:rectPts(x, 300, V.w, V.d, 0), animals:Array.from({length:n}, (_, i) => ({id:id + i, sp:"tikt"})), happy:70, biome:"tropical"});
+      const ev = mk("e-pv", 4, 200); state.exhibits.push(ev); recompute(); buildKeeperGraph();
+      const ft = Object.keys(dailyNeed(ev))[0], carrier = () => ({id:"k-x", carry:{type:ft, amount:6}});
+      const noteBad = (e, re) => exhibitReport(e).issues.some(i => i.bad && re.test(i.text));
+      // no dish: keepers can't deliver, animals go hungry, and the panel and report say so
+      const h0 = ev.hungryMin || 0; eatTick(30);
+      out.vivNoDishNoFeed = vivNoDish(ev) && dishText(ev) === "Needs a food dish." && !startFilling(carrier(), ev) && !shortages(null).some(j => j.e === ev) && (ev.hungryMin || 0) > h0
+        && noteBad(ev, /Needs a food dish/) && exhibitHtml(ev).includes("Needs a food dish");
+      // a dish: sized by the case, keepers fill it, animals eat from it and aren't hungry
+      addVivToy(ev, "vdish"); const dish = landOf(ev).find(f => f.type === "vdish");
+      const c = carrier(), k = {stamina:100};
+      out.vivDishSized = dish.cap === VIV_DISH.cap.M && trayCap(dish) === VIV_DISH.cap.M && !vivNoDish(ev) && !dishText(ev) && vivServed(ev) === 1;
+      out.vivDishListed = shortages(null).some(j => j.e === ev) || (kGraph.anchors[ev.id] ? false : true);
+      const filled = startFilling(c, ev); let guard = 0; while(c.job === "filling" && guard++ < 50) fillStep(c, k, 1000);
+      out.vivDishFills = filled && trayFood(ev, ft) > 0 && trayFood(ev, ft) <= VIV_DISH.cap.M + 1e-6 && trayHas(dish) === trayFood(ev, ft);
+      const before = trayFood(ev, ft), hm = ev.hungryMin || 0; eatTick(60);
+      out.vivDishEaten = trayFood(ev, ft) < before && (ev.hungryMin || 0) === hm && !noteBad(ev, /Hungry/);
+      // one food at a time: a dish holding one food takes no other
+      out.vivDishOneFood = trayRoomOf(dish, "meat") === 0 && trayRoomOf(dish, ft) >= 0;
+      // more animals than dishes reach: the rest go without, and the report says another dish is needed
+      const big = mk("e-pv2", 8, 230); state.exhibits.push(big); addVivToy(big, "vdish"); big.land.find(f => f.type === "vdish").food = {[ft]:5};
+      const hb = big.hungryMin || 0; eatTick(30);
+      out.vivDishesPerAnimals = dishesNeeded(big) === 2 && vivServed(big) === .5 && /another food dish/.test(dishText(big)) && (big.hungryMin || 0) > hb;
+      addVivToy(big, "vdish"); out.vivSecondDishCovers = vivServed(big) === 1 && !dishText(big);
+      state.exhibits = state.exhibits.filter(x => x !== big);
+      // old saves: every vivarium gets one free dish, once (and its loose food moves into it)
+      const old = JSON.parse(JSON.stringify(newPark())); delete old.vivDish;
+      old.exhibits.push({id:"e-od", name:"OldDish", points:rectPts(200, 270, 10, 6, 0), animals:[{id:"od1", sp:"tikt"}], happy:70, viv:"M", stock:{[ft]:3}}, {id:"e-od2", name:"OldDish2", points:rectPts(230, 270, 6, 4, 0), animals:[], happy:70, viv:"S"});
+      const up = upgradeSave(old), up2 = upgradeSave(JSON.parse(JSON.stringify(up)));
+      const od = up.exhibits.find(e => e.id === "e-od"), dishes = e => landOf(e).filter(f => f.type === "vdish");
+      out.vivOldSaveDish = up.vivDish === 1 && dishes(od).length === 1 && dishes(od)[0].cap === VIV_DISH.cap.M && trayFood(od, ft) === 3 && up.exhibits.every(e => !e.viv || dishes(e).length === 1) && !Object.keys(od.stock).length
+        && dishes(up2.exhibits.find(e => e.id === "e-od")).length === 1 && !vivNoDish(od);
+
+      // basking lamp: heat lovers get warmer and happier, less ill, it costs upkeep, and they gather under it
+      const wantHeat = SPECIES_BY_ID.tikt, ok = wantsHeat(wantHeat) && !wantsHeat(SPECIES_BY_ID.ples) && !wantsHeat(SPECIES_BY_ID.arch);
+      const tNo = exhibitReport(ev).target, ill0 = illChance(ev, ev.animals[0]).p, up0 = dailyCosts().upkeep, w0 = state.weather.today;
+      state.weather.today = "cold"; const coldNo = illChance(ev, ev.animals[0]); state.weather.today = w0;
+      const cm0 = comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0});
+      const m0 = state.money; addVivToy(ev, "vlamp"); const lamp = landOf(ev).find(f => f.type === "vlamp");
+      state.weather.today = "cold"; const coldYes = illChance(ev, ev.animals[0]); state.weather.today = w0;
+      out.vivLampEffects = ok && state.money === m0 - LAND.vlamp.price && heatShare(ev) === 1 && exhibitReport(ev).target > tNo && illChance(ev, ev.animals[0]).p < ill0 && coldNo.why.includes("the cold") && !coldYes.why.includes("the cold") && coldYes.p < coldNo.p
+        && comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0}) > cm0 && dailyCosts().upkeep === up0 + LAND.vlamp.upkeep && noteBad(ev, /basking lamp|Cold/) === false;
+      // one lamp warms VIV_LAMP.per animals: a bigger group is only partly warmed
+      const ev8 = mk("e-pv3", 8, 260); state.exhibits.push(ev8); addVivToy(ev8, "vlamp");
+      out.vivLampCovers = heatShare(ev8) === VIV_LAMP.per / 8 && exhibitReport(ev8).issues.some(i => /one lamp warms/.test(i.text)); state.exhibits = state.exhibits.filter(x => x !== ev8);
+      // animals gather under the lamp (a couple huddle in its glow, over a few tries since each starts somewhere random)
+      let gathered = 0; for(let t = 0; t < 6 && gathered < 2; t++){ regatherViv(ev); render(); gathered = [...herd.values()].filter(h => h.exhibitId === ev.id && Math.hypot(h.x - lamp.x, (h.y - lamp.y) * 2) <= VIV_LAMP.radius + 1).length; }
+      out.vivLampGather = gathered >= 2;
+      out.vivLampDrawn = landSvg(ev, null, () => false).includes("sprites/viv/vlamp-pool.png") && landSvg(ev, null, () => false).includes("sprites/viv/vlamp.png");
+
+      // pool: water for water lovers (thirst, water share, happiness), animals sit in it partly submerged; distinct from the misters
+      const pv = mk("e-pp", 4, 200 + 30); state.exhibits.push(pv); recompute();
+      const dryNo = thirsty(pv, wantHeat), tDry = exhibitReport(pv).target, wat0 = haveOf(pv, wantHeat).water, ill1 = illChance(pv, pv.animals[0]);
+      addVivToy(pv, "vpool"); const pool = landOf(pv).find(f => f.type === "vpool");
+      const arthLike = likesOf(SPECIES_BY_ID.arth).water < HAB.wantsWater;
+      out.vivPoolEffects = dryNo && !thirsty(pv, wantHeat) && haveOf(pv, wantHeat).water > wat0 && wat0 === 0 && exhibitReport(pv).target > tDry && !noteBad(pv, /Dry/) && ill1.why.includes("no pool") && !illChance(pv, pv.animals[0]).why.includes("no pool")
+        && vivPoolM2(pv) === LAND.vpool.poolM2 && arthLike && !thirsty(pv, SPECIES_BY_ID.arth) && LAND.vpool.pool && !LAND.vmist.pool;
+      let sunk = 0; for(let t = 0; t < 8 && sunk < 1; t++){ regatherViv(pv); render(); sunk = [...herd.values()].filter(h => h.exhibitId === pv.id && h.sub && /clip-path/.test(h.el.innerHTML)).length; }
+      out.vivPoolSubmerged = sunk >= 1 && !!vivPoolAt(pv, pool.x, pool.y) && !vivPoolAt(pv, pool.x + 5, pool.y);
+      const poolSvg = landSvg(pv, null, () => false);
+      out.vivPoolDrawn = poolSvg.includes("sprites/viv/vpool.png") && poolSvg.includes(`data-y="${pool.y - 1000}"`);
+      state.exhibits = state.exhibits.filter(x => x !== pv);
+
+      // pictures: the five old props and the new ones all come from sprites/viv through the pack, and the dish shows its food
+      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool"];
+      picsEv.land = keys.map((k, i) => ({id:"pc" + i, type:k, x:196 + i * 1.5, y:300}));
+      const svgp = landSvg(picsEv, null, () => false);
+      out.vivSpritesDrawn = keys.every(k => VIV_SPRITES[k] && svgp.includes(`sprites/viv/${k}.png`)) && !svgp.includes("<circle") && Object.keys(VIV_SPRITES).length === keys.length;
+      const dfull = {id:"pd", type:"vdish", x:200, y:300, cap:6, food:{[ft]:6}};
+      out.vivDishShowsFood = vivPropSvg(dfull, LAND.vdish).includes("<rect") && !vivPropSvg({...dfull, food:{}}, LAND.vdish).includes("<rect");
+
+      // vivarium animals only: open exhibits take none of it
+      const open = {id:"e-open", name:"Open", points:[[0,0],[40,0],[40,40],[0,40]], animals:[], happy:70, land:[]};
+      out.vivFittingsOnlyInGlass = ["vdish", "vlamp", "vpool", "vbark"].every(k => !!vivToyProblem(open, k) && !!landProblem(open, k, 20, 20) && !!decorProblem(k, 0, 0)) && !JSON.stringify(BUILD_MENU.map(g => g.items.map(i => i.tool))).match(/land-v(dish|lamp|pool)/)
+        && !thirsty(open, wantHeat) === !(likesOf(wantHeat).water >= HAB.wantsWater && habitatOf(open).wet === 0) && heatShare(open) === 1;
+      const html = vivToysHtml(ev); out.vivFittingsPanel = html.includes("Food Dish") && html.includes("Basking Lamp") && html.includes("Pool") && html.includes("vivFitSel");
     }
     return out;
   }));

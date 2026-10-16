@@ -1329,7 +1329,22 @@ const LAND = {
   vdig:   {label:"Dig Box",            one:"a dig box",            price:700,  r:.8, color:"#6B5236", toy:2, vivToy:true, look:"vdig"},
   vfeed:  {label:"Live-Feed Dispenser",one:"a live-feed dispenser",price:900,  r:.6, color:"#8A8F96", toy:3, vivToy:true, look:"vfeed"},
   vmist:  {label:"Misters",             one:"misters",              price:1200, r:.9, color:"#3E86A8", toy:3, vivToy:true, look:"vmist"},
+  // vivarium fittings (vivToy, but not enrichment): the food dish keepers fill (tray: its base size, VIV_DISH.cap sets it by case), a basking lamp (lamp) and a pool (pool, poolM2 of water; flat: drawn on the floor under the animals)
+  vdish:  {label:"Food Dish",           one:"a food dish",          price:250,  r:.8, color:"#8A8F96", vivToy:true, tray:6, fit:true, look:"vdish"},
+  vlamp:  {label:"Basking Lamp",        one:"a basking lamp",       price:900,  r:.7, color:"#B87034", vivToy:true, lamp:true, fit:true, upkeep:6, look:"vlamp"},
+  vpool:  {label:"Pool",                one:"a pool",               price:1800, r:1.3, color:"#3E86A8", vivToy:true, pool:true, poolM2:2.5, fit:true, flat:true, look:"vpool"},
 };
+// Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at ROCK_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
+const VIV_SPRITES = {vbark:{w:16, h:10}, vbranch:{w:16, h:20}, vdig:{w:16, h:11}, vfeed:{w:10, h:15}, vmist:{w:14, h:17}, vdish:{w:12, h:6, flat:true}, vlamp:{w:10, h:19}, vpool:{w:20, h:11, flat:true}};
+// Vivarium food: animals eat from dishes (LAND.vdish), and keepers can only deliver into dishes, so a case with none can't be fed. A dish holds one food at a time, up to cap units
+// by case size, and serves perDish animals; more animals than dishes go hungry. A dish costs nothing to run.
+const VIV_DISH = {cap:{S:6, M:10, L:16}, perDish:4};
+// Basking lamp: reptiles, amphibians and bugs want heat (not the feathered ones, WARM_BLOODED). One lamp warms `per` animals, and they gather within `radius` meters of it.
+// With heat: happy more, discomfort down, illness x`ill`; without it: happy less, and a cold snap makes them ill x`cold`.
+const VIV_LAMP = {per:4, radius:2.4, happy:6, lack:5, ill:.6, cold:1.5, comfort:.25};
+const WARM_BLOODED = ["anch", "yiqi", "arch", "micr", "scan", "mono", "comp", "long"];
+// Pool: a pool counts as water for water lovers (their water want in haveOf, and thirst), up to `bonus` happiness for a full fit; none and they're dry
+const VIV_POOL = {bonus:5};
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
 const TRAY = {

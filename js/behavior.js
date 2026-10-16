@@ -230,7 +230,7 @@ function behaviorCtx(e){
   const ctx = {
     counts, fight, ratio:need ? area(e.points) / need : 9,
     cover:!!e.viv || land.some(t => t.slots || t.cover || t.flora),
-    water:!!e.viv || waterOf(e).length > 0 || (BIOMES[biomeOf(e)].wet || 0) > 0,
+    water:(e.viv ? vivPoolM2(e) > 0 : waterOf(e).length > 0) || (BIOMES[biomeOf(e)].wet || 0) > 0,
     browse:!e.viv && browseRate(e, "plants") + browseRate(e, "paleoflora") > 0,
     seen:guestsSeen(e) * (1 - SCREEN.cut * screenShare(e)),   // how much of a crowd the animals feel: quiet signs hush the guests near them, screens block the view
     enrich:enrichment(e), x:exposure(e), dirt:e.dirt || 0, free:freeFeeding(), comfort:new Map(),
@@ -250,6 +250,7 @@ function comfortOf(e, s, ctx){
   const f = speciesFit(e, s), b = biomeFit(s, biomeOf(e));
   let c = .5 * (e.viv ? f.plants : f.sat) + .5 * (b === "home" ? 1 : b === "near" ? .6 : b === "away" ? .2 : 1) - .5 * ctx.x;
   if(ctx.dirt > CLEAN.penaltyFrom) c -= (ctx.dirt - CLEAN.penaltyFrom) / 100;
+  if(e.viv && wantsHeat(s)){ const hs = heatShare(e); c += hs > 0 ? VIV_LAMP.comfort * hs : -VIV_LAMP.comfort * .4; }   // warm under a basking lamp, chilly without one
   c = clamp(c, 0, 1); ctx.comfort.set(s.id, c);
   return c;
 }

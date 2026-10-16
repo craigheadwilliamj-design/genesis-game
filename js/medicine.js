@@ -152,7 +152,12 @@ function illChance(e, a){
   const d = e.dirt || 0; if(d > CLEAN.penaltyFrom){ p *= 1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer; why.push("dirt"); }
   const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
   const gs = grassSick(e, s); if(gs > 0){ p *= 1 + (HEALTH.grassSick - 1) * gs; why.push("eating grass"); }
-  if(thirsty(e, s)){ p *= HAB.dryIll; why.push("no water"); }
+  if(thirsty(e, s)){ p *= HAB.dryIll; why.push(e.viv ? "no pool" : "no water"); }
+  if(e.viv && wantsHeat(s)){   // a basking lamp keeps the cold-blooded well; without one a cold snap makes them ill
+    const hs = heatShare(e);
+    if(hs > 0) p *= 1 + (VIV_LAMP.ill - 1) * hs;
+    if(hs < 1 && state.weather && state.weather.today === "cold"){ p *= 1 + (VIV_LAMP.cold - 1) * (1 - hs); why.push("the cold"); }
+  }
   const wx = weatherNow(), x = exposure(e);
   if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))){ p *= 1 + wx.ill * x; why.push("weather"); }
   if(a.need && a.need.stress > 60){ p *= BEHAVIOR.stressIll; why.push("stress"); }
