@@ -1215,9 +1215,9 @@ function renderOverlay(){
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
     // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
-    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
-    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb, pic:gp != null ? gp : undefined}, gb, false)}</g><circle cx="${landGhost.x}" cy="${landGhost.y}" r="${footR(t)}" fill="none" ${ring}/>`;
-    else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>`;
+    const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : landGhost.pic != null ? landGhost.pic : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb, pic:gp != null ? gp : undefined}, gb, false)}</g>${footGhostSvg(landGhost, gb, ring)}`;
+    else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>${footSquare(landGhost.key) ? footGhostSvg(landGhost, gb, ring) : ""}`;
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -1442,10 +1442,15 @@ function walkArea(h, e){
   const obs = [];
   for(const f of landOf(e)){
     const t = LAND[f.type]; if(!t) continue;
-    const r = t.r * (f.k || 1), fr = footR(t) * (f.k || 1);
-    const R = t.flora ? (t.look === "conifer" || treeLift(t) ? r * .35 : 0)   // a tree's trunk; low plants are walked through
-      : t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : fr * .9;
-    if(R) obs.push({x:f.x, y:f.y, c:R + body});
+    const r = t.r * (f.k || 1);
+    // obstacles are rounded boxes: the box [x - hx, x + hx] x [y - hy, y + hy] grown by c (hx = hy = 0 is a circle)
+    if(t.flora){   // a tree's trunk, a fifth of its square; low plants are walked through
+      if(t.look === "conifer" || treeLift(t)){ const h = Math.max(.5, footBox(f, e)[2] - f.x) * .36; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); }
+    } else if(ROCK_TYPES.includes(f.type)){ const b = footBox(f, e), h = (b[2] - b[0]) / 2; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); }   // a rock keeps off its whole square
+    else {
+      const R = t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : footR(t) * (f.k || 1) * .9;
+      if(R) obs.push({x:f.x, y:f.y, hx:0, hy:0, c:R + body});
+    }
   }
   // land animals keep out of the exhibit's water; swimmers and flyers ignore it
   const sp = SPECIES_BY_ID[h.sp], wat = sp && !swims(sp) && !isFlyer(sp) ? waterOf(e).map(w => w.points) : [];
@@ -1454,7 +1459,8 @@ function walkArea(h, e){
 // Semi-aquatic animals (fish eaters and the like) wade in and swim; the rest stay on the bank
 const swims = s => !isFlyer(s) && likesOf(s).water >= .6;
 const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w));
-const inObstacle = (p, A) => A.obs.some(o => Math.hypot(p[0] - o.x, p[1] - o.y) < o.c) || inWater(p, A);
+const obsDist = (o, x, y) => Math.hypot(Math.max(Math.abs(x - o.x) - o.hx, 0), Math.max(Math.abs(y - o.y) - o.hy, 0));
+const inObstacle = (p, A) => A.obs.some(o => obsDist(o, p[0], p[1]) < o.c) || inWater(p, A);
 // Is p somewhere an animal can stand: inside, off the fence, out of the rocks and trees?
 const standable = (p, A) => inPoly(p[0], p[1], A.pts) && distToEdge(p[0], p[1], A.pts) >= A.m && !inObstacle(p, A);
 // A spot by the fence moved in toward the middle until the animal fits there; solid also steps it out of any rock or tree it's in
@@ -1474,8 +1480,8 @@ function walkClear(a, b, A){
   const pts = A.pts, need = Math.min(A.m, distToEdge(a[0], a[1], pts), distToEdge(b[0], b[1], pts)) * .9;
   for(let i = 0; i < pts.length; i++) if(segSegDist(a, b, pts[i], pts[(i+1) % pts.length]) < need || segCross(a, b, pts[i], pts[(i+1) % pts.length])) return false;
   for(const o of A.obs){
-    if(Math.hypot(a[0] - o.x, a[1] - o.y) < o.c || Math.hypot(b[0] - o.x, b[1] - o.y) < o.c) continue;
-    if(segProj(o.x, o.y, a, b).d < o.c) return false;
+    if(obsDist(o, a[0], a[1]) < o.c || obsDist(o, b[0], b[1]) < o.c) continue;
+    if(segBoxDist(a, b, [o.x - o.hx, o.y - o.hy, o.x + o.hx, o.y + o.hy]) < o.c) return false;
   }
   // not across a pond (one it's standing in doesn't count, so it can wade out)
   if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length])) return false;
@@ -1510,7 +1516,7 @@ function cornerNodes(pts, m = 0){
 // The corners, plus a ring of spots around each rock and tree to walk round it by
 function walkNodes(A){
   const out = cornerNodes(A.pts, A.m).filter(p => !inObstacle(p, A));
-  for(const o of A.obs) for(let k = 0; k < 6; k++){ const a = k * Math.PI / 3 + .3, p = [o.x + Math.cos(a) * (o.c + .4), o.y + Math.sin(a) * (o.c + .4)]; if(standable(p, A)) out.push(p); }
+  for(const o of A.obs) for(let k = 0; k < 8; k++){ const a = k * Math.PI / 4 + .3, ca = Math.cos(a), sa = Math.sin(a), p = [o.x + clamp(ca * 1e3, -o.hx, o.hx) + ca * (o.c + .4), o.y + clamp(sa * 1e3, -o.hy, o.hy) + sa * (o.c + .4)]; if(standable(p, A)) out.push(p); }
   for(const w of A.wat){   // spots just off each pond corner, pushed away from the middle
     const c = centroid(w);
     for(const q of w){ const d = dist(q, c) || 1; for(const k of [1, 2.5]){ const r = A.m + k, p = [q[0] + (q[0] - c[0]) / d * r, q[1] + (q[1] - c[1]) / d * r]; if(standable(p, A)){ out.push(p); break; } } }
@@ -2712,9 +2718,10 @@ function platformTap(ev){
 }
 
 /* ---------- rocks, groves and shelters ---------- */
+// The pointer's spot in the world; landSpot snaps it so a plant's or rock's square covers whole cells (odd sides on a cell center, even on a grid corner)
 function landPoint(ev){
   const p = toWorld(ev.clientX, ev.clientY);
-  return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP};
+  return {x:p.x, y:p.y};
 }
 function landHover(ev){
   const key = landKey(tool), p = landPoint(ev);
@@ -2727,7 +2734,8 @@ function landHover(ev){
 function landTap(ev){
   const key = landKey(tool), p = landPoint(ev), g = landSpot(p.x, p.y, key);
   if(!g.ok){ setStat(g.why, true); return; }
-  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()), rockPicOf(key, rockBiome || (g.e ? biomeOf(g.e) : parkBiome())));
+  placeLand(g.e, key, g.x, g.y, rockBiome || (g.e ? null : parkBiome()), g.pic);
+  if(rockRoll[key] !== undefined) rockRoll[key] = Math.random();
   afterChange(); render();
   ui.toast(g.e ? `Added ${LAND[key].one} to ${g.e.name}.` : `Added ${LAND[key].one} to the park.`, "good");
 }
@@ -2907,7 +2915,7 @@ function reshapeProblem(e, orig){
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => !deepInside(f.x, f.y, pts, footR(LAND[f.type])))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => LAND[f.type] && !boxInside(footBox(f, e), pts))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;

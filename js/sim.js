@@ -412,6 +412,7 @@ function upgradeSave(s){
   { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
     for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
     for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
+  snapFootprints(s);   // plants and rocks take whole-cell squares (landscape.js)
   return s;
 }
 

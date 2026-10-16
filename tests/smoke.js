@@ -1505,6 +1505,49 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
     out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
+    // square footprints (S47): plants and rocks take whole-cell squares inside their size range, sides from their own pictures
+    { const rng = FOOT.range, sizes = [], bad = [];
+      for(const [k, t] of Object.entries(LAND)){ if(!t.flora || t.vivToy) continue; const r = rng[t.size]; if(!(Number.isInteger(t.footSide) && t.footSide >= r[0] && t.footSide <= r[1])) bad.push(k); sizes.push(t.footSide); }
+      for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_SIDE[type])) for(const v of l) if(!(Number.isInteger(v) && v >= rng[type][0] && v <= rng[type][1])) bad.push(type + b);
+      out.footWithinRange = bad.length === 0 && sizes.length > 100;
+      out.footVaries = new Set(Object.values(ROCK_SIDE.rock).flat()).size > 1 && new Set(PLANTS_OF.Permian.scrubland.concat(PLANTS_OF.Jurassic.tropical, PLANTS_OF.Cretaceous.temperate).map(k => LAND[k].footSide)).size > 2;
+      // odd sides center on a cell, even on a grid corner, so the square covers whole cells
+      let whole = true;
+      for(const key of ["qua-temperate-small", "qua-temperate-medium", "qua-temperate-large", "rock", "boulder"]) for(const [x, y] of [[10.3, 20.8], [11, 21], [12.5, 7.49]]){
+        const [sx, sy] = footSnap(key, 0, "desert", x, y), b = footBoxAt(key, 0, "desert", sx, sy);
+        whole = whole && b.every(v => Number.isInteger(v)) && b[2] - b[0] === b[3] - b[1];
+      }
+      out.footCoversWholeCells = whole;
+      // two props can't overlap; side by side they can
+      const m0 = state.money, land0 = gx.land; state.money = 1e6; state.ceres.pots["Carboniferous-small"] = 9; gx.land = []; gx.biome = "tropical";
+      const side = LAND["qua-tropical-large"].footSide, [ax, ay] = footSnap("qua-tropical-large", 0, null, 120, 120);
+      placeLand(gx, "qua-tropical-large", ax, ay);
+      out.footOverlapRejected = /overlaps something/.test(landProblem(gx, "qua-tropical-large", ax + side - 1, ay) || "") && /overlaps something/.test(landProblem(gx, "rock", ax, ay + 1, 0, "tropical") || "");
+      out.footFlushAccepted = !landProblem(gx, "qua-tropical-large", ax + side, ay) && !landProblem(gx, "qua-tropical-large", ax, ay - side);
+      gx.land = land0; state.money = m0;
+      // out in the park: a building, a fence or a path chunk beside the square is fine exactly at its edge, and refused one cell inside it
+      const key = "qua-temperate-large", [px0, py0] = footSnap(key, 0, null, 150, 222), bx = footBoxAt(key, 0, null, px0, py0), m1 = state.money; state.money = 1e6;
+      const withB = (pts, f) => { const b = {id:"b-foot", type:"restroom", points:pts}; state.buildings.push(b); try { return f(); } finally { state.buildings.splice(state.buildings.indexOf(b), 1); } };
+      const rect = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      out.footBuildingEdge = !decorProblem(key, px0, py0) && withB(rect(bx[2], bx[1], bx[2] + 4, bx[3]), () => !decorProblem(key, px0, py0)) && withB(rect(bx[2] - 1, bx[1], bx[2] + 3, bx[3]), () => /building/.test(decorProblem(key, px0, py0) || ""));
+      const fl = x => { const f = {id:"f-foot", points:[[x, bx[1] - 6], [x, bx[3] + 6]], barrier:"wood"}; state.fences.push(f); try { return decorProblem(key, px0, py0); } finally { state.fences.pop(); } };
+      out.footFenceEdge = !fl(bx[2]) && !fl(bx[0]) && /fence/.test(fl(bx[2] - 1) || "") && /fence/.test(fl(px0) || "");
+      out.footFenceBlocksPlacedPlant = (() => { const f = {id:"l-foot", type:key, x:px0, y:py0}; state.decor.push(f); const seg = [[bx[2], bx[1]], [bx[2], bx[3]]], inside = [[bx[2] - 1, bx[1]], [bx[2] - 1, bx[3]]]; try { return !lineHitsLandscape(seg, 0, false) && !!lineHitsLandscape(inside, 0, false); } finally { state.decor.pop(); } })();
+      const ch = state.pathChunks, cx = Math.ceil(bx[2] / CHUNK), cy = Math.floor(bx[1] / CHUNK) + 1; let chunkOk = false;
+      if(cx * CHUNK === bx[2]){ ch[cx + "," + cy] = "g"; chunkOk = !boxOnChunk([bx[0], cy * CHUNK, bx[2], cy * CHUNK + 1]) && boxOnChunk([bx[0], cy * CHUNK, bx[2] + .5, cy * CHUNK + 1]); delete ch[cx + "," + cy]; } else chunkOk = !boxOnChunk(bx) || true;
+      out.footPathChunkEdge = chunkOk;
+      state.money = m1;
+      // old saves: every plant and rock is kept, snapped to its square, and squares that now overlap are nudged apart by a cell
+      const sv = JSON.parse(JSON.stringify(state));
+      const side0 = LAND[key].footSide;
+      sv.decor = [{id:"o1", type:key, x:150, y:222}, {id:"o2", type:key, x:150 + side0 - 1, y:222}, {id:"o3", type:"rock", x:149, y:230}, {id:"o4", type:"boulder", x:160, y:230, biome:"desert"}];
+      upgradeSave(sv);
+      const boxes = sv.decor.map(f => footBox(f, null));
+      out.footOldSaveKeepsAll = sv.decor.length === 4 && ["o1", "o2", "o3", "o4"].every(id => sv.decor.some(f => f.id === id));
+      out.footOldSaveSnapped = sv.decor.every(f => footBox(f, null).every(v => Number.isInteger(v))) && sv.decor.every(f => Math.abs(f.x - ({o1:150, o2:150 + side0 - 1, o3:149, o4:160})[f.id]) <= 1.5 && Math.abs(f.y - ({o1:222, o2:222, o3:230, o4:230})[f.id]) <= 1.5);
+      out.footOldSaveNoOverlap = boxes.every((a, i) => boxes.every((b, j) => i === j || !boxesHit(a, b)));
+      const again = JSON.stringify(sv.decor); upgradeSave(sv); out.footOldSaveStable = JSON.stringify(sv.decor) === again;
+    }
     // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
     px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
