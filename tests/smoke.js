@@ -2145,7 +2145,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.masonryFence = ["brick", "stone"].every(k => BARRIERS[k].strength > BARRIERS.acrylic.strength && BARRIERS[k].strength < BARRIERS.concrete.strength && BARRIERS[k].tech === "masonry" && TECH.some(t => t.id === "masonry")
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png") && !fm(k, 100, [0, 0], [7, 0]).includes("<polygon")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:1}).includes(k + "-gate-1.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
-      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
+      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone", "rope"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:3}).includes(k + "-gate-3.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
       // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave
