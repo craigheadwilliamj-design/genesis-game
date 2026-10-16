@@ -2,7 +2,7 @@
 
 Wetland is done and is the model: ground, rocks and boulders, all 27 landscape plants, the six Park Plants, and textured water with a pixel shoreline. Scrubland has ground, rocks and boulders, all 24 plants and water (it has no Park Plants). Everything else is still in the older vector or shaded style.
 
-This is a brief for whoever does the work (a person or a fresh Claude session). Read `CLAUDE.md` first (the **Art direction (locked)** section is the law), then this. Work one biome at a time and ship each as its own change.
+This is a brief for whoever does the work (a person or a fresh Claude session). Read `CLAUDE.md` and `docs/art.md` first (the **Art direction (locked)** section is the law), then this. Work one biome at a time and ship each as its own change.
 
 ## What is left
 
@@ -31,7 +31,7 @@ Do these in order. Each step has a preview, see "Check your work".
 4. **Park Plants.** `sprites/plants/q-<name>.png`.
 5. **Water.** `sprites/water/<biome>.png` plus the small code change below.
 6. Common names for the modern periods (see "Names").
-7. Update the status lines in `CLAUDE.md`, run the smoke test, commit.
+7. Update the status lines in `docs/art.md`, run the smoke test, commit.
 
 ### 1. Ground
 
@@ -115,7 +115,7 @@ Biome notes for the common-name pass (a suggestion, adjust as you see fit): dese
 ## Shipping each biome
 
 1. Branch from `main`; merge `origin/main` in before publishing.
-2. Update the **Status** line in `CLAUDE.md` and the file notes for ground, rocks, plants and water (name the generator scripts).
+2. Update the **Status** line in `docs/art.md` and the file notes for ground, rocks, plants and water (name the generator scripts).
 3. Publish per the **Publish** section in `CLAUDE.md`: `file_path: index.html`, the artifact `url`, and `files` listing every changed `js/*.js` and every new PNG. The tool will refuse the first publish until you have read the live files (`action: "read"` with `paths`); diff the live `js/data.js` and `js/landscape.js` against `main` and port any live-only hunks into git before overwriting (the Lystrosaurus rest fields were one such hunk). Never copy the wrapped live `index.html` back into git.
 4. Open a PR to `main`, merge, and re-check the live game.
 
