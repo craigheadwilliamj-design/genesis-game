@@ -909,9 +909,10 @@ const CLEAN = {
 //   perMeter   cost to upgrade, per meter of fence
 //   view       how well guests can see in (concrete hides the animals)
 //   tech       what ORACLE has to research first
+//   deco       decoration only (hedge, rope): it marks off ground and guests like it, but it can't hold animals, so it never becomes an exhibit's wall
 const BARRIERS = {
   wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
-  hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true},
+  hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true, deco:true},
   bars:     {label:"Metal bars",        strength:45,  perMeter:40,  view:.95,  tech:"bars",     color:"#4A4F57"},
   electric: {label:"Electrified fence", strength:65,  perMeter:60,  view:.95,  tech:"electric", color:"#D8B04A"},
   acrylic:  {label:"Acrylic wall",      strength:85,  perMeter:150, view:1.1,  tech:"acrylic",  color:"#8CCBDA"},
@@ -924,7 +925,7 @@ const BARRIERS = {
   drystone: {label:"Dry-stone wall",    strength:35,  perMeter:20,  view:.95,  tech:"masonry",  color:"#98927F"},
   adobe:    {label:"Adobe wall",        strength:80,  perMeter:40,  view:.5,   tech:"masonry",  color:"#CC9862"},
   stake:    {label:"Stake fence",       strength:40,  perMeter:10,  view:.9,   tech:null,       color:"#B8925C"},
-  rope:     {label:"Rope fence",        strength:8,   perMeter:2,   view:1.2,  tech:null,       color:"#B8905A"},
+  rope:     {label:"Rope fence",        strength:8,   perMeter:2,   view:1.2,  tech:null,       color:"#B8905A", deco:true},
   bone:     {label:"Bone fence",        strength:65,  perMeter:35,  view:.8,   tech:null,       color:"#E2D4B0"},
 };
 
@@ -954,7 +955,7 @@ Object.assign(BARRIERS.drystone, {wear:1.0, repair:8});    // low, mortarless an
 Object.assign(BARRIERS.adobe,    {wear:2.0, repair:10});   // mud erodes in the rain
 Object.assign(BARRIERS.stake,    {wear:2.5, repair:6});
 Object.assign(BARRIERS.bone,     {wear:1.8, repair:12});
-Object.assign(BARRIERS.rope,     {wear:3.0, repair:3});    // a keep-out line for guests more than a pen: almost nothing stops an animal, and the rope frays
+Object.assign(BARRIERS.rope,     {wear:3.0, repair:3});    // decoration only (deco): a keep-out line for guests that frays; it never holds animals
 
 // Fences drawn from pictures in the 3/4 view (sprites/fence/<kind>-<pristine|degrading|broken>.png, made by tools/pixelfence_bars.py pixelfence_wood.py, pixelfence_electric.py, pixelfence_acrylic.py, pixelfence_hedge.py, pixelfence_concrete.py, pixelfence_masonry.py, pixelfence_more.py, pixelfence_themed.py and pixelfence_rope.py). `gate` means the kind also has a keeper gate picture, <kind>-gate.png (one picture: gates never wear).
 // One picture is a 3 m section (w by h pixels of ROCK_MPP); sections are laid end to end along a side. Every kind of fence has pictures now: bars, wood, electric, acrylic, hedge, concrete, brick, stone, bamboo, palisade, iron, drystone, adobe, stake, bone and rope. `leafy` is a post-less kind (hedge): its sections tile by matching top outlines, and seen edge-on it is a wide leafy column. `power` means each state also has an `-off` twin (<kind>-pristine-off, <kind>-degrading-off, <kind>-gate-off, and its swing frames) shown while the exhibit's `powered` is false; `wires` (pixels above the ground) are drawn as thin lines between post columns when the side is seen edge-on.

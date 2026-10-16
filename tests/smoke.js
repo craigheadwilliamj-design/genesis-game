@@ -1279,8 +1279,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
-      const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
+      const pf = penFaces()[0]; const hedgePenRefused = penProblem(pf) === DECO_WHY + " Fence it with something strong first."; adoptPen(pf, pf.pts[0].slice());
       const ne = state.exhibits[state.exhibits.length - 1];
+      out.decoCantHouse = hedgePenRefused && planPieces(loopPieces(ne.points), "rope").why === DECO_WHY && BARRIERS.hedge.deco && BARRIERS.rope.deco && !BARRIERS.wood.deco;
       out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
       // guests enjoy the gardens and read the plaques

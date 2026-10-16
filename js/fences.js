@@ -112,6 +112,11 @@ function weakestOf(keys){
   for(const k of keys){ const t = P[k] ? pieceType(P[k]) : null; if(t && (!w || BARRIERS[t].strength < BARRIERS[w].strength)) w = t; }
   return w || "wood";
 }
+// Decoration fences (hedge, rope) can't hold animals: the reason a pen or exhibit can't use them, or null
+const DECO_WHY = "Hedges and rope fences are only for show. They can't hold animals.";
+const decoPieces = keys => keys.filter(k => fencePieces()[k] && BARRIERS[pieceType(fencePieces()[k])].deco);
+// Why a closed pen can't be made an exhibit (a gate on it), or null
+const penProblem = f => decoPieces(loopPieces(f.pts)).length ? DECO_WHY + " Fence it with something strong first." : null;
 // The kind of fence along each side of a closed grid exhibit
 const sideKinds = e => e.points.map((p, i) => pieceType(fencePieces()[pieceBetween(p, [p[0] + Math.sign(e.points[(i + 1) % e.points.length][0] - p[0]), p[1] + Math.sign(e.points[(i + 1) % e.points.length][1] - p[1])])]));
 // Pieces that are part of a closed grid exhibit's loop (the rest are drawn as loose fence)
@@ -173,6 +178,7 @@ function planPieces(keys, barrier){
   const out = {todo, cost:0, why:null};
   if(B.tech && !hasTech(B.tech)) return {...out, why:`Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.`};
   if(!todo.length) return {...out, why:keys.length ? "That fence is already there." : ""};
+  if(B.deco){ const held = claimedPieces(); if(todo.some(k => held.has(k))) return {...out, why:DECO_WHY}; }   // it can't replace an exhibit's wall
   const all = new Set(todo);
   for(const k of todo){ const why = pieceSpotProblem(k, all); if(why) return {...out, why}; }
   const trial = {...P}; for(const k of todo) trial[k] = {b:barrier};
@@ -292,6 +298,7 @@ function rehomeContents(notes){
 }
 // Change every piece around a grid exhibit to one kind of fence (the panel's wall picker)
 function refenceExhibit(e, barrier){
+  if(BARRIERS[barrier].deco) return;
   for(const k of loopPieces(e.points)) fencePieces()[k] = barrier === "wood" ? {} : {b:barrier};
   syncFenceExhibits();
 }
