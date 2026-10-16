@@ -1277,10 +1277,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       fenceSel = "hedge"; setTool("exhibit");
       const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
       out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
+      const ringOpen = fenceJointsSvg(1).includes("#E08A2E"); tool = "select"; const ringShut = fenceJointsSvg(1).includes("#E08A2E"); tool = "exhibit";
+      out.decoRingOnlyWhileFencing = ringOpen && !ringShut;
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
-      const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
+      const pf = penFaces()[0]; const hedgePenRefused = penProblem(pf) === DECO_WHY + " Fence it with something strong first."; adoptPen(pf, pf.pts[0].slice());
       const ne = state.exhibits[state.exhibits.length - 1];
+      out.decoCantHouse = hedgePenRefused && planPieces(loopPieces(ne.points), "rope").why === DECO_WHY && BARRIERS.hedge.deco && BARRIERS.rope.deco && !BARRIERS.wood.deco;
       out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
       // guests enjoy the gardens and read the plaques
@@ -2145,7 +2148,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.masonryFence = ["brick", "stone"].every(k => BARRIERS[k].strength > BARRIERS.acrylic.strength && BARRIERS[k].strength < BARRIERS.concrete.strength && BARRIERS[k].tech === "masonry" && TECH.some(t => t.id === "masonry")
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png") && !fm(k, 100, [0, 0], [7, 0]).includes("<polygon")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:1}).includes(k + "-gate-1.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
-      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
+      out.moreFences = ["bamboo", "palisade", "iron", "drystone", "adobe", "stake", "bone", "rope"].every(k => !!BARRIERS[k] && !!FENCE_SPRITES[k] && !!FENCE34[k].sprite
         && fm(k, 100, [0, 0], [7, 0]).includes(k + "-pristine.png") && fm(k, 30, [0, 0], [7, 0]).includes(k + "-degrading.png") && fm(k, 0, [0, 0], [7, 0]).includes(k + "-broken.png")
         && fm(k, 100, [0, 0], [7, 0], {i:0, p:[3.5, 0], id:"gt", f:3}).includes(k + "-gate-3.png") && !fm(k, 100, [0, 0], [0, 7]).includes("<image") && fm(k, 30, [0, 0], [0, 7]).includes(FENCE_EDGE[k].rust.mid));
       // drawGates: a keeper at the gate swings it open frame by frame, and it shuts when they leave

@@ -181,7 +181,7 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
@@ -518,6 +518,7 @@ const FENCE34 = {
   adobe:   {h:2.1, col:"#CC9862", solid:1, sprite:"adobe"},
   stake:   {h:1.5, col:"#B8925C", sprite:"stake"},
   bone:    {h:2.4, col:"#E2D4B0", sprite:"bone"},
+  rope:    {h:1.3, col:"#B8905A", sprite:"rope"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -562,6 +563,7 @@ const FENCE_EDGE = {
   drystone:{steel:{hi:"#B5AFA0", mid:"#98927F", lo:"#706B5D", deep:"#4A463B"}, rust:{hi:"#A4B060", mid:"#616F22", lo:"#46501A", deep:"#2E3410"}},   // rust is moss
   adobe:{steel:{hi:"#E0B88E", mid:"#CC9862", lo:"#95703F", deep:"#6A4E2C"}, rust:{hi:"#C78A56", mid:"#B06C3C", lo:"#84502C", deep:"#5C381E"}},   // rust is bare brick
   stake:{steel:{hi:"#D6B684", mid:"#B8925C", lo:"#8A6C44", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is weathered grey
+  rope:{steel:{hi:"#D2AE7C", mid:"#B8905A", lo:"#8A6A40", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is frayed grey rope
   bone:{steel:{hi:"#F2E8CC", mid:"#E2D4B0", lo:"#B4A584", deep:"#867A5E"}, rust:{hi:"#DCC884", mid:"#C4AC70", lo:"#9A8450", deep:"#6E5C34"}},   // rust is yellowed bone
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
 };
@@ -2384,6 +2386,7 @@ function findGateSpot(clientX, clientY){
     const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
     return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
   }
+  if(best.pen && penProblem(best.pen)) return {...best, ok:false, deco:true, why:penProblem(best.pen)};   // a hedge or rope pen can't be an exhibit
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
@@ -2403,7 +2406,7 @@ function gateHover(e){
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
   if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
-  if(g.loose){ setStat(g.why, true); return; }
+  if(g.loose || g.deco){ setStat(g.why, true); return; }
   const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
   if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
