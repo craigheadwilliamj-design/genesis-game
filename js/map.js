@@ -2603,21 +2603,52 @@ function drawFx(now){
   }
   layer.innerHTML = s;
 }
+// Escaped animals outside an exhibit: a species with a picture is drawn like it is in its pen (walk strip or rig, facing the way it goes, idle when it stops),
+// with the red ring and the ! / z marker over it; otherwise (or zoomed far out) the old dot. Each loose animal keeps one element group (looseEls), so the rig and strip can animate.
+const looseEls = new Map();
 function drawLoose(){
   const layer = $("#looseLayer"), inv = 1/view.k;
-  if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; return; }
-  let s = "";
+  if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; looseEls.clear(); return; }
+  const seen = new Set(), pulse = 1 + .25 * Math.sin(performance.now() / 180);
   for(const l of state.safety.loose){
     let p = loosePos(l);
     if(l.status === "carried"){ const c = crew.find(x => x.hunt === l); if(c && c.at) p = keeperPos(c); }
     if(!p) continue;
-    const sp = SPECIES_BY_ID[l.sp], r = Math.max(2.5, 7*inv), pulse = 1 + .25 * Math.sin(performance.now() / 180);
-    s += `<g transform="translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${upright()}">`;
-    if(l.status === "loose") s += `<circle r="${r * 1.8 * pulse}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    s += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    s += `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text></g>`;
+    seen.add(l);
+    const sp = SPECIES_BY_ID[l.sp], S = SPRITES[l.sp];
+    let h = looseEls.get(l);
+    if(!h){
+      const wrap = document.createElementNS("http://www.w3.org/2000/svg", "g"), art = document.createElementNS("http://www.w3.org/2000/svg", "g"), mark = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      wrap.setAttribute("pointer-events", "none"); wrap.append(art, mark); layer.appendChild(wrap);
+      h = {wrap, el:art, mark, sp:l.sp, x:p[0], y:p[1], face:1, stride:0, pose:null, spr:null, viv:false, key:""};
+      looseEls.set(l, h);
+    }
+    const dx = p[0] - h.x, dy = p[1] - h.y, step = Math.hypot(dx, dy);
+    h.x = p[0]; h.y = p[1];
+    const spr = !!S && animalRadius(l.sp) * view.k >= 6, r = spr ? animalRadius(l.sp) : Math.max(2.5, 7*inv), moving = step > .002 && l.status === "loose";
+    h.r = r; h.act = null;
+    if(spr !== h.spr || (spr && Math.abs(r - h.rr) > 1e-6)){   // picture appears, vanishes or resizes with zoom: draw it again
+      h.spr = spr; h.rr = r; h.pose = null; h.rg = null;
+      h.el.innerHTML = spr ? spriteSvg(l.sp, h) : "";
+    }
+    if(spr){
+      if(moving && Math.abs(dx) > .0005){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
+      if(moving){
+        h.stride += step;
+        if(rigOf(l.sp)) rigStep(h, "walk"); else if(S.walk) setPose(h, Math.floor(h.stride / (r * (S.step || .5))) % S.walk);
+      }else if(rigOf(l.sp)) rigStep(h, "idle"); else setPose(h, restPose(h, S));
+    }
+    h.wrap.setAttribute("transform", `translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${spr ? animalUp(h) : upright()}`);
+    let m = "";
+    const rr = Math.max(r, 2.5);
+    if(l.status === "loose") m += `<circle r="${(rr * 1.8 * pulse).toFixed(2)}" fill="none" stroke="#E5484D" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    if(!spr){
+      m += `<circle r="${r}" fill="${PERIOD_COLOR[sp.period]}" stroke="${l.status === "loose" ? "#E5484D" : "#fff"}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`
+        + `<text class="glyph" font-size="${r*1.1}" style="fill:#1D2B22">${l.status === "loose" ? "!" : "z"}</text>`;
+    }else m += `<text class="glyph" y="${(-r * 1.9).toFixed(2)}" font-size="${(r*1.1).toFixed(2)}" style="fill:${l.status === "loose" ? "#E5484D" : "#fff"}">${l.status === "loose" ? "!" : "z"}</text>`;
+    if(m !== h.key){ h.key = m; h.mark.innerHTML = m; }
   }
-  layer.innerHTML = s;
+  for(const [l, h] of looseEls) if(!seen.has(l)){ h.wrap.remove(); looseEls.delete(l); }
 }
 
 /* ---------- viewing platforms ---------- */
