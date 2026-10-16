@@ -94,7 +94,7 @@ const SPECIES = [
   {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"arth", name:"Arthropleura",   period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
   {id:"pulm", name:"Pulmonoscorpius", period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
-  {id:"mega", name:"Meganeura",      period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"L"},
+  {id:"mega", name:"Meganeura",      period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
   {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
   // Permian
   {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},

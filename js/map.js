@@ -1697,6 +1697,17 @@ function animalPlan(h, e){
   if(!ACT_STAYS.has(a.act)) animalWander(h, e);
 }
 
+// A vivarium animal doesn't walk: on a new act it jumps to the spot that act uses (its dish, the water, a hide or plant), or back to its home spot if the act has none
+function vivJump(h, e){
+  if(!h.a) return;
+  if(!h.home) h.home = [h.x, h.y];   // the spot it first appeared at
+  if(!inPoly(h.home[0], h.home[1], e.points)) h.home = randomInside(e.points);
+  const g = actGoal(h, e, h.a), inside = g && inPoly(g[0], g[1], e.points);
+  [h.x, h.y] = inside ? g : h.home;
+  h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+  place34(h);
+}
+
 // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto (a species with a swim strip draws it in place of its walk picture or rig)
 function swimCheck(h, e){
   if(h.swim === undefined && !swims(SPECIES_BY_ID[h.sp])) return;
@@ -1720,8 +1731,8 @@ function animateAnimals(dt){
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
-    if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); }
-    // vivarium animals don't walk: they stay on their spot and cycle an idle strip if their picture has one (else the standing picture or dot)
+    if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); if(e.viv) vivJump(h, e); }
+    // vivarium animals don't walk: they jump on a new act (vivJump) and cycle an idle strip if their picture has one (else the standing picture or dot)
     if(e.viv){
       const S = SPRITES[h.sp];
       if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
