@@ -268,7 +268,7 @@ function exhibitHtml(e){
 
   // food and keeper access
   const g = gateCheck(e), need = dailyNeed(e);
-  h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>`;
+  h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>${dishText(e) ? `<div class="row" style="margin-top:4px"><span class="status no">${esc(dishText(e))}</span></div>` : ""}`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
   for(const kind of e.viv ? ["keeper", "vet"] : ["keeper", "vet", "mech"]){
@@ -276,7 +276,7 @@ function exhibitHtml(e){
     h += `<div class="row" style="margin-top:6px">${called ? `<span class="status ok">${w ? esc(w.name) + " is on the way" : "Waiting for a free " + K.word}</span><button class="btn" data-action="cancelCall" data-kind="${kind}">Cancel</button>` : `<button class="btn" data-action="callKeeper" data-kind="${kind}"${why ? ` disabled title="${esc(why)}"` : ""}>Call ${K.word}</button><span class="meta">${why ? esc(why) : kind === "keeper" ? "Nearest keeper drops what they're doing to check here." : kind === "vet" ? "A vet checks the animals and sees to the sick ones first." : "A mechanic inspects and repairs the fence now."}</span>`}</div>`;
   }
   if(n){
-    h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
+    h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
   }
   h += `</section>`;
@@ -345,15 +345,25 @@ function vivPlantsHtml(e){
   if(here.length) h += `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${PERIOD_COLOR[t.period]}"></span><span>${esc(t.label)} (${esc(t.size)}, ${esc(t.period)})</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>`;
   return h + `</section>`;
 }
-// Vivarium enrichment: pick one from the list and it's set in the glass wherever there's room
-const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy);
+// Vivarium fittings and enrichment: pick one from a list and it's set in the glass wherever there's room
+const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy && !LAND[k].fit), VIV_FITS = Object.keys(LAND).filter(k => LAND[k].vivToy && LAND[k].fit);
+const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="${id}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${keys.map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${note(t)})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="${id === "vivFitSel" ? "vivFit" : "vivToy"}">Add</button></div>`;
+const vivHere = (e, fit) => { const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy && !!LAND[f.type].fit === fit); return here.length ? `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${t.color}"></span><span>${esc(t.label)}${t.tray ? ` (${Math.round(trayHas(f))}/${trayCap(f)}${trayKind(f) ? " " + esc(trayKind(f)) : ""})` : ""}</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>` : ""; };
 function vivToysHtml(e){
-  if(!devMode()) return "";
-  const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy), need = enrichNeed(e), have = toyPoints(e);
-  let h = `<section><h3>Enrichment</h3><div class="meta">Things to hide under, climb, dig in and hunt from. Bored animals with nothing to do pace.</div>`;
+  const n = e.animals.length, heat = heatCount(e), lovers = e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
+  let h = `<section><h3>Fittings</h3><div class="meta">A food dish keepers fill (one for every ${VIV_DISH.perDish} animals, one food each), a basking lamp for the cold-blooded (one warms ${VIV_LAMP.per}) and a pool for water lovers.</div>`;
+  if(n){
+    const need = dishesNeeded(e), have = trays(e).length;
+    h += `<div class="row" style="margin-top:6px"><span class="status ${have >= need ? "ok" : "no"}">${have >= need ? `Food dishes ${have} of ${need}` : esc(dishText(e))}</span></div>`;
+    if(heat) h += `<div class="row"><span class="status ${heatShare(e) >= 1 ? "ok" : "no"}">${vivFit(e, "lamp").length ? `Lamps warm ${Math.min(heat, vivFit(e, "lamp").length * VIV_LAMP.per)} of ${heat} that want heat` : `${heat} want a basking lamp`}</span></div>`;
+    if(lovers) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
+  }
+  h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
+  if(!devMode()) return h;
+  const need = enrichNeed(e), have = toyPoints(e);
+  h += `<section><h3>Enrichment</h3><div class="meta">Things to hide under, climb, dig in and hunt from. Bored animals with nothing to do pace.</div>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
-  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="vivToySel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${VIV_TOYS.map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${t.toy} toy point${t.toy === 1 ? "" : "s"})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="vivToy">Add</button></div>`;
-  if(here.length) h += `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${t.color}"></span><span>${esc(t.label)}</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>`;
+  h += vivSelect("vivToySel", VIV_TOYS, e, t => `${t.toy} toy point${t.toy === 1 ? "" : "s"}`) + vivHere(e, false);
   return h + `</section>`;
 }
 // Plant cover and rock coverage per species: "X/Y" (what it has / what it wants), then red lines for what's wrong or one green line when it's right
@@ -842,8 +852,9 @@ panelEl.addEventListener("click", e => {
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; ui.panel(); return; }
   if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "vivPlant"){ const why = vivPlantProblem(it, b.dataset.key); if(why){ ui.toast(why, "bad"); return; } addVivPlant(it, b.dataset.key); afterChange(); render(); return; }
+  if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
-  if(a === "vivPlantOff"){ const f = landOf(it).find(x => x.id === b.dataset.id); if(f){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); it.land.splice(it.land.indexOf(f), 1); afterChange(); render(); } return; }
+  if(a === "vivPlantOff"){ const f = landOf(it).find(x => x.id === b.dataset.id); if(f){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); it.land.splice(it.land.indexOf(f), 1); regatherViv(it); afterChange(); render(); } return; }
   if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "expd"){ exTabs.period = b.dataset.k; ui.panel(); return; }

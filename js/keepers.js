@@ -32,13 +32,18 @@ function sourcesFor(t, k){
 function stockFor(e, t){ const s = e.stock || {}; return (s[t] || 0) + trayFood(e, t) + (t === "paleoflora" ? (s.plants || 0) * (dailyNeed(e).plants ? 0 : 1) : 0); }
 // Food trays: units each holds, what's in them, and the room left. A tray holds one kind of food at a time (any kind, once it's empty).
 const trays = e => landOf(e).filter(f => LAND[f.type] && LAND[f.type].tray);
-const trayCap = f => LAND[f.type].tray;
+const trayCap = f => f.cap || LAND[f.type].tray;   // a vivarium dish is sized by its case (f.cap)
 const trayHas = f => Object.values(f.food || {}).reduce((n, v) => n + v, 0);
 const trayKind = f => Object.keys(f.food || {}).find(t => f.food[t] > .001) || null;
 // room left in a tray, for food t (none if it holds another food); with no t, whatever's free
 const trayRoomOf = (f, t) => { const k = trayKind(f); return t && ((k && k !== t) || (f.set && f.set !== t)) ? 0 : Math.max(0, trayCap(f) - trayHas(f)); };
 const trayFood = (e, t) => trays(e).reduce((n, f) => n + ((f.food || {})[t] || 0), 0);
 const trayRoom = e => trays(e).reduce((n, f) => n + trayRoomOf(f), 0);
+// Vivarium food: animals eat from dishes and keepers only deliver into them (VIV_DISH). No dish, no feeding; each dish serves VIV_DISH.perDish animals, and a dish holds one food, so a mixed case needs one a food.
+const vivNoDish = e => !!e.viv && e.animals.length > 0 && !trays(e).length;
+const dishesNeeded = e => !e.viv || !e.animals.length ? 0 : Math.max(Math.ceil(e.animals.length / VIV_DISH.perDish), Object.keys(dailyNeed(e)).length);
+const vivServed = e => !e.viv || !e.animals.length ? 1 : Math.min(1, trays(e).length * VIV_DISH.perDish / e.animals.length);   // share of the animals a dish reaches
+const dishText = e => vivNoDish(e) ? "Needs a food dish." : e.viv && trays(e).length < dishesNeeded(e) ? `Needs another food dish. ${trays(e).length} for ${e.animals.length} animals.` : null;
 // Tray room a food can count on: trays set to it or already holding it, plus unset empty trays split by how much of each the herd eats
 function trayShare(e, t){
   const need = dailyNeed(e), all = Object.values(need).reduce((n, v) => n + v, 0), part = all > 0 ? (need[t] || 0) / all : 0;
@@ -75,7 +80,7 @@ function dailyNeed(e){
   needCache.set(e, {key, need});
   return need;
 }
-function storeMax(e, t){ return Math.ceil((dailyNeed(e)[t] || 0) * STORE_DAYS); }
+function storeMax(e, t){ return e.viv ? 0 : Math.ceil((dailyNeed(e)[t] || 0) * STORE_DAYS); }   // a vivarium holds its food in dishes (trays), not loose
 function freeFeeding(){ return state.day < state.staff.feedFrom; }
 
 // Where keepers get into an exhibit: its gate, or for a vivarium the path beside it
@@ -470,12 +475,12 @@ function cleanJob(c, k, min = CLEAN.dirtyAt){
 
 // Leftover food goes into the exhibit's trays: the keeper walks in from the gate, visits the nearest trays with room, and walks back out
 function startFilling(c, e){
-  if(!e.gate || !c.carry) return false;
-  const g = [e.gate[0], e.gate[1]]; let pos = g, left = c.carry.amount, pool = trays(e).filter(f => trayRoomOf(f, c.carry.type) > .01);
+  if((!e.gate && !e.viv) || !c.carry) return false;
+  const g = e.gate ? [e.gate[0], e.gate[1]] : vivFront(e); let pos = g, left = c.carry.amount, pool = trays(e).filter(f => trayRoomOf(f, c.carry.type) > .01);
   const pts = [g], ids = [];
   while(pool.length && left > .01){
     pool.sort((a, b) => dist(pos, [a.x, a.y]) - dist(pos, [b.x, b.y]));
-    const f = pool.shift(); pts.push([f.x, f.y]); ids.push(f.id); pos = [f.x, f.y]; left -= trayRoomOf(f, c.carry.type);
+    const f = pool.shift(), at = e.viv ? g : [f.x, f.y]; pts.push(at); ids.push(f.id); pos = at; left -= trayRoomOf(f, c.carry.type);   // a keeper reaches into a vivarium from its front, so the round stays at the glass
   }
   if(!ids.length) return false;
   pts.push(g);
@@ -483,6 +488,8 @@ function startFilling(c, e){
   c.job = "filling";
   return true;
 }
+// Where a keeper stands to reach a vivarium's dishes: just in front of the case, in the middle
+const vivFront = e => { const bb = bbox(e.points); return [(bb.x0 + bb.x1) / 2, bb.y1 + 1]; };
 // Where a keeper filling trays is standing, inside the fence
 const fillPos = c => c.job === "filling" && c.fill ? c.fill.pos : null;
 // Walk the next stretch of the round; returns the park minutes left over
@@ -737,10 +744,12 @@ function eatTick(dtMin){
     let want = 0, unmet = 0, cover = 1;   // for the pack pecking order below
     // time spent with some food run out makes animals more likely to fall ill
     if(!free && Object.keys(need).some(t => stockFor(e, t) <= 0.01)) e.hungryMin = (e.hungryMin || 0) + dtMin;
+    else if(!free && e.viv && vivServed(e) < 1) e.hungryMin = (e.hungryMin || 0) + dtMin * (1 - vivServed(e));   // too few dishes: the ones that can't reach one go without
+    const served = free ? 1 : vivServed(e);
     for(const t of Object.keys(need)){
       if(free){ e.stock[t] = storeMax(e, t); continue; }
       // groves in the exhibit feed part of it; keepers bring the rest
-      let eat = need[t] * dtMin / DAY_MIN * (1 - browseShare(e, t, need[t]));
+      let eat = need[t] * dtMin / DAY_MIN * (1 - browseShare(e, t, need[t])) * served;   // only the animals a dish reaches eat from it
       eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
       want += eat; cover = Math.min(cover, clamp(has / ((need[t] || 1) * PACK.pile), 0, 1));

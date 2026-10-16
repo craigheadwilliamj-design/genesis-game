@@ -103,7 +103,7 @@ function haveOf(e, s){
   let own = 0, off = 0;
   for(const f of land){ const t = LAND[f.type]; if(t.flora && plantHere(t, e)) { if(!s || plantSuits(t, s)) own += landM2(f); else off += landM2(f); } }
   if(s) off = Math.min(off, wantsOf(e, s).plants * HAB.offEra);   // other periods' plants fill at most a share of what it wants
-  return {water:waterOf(e).reduce((n, w) => n + area(w.points), 0) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
+  return {water:(waterOf(e).reduce((n, w) => n + area(w.points), 0) + vivPoolM2(e)) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
     rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(own + off)};
 }
 // How well it's met, 0 to 1. Water can be too much as well as too little; rocks and plants only fall short.
@@ -133,8 +133,25 @@ function browseRate(e, t){
 }
 // How much of today's eating the groves cover, capped so keepers still bring the rest
 const browseShare = (e, t, need) => need > 0 ? Math.min(HAB.browseMax, browseRate(e, t) / need) : 0;
-// A water lover with no water to drink from or wade in
-const thirsty = (e, s) => !e.viv && likesOf(s).water >= HAB.wantsWater && habitatOf(e).wet === 0;
+// Vivarium fittings: pools (their water), basking lamps (heat for the ones that want it), and which species want heat
+const vivFit = (e, k) => e.viv ? landOf(e).filter(f => LAND[f.type] && LAND[f.type][k]) : [];
+const vivPoolM2 = e => vivFit(e, "pool").reduce((n, f) => n + LAND[f.type].poolM2, 0);
+const wantsHeat = s => ERA_OF[s.period] !== "cenozoic" && !WARM_BLOODED.includes(s.id);
+const heatCount = e => e.animals.filter(a => SPECIES_BY_ID[a.sp] && wantsHeat(SPECIES_BY_ID[a.sp])).length;
+// Share of the animals that want heat that the case's lamps cover (VIV_LAMP.per each); 1 when none want it
+const heatShare = e => { const n = heatCount(e); return !n ? 1 : clamp(vivFit(e, "lamp").length * VIV_LAMP.per / n, 0, 1); };
+// Where an animal in a vivarium likes to be: in the pool (water lovers) or under a lamp (heat lovers), as {x, y, rx, ry} areas in meters
+function vivHomes(e, s){
+  const out = [];
+  if(!e.viv) return out;
+  if(likesOf(s).water >= HAB.wantsWater) for(const f of vivFit(e, "pool")) out.push({x:f.x, y:f.y, rx:LAND[f.type].r * .7, ry:LAND[f.type].r * .3, pool:true});
+  if(wantsHeat(s)) for(const f of vivFit(e, "lamp")) out.push({x:f.x, y:f.y + .5, rx:VIV_LAMP.radius * .8, ry:VIV_LAMP.radius * .3});
+  return out;
+}
+// The pool an animal at (x, y) is standing in, or null (the water is the pool's inner ellipse, a bit smaller than its rim)
+const vivPoolAt = (e, x, y) => vivFit(e, "pool").find(f => { const r = LAND[f.type].r; return ((x - f.x) / (r * .85)) ** 2 + ((y - f.y) / (r * .42)) ** 2 <= 1; }) || null;
+// A water lover with no water to drink from or wade in (a vivarium's water is its pools)
+const thirsty = (e, s) => likesOf(s).water >= HAB.wantsWater && (e.viv ? vivPoolM2(e) <= 0 : habitatOf(e).wet === 0);
 
 /* ---------- weather and shelter ---------- */
 function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
@@ -199,6 +216,19 @@ function habitatScore(e){
       sat /= n;
       out.delta += VIV_PLANT.bonus * sat;
       out.issues.push({bad:false, text:sat >= .99 ? "Plants from their own period fill it out." : sat > 0 ? "Some plants from their own period. More would suit them." : "Bare. Plants from their own period and biome would make it feel like home."});
+    }
+    // water lovers want a pool; a basking lamp warms the ones that want heat
+    const lovers = [...speciesCounts(e)].filter(([sp]) => likesOf(SPECIES_BY_ID[sp]).water >= HAB.wantsWater);
+    if(lovers.length){
+      const dry = lovers.filter(([sp]) => thirsty(e, SPECIES_BY_ID[sp]));
+      if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.map(([sp]) => SPECIES_BY_ID[sp].name).join(", ")} need${dry.length === 1 ? "s" : ""} a pool to drink from and wade in.`}); }
+      else { const fit = lovers.reduce((n, [sp, c]) => n + c * waterFit(haveOf(e, SPECIES_BY_ID[sp]).water, wantsOf(e, SPECIES_BY_ID[sp]).water), 0) / lovers.reduce((n, [, c]) => n + c, 0); out.delta += VIV_POOL.bonus * fit; out.issues.push({bad:fit < .6, text:fit >= .6 ? "A pool to wade in." : "A pool, but not enough water for them. Another would help."}); }
+    }
+    const heat = heatCount(e);
+    if(heat){
+      const hs = heatShare(e);
+      if(hs > 0){ out.delta += VIV_LAMP.happy * hs; out.issues.push({bad:hs < 1, text:hs >= 1 ? "Warm under the basking lamp." : `Some bask under the lamp, but one lamp warms ${VIV_LAMP.per} animals. Another would help.`}); }
+      if(hs < 1){ out.delta -= VIV_LAMP.lack * (1 - hs); if(hs <= 0) out.issues.push({bad:true, text:"Cold. They want a basking lamp to warm up under."}); }
     }
     return out;
   }
@@ -459,11 +489,18 @@ function vivToyProblem(e, key){
   if(!canAfford(t.price)) return `Costs ${money(t.price)}.`;
   return null;
 }
+// Where a case's free starter dish goes (old saves): the first free spot, else the middle
+const vivSlot = e => vivPlantSpot(e, "vdish") || centroid(e.points);
 function addVivToy(e, key){
-  const [x, y] = vivPlantSpot(e, key);
-  spend(LAND[key].price, "built");
-  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y});
+  const [x, y] = vivPlantSpot(e, key), t = LAND[key];
+  spend(t.price, "built");
+  const f = {id:uid("l-"), type:key, x, y};
+  if(t.tray) f.cap = VIV_DISH.cap[e.viv];   // a dish is sized by its case
+  (e.land = e.land || []).push(f);
+  regatherViv(e);
 }
+// A lamp or pool came or went: the animals find their spots again, so they gather where they like to be
+function regatherViv(e){ if(typeof herd !== "undefined") for(const h of herd.values()) if(h.exhibitId === e.id) h.placed = false; }
 
 /* ---------- rocks, groves and shelters ---------- */
 // Why a rock, grove or shelter can't go at (x, y) in this exhibit, or null
@@ -806,15 +843,28 @@ function statue34(f, t, edge, dead){
   s += `<text class="glyph" x="${x}" y="${cy}" font-size="${br * (txt.length > 2 ? .62 : txt.length > 1 ? .82 : 1.1)}" style="fill:#F6E7C1;stroke:#3A2410">${esc(txt)}</text>`;
   return s;
 }
+// A vivarium prop from its picture (sprites/viv, tools/pixelviv.py): upright ones stand on their spot, flat ones lie on the floor centered on it. A dish shows what's in it.
+function vivPropSvg(f, t){
+  const V = VIV_SPRITES[f.type], w = V.w * ROCK_MPP, h = V.h * ROCK_MPP, x = f.x - w / 2, y = V.flat ? f.y - h / 2 : f.y + t.r * .3 - h, n2 = v => v.toFixed(2);
+  let s = `<image href="${spriteUrl(`sprites/viv/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
+  if(t.tray){
+    const cap = trayCap(f), main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0], fill = main ? clamp(trayHas(f) / cap, .15, 1) : 0;
+    if(fill > 0){ const rw = Math.max(2, Math.round(8 * fill)) * ROCK_MPP; s += `<rect x="${n2(f.x - rw / 2)}" y="${n2(y + 2 * ROCK_MPP)}" width="${n2(rw)}" height="${n2(ROCK_MPP * 1.5)}" fill="${FOOD_COLOR[main[0]] || "#999"}" pointer-events="none"/>`; }
+  }
+  return s;
+}
+// The warm pool of light under a basking lamp: flat on the floor, under the animals (landSvg)
+const lampLightSvg = f => `<g data-y="${f.y - 1001}"><image href="${spriteUrl("sprites/viv/vlamp-pool.png")}" style="image-rendering:pixelated" pointer-events="none" x="${(f.x - 22 * ROCK_MPP).toFixed(2)}" y="${(f.y + .6 - 10 * ROCK_MPP).toFixed(2)}" width="${(44 * ROCK_MPP).toFixed(2)}" height="${(20 * ROCK_MPP).toFixed(2)}"/></g>`;
 // One rock, plant, shelter, tray or statue. biome is the ground it stands on (rocks take their stone color from it).
 function featSvg(f, biome, pick, isDead){
   let t = LAND[f.type]; if(!t) return "";
   if(f.k) t = {...t, r:t.r * f.k};   // a vivarium's plants are drawn shrunk
   const dead = pick && isDead("land", f.id);
   const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
-  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${f.y}"` : ""}>`;
+  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included
   const up = tilted() && !f.k;
-  if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
+  if(VIV_SPRITES[f.type]) s += vivPropSvg(f, t);
+  else if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
   else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
   else if(up && t.look === "canopy") s += canopy34(f, t, edge, dead ? 3 : 1.5);
   else if(up && t.slots && !t.look) s += shelter34(f, t, edge, dead ? 3 : 1.5);
@@ -872,21 +922,6 @@ function featSvg(f, biome, pick, isDead){
     s += `<rect x="${f.x - t.r}" y="${f.y - t.r * .4}" width="${t.r * 2}" height="${t.r * .8}" rx="${t.r * .4}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1.5}" vector-effect="non-scaling-stroke"/>`;
     for(const [ox, oy] of [[-.5, -.1], [-.1, .15], [.3, -.12], [.6, .1]]) s += `<circle cx="${f.x + ox * t.r}" cy="${f.y + oy * t.r}" r="${t.r * .09}" fill="#2A211A"/>`;
     s += `<ellipse cx="${f.x + t.r * .85}" cy="${f.y}" rx="${t.r * .15}" ry="${t.r * .34}" fill="#B08E66"/>`;
-  } else if(t.look === "vbark"){
-    // a curl of bark to hide under
-    s += `<path d="M${f.x - t.r} ${f.y + t.r * .3}A${t.r} ${t.r * .8} 0 0 1 ${f.x + t.r} ${f.y + t.r * .3}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/>`;
-  } else if(t.look === "vbranch"){
-    // forked branches
-    s += `<path d="M${f.x - t.r} ${f.y + t.r * .6}L${f.x + t.r * .8} ${f.y - t.r * .7}M${f.x - t.r * .1} ${f.y - t.r * .05}L${f.x + t.r * .5} ${f.y + t.r * .7}M${f.x + t.r * .3} ${f.y - t.r * .3}L${f.x - t.r * .4} ${f.y - t.r * .8}" stroke="${t.color}" stroke-width="${t.r * .25}" stroke-linecap="round" fill="none"/>`;
-  } else if(t.look === "vdig"){
-    // a box of deep, loose earth
-    s += `<rect x="${f.x - t.r}" y="${f.y - t.r * .7}" width="${t.r * 2}" height="${t.r * 1.4}" rx="${t.r * .15}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${f.x - t.r * .3}" cy="${f.y}" r="${t.r * .25}" fill="#4E3B26"/>`;
-  } else if(t.look === "vfeed"){
-    // a little hopper with a hatch
-    s += `<circle cx="${f.x}" cy="${f.y}" r="${t.r}" fill="${t.color}" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><circle cx="${f.x}" cy="${f.y}" r="${t.r * .35}" fill="#4B4F55"/>`;
-  } else if(t.look === "vmist"){
-    // a shallow pool under the mister
-    s += `<ellipse cx="${f.x}" cy="${f.y}" rx="${t.r}" ry="${t.r * .75}" fill="${t.color}" fill-opacity=".85" stroke="${edge}" stroke-width="${dead ? 3 : 1}" vector-effect="non-scaling-stroke"/><ellipse cx="${f.x - t.r * .3}" cy="${f.y - t.r * .2}" rx="${t.r * .3}" ry="${t.r * .12}" fill="#BFE0EE" fill-opacity=".7"/>`;
   } else if(t.flora && !f.k && PLANT_SPRITES[f.type]) s += plantSpriteSvg(f, {...t, key:f.type}, PLANT_SPRITES[f.type], dead, pick);
   else if(t.flora) s += tilted() && !f.k && (t.look === "conifer" || treeLift(t)) ? tree34(f, t, edge, dead ? 3 : 1) : plantSvg(f, t, edge, dead ? 3 : 1);
   else if(!f.k && rockSprites(f, biome)) s += rockSpriteSvg(f, rockSprites(f, biome), biome, dead, pick);
@@ -906,7 +941,7 @@ let openFence34 = new Map();   // open exhibit id -> its loose fence pieces {y, 
 function landSvg(e, pick, isDead){
   if(!tilted()) return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
-  const items = landOf(e).map(f => ({y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)})).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
+  const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
   return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}</g>`;
 }

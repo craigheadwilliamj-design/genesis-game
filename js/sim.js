@@ -154,7 +154,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:DAWN_MIN + 60, clockV:2, parkClosed:false,
+    day:1, minute:DAWN_MIN + 60, clockV:2, vivDish:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
@@ -184,6 +184,17 @@ function upgradeSave(s){
   // the day became a 24 h clock: minute is park minutes since the 4 AM rollover. Old saves counted from opening at 8, so shift by that to keep every science stamp exact.
   if(s.clockV !== 2){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 2; }
   if(s.parkClosed === undefined) s.parkClosed = false;
+  // vivariums feed from dishes now: every case already standing gets a free one, once (food it held loose becomes the dish's)
+  if(s.vivDish !== 1){
+    for(const e of s.exhibits || []) if(e.viv){
+      const loose = e.stock || {}; e.stock = {};
+      const cap = VIV_DISH.cap[e.viv], f = {id:uid("l-"), type:"vdish", x:0, y:0, cap, food:{}};
+      const [x, y] = vivSlot(e); f.x = x; f.y = y;
+      for(const [t, v] of Object.entries(loose)) if(v > 0.01 && !Object.keys(f.food).length) f.food[t] = Math.min(v, cap);   // a dish holds one food
+      (e.land = e.land || []).push(f);
+    }
+    s.vivDish = 1;
+  }
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);
@@ -526,8 +537,9 @@ function exhibitReport(e){
     const need = dailyNeed(e), stock = e.stock || {};
     const empty = Object.keys(need).filter(t => stockFor(e, t) <= 0.01);
     const low = Object.keys(need).filter(t => !empty.includes(t) && stockFor(e, t) < storeMax(e, t) * .25);
-    if(empty.length){ target -= 40; issues.push({bad:true, text:`Hungry. They're out of ${empty.join(" and ")}. ${gateCheck(e).ok ? "Keepers need to bring more." : gateCheck(e).text}`}); }
+    if(empty.length){ target -= 40; issues.push({bad:true, text:`Hungry. They're out of ${empty.join(" and ")}. ${dishText(e) || (gateCheck(e).ok ? "Keepers need to bring more." : gateCheck(e).text)}`}); }
     else if(low.length) issues.push({bad:true, text:`Running low on ${low.join(" and ")}.`});
+    if(!empty.length && dishText(e)){ target -= 12 * (1 - vivServed(e)); issues.push({bad:true, text:`Some can't reach a dish. ${dishText(e)}`}); }
   }
   // Any pair of species that can't live together causes trouble (counted once per exhibit)
   const kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
@@ -724,7 +736,7 @@ function dailyCosts(){
   let feed = 0, wages = 0, upkeep = 0;
   for(const e of state.exhibits){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
-    upkeep += e.viv ? VIVARIUMS[e.viv].upkeep : area(e.points) * UPKEEP.exhibitPerSqM;
+    upkeep += e.viv ? VIVARIUMS[e.viv].upkeep + landOf(e).reduce((n, f) => n + ((LAND[f.type] || {}).upkeep || 0), 0) : area(e.points) * UPKEEP.exhibitPerSqM;   // a vivarium's lamps run on the bill
   }
   for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
   for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);

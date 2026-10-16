@@ -1373,7 +1373,21 @@ function vivSpot(h, e, p){
   return inPoly(p[0], p[1], P) && inPoly(p[0] - hw, p[1], P) && inPoly(p[0] + hw, p[1], P) && inPoly(p[0], p[1] + m, P) && inPoly(p[0] - hw, p[1] + m, P) && inPoly(p[0] + hw, p[1] + m, P);
 }
 // a vivarium animal stays put, so keep new ones a couple of bodies apart
-function cramped(h, p){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * 4) return true; return false; }
+function cramped(h, p, k = 4){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * k) return true; return false; }
+// A spot in a lamp's glow or a pool for a vivarium animal (a home from vivHomes): a few huddle together, and one too near a wall for its picture is nudged toward the middle of the case
+function vivHomeSpot(h, e, hm){
+  const [cx, cy] = centroid(e.points);
+  for(let t = 0; t < 20; t++){
+    const p = [hm.x + (Math.random() * 2 - 1) * hm.rx, hm.y + (Math.random() * 2 - 1) * hm.ry];
+    for(let f = 1; f >= .5; f -= .1){
+      const q = [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f];
+      if(!vivSpot(h, e, q) || cramped(h, q, 2.2)) continue;
+      if(hm.pool ? vivPoolAt(e, q[0], q[1]) : Math.hypot(q[0] - hm.x, (q[1] - hm.y) * 2) <= hm.rx + 2.2) return q;
+      break;
+    }
+  }
+  return null;
+}
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
@@ -1398,14 +1412,21 @@ function syncAnimals(){
       const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
       h.r = r; h.spr = sprite; h.viv = !!e.viv;
       if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
-      if(!h.placed){ h.placed = true; const A = walkArea(h, e); let ok = false; for(let i = 0; i < (e.viv ? 80 : 20); i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) : standable(p, A)){ [h.x, h.y] = p; ok = true; break; } }   // a new animal starts somewhere it fits
+      if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
+        for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
+        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
+      // in a vivarium pool: the body is cut at the waterline, with a ripple over the cut
+      const pool = e.viv && vivPoolAt(e, h.x, h.y), body = sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` + (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
+      h.sub = !!pool;
+      const subSvg = () => { const S = SPRITES[a.sp], w = sprite ? r * 4 * (S.size || 1) : r * 2, ht = sprite ? w / S.ratio : r * 2, cut = sprite ? r * .5 - ht * .09 : r * .1, cid = "vc-" + esc(a.id);
+        return `<clipPath id="${cid}"><rect x="${(-w).toFixed(2)}" y="${(-ht * 3).toFixed(2)}" width="${(2 * w).toFixed(2)}" height="${(ht * 3 + cut).toFixed(2)}"/></clipPath><g clip-path="url(#${cid})">${body}</g>`
+          + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${cut.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(cut + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
         (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
-        (sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` +
-        (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : ""));
+        (pool ? subSvg() : body);
       h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
     }
   }
