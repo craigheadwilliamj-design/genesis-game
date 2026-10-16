@@ -392,7 +392,7 @@ function stepOff(p, meters){
     if(p.offK !== k){
       p.offK = k;
       const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
-      let f = 1; while(f > .05 && bad(f)) f *= .6;
+      let f = 1; while(!(p.stand && p.stand.deck) && f > .05 && bad(f)) f *= .6;
       p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
     }
     o = p.offT;
@@ -478,6 +478,7 @@ function standNear(p, pts, e, bld){
       while(t < 1 && !inPoly(n.x + (x - n.x) * t, n.y + (y - n.y) * t, P)) t += .02;
       if(standOk(n.x, n.y, n.x + (x - n.x) * t, n.y + (y - n.y) * t, best)) p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
       if(p.stand){
+        p.stand.deck = true;
         if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
         return;
       }
