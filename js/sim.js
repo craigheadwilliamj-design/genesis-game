@@ -154,7 +154,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:DAWN_MIN + 60, clockV:2, vivDish:1, parkClosed:false,
+    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
@@ -181,8 +181,9 @@ function linesFromTiles(T){
 }
 
 function upgradeSave(s){
-  // the day became a 24 h clock: minute is park minutes since the 4 AM rollover. Old saves counted from opening at 8, so shift by that to keep every science stamp exact.
-  if(s.clockV !== 2){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 2; }
+  // minute is park minutes since the rollover. Saves from before the clock existed counted from opening at 8, so shift by that to keep every science stamp exact.
+  if(s.clockV === 2) s.clockV = 3;   // the clock became 6 AM to 11 PM: same park minutes, so every stamp stays exact
+  if(s.clockV !== 3){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 3; }
   if(s.parkClosed === undefined) s.parkClosed = false;
   // vivariums feed from dishes now: every case already standing gets a free one, once (food it held loose becomes the dish's)
   if(s.vivDish !== 1){
@@ -853,7 +854,7 @@ const clockMin = (m = state.minute) => (ROLLOVER_CLOCK + m * CLOCK_SCALE) % 1440
 const minuteAtClock = c => (((c - ROLLOVER_CLOCK) % 1440) + 1440) % 1440 / CLOCK_SCALE;
 // How dark it is, 0 (day) to NIGHT.dark (night), in steps so the map overlay only changes now and then. Dusk and dawn each fade over NIGHT.fade clock hours.
 function nightDark(c = clockMin()){
-  const h = c / 60, f = NIGHT.fade, d = Math.max(0, Math.min(1, h < DAWN_CLOCK / 60 + f ? (DAWN_CLOCK / 60 + f - h) / f : h >= DUSK_CLOCK / 60 - f ? (h - (DUSK_CLOCK / 60 - f)) / f : 0));
+  const h = c / 60, f = NIGHT.fade, d = Math.max(0, Math.min(1, h < DAWN_CLOCK / 60 + NIGHT.dawnFade ? (DAWN_CLOCK / 60 + NIGHT.dawnFade - h) / NIGHT.dawnFade : h >= DUSK_CLOCK / 60 - f ? (h - (DUSK_CLOCK / 60 - f)) / f : 0));
   return Math.round(d * NIGHT.dark * 40) / 40;
 }
 function fmtClock(min){
