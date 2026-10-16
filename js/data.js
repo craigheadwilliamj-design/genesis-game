@@ -402,6 +402,7 @@ const CLONE_FAIL = {from:.2, to:.9, causes:[
 //   doses   (medicine) doses one batch makes
 const CERES_GROW = {
   medicine: {cenozoic:{days:.75, cost:900, doses:20}, mesozoic:{days:1.25, cost:1500, doses:20}, paleozoic:{days:1.75, cost:2200, doses:20}},
+  food: {days:.5, cost:500, amount:60},   // Paleoflora food: one batch adds `amount` to CERES's stock, on top of what it grows on its own
 };
 // Plants for the landscape come in three sizes (LAND size), grown in batches that make several plants each. Prices and times follow the era; each period's plants need that period's DNA.
 //   count   plants one batch makes
