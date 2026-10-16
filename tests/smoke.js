@@ -733,17 +733,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ln = nearestGuestNode(100, 200), nodes = [...gGraph.nodes.values()].filter(n => !n.rail);
       const dark = nodes.find(n => Math.hypot(n.x - 103, n.y - 200) > LAMP.radius + LAMP.lean + 4);
       const tm0 = state.minute;
-      state.minute = 0;
+      state.minute = minuteAtClock(22 * 60);
       out.lampLightsNight = ln.lit >= LAMP.litAt && !!dark && dark.lit < LAMP.litAt && darkLevel() === 1 && darkStretches >= 1;
       state.minute = DAWN_MIN + 120;
       out.lampNoDayEffect = darkLevel() === 0 && deterrence(100, 200) === VANDAL.lampCut * (litterAt(100, 200) >= 6 ? VANDAL.litterBoost : 1);
       const moodAfter = n => { resetParties(); guestsArrive(2); const q = parties[0]; q.at = n; q.to = null; q.hold = true; q.mood = 90; q.pers = ["fun"]; q.fxc = null; guestsTick(state.minute, state.minute + 1); return q.mood; };
-      state.minute = 0;
+      state.minute = minuteAtClock(22 * 60);
       const litMood = moodAfter(ln), darkMood = moodAfter(dark);
       out.darkNodesCostMood = darkMood < litMood - 1e-6;
       state.minute = DAWN_MIN + 120;
       out.darkNoCostByDay = Math.abs(moodAfter(dark) - moodAfter(ln)) < 1e-6;
-      state.minute = 0;
+      state.minute = minuteAtClock(22 * 60);
       const dLit = deterrence(100, 200), dDark = deterrence(dark.x, dark.y);
       out.lampDeterNight = dLit < dDark && dLit <= LAMP.nightCut + 1e-9;
       state.minute = tm0;
@@ -956,7 +956,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // next morning the hotel guests start at the hotel, without buying a ticket
     book(1000, 5); resetParties();
     const tk0 = state.today.tickets, gs0 = state.today.guests;
-    hotelGuestsArrive();
+    state.minute = LODGING.outAt + 1; hotelGuestsArrive();
     out.hotelGuestsMorning = parties.length === BUILDINGS.lodge.rooms && parties.every(x => x.at === gGraph.anchors["b-lodge"] && x.hotel === "b-lodge")
       && state.today.tickets === tk0 && state.today.guests - gs0 === BUILDINGS.lodge.rooms * LODGING.perRoom && !state.lodging.stays.length;
     resetParties();
@@ -2806,20 +2806,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   checks.pointsIgnoreStepSize = sci.pointsIgnoreStepSize;
   checks.cloneWaitsThenFinishes = sci.cloneWaitsThenFinishes;
 
-  // S13: the clock runs round the clock; a trickle of guests keeps coming; Close park empties the park; the day turns over once, at 4 AM
+  // S13: the clock runs round the clock; a trickle of guests keeps coming; Close park empties the park; the day turns over once, at 6 AM
   const clk = await page.evaluate(() => {
     const out = {}, keep = {day:state.day, minute:state.minute, rating:state.rating, money:state.money, over:state.over, sandbox:state.sandbox, closed:state.parkClosed};
     state.over = false; state.sandbox = false; state.money = 1e7; state.rating = 5; state.parkClosed = false; resetParties();
-    // the clock passes 8 PM without a rollover
-    state.day = 30; state.minute = minuteAtClock(19 * 60 + 50); tick(10);
-    out.clockPastEight = state.day === 30 && clockMin() > 20 * 60 && clockMin() < 20 * 60 + 30 && fmtClock(clockMin()) === "8:10 PM";
-    out.clockMapsBack = Math.abs(minuteAtClock(clockMin(123)) - 123) < 1e-9 && clockMin(0) === ROLLOVER_CLOCK && DAY_MIN * CLOCK_SCALE === 1440;
+    // the clock passes 9 PM without a rollover
+    state.day = 30; state.minute = minuteAtClock(20 * 60 + 50); tick(10);
+    out.clockPastEight = state.day === 30 && clockMin() > 21 * 60 && clockMin() < 21 * 60 + 30 && fmtClock(clockMin()) === "9:04 PM";
+    out.clockMapsBack = Math.abs(minuteAtClock(clockMin(123)) - 123) < 1e-9 && clockMin(0) === ROLLOVER_CLOCK && DAY_MIN * CLOCK_SCALE === 17 * 60;
     // guests still arrive at night, a few staying on
-    resetParties(); state.day = 31; state.minute = minuteAtClock(21 * 60); nextSize = 1;
+    resetParties(); state.day = 31; state.minute = minuteAtClock(21 * 60); nextSize = 1; const trk = GUEST.trickle; GUEST.trickle = 60;   // the evening is short now, so a fatter trickle
     const g0 = state.today.guests, t0 = state.today.tickets;
-    for(let i = 0; i < 200; i++) tick(1);
+    for(let i = 0; i < 80; i++) tick(1);
     out.guestsArriveAtNight = state.today.guests > g0 && state.today.tickets > t0 && state.day === 31;
-    out.someStayOvernight = guestCount() > 0 && isNight();
+    out.someStayOvernight = guestCount() > 0 && isNight(); GUEST.trickle = trk;
     out.trickleScalesWithRating = (r => { const a = (state.rating = 0, trickleRate()), b = (state.rating = 5, trickleRate()); return a > 0 && b > a && Math.abs(b - GUEST.trickle) < 1e-9; })();
     // Closed: no new guests, no tickets, the park empties, bills still come, the HUD says so
     state.parkClosed = true; state.today = freshLedger(); ui.hud(true);
@@ -2843,12 +2843,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     events.dayEnded = de;
     out.rolloverOncePerDay = n === 2 && state.day === 42 && at.every(c => Math.abs(c - ROLLOVER_CLOCK) <= 2) && state.minute === 0;
     // night looks and animal schedules
-    out.nightWash = nightDark(12 * 60) === 0 && nightDark(2 * 60) === NIGHT.dark && nightDark(20 * 60 - 30) > 0 && nightDark(20 * 60 - 30) < NIGHT.dark;
-    out.nocturnalAtNight = awake(SPECIES_BY_ID.ornw, minuteAtClock(2 * 60)) === 1 && awake(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) <= .2 && awake(SPECIES_BY_ID.plat, minuteAtClock(2 * 60)) < .5 && awake(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) >= .55;
+    out.nightWash = nightDark(12 * 60) === 0 && nightDark(22 * 60) === NIGHT.dark && nightDark(6 * 60) === 0 && nightDark(20 * 60) > 0 && nightDark(20 * 60) < NIGHT.dark;
+    out.nocturnalAtNight = awake(SPECIES_BY_ID.ornw, minuteAtClock(22 * 60)) === 1 && awake(SPECIES_BY_ID.ornw, minuteAtClock(13 * 60)) <= .2 && awake(SPECIES_BY_ID.plat, minuteAtClock(22 * 60)) < .5 && awake(SPECIES_BY_ID.plat, minuteAtClock(13 * 60)) >= .55;
     // old saves: the minute shifts so science stamps stay exact, and the park starts open
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.clockV; delete oldS.parkClosed; oldS.day = 3; oldS.minute = 540;
     const nowOld = (oldS.day - 1) * 720 + (oldS.minute - 480), up = upgradeSave(oldS);
-    out.oldSaveClock = up.clockV === 2 && up.parkClosed === false && up.minute === 60 && (up.day - 1) * DAY_MIN + up.minute === nowOld;
+    out.oldSaveClock = up.clockV === 3 && up.parkClosed === false && up.minute === 60 && (up.day - 1) * DAY_MIN + up.minute === nowOld;
     const wrapped = JSON.parse(JSON.stringify(state)); delete wrapped.clockV; wrapped.minute = 1199.5; out.oldSaveEdge = upgradeSave(wrapped).minute < DAY_MIN;
     const cur = upgradeSave(JSON.parse(JSON.stringify(state))); out.newSaveKeepsMinute = cur.minute === state.minute && cur.parkClosed === false;
     Object.assign(state, {day:keep.day, minute:keep.minute, rating:keep.rating, money:keep.money, over:keep.over, sandbox:keep.sandbox, parkClosed:keep.closed}); resetParties(); recompute();

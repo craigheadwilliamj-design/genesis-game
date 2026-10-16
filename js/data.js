@@ -37,16 +37,17 @@ const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, s
 const STAFF_PACE = 1;
 // The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
 const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
-// Time runs around the clock. The sim counts in PARK minutes (DAY_MIN of them make one day, MINUTES_PER_SECOND a second on screen, so a day is still 240 s);
+// The park day runs on a clock from ROLLOVER_HOUR (6 AM) to 11 PM, then jumps back. The sim counts in PARK minutes (DAY_MIN of them make one day, MINUTES_PER_SECOND a second on screen, so a day is still 240 s);
 // the 24 h clock is only how a park minute is shown: CLOCK_SCALE clock minutes each. state.minute is park minutes since the daily rollover,
 // which happens at ROLLOVER_HOUR on the clock (endDay and every *Night function run then). clockMin/minuteAtClock (sim.js) convert.
 const DAY_MIN = 720;                    // park minutes in one day. Research, trips, and growing are counted in these.
-const CLOCK_SCALE = 1440 / DAY_MIN;     // clock minutes in a park minute
-const ROLLOVER_HOUR = 4;                // the quiet hour the day turns over: weather rolls, bills are paid, staff reset
+const DAY_CLOCK = 17 * 60;              // clock minutes the day shows: 6 AM to 11 PM
+const CLOCK_SCALE = DAY_CLOCK / DAY_MIN;     // clock minutes in a park minute
+const ROLLOVER_HOUR = 6;                // the hour the day starts and turns over: weather rolls, bills are paid, staff reset
 const ROLLOVER_CLOCK = ROLLOVER_HOUR * 60;
 // Daylight on the clock (animals' awake schedules, the night wash on the map). Park-minute versions DAWN_MIN/DUSK_MIN are state.minute values.
-const DAWN_CLOCK = 6 * 60, DUSK_CLOCK = 20 * 60;
-const DAWN_MIN = (DAWN_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE, DUSK_MIN = (DUSK_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE;
+const DAWN_CLOCK = 5 * 60, DUSK_CLOCK = 21 * 60;   // light from the first minute of the day until 9 PM
+const DAWN_MIN = Math.max(0, (DAWN_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE), DUSK_MIN = (DUSK_CLOCK - ROLLOVER_CLOCK) / CLOCK_SCALE;
 
 // Building costs
 const COST = {
@@ -485,13 +486,13 @@ const BUILDINGS = {
    Guests come in parties. Needs run from 0 (fine) to 100 (desperate).
    --------------------------------------------------------------------- */
 // The night wash over the map: strongest opacity of the dark-blue layer, and clock hours dusk and dawn take to fade in and out
-const NIGHT = {dark:.35, fade:2.5};
+const NIGHT = {dark:.35, fade:2, dawnFade:1};
 const GUEST = {
   drawPivot:25,        // species appeal is stretched around this: speciesDraw = pivot * (appeal / pivot) ^ drawPower, so a T. rex counts in full and cheap animals count for little
   drawPower:1.6,
-  arriveFrom:5, arriveTo:21,   // clock hours the day's crowd arrives in (a hump, busiest at 1 PM)
+  arriveFrom:6, arriveTo:21,   // clock hours the day's crowd arrives in (a hump, busiest at 1 PM)
   trickle:6,           // guests a day who keep arriving round the clock, even at night, at a 5-star park (a few stay the night); fewer at fewer stars
-  curfew:21,           // clock hour most daytime guests plan to be out by (they were all sent home at closing before)
+  curfew:22,           // clock hour most daytime guests plan to be out by (they were all sent home at closing before)
   overnight:.06,       // share of daytime parties who stay on past it anyway
   nightStay:240,       // the most park minutes a party that arrives after hours stays
   trickleLow:.3,       // the share of that trickle a 0-star park still gets
