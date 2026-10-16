@@ -278,10 +278,10 @@ function finishClone(c){
 const beds = () => dept("ceres") ? Math.max(0, state.science.crew.botanist) : 0;
 const growing = (kind, era, size) => state.ceres.beds.filter(b => b.kind === kind && b.era === era && (b.size || null) === (size || null)).length;
 // For plants `era` is the period they're from (a bed's `era` field too); for medicine it's the era
-const growInfo = (kind, era, size) => kind === "plant" ? (CERES_GROW.plant[ERA_OF[era]] || {})[size] : CERES_GROW.medicine[era];
+const growInfo = (kind, era, size) => kind === "plant" ? (CERES_GROW.plant[ERA_OF[era]] || {})[size] : kind === "food" ? CERES_GROW.food : CERES_GROW.medicine[era];
 const growMinutes = (kind, era, size) => Math.round(growInfo(kind, era, size).days * DAY_MIN);
 // What a batch is called, for toasts and bed cards
-const growName = (kind, era, size) => kind === "plant" ? `${era} ${size} plants` : `${ERA_LABEL[era]} medicine`;
+const growName = (kind, era, size) => kind === "plant" ? `${era} ${size} plants` : kind === "food" ? "Paleoflora food" : `${ERA_LABEL[era]} medicine`;
 
 function growProblem(kind, era, size){
   const sc = state.science, c = state.ceres;
@@ -292,6 +292,9 @@ function growProblem(kind, era, size){
     const f = FLORA[ERA_OF[era]];
     if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at ORACLE first.`;
     if(PLANT_DNA[era] && !plantDnaDone(era)) return `GHOST has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
+  } else if(kind === "food"){
+    if(!hasTech("paleoflora")) return "Research Paleoflora cultivation at ORACLE first.";
+    if(!anyPlantDna()) return "CERES needs plant DNA first.";
   } else {
     if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
     if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
@@ -311,9 +314,11 @@ function growBatch(kind, era, size){
 function finishBatch(b){
   const c = state.ceres;
   if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
+  else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); events.toast("CERES finished a batch of Paleoflora food.", "good"); }
   else { const g = MED_GOOD[b.era]; cerMeds()[g] = (cerMeds()[g] || 0) + growInfo("med", b.era).doses; if(cerMedTotal() > medCap()) cerMeds()[g] -= cerMedTotal() - medCap(); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
+const pendingFood = () => growing("food") * CERES_GROW.food.amount;
 const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce((s, b) => s + growInfo("med", b.era).doses, 0);
 
 /* ---------- time passing ---------- */
@@ -373,8 +378,9 @@ function scienceTick(dtMin){
   }
   // CERES keeps medicine stocked for the types set to "keep stocked"
   if(beds() && freeBay("botanist") >= 0){
+    if(c.auto.food && c.stock + pendingFood() + CERES_GROW.food.amount <= ceresCap() && growBatch("food")) return;
     for(const era of Object.keys(c.auto)){
-      if(!c.auto[era] || cerMedTotal() + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
+      if(era === "food" || !c.auto[era] || cerMedTotal() + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
       if(growBatch("med", era)) break;
     }
   }
