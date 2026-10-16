@@ -234,6 +234,17 @@ function render(){
   under = pathLayerSvg() + under;
   s += clipDefs + (decks.length ? `<g mask="url(#deckcut)">${under}${over}</g>` : under + over);
 
+  // loose fence cut into 3 m pieces of depth; the ones along an open exhibit go in its own depth group (landSvg), the rest sort with the park decor below
+  const looseLeft = []; openFence34 = new Map();
+  for(const r of looseRuns()){
+    const P = r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, [a, z] = P, n = Math.max(1, Math.ceil(Math.abs(z[1] - a[1]) / 3));   // a run running up the screen is cut so what stands beside it sorts against each part
+    for(let i = 0; i < n; i++){
+      const u = i / n, v = (i + 1) / n, q = [[a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u], [a[0] + (z[0] - a[0]) * v, a[1] + (z[1] - a[1]) * v]], mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
+      const it = {y:my, o:0, svg:fenceRunSvg(q, r.b, false)}, host = tilt ? state.exhibits.find(e => e.open && !e.viv && (inPoly(mx, my, e.points) || distToEdge(mx, my, e.points) < 1.5)) : null;
+      if(host) (openFence34.get(host.id) || openFence34.set(host.id, []).get(host.id)).push(it); else looseLeft.push(it);
+    }
+  }
+
   // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
   const tanks = [];
   for(const e of state.exhibits){
@@ -309,14 +320,15 @@ function render(){
 
   // open fences and hedge rows
   for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
-  for(const r of looseRuns()) s += fenceRunSvg(r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, r.b, false);
   s += fenceJointsSvg(inv);
 
   // plants, rocks and statues out in the park stand over the path edges
-  s += decorSvg(tool === "bulldoze", isDoomed);
-
-  // entrance building
-  s += entrance34(inv);
+  // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
+  const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze", isDoomed)}));
+  for(const q of looseLeft) standing.push(q);
+  standing.push({y:state.gate[1], o:2, svg:entrance34(inv)});   // the entrance building stands on the south edge, so it sorts in too
+  standing.sort((p, q) => p.y - q.y || p.o - q.o);
+  if(!tilt) while(standing.length) s += standing.shift().svg;   // the flat view has no depth: all of it goes under the buildings
 
   // litter on the paths
   const specks = litterSpecks();
@@ -332,6 +344,7 @@ function render(){
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    while(standing.length && standing[0].y <= cy) s += standing.shift().svg;   // trees, rocks, loose fence behind this building draw first
     while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
@@ -368,6 +381,7 @@ function render(){
     s += `</g>`;
   }
   for(const tk of tanks) s += tk.svg;
+  for(const it of standing) s += it.svg;
   // with cameras researched, a selected Security Office shows what every office watches
   const selB = sel && sel.kind === "building" && findItem("building", sel.id);
   if(selB && (selB.type === "security" || selB.type === "camera") && hasTech("cameras")) for(const o of state.buildings.filter(x => x.type === "security" || x.type === "camera")){
