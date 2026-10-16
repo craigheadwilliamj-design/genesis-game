@@ -798,8 +798,8 @@ const LAMP = {
   steps:[[1, .62], [.66, .36], [.33, .16]],   // [share of visRadius, share of night left] per step, outer to inner
   glow:"#FFC96B",      // warm light
   tint:.07,            // opacity of the warm tint over the pool
-  headH:3.9,           // meters up the lamp head glows
-  headR:.9,            // meters across the glow at the lamp head
+  headH:3.0,           // meters up the glow hangs: just under the lamp head, so the head itself stays visible
+  headR:.8,            // meters across the glow under the lamp head
   fear:.05,            // mood lost a minute on an unlit stretch in full dark (times how much the guest minds)
   pull:.5,             // share of an exhibit's pull lost at night when no lit path sees it
   nightCut:.35,        // a lamp nearby multiplies vandalism by this at night (VANDAL.lampCut by day)

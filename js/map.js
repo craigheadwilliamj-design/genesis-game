@@ -1260,9 +1260,8 @@ function drawLights(){
     let left = 1, holes = "";   // the share of night left in each step; a step's group opacity cuts it from what the step before left
     LAMP.steps.forEach(([share, wash]) => { holes += `<g opacity="${(1 - wash / left).toFixed(3)}">${spots.map(s => c(s, R * share, "#000")).join("")}</g>`; left = wash; });
     h.innerHTML = holes;
-    const head = s => { const hx = s.hx, hy = s.hy - LAMP.headH / TILT; return `<circle cx="${hx.toFixed(2)}" cy="${hy.toFixed(2)}" r="${LAMP.headR}" fill="${LAMP.glow}"/>`; };
-    const core = s => `<circle cx="${s.hx.toFixed(2)}" cy="${(s.hy - LAMP.headH / TILT).toFixed(2)}" r="${LAMP.headR * .45}" fill="#FFF3D0"/>`;
-    g.innerHTML = `<g opacity="${LAMP.tint}">${spots.map(s => c(s, R, LAMP.glow)).join("")}</g><g opacity=".45">${spots.map(head).join("")}</g><g opacity=".9">${spots.map(core).join("")}</g>`;
+    const head = s => `<circle cx="${s.hx.toFixed(2)}" cy="${(s.hy - LAMP.headH / TILT).toFixed(2)}" r="${LAMP.headR}" fill="${LAMP.glow}"/>`;
+    g.innerHTML = `<g opacity="${LAMP.tint}">${spots.map(s => c(s, R, LAMP.glow)).join("")}</g><g opacity=".4">${spots.map(head).join("")}</g>`;
   }
   const o = darkLevel().toFixed(2); if(g.getAttribute("opacity") !== o) g.setAttribute("opacity", o);
 }
