@@ -1795,6 +1795,13 @@ function partyPos(p){
 }
 // Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
 const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
+// A party up on a viewing platform is drawn at deck height, rising up the steps (the deck is outside its footprint by the steps' run)
+function deckLift(p, x, y){
+  const b = p.deckB;
+  if(!b || !b.points) return 0;
+  if(inPoly(x, y, b.points)) return DECK.h;
+  return DECK.h * clamp(1 - distToEdge(x, y, b.points) / (DECK.step * DECK.steps), 0, 1);
+}
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
   const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
@@ -1812,7 +1819,7 @@ function drawParties(){
       }
       const col = cols[ci] || SHIRTS[ci];
       if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
-      humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y); seen.add(p.id);
+      humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT); seen.add(p.id);
       continue;
     }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
@@ -1822,7 +1829,7 @@ function drawParties(){
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
-  if(at && !hidden34(at[0], at[1])){ guestRing.style.display = ""; guestRing.setAttribute("transform", `translate(${at[0].toFixed(2)} ${at[1].toFixed(2)})${upright()}`); }
+  if(at && !hidden34(at[0], at[1])){ guestRing.style.display = ""; guestRing.setAttribute("transform", `translate(${at[0].toFixed(2)} ${(at[1] - deckLift(sp, at[0], at[1]) / TILT).toFixed(2)})${upright()}`); }
   else guestRing.style.display = "none";
 }
 // The party under a tap or click, if there is one (they're drawn as dots, so this is by distance on screen)
@@ -1831,7 +1838,7 @@ function guestAt(cx, cy){
   let best = null, bd = 14;
   for(const p of parties){
     if(!p.at) continue;
-    const [x, y] = partyPos(p), d = Math.hypot((x - w.x) * view.k, (y - w.y) * ky());
+    const [x, y] = partyPos(p), d = Math.hypot((x - w.x) * view.k, (y - deckLift(p, x, y) / TILT - w.y) * ky());
     if(d < bd && !hidden34(x, y)){ bd = d; best = p; }
   }
   return best;

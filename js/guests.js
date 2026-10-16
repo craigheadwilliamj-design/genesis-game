@@ -389,6 +389,7 @@ function stepOff(p, meters){
   // (walking, the lane must stay off one at both ends of the stretch)
   {
     const k = o[0].toFixed(2) + "," + o[1].toFixed(2) + "@" + p.at.k + (p.to ? ">" + p.to.k : "");
+    if(p.deckB && !p.stand && Math.hypot(p.ox || 0, p.oy || 0) < .3) p.deckB = null;   // back down on the path
     if(p.offK !== k){
       p.offK = k;
       const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
@@ -478,7 +479,7 @@ function standNear(p, pts, e, bld){
       while(t < 1 && !inPoly(n.x + (x - n.x) * t, n.y + (y - n.y) * t, P)) t += .02;
       if(standOk(n.x, n.y, n.x + (x - n.x) * t, n.y + (y - n.y) * t, best)) p.stand = {dx:P[0][0] + (P[1][0] - P[0][0]) * u + (P[3][0] - P[0][0]) * v - n.x, dy:P[0][1] + (P[1][1] - P[0][1]) * u + (P[3][1] - P[0][1]) * v - n.y};
       if(p.stand){
-        p.stand.deck = true;
+        p.stand.deck = p.deckB = best;   // drawn up on the deck (map.js deckLift)
         if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);   // the walk over doesn't eat into the watching
         return;
       }
@@ -516,6 +517,8 @@ function standNear(p, pts, e, bld){
   p.stand = {dx:c[0] - n.x, dy:c[1] - n.y};
   if(p.linger > state.minute) p.linger += Math.hypot(p.stand.dx - (p.ox || 0), p.stand.dy - (p.oy || 0)) / (WALK_PER_MIN * p.spd);
 }
+// Does this exhibit have any acrylic fence on show?
+const hasGlass = e => !e.viv && (e.grid ? sideKinds(e).includes("acrylic") : e.barrier === "acrylic");
 function seeExhibit(p, e, quick){
   if(p.dest === e.id && p.why === "see"){ p.dest = null; p.why = null; }
   if(p.seen.has(e.id)) return;
@@ -579,9 +582,9 @@ function walkParty(p, left){
       if(g.has(id) || !e.animals.length) continue;
       g.add(id);
       const a = exhibitAppeal(e), onTrip = p.why in NEEDS;
-      if(Math.random() < clamp(SIGHT.glance * a / (a + SIGHT.glanceAppeal) * tasteOf(p, e) * (onTrip ? .3 : 1), 0, .95)) seeExhibit(p, e);
+      if(Math.random() < clamp(SIGHT.glance * a / (a + SIGHT.glanceAppeal) * tasteOf(p, e) * (onTrip ? .3 : 1) * (hasGlass(e) ? SIGHT.glassGlance : 1), 0, .95)) seeExhibit(p, e);
     }
-    p.prev = p.at; p.at = p.to; p.to = null; p.t = 0; p.stand = null; p.lane = Math.random() * 2 - 1;
+    p.prev = p.at; p.at = p.to; p.to = null; p.t = 0; p.stand = null; p.deckB = null; p.lane = Math.random() * 2 - 1;
     if(p.stroll > 0) p.stroll--;
     if(p.trail) p.trail.set(p.at.k, (p.trail.get(p.at.k) || 0) + 1);
     if(!p.at.rail){ trashCheck(p); boxCheck(p); }

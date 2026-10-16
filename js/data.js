@@ -536,6 +536,7 @@ const SIGHT = {
   standPull:6,         // meters at which a fence spot's chance is halved, so the crowd spreads out but favors what's close
   glassReach:30,       // the same for acrylic fence, which draws a crowd from farther along the path
   glassPull:12,        // and spreads it wider
+  glassGlance:2.5,     // how many times likelier a passing party stops for an exhibit with acrylic fence
   glassWeight:6,       // how many times likelier a spot at acrylic is than the same spot at any other fence
   deckShare:.8,        // chance a party stands on a viewing platform for the exhibit when there's one close
   deckReach:16,        // meters from the path stop to the platform's middle
