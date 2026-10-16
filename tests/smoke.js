@@ -270,17 +270,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const pen = state.exhibits[0] || {id:"e-t", name:"T", points:[[0,0],[30,0],[30,30],[0,30]], animals:[{id:"t1", sp:"trex"}]};
       const real = state.exhibits.includes(pen), had = pen.enrich;
       if(!real){ state.exhibits.push(pen); recompute(); }
-      const me = state.exhibits.includes(pen) && pen.animals.length ? pen : null;
+      const me = state.exhibits.includes(pen) && pen.animals.length && !pen.viv ? pen : null;
       localStorage.removeItem("genesis-dev");
       const html = () => [typeof themesOverview === "function" ? themesOverview() : "", themeHtml("exhibit", {theme:themed, points:[]}), zoneThemeHtml({theme:themed, points:[]})].join("");
       out.themesHiddenOff = themeKey({theme:themed}) === "genesis" && html() === "" && themeFor("path", {points:[[0,0],[1,1]]}) === null;
-      out.toysHiddenOff = toyHidden("post") && toyHidden("hay") && toyHidden("vbark") && !toyHidden("pbale") && !toyHidden("barn");
+      out.toysHiddenOff = toyHidden("post") && toyHidden("hay") && !toyHidden("vbark") && !toyHidden("vmist") && !toyHidden("pbale") && !toyHidden("barn");
       buildMenu(); out.toyMenuHiddenOff = !document.querySelector('#sideMenu [data-tool="land-post"]') && !!document.querySelector('#sideMenu [data-tool="land-pbale"]');
       out.enrichFullOff = !me || enrichment(me) === 1;
-      out.vivToysHiddenOff = !vivToysHtml({viv:"S", animals:[], points:[[0,0],[1,0],[1,1]]}).includes("Enrichment");
+      { const vv = {id:"e-vv", name:"V", viv:"S", points:[[0,0],[10,0],[10,10],[0,10]], animals:[{id:"vv1", sp:"coel"}, {id:"vv2", sp:"coel"}], land:[]};
+        const bareHtml = vivToysHtml(vv), bareE = enrichment(vv);
+        out.vivToysShownOff = bareHtml.includes("Enrichment") && bareHtml.includes("vivToySel") && bareHtml.includes("Misters") && bareHtml.includes("Add enrichment") && !!vivToyProblem(vv, "vbark") === false;
+        out.vivBareNotHarshOff = bareE >= ENRICH.vivBase && bareE < 1;
+        vv.land = [{id:"vt1", type:"vbark", x:3, y:3}, {id:"vt2", type:"vmist", x:6, y:6}];
+        out.vivToysCountOff = toyPoints(vv) > 0 && enrichment(vv) > bareE; }
+      { const op = {id:"e-op", name:"O", points:[[0,0],[40,0],[40,40],[0,40]], animals:[{id:"o1", sp:"coel"}], land:[]};
+        out.openFullNoToysOff = enrichment(op) === 1 && toyHidden("post"); }
       localStorage.setItem("genesis-dev", "1");
       out.themesShownOn = themeKey({theme:themed}) === themed && themeHtml("exhibit", {theme:themed, points:[]}).includes("themeSel");
       out.toysShownOn = !toyHidden("post") && !toyHidden("vbark");
+      { const vv = {id:"e-vv", name:"V", viv:"S", points:[[0,0],[10,0],[10,10],[0,10]], animals:[{id:"vv1", sp:"coel"}], land:[]}; out.vivDevUnchangedOn = vivToysHtml(vv).includes("vivToySel") && enrichment(vv) < ENRICH.vivBase + ENRICH.room + ENRICH.habitat; }
       buildMenu(); out.toyMenuShownOn = !!document.querySelector('#sideMenu [data-tool="land-post"]');
       if(!real) { state.exhibits.pop(); recompute(); }
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was);

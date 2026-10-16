@@ -1527,7 +1527,7 @@ const ACTS = {
   pace:  {label:"Pacing", tell:true},
 };
 // Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
-const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3, melt:2};   // melt: days a frozen treat loses in a heat wave   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
+const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3, melt:2, vivBase:.2};   // melt: days a frozen treat loses in a heat wave   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
