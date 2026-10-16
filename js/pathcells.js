@@ -56,7 +56,7 @@ function pathCtx(){
     ex: state.exhibits.map(e => ({...box(e.points), name:e.name})),
     bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath).map(b => box(b.points)),
     water: parkWater().map(w => box(w.points)),
-    decor: decorOf().filter(f => LAND[f.type]).map(f => ({x:f.x, y:f.y, r:footR(LAND[f.type]) * .5})),
+    decor: decorOf().filter(f => LAND[f.type]).map(f => footBox(f, null)),
     lines: (state.fences || []).map(l => l.points),
     diag
   };
@@ -70,7 +70,7 @@ function pathChunkProblem(cx, cy, kind, ctx){
   for(const o of ctx.ex) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through an exhibit.";
   for(const o of ctx.bl) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through a building.";
   if(kind !== "b") for(const o of ctx.water) if(hitsBox(o, x, y) && (shapesOverlap(r, o.pts) || shapesOverlap(o.pts, r))) return "Paths can't cross water. Lay a wooden bridge over it.";
-  for(const f of ctx.decor) if(f.x > x - f.r && f.x < x + S + f.r && f.y > y - f.r && f.y < y + S + f.r && Math.hypot(f.x - clamp(f.x, x, x + S), f.y - clamp(f.y, y, y + S)) < f.r) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  for(const b of ctx.decor) if(boxesHit(b, [x, y, x + S, y + S])) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(ctx.diag.size) for(let i = 0; i < S; i++) for(let j = 0; j < S; j++) if(ctx.diag.has((x + i) + "," + (y + j))) return "It runs into a fence.";
   for(const l of ctx.lines) if(lineEntersShape(l, r)) return "It runs into a fence.";
   return null;
