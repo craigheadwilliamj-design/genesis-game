@@ -1181,7 +1181,6 @@ function renderOverlay(){
   }
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
-    if(fdrag.why && !fdrag.lift && faceProblemAt && /park water/.test(fdrag.why)) s += `<circle cx="${faceProblemAt[0]}" cy="${faceProblemAt[1]}" r="${Math.max(2.5, 14 * inv)}" fill="var(--bad)" fill-opacity=".2" stroke="var(--bad)" stroke-width="3" stroke-dasharray="${6*inv} ${4*inv}" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     const keys = !fdrag.lift && fdrag.todo ? fdrag.todo : fenceDragKeys(), sh = fdrag.lift ? null : fdrag.shift;
     s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv, sh);
     for(const k of keys){ const [a, b] = pieceEnds(k), o = sh && sh[k] || [0, 0]; s += `<line x1="${a[0] + o[0]}" y1="${a[1] + o[1]}" x2="${b[0] + o[0]}" y2="${b[1] + o[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }

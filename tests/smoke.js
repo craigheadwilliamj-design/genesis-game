@@ -1413,6 +1413,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.fenceBordersPath = !why("400,150,h") && !why("400,155,h") && !why("400,152,v") && /path/.test(why("402,152,h") || "") && /path/.test(why("405,152,v") || "") && /path/.test(why("402,152,d") || "");
         out.fenceBordersWater = !why("410,140,h") && !why("405,142,v") && !why("415,142,v") && /water/.test(why("410,142,h") || "") && /water/.test(why("410,142,d") || "");
         for(const k of Object.keys(pc)) if(!(k in keepPc)) delete pc[k]; state.water = keepWater;
+        // a pen closed around park water and a rock takes them in as its own, with no complaint
+        {
+          const kd = state.decor, kw = state.water, lt = Object.keys(LAND)[0];
+          state.water = [{id:"w-in", points:[[405,145],[410,145],[410,150],[405,150]]}]; state.decor = [{id:"d-in", type:lt, x:412, y:155}];
+          const nb = state.exhibits.length; box(400,140,420,160); gatePens();
+          const pe = state.exhibits[state.exhibits.length - 1];
+          out.penTakesParkThings = state.exhibits.length === nb + 1 && !state.water.length && !state.decor.length && waterOf(pe).length === 1 && landOf(pe).length === 1;
+          state.decor = kd; state.water = kw;
+        }
       }
       render(); out.fenceDraws = !!world.querySelector(`[data-id="${ge.id}"]`);
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
