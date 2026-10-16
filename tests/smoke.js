@@ -2834,7 +2834,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.closedStillArrivesNobody = parties.length === 0 && state.history.length > hist0 && state.history[state.history.length - 1].guests === 0 && state.history[state.history.length - 1].costs > 0 && state.money < m0;
     state.parkClosed = false; ui.hud(true);
     out.hudOpenAgain = document.querySelector("#closedTag").hidden;
-    state.minute = minuteAtClock(21 * 60); nextSize = 1; for(let i = 0; i < 200; i++) tick(1);
+    state.minute = minuteAtClock(21 * 60); nextSize = 1; GUEST.trickle = 60; for(let i = 0; i < 80; i++) tick(1); GUEST.trickle = trk;
     out.openAgainArrives = parties.length > 0;
     // the day turns over exactly once a day, at the rollover hour
     resetParties(); let n = 0, at = []; const de = events.dayEnded; events.dayEnded = r => { n++; at.push(clockMin()); de && de(r); };
