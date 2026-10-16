@@ -53,7 +53,7 @@ const darkLevel = () => nightDark() / NIGHT.dark;
 function lampSpots(){
   return state.buildings.filter(b => b.type === "lamp" && !isBroken(b)).map(b => {
     const [cx, cy] = centroid(b.points), f = propFront(b);
-    return {id:b.id, x:cx + f[0] * LAMP.lean, y:cy + f[1] * LAMP.lean, r:LAMP.radius};
+    return {id:b.id, x:cx + f[0] * LAMP.lean, y:cy + f[1] * LAMP.lean, r:LAMP.radius, hx:cx, hy:cy};
   });
 }
 // How lit a spot is by the lamps (0 to 1, regardless of the hour)

@@ -1247,15 +1247,22 @@ function renderOverlay(){
   overlay.innerHTML = s;
 }
 
-function applyTransform(){ const t = `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`; cam.setAttribute("transform", t); const lc = $("#lightCam"); if(lc) lc.setAttribute("transform", t); }
-// Lamp light pools: stepped rings per working lamp in one layer above the night wash, drawn only when the lamp set changes; brightness follows the clock
+function applyTransform(){ const t = `translate(${view.tx} ${view.ty}) scale(${view.k} ${ky()})`; cam.setAttribute("transform", t); const lc = $("#lightCam"); if(lc) lc.setAttribute("transform", t); const wc = $("#washCam"); if(wc) wc.setAttribute("transform", t); }
+// Lamp light: the night wash gets stepped holes cut in it round each working lamp (the ground shows at its day color), a faint warm tint
+// over the pool, and a small glow at the lamp head. Each step is one group at a single opacity, so overlapping pools never add up. Redrawn only when the lamp set changes.
 let lightKey = "";
 function drawLights(){
-  const g = $("#lightPools"); if(!g) return;
+  const g = $("#lightPools"), h = $("#washHoles"); if(!g || !h) return;
   const spots = lampSpots(), key = spots.map(s => `${s.id}:${s.x.toFixed(1)},${s.y.toFixed(1)}`).join("|");
   if(key !== lightKey){
     lightKey = key;
-    g.innerHTML = spots.map(s => Array.from({length:LAMP.rings}, (_, i) => `<circle cx="${s.x}" cy="${s.y}" r="${(s.r * (1 - i / LAMP.rings)).toFixed(2)}" fill="${LAMP.glow}" fill-opacity="${LAMP.ringAlpha}"/>`).join("")).join("");
+    const R = LAMP.visRadius, c = (s, r, fill) => `<circle cx="${s.x.toFixed(2)}" cy="${s.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${fill}"/>`;
+    let left = 1, holes = "";   // the share of night left in each step; a step's group opacity cuts it from what the step before left
+    LAMP.steps.forEach(([share, wash]) => { holes += `<g opacity="${(1 - wash / left).toFixed(3)}">${spots.map(s => c(s, R * share, "#000")).join("")}</g>`; left = wash; });
+    h.innerHTML = holes;
+    const head = s => { const hx = s.hx, hy = s.hy - LAMP.headH / TILT; return `<circle cx="${hx.toFixed(2)}" cy="${hy.toFixed(2)}" r="${LAMP.headR}" fill="${LAMP.glow}"/>`; };
+    const core = s => `<circle cx="${s.hx.toFixed(2)}" cy="${(s.hy - LAMP.headH / TILT).toFixed(2)}" r="${LAMP.headR * .45}" fill="#FFF3D0"/>`;
+    g.innerHTML = `<g opacity="${LAMP.tint}">${spots.map(s => c(s, R, LAMP.glow)).join("")}</g><g opacity=".45">${spots.map(head).join("")}</g><g opacity=".9">${spots.map(core).join("")}</g>`;
   }
   const o = darkLevel().toFixed(2); if(g.getAttribute("opacity") !== o) g.setAttribute("opacity", o);
 }

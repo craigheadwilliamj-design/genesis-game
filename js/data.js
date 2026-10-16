@@ -794,9 +794,12 @@ const LAMP = {
   radius:14,           // meters of ground a working lamp lights
   lean:1.5,            // the pool leans this far toward the way the lamp faces
   litAt:.25,           // a path corner this lit counts as lit (0 to 1)
-  rings:4,             // stepped pixel rings drawn for each pool
+  visRadius:8,         // meters of pool drawn round a lamp (the gameplay radius above is wider)
+  steps:[[1, .62], [.66, .36], [.33, .16]],   // [share of visRadius, share of night left] per step, outer to inner
   glow:"#FFC96B",      // warm light
-  ringAlpha:.16,       // each ring adds this much light
+  tint:.07,            // opacity of the warm tint over the pool
+  headH:3.9,           // meters up the lamp head glows
+  headR:.9,            // meters across the glow at the lamp head
   fear:.05,            // mood lost a minute on an unlit stretch in full dark (times how much the guest minds)
   pull:.5,             // share of an exhibit's pull lost at night when no lit path sees it
   nightCut:.35,        // a lamp nearby multiplies vandalism by this at night (VANDAL.lampCut by day)
