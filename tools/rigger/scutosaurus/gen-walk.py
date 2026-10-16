@@ -6,7 +6,7 @@
 # stance (hind legs a touch low, front legs raised and nearly straight), so walking and standing look like the same animal.
 import json, math, sys
 from kit import *
-K = dict(N=12, fps=8, ds=.7, S=9.0, lift=3.0, bob=.7, pitch=.8, head=1.6, tail=2.2, cx_b=42.0, cx_f=68.0, ground=65.0, hip_b=(1, 1.5), hip_f=(-1, -4), toe=1.0)
+K = dict(N=16, fps=8, ds=.75, S=17.0, lift=4.2, bob=1.0, pitch=1.6, head=2.6, tail=4.0, drop=1.8, cx_b=42.0, cx_f=68.0, ground=65.0, hip_b=(1, 1.5), hip_f=(-1, -4), toe=1.0, flare=14.0)
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); R = SRig(P)
 LG = [('nb', 'b', 0), ('nf', 'f', .25), ('fb', 'b', .5), ('ff', 'f', .75)]
@@ -15,6 +15,7 @@ for i in range(K['N']):
   f, pose = i/K['N'], {}
   bob = K['bob']*math.sin(2*math.pi*2*f)           # down twice a cycle as a hind foot and then a front foot take the weight
   rb = K['pitch']*math.sin(2*math.pi*(2*f + .25))   # nose down as a front foot takes the weight, up as a hind one does
+  bob += K['drop']   # it walks low, belly near the ground, so the legs stay bent and sprawled
   pose[BODY] = {'r': rd(rb), 'dx': 0, 'dy': rd(bob)}
   pose[HEAD] = {'r': rd(K['head']*math.sin(2*math.pi*(2*f + .1)) - rb*.5), 'dx': 0, 'dy': 0}
   pose[JAW] = {'r': 0, 'dx': 0, 'dy': 0}
@@ -26,7 +27,7 @@ for i in range(K['N']):
       ox = K['S']/2 - K['S']*fl/K['ds']
       if fl/K['ds'] > .85: fr = K['toe']*8*(fl/K['ds'] - .85)/.15; lift = K['toe']*(fl/K['ds'] - .85)/.15   # the heel comes up as it pushes off
     else:
-      t = (fl - K['ds'])/(1 - K['ds']); ox = -K['S']/2 + K['S']*sm(t); lift = K['lift']*math.sin(math.pi*t); fr = 8*(1 - t)*.0
+      t = (fl - K['ds'])/(1 - K['ds']); ox = -K['S']/2 + K['S']*sm(t); lift = K['lift']*math.sin(math.pi*t); fr = -K['flare']*math.sin(math.pi*t)   # the toe cocks up as the foot swings through
     pose[th] = {'r': 0, 'dx': hd[0], 'dy': rd(hd[1] + bob)}
     short = max(short, leg_ik(R, pose, th, sh, ft, (cx + ox, K['ground'] - lift), fr))
   frames.append(pose)
