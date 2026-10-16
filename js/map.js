@@ -48,6 +48,7 @@ const FAMILIES = {
 };
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
+let fenceMeet = false;             // the fence tool keeps other fence where it stands and lays against it, instead of replacing it
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
 const isDrawTool = t => t === "tram" || t === "zone";
@@ -212,7 +213,7 @@ function render(){
     if(!tilt && (!e.viv || themeKey(e) !== "genesis") && e.barrier !== "hedge" && !e.open) s += themeRailSvg(polyStr(insetRect(e.points, e.viv ? .93 : .96)), themeOf(e), inv, e.viv ? 2 : 4, !e.viv && e.animals.some(a => isDangerous(SPECIES_BY_ID[a.sp])), e.viv ? null : e.barrier || "wood");
     // Genesis electric fence: a small amber light at each post, glowing while powered and dark when the power fails
     // in the 3/4 view the fence stands up: its far sides here, behind what's inside, and its near sides after
-    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered};
+    const hi34 = dead ? "var(--bad)" : on ? "var(--sel)" : null, fo34 = {hi:hi34, cond:knownCond(e), lights:e.barrier === "electric" && themeKey(e) === "genesis", powered:e.powered, off:e.grid && !e.open ? sideOffsets(e) : null};
     const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
     const gi = tilt ? gateSide34(e, kinds34) : -1;
     if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
@@ -240,7 +241,7 @@ function render(){
 
   // open fences and hedge rows
   for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
-  for(const r of looseRuns()) s += fenceRunSvg(r.pts, r.b, false);
+  for(const r of looseRuns()) s += fenceRunSvg(r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, r.b, false);
   s += fenceJointsSvg(inv);
 
   // paths: dark edges drawn first under every path, so joins look like one surface
@@ -683,22 +684,24 @@ function gateSide34(e, kinds){
 function fence34(P, closed, kinds, which, o = {}){
   const n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
   const segs = [];
-  for(let i = 0; i < n; i++){ const a = P[i], b = P[(i+1) % P.length], ny = closed ? norm34(P, i)[1] : 0;
-    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue; segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
+  for(let i = 0; i < n; i++){ let a = P[i], b = P[(i+1) % P.length]; const ny = closed ? norm34(P, i)[1] : 0, off = o.off && o.off[i];
+    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue;
+    if(off){ a = [a[0] + off[0], a[1] + off[1]]; b = [b[0] + off[0], b[1] + off[1]]; }   // a wall shared with another pen's fence stands a little inside, so both show
+    segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
   segs.sort((p, q) => p.y - q.y);
   const up = h => lift34(h), M = ([x, y]) => `M${n2(x)} ${n2(y)}`, Lto = ([x, y]) => `L${n2(x)} ${n2(y)}`, at = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
   let s = "";
   for(const {i, a, b, ny, kind} of segs){
     const F = FENCE34[kind] || FENCE34.wood, H = F.h, q = [a, b, up(H)(b), up(H)(a)], front = which === "front";
     if(F.hedge && !F.sprite){
-      s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .5);
+      s += `<polygon points="${polyStr(q)}" fill="#3F7A32" stroke="#24461F" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` + shade34(q, lit34(closed ? norm34(P, i) : [0, 1]) * .5);
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="#6BA851" stroke-width="1.1" stroke-linecap="round" fill="none"/>`;
       if(hi) s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
     if(F.solid && !F.sprite){
       const op = F.solid * (front ? .55 : 1);
-      s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, P.indexOf(a)) : [0, 1]) * .4) : "");
+      s += `<polygon points="${polyStr(q)}" fill="${F.col}" fill-opacity="${op.toFixed(2)}" stroke="#3A3A34" stroke-opacity=".5" stroke-width="1" vector-effect="non-scaling-stroke"/>` + (F.solid === 1 && !front ? shade34(q, lit34(closed ? norm34(P, i) : [0, 1]) * .4) : "");
       s += `<path d="${M(up(H)(a))}${Lto(up(H)(b))}" stroke="${hi || (kind === "concrete" ? "#8E8778" : "#D8EEF5")}" stroke-width="${hi ? 3 : 2}" stroke-linecap="round" vector-effect="non-scaling-stroke" fill="none"/>`;
       continue;
     }
@@ -1127,20 +1130,20 @@ function parcelOverlay(){
   return s;
 }
 // The construction ghost of fence being laid (or lifted): in 3/4 a translucent wall as tall as the fence will stand, with a post line at every piece; flat, a wide band. Green when it can go down, red when it can't.
-function fenceGhostSvg(keys, kind, bad, inv){
+function fenceGhostSvg(keys, kind, bad, inv, shift){
   if(!keys.length) return "";
   const c = bad ? "#E5484D" : "#4CD964", n2 = v => v.toFixed(2), H = (FENCE34[kind] || FENCE34.wood).h;
   const dash = `stroke-dasharray="${5*inv} ${3*inv}"`, ln = `stroke="${c}" stroke-width="1.4" ${dash} vector-effect="non-scaling-stroke"`;
   let s = `<g pointer-events="none" stroke-linejoin="round">`;
   for(const k of keys){
-    const [a, b] = pieceEnds(k);
+    let [a, b] = pieceEnds(k); const sh = shift && shift[k]; if(sh){ a = [a[0] + sh[0], a[1] + sh[1]]; b = [b[0] + sh[0], b[1] + sh[1]]; }
     if(tilt){
       const ta = lift34(H)(a), tb = lift34(H)(b);
       s += `<polygon points="${polyStr([a, b, tb, ta])}" fill="${c}" fill-opacity=".3" ${ln}/>`;
       s += `<line x1="${n2(a[0])}" y1="${n2(a[1])}" x2="${n2(ta[0])}" y2="${n2(ta[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`;
     } else s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${c}" stroke-opacity=".35" stroke-width="${Math.max(10, 1.2 * view.k)}" stroke-linecap="butt" vector-effect="non-scaling-stroke"/>`;
   }
-  const last = pieceEnds(keys[keys.length - 1])[1];
+  let last = pieceEnds(keys[keys.length - 1])[1]; const shl = shift && shift[keys[keys.length - 1]]; if(shl) last = [last[0] + shl[0], last[1] + shl[1]];
   if(tilt){ const tl = lift34(H)(last); s += `<line x1="${n2(last[0])}" y1="${n2(last[1])}" x2="${n2(tl[0])}" y2="${n2(tl[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`; }
   return s + `</g>`;
 }
@@ -1178,9 +1181,9 @@ function renderOverlay(){
   }
   if(fdrag){
     const bad = fdrag.lift || fdrag.why, col = bad ? "var(--bad)" : "var(--sel)";
-    const keys = fenceDragKeys();
-    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv);
-    for(const k of keys){ const [a, b] = pieceEnds(k); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
+    const keys = !fdrag.lift && fdrag.todo ? fdrag.todo : fenceDragKeys(), sh = fdrag.lift ? null : fdrag.shift;
+    s += fenceGhostSvg(keys, fdrag.lift ? (fencePieces()[keys[0]] ? pieceType(fencePieces()[keys[0]]) : "wood") : fenceSel, bad, inv, sh);
+    for(const k of keys){ const [a, b] = pieceEnds(k), o = sh && sh[k] || [0, 0]; s += `<line x1="${a[0] + o[0]}" y1="${a[1] + o[1]}" x2="${b[0] + o[0]}" y2="${b[1] + o[1]}" stroke="${col}" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
     if(fdrag.box) s += `<rect x="${Math.min(fdrag.a[0], fdrag.b[0])}" y="${Math.min(fdrag.a[1], fdrag.b[1])}" width="${Math.abs(fdrag.b[0] - fdrag.a[0])}" height="${Math.abs(fdrag.b[1] - fdrag.a[1])}" fill="var(--bad)" fill-opacity=".12" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
     else s += `<circle cx="${fdrag.a[0]}" cy="${fdrag.a[1]}" r="${4.5*inv}" fill="#fff" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   }
@@ -2029,7 +2032,7 @@ function buyLand(){
   ui.toast(`Bought ${fmtArea(parcelArea(i, j))} of land for ${money(price)}.`, "good");
 }
 function cancelTool(){ setTool("select"); }
-function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
+function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "exhibit"){ fenceMeet = !fenceMeet; fenceBar(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
 
 function finishDraw(){
   if(tool === "parcels"){ buyLand(); return; }
@@ -2143,7 +2146,8 @@ function endWaterDrag(){
 const gridAt = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math.round(w.x / GRID_STEP) * GRID_STEP, Math.round(w.y / GRID_STEP) * GRID_STEP]; };
 function fenceBar(stat){
   const B = BARRIERS[fenceSel];
-  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
+  $("#dUndo").disabled = false;
   setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.` : stat || `${money(fenceRate(fenceSel))} a meter.`, !!(B.tech && !hasTech(B.tech)));
 }
 // The pieces the current drag covers
@@ -2169,7 +2173,7 @@ function segHitsRect(p, q, a, b){
 function fenceDragStat(){
   const keys = fenceDragKeys();
   if(fdrag.lift){
-    const back = Math.round(keys.reduce((n, k) => n + pieceCost(k, pieceType(fencePieces()[k])) * COST.refundShare, 0)), ch = fdrag.box ? bulldozeChunkKeys(fdrag) : [];
+    const back = Math.round(keys.reduce((n, k) => n + pieceWorth(k, fencePieces()[k]) * COST.refundShare, 0)), ch = fdrag.box ? bulldozeChunkKeys(fdrag) : [];
     const chBack = Math.round(ch.reduce((n, k) => n + pathChunkCost(pathChunks()[k]) * COST.refundShare, 0));
     const parts = [];
     if(ch.length) parts.push(`${ch.length} path chunk${ch.length === 1 ? "" : "s"}`);
@@ -2177,22 +2181,36 @@ function fenceDragStat(){
     setStat(`Remove ${parts.join(" and ")} for ${money(back + chBack)} back.`);
     return;
   }
-  const plan = planPieces(keys, fenceSel), m = Math.round(keys.reduce((n, k) => n + pieceLen(k), 0));
-  fdrag.why = plan.why;
-  setStat(plan.why || `${m} m, ${money(plan.cost)}.`, !!plan.why);
+  const opts = fenceOpts(), plan = planPieces(keys, fenceSel, opts), m = Math.round(plan.todo.reduce((n, k) => n + pieceLen(k), 0));
+  fdrag.why = plan.why; fdrag.todo = plan.todo; fdrag.side = opts.side; fdrag.shift = {};
+  // a shared wall that changes on one side only is shown nudged to that side
+  for(const k of plan.todo){
+    const old = fencePieces()[k], nx = plan.next[k]; if(!old || !pieceSplit(nx)) continue;
+    const a = pieceKind(nx, true) !== pieceKind(old, true), b = pieceKind(nx, false) !== pieceKind(old, false); if(a === b) continue;
+    const [e0, e1] = pieceEnds(k), L = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]), sg = a ? 1 : -1;
+    fdrag.shift[k] = [-(e1[1] - e0[1]) / L * sg * FENCE_GRID.sideGap, (e1[0] - e0[0]) / L * sg * FENCE_GRID.sideGap];
+  }
+  setStat(plan.why || `${m} m, ${money(plan.cost)}.${plan.note ? " " + plan.note : ""}`, !!plan.why);
+}
+// How the drag is laid: which way it runs, which side of it the pointer is on (for a wall two pens share), and whether to leave other fence alone
+function fenceOpts(){
+  const L = pieceLine(fdrag.a, fdrag.b), dx = Math.sign(L.end[0] - fdrag.a[0]), dy = Math.sign(L.end[1] - fdrag.a[1]);
+  let side = 0;
+  if((dx || dy) && fdrag.w){ const d = (-(fdrag.w.x - fdrag.a[0]) * dy + (fdrag.w.y - fdrag.a[1]) * dx) / Math.hypot(dx, dy); side = Math.abs(d) < FENCE_GRID.sideDead ? 0 : Math.sign(d); }
+  return {dir:[dx, dy], side, meet:fenceMeet};
 }
 function endFenceDrag(){
-  const keys = fenceDragKeys(), lift = fdrag.lift, box = fdrag.box && fdrag; fdrag = null;
+  const keys = fenceDragKeys(), lift = fdrag.lift, box = fdrag.box && fdrag, opts = lift ? null : fenceOpts(); fdrag = null;
   const tookPath = box ? bulldozeChunks(box) : false;   // the chunks lit in the box go at once, with one refund and one toast
   if(!keys.length){ if(box && !tookPath) bulldozePaint(box); renderOverlay(); return; }
   if(lift){
     askConfirm("Remove this fence?", "Animals inside can escape.", "Remove", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
     renderOverlay(); return;
   }
-  finishFenceDrag(keys, false);
+  finishFenceDrag(keys, false, opts);
 }
-function finishFenceDrag(keys, lift){
-  const r = lift ? liftPieces(keys) : layPieces(keys, fenceSel);
+function finishFenceDrag(keys, lift, opts){
+  const r = lift ? liftPieces(keys) : layPieces(keys, fenceSel, opts);
   if(!r){ renderOverlay(); return; }   // the stat line already says why
   afterChange(); render();
   if(lift) setStat(""); else fenceBar();
@@ -2703,6 +2721,7 @@ function confirmGateRemoval(e){
 
 function removeItem(kind, it, opts = {}){
   const lift = kind === "exhibit" && it.grid && !opts.keepFence ? ownPieces(it) : [];
+  if(kind === "exhibit" && it.grid && !opts.keepFence) releaseSides(it);   // its side of a wall it shares goes; the neighbor's stays
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
   if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
@@ -2969,7 +2988,7 @@ svg.addEventListener("pointerdown", e => {
       fdrag = {a:[w.x, w.y], b:[w.x, w.y], lift:true, box:true, swept:new Set(), last:w}; fhover = null;
       drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; return;
     }
-    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
+    if(tool === "exhibit" || first){ const g = gridAt(e); fdrag = {a:g, b:g, lift:!!first, first, swept:new Set(first ? [first] : []), last:w, w}; fhover = null; drag = {fd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; fenceDragStat(); renderOverlay(); return; }
   }
   drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, hit:itemAt(e.target)};
 });
@@ -3036,8 +3055,8 @@ svg.addEventListener("pointermove", e => {
       if(fdrag.swept.size !== before){ fenceDragStat(); renderOverlay(); }
       return;
     }
-    const g = gridAt(e); drag.moved = true;
-    if(g[0] !== fdrag.b[0] || g[1] !== fdrag.b[1]){ fdrag.b = g; fenceDragStat(); renderOverlay(); }
+    const g = gridAt(e), moved = g[0] !== fdrag.b[0] || g[1] !== fdrag.b[1]; drag.moved = true; fdrag.w = toWorld(e.clientX, e.clientY); fdrag.b = g;
+    if(moved || fenceOpts().side !== fdrag.side){ fenceDragStat(); renderOverlay(); }
     return;
   }
   if(drag.rv){

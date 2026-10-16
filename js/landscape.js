@@ -244,9 +244,9 @@ function habitatScore(e){
 function insideFence(pts, fence, m){
   for(let i = 0; i < pts.length; i++){
     const a = pts[i], b = pts[(i + 1) % pts.length];
-    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!deepInside(x, y, fence, m)) return false; }
+    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!(m > 0 ? deepInside(x, y, fence, m) : inPoly(x, y, fence) || distToEdge(x, y, fence) < .02)) return false; }   // m 0: the shore may sit right on the fence
   }
-  return !fence.some(p => inPoly(p[0], p[1], pts));
+  return !fence.some(p => inPoly(p[0], p[1], pts) && distToEdge(p[0], p[1], pts) > .02);
 }
 // Water drawn as chunk boxes is an axis-aligned rectangle: [x0, y0, x1, y1], else null
 function rectOfPts(p){

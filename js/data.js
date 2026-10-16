@@ -935,7 +935,7 @@ const BARRIERS = {
 // Fence laid piece by piece on the 1 m grid (js/fences.js)
 //   minArea     smallest fenced-off region that becomes an exhibit (m²)
 //   keepShare   an exhibit keeps a region holding at least this share of its old ground
-const FENCE_GRID = {minArea:60, keepShare:.25};
+const FENCE_GRID = {minArea:60, keepShare:.25, sideGap:.18, sideDead:.2};   // sideGap: m each wall of a shared pair is nudged into its own pen so both show; sideDead: m the pointer can stray from a wall and still change both sides of it
 
 // What a new fence costs to build, per meter: the base fence plus the barrier's own cost
 const fenceRate = key => COST.fencePerMeter + BARRIERS[key].perMeter;
@@ -1281,7 +1281,7 @@ BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platf
 const WATER = {
   perSqM:20,       // cost per square meter
   minArea:12,      // smallest body of water, in square meters
-  margin:.5,       // gap kept between the water and the fence, in meters
+  margin:0,        // gap kept between the water and the fence, in meters (none: water may border the fence)
   oldPondR:6,      // radius of the round ponds older saves had; they become drawn water
 };
 

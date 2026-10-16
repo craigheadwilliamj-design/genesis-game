@@ -1366,6 +1366,63 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceNoMove = moveTarget({kind:"exhibit", id:ge.id}) === null;
       const ob = JSON.parse(JSON.stringify(state)); delete ob.fenceGrid;
       out.fenceSave = Object.keys(upgradeSave(ob).fenceGrid).length === 0 && Object.keys(upgradeSave(JSON.parse(JSON.stringify(state))).fenceGrid).length === Object.keys(state.fenceGrid).length;
+      // two pens side by side share a wall, and each side of it can be its own fence
+      {
+        box(370,150,380,165); box(380,150,390,165); gatePens();   // 10 x 15 each: 150 m2
+        const bx = state.exhibits.filter(e => e.grid && e.points.some(p => p[0] === 380) && area(e.points) === 150), W = bx.find(e => e.points.some(p => p[0] === 370)), E = bx.find(e => e.points.some(p => p[0] === 390));
+        const wall = pieceLine([380,150],[380,165]).keys, wallKinds = e => sideKinds(e).filter((k, i) => k !== "wood");
+        out.sharedWallStart = !!W && !!E && wall.every(k => !pieceSplit(fencePieces()[k]));
+        // meeting mode leaves the wall alone and says why
+        const mp = planPieces(wall, "bars", {meet:true});
+        out.fenceMeetKeeps = !mp.todo.length && /in the way/.test(mp.why || "");
+        // pointer on the west pen's side: only that side becomes bars
+        layPieces(wall, "bars", {dir:[0,1], side:1});
+        out.sharedWallSplit = wall.every(k => pieceSplit(fencePieces()[k]) && pieceKind(fencePieces()[k], true) === "bars" && pieceKind(fencePieces()[k], false) === "wood");
+        out.sharedWallKinds = wallKinds(W).length === 1 && wallKinds(W)[0] === "bars" && wallKinds(E).length === 0 && sideOffsets(W).filter(Boolean).length === 1 && sideOffsets(E).filter(Boolean).length === 1;
+        out.sharedWallHolds = W.barrier === (BARRIERS.bars.strength < BARRIERS.wood.strength ? "bars" : undefined) && E.barrier === undefined;
+        // the other pen's side takes concrete without touching the first
+        layPieces(wall, "concrete", {dir:[0,1], side:-1});
+        out.sharedWallOtherSide = wall.every(k => pieceKind(fencePieces()[k], true) === "bars" && pieceKind(fencePieces()[k], false) === "concrete") && wallKinds(E).join() === "concrete" && wallKinds(W).join() === "bars";
+        // a deco fence can't take an exhibit's side of the wall
+        out.sharedWallNoDeco = planPieces(wall, "rope", {dir:[0,1], side:1}).why === DECO_WHY;
+        // pointer on the wall changes both sides; it costs one fence's worth a piece
+        const cost = planPieces(wall, "bars", {dir:[0,1], side:0}).cost;
+        out.sharedWallBoth = cost === Math.round(wall.length * fenceRate("bars")) && layPieces(wall, "bars", {dir:[0,1], side:0}) && wall.every(k => !pieceSplit(fencePieces()[k]) && pieceType(fencePieces()[k]) === "bars");
+        // the wall picker changes one pen's side only
+        layPieces(wall, "wood", {dir:[0,1], side:1}); refenceExhibit(E, "concrete");
+        out.sharedWallRefence = wall.every(k => pieceKind(fencePieces()[k], true) === "wood" && pieceKind(fencePieces()[k], false) === "concrete") && E.barrier === "concrete";
+        // lifting a split piece sells back both fences
+        const wk = wall[0], worth = pieceWorth(wk, fencePieces()[wk]);
+        out.sharedWallWorth = worth === pieceCost(wk, "wood") + pieceCost(wk, "concrete");
+        // bulldozing one pen takes its side of the shared wall and leaves the neighbor's
+        const wasW = W.points.length; removeItem("exhibit", E);
+        out.sharedWallRelease = wall.every(k => fencePieces()[k] && !pieceSplit(fencePieces()[k]) && pieceType(fencePieces()[k]) === "wood") && state.exhibits.includes(W) && W.barrier === undefined && wasW === W.points.length;
+        // one run changing fence along its length is its own sides, and the two kinds meet at a post
+        L([400,150],[410,150],"wood"); L([410,150],[420,150],"bars");
+        const runs = looseRuns().filter(r => r.pts[0][1] === 150 && r.pts[0][0] >= 400);
+        out.fenceKindsMeet = runs.length === 2 && runs.some(r => r.b === "wood" && r.pts[1][0] === 410) && runs.some(r => r.b === "bars" && r.pts[0][0] === 410);
+        // laying wood over the bars replaces just the bars pieces, and meeting mode would not
+        out.fenceMeetFills = planPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}).why !== null && layPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}) === null && pieceType(fencePieces()["415,150,h"]) === "bars";
+        L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
+        for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
+        // water inside an exhibit may sit flush against its fence, but not poke out
+        out.waterBordersFence = !waterProblem([[375,160],[380,160],[380,165],[375,165]], W) && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        // fence may border a path or water but not run through it
+        const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
+        const why = k => planPieces([k], "wood").why;
+        out.fenceBordersPath = !why("400,150,h") && !why("400,155,h") && !why("400,152,v") && /path/.test(why("402,152,h") || "") && /path/.test(why("405,152,v") || "") && /path/.test(why("402,152,d") || "");
+        out.fenceBordersWater = !why("410,140,h") && !why("405,142,v") && !why("415,142,v") && /water/.test(why("410,142,h") || "") && /water/.test(why("410,142,d") || "");
+        for(const k of Object.keys(pc)) if(!(k in keepPc)) delete pc[k]; state.water = keepWater;
+        // a pen closed around park water and a rock takes them in as its own, with no complaint
+        {
+          const kd = state.decor, kw = state.water, lt = Object.keys(LAND)[0];
+          state.water = [{id:"w-in", points:[[405,145],[410,145],[410,150],[405,150]]}]; state.decor = [{id:"d-in", type:lt, x:412, y:155}];
+          const nb = state.exhibits.length; box(400,140,420,160); gatePens();
+          const pe = state.exhibits[state.exhibits.length - 1];
+          out.penTakesParkThings = state.exhibits.length === nb + 1 && !state.water.length && !state.decor.length && waterOf(pe).length === 1 && landOf(pe).length === 1;
+          state.decor = kd; state.water = kw;
+        }
+      }
       render(); out.fenceDraws = !!world.querySelector(`[data-id="${ge.id}"]`);
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
       state.science.tech = keep.tech; setTool("select"); recompute(); buildGuestGraph(); render();
