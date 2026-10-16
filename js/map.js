@@ -950,9 +950,14 @@ function wallStrips34(){
       if(a[0] > b[0]) [a, b] = [b, a];
       if(b[0] - a[0] > .01) out.push({a, b, up:F.h / TILT});
     }
-    for(const f of landOf(e)){   // a barn shelter's walls and roof, from its front edge up to its far eave and a bit of the ridge
+    for(const f of landOf(e)){   // a barn, cave or burrow, from its front edge up to its far eave and a bit of the ridge
       const t = LAND[f.type];
-      if(!t || !t.slots || t.look || f.k) continue;
+      if(!t || !t.slots || f.k || t.look === "canopy") continue;
+      if(t.look === "cave" || t.look === "burrow"){   // a lumpy mound: the blob (a bit narrower than its radius at the sides) stacked up to the top
+        const r = t.look === "burrow" ? t.r * .8 : t.r;
+        out.push({a:[f.x - r * .85, f.y + r], b:[f.x + r * .85, f.y + r], up:2 * r + r * .85 / TILT});
+        continue;
+      }
       const h = t.r * .78;
       out.push({a:[f.x - h, f.y + h], b:[f.x + h, f.y + h], up:2 * h + (t.r * .5 + t.r * .45 * .5) / TILT});
     }
