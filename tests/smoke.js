@@ -1510,7 +1510,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       for(const [k, t] of Object.entries(LAND)){ if(!t.flora || t.vivToy) continue; const r = rng[t.size]; if(!(Number.isInteger(t.footSide) && t.footSide >= r[0] && t.footSide <= r[1])) bad.push(k); sizes.push(t.footSide); }
       for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_SIDE[type])) for(const v of l) if(!(Number.isInteger(v) && v >= rng[type][0] && v <= rng[type][1])) bad.push(type + b);
       out.footWithinRange = bad.length === 0 && sizes.length > 100;
-      out.footVaries = new Set(Object.values(ROCK_SIDE.rock).flat()).size > 1 && new Set(PLANTS_OF.Permian.scrubland.concat(PLANTS_OF.Jurassic.tropical).map(k => LAND[k].footSide)).size > 3;
+      out.footVaries = new Set(Object.values(ROCK_SIDE.rock).flat()).size > 1 && new Set(PLANTS_OF.Permian.scrubland.concat(PLANTS_OF.Jurassic.tropical, PLANTS_OF.Cretaceous.temperate).map(k => LAND[k].footSide)).size > 2;
       // odd sides center on a cell, even on a grid corner, so the square covers whole cells
       let whole = true;
       for(const key of ["qua-temperate-small", "qua-temperate-medium", "qua-temperate-large", "rock", "boulder"]) for(const [x, y] of [[10.3, 20.8], [11, 21], [12.5, 7.49]]){

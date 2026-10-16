@@ -2093,8 +2093,8 @@ const SPRITE_HIT = {
 // Ground footprint of a plant, rock or boulder: a square of whole 1 m cells (landscape.js footBox). Each picture's side comes from its own sprite
 // (SPRITE_HIT), rounded to whole meters and held to its kind's range. side: key -> meters, to override one by hand.
 const FOOT = {
-  range:{small:[1, 2], medium:[3, 5], large:[6, 8], rock:[2, 4], boulder:[6, 8]},
-  plain:{small:2, medium:4, large:7, rock:3, boulder:7},   // no picture to measure: the middle of the range
+  range:{small:[1, 2], medium:[3, 5], large:[3, 3], rock:[2, 4], boulder:[6, 8]},
+  plain:{small:2, medium:4, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
   crown:.5,    // a plant's side is its base width, or this share of its crown width if that is more
   rockK:.8,    // a rock's or boulder's side is this share of its picture's width
   side:{}
