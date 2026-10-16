@@ -902,10 +902,13 @@ function featSvg(f, biome, pick, isDead){
 // in the 3/4 view things further north draw first, so a tree in front covers the one behind
 const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
 // SVG for one exhibit's water, rocks, groves and shelters. When bulldozing they can be picked out one by one.
+let openFence34 = new Map();   // open exhibit id -> its loose fence pieces {y, o, svg}, set each render in map.js so they sort among its plants and rocks
 function landSvg(e, pick, isDead){
-  const feats = byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
-  // in the 3/4 view the features go in their own group, where map.js slots the animals in among them by depth (place34)
-  return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + (tilted() ? `<g data-z34="${esc(e.id)}">${feats}</g>` : feats);
+  if(!tilted()) return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
+  // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
+  const items = landOf(e).map(f => ({y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)})).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
+  items.sort((p, q) => p.y - q.y || p.o - q.o);
+  return watersSvg(waterOf(e), pick, isDead, biomeOf(e)) + `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}</g>`;
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = (pick, isDead) => watersSvg(parkWater(), pick, isDead, parkBiome());
