@@ -1,5 +1,5 @@
 # Draws the seamless path tiles in the Dimetrodon's flat, simple style: sprites/path/guest.png (warm concrete paving square slabs), staff.png (dark asphalt with gravel dashes
-# and pour seams) and bridge.png (wooden planks with butt joints and nails). Each is 96 px = 12.48 m at ROCK_MPP (0.13 m a pixel, the same grid the path layer's edges are cut to,
+# ; the pour seams between chunks are drawn by pathart.js on the 5 m chunk grid, not in the tile) and bridge.png (wooden planks with butt joints and nails). Each is 96 px = 12.48 m at ROCK_MPP (0.13 m a pixel, the same grid the path layer's edges are cut to,
 # so the tile and the stair-stepped outline share pixels). Fully opaque, used as the #pt-<kind> patterns (index.html) behind the path chunks (pathart.js). Everything is
 # structured and rhythmic (rows of dashes, plank gaps) with no random scatter, light from the top left, a lit top-left row and a shaded bottom-right row on each slab or plank.
 # Features wrap over the edges. Usage: python3 -I tools/pixelpath_flat.py [outdir]
@@ -25,7 +25,7 @@ def guest():
 
 def staff():
     BASE = hexc("#5A5F64")   # PATH_CELLS.kinds.s.color
-    dark = mix(BASE, BLACK, .2); lite = mix(BASE, WHITE, .12); peb = mix(BASE, WHITE, .3); pebs = mix(BASE, BLACK, .32); seam = mix(BASE, BLACK, .3); seamlit = mix(BASE, WHITE, .1)
+    dark = mix(BASE, BLACK, .2); lite = mix(BASE, WHITE, .12); peb = mix(BASE, WHITE, .3); pebs = mix(BASE, BLACK, .32)
     px = {(x, y): BASE for x in range(N) for y in range(N)}
     for r in range(N // 4):   # rows of short gravel dashes every 4 px, the dash lengths and offsets repeating in a fixed rhythm
         y = r * 4 + 1
@@ -36,11 +36,6 @@ def staff():
         for k in range(4):
             x = (r * 7 + k * 24 + 5) % N; y = r * 12 + 7 + (k % 2) * 4
             px[(x, y)] = peb; px[(x + 1, y)] = peb; px[(x + 1, y + 1)] = pebs; px[(x + 2, y + 1)] = pebs
-    for P in (0, 48):   # pour seams: a dashed dark line with a lit pixel row beside it, horizontal and vertical, every 6.2 m
-        for i in range(N):
-            if i % 8 < 6:
-                px[(i, P)] = seam; px[(i, (P + 1) % N)] = seamlit
-                px[(P, i)] = seam; px[((P + 1) % N, i)] = seamlit
     return px
 
 def bridge():

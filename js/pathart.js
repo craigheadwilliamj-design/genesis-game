@@ -5,7 +5,7 @@
 // The tile for each kind: sprites/path/<tile>.png behind the #pt-<kind> pattern in index.html (12.48 m = 96 px at ROCK_MPP), and the edge colors
 const PATH_TEX = {
   g:{lit:"#E4DDCB", dark:"#8C8470"},   // plain warm concrete
-  s:{lit:"#7C8187", dark:"#34383C"},   // dark asphalt
+  s:{lit:"#7C8187", dark:"#34383C", seam:"#4A4F54"},   // dark asphalt
   b:{lit:"#D0A67A", dark:"#5E4429"},   // planks
 };
 const PATH_CAST = .16;   // opacity of the one-pixel shadow a path throws on the ground below and to its right
@@ -51,6 +51,17 @@ function pathMask(squares){
     // a pixel that is both lit and dark (a corner) stays dark, painted after
     by[k] = {body:paint(m), lit:paint(clean(lit)), dark:paint(clean(dark))};
   }
+  // asphalt pour seams: a dashed dark line along every border between two staff chunks, so the pattern sits inside each 5 m chunk
+  if(by.s){
+    const have = new Set(squares.filter(q => q.kind === "s").map(q => q.cx + "," + q.cy)), seam = new Map(), put = (r, a) => { if(!seam.has(r)) seam.set(r, []); seam.get(r).push([a, a + 1]); };
+    for(const q of squares){
+      if(q.kind !== "s") continue;
+      const x0 = Math.round(q.x / P), x1 = Math.round((q.x + q.w) / P), r0 = Math.round(q.y / P), r1 = Math.round((q.y + q.h) / P);
+      if(have.has((q.cx + 1) + "," + q.cy)) for(let r = r0; r < r1; r++) if((r - r0) % 8 < 6) put(r, x1 - 1);
+      if(have.has(q.cx + "," + (q.cy + 1))) for(let x = x0; x < x1; x++) if((x - x0) % 8 < 6) put(r1 - 1, x);
+    }
+    by.s.seam = paint(new Map([...seam].map(([r, runs]) => [r, join(runs)])));
+  }
   // shadow on bare ground: the row below each bottom edge (shifted a pixel right) and the column beside each right end
   const cast = new Map(), addc = (r, a, b) => { if(b <= a) return; if(!cast.has(r)) cast.set(r, []); cast.get(r).push([a, b]); };
   for(const [r, runs] of all) for(const [a, b] of runs){
@@ -68,7 +79,7 @@ function pathLayerSvg(){
   const m = pathMask(pathSquares()), order = ["s", "g", "b"].filter(k => m.by[k]);
   let svg = `<g id="pathLayer" pointer-events="none" shape-rendering="crispEdges">`;
   if(m.cast) svg += `<path d="${m.cast}" fill="#000" fill-opacity="${PATH_CAST}"/>`;
-  for(const k of order) svg += `<path d="${m.by[k].body}" fill="${PATH_CELLS.kinds[k].color}"/><path d="${m.by[k].body}" fill="url(#pt-${k})"/><path d="${m.by[k].lit}" fill="${PATH_TEX[k].lit}"/><path d="${m.by[k].dark}" fill="${PATH_TEX[k].dark}"/>`;
+  for(const k of order) svg += `<path d="${m.by[k].body}" fill="${PATH_CELLS.kinds[k].color}"/><path d="${m.by[k].body}" fill="url(#pt-${k})"/>${m.by[k].seam ? `<path d="${m.by[k].seam}" fill="${PATH_TEX[k].seam}"/>` : ""}<path d="${m.by[k].lit}" fill="${PATH_TEX[k].lit}"/><path d="${m.by[k].dark}" fill="${PATH_TEX[k].dark}"/>`;
   svg += `</g>`;
   pathLayer = {chunks:C, ver:pathVer, size, svg, builds:(pathLayer ? pathLayer.builds : 0) + 1};
   return svg;
