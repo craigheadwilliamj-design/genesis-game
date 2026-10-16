@@ -309,11 +309,16 @@ function render(){
 
   // open fences and hedge rows
   for(const l of fenceLines()) s += fenceLineSvg(l, isSel("fence", l.id), isDoomed("fence", l.id));
-  for(const r of looseRuns()) s += fenceRunSvg(r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, r.b, false);
   s += fenceJointsSvg(inv);
 
   // plants, rocks and statues out in the park stand over the path edges
-  s += decorSvg(tool === "bulldoze", isDoomed);
+  // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
+  const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze", isDoomed)}));
+  for(const r of looseRuns()){
+    const P = r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, [a, z] = P, n = Math.max(1, Math.ceil(Math.abs(z[1] - a[1]) / 3));   // a run running up the screen is cut into 3 m of depth so what stands beside it sorts against each part
+    for(let i = 0; i < n; i++){ const u = i / n, v = (i + 1) / n, q = [[a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u], [a[0] + (z[0] - a[0]) * v, a[1] + (z[1] - a[1]) * v]]; standing.push({y:(q[0][1] + q[1][1]) / 2, o:0, svg:fenceRunSvg(q, r.b, false)}); }
+  }
+  s += standing.sort((p, q) => p.y - q.y || p.o - q.o).map(it => it.svg).join("");
 
   // entrance building
   s += entrance34(inv);
