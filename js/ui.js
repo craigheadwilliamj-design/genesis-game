@@ -359,9 +359,9 @@ function vivToysHtml(e){
     if(lovers) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
   }
   h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
-  if(!devMode()) return h;
   const need = enrichNeed(e), have = toyPoints(e);
   h += `<section><h3>Enrichment</h3><div class="meta">Things to hide under, climb, dig in and hunt from. Bored animals with nothing to do pace.</div>`;
+  if(e.animals.length && have < need) h += `<div class="row"><span class="status no">Add enrichment: hides, branches, a dig box and the like.</span></div>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
   h += vivSelect("vivToySel", VIV_TOYS, e, t => `${t.toy} toy point${t.toy === 1 ? "" : "s"}`) + vivHere(e, false);
   return h + `</section>`;
