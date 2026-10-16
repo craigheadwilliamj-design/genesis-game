@@ -7,7 +7,7 @@
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lystkit import *
-K = dict(N=8, fps=8, ds=.72, S=17.0, lift=3.2, bob=.6, pitch=1.2, head=1.5, shift=.0, name='walk')
+K = dict(N=8, fps=8, ds=.6, S=17.0, lift=3.2, bob=.6, pitch=1.2, head=1.5, shift=.0, name='walk')
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); V = View(P)
 rest = {}   # each foot's ankle (the foot part's joint) standing, in the world
