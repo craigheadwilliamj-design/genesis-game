@@ -27,6 +27,7 @@ let landGhost = null;               // rock, grove or shelter being placed: {key
 let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
+let wdrag = null;                   // water box being dragged: {a, b} (chunks, like paint)
 let pdrag = null;                   // biome paint box being dragged: {a, b} (grid points, js/biomepaint.js)
 let paintPick = null;               // what the paint tool does: a biome id, or "erase"
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
@@ -48,7 +49,7 @@ const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes
 let fenceSel = "wood";             // fence type the next exhibit is built with
 const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
-const isDrawTool = t => t === "tram" || t === "zone" || t === "water";
+const isDrawTool = t => t === "tram" || t === "zone";
 const PATH_TOOLS = {path:"g", service:"s", bridge:"b"};   // drag-and-drop path tools and the chunk kind each lays (js/pathcells.js)
 const isPathTool = t => !!PATH_TOOLS[t];
 // Exhibits, zones and water are closed shapes. Paths are open lines.
@@ -1186,6 +1187,10 @@ function renderOverlay(){
     const r = paintBox(pdrag.a, pdrag.b), er = paintPick === "erase", c = er ? "var(--bad)" : "var(--sel)";
     s += `<rect x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}" fill="${er ? c : BIOMES[paintPick].park}" fill-opacity="${er ? .15 : .7}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
+  if(wdrag){
+    const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
+    s += `<rect x="${b.r[0]}" y="${b.r[1]}" width="${b.r[2] - b.r[0]}" height="${b.r[3] - b.r[1]}" fill="${b.err ? c : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .55}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+  }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), landGhost.key).fill;
@@ -1799,7 +1804,6 @@ function toWorld(cx, cy){ const r = svg.getBoundingClientRect(); return {x:(cx -
 function snapAt(clientX, clientY, ev){
   const p = toWorld(clientX, clientY);
   // water stays clear of fences and paths, so it only snaps to the grid
-  if(draw && draw.kind === "water") return {x:Math.round(p.x / GRID_STEP) * GRID_STEP, y:Math.round(p.y / GRID_STEP) * GRID_STEP, info:{type:"grid"}};
   const R = 12 / view.k;
   // drawing a path: anywhere on another path's body snaps onto its centerline, so the two actually join
   // tram track only ever joins other tram track, and nothing else snaps to it
@@ -1867,14 +1871,13 @@ function pathProblem(pts, type){
 const DRAW_TEXT = {
   zone:["New work zone", "Tap to drop corners around the exhibits and stores you want to group. Tap the first corner again to close it. Things inside join the zone."],
   tram:["New tram track", "Guests ride it between tram stations. Draw it alongside your footpaths, then build a Tram station beside the track and a footpath at each stop. Tap the last point again to finish."],
-  water:["New water", "Tap to drop shore corners, inside an open exhibit for the animals or out in the park for the guests. Tap the first corner again to fill it. Only wooden bridges cross water."],
 };
 const drawType = () => draw && draw.kind === "tram" ? draw.kind : undefined;
 
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; pdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; doomed = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -1884,6 +1887,7 @@ function setTool(t){
     $("#dSizes").innerHTML = FAMILIES[fam].tools.map((x, i) => `<button data-pick="${x}" aria-pressed="${x === t}">${FAMILIES[fam].labels[i]}</button>`).join("");
   }
   if(t === "paint"){ paintBar(); }
+  if(t === "water"){ waterBar(); }
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "exhibit") fenceBar();
@@ -1914,7 +1918,7 @@ function setTool(t){
     showBar("Reshape zone", "Drag a corner to move it. Drag a + on an edge to add a corner. Tap a corner, then Delete corner to remove it.", "", {undo:true, finish:true, cancel:"Cancel", undoText:"Delete corner", finishText:"Done"});
     updateZoneEditBar();
   }
-  else if(t === "paint"){}
+  else if(t === "paint" || t === "water"){}
   else if(t === "parcels"){ parcelSel = null; fit(); updateParcelBar(); }
   else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
@@ -1954,15 +1958,13 @@ function updateDrawbar(){
   let stat = "", err = null;
   if(draw.kind === "zone"){
     if(all.length >= 3){ stat = `${fmtArea(area(all))}. Free`; err = zoneProblem(all); }
-  } else if(draw.kind === "water"){
-    if(all.length >= 3){ const h = waterHost(all); stat = `${fmtArea(area(all))} of water ${h ? "in " + h.name : "out in the park"}. ${money(waterCost(all))}`; err = waterProblem(all, h, null, waterCost(all)); }
   } else if(all.length >= 2){
     stat = `${Math.round(lineLength(all))} m. ${money(pathCost(all, drawType()))}`; err = pathProblem(all, drawType());
   }
   draw.error = err;
   setStat(err || stat, !!err);
   $("#dUndo").disabled = !draw.pts.length;
-  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.kind === "water" ? !waterProblem(draw.pts, waterHost(draw.pts), null, waterCost(draw.pts)) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
+  const ready = draw.kind === "zone" ? !zoneProblem(draw.pts) : draw.pts.length >= 2 && !pathProblem(draw.pts, drawType());
   $("#dFinish").disabled = !ready;
 }
 
@@ -2029,18 +2031,8 @@ function finishDraw(){
   if(!draw) return;
   const d = draw, type = drawType();
   const pts = d.pts.map(p => [p[0], p[1]]);
-  const host = d.kind === "water" ? waterHost(pts) : null;
-  const problem = d.kind === "zone" ? zoneProblem(pts) : d.kind === "water" ? waterProblem(pts, host, null, waterCost(pts)) : pathProblem(pts, type);
+  const problem = d.kind === "zone" ? zoneProblem(pts) : pathProblem(pts, type);
   if(problem){ setStat(problem, true); return; }
-  if(d.kind === "water"){
-    const cost = waterCost(pts);
-    addWater(host, pts);
-    afterChange();
-    // keep the tool going so you can draw the next one
-    startDraw("water"); render();
-    ui.toast(`Added ${fmtArea(area(pts))} of water to ${host ? host.name : "the park"} for ${money(cost)}.`, "good");
-    return;
-  }
   if(d.kind === "zone"){
     const used = new Set(state.zones.map(x => x.name));
     let n = 1; while(used.has(`Zone ${n}`)) n++;
@@ -2073,7 +2065,7 @@ function finishDraw(){
 /* ---------- painting ground (js/biomepaint.js) ---------- */
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
-  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box on the grid to paint it. New paint covers old paint. Tap a patch to change its biome, or pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
 }
@@ -2086,18 +2078,10 @@ function paintDragStat(){
 }
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
-  const tap = d.a[0] === d.b[0] && d.a[1] === d.b[1], r = paintBox(d.a, d.b);
+  const r = paintBox(d.a, d.b);
   if(paintPick === "erase"){
-    if(tap ? !erasePaintAt(d.wx, d.wy) : !eraseRect(r)){ setStat("No paint there."); return; }
+    if(!eraseRect(r)){ setStat("No paint there."); return; }
     setStat(""); afterChange(); render(); return;
-  }
-  if(tap){
-    const o = paintAt(d.wx, d.wy);
-    if(!o){ setStat("Drag a box to paint."); return; }
-    const c = exhibitPaintCost(o.r, paintPick);
-    if(!canAfford(c)){ setStat(`Costs ${money(c)}. You have ${money(state.money)}.`, true); return; }
-    if(repickPaint(o.id, paintPick)){ if(c) spend(c, "built"); setStat(""); afterChange(); render(); }
-    return;
   }
   const c = exhibitPaintCost(r, paintPick);
   if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
@@ -2109,9 +2093,29 @@ function endPaintDrag(){
 // Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
 function bulldozePaint(d){
   const tap = d.a[0] === d.b[0] && d.a[1] === d.b[1];
-  const hit = tap ? erasePaintAt(d.a[0], d.a[1]) : eraseRect(paintBox(d.a, d.b)) > 0;
+  const hit = tap ? erasePaintAt(d.a[0], d.a[1]) : eraseRect(paintBoxW(d.a, d.b)) > 0;
   if(hit){ setStat(""); afterChange(); render(); }
   return hit;
+}
+
+/* ---------- laying water in chunks ---------- */
+function waterBar(){ showBar("Lay water", "Drag a box to lay water in 5 m chunks, like a path. Inside an open exhibit it's for the animals, out in the park guests enjoy it. Only wooden bridges cross water. Touching boxes of the same width join up.", "", {undo:false, finish:false, cancel:"Done"}); }
+// the box being dragged: its meters, outline, the exhibit it's in (null: out in the park), price and why not
+function waterBox(){
+  const r = paintBox(wdrag.a, wdrag.b), pts = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), cost = waterCost(pts);
+  return {r, pts, host, cost, err:waterProblem(pts, host, null, cost)};
+}
+function waterDragStat(){
+  if(!wdrag) return;
+  const b = waterBox();
+  setStat(b.err || `${b.r[2] - b.r[0]} × ${b.r[3] - b.r[1]} m of water ${b.host ? "in " + b.host.name : "out in the park"}. ${money(b.cost)}`, !!b.err);
+}
+function endWaterDrag(){
+  const b = waterBox(); wdrag = null; renderOverlay();
+  if(b.err){ setStat(b.err, true); ui.toast(b.err, "bad"); return; }
+  mergeWater(b.host, addWater(b.host, b.pts));
+  setStat(""); afterChange(); render();
+  ui.toast(`Added ${fmtArea(area(b.pts))} of water to ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
@@ -2897,7 +2901,7 @@ svg.addEventListener("pointerdown", e => {
   // the middle or right button always pans, whatever the tool
   if(e.button > 0){ drag = {sx:e.clientX, sy:e.clientY, tx:view.tx, ty:view.ty, moved:false, pan:true, hit:{kind:null, id:null}}; return; }
   if(pointers.size === 2){
-    drag = null; if(fdrag || pdrag || cdrag){ fdrag = null; pdrag = null; cdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
+    drag = null; if(fdrag || pdrag || cdrag || wdrag){ fdrag = null; pdrag = null; cdrag = null; wdrag = null; renderOverlay(); } const [a, b] = [...pointers.values()];
     pinch = {d:Math.hypot(a.x-b.x, a.y-b.y) || 1, k:view.k, ky:ky(), tx:view.tx, ty:view.ty, mx:(a.x+b.x)/2, my:(a.y+b.y)/2};
     return;
   }
@@ -2929,8 +2933,12 @@ svg.addEventListener("pointerdown", e => {
     drag = {cd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; pathDragStat(); renderOverlay(); return;
   }
   if(tool === "paint"){
-    const w = toWorld(e.clientX, e.clientY), g = gridAt(e);
-    pdrag = {a:g, b:g, wx:w.x, wy:w.y}; drag = {pd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; paintDragStat(); renderOverlay(); return;
+    const c = chunkAtEv(e);
+    pdrag = {a:c, b:c}; drag = {pd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; paintDragStat(); renderOverlay(); return;
+  }
+  if(tool === "water"){
+    const c = chunkAtEv(e); wdrag = {a:c, b:c};
+    drag = {wd:true, sx:e.clientX, sy:e.clientY, moved:false, hit:{kind:null, id:null}}; waterDragStat(); renderOverlay(); return;
   }
   if(tool === "exhibit" || tool === "bulldoze"){
     const gx = tool === "bulldoze" ? gateNear(e.clientX, e.clientY) : null;
@@ -2987,7 +2995,8 @@ svg.addEventListener("pointermove", e => {
   }
   if(!drag) return;
   if(drag.cd){ const c = chunkAtEv(e); drag.moved = true; if(cdrag && (c[0] !== cdrag.b[0] || c[1] !== cdrag.b[1])){ cdrag.b = c; pathDragStat(); renderOverlay(); } return; }
-  if(drag.pd){ const g = gridAt(e); if(pdrag && (g[0] !== pdrag.b[0] || g[1] !== pdrag.b[1])){ pdrag.b = g; paintDragStat(); renderOverlay(); } return; }
+  if(drag.pd){ const c = chunkAtEv(e); if(pdrag && (c[0] !== pdrag.b[0] || c[1] !== pdrag.b[1])){ pdrag.b = c; paintDragStat(); renderOverlay(); } return; }
+  if(drag.wd){ const c = chunkAtEv(e); if(wdrag && (c[0] !== wdrag.b[0] || c[1] !== wdrag.b[1])){ wdrag.b = c; waterDragStat(); renderOverlay(); } return; }
   if(drag.fd){
     if(fdrag.box){
       if(!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 6) return;
@@ -3036,6 +3045,7 @@ function endPointer(e){
   const d = drag; drag = null;
   if(d.cd){ if(cdrag) endPathDrag(); return; }
   if(d.pd){ if(pdrag) endPaintDrag(); return; }
+  if(d.wd){ if(wdrag) endWaterDrag(); return; }
   if(d.fd){ if(fdrag) endFenceDrag(); return; }
   if(d.pan){ if(d.moved) render(); return; }
   if(d.mv){ if(d.moved) dropMove(d.mv); return; }

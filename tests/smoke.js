@@ -2920,7 +2920,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rs = () => JSON.stringify(state.biomePaint.map(p => [p.biome, ...p.r]));
     paintRect(A, [x, y, x + 10, y + 10]);
     out.paintAdds = state.biomePaint.length === 1 && state.biomePaint[0].biome === A;
-    out.paintSnapsToGrid = (() => { const r = paintBox([x + .4, y + .4], [x + 5.6, y + 3.2]); return r.every(Number.isInteger) && r[2] - r[0] === 6 && r[3] - r[1] === 3; })();
+    out.paintSnapsToGrid = (() => { const r = paintBoxW([x + .4, y + .4], [x + 5.6, y + 3.2]); return r.every(v => v % 5 === 0) && r[2] - r[0] >= 5 && r[2] - r[0] <= 10 && r[3] - r[1] === 5; })();
     out.paintLeavesParkBiome = state.biome === undefined || state.biome === parkBiome();
     paintRect(B, [x + 2, y + 2, x + 6, y + 6]);
     out.paintCoversInPlace = state.biomePaint.length === 2 && paintAt(x + 3, y + 3).biome === B && paintAt(x + 8, y + 8).biome === A;
@@ -2971,11 +2971,22 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.vivNeverPainted = (() => { const v = {viv:"S", biome:"desert", points:[[0,0],[5,0],[5,5],[0,5]], animals:[]}; const k = state.biomePaint; state.biomePaint = [{id:"x", biome:"tropical", r:[0,0,5,5]}]; paintTouch(); const ok = biomeOf(v) === "desert"; state.biomePaint = k; paintTouch(); return ok; })();
     out.paintMenuAndTool = !!document.querySelector('#sideMenu [data-tool="paint"]');
     out.paintToolBar = (() => { setTool("paint"); const ok = document.querySelectorAll("#dSizes [data-pickbiome]").length === Object.keys(BIOMES).length + 1 && !$("#dSizes").hidden;
-      pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
-      const drawn = state.biomePaint.some(p => p.r.join() === [x + 20, y, x + 24, y + 3].join());
-      paintPick = "erase"; pdrag = {a:[x + 20, y], b:[x + 24, y + 3], wx:x + 20, wy:y}; endPaintDrag();
-      const gone = !paintAt(x + 21, y + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
+      const [pcx, pcy] = chunkAt(x + 20, y), px = pcx * 5, py = pcy * 5;
+      pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
+      const drawn = state.biomePaint.some(p => p.r.join() === [px, py, px + 10, py + 5].join());
+      paintPick = "erase"; pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
+      const gone = !paintAt(px + 1, py + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
     state.biomePaint = keep || []; paintTouch(); render();
+    out.waterChunks = (() => {
+      const kw = state.water; state.water = []; setTool("water");
+      const [cx, cy] = chunkAt(x, y);
+      wdrag = {a:[cx, cy], b:[cx + 1, cy]}; const sized = waterBox().r.join() === [cx * 5, cy * 5, cx * 5 + 10, cy * 5 + 5].join();
+      state.money = 1e7; endWaterDrag();
+      wdrag = {a:[cx + 2, cy], b:[cx + 2, cy]}; endWaterDrag();   // touches the first at its end and has the same height: they join
+      const joined = state.water.length === 1 && rectOfPts(state.water[0].points).join() === [cx * 5, cy * 5, cx * 5 + 15, cy * 5 + 5].join();
+      wdrag = {a:[cx, cy], b:[cx, cy]}; const over = !!waterBox().err; wdrag = null;
+      state.water = kw; setTool("select"); return sized && joined && over;
+    })();
 
     // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
     startWith(newPark(), false); setSpeed(0);

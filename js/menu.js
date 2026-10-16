@@ -34,7 +34,7 @@ const BUILD_MENU = [
     {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges and rope fences are only for show: guests like them, but they can't hold animals."},
   ]},
   {id:"land", label:"Landscaping", items:[
-    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Draw it like a fence: tap the shore corners, then the first one again. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
+    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Drag a box to lay it in 5 m chunks, like a path. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
     ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
     {label:"Paint Ground", tool:"paint", price:() => "Free in the park", note:"Drag a box to paint ground in another biome, pick the biome in the bar. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
