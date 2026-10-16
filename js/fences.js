@@ -168,6 +168,13 @@ const ownPieceCost = e => ownPieces(e).reduce((s, k) => s + pieceWorth(k, fenceP
 function releaseSides(e){ for(const t of ownSides(e)){ const p = fencePieces()[t.k]; fencePieces()[t.k] = mkPiece(pieceKind(p, !t.fwd)); } }
 
 /* ---------- checking a run ---------- */
+// Is this piece on a path chunk? Running along the edge of a path is fine; through it, or along an edge two path chunks share, is not.
+function pieceOnPath(k){
+  const [xs, ys, d] = k.split(","), x = +xs, y = +ys, C = pathChunks(), has = (cx, cy) => !!C[chunkKey(cx, cy)], cx = Math.floor(x / CHUNK), cy = Math.floor(y / CHUNK);
+  if(d === "d" || d === "a") return has(cx, cy);
+  if(d === "h") return y % CHUNK === 0 ? has(cx, cy - 1) && has(cx, cy) : has(cx, cy);
+  return x % CHUNK === 0 ? has(cx - 1, cy) && has(cx, cy) : has(cx, cy);
+}
 // Why one piece can't go here, or null. with: other pieces going down at the same time.
 function pieceSpotProblem(k, with_ = new Set()){
   const seg = pieceEnds(k), [x, y, d] = k.split(",");
@@ -176,12 +183,12 @@ function pieceSpotProblem(k, with_ = new Set()){
   if((d === "d" || d === "a") && (fencePieces()[other] || with_.has(other))) return "Two diagonal fences can't cross.";
   for(const e of state.exhibits){
     if(!e.grid){ if(lineEntersShape(seg, e.points) || (e.viv && lineShapeDist(seg, e.points) < .1)) return `It runs into ${e.name}.`; continue; }
-    if(waterOf(e).some(w => lineShapeDist(seg, w.points) < .3)) return `It runs into the water in ${e.name}.`;
+    if(waterOf(e).some(w => lineThroughShape(seg, w.points))) return `It runs into the water in ${e.name}.`;
     if(landOf(e).some(f => LAND[f.type] && lineDist(f.x, f.y, seg) < footR(LAND[f.type]) * .8)) return `It runs into something in ${e.name}. Bulldoze it first.`;
   }
   if(state.buildings.some(b => !b.exhibitId && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
-  if(state.paths.some(p => linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) return "It runs into a path.";
-  if(parkWater().some(w => lineShapeDist(seg, w.points) < .3)) return "It runs into water.";
+  if(state.paths.some(p => !p.d && (linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) || pieceOnPath(k)) return "It runs into a path.";
+  if(parkWater().some(w => lineThroughShape(seg, w.points))) return "It runs into water.";
   if(decorOf().some(f => LAND[f.type] && lineDist(f.x, f.y, seg) < footR(LAND[f.type]) * .8)) return "It runs into a plant, rock or statue.";
   if(fenceLines().some(l => linesCross(l.points, seg))) return "It runs into a fence.";
   if(lineDist(state.gate[0], state.gate[1], seg) < 8.5) return "Keep clear of the entrance.";
@@ -191,10 +198,10 @@ function pieceSpotProblem(k, with_ = new Set()){
 function faceProblem(f){
   if(!f.simple || f.nested) return "A pen inside another one has to share a wall with it.";
   const P = f.raw, inside = p => inPoly(p[0], p[1], P);
-  if(state.paths.some(p => p.points.some(inside))) return "That would fence in a path.";
+  if(state.paths.some(p => !p.d && p.points.some(inside)) || Object.keys(pathChunks()).some(k => { const [cx, cy] = chunkXY(k); return inside([(cx + .5) * CHUNK, (cy + .5) * CHUNK]); })) return "That would fence in a path.";
   if(state.buildings.some(b => !b.exhibitId && inside(centroid(b.points)))) return "That would fence in a building.";
   if(state.exhibits.some(e => !e.grid && inside(e.points[0]))) return "That would fence in another exhibit.";
-  if(parkWater().some(w => inside(w.points[0]))) return "That would fence in park water.";
+  if(parkWater().some(w => inside(centroid(w.points)))) return "That would fence in park water.";
   if(decorOf().some(f => inside([f.x, f.y]))) return "That would fence in a park plant, rock or statue. Bulldoze it first.";
   if(fenceLines().some(l => l.points.some(inside))) return "That would fence in another fence.";
   if(inside(state.gate)) return "That would fence in the entrance.";

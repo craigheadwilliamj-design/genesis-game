@@ -1405,6 +1405,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.fenceMeetFills = planPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}).why !== null && layPieces(pieceLine([400,150],[420,150]).keys, "wood", {meet:true}) === null && pieceType(fencePieces()["415,150,h"]) === "bars";
         L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
         for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
+        // fence may border a path or water but not run through it
+        const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
+        const why = k => planPieces([k], "wood").why;
+        out.fenceBordersPath = !why("400,150,h") && !why("400,155,h") && !why("400,152,v") && /path/.test(why("402,152,h") || "") && /path/.test(why("405,152,v") || "") && /path/.test(why("402,152,d") || "");
+        out.fenceBordersWater = !why("410,140,h") && !why("405,142,v") && !why("415,142,v") && /water/.test(why("410,142,h") || "") && /water/.test(why("410,142,d") || "");
+        for(const k of Object.keys(pc)) if(!(k in keepPc)) delete pc[k]; state.water = keepWater;
       }
       render(); out.fenceDraws = !!world.querySelector(`[data-id="${ge.id}"]`);
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, paths:keep.paths, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, money:keep.money, zones:keep.zones});
