@@ -1277,6 +1277,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       fenceSel = "hedge"; setTool("exhibit");
       const hp = layPieces(pieceLine([110,270],[180,270]).keys, "hedge");
       out.fenceToolOpen = !!hp && hp.n === 70 && looseRuns().some(r => r.b === "hedge" && dist(r.pts[0], r.pts[1]) === 70) && tool === "exhibit" && !!pathProblem([[150,262],[150,280]]);
+      const ringOpen = fenceJointsSvg(1).includes("#E08A2E"); tool = "select"; const ringShut = fenceJointsSvg(1).includes("#E08A2E"); tool = "exhibit";
+      out.decoRingOnlyWhileFencing = ringOpen && !ringShut;
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
       const pf = penFaces()[0]; const hedgePenRefused = penProblem(pf) === DECO_WHY + " Fence it with something strong first."; adoptPen(pf, pf.pts[0].slice());

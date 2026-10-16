@@ -329,20 +329,21 @@ function fenceRunSvg(pts, b, themed){
   if(b === "bars") s += `<polyline points="${p}" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" ${ns}/>`;
   return s;
 }
-// Makes connections readable at a glance: a dark footing line under every piece, a post cap where pieces meet, and an amber ring on each loose end that joins nothing (a gap or an unfinished pen)
+// Makes connections readable at a glance: a dark footing line under every piece, a post cap where pieces meet, and an amber ring on each loose end that joins nothing (a gap or an unfinished pen). Decoration fences (hedge, rope) don't need closing, so their loose ends only show the ring while the fence tool is open.
 function fenceJointsSvg(inv){
   const P = fencePieces(), keys = Object.keys(P); if(!keys.length) return "";
-  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), n2 = v => v.toFixed(2);
+  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), solid = new Set(), n2 = v => v.toFixed(2), fencing = tool === "exhibit";
   let foot = "", s = "";
   for(const k of keys){
     const [a, b] = pieceEnds(k), loose = !claimed.has(k);
     foot += `M${a[0]} ${a[1]}L${b[0]} ${b[1]}`;
-    for(const p of [a, b]){ const id = p[0] + "," + p[1], v = deg.get(id) || 0; deg.set(id, v + 1); (dirs.get(id) || dirs.set(id, new Set()).get(id)).add(k.split(",")[2]); if(loose) at.set(id, p); else if(!at.has(id)) at.set(id, null); }
+    const deco = BARRIERS[pieceType(P[k])].deco;
+    for(const p of [a, b]){ const id = p[0] + "," + p[1], v = deg.get(id) || 0; deg.set(id, v + 1); if(!deco) solid.add(id); (dirs.get(id) || dirs.set(id, new Set()).get(id)).add(k.split(",")[2]); if(loose) at.set(id, p); else if(!at.has(id)) at.set(id, null); }
   }
   s += `<path d="${foot}" fill="none" stroke="#1D2B22" stroke-opacity=".38" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   const r = Math.max(.28, 3.5 * inv);
   for(const [id, n] of deg){
-    const [x, y] = id.split(",").map(Number), open = n === 1 && at.get(id);
+    const [x, y] = id.split(",").map(Number), open = n === 1 && at.get(id) && (fencing || solid.has(id));
     if(open) s += `<circle cx="${x}" cy="${y}" r="${n2(r * 1.5)}" fill="#E08A2E" fill-opacity=".28" stroke="#E08A2E" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     else if(n > 2 || dirs.get(id).size > 1) s += `<rect x="${n2(x - r * .6)}" y="${n2(y - r * .6)}" width="${n2(r * 1.2)}" height="${n2(r * 1.2)}" fill="#1D2B22" fill-opacity=".7" pointer-events="none"/>`;
   }
