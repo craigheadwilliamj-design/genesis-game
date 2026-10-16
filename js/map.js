@@ -28,6 +28,7 @@ let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
 let wdrag = null;                   // water box being dragged: {a, b} (chunks, like paint)
+let waterPick = "auto";             // what the water tool lays: a WATER_TEX key (a water type), or "auto" for the biome's own water
 let pdrag = null;                   // biome paint box being dragged: {a, b} (grid points, js/biomepaint.js)
 let paintPick = null;               // what the paint tool does: a biome id, or "erase"
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
@@ -1189,7 +1190,7 @@ function renderOverlay(){
   }
   if(wdrag){
     const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
-    s += `<rect x="${b.r[0]}" y="${b.r[1]}" width="${b.r[2] - b.r[0]}" height="${b.r[3] - b.r[1]}" fill="${b.err ? c : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .55}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+    s += `<rect x="${b.r[0]}" y="${b.r[1]}" width="${b.r[2] - b.r[0]}" height="${b.r[3] - b.r[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? `url(#w-${b.look})` : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
@@ -2099,11 +2100,25 @@ function bulldozePaint(d){
 }
 
 /* ---------- laying water in chunks ---------- */
-function waterBar(){ showBar("Lay water", "Drag a box to lay water in 5 m chunks, like a path. Inside an open exhibit it's for the animals, out in the park guests enjoy it. Only wooden bridges cross water. Touching boxes of the same width join up.", "", {undo:false, finish:false, cancel:"Done"}); }
+// The water types to pick from: one for each biome with a water texture, plus the biome's own
+const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
+function waterBar(){
+  if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
+  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Bulldoze takes a box away.", "", {undo:false, finish:false, cancel:"Done"});
+  $("#dSizes").hidden = false;
+  $("#dSizes").innerHTML = `<button data-pickwater="auto" aria-pressed="${waterPick === "auto"}" title="The water that goes with the ground it's laid on">Own biome</button>`
+    + waterTypes().map(k => `<button data-pickwater="${k}" aria-pressed="${k === waterPick}" title="${esc(BIOMES[k].ground)}">${esc(BIOMES[k].label)}</button>`).join("");
+}
+$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickwater]"); if(b && tool === "water"){ waterPick = b.dataset.pickwater; waterBar(); renderOverlay(); } });
+// the kind (water type) a new box is laid with: undefined means the biome of where it goes
+const waterKindPick = () => waterPick !== "auto" && WATER_TEX[waterPick] ? waterPick : undefined;
 // the box being dragged: its meters, outline, the exhibit it's in (null: out in the park), price and why not
 function waterBox(){
-  const r = paintBox(wdrag.a, wdrag.b), pts = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), cost = waterCost(pts);
-  return {r, pts, host, cost, err:waterProblem(pts, host, null, cost)};
+  const r = paintBox(wdrag.a, wdrag.b), pts = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), kind = waterKindPick();
+  const cost = waterNetCost(host, pts, kind), same = waterCovered(host, pts, kind);
+  // the look of the ghost: the picked type, else the biome it would sit in
+  const look = kind || (host ? biomeOf(host) : parkBiome());
+  return {r, pts, host, kind, cost, same, look, err:same ? "That water is already there." : waterProblem(pts, host, null, cost, true)};
 }
 function waterDragStat(){
   if(!wdrag) return;
@@ -2112,10 +2127,10 @@ function waterDragStat(){
 }
 function endWaterDrag(){
   const b = waterBox(); wdrag = null; renderOverlay();
-  if(b.err){ setStat(b.err, true); ui.toast(b.err, "bad"); return; }
-  mergeWater(b.host, addWater(b.host, b.pts));
+  if(b.err){ setStat(b.err, true); if(!b.same) ui.toast(b.err, "bad"); return; }
+  layWater(b.host, b.pts, b.kind);
   setStat(""); afterChange(); render();
-  ui.toast(`Added ${fmtArea(area(b.pts))} of water to ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
+  ui.toast(`Laid ${fmtArea(area(b.pts))} of water in ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
