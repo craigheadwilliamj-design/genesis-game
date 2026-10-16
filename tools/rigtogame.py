@@ -27,6 +27,7 @@ def main():
     ap.add_argument("project"); ap.add_argument("id")
     ap.add_argument("--walk", help="name of the walk clip (a loop; one cycle of the stride)")
     ap.add_argument("--idle", nargs="+", help="name of the idle clip (played once now and then at its fps while the animal stands); give several names and they take turns at random (idle, idle2, ...)")
+    ap.add_argument("--stand", help="name of a standing clip (a loop played while the animal stands still; with it, the idle clips play now and then in its place)")
     ap.add_argument("--rest", help="name of the rest clip (played once when the animal settles to rest, then its last frame is held)")
     ap.add_argument("--swim", help="name of the swim clip (a loop played while the animal is in water: everything under the waterline is clipped away and ghosted, with ripples on it)")
     ap.add_argument("--waterline", type=int, default=40, help="the cell row of the waterline for the swim clip (rows above show, rows below are under water)")
@@ -70,6 +71,7 @@ def main():
     clips = {}
     if a.walk: clips["walk"] = {"frames": frames(a.walk)[1]}
     for i, name in enumerate(a.idle or []): fps, fr = frames(name); clips["idle" + (str(i + 1) if i else "")] = {"fps": fps, "frames": fr}
+    if a.stand: fps, fr = frames(a.stand); clips["stand"] = {"fps": fps, "frames": fr}
     if a.rest:
         fps, fr = frames(a.rest)
         clips["rest"] = {"fps": fps, "frames": fr[:a.rest_end + 1] if a.rest_end is not None else fr}
@@ -85,7 +87,7 @@ def main():
         if mark not in src: sys.exit("js/rigs.js has no marker line for the species data")
         src = src.replace(mark, mark + line + "\n", 1)
     open(path, "w").write(src)
-    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, idle {'+'.join(str(len(c['frames'])) for k, c in clips.items() if k.startswith('idle')) or 0} frames, rest {len(clips.get('rest', {}).get('frames', []))} frames, swim {len(clips.get('swim', {}).get('frames', []))} frames, js/rigs.js updated")
+    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, stand {len(clips.get('stand', {}).get('frames', []))} frames, idle {'+'.join(str(len(c['frames'])) for k, c in clips.items() if k.startswith('idle')) or 0} frames, rest {len(clips.get('rest', {}).get('frames', []))} frames, swim {len(clips.get('swim', {}).get('frames', []))} frames, js/rigs.js updated")
 
 if __name__ == "__main__":
     main()
