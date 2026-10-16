@@ -230,6 +230,9 @@ function ceresHtml(b){
     h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter(st / cap * 100, FOOD_COLOR.paleoflora)}<span>${Math.floor(st)}/${Math.round(cap)}</span></div>`;
     h += `<dl class="kv" style="margin-top:6px"><dt>Grows</dt><dd>${ceresRate()} a day</dd><dt>Greenhouses</dt><dd>${greenhouses().length} (+${PALEOFLORA.greenhouse} a day each)</dd><dt>Your animals eat</dt><dd style="color:${need > ceresRate() ? "var(--bad)" : "inherit"}">${need} a day</dd></dl>`;
     if(need > ceresRate()) h += `<div class="meta" style="color:var(--bad)">CERES can't keep up. ${hasTech("greenhouse") ? "Build greenhouses." : "Research greenhouses at ORACLE."} When it runs dry, keepers bring grass hay instead.</div>`;
+    const fg = CERES_GROW.food, fwhy = growProblem("food"), fq = growing("food");
+    h += `<ul class="shop" style="margin-top:8px"><li><span class="nm">Extra Paleoflora food</span><button class="buy" data-action="grow" data-kind="food" data-era="food"${fwhy ? ` disabled title="${esc(fwhy)}"` : ""}>Grow ${money(fg.cost)}</button><span class="need">A batch takes ${spanText(growMinutes("food"))} and adds ${fg.amount} to the stock.${fq ? ` <b>${fq} growing.</b>` : ""}</span>`;
+    h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="food" aria-pressed="${!!c.auto.food}" style="padding:3px 9px">${c.auto.food ? "Keeping it stocked" : "Keep it stocked"}</button> <span class="meta">${c.auto.food ? "A free bed starts a batch whenever there's room for more." : "Starts batches by itself when there's room."}</span></span></li></ul>`;
   }
   h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect CERES to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
 
