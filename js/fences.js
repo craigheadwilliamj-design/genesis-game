@@ -194,14 +194,19 @@ function pieceSpotProblem(k, with_ = new Set()){
   if(lineDist(state.gate[0], state.gate[1], seg) < 8.5) return "Keep clear of the entrance.";
   return null;
 }
+// Points that lie inside a body of water: its middle and each corner pulled a little toward it (a bent shore can put the middle outside, so only points really in the water count)
+function waterProbe(pts){ const c = centroid(pts); return [c, ...pts.map(p => [p[0] + (c[0] - p[0]) * .1, p[1] + (c[1] - p[1]) * .1])].filter(p => inPoly(p[0], p[1], pts)); }
+let faceProblemAt = null;   // where the last "would fence in" water was, for the map to ring
 // Why a region can't be fenced off, or null
 function faceProblem(f){
+  faceProblemAt = null;
   if(!f.simple || f.nested) return "A pen inside another one has to share a wall with it.";
   const P = f.raw, inside = p => inPoly(p[0], p[1], P);
   if(state.paths.some(p => !p.d && p.points.some(inside)) || Object.keys(pathChunks()).some(k => { const [cx, cy] = chunkXY(k); return inside([(cx + .5) * CHUNK, (cy + .5) * CHUNK]); })) return "That would fence in a path.";
   if(state.buildings.some(b => !b.exhibitId && inside(centroid(b.points)))) return "That would fence in a building.";
   if(state.exhibits.some(e => !e.grid && inside(e.points[0]))) return "That would fence in another exhibit.";
-  if(parkWater().some(w => inside(centroid(w.points)))) return "That would fence in park water.";
+  const drowned = parkWater().map(w => waterProbe(w.points).find(inside)).find(Boolean);   // any point of the water inside the pen means it is fenced in
+  if(drowned){ faceProblemAt = drowned; return "That would fence in park water. It is ringed on the map."; }
   if(decorOf().some(f => inside([f.x, f.y]))) return "That would fence in a park plant, rock or statue. Bulldoze it first.";
   if(fenceLines().some(l => l.points.some(inside))) return "That would fence in another fence.";
   if(inside(state.gate)) return "That would fence in the entrance.";
