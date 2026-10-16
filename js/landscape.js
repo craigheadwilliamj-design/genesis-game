@@ -248,6 +248,30 @@ function insideFence(pts, fence, m){
   }
   return !fence.some(p => inPoly(p[0], p[1], pts));
 }
+// Water drawn as chunk boxes is an axis-aligned rectangle: [x0, y0, x1, y1], else null
+function rectOfPts(p){
+  if(p.length !== 4) return null;
+  const sq = (p[0][0] === p[1][0] && p[1][1] === p[2][1] && p[2][0] === p[3][0] && p[3][1] === p[0][1]) || (p[0][1] === p[1][1] && p[1][0] === p[2][0] && p[2][1] === p[3][1] && p[3][0] === p[0][0]);
+  return sq ? [Math.min(p[0][0], p[2][0]), Math.min(p[0][1], p[2][1]), Math.max(p[0][0], p[2][0]), Math.max(p[0][1], p[2][1])] : null;
+}
+// Do two water shapes overlap? Two rectangles that only share an edge don't.
+function waterHit(a, b){
+  const ra = rectOfPts(a), rb = rectOfPts(b);
+  return ra && rb ? rectOverlap(ra, rb) : shapesOverlap(a, b) || shapesOverlap(b, a);
+}
+// Join a new rectangle of water to a neighbouring one of the same width or height in the same place, so the shore has no seam
+function mergeWater(e, w){
+  const list = e ? e.water : state.water;
+  for(let again = true; again;){
+    again = false;
+    const rw = rectOfPts(w.points); if(!rw) return w;
+    for(const o of list){
+      const ro = o !== w && rectOfPts(o.points), u = ro && paintUnion(ro, rw); if(!u) continue;
+      o.points = [[u[0], u[1]], [u[2], u[1]], [u[2], u[3]], [u[0], u[3]]]; list.splice(list.indexOf(w), 1); w = o; again = true; break;
+    }
+  }
+  return w;
+}
 // The open exhibit a new body of water starts in (null: out in the park)
 const waterHost = pts => pts.length ? state.exhibits.find(e => !e.viv && inPoly(pts[0][0], pts[0][1], e.points)) || null : null;
 // Why this water shape won't work in exhibit e (or out in the park, with no e), or null. skip is the water being reshaped; cost is what it would cost now.
@@ -257,7 +281,7 @@ function waterProblem(pts, e, skip, cost){
   if(selfCrosses(pts)) return "The shore crosses itself.";
   if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";
   if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
-  if(waterOf(e).some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
+  if(waterOf(e).some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && shapesOverlap(circlePts(f.x, f.y, footR(LAND[f.type])), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
@@ -272,7 +296,7 @@ function parkWaterProblem(pts, skip, cost){
   if(state.exhibits.some(e => shapesOverlap(pts, e.points) || shapesOverlap(e.points, pts))) return "It runs into an exhibit. Draw water for the animals inside the fence.";
   if(state.buildings.some(b => shapesOverlap(pts, b.points) || shapesOverlap(b.points, pts))) return "It runs into a building.";
   if(state.paths.some(p => !isBridge(p) && lineShapeDist(p.points, pts) < halfWidth(p))) return "It runs into a path. Only a wooden bridge can cross water.";
-  if(parkWater().some(w => w !== skip && (shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts)))) return "It overlaps other water.";
+  if(parkWater().some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && (inPoly(f.x, f.y, pts) || distToEdge(f.x, f.y, pts) < footR(LAND[f.type]) * .6))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(inPoly(state.gate[0], state.gate[1], pts) || distToEdge(state.gate[0], state.gate[1], pts) < 9) return "Keep clear of the entrance.";

@@ -10,8 +10,10 @@ const paintTouch = () => { paintVer++; };
 const rectOverlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 const rectCovers = (a, b) => a[0] <= b[0] && a[1] <= b[1] && a[2] >= b[2] && a[3] >= b[3];
 const rectArea = r => (r[2] - r[0]) * (r[3] - r[1]);
-// a rectangle between two grid points, as [x0, y0, x1, y1] snapped to the grid
-const paintBox = (a, b) => { const g = v => Math.round(v / GRID_STEP) * GRID_STEP; return [Math.min(g(a[0]), g(b[0])), Math.min(g(a[1]), g(b[1])), Math.max(g(a[0]), g(b[0])), Math.max(g(a[1]), g(b[1]))]; };
+// Paint and water go down in whole 5 m chunks, like paths. The box between two chunks (cx, cy), both included, as [x0, y0, x1, y1] in meters
+const paintBox = (a, b) => [Math.min(a[0], b[0]) * CHUNK, Math.min(a[1], b[1]) * CHUNK, (Math.max(a[0], b[0]) + 1) * CHUNK, (Math.max(a[1], b[1]) + 1) * CHUNK];
+// the same from two world points (every chunk the box touches)
+const paintBoxW = (a, b) => paintBox(chunkAt(a[0], a[1]), chunkAt(b[0], b[1]));
 // the part of a box over land the player owns, or null
 function paintClip(r){
   const b = ownedBox(), c = [Math.max(r[0], b.x0), Math.max(r[1], b.y0), Math.min(r[2], b.x1), Math.min(r[3], b.y1)];
