@@ -934,7 +934,7 @@ function camp34(bl, P, col, line){
 }
 
 // Solid fence sides on the far edge of an exhibit stand over the path behind them, so they cover a guest's legs there (guests are drawn above the whole world).
-// Each strip is {a, b, h}, a left to right; see-through fences (wood, bars, glass, ...) are left out.
+// Each strip is {a, b, up}: a left to right along its base, up the map y it stands (a fence's height, or a barn shelter's body to its roof). See-through fences (wood, bars, glass, ...) and open canopies are left out.
 let wall34 = [];
 function wallStrips34(){
   const out = [];
@@ -948,7 +948,13 @@ function wallStrips34(){
       let a = P[i], b = P[(i + 1) % P.length]; const o = off && off[i];
       if(o){ a = [a[0] + o[0], a[1] + o[1]]; b = [b[0] + o[0], b[1] + o[1]]; }
       if(a[0] > b[0]) [a, b] = [b, a];
-      if(b[0] - a[0] > .01) out.push({a, b, h:F.h});
+      if(b[0] - a[0] > .01) out.push({a, b, up:F.h / TILT});
+    }
+    for(const f of landOf(e)){   // a barn shelter's walls and roof, from its front edge up to its far eave and a bit of the ridge
+      const t = LAND[f.type];
+      if(!t || !t.slots || t.look || f.k) continue;
+      const h = t.r * .78;
+      out.push({a:[f.x - h, f.y + h], b:[f.x + h, f.y + h], up:2 * h + (t.r * .5 + t.r * .45 * .5) / TILT});
     }
   }
   return out;
@@ -958,7 +964,7 @@ function wallCut34(x, y){
   let cut = null;
   for(const w of wall34){
     if(x < w.a[0] || x > w.b[0]) continue;
-    const yb = w.a[1] + (w.b[1] - w.a[1]) * (x - w.a[0]) / (w.b[0] - w.a[0]), yt = yb - w.h / TILT;
+    const yb = w.a[1] + (w.b[1] - w.a[1]) * (x - w.a[0]) / (w.b[0] - w.a[0]), yt = yb - w.up;
     if(y < yb && y > yt && (cut === null || yt < cut)) cut = yt;
   }
   return cut;
