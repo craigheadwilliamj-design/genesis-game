@@ -2640,7 +2640,7 @@ function drawLoose(){
     const dx = p[0] - h.x, dy = p[1] - h.y, step = Math.hypot(dx, dy);
     h.x = p[0]; h.y = p[1];
     const spr = !!S && animalRadius(l.sp) * view.k >= 6, r = spr ? animalRadius(l.sp) : Math.max(2.5, 7*inv), moving = step > .002 && l.status === "loose";
-    h.r = r; h.act = null;
+    h.r = r; const sed = l.status === "sedated"; h.act = sed ? "rest" : null; if(!sed) h.restAt = null;   // a sedated animal lies down (its rest clip) until a keeper picks it up
     if(spr !== h.spr || (spr && Math.abs(r - h.rr) > 1e-6)){   // picture appears, vanishes or resizes with zoom: draw it again
       h.spr = spr; h.rr = r; h.pose = null; h.rg = null;
       h.el.innerHTML = spr ? spriteSvg(l.sp, h) : "";
@@ -2650,7 +2650,7 @@ function drawLoose(){
       if(moving){
         h.stride += step;
         if(rigOf(l.sp)) rigStep(h, "walk"); else if(S.walk) setPose(h, Math.floor(h.stride / (r * (S.step || .5))) % S.walk);
-      }else if(rigOf(l.sp)) rigStep(h, "idle"); else setPose(h, restPose(h, S));
+      }else if(rigOf(l.sp)) rigStep(h, sed ? "rest" : "idle"); else setPose(h, restPose(h, S));
     }
     h.wrap.setAttribute("transform", `translate(${p[0].toFixed(2)} ${p[1].toFixed(2)})${spr ? animalUp(h) : upright()}`);
     let m = "";
