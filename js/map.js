@@ -1438,7 +1438,7 @@ function vivHomeSpot(h, e, hm){
   return null;
 }
 
-function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6) * ANIMAL_SCALE; }
+function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
 function syncAnimals(){
   const seen = new Set(), inv = 1/view.k;
