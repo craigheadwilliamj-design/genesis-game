@@ -1230,6 +1230,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
     out.landMoves = lx.water[0].points[0][0] === 134 && lx.water[0].points[0][1] === 129 && lx.land[0].x === 120 && lx.points[0][0] === 110;
     moveBy(mv, 0, 0);
+    // water stays on the chunk grid: an exhibit with water moves in 5 m, and the Move tool has no corners on water
+    out.waterMoveStep = moveStep(mv) === CHUNK && moveStep({water:[]}) === GRID_STEP;
+    out.waterNotReshapable = reshapeables().every(x => x.t === x.e && !x.w);
+    // old water snaps to whole chunks: kept at half or more, cut to the fence, no money changes hands, and doing it twice changes nothing
+    const sv = JSON.parse(JSON.stringify(newPark())); delete sv.waterGrid5; sv.money = 777;
+    sv.exhibits = [{id:"e-u", name:"U", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], water:[{id:"w-a", points:[[103,103],[113,103],[113,111],[103,111]]}]}];
+    sv.water = [{id:"w-p", points:[[213,203],[222,203],[222,212],[213,212]]}];
+    upgradeSave(sv);
+    const snapped = JSON.stringify([sv.water.map(w => w.points), sv.exhibits[0].water.map(w => w.points)]);
+    out.waterUpgradeSnaps = sv.waterGrid5 === true && sv.money === 777 && sv.water.length === 1 && rectOfPts(sv.water[0].points).join() === "215,205,220,210" && sv.exhibits[0].water.length === 1 && rectOfPts(sv.exhibits[0].water[0].points).join() === "105,105,115,110";
+    upgradeSave(sv);
+    out.waterUpgradeOnce = JSON.stringify([sv.water.map(w => w.points), sv.exhibits[0].water.map(w => w.points)]) === snapped && newPark().waterGrid5 === true;
     // an outline that would leave something outside the fence is refused
     const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
     out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
@@ -1446,7 +1458,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
         for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
         // water inside an exhibit may sit flush against its fence, but not poke out
-        out.waterBordersFence = !waterProblem([[375,160],[380,160],[380,165],[375,165]], W) && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        out.waterBordersFence = waterProblem([[374.5,155],[379.5,155],[379.5,160],[374.5,160]], W) === null && /inside the fence/.test(waterProblem([[375,155],[380,155],[380,160],[375,160]], W) || "") && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        // a chunk that reaches the fence is cut to leave the bank; one wholly inside is kept; one wholly outside gives nothing
+        const wb = bbox(W.points), area0 = r => (r[2] - r[0]) * (r[3] - r[1]);
+        const inner = [wb.x0 + 2, wb.y0 + 2, wb.x0 + 7, wb.y0 + 7], edge = [wb.x1 - 3, wb.y0 + 2, wb.x1 + 2, wb.y0 + 7];
+        const cIn = waterClip(W, inner), cEdge = waterClip(W, edge);
+        out.waterClipKeepsInside = cIn.length === 1 && cIn[0].join() === inner.join();
+        out.waterClipCutsAtFence = cEdge.length === 1 && cEdge[0].join() === [edge[0], edge[1], wb.x1 - WATER.margin, edge[3]].join() && cEdge.every(q => waterProblem(rectPtsOf(q), W) === null);
+        out.waterClipOutsideEmpty = waterClip(W, [wb.x1 + 5, wb.y0, wb.x1 + 10, wb.y0 + 5]).length === 0 && waterClip(null, inner)[0].join() === inner.join();
+        // a fence that bends gives steps, every one of them valid water
+        const tri = {id:"e-tri", points:[[0,0],[40,0],[40,40]], water:[], land:[], animals:[]}, cTri = waterClip(tri, [20,0,25,5]).concat(waterClip(tri, [30,10,35,15]), waterClip(tri, [15,0,20,5]));
+        out.waterClipSlant = cTri.length > 1 && cTri.every(q => waterProblem(rectPtsOf(q), tri, null, 0) === null && area0(q) >= WATER.minArea) && waterClip(tri, [0,30,5,35]).length === 0;
         // fence may border a path or water but not run through it
         const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
         const why = k => planPieces([k], "wood").why;

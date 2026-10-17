@@ -376,7 +376,7 @@ function habitatScore(e){
 function insideFence(pts, fence, m){
   for(let i = 0; i < pts.length; i++){
     const a = pts[i], b = pts[(i + 1) % pts.length];
-    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!(m > 0 ? deepInside(x, y, fence, m) : inPoly(x, y, fence) || distToEdge(x, y, fence) < .02)) return false; }   // m 0: the shore may sit right on the fence
+    for(let k = 0; k < 8; k++){ const x = a[0] + (b[0] - a[0]) * k / 8, y = a[1] + (b[1] - a[1]) * k / 8; if(!(m > 0 ? inPoly(x, y, fence) && distToEdge(x, y, fence) >= m - .02 : inPoly(x, y, fence) || distToEdge(x, y, fence) < .02)) return false; }   // m 0: the shore may sit right on the fence
   }
   return !fence.some(p => inPoly(p[0], p[1], pts) && distToEdge(p[0], p[1], pts) > .02);
 }
@@ -475,6 +475,58 @@ function cutWater(host, r){
     list.splice(at + 1, 0, ...more); left.push(...more);
   }
   return {m2, left};
+}
+// A chunk box cut to what an exhibit's fence leaves for water: the cells (half a meter across) that sit wholly inside the fence with WATER.margin to spare,
+// joined into rectangles. A straight wall gives one box; a slanted one gives steps. Out in the park (no host) the box is kept as it is.
+function waterClip(e, r){
+  if(!e) return [r.slice()];
+  const C = .5, m = WATER.margin - .02, ok = (x, y) => inPoly(x, y, e.points) && distToEdge(x, y, e.points) >= m;
+  const nx = Math.round((r[2] - r[0]) / C), ny = Math.round((r[3] - r[1]) / C), done = [], open = new Map();   // open: "x0,x1" -> the box still growing downward
+  const pts = Array.from({length:ny + 1}, (_, j) => Array.from({length:nx + 1}, (_, i) => ok(r[0] + i * C, r[1] + j * C)));
+  for(let j = 0; j <= ny; j++){
+    const runs = [];
+    for(let i = 0; j < ny && i < nx; i++){
+      if(!(pts[j][i] && pts[j][i + 1] && pts[j + 1][i] && pts[j + 1][i + 1])) continue;
+      const t = runs[runs.length - 1]; if(t && t[1] === i) t[1] = i + 1; else runs.push([i, i + 1]);
+    }
+    const next = new Map();
+    for(const [a, b] of runs){ const k = a + "," + b, o = open.get(k); if(o){ o[3] = r[1] + (j + 1) * C; next.set(k, o); open.delete(k); } else next.set(k, [r[0] + a * C, r[1] + j * C, r[0] + b * C, r[1] + (j + 1) * C]); }
+    done.push(...open.values()); open.clear(); for(const [k, v] of next) open.set(k, v);
+  }
+  return done.filter(q => (q[2] - q[0]) * (q[3] - q[1]) >= WATER.minArea);
+}
+// Old saves: water drawn off the chunk grid becomes whole 5 m chunks. A chunk is kept when the body covers at least half of what the host leaves of it
+// (half the chunk in the park; half of the part inside the fence in an exhibit), then cut to the fence like newly laid water. s is the save, so this works before it is loaded.
+function snapWaterToGrid(s){
+  const C = .5, per = CHUNK / C, joinAll = list => {
+    for(let again = true; again;){
+      again = false;
+      for(const a of list) for(const b of list){
+        const ra = a !== b && a.kind === b.kind && rectOfPts(a.points), rb = ra && rectOfPts(b.points), u = rb && paintUnion(ra, rb); if(!u) continue;
+        a.points = rectPtsOf(u); list.splice(list.indexOf(b), 1); again = true; break;
+      }
+    }
+  };
+  for(const host of [null, ...s.exhibits.filter(e => !e.viv && Array.isArray(e.water))]){
+    const old = host ? host.water : s.water; if(!old.length) continue;
+    const chunks = new Map();
+    for(const w of old){
+      const xs = w.points.map(p => p[0]), ys = w.points.map(p => p[1]);
+      for(let cx = Math.floor(Math.min(...xs) / CHUNK); cx * CHUNK < Math.max(...xs); cx++) for(let cy = Math.floor(Math.min(...ys) / CHUNK); cy * CHUNK < Math.max(...ys); cy++){
+        let den = 0, num = 0;
+        for(let i = 0; i < per; i++) for(let j = 0; j < per; j++){
+          const x = cx * CHUNK + (i + .5) * C, y = cy * CHUNK + (j + .5) * C;
+          if(host && !inPoly(x, y, host.points)) continue;
+          den++; if(inPoly(x, y, w.points)) num++;
+        }
+        if(den && num * 2 >= den) chunks.set(cx + "," + cy, {cx, cy, kind:w.kind});
+      }
+    }
+    const fresh = [];
+    for(const {cx, cy, kind} of chunks.values()) for(const q of waterClip(host, [cx * CHUNK, cy * CHUNK, (cx + 1) * CHUNK, (cy + 1) * CHUNK])) fresh.push({id:uid("w-"), points:rectPtsOf(q), ...(kind ? {kind} : {})});
+    joinAll(fresh);
+    if(host) host.water = fresh; else s.water = fresh;
+  }
 }
 function layWater(e, pts, kind){
   const r = rectOfPts(pts), cost = waterNetCost(e, pts, kind);
@@ -1064,14 +1116,14 @@ function featSvg(f, biome, pick, isDead){
 }
 // in the 3/4 view things further north draw first, so a tree in front covers the one behind
 const byDepth = list => tilted() ? [...list].sort((a, b) => a.y - b.y) : list;
-// SVG for one exhibit's water, rocks, groves and shelters. When bulldozing they can be picked out one by one.
+// SVG for one exhibit's rocks, groves and shelters (its water is drawn by map.js under the fence). When bulldozing they can be picked out one by one.
 let openFence34 = new Map();   // open exhibit id -> its loose fence pieces {y, o, svg}, set each render in map.js so they sort among its plants and rocks
 function landSvg(e, pick, isDead){
-  if(!tilted()) return watersSvg(waterOf(e), biomeOf(e)) + byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
+  if(!tilted()) return byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
   const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
-  return watersSvg(waterOf(e), biomeOf(e)) + `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}</g>`;
+  return `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}</g>`;
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = () => watersSvg(parkWater(), parkBiome());

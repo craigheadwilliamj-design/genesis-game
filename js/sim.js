@@ -157,7 +157,7 @@ function newPark(){
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
-    exhibits:[], decor:[], water:[], fences:[], fenceGrid:{},
+    exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{},
     paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
@@ -268,6 +268,8 @@ function upgradeSave(s){
   // park landscaping: plants, rocks and statues (decor), water and open fences out in the park, and the ground the park is set in
   if(!BIOMES[s.biome]) s.biome = DEFAULT_PARK_BIOME;
   for(const k of ["decor", "water", "fences"]) if(!Array.isArray(s[k])) s[k] = [];
+  // water sits on the 5 m chunk grid (older water was drawn corner by corner, or moved in 1 m steps)
+  if(!s.waterGrid5){ snapWaterToGrid(s); s.waterGrid5 = true; }
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
   for(const b of s.buildings) if(BUILDINGS[b.type] && BUILDINGS[b.type].prop && b.rot === undefined) b.rot = 0;   // path objects: 45° turns the player gave them (see propart.js)
