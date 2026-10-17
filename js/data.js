@@ -1792,9 +1792,10 @@ const PLANT_SPRITES = {
 // Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
 const ROCK_MPP = .13;
-// Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each, n = 1..count. js/biomepaint.js lays them out at random on the 1 m grid
-// (a fixed pick per cell) and uses the result as the #p-<biome> pattern; a biome not listed keeps its sprites/ground/<biome>.png tile.
-const GROUND_TILES = {boreal:5};
+// Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each. Tile 1..plain are plain ground, the next `detail` tiles carry a mark (a twig, a stone).
+// js/biomepaint.js lays them out on the 1 m grid (a fixed pick per cell, turned and mirrored at random) and uses the result as the #p-<biome> and #b-<biome> patterns,
+// with `share` of the cells in each 5 m chunk (rounded at random) taking a detail tile. A biome not listed keeps its sprites/ground/<biome>.png tile.
+const GROUND_TILES = {boreal:{plain:1, detail:2, share:.1}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
