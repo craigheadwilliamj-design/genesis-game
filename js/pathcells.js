@@ -4,7 +4,7 @@
    with a kind: g guest path, s staff path, b wooden bridge. Lay two side by side and they merge into one wide path. A drag lays whole chunks
    along a straight or 45 degree run (pathRun, planPath, layPath), like the fence tool; a diagonal run adds a connecting chunk at each step so
    the chunks stay edge to edge. Everything snaps to the chunk grid. Tram track is not chunks: it stays in state.paths as lines.
-   state.pathFixed holds the chunk of the entrance walk, which can't be bulldozed.
+   state.pathFixed holds the one chunk at the gate, which can't be bulldozed (the rest of the entrance walk can).
    pathSquares() lists the chunks as squares for the renderer.
 
    Compatibility layer (until the navigation rework): the rest of the game still reads state.paths as lines, so syncPathStrips() derives
@@ -19,6 +19,7 @@ const pathChunks = () => state.pathChunks || (state.pathChunks = {});
 const pathFixedChunks = () => state.pathFixed || (state.pathFixed = {});
 const chunkXY = k => k.split(",").map(Number);
 const chunkAt = (wx, wy) => [Math.floor(wx / CHUNK), Math.floor(wy / CHUNK)];
+const gateChunk = (gate = state.gate) => chunkAt(gate[0], gate[1] - .5);   // the chunk just north of the gate, the one that can't be bulldozed
 const pathKind = (cx, cy) => pathChunks()[chunkKey(cx, cy)] || null;
 const pathAt = (wx, wy) => pathKind(Math.floor(wx / CHUNK), Math.floor(wy / CHUNK));
 const pathChunkCost = k => PATH_CELLS.kinds[k].perMeter * CHUNK;   // a chunk is 5 m of path
@@ -120,7 +121,7 @@ function layPath(a, b, kind){
   pathVer++;
   return {n:plan.todo.length, cost:plan.cost};
 }
-// Take chunks away (not the entrance walk); gives back the refund share of what each cost. One refund for the lot.
+// Take chunks away (not the chunk at the gate); gives back the refund share of what each cost. One refund for the lot.
 function removeChunks(keys){
   const C = pathChunks(), F = pathFixedChunks();
   let n = 0, back = 0, kept = 0;
@@ -198,10 +199,11 @@ function migratePaths(s){
   s.paths = s.paths.filter(p => p.type === "tram");
   pathVer++;
 }
-// The entrance walk of a new park: one chunk wide, from the chunk row by the gate (the gate is the middle of its chunk column) north to y 235
+// The entrance walk of a new park (only its chunk at the gate is fixed): one chunk wide, from the chunk row by the gate (the gate is the middle of its chunk column) north to y 235
 function mainWalkChunks(gate){
   const C = {}, F = {}, cx = Math.floor(gate[0] / CHUNK);
-  for(let cy = Math.floor(235 / CHUNK); cy * CHUNK < gate[1]; cy++){ C[chunkKey(cx, cy)] = "g"; F[chunkKey(cx, cy)] = 1; }
+  for(let cy = Math.floor(235 / CHUNK); cy * CHUNK < gate[1]; cy++) C[chunkKey(cx, cy)] = "g";
+  F[chunkKey(...gateChunk(gate))] = 1;
   return {C, F};
 }
 
@@ -232,7 +234,7 @@ function pathReach(){
   if(c && c.state === state && c.chunks === C && c.ver === pathVer && c.size === size && c.gate === state.gate[0] + "," + state.gate[1]) return c;
   const kindAt = new Map();
   for(const k in C){ const [x, y] = chunkXY(k); kindAt.set(cnum(x, y), C[k]); }
-  const [gx, gy] = chunkAt(state.gate[0], state.gate[1] - .5);
+  const [gx, gy] = gateChunk();
   const flood = guests => {
     const seen = new Set(), queue = [], s = cnum(gx, gy), k0 = kindAt.get(s);
     if(k0 && (!guests || guestCell(k0))){ seen.add(s); queue.push(s); }
