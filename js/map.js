@@ -24,7 +24,6 @@ let draw = null;                    // shape being drawn: {kind, pts, snaps, hov
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
 let rockBiome = null;               // biome tab a rock was picked from, so it's placed in that stone color (null: the exhibit's biome)
 let landGhost = null;               // rock, grove or shelter being placed: {key, x, y, ok, why}
-let doomed = null;                  // thing about to be bulldozed: {kind, id}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
 let wdrag = null;                   // water box being dragged: {a, b} (chunks, like paint)
@@ -152,7 +151,7 @@ function render(){
     s += `<path d="${wd}" fill="none" stroke="#4A4A42" stroke-width="1.3" stroke-linecap="butt" pointer-events="none"/><path d="${wd}" fill="none" stroke="#8C8C80" stroke-width=".5" transform="translate(0 -.4)" pointer-events="none"/><path d="${wd}" fill="none" stroke="#2E2E28" stroke-width=".4" stroke-dasharray="1.3 1.3" transform="translate(0 .4)" pointer-events="none"/>`;
   }
 
-  const isDoomed = (kind, id) => (doomed && doomed.kind === kind && doomed.id === id) || (tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id);
+  const isDoomed = (kind, id) => tool === "bulldoze" && hoverItem && hoverItem.kind === kind && hoverItem.id === id;
   const isSel = (kind, id) => sel && sel.kind === kind && sel.id === id;
 
   // work zones: a tinted wash and a dashed edge, under everything else
@@ -1948,7 +1947,7 @@ const drawType = () => draw && draw.kind === "tram" ? draw.kind : undefined;
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; doomed = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -2265,7 +2264,12 @@ function endFenceDrag(){
   const tookPath = box ? bulldozeChunks(box) : false;   // the chunks lit in the box go at once, with one refund and one toast
   if(!keys.length){ if(box && !tookPath) bulldozePaint(box); renderOverlay(); return; }
   if(lift){
-    askConfirm("Remove this fence?", "Animals inside can escape.", "Remove", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
+    // only a lift that opens a gap in a closed exhibit asks first
+    const lifted = new Set(keys.filter(k => fencePieces()[k]));
+    const hit = gridExhibits().filter(e => !e.open && loopPieces(e.points).some(k => lifted.has(k)));
+    if(!hit.length){ finishFenceDrag(keys, true); return; }
+    const names = hit.map(e => e.name), who = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names[names.length - 1] : names[0];
+    askConfirm(`Open a gap in ${who}?`, `Lifting this fence leaves a gap in ${who}. Animals inside can walk out until it's closed again.`, "Lift it", () => { if(keys.every(k => fencePieces()[k])) finishFenceDrag(keys, true); else renderOverlay(); });
     renderOverlay(); return;
   }
   finishFenceDrag(keys, false, opts);
@@ -2760,28 +2764,29 @@ function landTap(ev){
 
 /* ---------- bulldozing ---------- */
 function bulldozeTap(kind, id){
-  if(!kind){ doomed = null; setStat(""); render(); return; }
+  if(!kind){ setStat(""); render(); return; }
   if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
   const it = findItem(kind, id);
   if(!it) return;
   if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
+  bulldozeItem(kind, it);
+}
+
+// Bulldozing goes at once. Exhibits, staff buildings and big guest buildings ask first.
+const asksBulldoze = (kind, it) => kind === "building" && !!(BUILDINGS[it.type].dept || BUILDINGS[it.type].confirm);
+function bulldozeItem(kind, it){
   if(kind === "exhibit"){ confirmExhibitRemoval(it); return; }
-  if(!(doomed && doomed.kind === kind && doomed.id === id)){
-    doomed = {kind, id};
-    const refund = refundFor(kind, it);
-    const extra = kind === "exhibit" && it.animals.length ? ` Its ${it.animals.length} animal${it.animals.length === 1 ? "" : "s"} will be sold for ${money(it.animals.reduce((s,a) => s + SPECIES_BY_ID[a.sp].price * COST.animalResale, 0))}.` : "";
-    setStat(`Tap it again to remove it and get ${money(refund)} back.${extra}`, true);
-    render(); return;
-  }
-  removeItem(kind, it);
-  doomed = null; setStat("");
+  const go = () => { if(!findItem(kind, it.id)) return; const r = refundFor(kind, it); removeItem(kind, it); setStat(`Bulldozed for ${money(r)} back.`); };
+  if(!asksBulldoze(kind, it)){ go(); return; }
+  const t = BUILDINGS[it.type];
+  askConfirm(`Bulldoze ${t.label}?`, `This removes the ${t.label} from your park and gives back ${money(refundFor(kind, it))}. Are you sure?`, "Bulldoze", go);
 }
 
 // Exhibits hold animals, so bulldozing one asks first
 function confirmExhibitRemoval(e){
   askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
-    removeItem("exhibit", e); doomed = null; setStat("");
+    removeItem("exhibit", e); setStat("");
   }, "No");
 }
 
@@ -2789,7 +2794,7 @@ function confirmExhibitRemoval(e){
 function confirmGateRemoval(e){
   askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will sell all animals in it and everything inside, but the fence stays. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
-    removeItem("exhibit", e, {keepFence:true}); doomed = null; setStat("");
+    removeItem("exhibit", e, {keepFence:true}); setStat("");
   }, "No");
 }
 
