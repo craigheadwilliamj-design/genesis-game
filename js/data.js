@@ -1367,7 +1367,9 @@ const HAB = {
   groveFull:.06,   // share of the floor in groves from an animal's own era that fully satisfies it
   wrongPlants:8,   // happiness lost when plants from another biome fill as much floor as a full grove would
   groveBonus:6,    // happiness for animals with plenty of groves from their era
-  waterMax:.1,     // share of the floor an animal that loves water (likes 1) wants under water; less keen animals want proportionally less
+  waterDry:.05,    // share of the floor under water that animals from scrubland or desert want
+  waterBase:.08,   // ...that everyone else wants
+  waterSemi:.25,   // ...that semi-aquatic species (fish eaters) want
   waterBand:.2,    // no penalty within this share either side of what an animal wants
   rockBase:1,      // rocks a 500 m² exhibit of grassland wants for an animal with middling taste (likes .4); scaled by biome and by how much it likes rocks
   offEra:1/3,      // other periods' plants of the right biome can fill this share of the plant cover an animal wants
@@ -2258,6 +2260,8 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   gtod:"tropical temperate",  rmlo:"grassland scrubland",  sdel:"scrubland temperate",
 }).map(([id, b]) => [id, b.split(" ")]));
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
+// Share of an exhibit's floor a species wants under water: fish eaters most, scrubland and desert animals least
+const waterWant = s => s.diet.includes("piscivore") ? HAB.waterSemi : ["scrubland", "desert"].includes((biomesOf(s) || [])[0]) ? HAB.waterDry : HAB.waterBase;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
 //   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity}), and `center`: a thin painted dashed center line ({c, w, dash, o})
