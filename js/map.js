@@ -128,17 +128,9 @@ function render(){
   const pb = parkBiome();
   s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/><path d="${rd}" fill="var(--ground-shade)"/>`;
 
-  // painted biome ground, over the park ground and under the grid, paths, buildings and exhibits
+  // painted biome ground, over the park ground and under paths, buildings and exhibits
   s += paintSvg();
 
-  // grid: 10 m squares, darker every 50 m. Closer in, 5 m squares, then the 1 m snap grid.
-  const st = k > 7 ? GRID_STEP : k > 2.5 ? 5 : 10;
-  let dMin = "", dMaj = "";
-  // zoomed in on the 1 m grid, every 5 m line is the darker one
-  const maj = st === 1 ? 5 : 50;
-  for(let x = Math.floor(b.x0/st)*st; x <= b.x1; x += st){ const d = `M${x} ${b.y0}V${b.y1}`; if(x % maj === 0) dMaj += d; else dMin += d; }
-  for(let y = Math.floor(b.y0/st)*st; y <= b.y1; y += st){ const d = `M${b.x0} ${y}H${b.x1}`; if(y % maj === 0) dMaj += d; else dMin += d; }
-  s += `<g clip-path="url(#plotClip)" pointer-events="none"><path d="${dMin}" stroke="var(--grid)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/><path d="${dMaj}" stroke="var(--grid-major)" stroke-width="1" fill="none" vector-effect="non-scaling-stroke"/></g>`;
   const bd = ownedEdges().map(([p, q]) => `M${p[0]} ${p[1]}L${q[0]} ${q[1]}`).join("");
   // the southern edge (the entrance line) is a hard wall, open only at the entrance; the other edges stay a dashed property line
   const wall = [];
