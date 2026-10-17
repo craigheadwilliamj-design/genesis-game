@@ -161,7 +161,7 @@ function exhibitPaintCost(box, biome){
 /* ---- ground tiles ----
    A biome in GROUND_TILES has its #p-<biome> (park) and #b-<biome> (exhibit floor) patterns rebuilt from its 1 m tiles: a GROUND_SPAN m square, one tile in each 1 m cell.
    Each 5 m chunk takes about `share` of its cells (the ones with the lowest hash, so a fixed pick) for the detail tiles, and the rest get plain tiles. Every cell is also
-   turned a quarter-turn 0 to 3 times and mirrored at random. All picks are hashes of the cell, so nothing changes between draws or reloads. The pattern repeats every GROUND_SPAN m. */
+   turned a quarter-turn 0 to 3 times and mirrored at random, except tiles listed in `still`. All picks are hashes of the cell, so nothing changes between draws or reloads. The pattern repeats every GROUND_SPAN m. */
 const GROUND_SPAN = 100, GROUND_TILE_PX = 8;
 const cellHash = (x, y) => { let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
 // which tile (0-based) each cell of the GROUND_SPAN square shows, as a flat array
@@ -186,9 +186,9 @@ function buildGroundTiles(){
         const c = document.createElement("canvas"), px = GROUND_SPAN * GROUND_TILE_PX; c.width = c.height = px;
         const g = c.getContext("2d"), pick = groundPicks(T.plain, T.detail, T.share); g.imageSmoothingEnabled = false;
         for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
-          const o = cellHash(x + 7919, y + 104729) % 8, h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+          const t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919, y + 104729) % 8, h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
           g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
-          g.drawImage(tiles[pick[x * GROUND_SPAN + y]], -h, -h);
+          g.drawImage(tiles[t], -h, -h);
         }
         try {
           const url = c.toDataURL();
