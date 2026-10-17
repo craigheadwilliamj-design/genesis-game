@@ -160,7 +160,7 @@ function exhibitPaintCost(box, biome){
 
 /* ---- ground tiles ----
    A biome in GROUND_TILES has its #p-<biome> (park) and #b-<biome> (exhibit floor) patterns rebuilt from its 1 m tiles: a GROUND_SPAN m square, one tile in each 1 m cell, picked by a hash of the cell
-   (so it never changes between draws or reloads). The pattern repeats every GROUND_SPAN m, which is too far apart to notice. */
+   (so it never changes between draws or reloads), turned and mirrored at random. The pattern repeats every GROUND_SPAN m, which is too far apart to notice. */
 const GROUND_SPAN = 100, GROUND_TILE_PX = 8;
 const cellPick = (x, y, n) => { let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) % n; };
 function buildGroundTiles(){
@@ -173,7 +173,12 @@ function buildGroundTiles(){
         if(--left) return;
         const c = document.createElement("canvas"), px = GROUND_SPAN * GROUND_TILE_PX; c.width = c.height = px;
         const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
-        for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++) g.drawImage(tiles[cellPick(x, y, n)], x * GROUND_TILE_PX, y * GROUND_TILE_PX);
+        // each cell also gets a random quarter-turn (0 to 3) and mirror, so the same tile never shows the same shape twice in a row
+        for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
+          const o = cellPick(x + 7919, y + 104729, 8), h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2;
+          g.setTransform(Math.cos(a) * (o & 1 ? -1 : 1), Math.sin(a) * (o & 1 ? -1 : 1), -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
+          g.drawImage(tiles[cellPick(x, y, n)], -h, -h);
+        }
         try {
           const url = c.toDataURL();
           imgs.forEach(img => { img.setAttribute("href", url); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
