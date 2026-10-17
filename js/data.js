@@ -2099,7 +2099,7 @@ const SPRITE_HIT = {
   "rock-wetland-5":[41,29,16,17,",18-33,7-35,4-36,3-36,3-34,11-15"],
 };
 // SPRITE_HIT:end
-// Ground footprint of a plant, rock or boulder: a square of whole 1 m cells (landscape.js footBox). Each picture's side comes from its own sprite
+// Ground footprint of a plant, rock or boulder: a square of whole 1 m cells (landscape.js footBox). A pictured one's box ends at its base and runs back up the map. Each picture's side comes from its own sprite
 // (SPRITE_HIT), rounded to whole meters and held to its kind's range. side: key -> meters, to override one by hand.
 const FOOT = {
   range:{small:[1, 2], medium:[3, 5], large:[3, 3], rock:[2, 4], boulder:[6, 8]},

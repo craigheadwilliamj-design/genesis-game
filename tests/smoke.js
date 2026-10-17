@@ -1609,6 +1609,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.footOldSaveSnapped = sv.decor.every(f => footBox(f, null).every(v => Number.isInteger(v))) && sv.decor.every(f => Math.abs(f.x - ({o1:150, o2:150 + side0 - 1, o3:149, o4:160})[f.id]) <= 1.5 && Math.abs(f.y - ({o1:222, o2:222, o3:230, o4:230})[f.id]) <= 1.5);
       out.footOldSaveNoOverlap = boxes.every((a, i) => boxes.every((b, j) => i === j || !boxesHit(a, b)));
       const again = JSON.stringify(sv.decor); upgradeSave(sv); out.footOldSaveStable = JSON.stringify(sv.decor) === again;
+      // a plant or rock stands on its base: its box ends at its point (the ground in front stays free), and an old save slides each picture down so every box stays put
+      out.footStandsOnBase = footBased(key) && footBased("rock", "desert") && !footBased("rock", "nowhere") && [key, "dev-tropical-small", "rock"].every(k => { const [sx, sy] = footSnap(k, 0, "desert", 40.3, 50.6), b = footBoxAt(k, 0, "desert", sx, sy); return b[3] === sy && b.every(Number.isInteger) && b[2] - b[0] === b[3] - b[1]; });
+      { const sv2 = JSON.parse(JSON.stringify(state)), h0 = side0 / 2; delete sv2.footBase; sv2.decor = [{id:"m1", type:key, x:150 + (side0 % 2 ? .5 : 0), y:222 + (side0 % 2 ? .5 : 0)}];
+        const [f0] = sv2.decor, old = [f0.x - h0, f0.y - h0, f0.x + h0, f0.y + h0]; upgradeSave(sv2);
+        out.footOldSaveBoxesStay = sv2.footBase === 1 && JSON.stringify(footBox(sv2.decor[0], null)) === JSON.stringify(old) && sv2.decor[0].y === old[3];
+        const again2 = JSON.stringify(sv2.decor); upgradeSave(sv2); out.footOldSaveSlidesOnce = JSON.stringify(sv2.decor) === again2; }
     }
     // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
     const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
