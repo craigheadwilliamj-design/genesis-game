@@ -1358,7 +1358,7 @@ function animalUp(h){ return tilt ? `${upright()} translate(0 ${(-(h.r || 0) * (
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
 function spriteSvg(sp, h){
-  if(!h.viv && rigOf(sp) && !(h.swim && SPRITES[sp].swim && !rigSwims(sp))) return rigSvg(sp, h);   // drawn from parts, not a strip (rigs.js); a swimmer in a pond keeps its swim strip unless its rig has a swim clip
+  if(rigOf(sp) && !(h.swim && SPRITES[sp].swim && !rigSwims(sp))) return rigSvg(sp, h);   // drawn from parts, not a strip (rigs.js), a vivarium too; a swimmer in a pond keeps its swim strip unless its rig has a swim clip
   const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht * (S.foot || 1)).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
   return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${spriteUrl(`sprites/${sp}.png`)}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
     + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-${kind}.png`)}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
@@ -1494,7 +1494,9 @@ function walkArea(h, e){
     const r = t.r * (f.k || 1);
     // obstacles are rounded boxes: the box [x - hx, x + hx] x [y - hy, y + hy] grown by c (hx = hy = 0 is a circle)
     if(t.flora){   // a tree's trunk, a fifth of its square; low plants are walked through
-      if(t.look === "conifer" || treeLift(t)){ const h = Math.max(.5, footBox(f, e)[2] - f.x) * .36; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); }
+      if(t.look === "conifer" || treeLift(t)){
+        if(t.footW){ const b = footBox(f, e); obs.push({x:(b[0] + b[2]) / 2, y:(b[1] + b[3]) / 2, hx:(b[2] - b[0]) / 2, hy:(b[3] - b[1]) / 2, c:body}); }   // a pictured tree's base
+        else { const h = Math.max(.5, footBox(f, e)[2] - f.x) * .36; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); } }
     } else if(ROCK_TYPES.includes(f.type)){ const b = footBox(f, e), h = (b[2] - b[0]) / 2; obs.push({x:f.x, y:(b[1] + b[3]) / 2, hx:h, hy:h, c:body}); }   // a rock keeps off its whole square
     else {
       const R = t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : footR(t) * (f.k || 1) * .9;
@@ -1781,14 +1783,15 @@ function animateAnimals(dt){
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
     if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); if(e.viv) vivJump(h, e); }
-    // vivarium animals don't walk: they jump on a new act (vivJump) and cycle an idle strip if their picture has one (else the standing picture or dot)
+    // vivarium animals don't walk: they jump on a new act (vivJump) and play their rig, or cycle an idle strip if their picture has one (else the standing picture or dot)
     if(e.viv){
       const S = SPRITES[h.sp];
-      if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
+      if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle");   // a rig plays its stand loop and idle clips here like in the park
+      else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
       continue;
     }
     // an open-exhibit picture with an idle strip but no walk strip cycles the idle strip all the time, still or moving
-    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleOnlyFrame = () => setPose(h, idleFrame(h, S));
+    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle && !rigOf(h.sp), idleOnlyFrame = () => setPose(h, idleFrame(h, S));
     if(h.wait > 0){ h.wait -= dt; if(swimmingPic(h)) setPose(h, swimFrame(h, S)); else if(idleOnly) idleOnlyFrame(); else if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle"); else setPose(h, restPose(h, S)); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on

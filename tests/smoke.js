@@ -2279,6 +2279,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const fake = {r:3, sp:"plat", stride:0, face:1, el:document.createElementNS("http://www.w3.org/2000/svg", "g")};
       fake.el.innerHTML = rigSvg("plat", fake);
       out.rigSvg = fake.el.querySelectorAll(".spr .rig image").length === n;
+      // a vivarium draws rigs too, and its rig plays the stand loop
+      const vf = {r:3, sp:"comp", viv:true, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; vf.el.innerHTML = spriteSvg("comp", vf);
+      out.rigViv = vf.el.querySelectorAll(".spr .rig image").length === rigOf("comp").parts.length && (rigStep(vf, "idle"), vf.rg.mode === "idle" || String(vf.rg.mode).startsWith("idle"));
       // at rest each part sits where its joints add up
       const rest = new Float32Array(n * 3), m = new Float64Array(n * 6); rigMatrices(R, rest, m);
       const at = i => { let x = 0, y = 0; for(let q = i; q >= 0; q = R.parts[q].p){ x += R.parts[q].x; y += R.parts[q].y; } return [x, y]; };
@@ -2336,10 +2339,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const asleep = shownHeads(f6) === "COTY_HEAD_CLOSED";
       f6.stride = 1; f6.rg.last = performance.now() - 100; rigStep(f6, "walk");
       out.rigSwap = openAtFirst && asleep && shownHeads(f6) === "COTY_HEAD";
-      // switching rigs off draws the strips (and a vivarium always does: its picture stands, no rig), and back on restores them
+      // switching rigs off draws the strips (and a vivarium draws strips then too), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
-      setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
-      out.rigToggle = offOk && !!rigOf("plat") && spriteSvg("plat", {r:3, face:1}).includes('class="rig"') && viv.includes("sprites/plat.png") && !viv.includes('class="rig"') && localStorage.getItem("genesis-rigs") === "1";
+      const vivOff = (setRigs(false), spriteSvg("plat", {r:3, face:1, viv:true})); setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
+      out.rigToggle = offOk && vivOff.includes("sprites/plat.png") && !vivOff.includes('class="rig"') && !!rigOf("plat") && spriteSvg("plat", {r:3, face:1}).includes('class="rig"') && viv.includes('class="rig"') && localStorage.getItem("genesis-rigs") === "1";
 
       // bar fence pictures: broken at 0 condition, rusted below FENCE_LOOK.worn, pristine otherwise (and for loose fence with no condition)
       out.fenceState = fenceState(100) === "pristine" && fenceState(FENCE_LOOK.worn) === "pristine" && fenceState(FENCE_LOOK.worn - 1) === "degrading" && fenceState(.1) === "degrading" && fenceState(0) === "broken" && fenceState(undefined) === "pristine";
