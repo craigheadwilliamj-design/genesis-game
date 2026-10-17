@@ -25,7 +25,7 @@ Suggested order, easiest and most visible first: **grassland, tundra** (6 plants
 
 Do these in order. Each step has a preview, see "Check your work".
 
-1. **Ground tile.** `sprites/ground/<biome>.png`.
+1. **Ground tile.** `sprites/ground/<biome>.png`, or 1 m tiles (see 1b).
 2. **Rocks and boulders.** `sprites/rocks/{boulder,rock}-<biome>-<n>.png`.
 3. **Landscape plants.** `sprites/plants/<period3>-<biome>-<size>.png`, three sizes per period.
 4. **Park Plants.** `sprites/plants/q-<name>.png`.
@@ -44,6 +44,27 @@ Model: `wetland_tile` and `tile` in `tools/pixelground_flat.py`.
 - Register it in `index.html`: replace both `<pattern id="b-<biome>">` and `<pattern id="p-<biome>">` with
   `<pattern id="b-<biome>" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/<biome>.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>`.
 - Plants must stay readable on it. If the plants vanish, lower the ground's contrast.
+
+### 1b. Ground from 1 m tiles (boreal does this; use it for a biome when you want per-cell variety)
+
+Instead of one 18 m tile, a biome can be built from several 8 x 8 px tiles, each exactly 1 m (0.125 m a pixel). `buildGroundTiles` (end of `js/biomepaint.js`) lays them on the 1 m grid at random, so the 18 m repeat never shows. It replaces both the `#p-<biome>` (park ground and paint) and `#b-<biome>` (exhibit floor) patterns, so keep the old `sprites/ground/<biome>.png` and its `index.html` patterns in place as the fallback.
+
+**Files.** `sprites/ground/<biome>-1.png`, `-2.png`, ... 8 x 8 px, opaque. The first `plain` tiles are plain ground, the next `detail` tiles carry one small mark (a twig, a stone). Light is from the top left. Draw each tile so nothing runs off its edge, because tiles are placed, turned and mirrored at random.
+
+**Config.** One entry in `GROUND_TILES` (`js/data.js`): `{plain, detail, share, still}`.
+- `plain`: how many plain tiles (`-1` .. `-plain`). `detail`: how many marked tiles after them.
+- `share`: the fraction of cells in each 5 m chunk that take a detail tile. `.1` gives 2 or 3 of 25. Everything else is plain.
+- `still`: tile numbers that are never turned or mirrored, like a stone with a lit side. Leave it out if every tile can turn.
+- The boreal entry is `boreal:{plain:1, detail:2, share:.1, still:[3]}`.
+
+**Releasing or replacing PNGs.**
+1. Save them over `sprites/ground/<biome>-<n>.png` (same names to replace, new numbers to add). Delete any numbered tile you no longer use, so the pack stays small.
+2. If the count changed, update `plain` and `detail` in `GROUND_TILES`. Tiles are numbered from 1 with no gaps, plain ones first.
+3. Run `python3 tools/packsprites.py` and commit `js/spritepack.js`. Nothing else needs touching for a plain recolour or redraw.
+4. Look at it before wiring anything else: paint the biome over park ground and look at three zooms (see "Check your work"), in light mode and in dark mode, and compare the painted ground with an exhibit floor. They should be the same colour. A biome listed in `GROUND_TILES` skips the dark-mode dimming layer (`groundShade`, `js/biomepaint.js`) so park and exhibit match.
+5. Run `node tests/smoke.js`, commit, and publish. Publishing: list only the changed `js/*.js` plus `js/spritepack.js`. Never list PNGs.
+
+**What reads well.** At game zoom the ground should be calm: a flat base with a mark in about one cell in ten. Many small high-contrast specks turn into a visible lattice, and large clumps repeat noticeably. Keep marks to a few pixels and the contrast low.
 
 ### 2. Rocks and boulders
 
