@@ -948,18 +948,18 @@ function wallStrips34(){
       let a = P[i], b = P[(i + 1) % P.length]; const o = off && off[i];
       if(o){ a = [a[0] + o[0], a[1] + o[1]]; b = [b[0] + o[0], b[1] + o[1]]; }
       if(a[0] > b[0]) [a, b] = [b, a];
-      if(b[0] - a[0] > .01) out.push({a, b, up:F.h / TILT});
+      if(b[0] - a[0] > .01) out.push({a, b, x0:a[0], x1:b[0], up:F.h / TILT});
     }
     for(const f of landOf(e)){   // a barn, cave or burrow, from its front edge up to its far eave and a bit of the ridge
       const t = LAND[f.type];
       if(!t || !t.slots || f.k || t.look === "canopy") continue;
-      if(t.look === "cave" || t.look === "burrow"){   // a lumpy mound: the blob (a bit narrower than its radius at the sides) stacked up to the top
-        const r = t.look === "burrow" ? t.r * .8 : t.r;
-        out.push({a:[f.x - r * .85, f.y + r], b:[f.x + r * .85, f.y + r], up:2 * r + r * .85 / TILT});
+      if(t.look === "cave" || t.look === "burrow"){   // the lumpy outline rock34 draws, swept up by the mound's height
+        const r = t.look === "burrow" ? t.r * .8 : t.r, P = blobPts(f.x, f.y, r, seedOf(f), true);
+        out.push({x0:Math.min(...P.map(q => q[0])), x1:Math.max(...P.map(q => q[0])), P, up:r * .85 / TILT});
         continue;
       }
       const h = t.r * .78;
-      out.push({a:[f.x - h, f.y + h], b:[f.x + h, f.y + h], up:2 * h + (t.r * .5 + t.r * .45 * .5) / TILT});
+      out.push({x0:f.x - h, x1:f.x + h, a:[f.x - h, f.y + h], b:[f.x + h, f.y + h], up:2 * h + (t.r * .5 + t.r * .45 * .5) / TILT});
     }
   }
   return out;
@@ -968,8 +968,21 @@ function wallStrips34(){
 function wallCut34(x, y){
   let cut = null;
   for(const w of wall34){
-    if(x < w.a[0] || x > w.b[0]) continue;
-    const yb = w.a[1] + (w.b[1] - w.a[1]) * (x - w.a[0]) / (w.b[0] - w.a[0]), yt = yb - w.up;
+    if(x < w.x0 || x > w.x1) continue;
+    let yt, yb;
+    if(w.P){   // a mound: its outline's highest and lowest y at this x
+      yt = Infinity; yb = -Infinity;
+      for(let i = 0, n = w.P.length; i < n; i++){
+        const p = w.P[i], q = w.P[(i + 1) % n];
+        if((p[0] <= x) === (q[0] <= x)) continue;
+        const yy = p[1] + (q[1] - p[1]) * (x - p[0]) / (q[0] - p[0]);
+        if(yy < yt) yt = yy;
+        if(yy > yb) yb = yy;
+      }
+      if(yt === Infinity) continue;
+      yt -= w.up;
+    }
+    else{ yb = w.a[1] + (w.b[1] - w.a[1]) * (x - w.a[0]) / (w.b[0] - w.a[0]); yt = yb - w.up; }
     if(y < yb && y > yt && (cut === null || yt < cut)) cut = yt;
   }
   return cut;
