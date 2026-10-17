@@ -1358,13 +1358,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // a small loop is just a pen, not an exhibit
       L([300,100],[305,100]); L([305,100],[305,105]); L([305,105],[300,105]); L([300,105],[300,100]);
       out.fenceSmallPen = state.exhibits.length === 2;
-      // lifting fence with Bulldoze asks first; Cancel leaves it, Remove lifts it
+      // lifting loose fence with Bulldoze goes at once, with no question
       L([380,60],[381,60]);
-      const lk = "380,60,h", liftDrag = () => { fdrag = {lift:true, swept:new Set([lk])}; endFenceDrag(); };
-      liftDrag(); const askedLift = $("#dlgConfirm").open && /fence/i.test($("#confirmTitle").textContent) && !!fencePieces()[lk];
-      $("#confirmNo").click(); const keptLift = !fencePieces()[lk] ? false : !$("#dlgConfirm").open;
-      liftDrag(); $("#confirmYes").click();
-      out.fenceLiftConfirm = askedLift && keptLift && !fencePieces()[lk];
+      const liftDrag = k => { fdrag = {lift:true, swept:new Set([k])}; endFenceDrag(); };
+      liftDrag("380,60,h");
+      out.fenceLiftNoAsk = !$("#dlgConfirm").open && !fencePieces()["380,60,h"];
       // bulldozing an exhibit lifts the fence it doesn't share, and refunds it
       const before = Object.keys(state.fenceGrid).length, r = refundFor("exhibit", de);
       const mb = state.money; removeItem("exhibit", de);
@@ -1374,10 +1372,40 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ge2 = state.exhibits.find(e => e !== ge), np = Object.keys(state.fenceGrid).length, mg = state.money;
       removeItem("exhibit", ge2, {keepFence:true});
       out.fenceGateRemoval = !state.exhibits.includes(ge2) && Object.keys(state.fenceGrid).length === np && penFaces().length === 1 && state.money > mg;
+      // bulldozing goes on the first click; staff buildings and big guest buildings ask first
+      {
+        const dlg = $("#dlgConfirm"), add = (id, type, x) => { const b = {id, type, points:rectPts(x, 330, BUILDINGS[type].w, BUILDINGS[type].d, 0)}; state.buildings.push(b); return b; }, has = id => !!findItem("building", id);
+        add("b-bz1", "bin", 20); bulldozeTap("building", "b-bz1");
+        out.bulldozeOneTap = typeof doomed === "undefined" && !dlg.open && !has("b-bz1");
+        add("b-bz2", "bench", 30); select("building", "b-bz2"); ui.panel();
+        const btn = panelEl.querySelector('[data-action="demolish"]'); if(btn) btn.click();
+        out.bulldozePanelOneTap = !!btn && !dlg.open && !has("b-bz2") && !panelEl.querySelector("[data-armed]");
+        let asks = true;
+        for(const [id, type] of [["b-bz3", "station"], ["b-bz4", "restaurant"], ["b-bz5", "lodge"]]){
+          add(id, type, 60); bulldozeTap("building", id);
+          const asked = dlg.open && has(id); $("#confirmNo").click(); const kept = !dlg.open && has(id);
+          bulldozeTap("building", id); $("#confirmYes").click();
+          asks = asks && asked && kept && !has(id);
+        }
+        out.bulldozeAsks = asks && ["lodge", "resort", "campground", "restaurant", "edcenter"].every(t => BUILDINGS[t].confirm === true) && !BUILDINGS.bench.confirm;
+      }
       // the move tool leaves grid exhibits alone; saves keep the pieces
       out.fenceNoMove = moveTarget({kind:"exhibit", id:ge.id}) === null;
       const ob = JSON.parse(JSON.stringify(state)); delete ob.fenceGrid;
       out.fenceSave = Object.keys(upgradeSave(ob).fenceGrid).length === 0 && Object.keys(upgradeSave(JSON.parse(JSON.stringify(state))).fenceGrid).length === Object.keys(state.fenceGrid).length;
+      // lifting fence that opens a gap in a closed exhibit asks first, naming it; No keeps it, Yes lifts it
+      {
+        const had = new Set(state.exhibits); box(340,180,350,190); gatePens();
+        const bx = state.exhibits.find(e => !had.has(e) && e.grid && inPoly(345, 185, e.points)), bk = "340,180,h";
+        if(bx){
+          bx.name = "Breach Test";
+          liftDrag(bk); const asked = $("#dlgConfirm").open && /Breach Test/.test($("#confirmTitle").textContent) && !!fencePieces()[bk];
+          $("#confirmNo").click(); const kept = !$("#dlgConfirm").open && !!fencePieces()[bk] && !bx.open;
+          liftDrag(bk); $("#confirmYes").click();
+          out.fenceBreachConfirm = asked && kept && !fencePieces()[bk] && !!bx.open;
+          removeItem("exhibit", bx);
+        } else out.fenceBreachConfirm = false;
+      }
       // two pens side by side share a wall, and each side of it can be its own fence
       {
         box(370,150,380,165); box(380,150,390,165); gatePens();   // 10 x 15 each: 150 m2

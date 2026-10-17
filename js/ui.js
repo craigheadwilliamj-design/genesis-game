@@ -902,13 +902,7 @@ panelEl.addEventListener("click", e => {
     afterChange(); render();
   }
   if(a === "demolish"){
-    if(sel.kind === "exhibit"){ confirmExhibitRemoval(it); return; }
-    if(b.dataset.armed !== "1"){
-      b.dataset.armed = "1"; const orig = b.textContent; b.textContent = "Tap again to bulldoze";
-      setTimeout(() => { if(b.isConnected){ b.dataset.armed = ""; b.textContent = orig; } }, 3000);
-      return;
-    }
-    removeItem(sel.kind, it);
+    bulldozeItem(sel.kind, it);
   }
 });
 panelEl.addEventListener("input", e => {
