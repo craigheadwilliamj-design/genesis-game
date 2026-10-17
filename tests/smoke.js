@@ -9,7 +9,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
   const page = await browser.newPage();
   const errors = [];
-  page.on("pageerror", e => errors.push(String(e)));
+  page.on("pageerror", e => errors.push(String(e.stack||e)));
   // Google Fonts can't load in sandboxes; ignore network errors for it
   page.on("console", m => { if(m.type() === "error" && !/ERR_CERT|net::/.test(m.text())) errors.push(m.text()); });
   await page.goto("file://" + path.resolve(__dirname, "../index.html"));
@@ -94,7 +94,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         JSON.stringify(upgradeSave({...JSON.parse(JSON.stringify(state)), parcels:undefined}).parcels) === "[]";
       state.parcels = keep; state.money = m0;
     }
-    // S33: nothing for sale south of the entrance, a hard southern barrier, a 15-plot cap, old saves keep their land
+    // S33: nothing for sale south of the entrance, a hard southern barrier, a rising price per plot, old saves keep their land
     {
       const m0 = state.money, keep = state.parcels.slice(); state.money = 1e9;
       const south = PARCEL_CELLS.filter(([i, j]) => parcelRect(i, j)[3] > state.gate[1]);
@@ -105,10 +105,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         !!pathProblem([[200,290],[200,320]], "path") && !!decorProblem(Object.keys(LAND).find(k => k.startsWith("q-")), 200, 312) ;
       out.southEdgeWall = ownedEdges().every(([p, q]) => p[1] <= state.gate[1] && q[1] <= state.gate[1]);
       state.parcels = [];
-      // buy outward from the home plot until the cap
-      for(let pass = 0; pass < 20 && state.parcels.length < MAX_PARCELS; pass++) for(const [i, j] of SALE_CELLS) if(state.parcels.length < MAX_PARCELS && !ownsParcel(i, j) && !parcelProblem(i, j)) buyParcel(i, j);
-      const left = SALE_CELLS.find(([i, j]) => !ownsParcel(i, j) && parcelTouches(i, j)), why16 = left ? parcelProblem(left[0], left[1]) : "";
-      out.parcelCap = state.parcels.length === MAX_PARCELS && !!left && /allowed/.test(why16) && !buyParcel(left[0], left[1]) && state.parcels.length === MAX_PARCELS;
+      // no cap: buy past 15 plots, each costing more than the same plot would with fewer owned
+      for(let pass = 0; pass < 20 && state.parcels.length < 16; pass++) for(const [i, j] of SALE_CELLS) if(state.parcels.length < 16 && !ownsParcel(i, j) && !parcelProblem(i, j)) buyParcel(i, j);
+      const next = SALE_CELLS.find(([i, j]) => !ownsParcel(i, j) && parcelTouches(i, j)), pHigh = next ? parcelPrice(next[0], next[1]) : 0, kept = state.parcels; state.parcels = [];
+      const pLow = next ? parcelPrice(next[0], next[1]) : 0; state.parcels = kept;
+      out.parcelCap = state.parcels.length === 16 && !!next && pHigh > pLow && !parcelProblem(next[0], next[1]);
       // an old save that owns south land keeps it
       state.parcels = [parcelId(2, 5), parcelId(2, 6)];
       const old = upgradeSave(JSON.parse(JSON.stringify(state)));
