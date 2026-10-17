@@ -211,9 +211,12 @@ function upgradeSave(s){
     const m = mainWalkChunks(s.gate);
     s.pathFixed = m.F;
     for(const k in m.C) s.pathChunks[k] = "g";
-  } else if(!Object.keys(s.pathFixed).length || Object.keys(s.pathFixed).some(k => !s.pathChunks[k])){
+  } else if(!Object.keys(s.pathFixed).length){   // a save that never had a walk gets one; a walk the player bulldozed stays gone
     const m = mainWalkChunks(s.gate); s.pathFixed = m.F;
     for(const k in m.C) s.pathChunks[k] = "g";
+  } else {
+    const m = mainWalkChunks(s.gate); s.pathFixed = m.F;
+    for(const k in m.F) s.pathChunks[k] = s.pathChunks[k] || "g";
   }
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());

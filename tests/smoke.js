@@ -1793,7 +1793,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const nch = () => Object.keys(state.pathChunks).length;
       // the entrance walk is one chunk wide, centered under the entrance
       const wk = Object.keys(state.pathFixed).map(chunkXY);
-      out.chunksDefaultWalk = nch() === 14 && wk.length === 14 && wk.every(([cx]) => cx === 41) && Math.min(...wk.map(c => c[1])) === 47 && Math.max(...wk.map(c => c[1])) === 60
+      out.chunksDefaultWalk = nch() === 14 && wk.length === 1 && wk[0][0] === 41 && wk[0][1] === 60 && Math.min(...Object.keys(state.pathChunks).map(k => chunkXY(k)[1])) === 47
         && state.gate[0] === 207.5 && state.gate[0] === 41 * CHUNK + CHUNK / 2 && state.gate[1] === SOUTH_LINE && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0;
       out.entranceAligned = state.gate[0] === ENTRANCE_X && chunkAt(state.gate[0] - 2.4, 300)[0] === 41 && chunkAt(state.gate[0] + 2.4, 300)[0] === 41 && pathAt(state.gate[0], state.gate[1] - 1) === "g";
       out.platesOnGrid = [...PARCELS.xs, ...PARCELS.ys, ...PARCELS.home, ...LEGACY_SOUTH_YS, ...PARK_PLOT.flat()].every(v => v % CHUNK === 0);
@@ -1813,7 +1813,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && dp.chunks.every(k => { const [x, y] = chunkXY(k); return dp.chunks.some(j => { const [u, v] = chunkXY(j); return Math.abs(u - x) + Math.abs(v - y) === 1; }); });
       layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
       out.chunkDiagJoined = chunksJoined(dp.chunks, true) && chunkReached(56, 41, true) && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
-      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 14;
+      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 1;
       // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
       state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
       const pe = planPath([58, 21], [66, 21], "g");
@@ -1837,10 +1837,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const litN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="var\(--bad\)" fill-opacity="\.45"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
       endFenceDrag();
       out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare) && /Removed 3 path chunks, refunded \$/.test(toasted);
-      const c2 = nch(); boxAt([207.5, 280], [207.5, 280]); endFenceDrag();
-      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,56"];
-      boxAt([200, 270], [215, 300]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
-      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,56"];
+      const c2 = nch(); boxAt([207.5, 303], [207.5, 303]); endFenceDrag();
+      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,60"];
+      boxAt([200, 300], [215, 304]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
+      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,60"];
       ui.toast = toastKeep; setTool("select");
       // the same through real pointer events: drag the path tool, then drag a bulldoze box that lights the chunks as it grows
       {
@@ -1899,15 +1899,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       upgradeSave(oldC);
       const cnt = k => Object.keys(oldC.pathChunks).filter(k).length;
       out.chunkMigrateCells = !oldC.pathCells && oldC.gate[0] === 207.5 && oldC.gate[1] === 305 && oldC.pathChunks["41,47"] === "g" && oldC.pathChunks["42,47"] === "g" && !oldC.pathChunks["42,46"] && !oldC.pathChunks["40,56"] && oldC.pathChunks["41,60"] === "g" && !oldC.pathChunks["41,61"]
-        && Object.keys(oldC.pathFixed).length === 14 && Object.keys(oldC.pathFixed).every(k => /^41,/.test(k)) && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
+        && Object.keys(oldC.pathFixed).join() === "41,60" && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
         && cnt(k => oldC.pathChunks[k] === "s") === 20;
       const againC = upgradeSave(JSON.parse(JSON.stringify(oldC)));
-      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).length === 14;
+      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).join() === "41,60";
       // old saves from line paths (tram stays a line)
       const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathChunks; delete oldS.pathFixed; oldS.gate = [205, 305];
       oldS.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o1", points:[[205,235],[300,235]]}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}, {id:"p-o3", type:"wide", points:[[250,200],[250,150]]}, {id:"p-o4", type:"bridge", points:[[300,235],[300,200]]}, {id:"p-tr", type:"tram", points:[[250,312],[480,312]]}, {id:"x", d:1, points:[[0,0],[5,0]]}];
       upgradeSave(oldS);
-      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).length === 14
+      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).join() === "41,60"
         && oldS.pathChunks["50,47"] === "g" && oldS.pathChunks["35,50"] === "s" && oldS.pathChunks["49,35"] === "g" && oldS.pathChunks["50,35"] === "g" && !oldS.pathChunks["48,35"] && !oldS.pathChunks["51,35"]
         && Object.keys(oldS.pathChunks).some(k => oldS.pathChunks[k] === "b") && !Object.keys(oldS.pathChunks).some(k => chunkXY(k)[1] >= 61) && oldS.gate[0] === 207.5;
       // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
@@ -1919,6 +1919,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.chunkStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
       render();
       out.chunkRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
+      // the entrance walk can be bulldozed except the chunk at the gate, and a reload doesn't bring it back
+      {
+        const W = mainWalkChunks(state.gate);
+        state.pathChunks = Object.assign({}, W.C); state.pathFixed = Object.assign({}, W.F); state.paths = state.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+        const wb = {a:[207.5, 235], b:[207.5, 304]};
+        const r = removeChunks(chunksInBox(wb.a, wb.b)); pathVer++;
+        out.walkBulldoze = r.n === 13 && r.kept === 1 && nch() === 1 && state.pathChunks["41,60"] === "g" && bulldozeChunkKeys(wb).length === 0;
+        const reloaded = upgradeSave(JSON.parse(JSON.stringify(state)));
+        out.walkStaysGone = Object.keys(reloaded.pathChunks).join() === "41,60" && Object.keys(reloaded.pathFixed).join() === "41,60";
+        const lost = JSON.parse(JSON.stringify(state)); delete lost.pathFixed; lost.pathChunks = {}; upgradeSave(lost);
+        out.walkSeedsWhenNone = Object.keys(lost.pathChunks).length === 14 && Object.keys(lost.pathFixed).join() === "41,60";
+        let threw = null;
+        try { recompute(); buildGuestGraph(); buildKeeperGraph(); resetParties(); guestsArrive(4); for(let i = 0; i < 5; i++) guestsTick(state.minute + i, state.minute + i + 1); } catch(e){ threw = e; }
+        out.walkNoPathNoCrash = !threw && parties.length > 0;
+        const j0 = layPath([41, 59], [41, 50], "g");
+        recompute(); buildGuestGraph(); buildKeeperGraph();
+        out.walkRelaidFromGate = !!j0 && chunkReached(41, 50, true) && derived.joined.size > 0 && !!gGraph.anchors.gate;
+        resetParties();
+      }
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
       pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
     }
@@ -1928,7 +1947,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
       state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
       state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = [];   // no loose lines from earlier checks
-      const reset = () => { state.pathChunks = {}; for(const k in state.pathFixed) state.pathChunks[k] = "g"; pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
+      const reset = () => { state.pathChunks = Object.assign({}, mainWalkChunks(state.gate).C); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
       const redo = () => { recompute(); buildGuestGraph(); buildKeeperGraph(); };
       const G = (x, y) => chunkReached(x, y, true), S = (x, y) => chunkReached(x, y, false);
       reset();

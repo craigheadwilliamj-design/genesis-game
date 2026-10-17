@@ -2318,17 +2318,17 @@ function endPathDrag(){
   const joined = chunksJoined(d.plan.todo, d.kind !== "s");
   ui.toast(joined ? `Laid ${r.n} chunk${r.n === 1 ? "" : "s"} of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
 }
-// The chunks a bulldoze box (or tap) takes: the lit ones, never the entrance walk
+// The chunks a bulldoze box (or tap) takes: the lit ones, never the chunk at the gate
 function bulldozeChunkKeys(box){ const F = pathFixedChunks(); return chunksInBox(box.a, box.b).filter(k => !F[k]); }
 // Bulldoze on bare ground: a tap takes the chunk under it, a box takes every chunk it touches. Returns true if it dealt with path.
 function bulldozeChunks(box){
   const all = chunksInBox(box.a, box.b);
   if(!all.length) return false;
   const r = removeChunks(all);
-  if(!r.n){ setStat("The main walk from the entrance can't be removed.", true); return true; }
+  if(!r.n){ setStat("The path at the entrance stays.", true); return true; }
   afterChange(); render();
   setStat("");
-  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The main walk from the entrance stays." : ""}`, "good");
+  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The path at the entrance stays." : ""}`, "good");
   return true;
 }
 function toolDone(newSel){
@@ -2768,7 +2768,6 @@ function bulldozeTap(kind, id){
   if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
   const it = findItem(kind, id);
   if(!it) return;
-  if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
   bulldozeItem(kind, it);
 }
 
@@ -2823,7 +2822,6 @@ function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
   if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
-  if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   if(it.grid){ setStat("A fenced exhibit stays where its fence is. Lift the fence with Bulldoze and lay it again.", true); return null; }
   return it;

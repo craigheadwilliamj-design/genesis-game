@@ -794,8 +794,7 @@ function pathHtml(p){
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
   if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
   if(!svc && !isBridge(p)) h += themeHtml("path", p);
-  if(!p.fixed) h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
-  else h += `<div class="meta">This is where guests come in. It can't be removed.</div>`;
+  h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   return h;
 }
 
