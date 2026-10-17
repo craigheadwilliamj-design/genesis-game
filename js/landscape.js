@@ -74,18 +74,21 @@ function footSideFor(key, pic, biome){
 const footSquare = key => !!LAND[key] && (!!LAND[key].footSide);
 // The biome a rock in exhibit e (null: out in the park) is drawn in
 const featBiome = (f, e) => BIOMES[f.biome] ? f.biome : e ? biomeOf(e) : parkBiome();
+// A plant or rock drawn from a picture stands on its base (the picture's bottom edge is at f.y), so its box runs from there back up the map and the ground in front stays free
+const footBased = (key, biome) => !!PLANT_SPRITES[key] || (ROCK_TYPES.includes(key) && !!(ROCK_SPRITES[biome] || {})[key]);
 // A placed thing's box [x0, y0, x1, y1]; e is the exhibit it stands in (null: out in the park)
 function footBox(f, e){
   const t = LAND[f.type]; if(!t) return [f.x, f.y, f.x, f.y];
-  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null, h = footSideFor(f.type, rb && rockPicIndex(f, rb), rb) * k / 2;
-  return [f.x - h, f.y - h, f.x + h, f.y + h];
+  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null, h = footSideFor(f.type, rb && rockPicIndex(f, rb), rb) * k / 2, up = footBased(f.type, rb) ? h : 0;
+  return [f.x - h, f.y - h - up, f.x + h, f.y + h - up];
 }
 // The box a new one of this kind would take at (x, y)
-function footBoxAt(key, pic, biome, x, y){ const h = footSideFor(key, pic, biome) / 2; return [x - h, y - h, x + h, y + h]; }
-// Snap a point so a footprint of this kind covers whole cells: odd sides center on a cell, even on a grid corner. Other things keep the grid corner.
+function footBoxAt(key, pic, biome, x, y){ const h = footSideFor(key, pic, biome) / 2, up = footBased(key, biome) ? h : 0; return [x - h, y - h - up, x + h, y + h - up]; }
+// Snap a point so a footprint of this kind covers whole cells: odd sides center on a cell across, even on a grid corner. Down the map the box ends at the point when it stands on a base, so that is a grid line for any side; else it is centered like across. Other things keep the grid corner.
 function footSnap(key, pic, biome, x, y){
   if(!footSquare(key)) return [Math.round(x), Math.round(y)];
-  return Math.round(footSideFor(key, pic, biome)) % 2 ? [Math.floor(x) + .5, Math.floor(y) + .5] : [Math.round(x), Math.round(y)];
+  const odd = Math.round(footSideFor(key, pic, biome)) % 2;
+  return [odd ? Math.floor(x) + .5 : Math.round(x), odd && !footBased(key, biome) ? Math.floor(y) + .5 : Math.round(y)];
 }
 // The ghost's footprint: its square on the grid (plants, rocks), else a ring
 function footGhostSvg(g, biome, attrs){
@@ -106,6 +109,8 @@ function snapFootprints(s){
     const rockOf = f => ROCK_TYPES.includes(f.type), biomeOfF = f => BIOMES[f.biome] ? f.biome : homeBiome(e);
     const picOf = f => rockOf(f) ? rockPicIndex(f, biomeOfF(f)) : null;
     const boxAt = (f, x, y) => footBoxAt(f.type, picOf(f), biomeOfF(f), x, y);
+    // saves from before boxes stood on their base: slide each picture down to the bottom of its old box, so every box stays exactly where it was
+    if(!s.footBase) for(const f of items) if(footSquare(f.type) && footBased(f.type, rockOf(f) ? biomeOfF(f) : null)) f.y += footSideFor(f.type, picOf(f), biomeOfF(f)) * (f.k || 1) / 2;
     for(const f of items) if(footSquare(f.type)){ [f.x, f.y] = footSnap(f.type, picOf(f), biomeOfF(f), f.x, f.y); }
     const placed = items.filter(f => !footSquare(f.type)).map(f => boxAt(f, f.x, f.y));
     for(const f of items.filter(f => footSquare(f.type))){
@@ -116,6 +121,7 @@ function snapFootprints(s){
       placed.push(boxAt(f, f.x, f.y));
     }
   }
+  s.footBase = 1;
 }
 // Do two boxes share ground? Touching edges don't count.
 const boxesHit = (a, b) => a[0] < b[2] - FOOT_EPS && b[0] < a[2] - FOOT_EPS && a[1] < b[3] - FOOT_EPS && b[1] < a[3] - FOOT_EPS;

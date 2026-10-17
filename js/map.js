@@ -1495,7 +1495,7 @@ function walkArea(h, e){
     // obstacles are rounded boxes: the box [x - hx, x + hx] x [y - hy, y + hy] grown by c (hx = hy = 0 is a circle)
     if(t.flora){   // a tree's trunk, a fifth of its square; low plants are walked through
       if(t.look === "conifer" || treeLift(t)){ const h = Math.max(.5, footBox(f, e)[2] - f.x) * .36; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); }
-    } else if(ROCK_TYPES.includes(f.type)){ const b = footBox(f, e), h = (b[2] - b[0]) / 2; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); }   // a rock keeps off its whole square
+    } else if(ROCK_TYPES.includes(f.type)){ const b = footBox(f, e), h = (b[2] - b[0]) / 2; obs.push({x:f.x, y:(b[1] + b[3]) / 2, hx:h, hy:h, c:body}); }   // a rock keeps off its whole square
     else {
       const R = t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : footR(t) * (f.k || 1) * .9;
       if(R) obs.push({x:f.x, y:f.y, hx:0, hy:0, c:R + body});
