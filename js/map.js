@@ -163,7 +163,7 @@ function render(){
   }
 
   // ponds and lakes out in the park, under everything built
-  s += parkWaterSvg(tool === "bulldoze", isDoomed);
+  s += parkWaterSvg();
 
   // paths and path chunks lie flat on the ground, so they go under every fence, exhibit and building (the 3/4 view stands those up)
   // paths: dark edges drawn first under every path, so joins look like one surface
@@ -2135,7 +2135,7 @@ function finishDraw(){
 /* ---------- painting ground (js/biomepaint.js) ---------- */
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
-  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Paint ground over water to remove it. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
 }
@@ -2144,21 +2144,25 @@ function paintDragStat(){
   if(!pdrag) return;
   const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
   const cost = w && h && paintPick !== "erase" ? exhibitPaintCost(r, paintPick) : 0;
-  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}` : "", cost > 0 && !canAfford(cost));
+  const wet = w && h ? waterCutM2(r) : 0;
+  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}${wet ? ` Removes ${fmtArea(wet)} of water, ${money(waterCutRefund(wet))} back.` : ""}` : "", cost > 0 && !canAfford(cost));
 }
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
   const r = paintBox(d.a, d.b);
+  const wetToast = c => c.m2 ? ui.toast(`Removed ${fmtArea(c.m2)} of water. ${money(c.refund)} back.`, "good") : 0;
   if(paintPick === "erase"){
-    if(!eraseRect(r)){ setStat("No paint there."); return; }
-    setStat(""); afterChange(); render(); return;
+    const n = eraseRect(r), cut = cutWaterAll(r);
+    if(!n && !cut.m2){ setStat("No paint there."); return; }
+    setStat(""); afterChange(); render(); wetToast(cut); return;
   }
   const c = exhibitPaintCost(r, paintPick);
   if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
   const res = paintRect(paintPick, r);
   if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
   if(c) spend(c, "built");
-  setStat(""); afterChange(); render();
+  const cut = cutWaterAll(r);
+  setStat(""); afterChange(); render(); wetToast(cut);
 }
 // Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
 function bulldozePaint(d){
@@ -2173,7 +2177,7 @@ function bulldozePaint(d){
 const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
-  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Bulldoze takes a box away.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Paint ground over water to remove it.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = `<button data-pickwater="auto" aria-pressed="${waterPick === "auto"}" title="The water that goes with the ground it's laid on">Own biome</button>`
     + waterTypes().map(k => `<button data-pickwater="${k}" aria-pressed="${k === waterPick}" title="${esc(BIOMES[k].ground)}">${esc(BIOMES[k].label)}</button>`).join("");
@@ -2766,6 +2770,7 @@ function landTap(ev){
 function bulldozeTap(kind, id){
   if(!kind){ setStat(""); render(); return; }
   if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
+  if(kind === "water") return;   // water goes by painting ground over it
   const it = findItem(kind, id);
   if(!it) return;
   bulldozeItem(kind, it);

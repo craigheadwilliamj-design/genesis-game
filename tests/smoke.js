@@ -3181,6 +3181,29 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       wdrag = {a:[cx, cy], b:[cx, cy]}; const over = !!waterBox().err; wdrag = null;
       state.water = kw; setTool("select"); return sized && joined && over;
     })();
+    // water can't be bulldozed; painting or erasing ground over it cuts it out and refunds at refundShare
+    out.paintRemovesWater = (() => {
+      const kw = state.water, kp = state.biomePaint, km = state.money, [cx, cy] = chunkAt(x, y), X = cx * 5, Y = cy * 5, mid = [X + 5, Y + 5, X + 10, Y + 10];
+      const lay = () => { state.water = [{id:"w-pw", points:[[X, Y], [X + 15, Y], [X + 15, Y + 15], [X, Y + 15]]}]; };
+      const area = () => state.water.reduce((n, w) => { const q = rectOfPts(w.points); return n + (q[2] - q[0]) * (q[3] - q[1]); }, 0);
+      const A = Object.keys(BIOMES).find(b => b !== parkBiome());
+      lay(); state.money = 1e6; state.biomePaint = [];
+      const noPick = !watersSvg(state.water, parkBiome()).includes("data-kind"); tool = "bulldoze"; bulldozeTap("water", "w-pw"); tool = "select";
+      const kept = state.water.length === 1;
+      bulldozePaint({a:[cx + 1, cy + 1], b:[cx + 1, cy + 1]});   // bulldoze over water leaves it
+      const bulldozeKeeps = state.water.length === 1 && area() === 225;
+      setTool("paint"); paintPick = A;
+      pdrag = {a:[cx + 1, cy + 1], b:[cx + 1, cy + 1]}; const stat = (paintDragStat(), $("#dStat") ? $("#dStat").textContent : "");
+      const m0 = state.money; endPaintDrag();
+      const cut = area() === 200 && state.water.length === 4 && !state.water.some(w => rectOverlap(rectOfPts(w.points), mid)) && state.money === m0 + Math.round(25 * WATER.perSqM * COST.refundShare) && !!paintAt(X + 6, Y + 6);
+      lay(); paintPick = "erase"; pdrag = {a:[cx, cy], b:[cx, cy + 2]}; const m1 = state.money; endPaintDrag();   // erase a whole column with no paint under it
+      const erased = area() === 150 && state.water.length === 1 && state.money === m1 + Math.round(75 * WATER.perSqM * COST.refundShare);
+      lay(); const ex = {id:"e-cw", points:[[X + 40, Y], [X + 60, Y], [X + 60, Y + 20], [X + 40, Y + 20]], animals:[], land:[], water:[{id:"w-ex", points:[[X + 40, Y], [X + 50, Y], [X + 50, Y + 10], [X + 40, Y + 10]]}]};
+      state.exhibits.push(ex); const cw = cutWaterAll([X + 40, Y, X + 45, Y + 10]); state.exhibits.pop();
+      const exhibit = cw.m2 === 50 && ex.water.length === 1 && rectOfPts(ex.water[0].points).join() === [X + 45, Y, X + 50, Y + 10].join() && state.water.length === 1;
+      paintPick = null; setTool("select"); state.water = kw; state.biomePaint = kp || []; paintTouch(); state.money = km; render();
+      return noPick && kept && bulldozeKeeps && /Removes 25 m² of water/.test(stat) && cut && erased && exhibit;
+    })();
 
     // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
     startWith(newPark(), false); setSpeed(0);
