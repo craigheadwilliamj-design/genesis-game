@@ -34,13 +34,12 @@ function parcelRing(i, j){
   for(const [a, b] of PARCEL_CELLS) if(parcelHome(a, b)) best = Math.min(best, Math.max(Math.abs(a - i), Math.abs(b - j)));
   return best;
 }
-const parcelPrice = (i, j) => Math.round(parcelArea(i, j) * (PARCELS.rates[Math.min(parcelRing(i, j), PARCELS.rates.length - 1)]) / 100) * 100;
+const parcelPrice = (i, j) => Math.round(parcelArea(i, j) * (PARCELS.rates[Math.min(parcelRing(i, j), PARCELS.rates.length - 1)]) * (1 + PARCELS.growth * parcelsBought()) / 100) * 100;
 const parcelTouches = (i, j) => !parcelSouth(i, j) && [[1,0], [-1,0], [0,1], [0,-1]].some(([a, b]) => i + a >= 0 && j + b >= 0 && i + a < PARCELS.xs.length - 1 && j + b < PARCEL_YS.length - 1 && ownsParcel(i + a, j + b));
-const parcelsBought = () => (state.parcels || []).length;
+const parcelsBought = () => (state?.parcels || []).length;
 function parcelProblem(i, j){
   if(ownsParcel(i, j)) return "You already own this land.";
   if(parcelSouth(i, j)) return "No land is for sale south of the entrance.";
-  if(parcelsBought() >= MAX_PARCELS) return `You own the most land allowed (${MAX_PARCELS} of ${MAX_PARCELS} plots).`;
   if(!parcelTouches(i, j)) return "Not for sale yet. Buy the land next to it first.";
   const cost = parcelPrice(i, j);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;

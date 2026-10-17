@@ -2136,9 +2136,9 @@ function finishZoneEdit(){
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function updateParcelBar(){
-  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${parcelsBought()} of ${MAX_PARCELS} plots bought. ${fmtArea(PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0))} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
+  if(!parcelSel){ showBar("Buy land", "Tap a green plot to see its price. Plots only go on sale next to land you own.", `${parcelsBought()} plots bought. ${fmtArea(PARCEL_CELLS.filter(([i, j]) => ownsParcel(i, j)).reduce((a, [i, j]) => a + parcelArea(i, j), 0))} owned`, {undo:false, finish:false, cancel:"Done"}); return; }
   const [i, j] = parcelSel, why = parcelProblem(i, j);
-  showBar("Buy this plot", `Plot ${parcelsBought() + 1} of ${MAX_PARCELS}. ${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
+  showBar("Buy this plot", `Plot ${parcelsBought() + 1}. ${fmtArea(parcelArea(i, j))} for ${money(parcelPrice(i, j))}. Costs ${money(Math.round(parcelArea(i, j) * UPKEEP.landPerSqM))} a day in property tax.`, why || "", {undo:false, finish:true, cancel:"Done", finishText:"Buy"});
   $("#dFinish").disabled = !!why; setStat(why || "", !!why);
 }
 function parcelTap(e){
