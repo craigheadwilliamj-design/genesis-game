@@ -413,7 +413,7 @@ function landHtml(e){
   const biomeTabs = `<div class="meta" style="margin-top:8px">You can place any of these anywhere, but animals only count the ones from the exhibit's own biome (${esc(BIOMES[here].label.toLowerCase())}), and ones from another biome make them unhappy.</div><div style="margin-top:6px">${tabBar("lbiome", biomes.map(x => ({key:x, label:BIOMES[x].label + (x === here ? " (here)" : ""), color:BIOMES[x].color})), lb)}</div>`;
   const body = sub === "plants" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} plants</b></div><div style="margin-top:6px">${tabBar("lperiod", periods.map(x => ({key:x, label:x, color:PERIOD_COLOR[x]})), lp)}</div><div class="row" style="margin-top:6px">${plantBtns}</div>`
     : sub === "rocks" ? `${biomeTabs}<div class="meta" style="margin-top:8px"><b>${esc(BIOMES[lb].label)} rocks</b></div><div class="row" style="margin-top:4px">${rockBtns}</div>`
-    : `<div class="row" style="margin-top:8px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button></div><div class="meta" style="margin-top:4px">Draw it corner by corner like a fence. Reshape it with the Move tool.</div>`;
+    : `<div class="row" style="margin-top:8px"><button class="btn" data-action="waterTool" style="padding:3px 9px">Draw water, ${money(WATER.perSqM)}/m²</button></div><div class="meta" style="margin-top:4px">Drag a box to lay it in 5 m chunks, like a path. It stops short of the fence. Paint ground over it to take it away.</div>`;
   return `${biomeHtml(e)}<section><h3>Landscape needs</h3>${needsHtml(e)}</section><section><h3>Landscaping</h3>${tabBar("lsub", [{key:"plants", label:"Plants", color:"#4E7F2E"}, {key:"rocks", label:"Rocks", color:"#7A6A58"}, {key:"water", label:"Water", color:"#2F6FA8"}], sub)}${body}</section>`;
 }
 
@@ -794,8 +794,7 @@ function pathHtml(p){
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
   if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
   if(!svc && !isBridge(p)) h += themeHtml("path", p);
-  if(!p.fixed) h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
-  else h += `<div class="meta">This is where guests come in. It can't be removed.</div>`;
+  h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("path", p))}</button></div>`;
   return h;
 }
 

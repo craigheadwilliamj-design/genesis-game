@@ -155,7 +155,7 @@ function render(){
   }
 
   // ponds and lakes out in the park, under everything built
-  s += parkWaterSvg(tool === "bulldoze", isDoomed);
+  s += parkWaterSvg();
 
   // paths and path chunks lie flat on the ground, so they go under every fence, exhibit and building (the 3/4 view stands those up)
   // paths: dark edges drawn first under every path, so joins look like one surface
@@ -260,6 +260,8 @@ function render(){
       // the floor shows the biome: its color, with its texture over it
       const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
       s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${fb})" pointer-events="none"/>` + exhibitPaintSvg(e);
+      // water lies on the floor, under the fence, so posts and rails stand over the bank
+      s += watersSvg(waterOf(e), biomeOf(e));
       // a hedge row is drawn as a real hedge, as wide as it is
       if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
       // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
@@ -1200,7 +1202,7 @@ function renderOverlay(){
   }
   if(wdrag){
     const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
-    s += `<rect x="${b.r[0]}" y="${b.r[1]}" width="${b.r[2] - b.r[0]}" height="${b.r[3] - b.r[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? `url(#w-${b.look})` : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+    for(const q of b.parts.length ? b.parts : [b.r]) s += `<rect x="${q[0]}" y="${q[1]}" width="${q[2] - q[0]}" height="${q[3] - q[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? `url(#w-${b.look})` : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
@@ -2127,7 +2129,7 @@ function finishDraw(){
 /* ---------- painting ground (js/biomepaint.js) ---------- */
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
-  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Paint ground over water to remove it. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
 }
@@ -2136,21 +2138,25 @@ function paintDragStat(){
   if(!pdrag) return;
   const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
   const cost = w && h && paintPick !== "erase" ? exhibitPaintCost(r, paintPick) : 0;
-  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}` : "", cost > 0 && !canAfford(cost));
+  const wet = w && h ? waterCutM2(r) : 0;
+  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}${wet ? ` Removes ${fmtArea(wet)} of water, ${money(waterCutRefund(wet))} back.` : ""}` : "", cost > 0 && !canAfford(cost));
 }
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
   const r = paintBox(d.a, d.b);
+  const wetToast = c => c.m2 ? ui.toast(`Removed ${fmtArea(c.m2)} of water. ${money(c.refund)} back.`, "good") : 0;
   if(paintPick === "erase"){
-    if(!eraseRect(r)){ setStat("No paint there."); return; }
-    setStat(""); afterChange(); render(); return;
+    const n = eraseRect(r), cut = cutWaterAll(r);
+    if(!n && !cut.m2){ setStat("No paint there."); return; }
+    setStat(""); afterChange(); render(); wetToast(cut); return;
   }
   const c = exhibitPaintCost(r, paintPick);
   if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
   const res = paintRect(paintPick, r);
   if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
   if(c) spend(c, "built");
-  setStat(""); afterChange(); render();
+  const cut = cutWaterAll(r);
+  setStat(""); afterChange(); render(); wetToast(cut);
 }
 // Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
 function bulldozePaint(d){
@@ -2165,7 +2171,7 @@ function bulldozePaint(d){
 const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
-  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Bulldoze takes a box away.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Paint ground over water to remove it.", "", {undo:false, finish:false, cancel:"Done"});
   $("#dSizes").hidden = false;
   $("#dSizes").innerHTML = `<button data-pickwater="auto" aria-pressed="${waterPick === "auto"}" title="The water that goes with the ground it's laid on">Own biome</button>`
     + waterTypes().map(k => `<button data-pickwater="${k}" aria-pressed="${k === waterPick}" title="${esc(BIOMES[k].ground)}">${esc(BIOMES[k].label)}</button>`).join("");
@@ -2173,25 +2179,29 @@ function waterBar(){
 $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickwater]"); if(b && tool === "water"){ waterPick = b.dataset.pickwater; waterBar(); renderOverlay(); } });
 // the kind (water type) a new box is laid with: undefined means the biome of where it goes
 const waterKindPick = () => waterPick !== "auto" && WATER_TEX[waterPick] ? waterPick : undefined;
-// the box being dragged: its meters, outline, the exhibit it's in (null: out in the park), price and why not
+// the box being dragged: its meters, the exhibit it's in (null: out in the park), the parts of it the fence leaves room for, price and why not
 function waterBox(){
-  const r = paintBox(wdrag.a, wdrag.b), pts = [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), kind = waterKindPick();
-  const cost = waterNetCost(host, pts, kind), same = waterCovered(host, pts, kind);
+  const r = paintBox(wdrag.a, wdrag.b), host = waterHost([[(r[0] + r[2]) / 2, (r[1] + r[3]) / 2]]), kind = waterKindPick();
+  const parts = waterClip(host, r), ptsOf = parts.map(rectPtsOf);
+  const cost = ptsOf.reduce((n, p) => n + waterNetCost(host, p, kind), 0), same = parts.length > 0 && ptsOf.every(p => waterCovered(host, p, kind));
   // the look of the ghost: the picked type, else the biome it would sit in
   const look = kind || (host ? biomeOf(host) : parkBiome());
-  return {r, pts, host, kind, cost, same, look, err:same ? "That water is already there." : waterProblem(pts, host, null, cost, true)};
+  let err = same ? "That water is already there." : null;
+  if(!err && !parts.length) err = "Keep it inside the fence.";
+  for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true);
+  return {r, parts, ptsOf, host, kind, cost, same, look, m2:parts.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), err};
 }
 function waterDragStat(){
   if(!wdrag) return;
   const b = waterBox();
-  setStat(b.err || `${b.r[2] - b.r[0]} × ${b.r[3] - b.r[1]} m of water ${b.host ? "in " + b.host.name : "out in the park"}. ${money(b.cost)}`, !!b.err);
+  setStat(b.err || `${fmtArea(b.m2)} of water ${b.host ? "in " + b.host.name : "out in the park"}. ${money(b.cost)}`, !!b.err);
 }
 function endWaterDrag(){
   const b = waterBox(); wdrag = null; renderOverlay();
   if(b.err){ setStat(b.err, true); if(!b.same) ui.toast(b.err, "bad"); return; }
-  layWater(b.host, b.pts, b.kind);
+  for(const p of b.ptsOf) layWater(b.host, p, b.kind);
   setStat(""); afterChange(); render();
-  ui.toast(`Laid ${fmtArea(area(b.pts))} of water in ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
+  ui.toast(`Laid ${fmtArea(b.m2)} of water in ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
@@ -2310,17 +2320,17 @@ function endPathDrag(){
   const joined = chunksJoined(d.plan.todo, d.kind !== "s");
   ui.toast(joined ? `Laid ${r.n} chunk${r.n === 1 ? "" : "s"} of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
 }
-// The chunks a bulldoze box (or tap) takes: the lit ones, never the entrance walk
+// The chunks a bulldoze box (or tap) takes: the lit ones, never the chunk at the gate
 function bulldozeChunkKeys(box){ const F = pathFixedChunks(); return chunksInBox(box.a, box.b).filter(k => !F[k]); }
 // Bulldoze on bare ground: a tap takes the chunk under it, a box takes every chunk it touches. Returns true if it dealt with path.
 function bulldozeChunks(box){
   const all = chunksInBox(box.a, box.b);
   if(!all.length) return false;
   const r = removeChunks(all);
-  if(!r.n){ setStat("The main walk from the entrance can't be removed.", true); return true; }
+  if(!r.n){ setStat("The path at the entrance stays.", true); return true; }
   afterChange(); render();
   setStat("");
-  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The main walk from the entrance stays." : ""}`, "good");
+  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The path at the entrance stays." : ""}`, "good");
   return true;
 }
 function toolDone(newSel){
@@ -2758,9 +2768,9 @@ function landTap(ev){
 function bulldozeTap(kind, id){
   if(!kind){ setStat(""); render(); return; }
   if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
+  if(kind === "water") return;   // water goes by painting ground over it
   const it = findItem(kind, id);
   if(!it) return;
-  if(it.fixed){ setStat("The main walk from the entrance can't be removed.", true); return; }
   bulldozeItem(kind, it);
 }
 
@@ -2815,7 +2825,6 @@ function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
   if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
-  if(it.fixed){ setStat("The main walk from the entrance can't be moved.", true); return null; }
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   if(it.grid){ setStat("A fenced exhibit stays where its fence is. Lift the fence with Bulldoze and lay it again.", true); return null; }
   return it;
@@ -2863,8 +2872,10 @@ function startMove(it, kind, e){
     land:kind === "exhibit" ? landOf(it).map(f => ({f, x:f.x, y:f.y})) : [],
     water:kind === "exhibit" ? waterOf(it).map(w => ({w, pts:w.points.map(p => p.slice())})) : []};
 }
+// An exhibit that holds water moves in whole 5 m chunks, so its water stays on the chunk grid like paths and paint
+const moveStep = m => m.water.length ? CHUNK : GRID_STEP;
 function dragMove(m, e){
-  const w = toWorld(e.clientX, e.clientY), g = GRID_STEP;
+  const w = toWorld(e.clientX, e.clientY), g = moveStep(m);
   const dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
   moveBy(m, dx, dy);
   const why = moveProblem(m.kind, m.it);
@@ -2883,15 +2894,14 @@ function dropMove(m){
   setStat("");
 }
 
-// Reshaping an exhibit or its water: drag a corner, drag a + to add one, tap a corner and delete it
-// Every shape that can be reshaped: each open exhibit's fence, and each body of water inside it
+// Reshaping an exhibit: drag a corner, drag a + to add one, tap a corner and delete it
+// Every shape that can be reshaped: each open exhibit's fence. Water isn't reshaped: it is laid in 5 m chunks.
 function reshapeables(){
   const out = [];
-  for(const e of state.exhibits){ if(e.viv) continue; if(!e.grid) out.push({e, t:e}); for(const w of waterOf(e)) out.push({e, t:w, w}); }
-  for(const w of parkWater()) out.push({e:null, t:w, w});
+  for(const e of state.exhibits){ if(e.viv) continue; if(!e.grid) out.push({e, t:e}); }
   return out;
 }
-// Corners first (fences before water), then the + in the middle of each edge
+// Corners first, then the + in the middle of each edge
 function cornerAt(clientX, clientY){
   const p = toWorld(clientX, clientY), R = 14 / view.k, all = reshapeables();
   for(const s of all) for(let i = 0; i < s.t.points.length; i++) if(Math.hypot(p.x - s.t.points[i][0], p.y - s.t.points[i][1]) < R) return {...s, i, type:"v"};
@@ -2901,23 +2911,13 @@ function cornerAt(clientX, clientY){
   }
   return null;
 }
-// Water is priced by area: growing it costs the difference, shrinking it refunds part
-const waterReshapeCost = (w, orig) => waterCost(w.points) - waterCost(orig);
-// A reshape in progress (r.t is the shape being changed: an exhibit, or water inside r.e)
-const rvProblem = r => r.w ? waterProblem(r.w.points, r.e, r.w, waterReshapeCost(r.w, r.orig)) : reshapeProblem(r.e, r.orig);
+// A reshape in progress (r.t is the exhibit being changed)
+const rvProblem = r => reshapeProblem(r.e, r.orig);
 function rvStat(r){
-  if(r.w){ const diff = waterReshapeCost(r.w, r.orig); return `${fmtArea(area(r.w.points))} of water. ${diff > 0 ? "Costs " + money(diff) : diff < 0 ? "Refund " + money(Math.round(-diff * COST.refundShare)) : "No change"}`; }
   const diff = reshapeCost(r.e, r.orig);
   return `${fmtArea(area(r.e.points))}. ${diff > 0 ? "Extra fence " + money(diff) : diff < 0 ? "Fence refund " + money(Math.round(-diff * COST.refundShare)) : "No change in fence"}`;
 }
-const rvCommit = r => r.w ? commitWaterReshape(r.e, r.w, r.orig) : commitReshape(r.e, r.orig);
-function commitWaterReshape(e, w, orig){
-  const diff = waterReshapeCost(w, orig);
-  if(diff > 0) spend(diff, "built"); else if(diff < 0) earn(Math.round(-diff * COST.refundShare), "sold");
-  afterChange(); render();
-  const where = e ? `the water in ${e.name}` : "the water";
-  ui.toast(diff > 0 ? `Reshaped ${where} for ${money(diff)}.` : diff < 0 ? `Reshaped ${where}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${where}.`);
-}
+const rvCommit = r => commitReshape(r.e, r.orig);
 const reshapeCost = (e, orig) => exhibitCost(e.points, e.barrier) - exhibitCost(orig, e.barrier);
 // Why this exhibit's new outline won't work, or null
 function reshapeProblem(e, orig){

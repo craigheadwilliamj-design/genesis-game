@@ -493,9 +493,6 @@ const GUEST = {
   drawPower:1.6,
   arriveFrom:6, arriveTo:21,   // clock hours the day's crowd arrives in (a hump, busiest at 1 PM)
   trickle:6,           // guests a day who keep arriving round the clock, even at night, at a 5-star park (a few stay the night); fewer at fewer stars
-  curfew:22,           // clock hour most daytime guests plan to be out by (they were all sent home at closing before)
-  overnight:.06,       // share of daytime parties who stay on past it anyway
-  nightStay:240,       // the most park minutes a party that arrives after hours stays
   trickleLow:.3,       // the share of that trickle a 0-star park still gets
   maxParties:1200,     // parties on the map at once; past this, newcomers join a party already there
   sizes:[1, 2, 2, 2, 3, 3, 4, 4],   // party sizes, picked at random
@@ -1287,7 +1284,7 @@ BUILDINGS.platform = {label:"Viewing Platform", tag:"VIEW", one:"a viewing platf
 const WATER = {
   perSqM:20,       // cost per square meter
   minArea:12,      // smallest body of water, in square meters
-  margin:0,        // gap kept between the water and the fence, in meters (none: water may border the fence)
+  margin:.5,       // gap kept between the water and the fence, in meters: room for the muddy bank, so the fence stands clear of the water
   oldPondR:6,      // radius of the round ponds older saves had; they become drawn water
 };
 

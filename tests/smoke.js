@@ -589,6 +589,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const before = state.today.moodN; goHome(p);
     out.partyLeaves = run(600, () => p.gone) && !parties.includes(p) && state.today.moodN === before + 2;
 
+    // no curfew: a party whose stay isn't done is still in the park after 10 PM, and carries over the day's turn
+    resetParties(); state.minute = minuteAtClock(21 * 60 + 30); guestsArrive(2); const np = parties[0];
+    np.until = state.minute + 300; np.mood = 90; np.needs = {hunger:0, thirst:0, bladder:0, energy:0};
+    const late = minuteAtClock(22 * 60) + 5;
+    for(; state.minute < late; state.minute++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); np.mood = 90; np.needs = {hunger:0, thirst:0, bladder:0, energy:0}; }
+    out.guestStaysPastCurfew = parties.includes(np) && !np.home && !np.gone && np.until > state.minute;
+    const u0 = np.until; shiftStamps(DAY_MIN);
+    out.guestStaysOverRollover = np.until === u0 - DAY_MIN && !np.home;
+    state.minute = minuteAtClock(22.5 * 60); const sl = GUEST.stay.map(x => x / GUEST.pace);
+    out.stayUncapped = Array.from({length:30}, () => newParty(2).until - state.minute).every(d => d >= sl[0] - 1e-6 && d <= sl[1] + 1e-6);
+
     // a desperate party gives up on a long queue
     guestsArrive(1); const q = parties[parties.length - 1];
     svcQ.set("b-r", {queue:[q], busy:[{readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}]}); q.in = "b-r"; q.waited = 0; q.why = "bladder"; q.dest = "b-r";
@@ -633,7 +644,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && parties.length < 8;   // a few guests may still be in the park: the day turns over at 4 AM, not at closing
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && state.guestLog.last.guests > 0;   // some left during the day; the rest are still in the park, since the day turns over at the rollover hour and nobody is sent home at closing
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested
@@ -1230,6 +1241,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const mv = startMove(lx, "exhibit", {clientX:0, clientY:0}); moveBy(mv, 10, 5);
     out.landMoves = lx.water[0].points[0][0] === 134 && lx.water[0].points[0][1] === 129 && lx.land[0].x === 120 && lx.points[0][0] === 110;
     moveBy(mv, 0, 0);
+    // water stays on the chunk grid: an exhibit with water moves in 5 m, and the Move tool has no corners on water
+    out.waterMoveStep = moveStep(mv) === CHUNK && moveStep({water:[]}) === GRID_STEP;
+    out.waterNotReshapable = reshapeables().every(x => x.t === x.e && !x.w);
+    // old water snaps to whole chunks: kept at half or more, cut to the fence, no money changes hands, and doing it twice changes nothing
+    const sv = JSON.parse(JSON.stringify(newPark())); delete sv.waterGrid5; sv.money = 777;
+    sv.exhibits = [{id:"e-u", name:"U", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], water:[{id:"w-a", points:[[103,103],[113,103],[113,111],[103,111]]}]}];
+    sv.water = [{id:"w-p", points:[[213,203],[222,203],[222,212],[213,212]]}];
+    upgradeSave(sv);
+    const snapped = JSON.stringify([sv.water.map(w => w.points), sv.exhibits[0].water.map(w => w.points)]);
+    out.waterUpgradeSnaps = sv.waterGrid5 === true && sv.money === 777 && sv.water.length === 1 && rectOfPts(sv.water[0].points).join() === "215,205,220,210" && sv.exhibits[0].water.length === 1 && rectOfPts(sv.exhibits[0].water[0].points).join() === "105,105,115,110";
+    upgradeSave(sv);
+    out.waterUpgradeOnce = JSON.stringify([sv.water.map(w => w.points), sv.exhibits[0].water.map(w => w.points)]) === snapped && newPark().waterGrid5 === true;
     // an outline that would leave something outside the fence is refused
     const orig = lx.points.map(p => p.slice()); lx.points[1] = [105, 100];
     out.landReshapeGuard = /outside the fence/.test(reshapeProblem(lx, orig) || ""); lx.points = orig;
@@ -1446,7 +1469,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         L([400,150],[420,150],"wood"); out.fenceReplaceRun = pieceType(fencePieces()["415,150,h"]) === "wood";
         for(const k of pieceLine([400,150],[420,150]).keys) delete fencePieces()[k];
         // water inside an exhibit may sit flush against its fence, but not poke out
-        out.waterBordersFence = !waterProblem([[375,160],[380,160],[380,165],[375,165]], W) && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        out.waterBordersFence = waterProblem([[374.5,155],[379.5,155],[379.5,160],[374.5,160]], W) === null && /inside the fence/.test(waterProblem([[375,155],[380,155],[380,160],[375,160]], W) || "") && /inside the fence/.test(waterProblem([[375,160],[382,160],[382,165],[375,165]], W) || "");
+        // a chunk that reaches the fence is cut to leave the bank; one wholly inside is kept; one wholly outside gives nothing
+        const wb = bbox(W.points), area0 = r => (r[2] - r[0]) * (r[3] - r[1]);
+        const inner = [wb.x0 + 2, wb.y0 + 2, wb.x0 + 7, wb.y0 + 7], edge = [wb.x1 - 3, wb.y0 + 2, wb.x1 + 2, wb.y0 + 7];
+        const cIn = waterClip(W, inner), cEdge = waterClip(W, edge);
+        out.waterClipKeepsInside = cIn.length === 1 && cIn[0].join() === inner.join();
+        out.waterClipCutsAtFence = cEdge.length === 1 && cEdge[0].join() === [edge[0], edge[1], wb.x1 - WATER.margin, edge[3]].join() && cEdge.every(q => waterProblem(rectPtsOf(q), W) === null);
+        out.waterClipOutsideEmpty = waterClip(W, [wb.x1 + 5, wb.y0, wb.x1 + 10, wb.y0 + 5]).length === 0 && waterClip(null, inner)[0].join() === inner.join();
+        // a fence that bends gives steps, every one of them valid water
+        const tri = {id:"e-tri", points:[[0,0],[40,0],[40,40]], water:[], land:[], animals:[]}, cTri = waterClip(tri, [20,0,25,5]).concat(waterClip(tri, [30,10,35,15]), waterClip(tri, [15,0,20,5]));
+        out.waterClipSlant = cTri.length > 1 && cTri.every(q => waterProblem(rectPtsOf(q), tri, null, 0) === null && area0(q) >= WATER.minArea) && waterClip(tri, [0,30,5,35]).length === 0;
         // fence may border a path or water but not run through it
         const pc = pathChunks(), keepPc = {...pc}, keepWater = state.water; pc["80,30"] = "g"; pc["81,30"] = "g"; state.water = [{id:"w-fb", points:[[405,140],[415,140],[415,145],[405,145]]}];
         const why = k => planPieces([k], "wood").why;
@@ -1793,7 +1826,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const nch = () => Object.keys(state.pathChunks).length;
       // the entrance walk is one chunk wide, centered under the entrance
       const wk = Object.keys(state.pathFixed).map(chunkXY);
-      out.chunksDefaultWalk = nch() === 14 && wk.length === 14 && wk.every(([cx]) => cx === 41) && Math.min(...wk.map(c => c[1])) === 47 && Math.max(...wk.map(c => c[1])) === 60
+      out.chunksDefaultWalk = nch() === 14 && wk.length === 1 && wk[0][0] === 41 && wk[0][1] === 60 && Math.min(...Object.keys(state.pathChunks).map(k => chunkXY(k)[1])) === 47
         && state.gate[0] === 207.5 && state.gate[0] === 41 * CHUNK + CHUNK / 2 && state.gate[1] === SOUTH_LINE && derived.joined.size > 0 && state.paths.some(p => p.d) && JSON.stringify(state).indexOf('"d":1') < 0;
       out.entranceAligned = state.gate[0] === ENTRANCE_X && chunkAt(state.gate[0] - 2.4, 300)[0] === 41 && chunkAt(state.gate[0] + 2.4, 300)[0] === 41 && pathAt(state.gate[0], state.gate[1] - 1) === "g";
       out.platesOnGrid = [...PARCELS.xs, ...PARCELS.ys, ...PARCELS.home, ...LEGACY_SOUTH_YS, ...PARK_PLOT.flat()].every(v => v % CHUNK === 0);
@@ -1813,7 +1846,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && dp.chunks.every(k => { const [x, y] = chunkXY(k); return dp.chunks.some(j => { const [u, v] = chunkXY(j); return Math.abs(u - x) + Math.abs(v - y) === 1; }); });
       layPath(D1, D2, "g"); recompute(); buildGuestGraph(); buildKeeperGraph();
       out.chunkDiagJoined = chunksJoined(dp.chunks, true) && chunkReached(56, 41, true) && state.paths.filter(p => p.d && derived.joined.has(p.id)).length > 1;
-      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 14;
+      out.pathSquaresList = pathSquares().length === nch() && pathSquares().every(q => q.w === 5 && q.h === 5 && q.x === q.cx * 5) && pathSquares().filter(q => q.fixed).length === 1;
       // refusals: through an exhibit, over water (a bridge crosses it), off your land, through a fence
       state.exhibits = [{id:"e-cp", name:"CP", points:[[300,100],[320,100],[320,120],[300,120]], animals:[], land:[], water:[], cond:100}];
       const pe = planPath([58, 21], [66, 21], "g");
@@ -1837,10 +1870,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const litN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="var\(--bad\)" fill-opacity="\.45"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
       endFenceDrag();
       out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare) && /Removed 3 path chunks, refunded \$/.test(toasted);
-      const c2 = nch(); boxAt([207.5, 280], [207.5, 280]); endFenceDrag();
-      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,56"];
-      boxAt([200, 270], [215, 300]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
-      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,56"];
+      const c2 = nch(); boxAt([207.5, 303], [207.5, 303]); endFenceDrag();
+      out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,60"];
+      boxAt([200, 300], [215, 304]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
+      out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,60"];
       ui.toast = toastKeep; setTool("select");
       // the same through real pointer events: drag the path tool, then drag a bulldoze box that lights the chunks as it grows
       {
@@ -1899,15 +1932,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       upgradeSave(oldC);
       const cnt = k => Object.keys(oldC.pathChunks).filter(k).length;
       out.chunkMigrateCells = !oldC.pathCells && oldC.gate[0] === 207.5 && oldC.gate[1] === 305 && oldC.pathChunks["41,47"] === "g" && oldC.pathChunks["42,47"] === "g" && !oldC.pathChunks["42,46"] && !oldC.pathChunks["40,56"] && oldC.pathChunks["41,60"] === "g" && !oldC.pathChunks["41,61"]
-        && Object.keys(oldC.pathFixed).length === 14 && Object.keys(oldC.pathFixed).every(k => /^41,/.test(k)) && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
+        && Object.keys(oldC.pathFixed).join() === "41,60" && oldC.pathChunks["35,49"] === "s" && oldC.pathChunks["35,50"] === "s" && !oldC.pathChunks["35,48"] && !oldC.pathChunks["35,51"]
         && cnt(k => oldC.pathChunks[k] === "s") === 20;
       const againC = upgradeSave(JSON.parse(JSON.stringify(oldC)));
-      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).length === 14;
+      out.chunkMigrateOnce = Object.keys(againC.pathChunks).length === Object.keys(oldC.pathChunks).length && againC.gate[0] === 207.5 && Object.keys(againC.pathFixed).join() === "41,60";
       // old saves from line paths (tram stays a line)
       const oldS = JSON.parse(JSON.stringify(state)); delete oldS.pathChunks; delete oldS.pathFixed; oldS.gate = [205, 305];
       oldS.paths = [{id:"p-main", name:"Main walk", points:[[205,305],[205,235]], fixed:true}, {id:"p-o1", points:[[205,235],[300,235]]}, {id:"p-o2", type:"service", points:[[205,250],[150,250]]}, {id:"p-o3", type:"wide", points:[[250,200],[250,150]]}, {id:"p-o4", type:"bridge", points:[[300,235],[300,200]]}, {id:"p-tr", type:"tram", points:[[250,312],[480,312]]}, {id:"x", d:1, points:[[0,0],[5,0]]}];
       upgradeSave(oldS);
-      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).length === 14
+      out.chunkMigrateLines = oldS.paths.length === 1 && oldS.paths[0].type === "tram" && oldS.pathChunks["41,56"] === "g" && !oldS.pathChunks["40,56"] && !oldS.pathChunks["42,56"] && Object.keys(oldS.pathFixed).join() === "41,60"
         && oldS.pathChunks["50,47"] === "g" && oldS.pathChunks["35,50"] === "s" && oldS.pathChunks["49,35"] === "g" && oldS.pathChunks["50,35"] === "g" && !oldS.pathChunks["48,35"] && !oldS.pathChunks["51,35"]
         && Object.keys(oldS.pathChunks).some(k => oldS.pathChunks[k] === "b") && !Object.keys(oldS.pathChunks).some(k => chunkXY(k)[1] >= 61) && oldS.gate[0] === 207.5;
       // guests still reach an exhibit beside a laid path, and the keeper map has the staff paths
@@ -1919,6 +1952,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.chunkStaffPath = state.paths.some(p => p.d && isService(p) && derived.joinedAll.has(p.id)) && !state.paths.some(p => p.d && isService(p) && derived.joined.has(p.id)) && kGraph.nodes.size > 2;
       render();
       out.chunkRenders = world.innerHTML.includes(PATH_CELLS.kinds.g.color) && world.innerHTML.includes(PATH_CELLS.kinds.s.color);
+      // the entrance walk can be bulldozed except the chunk at the gate, and a reload doesn't bring it back
+      {
+        const W = mainWalkChunks(state.gate);
+        state.pathChunks = Object.assign({}, W.C); state.pathFixed = Object.assign({}, W.F); state.paths = state.paths.filter(p => !p.d); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph();
+        const wb = {a:[207.5, 235], b:[207.5, 304]};
+        const r = removeChunks(chunksInBox(wb.a, wb.b)); pathVer++;
+        out.walkBulldoze = r.n === 13 && r.kept === 1 && nch() === 1 && state.pathChunks["41,60"] === "g" && bulldozeChunkKeys(wb).length === 0;
+        const reloaded = upgradeSave(JSON.parse(JSON.stringify(state)));
+        out.walkStaysGone = Object.keys(reloaded.pathChunks).join() === "41,60" && Object.keys(reloaded.pathFixed).join() === "41,60";
+        const lost = JSON.parse(JSON.stringify(state)); delete lost.pathFixed; lost.pathChunks = {}; upgradeSave(lost);
+        out.walkSeedsWhenNone = Object.keys(lost.pathChunks).length === 14 && Object.keys(lost.pathFixed).join() === "41,60";
+        let threw = null;
+        try { recompute(); buildGuestGraph(); buildKeeperGraph(); resetParties(); guestsArrive(4); for(let i = 0; i < 5; i++) guestsTick(state.minute + i, state.minute + i + 1); } catch(e){ threw = e; }
+        out.walkNoPathNoCrash = !threw && parties.length > 0;
+        const j0 = layPath([41, 59], [41, 50], "g");
+        recompute(); buildGuestGraph(); buildKeeperGraph();
+        out.walkRelaidFromGate = !!j0 && chunkReached(41, 50, true) && derived.joined.size > 0 && !!gGraph.anchors.gate;
+        resetParties();
+      }
       Object.assign(state, {exhibits:keep.exhibits, buildings:keep.buildings, decor:keep.decor, water:keep.water, fences:keep.fences, fenceGrid:keep.fenceGrid, pathChunks:keep.chunks, pathFixed:keep.fixed, paths:keep.paths, money:keep.money, sandbox:keep.sandbox, gate:keep.gate});
       pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); render();
     }
@@ -1928,7 +1980,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const keep = {exhibits:state.exhibits, buildings:state.buildings, decor:state.decor, water:state.water, fences:state.fences, fenceGrid:state.fenceGrid, chunks:state.pathChunks, fixed:state.pathFixed, paths:state.paths, money:state.money, sandbox:state.sandbox, gate:state.gate};
       state.gate = [ENTRANCE_X, 305];       state.exhibits = []; state.buildings = []; state.decor = []; state.water = []; state.fences = []; state.fenceGrid = {}; state.sandbox = false; state.money = 1e6;
       state.pathFixed = JSON.parse(JSON.stringify(keep.fixed)); state.paths = [];   // no loose lines from earlier checks
-      const reset = () => { state.pathChunks = {}; for(const k in state.pathFixed) state.pathChunks[k] = "g"; pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
+      const reset = () => { state.pathChunks = Object.assign({}, mainWalkChunks(state.gate).C); pathVer++; recompute(); buildGuestGraph(); buildKeeperGraph(); };
       const redo = () => { recompute(); buildGuestGraph(); buildKeeperGraph(); };
       const G = (x, y) => chunkReached(x, y, true), S = (x, y) => chunkReached(x, y, false);
       reset();
@@ -3161,6 +3213,29 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const joined = state.water.length === 1 && rectOfPts(state.water[0].points).join() === [cx * 5, cy * 5, cx * 5 + 15, cy * 5 + 5].join();
       wdrag = {a:[cx, cy], b:[cx, cy]}; const over = !!waterBox().err; wdrag = null;
       state.water = kw; setTool("select"); return sized && joined && over;
+    })();
+    // water can't be bulldozed; painting or erasing ground over it cuts it out and refunds at refundShare
+    out.paintRemovesWater = (() => {
+      const kw = state.water, kp = state.biomePaint, km = state.money, [cx, cy] = chunkAt(x, y), X = cx * 5, Y = cy * 5, mid = [X + 5, Y + 5, X + 10, Y + 10];
+      const lay = () => { state.water = [{id:"w-pw", points:[[X, Y], [X + 15, Y], [X + 15, Y + 15], [X, Y + 15]]}]; };
+      const area = () => state.water.reduce((n, w) => { const q = rectOfPts(w.points); return n + (q[2] - q[0]) * (q[3] - q[1]); }, 0);
+      const A = Object.keys(BIOMES).find(b => b !== parkBiome());
+      lay(); state.money = 1e6; state.biomePaint = [];
+      const noPick = !watersSvg(state.water, parkBiome()).includes("data-kind"); tool = "bulldoze"; bulldozeTap("water", "w-pw"); tool = "select";
+      const kept = state.water.length === 1;
+      bulldozePaint({a:[cx + 1, cy + 1], b:[cx + 1, cy + 1]});   // bulldoze over water leaves it
+      const bulldozeKeeps = state.water.length === 1 && area() === 225;
+      setTool("paint"); paintPick = A;
+      pdrag = {a:[cx + 1, cy + 1], b:[cx + 1, cy + 1]}; const stat = (paintDragStat(), $("#dStat") ? $("#dStat").textContent : "");
+      const m0 = state.money; endPaintDrag();
+      const cut = area() === 200 && state.water.length === 4 && !state.water.some(w => rectOverlap(rectOfPts(w.points), mid)) && state.money === m0 + Math.round(25 * WATER.perSqM * COST.refundShare) && !!paintAt(X + 6, Y + 6);
+      lay(); paintPick = "erase"; pdrag = {a:[cx, cy], b:[cx, cy + 2]}; const m1 = state.money; endPaintDrag();   // erase a whole column with no paint under it
+      const erased = area() === 150 && state.water.length === 1 && state.money === m1 + Math.round(75 * WATER.perSqM * COST.refundShare);
+      lay(); const ex = {id:"e-cw", points:[[X + 40, Y], [X + 60, Y], [X + 60, Y + 20], [X + 40, Y + 20]], animals:[], land:[], water:[{id:"w-ex", points:[[X + 40, Y], [X + 50, Y], [X + 50, Y + 10], [X + 40, Y + 10]]}]};
+      state.exhibits.push(ex); const cw = cutWaterAll([X + 40, Y, X + 45, Y + 10]); state.exhibits.pop();
+      const exhibit = cw.m2 === 50 && ex.water.length === 1 && rectOfPts(ex.water[0].points).join() === [X + 45, Y, X + 50, Y + 10].join() && state.water.length === 1;
+      paintPick = null; setTool("select"); state.water = kw; state.biomePaint = kp || []; paintTouch(); state.money = km; render();
+      return noPick && kept && bulldozeKeeps && /Removes 25 m² of water/.test(stat) && cut && erased && exhibit;
     })();
 
     // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
