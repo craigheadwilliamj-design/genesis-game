@@ -1794,7 +1794,7 @@ const ROCK_MPP = .13;
 // Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each. Tile 1..plain are plain ground, the next `detail` tiles carry a mark (a twig, a stone).
 // js/biomepaint.js lays them out on the 1 m grid (a fixed pick per cell, turned and mirrored at random) and uses the result as the #p-<biome> and #b-<biome> patterns,
 // with `share` of the cells in each 5 m chunk (rounded at random) taking a detail tile. Tiles listed in `still` are never turned or mirrored (a stone is lit from the top left). A biome not listed keeps its sprites/ground/<biome>.png tile.
-const GROUND_TILES = {boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2, 3]}};
+const GROUND_TILES = {boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2]}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
