@@ -53,7 +53,11 @@ const ROCK_SIDE = {rock:{}, boulder:{}};   // type -> biome -> a side per pictur
 for(const [k, S] of Object.entries(PLANT_SPRITES)){
   const t = LAND[k], h = SPRITE_HIT[k]; if(!t || !h) continue;
   const mpp = t.r * 2 * (S.size || 1) / h[0], range = FOOT.range[t.size];
-  t.footSide = FOOT.side[k] || clamp(Math.round(Math.max(h[2] * mpp * 2, h[3] * mpp * 2 * FOOT.crown)), range[0], range[1]);
+  t.footSide = FOOT.side[k] || clamp(Math.round(Math.max(h[2] * mpp * 2, h[3] * mpp * 2 * FOOT.crown)), range[0], range[1]);   // the old whole-cell square: rocks, and where an old save's box stood
+  if(FOOT.rect.includes(k)){   // a redrawn plant: its box is its base width, down to the half meter, by a share of it deep
+    t.footW = FOOT.side[k] || clamp(Math.floor(h[2] * mpp * 4) / 2, .5, range[1]);
+    t.footD = FOOT.side[k] || Math.max(.5, Math.round(t.footW * FOOT.depth * 2) / 2);
+  }
 }
 for(const t of Object.values(LAND)) if(t.flora && !t.footSide) t.footSide = FOOT.plain[t.size] || 2;
 for(const type of ROCK_TYPES){
@@ -76,17 +80,22 @@ const footSquare = key => !!LAND[key] && (!!LAND[key].footSide);
 const featBiome = (f, e) => BIOMES[f.biome] ? f.biome : e ? biomeOf(e) : parkBiome();
 // A plant or rock drawn from a picture stands on its base (the picture's bottom edge is at f.y), so its box runs from there back up the map and the ground in front stays free
 const footBased = (key, biome) => !!PLANT_SPRITES[key] || (ROCK_TYPES.includes(key) && !!(ROCK_SPRITES[biome] || {})[key]);
+// Width and depth in meters of a thing's box: a pictured plant's base, else a square
+const footDims = (key, pic, biome) => { const t = LAND[key]; if(t && t.footW) return [t.footW, t.footD]; const s = footSideFor(key, pic, biome); return [s, s]; };
 // A placed thing's box [x0, y0, x1, y1]; e is the exhibit it stands in (null: out in the park)
 function footBox(f, e){
   const t = LAND[f.type]; if(!t) return [f.x, f.y, f.x, f.y];
-  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null, h = footSideFor(f.type, rb && rockPicIndex(f, rb), rb) * k / 2, up = footBased(f.type, rb) ? h : 0;
-  return [f.x - h, f.y - h - up, f.x + h, f.y + h - up];
+  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null;
+  return boxFrom(f.x, f.y, footDims(f.type, rb && rockPicIndex(f, rb), rb).map(v => v * k), footBased(f.type, rb));
 }
+// A box of these meters [width, depth] at (x, y): standing on its base (front edge at y), or centered
+const boxFrom = (x, y, [w, d], based) => based ? [x - w / 2, y - d, x + w / 2, y] : [x - w / 2, y - d / 2, x + w / 2, y + d / 2];
 // The box a new one of this kind would take at (x, y)
-function footBoxAt(key, pic, biome, x, y){ const h = footSideFor(key, pic, biome) / 2, up = footBased(key, biome) ? h : 0; return [x - h, y - h - up, x + h, y + h - up]; }
-// Snap a point so a footprint of this kind covers whole cells: odd sides center on a cell across, even on a grid corner. Down the map the box ends at the point when it stands on a base, so that is a grid line for any side; else it is centered like across. Other things keep the grid corner.
+function footBoxAt(key, pic, biome, x, y){ return boxFrom(x, y, footDims(key, pic, biome), footBased(key, biome)); }
+// Snap a point so a footprint of this kind covers whole cells: odd sides center on a cell across, even on a grid corner. Down the map the box ends at the point when it stands on a base, so that is a grid line for any side; else it is centered like across. A pictured plant's box snaps to the half meter instead (its edges, not its center). Other things keep the grid corner.
 function footSnap(key, pic, biome, x, y){
   if(!footSquare(key)) return [Math.round(x), Math.round(y)];
+  if(LAND[key].footW) return [Math.round((x - LAND[key].footW / 2) * 2) / 2 + LAND[key].footW / 2, Math.round(y * 2) / 2];
   const odd = Math.round(footSideFor(key, pic, biome)) % 2;
   return [odd ? Math.floor(x) + .5 : Math.round(x), odd && !footBased(key, biome) ? Math.floor(y) + .5 : Math.round(y)];
 }
