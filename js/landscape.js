@@ -193,7 +193,7 @@ function wantsOf(e, s){
   const meat = !s.diet.some(d => d === "herbivore" || d === "omnivore");
   // no plants at all if its period had none in this biome (nothing to plant)
   const none = !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);
-  return {water:l.water * HAB.waterMax, rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
+  return {water:waterWant(s), rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
 // A plant counts for a species when it's from the animal's own period
 // Plants from another biome don't count for anything and make animals unhappy
