@@ -1566,7 +1566,7 @@ const BIOMES = {
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Temperate", ground:"woodland and meadow",         color:"#40813F", park:"#40813F", perSqM:.6, rock:0.8, plants:0.08},
   boreal:   {label:"Boreal",    ground:"cold conifer forest",         color:"#587260", park:"#587260", perSqM:.8, rock:1, plants:0.08},
-  tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#B3BDA3", park:"#B3BDA3", perSqM:.6, rock:1.4, plants:0.02},
+  tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#C3CDD4", park:"#C3CDD4", perSqM:.6, rock:1.4, plants:0.02},
 };
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
@@ -1794,7 +1794,7 @@ const ROCK_MPP = .13;
 // Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each. Tile 1..plain are plain ground, the next `detail` tiles carry a mark (a twig, a stone).
 // js/biomepaint.js lays them out on the 1 m grid (a fixed pick per cell, turned and mirrored at random) and uses the result as the #p-<biome> and #b-<biome> patterns,
 // with `share` of the cells in each 5 m chunk (rounded at random) taking a detail tile. Tiles listed in `still` are never turned or mirrored (a stone is lit from the top left). A biome not listed keeps its sprites/ground/<biome>.png tile.
-const GROUND_TILES = {boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}};
+const GROUND_TILES = {boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2]}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
