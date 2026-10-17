@@ -1794,7 +1794,7 @@ const PLANT_SPRITES = {
 const ROCK_MPP = .13;
 // Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each, n = 1..count. js/biomepaint.js lays them out at random on the 1 m grid
 // (a fixed pick per cell) and uses the result as the #p-<biome> pattern; a biome not listed keeps its sprites/ground/<biome>.png tile.
-const GROUND_TILES = {boreal:4};
+const GROUND_TILES = {boreal:5};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
