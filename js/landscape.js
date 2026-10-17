@@ -754,9 +754,13 @@ function placeLand(e, key, x, y, biome, pic){
 const seedOf = f => { let h = 2166136261; for(const c of String(f.id || f.x + "," + f.y)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
 function rngOf(seed){ return () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
 // Closed outline around (x, y) within radius r. Sharp = straight edges (rock), otherwise smoothed (leaves).
-function blobPath(x, y, r, seed, sharp){
+// the corner points of a lumpy blob outline (blobPath draws them, and the guests' cover test reads the same ones)
+function blobPts(x, y, r, seed, sharp){
   const rnd = rngOf(seed), n = sharp ? 6 + Math.floor(rnd() * 3) : 7 + Math.floor(rnd() * 3), a0 = rnd() * 6.283;
-  const p = Array.from({length:n}, (_, i) => { const a = a0 + i * 6.283 / n + (rnd() - .5) * .5, k = r * (sharp ? .62 + rnd() * .38 : .68 + rnd() * .32); return [x + k * Math.cos(a), y + k * Math.sin(a)]; });
+  return Array.from({length:n}, (_, i) => { const a = a0 + i * 6.283 / n + (rnd() - .5) * .5, k = r * (sharp ? .62 + rnd() * .38 : .68 + rnd() * .32); return [x + k * Math.cos(a), y + k * Math.sin(a)]; });
+}
+function blobPath(x, y, r, seed, sharp){
+  const p = blobPts(x, y, r, seed, sharp), n = p.length;
   if(sharp) return "M" + p.map(q => q[0].toFixed(2) + " " + q[1].toFixed(2)).join("L") + "Z";
   const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], m0 = mid(p[n - 1], p[0]);
   let d = `M${m0[0].toFixed(2)} ${m0[1].toFixed(2)}`;
