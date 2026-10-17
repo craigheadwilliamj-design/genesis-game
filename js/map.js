@@ -1788,7 +1788,7 @@ function animateAnimals(dt){
       continue;
     }
     // an open-exhibit picture with an idle strip but no walk strip cycles the idle strip all the time, still or moving
-    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle, idleOnlyFrame = () => setPose(h, idleFrame(h, S));
+    const S = SPRITES[h.sp], idleOnly = h.spr && S && !S.walk && S.idle && !rigOf(h.sp), idleOnlyFrame = () => setPose(h, idleFrame(h, S));
     if(h.wait > 0){ h.wait -= dt; if(swimmingPic(h)) setPose(h, swimFrame(h, S)); else if(idleOnly) idleOnlyFrame(); else if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle"); else setPose(h, restPose(h, S)); continue; }
     if(!h.path || h.key !== JSON.stringify(e.points)) animalPlan(h, e);   // new animal, new act, or the exhibit was reshaped
     // once there, eating, drinking, resting and hiding animals stay put until the act changes; the rest look around, then move on
