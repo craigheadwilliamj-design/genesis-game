@@ -589,6 +589,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const before = state.today.moodN; goHome(p);
     out.partyLeaves = run(600, () => p.gone) && !parties.includes(p) && state.today.moodN === before + 2;
 
+    // no curfew: a party whose stay isn't done is still in the park after 10 PM, and carries over the day's turn
+    resetParties(); state.minute = minuteAtClock(21 * 60 + 30); guestsArrive(2); const np = parties[0];
+    np.until = state.minute + 300; np.mood = 90; np.needs = {hunger:0, thirst:0, bladder:0, energy:0};
+    const late = minuteAtClock(22 * 60) + 5;
+    for(; state.minute < late; state.minute++){ derived.demand = 0; guestsTick(state.minute, state.minute + 1); np.mood = 90; np.needs = {hunger:0, thirst:0, bladder:0, energy:0}; }
+    out.guestStaysPastCurfew = parties.includes(np) && !np.home && !np.gone && np.until > state.minute;
+    const u0 = np.until; shiftStamps(DAY_MIN);
+    out.guestStaysOverRollover = np.until === u0 - DAY_MIN && !np.home;
+    state.minute = minuteAtClock(22.5 * 60); const sl = GUEST.stay.map(x => x / GUEST.pace);
+    out.stayUncapped = Array.from({length:30}, () => newParty(2).until - state.minute).every(d => d >= sl[0] - 1e-6 && d <= sl[1] + 1e-6);
+
     // a desperate party gives up on a long queue
     guestsArrive(1); const q = parties[parties.length - 1];
     svcQ.set("b-r", {queue:[q], busy:[{readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}, {readyAt:1e9}]}); q.in = "b-r"; q.waited = 0; q.why = "bladder"; q.dest = "b-r";
@@ -633,7 +644,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const day = state.day;
     while(state.day === day) tick(2);
     const h = state.history[state.history.length - 1];
-    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && parties.length < 8;   // a few guests may still be in the park: the day turns over at 4 AM, not at closing
+    out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && state.guestLog.last.guests > 0;   // some left during the day; the rest are still in the park, since the day turns over at the rollover hour and nobody is sent home at closing
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
 
     // a tired party sits on a bench, and gets up rested

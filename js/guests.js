@@ -175,10 +175,6 @@ function newParty(n){
   const p = {id:uid("g"), n, name:SURNAMES[Math.floor(Math.random() * SURNAMES.length)] + " party", pers, cash:n * rand(...GUEST.cash), mood:GUEST.startMood + 4 * state.rating, needs, seen:new Set(), thought:new Set(), cool:{},
              until:state.minute + rand(...GUEST.stay) / GUEST.pace, at:gGraph ? gGraph.gate : null, to:null, t:0, prev:null, dest:null, why:null, home:false,
              spd:rand(...GUEST.speed) * GUEST.pace, off:(Math.random()*2-1) * 1.4, tramRoll:Math.random(), in:null, rowdy:pers.includes("hooligan"), lane:Math.random()*2-1, sj:[Math.random()*2-1, Math.random()*2-1]};
-  // most daytime parties plan to be gone by the curfew, a few stay on; ones who turn up after hours stay a while, not a day
-  const m = state.minute, curfew = minuteAtClock(GUEST.curfew * 60);
-  if(m >= curfew || m < ARRIVE_START) p.until = Math.min(p.until, m + GUEST.nightStay);
-  else if(Math.random() >= GUEST.overnight) p.until = Math.min(p.until, Math.max(curfew, m + 60));
   p.sneaked = sneaksIn(p);   // hooligans may slip in without a ticket
   if(!p.sneaked && state.ticket > fairTicket() * 1.3 * pm(p, "ticket")){ thinks(p, "pricey"); p.mood -= 8; }
   return p;
