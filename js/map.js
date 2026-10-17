@@ -415,6 +415,7 @@ function render(){
   }
 
   occ34 = tilt ? occluders34() : [];
+  wall34 = tilt ? wallStrips34() : [];
   world.innerHTML = s;
   renderOverlay();
   syncAnimals();
@@ -923,6 +924,61 @@ function camp34(bl, P, col, line){
   s += `<circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r="1" fill="#6E6A60"/><circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r=".6" fill="#E8742A"/><circle cx="${fx.toFixed(2)}" cy="${(fy - .2).toFixed(2)}" r=".3" fill="#FFD27A"/>`;
   for(const tn of tents) s += `<polygon points="${polyStr(tn.pts.map(([x, y]) => [x + .35, y + .3]))}" fill="#1D2B22" fill-opacity=".2" pointer-events="none"/>` + hipRoof34(tn.pts, 0, 1.8, tn.c, null, line, true) + tentDoor34(tn.pts);
   return s;
+}
+
+// Solid fence sides on the far edge of an exhibit stand over the path behind them, so they cover a guest's legs there (guests are drawn above the whole world).
+// Each strip is {a, b, up}: a left to right along its base, up the map y it stands (a fence's height, or a barn shelter's body to its roof). See-through fences (wood, bars, glass, ...) and open canopies are left out.
+let wall34 = [];
+function wallStrips34(){
+  const out = [];
+  for(const e of state.exhibits){
+    if(e.viv || e.open) continue;
+    const P = e.points, kinds = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : null, off = e.grid ? sideOffsets(e) : null;
+    for(let i = 0; i < P.length; i++){
+      if(norm34(P, i)[1] > .05) continue;
+      const F = FENCE34[kinds ? kinds[i] : e.barrier || "wood"];
+      if(!F || !(F.solid === 1 || F.hedge)) continue;
+      let a = P[i], b = P[(i + 1) % P.length]; const o = off && off[i];
+      if(o){ a = [a[0] + o[0], a[1] + o[1]]; b = [b[0] + o[0], b[1] + o[1]]; }
+      if(a[0] > b[0]) [a, b] = [b, a];
+      if(b[0] - a[0] > .01) out.push({a, b, x0:a[0], x1:b[0], up:F.h / TILT});
+    }
+    for(const f of landOf(e)){   // a barn, cave or burrow, from its front edge up to its far eave and a bit of the ridge
+      const t = LAND[f.type];
+      if(!t || !t.slots || f.k || t.look === "canopy") continue;
+      if(t.look === "cave" || t.look === "burrow"){   // the lumpy outline rock34 draws, swept up by the mound's height
+        const r = t.look === "burrow" ? t.r * .8 : t.r, P = blobPts(f.x, f.y, r, seedOf(f), true);
+        out.push({x0:Math.min(...P.map(q => q[0])), x1:Math.max(...P.map(q => q[0])), P, up:r * .85 / TILT});
+        continue;
+      }
+      const h = t.r * .78;
+      out.push({x0:f.x - h, x1:f.x + h, a:[f.x - h, f.y + h], b:[f.x + h, f.y + h], up:2 * h + (t.r * .5 + t.r * .45 * .5) / TILT});
+    }
+  }
+  return out;
+}
+// How far up from a ground spot a far fence covers things standing there, as a y on the map (the fence's top edge), or null if nothing covers it
+function wallCut34(x, y){
+  let cut = null;
+  for(const w of wall34){
+    if(x < w.x0 || x > w.x1) continue;
+    let yt, yb;
+    if(w.P){   // a mound: its outline's highest and lowest y at this x
+      yt = Infinity; yb = -Infinity;
+      for(let i = 0, n = w.P.length; i < n; i++){
+        const p = w.P[i], q = w.P[(i + 1) % n];
+        if((p[0] <= x) === (q[0] <= x)) continue;
+        const yy = p[1] + (q[1] - p[1]) * (x - p[0]) / (q[0] - p[0]);
+        if(yy < yt) yt = yy;
+        if(yy > yb) yb = yy;
+      }
+      if(yt === Infinity) continue;
+      yt -= w.up;
+    }
+    else{ yb = w.a[1] + (w.b[1] - w.a[1]) * (x - w.a[0]) / (w.b[0] - w.a[0]); yt = yb - w.up; }
+    if(y < yb && y > yt && (cut === null || yt < cut)) cut = yt;
+  }
+  return cut;
 }
 
 // Standing buildings hide the guests and staff walking behind them: each one's footprint swept up to its roof line.
@@ -1788,6 +1844,7 @@ function partyPos(p){
 }
 // Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
 const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
+let guestClipN = 0;
 // A party up on a viewing platform is drawn at deck height, rising up the steps (the deck is outside its footprint by the steps' run)
 function deckLift(p, x, y){
   const b = p.deckB;
@@ -1808,7 +1865,19 @@ function drawParties(){
       if(!el){
         el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
         el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(guestKind(p), hm, null);
+        el._cid = "gcl" + guestEls.size + "-" + (guestClipN++);
+        el.insertAdjacentHTML("beforeend", `<clipPath id="${el._cid}"><rect x="-9" width="18"/></clipPath>`);
         guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el);
+      }
+      // behind a solid far fence: only what's above the fence's top edge shows
+      const cut = wallCut34(x, y);
+      if(cut === null){ if(el._cut != null) el.removeAttribute("clip-path"); el._cut = null; }
+      else{
+        const lc = (cut - y + deckLift(p, x, y) / TILT) * TILT;   // the cut's height on the guest, feet at 0 and up negative
+        if(el._cut !== lc){
+          el._cut = lc; const r = el.querySelector("clipPath rect"); r.setAttribute("y", -hm * 2); r.setAttribute("height", Math.max(0, lc + hm * 2));
+          el.setAttribute("clip-path", `url(#${el._cid})`);
+        }
       }
       const col = cols[ci] || SHIRTS[ci];
       if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
