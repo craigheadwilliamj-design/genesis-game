@@ -1562,6 +1562,7 @@ const BIOMES = {
   desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#D7C48C", park:"#D7C48C", perSqM:.5, rock:1.6, plants:0.01},
   tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#155310", park:"#155310", perSqM:1, rock:0.6, plants:0.12},
   grassland:{label:"Grassland", ground:"open plains",                 color:"#C3CC76", park:"#C3CC76", perSqM:.3, rock:0.6, plants:0.03},
+  fern:     {label:"Fern Prairie", ground:"open fern, horsetail and cycad ground", color:"#976937", park:"#976937", perSqM:.3, rock:0.7, plants:0.04},   // placeholder look: scrubland's
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#976937", park:"#976937", perSqM:.4, rock:1.3, plants:0.03},
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Seasonal Forest", ground:"broadleaf woodland and meadow", color:"#40813F", park:"#40813F", perSqM:.6, rock:0.8, plants:0.08},
@@ -1569,6 +1570,7 @@ const BIOMES = {
   tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#C3CDD4", park:"#C3CDD4", perSqM:.6, rock:1.4, plants:0.02},
 };
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
+// (The fern plants are placeholders named for their period until the real list.)
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
 // A biome missing from a period has no plants there (no grassland before the Neogene). They go in LAND below as keys like "jur-tropical-small".
 const PLANT_TABLE = {
@@ -1576,15 +1578,15 @@ const PLANT_TABLE = {
     scrubland:"Hostinella|Sawdonia|Drepanophycus", temperate:"Gosslingia|Barinophyton|Archaeopteris"},
   Carboniferous:{tropical:"Sphenophyllum|Calamites|Lepidodendron", wetland:"Asterophyllites|Medullosa|Sigillaria",
     temperate:"Neuropteris|Alethopteris|Cordaites", desert:"Sphenopteris|Callipteris|Walchia"},
-  Permian:{desert:"Supaia|Ullmannia|Pseudovoltzia", tropical:"Taeniopteris|Gigantopteris|Psaronius", wetland:"Annularia|Pecopteris|Arthropitys",
+  Permian:{fern:"Permian Fern|Permian Horsetail|Permian Tree Fern", desert:"Supaia|Ullmannia|Pseudovoltzia", tropical:"Taeniopteris|Gigantopteris|Psaronius", wetland:"Annularia|Pecopteris|Arthropitys",
     scrubland:"Peltaspermum|Comia|Callistophyton", temperate:"Sphenobaiera|Rufloria|Ginkgophyllum", boreal:"Gangamopteris|Noeggerathiopsis|Glossopteris"},
-  Triassic:{desert:"Dicroidium|Pleuromeia|Voltzia", tropical:"Neocalamites|Zamites|Araucarioxylon", scrubland:"Lepidopteris|Scytophyllum|Pagiophyllum",
+  Triassic:{fern:"Triassic Fern|Triassic Horsetail|Triassic Tree Fern", desert:"Dicroidium|Pleuromeia|Voltzia", tropical:"Neocalamites|Zamites|Araucarioxylon", scrubland:"Lepidopteris|Scytophyllum|Pagiophyllum",
     wetland:"Equisetites|Cladophlebis|Heidiphyllum", temperate:"Baiera|Podozamites|Elatocladus"},
-  Jurassic:{tropical:"Nilssonia|Williamsonia|Cycadeoidea", wetland:"Coniopteris|Todites|Matonidium", scrubland:"Otozamites|Ptilophyllum|Brachyphyllum",
+  Jurassic:{fern:"Jurassic Fern|Jurassic Horsetail|Jurassic Tree Fern", tropical:"Nilssonia|Williamsonia|Cycadeoidea", wetland:"Coniopteris|Todites|Matonidium", scrubland:"Otozamites|Ptilophyllum|Brachyphyllum",
     temperate:"Ginkgoites|Czekanowskia|Araucarites", desert:"Pachypteris|Hirmeriella|Cupressinocladus", boreal:"Phoenicopsis|Pityophyllum|Elatides"},
-  Cretaceous:{tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
+  Cretaceous:{fern:"Cretaceous Fern|Cretaceous Horsetail|Cretaceous Tree Fern", tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
     temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
-  Paleogene:{tropical:"Climbing Fern|Nipa Palm|Dipterocarp Tree", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
+  Paleogene:{fern:"Paleogene Fern|Paleogene Horsetail|Paleogene Tree Fern", tropical:"Climbing Fern|Nipa Palm|Dipterocarp Tree", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
     boreal:"Royal Fern|Birch|Larch", scrubland:"Hopbush|Acacia|Eucalyptus", desert:"Tamarisk|Saxaul|Honey Mesquite"},
   Neogene:{grassland:"Bluegrass|Kangaroo Grass|Pampas Grass", tropical:"Heliconia|Banana|Kapok", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Sagebrush|Saltbush|Juniper",
     temperate:"Anemone|Acer|Fagus", boreal:"Blueberry|Alder|Spruce", desert:"Cholla|Century Plant|Saguaro", tundra:"Cottongrass|Crowberry|Arctic Willow"},
@@ -1594,7 +1596,7 @@ const PLANT_TABLE = {
 // Leaf colors by biome, small to large
 const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6B", "#2F9A55", "#1F7A45"], grassland:["#B8D26A", "#9CBE55", "#7FA847"],
   scrubland:["#A8AE62", "#8E9654", "#747E48"], wetland:["#5FB8A2", "#3E9C88", "#2B7F6F"], temperate:["#8CC46E", "#6BAA55", "#4E8F42"], boreal:["#6E9C86", "#4F8068", "#386650"],
-  tundra:["#A9B48A", "#8C9A70", "#6F7F5A"]};
+  tundra:["#A9B48A", "#8C9A70", "#6F7F5A"], fern:["#8FB86A", "#6FA05A", "#4F8648"]};
 // Landscape plants drawn with a picture instead of code: sprites/plants/<LAND key>.png, 3/4 view with the base at the bottom middle.
 // ratio is width over height; size scales the width (2 x the plant's radius) so a tall plant isn't drawn too wide. Plants not listed keep their SVG.
 const PLANT_SPRITES = {
@@ -1794,13 +1796,17 @@ const ROCK_MPP = .13;
 // Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each. Tile 1..plain are plain ground, the next `detail` tiles carry a mark (a twig, a stone).
 // js/biomepaint.js lays them out on the 1 m grid (a fixed pick per cell, turned and mirrored at random) and uses the result as the #p-<biome> and #b-<biome> patterns,
 // with `share` of the cells in each 5 m chunk (rounded at random) taking a detail tile. Tiles listed in `still` are never turned or mirrored (a stone is lit from the top left). A biome not listed keeps its sprites/ground/<biome>.png tile.
-const GROUND_TILES = {grassland:{plain:1, detail:2, share:.1, still:[2]}, boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2]}, tropical:{plain:1, detail:2, share:.1, still:[1, 2, 3]}};
+const GROUND_TILES = {grassland:{plain:1, detail:2, share:.1, still:[2]}, boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, fern:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2]}, tropical:{plain:1, detail:2, share:.1, still:[1, 2, 3]}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
     rock:[[43, 31], [33, 32], [32, 39], [31, 29], [34, 32], [40, 29]],
   },
   scrubland:{
+    boulder:[[68, 66], [37, 59], [74, 62], [57, 63]],
+    rock:[[44, 30], [33, 31], [31, 38], [29, 29], [33, 31], [38, 38]],
+  },
+  fern:{
     boulder:[[68, 66], [37, 59], [74, 62], [57, 63]],
     rock:[[44, 30], [33, 31], [31, 38], [29, 29], [33, 31], [38, 38]],
   },
@@ -2033,9 +2039,13 @@ const SPRITE_HIT = {
   "boulder-grassland-3":[37,46,14.5,14.5,",12-27,9-30,7-31,5-32,4-32,4-32,4-32,4-32,5-32,10-27"],
   "boulder-grassland-4":[50,44,21,21,",12-38,8-42,6-43,4-44,4-44,4-45,4-45,4-44,10-39"],
   "boulder-scrubland-1":[68,66,30,30.5,",21-51,14-57,11-60,10-60,9-61,9-62,8-62,7-63,5-63,5-63,3-63,3-62,3-60,7-55,23-41"],
+  "boulder-fern-1":[68,66,30,30.5,",21-51,14-57,11-60,10-60,9-61,9-62,8-62,7-63,5-63,5-63,3-63,3-62,3-60,7-55,23-41"],
   "boulder-scrubland-2":[37,59,14.5,15,",16-29,13-30,10-31,9-31,8-31,6-32,6-32,6-31,5-31,3-31,3-31,4-31,7-26"],
+  "boulder-fern-2":[37,59,14.5,15,",16-29,13-30,10-31,9-31,8-31,6-32,6-32,6-31,5-31,3-31,3-31,4-31,7-26"],
   "boulder-scrubland-3":[74,62,33,33,",38-64,34-66,32-67,32-68,15-68,9-69,8-69,6-69,5-69,5-69,4-69,4-65,7-57,12-34"],
+  "boulder-fern-3":[74,62,33,33,",38-64,34-66,32-67,32-68,15-68,9-69,8-69,6-69,5-69,5-69,4-69,4-65,7-57,12-34"],
   "boulder-scrubland-4":[57,63,23.5,24.5,",21-36,12-45,10-47,7-51,7-51,5-52,5-52,4-52,4-52,4-52,4-52,5-47,5-43,6-39"],
+  "boulder-fern-4":[57,63,23.5,24.5,",21-36,12-45,10-47,7-51,7-51,5-52,5-52,4-52,4-52,4-52,4-52,5-47,5-43,6-39"],
   "boulder-temperate-1":[59,54,24,25.5,",15-42,12-50,10-53,7-53,6-54,5-54,4-54,4-54,4-53,5-51,6-48,19-35"],
   "boulder-temperate-2":[73,52,31.5,33,",38-61,34-63,32-66,30-67,9-68,7-68,5-68,3-68,3-67,3-63,9-33"],
   "boulder-temperate-3":[33,52,13,13,",15-25,11-27,9-28,7-28,6-28,4-28,4-28,3-28,3-28,5-27,6-26"],
@@ -2070,11 +2080,17 @@ const SPRITE_HIT = {
   "rock-grassland-5":[39,27,14.5,15.5,",18-32,8-33,4-34,4-34,6-31"],
   "rock-grassland-6":[35,25,13,13.5,",8-28,4-30,4-30,4-29,10-22"],
   "rock-scrubland-1":[44,30,17,18,",5-38,4-39,4-39,4-39,5-38,14-29"],
+  "rock-fern-1":[44,30,17,18,",5-38,4-39,4-39,4-39,5-38,14-29"],
   "rock-scrubland-2":[33,31,10.5,12.5,",8-25,5-27,4-28,4-28,5-28,7-23"],
+  "rock-fern-2":[33,31,10.5,12.5,",8-25,5-27,4-28,4-28,5-28,7-23"],
   "rock-scrubland-3":[31,38,11.5,11.5,",10-22,7-25,5-25,5-26,4-26,4-26,5-25,8-24"],
+  "rock-fern-3":[31,38,11.5,11.5,",10-22,7-25,5-25,5-26,4-26,4-26,5-25,8-24"],
   "rock-scrubland-4":[29,29,10,10.5,",8-23,5-24,4-24,4-24,4-23,10-16"],
+  "rock-fern-4":[29,29,10,10.5,",8-23,5-24,4-24,4-24,4-23,10-16"],
   "rock-scrubland-5":[33,31,11,12.5,",8-26,6-28,4-28,4-28,4-28,9-28"],
+  "rock-fern-5":[33,31,11,12.5,",8-26,6-28,4-28,4-28,4-28,9-28"],
   "rock-scrubland-6":[38,38,14.5,15,",9-22,8-23,8-30,4-33,4-33,4-33,5-31,10-28"],
+  "rock-fern-6":[38,38,14.5,15,",9-22,8-23,8-30,4-33,4-33,4-33,5-31,10-28"],
   "rock-temperate-1":[42,30,15,17,",8-32,6-36,4-37,4-37,4-35,13-33"],
   "rock-temperate-2":[35,29,14,14,",9-26,6-29,3-30,3-30,3-30,10-22"],
   "rock-temperate-3":[36,31,13,14,",9-27,5-30,4-31,4-31,4-31,8-27"],
@@ -2112,7 +2128,7 @@ const FOOT = {
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
 // Rocks and boulders are the same in every biome, just a natural stone color that fits it. Boulders run a shade darker.
-const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73", tundra:"#7F8780"};
+const ROCK_STONE = {desert:"#B98F68", tropical:"#6F7468", grassland:"#8E9188", scrubland:"#A39A83", fern:"#A39A83", wetland:"#6B7B76", temperate:"#868A8C", boreal:"#5F6A73", tundra:"#7F8780"};
 const rockTone = (biome, type) => { const base = plantMix(ROCK_STONE[biome] || ROCK_STONE[DEFAULT_BIOME], "#000000", type === "boulder" ? .16 : 0);
   return {fill:base, light:plantMix(base, "#ffffff", .35), dark:plantMix(base, "#000000", .3)}; };
 // Per size: price by era, radius, daily browse, label style
