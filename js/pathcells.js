@@ -256,15 +256,23 @@ function pathReach(){
 const chunkReached = (cx, cy, guests) => pathReach()[guests ? "G" : "A"].has(cnum(cx, cy));
 // Is a world point on a chunk joined to the entrance?
 const pointReached = (x, y, guests) => { const [cx, cy] = chunkAt(x, y); return chunkReached(cx, cy, guests); };
-// Is a shape within d meters of a chunk that is joined to the entrance (guests: guest and bridge chunks; staff: any)? With any: of any chunk at all, joined or not.
-function nearCells(shape, d, guests, any){
+// Is a shape within d meters of a chunk that is joined to the entrance (guests: guest and bridge chunks; staff: any)? With any: of any chunk at all, joined or not. With kind: only chunks of that kind.
+function nearCells(shape, d, guests, any, kind){
   const set = any ? null : pathReach()[guests ? "G" : "A"], C = pathChunks(), b = bbox(shape);
   for(let cx = Math.floor((b.x0 - d) / CHUNK); cx * CHUNK <= b.x1 + d; cx++) for(let cy = Math.floor((b.y0 - d) / CHUNK); cy * CHUNK <= b.y1 + d; cy++){
     if(set ? !set.has(cnum(cx, cy)) : !C[chunkKey(cx, cy)]) continue;
     if(any && guests && !guestCell(C[chunkKey(cx, cy)])) continue;
+    if(kind && C[chunkKey(cx, cy)] !== kind) continue;
     const r = chunkRect(cx, cy);
     if(lineShapeDist([...r, r[0]], shape) <= d || inPoly(shape[0][0], shape[0][1], r)) return true;
   }
+  return false;
+}
+// Does a shape sit on any path chunk? Touching a chunk's edge doesn't count.
+function shapeOnChunks(shape){
+  const C = pathChunks(), b = bbox(shape);
+  for(let cx = Math.floor(b.x0 / CHUNK); cx * CHUNK < b.x1; cx++) for(let cy = Math.floor(b.y0 / CHUNK); cy * CHUNK < b.y1; cy++)
+    if(C[chunkKey(cx, cy)] && shapesOverlap(chunkRect(cx, cy), shape)) return true;
   return false;
 }
 // Did these chunks (keys) just join the entrance? (guests: guest and bridge chunks only)

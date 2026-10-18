@@ -1736,23 +1736,83 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     parties = keepParties;
     state.paths = wPaths; recompute(); buildGuestGraph();
 
-    // a building can go far from any path (but doesn't work there), and Rotate turns it 45°
+    // a building can go far from any path (but doesn't work there), and Rotate turns it 90°
     const savedPaths = state.paths; state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]]}]; state.gate = [200,300]; recompute();
     setTool("food"); rot = 0; placeGhost(0, 0); const g0 = ghost; const w0 = Math.hypot(g0.pts[1][0] - g0.pts[0][0], g0.pts[1][1] - g0.pts[0][1]);
     rotateTool(); const w1 = Math.hypot(ghost.pts[1][0] - ghost.pts[0][0], ghost.pts[1][1] - ghost.pts[0][1]);
-    out.offPathRotate = typeof g0.ok === "boolean" && !(g0.why || "").includes("next to a path") && Math.abs(w0 - w1) < 1e-6 && Math.abs(ghost.angle - g0.angle - Math.PI/4) < 1e-6;
+    out.offPathRotate = typeof g0.ok === "boolean" && !(g0.why || "").includes("next to a path") && Math.abs(w0 - w1) < 1e-6 && Math.abs(ghost.angle - g0.angle - Math.PI/2) < 1e-6;
     const rc0 = svg.getBoundingClientRect();
-    // a building flush against its path can still be turned with the Move tool (it slides clear)
-    state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-t", points:[[100,100],[160,100]]}]; state.buildings = []; recompute();
-    setTool("food"); rot = 0; lastPtr = null; placeGhost(rc0.left + view.tx + 130*view.k, rc0.top + view.ty + 92*ky()); const flush = ghost;
-    out.rotateFlush = false;
-    if(flush.ok){ const fb = {id:"b-flush", type:"food", points:flush.pts}; state.buildings.push(fb); setTool("move"); mvSel = fb.id; rotateMoved(); out.rotateFlush = Math.abs(Math.atan2(fb.points[1][1] - fb.points[0][1], fb.points[1][0] - fb.points[0][0]) - flush.angle) > .5 && !moveProblem("building", fb); }
     setTool("select");
     state.paths = [{id:"p-gate", points:[[200,300],[200,300.5]], fixed:true}, {id:"p-h", points:[[200,300],[300,300]]}, {id:"p-w", type:"wide", points:[[250,240],[250,297.5]]}]; recompute();
     out.wideShortNotJoined = !derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 0;
     state.paths[2].points[1] = [250, 300]; recompute();
     out.wideOnCenterJoined = derived.joined.has("p-w") && wideJoin(state.paths[2]).clips.length === 1;
     setTool("select"); state.paths = savedPaths; recompute();
+
+    // buildings go on the 1 m grid square to the map; path chunks, fences, water and other buildings are the only things in the way
+    {
+      const K = {C:state.pathChunks, F:state.pathFixed, P:state.paths, B:state.buildings, Fe:state.fences, W:state.water, money:state.money, sb:state.sandbox, rot};
+      const W = mainWalkChunks([200, 300]);
+      state.pathChunks = W.C; state.pathFixed = W.F; state.paths = []; state.buildings = []; state.fences = []; state.water = []; state.sandbox = true; state.money = 1e7;
+      pathVer++; recompute(); buildGuestGraph();
+      const rc = svg.getBoundingClientRect(), px = (x, y) => [rc.left + view.tx + x * view.k, rc.top + view.ty + y * ky()];
+      const at = (x, y) => { placeGhost(...px(x, y)); return ghost; }, stat = () => $("#dStat").textContent;
+      const square = g => g.pts.every((q, i) => { const n = g.pts[(i + 1) % 4]; return Math.abs(q[0] - n[0]) < 1e-6 || Math.abs(q[1] - n[1]) < 1e-6; });
+      const mid = g => [(g.pts[0][0] + g.pts[2][0]) / 2, (g.pts[0][1] + g.pts[2][1]) / 2];
+      setTool("food"); rot = 0; lastPtr = null;
+      const f0 = at(220.4, 270.3), m0 = mid(f0);
+      out.placeGrid = f0.ok && square(f0) && Math.abs(m0[0] - 220) < 1e-6 && Math.abs(m0[1] - 270) < 1e-6 && f0.angle === 0;
+      // a path beside it doesn't turn it or pull it to the path
+      out.placeNoSnap = Math.abs(at(212.2, 250.8).angle) < 1e-9 && Math.abs(mid(ghost)[0] - 212) < 1e-6;
+      // Rotate: four distinct quarter turns, all square
+      const turns = []; for(let i = 0; i < 4; i++){ turns.push(ghost.angle.toFixed(4)); rotateTool(); }
+      out.rotateQuarterTurns = new Set(turns).size === 4 && rot === 0 && square(ghost) && Math.abs(ghost.angle) < 1e-9;
+      rotateTool(); const tall = ghost; out.rotateSwapsSides = Math.abs((Math.max(...tall.pts.map(q => q[1])) - Math.min(...tall.pts.map(q => q[1]))) - BUILDINGS.food.w) < 1e-6;
+      rot = 0;
+      // refused on a chunk (even 1 m of it), fine flush against its edge
+      const onPathG = at(204, 270), clipG = at(205 + BUILDINGS.food.w / 2 - 1, 270), flushG = at(Math.ceil(205 + BUILDINGS.food.w / 2), 270);
+      out.placeRefusesChunk = !onPathG.ok && onPathG.why === "It sits on a path." && !clipG.ok && clipG.why === "It sits on a path." && flushG.ok;
+      // the reach warning: 3.5 m from a chunk is as far as it works (food stand is 10 m wide, so its middle is 5 m + the gap from the edge)
+      at(205 + 5 + 3, 270); const nearOk = ghost.ok && !stat().includes("No path nearby");
+      at(205 + 5 + 4, 270); const farWarn = ghost.ok && stat().includes("No path nearby");
+      out.placeReachWarning = nearOk && farWarn;
+      // fences, water, exhibits and buildings
+      state.fences = [{points:[[230, 265], [230, 275]], barrier:"wood"}]; out.placeRefusesFence = !at(230, 270).ok && at(230, 270).why.includes("fence"); state.fences = [];
+      state.water = [{id:"w-pg", points:[[225, 262], [235, 262], [235, 278], [225, 278]]}]; out.placeRefusesWater = !at(230, 270).ok && at(230, 270).why.includes("water"); state.water = [];
+      const nb = {id:"b-pg", type:"food", points:at(230, 270).pts}; state.buildings = [nb];
+      out.placeRefusesBuilding = !at(233, 270).ok && at(233, 270).why === "It overlaps another building." && at(230 + BUILDINGS.food.w, 270).ok;
+      state.buildings = [];
+      // dept and service-only buildings: a depot wants a staff chunk, not just any path
+      const techKeep = state.science.tech.slice(); state.science.tech.push("vehicles"); setTool("depot"); const D = BUILDINGS.depot, dx = 205 + D.w / 2 + 2;
+      at(dx, 264); const depotGuest = stat().includes("No path nearby");
+      state.pathChunks = Object.assign({}, W.C, {[chunkKey(41, 54)]:"s"}); pathVer++; recompute();
+      at(dx, 264); const depotStaff = !stat().includes("No path nearby");
+      state.pathChunks = Object.assign({}, W.C); pathVer++; recompute();
+      state.science.tech = techKeep; out.placeServiceRules = depotGuest && depotStaff;
+      // the guest walking graph still finds a building placed at the reach limit, in both turns
+      setTool("restroom");
+      for(const r of [0, 2]){
+        rot = r; state.buildings = []; const g = at(205 + (r ? BUILDINGS.restroom.d : BUILDINGS.restroom.w) / 2 + 3, 270);
+        state.buildings = [{id:"b-lim" + r, type:"restroom", points:g.pts}]; recompute(); buildGuestGraph();
+        out["guestStopAtLimit" + r] = g.ok && isReachable(state.buildings[0]) && gGraph.anchors["b-lim" + r] !== undefined;
+      }
+      state.buildings = [];
+      // Move: the same rules; a turn works in place and refuses (no sliding) when it can't
+      const mv = {id:"b-mv", type:"restroom", points:rectPts(209, 270, 8, 6, 0)}; state.buildings = [mv]; recompute(); setTool("move"); mvSel = mv.id;
+      out.moveFlushOk = !moveProblem("building", mv);
+      const c0 = centroid(mv.points); rotateMoved(); const c1 = centroid(mv.points);
+      out.moveTurnsInPlace = Math.abs(c0[0] - c1[0]) < 1e-6 && Math.abs(c0[1] - c1[1]) < 1e-6 && Math.abs(mv.points[1][1] - mv.points[0][1]) > 5 && !moveProblem("building", mv);
+      mv.points = rectPts(207.5, 270, 9, 3, 0); out.moveRefusesChunk = moveProblem("building", mv) === "It sits on a path.";   // 2.5 m of the 3 m-high... overlaps the walk
+      mv.points = rectPts(209, 270, 8, 6, 0);
+      state.buildings.push({id:"b-wall", type:"restroom", points:rectPts(209, 273.5, 8, .6, 0)});   // a sliver the turned shape (not the original) runs into
+      const before = JSON.stringify(mv.points); rotateMoved();
+      out.moveTurnRefusedNoNudge = JSON.stringify(mv.points) === before && $("#dStat").textContent.startsWith("Can't turn it here");
+      // a chunk can't be laid through a building
+      state.buildings = [{id:"b-pc", type:"restroom", points:rectPts(222.5, 270, 8, 6, 0)}];
+      out.chunkRefusedThroughBuilding = pathChunkProblem(44, 54, "g", pathCtx()) === "Paths can't go through a building." && pathChunkProblem(46, 54, "g", pathCtx()) === null;
+      setTool("select"); mvSel = null;
+      state.pathChunks = K.C; state.pathFixed = K.F; state.paths = K.P; state.buildings = K.B; state.fences = K.Fe; state.water = K.W; state.money = K.money; state.sandbox = K.sb; rot = K.rot; pathVer++; recompute(); buildGuestGraph();
+    }
 
     // tram: track is drawn like a path, guests ride it between stations, and nobody walks it
     const trSaved = {paths:state.paths, buildings:state.buildings, tech:state.science.tech.slice(), money:state.money, fares:state.today.fares};
