@@ -1551,7 +1551,7 @@ const TRAITS = {
 };
 const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepuscular", solitary:"solitary", pair:"lives in pairs", herd:"herd animal", pack:"pack animal", skittish:"skittish", curious:"curious", aggressive:"aggressive"};
 
-// Biomes: the ground an open exhibit is laid out as. Each animal has a home biome and one it gets by in.
+// Biomes: the ground an open exhibit is laid out as. Each animal has two biomes it is equally at home in.
 //   color    floor color on the map (the pattern id is "b-" + the key)
 //   perSqM   cost to regrade an exhibit to this biome
 //   wet      counts as this share of the water that fully satisfies water lovers
@@ -2236,9 +2236,9 @@ const DECOR = {
 // Wooden bridges are the only paths that cross water
 const BRIDGE = {perMeter:45, upkeepPerMeter:.3, halfWidth:2.5};
 
-const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's home biome, its second one, or any other
+const BIOME_HAPPY = {home:8, away:-6};   // happiness in either of an animal's two biomes, or in any other
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
-// Each animal's home biome, then the one it gets by in. Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.
+// Each animal's two biomes, equally at home in either (the order means nothing). Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.
 const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   eryo:"wetland tropical",    lyst:"fern scrubland",     mosc:"fern scrubland",     dime:"scrubland wetland",
   scut:"desert scrubland",    este:"temperate wetland",    coty:"scrubland desert",     ante:"wetland fern",
@@ -2278,8 +2278,9 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   gtod:"tropical temperate",  rmlo:"grassland scrubland",  sdel:"scrubland temperate",
 }).map(([id, b]) => [id, b.split(" ")]));
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
-// Share of an exhibit's floor a species wants under water: fish eaters most, scrubland and desert animals least
-const waterWant = s => s.diet.includes("piscivore") ? HAB.waterSemi : ["scrubland", "desert"].includes((biomesOf(s) || [])[0]) ? HAB.waterDry : HAB.waterBase;
+const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join(" or ");   // "fern prairie or scrubland"
+// Share of an exhibit's floor a species wants under water: fish eaters most, animals whose two biomes are both scrubland or desert least
+const waterWant = s => s.diet.includes("piscivore") ? HAB.waterSemi : (biomesOf(s) || []).length && biomesOf(s).every(b => ["scrubland", "desert"].includes(b)) ? HAB.waterDry : HAB.waterBase;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
 //   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity}), and `center`: a thin painted dashed center line ({c, w, dash, o})

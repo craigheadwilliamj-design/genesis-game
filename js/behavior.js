@@ -248,7 +248,7 @@ const thirstFloor = (s, ctx) => !ctx.water && likesOf(s).water >= HAB.wantsWater
 function comfortOf(e, s, ctx){
   if(ctx.comfort.has(s.id)) return ctx.comfort.get(s.id);
   const f = speciesFit(e, s), b = biomeFit(s, biomeOf(e));
-  let c = .5 * (e.viv ? f.plants : f.sat) + .5 * (b === "home" ? 1 : b === "near" ? .6 : b === "away" ? .2 : 1) - .5 * ctx.x;
+  let c = .5 * (e.viv ? f.plants : f.sat) + .5 * (b === "away" ? .2 : 1) - .5 * ctx.x;
   if(ctx.dirt > CLEAN.penaltyFrom) c -= (ctx.dirt - CLEAN.penaltyFrom) / 100;
   if(e.viv && wantsHeat(s)){ const hs = heatShare(e); c += hs > 0 ? VIV_LAMP.comfort * hs : -VIV_LAMP.comfort * .4; }   // warm under a basking lamp, chilly without one
   c = clamp(c, 0, 1); ctx.comfort.set(s.id, c);

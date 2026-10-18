@@ -1643,6 +1643,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     bx.biome = away; const awayT = exhibitReport(bx).target, awayFlag = exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text));
     bx.biome = "desert"; const homeT = exhibitReport(bx).target;
     out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeD - awayD === BIOME_HAPPY.home - BIOME_HAPPY.away && homeT > awayT && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
+    { const second = biomesOf(desertSp)[1]; out.biomeEitherHome = biomeFit(desertSp, second) === "home" && biomeD(second) === homeD && !exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text)); bx.biome = "desert"; }
     const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
