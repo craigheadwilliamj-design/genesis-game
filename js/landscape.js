@@ -274,7 +274,8 @@ const plantSuits = (t, s) => t.period === s.period;
 function haveOf(e, s){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);
   let own = 0, off = 0;
-  for(const f of land){ const t = LAND[f.type]; if(t.flora && plantHere(t, e)) { if(!s || plantSuits(t, s)) own += landM2(f); else off += landM2(f); } }
+  if(e.viv){ if(s) own = sceneFit(e, s) * wantsOf(e, s).plants; }   // a vivarium's plants are its scene
+  else for(const f of land){ const t = LAND[f.type]; if(t.flora && plantHere(t, e)) { if(!s || plantSuits(t, s)) own += landM2(f); else off += landM2(f); } }
   if(s) off = Math.min(off, wantsOf(e, s).plants * HAB.offEra);   // other periods' plants fill at most a share of what it wants
   return {water:(waterOf(e).reduce((n, w) => n + area(w.points), 0) + vivPoolM2(e)) / a + (BIOMES[biomeOf(e)].wet || 0) * HAB.waterFull,
     rock:land.reduce((n, f) => n + (LAND[f.type].cover || 0), 0), plants:Math.round(own + off)};
@@ -387,7 +388,7 @@ function habitatScore(e){
     if(want){
       sat /= n;
       out.delta += VIV_PLANT.bonus * sat;
-      out.issues.push({bad:false, text:sat >= .99 ? "Plants from their own period fill it out." : sat > 0 ? "Some plants from their own period. More would suit them." : "Bare. Plants from their own period and biome would make it feel like home."});
+      out.issues.push({bad:false, text:sat >= .99 ? "The scene is from their own era and biome." : sat > 0 ? "The scene half suits them. One from their own era and biome would suit them better." : e.vivScene ? "The scene is from another era and biome. One of their own would make it feel like home." : "Bare. A scene from their own era and biome would make it feel like home."});
     }
     // water lovers want a pool; a basking lamp warms the ones that want heat
     const lovers = [...speciesCounts(e)].filter(([sp]) => likesOf(SPECIES_BY_ID[sp]).water >= HAB.wantsWater);
@@ -731,21 +732,25 @@ function relayViv(e){
   }
   regatherViv(e);
 }
-function vivPlantProblem(e, key){
-  const t = LAND[key];
-  if(!e.viv || !t || !t.flora) return "Only plants go in a vivarium.";
-  if(!plantHere(t, e)) return `${t.label} doesn't grow in ${BIOMES[biomeOf(e)].label.toLowerCase()}.`;
-  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
-  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
-  if(!vivPlantSpot(e, key)) return "No room left for one that size.";
-  if(!canAfford(t.price)) return `Costs ${money(t.price)}.`;
+// A vivarium's scene ({era, biome}, and a period once that period has its own pictures): what it costs, and what it gives each species, 0 to 1
+const vivSceneKey = sc => sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
+const sameScene = (a, b) => !a ? !b : !!b && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
+// half for a scene from its own era (or its own period, for a period scene), half for one of its biomes
+function sceneFit(e, s){
+  const sc = e.vivScene; if(!sc) return 0;
+  return ((sc.period ? sc.period === s.period : sc.era === ERA_OF[s.period]) ? .5 : 0) + (biomeFit(s, sc.biome) !== "away" ? .5 : 0);
+}
+function vivSceneProblem(e, sc){
+  if(!e.viv) return "Only vivariums take a scene.";
+  if(sc && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
+  if(sameScene(e.vivScene, sc)) return sc ? "That's the scene it has." : "It has no scene.";
+  if(sc && !canAfford(VIV_SCENE.price)) return `Costs ${money(VIV_SCENE.price)}.`;
   return null;
 }
-function addVivPlant(e, key){
-  const t = LAND[key], [x, y] = vivPlantSpot(e, key);
-  spend(t.price, "built");
-  if(potKey(t)) state.ceres.pots[potKey(t)] -= 1;
-  (e.land = e.land || []).push({id:uid("l-"), type:key, x, y, k:VIV_PLANT.scale});
+// a new scene costs the flat price; clearing it gives back the usual share
+function setVivScene(e, sc){
+  if(sc) spend(VIV_SCENE.price, "built"); else earn(Math.round(VIV_SCENE.price * COST.refundShare), "sold");
+  e.vivScene = sc ? {era:sc.era, biome:sc.biome, ...(sc.period ? {period:sc.period} : {})} : null;
 }
 
 // Vivarium enrichment goes in the same way, full size

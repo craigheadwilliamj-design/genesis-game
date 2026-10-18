@@ -153,7 +153,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, parkClosed:false,
+    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{},
@@ -197,6 +197,21 @@ function upgradeSave(s){
   }
   // fittings used to fill the back-left first: lay each case out again from the front middle, once
   if(s.vivLay !== 1){ for(const e of s.exhibits || []) if(e.viv) relayViv(e); s.vivLay = 1; }
+  // vivariums took plants one by one; a case that had any gets the scene of its biome and its animals' era (else the plants' own), and the plants go
+  if(s.vivScene !== 1){
+    for(const e of s.exhibits || []) if(e.viv){
+      const flora = (e.land || []).filter(f => LAND[f.type] && LAND[f.type].flora);
+      if(flora.length && !e.vivScene){
+        const eras = (e.animals || []).map(a => SPECIES_BY_ID[a.sp] && ERA_OF[SPECIES_BY_ID[a.sp].period]).filter(Boolean);
+        if(!eras.length) eras.push(...flora.map(f => LAND[f.type].flora).filter(x => VIV_SCENE.eras.includes(x)));
+        const era = VIV_SCENE.eras.map(x => [x, eras.filter(y => y === x).length]).sort((a, b) => b[1] - a[1])[0][0];
+        e.vivScene = {era, biome:BIOMES[e.biome] ? e.biome : DEFAULT_BIOME};
+      }
+      e.land = (e.land || []).filter(f => !flora.includes(f));
+    }
+    s.vivScene = 1;
+  }
+  for(const e of s.exhibits || []) if(e.viv && e.vivScene === undefined) e.vivScene = null;
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);

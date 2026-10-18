@@ -2302,20 +2302,37 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const nz = zoneThemePlan(state.zones[0], "volcanic").length, rz = restyleZone(state.zones[0], "volcanic");
     render();
     out.zoneTheme = zp.theme === "volcanic" && nz > 0 && rz.n === nz && state.paths.filter(p => !p.d).concat(state.buildings, state.exhibits).every(it => it.theme === "volcanic") && world.innerHTML.includes(THEMES.volcanic.ground);
-    // vivariums take plants of their biome, scaled down, and regrading clears them
+    // vivariums take a scene (era and biome) for a flat price in place of plants: every scene has its pictures, the bonus follows the fit, and old plants turn into a scene
     {
-      const v = {id:"e-vp", name:"Fern house", viv:"L", biome:"tropical", points:[[0,0],[16,0],[16,10],[0,10]].map(p => [p[0] + 900, p[1] + 900]), animals:[{id:"a-vp", sp:"arth"}], happy:70};
+      const v = {id:"e-vp", name:"Fern house", viv:"L", biome:"tropical", points:[[0,0],[16,0],[16,10],[0,10]].map(p => [p[0] + 900, p[1] + 900]), animals:[{id:"a-vp", sp:"arth"}], happy:70, vivScene:null};
       state.exhibits.push(v);
-      const ok = PLANTS_OF.Carboniferous.tropical[0], bad = PLANTS_OF.Carboniferous.wetland[0], m0 = state.money;
-      const wasTech = state.science.tech.slice(), pots0 = Object.assign({}, state.ceres.pots);
-      if(!hasTech(FLORA.paleozoic.tech)) state.science.tech.push(FLORA.paleozoic.tech);
-      state.ceres.pots[potKey(LAND[ok])] = 2;
-      const wrongBiome = !!vivPlantProblem(v, bad), before = habitatScore(v).delta;
-      const why = vivPlantProblem(v, ok); if(!why) addVivPlant(v, ok);
-      out.vivPlants = !why && wrongBiome && v.land.length === 1 && state.ceres.pots[potKey(LAND[ok])] === 1 && state.money < m0 && habitatScore(v).delta > before;
+      const m0 = state.money; state.money = 1e5;
+      out.vivScenePictures = VIV_SCENE.eras.every(era => Object.keys(BIOMES).every(b => Object.keys(VIVARIUMS).every(z => ["wall", "floor"].every(l => SPRITE_PACK[`sprites/vivscene/${era}-${b}-${z}-${l}.png`]))));
+      VIV_SCENE_PERIODS["Carboniferous-wetland"] = true;
+      out.vivScenePeriodKey = vivSceneKey({era:"paleozoic", biome:"wetland"}) === "paleozoic-wetland" && vivSceneKey({era:"paleozoic", biome:"wetland", period:"Carboniferous"}) === "Carboniferous-wetland" && vivSceneKey({era:"paleozoic", biome:"tropical", period:"Carboniferous"}) === "paleozoic-tropical";
+      delete VIV_SCENE_PERIODS["Carboniferous-wetland"];
+      const bare = habitatScore(v).delta, s = SPECIES_BY_ID.arth;
+      const m1 = state.money, ok = !vivSceneProblem(v, {era:"paleozoic", biome:"desert"}); setVivScene(v, {era:"paleozoic", biome:"desert"});
+      const half = habitatScore(v).delta, halfFit = sceneFit(v, s);
+      out.vivSceneCharges = ok && state.money === m1 - VIV_SCENE.price && v.vivScene.era === "paleozoic" && !!vivSceneProblem(v, {era:"paleozoic", biome:"desert"});
+      setVivScene(v, {era:"paleozoic", biome:"tropical"});
+      const full = habitatScore(v).delta;
+      out.vivSceneBonus = halfFit === .5 && sceneFit(v, s) === 1 && bare < half && half < full && Math.abs(full - bare - VIV_PLANT.bonus) < .01 && speciesFit(v, s).plants === 1;
       out.vivEra = !exhibitReport(v).issues.some(i => /another era/.test(i.text));
-      render(); out.vivPlantsDraw = world.innerHTML.includes(LAND[ok].color);
-      state.exhibits.splice(state.exhibits.indexOf(v), 1); state.science.tech = wasTech; state.ceres.pots = pots0; state.money = m0;
+      state.money = 0; out.vivSceneBroke = !!vivSceneProblem(v, {era:"mesozoic", biome:"tropical"}); state.money = 1e5;
+      const html = vivSceneHtml(v); out.vivSceneUi = html.includes("vivEraSel") && html.includes("vivBiomeSel") && html.includes('data-action="vivScene"') && !html.includes("vivPlant\"") && vivToysHtml(v).includes("Enrichment");
+      render(); const w = world.innerHTML, fi = w.indexOf("sprites/vivscene/paleozoic-tropical-L-floor.png"), wi = w.indexOf("sprites/vivscene/paleozoic-tropical-L-wall.png"), zi = w.indexOf('data-z34="e-vp"');
+      out.vivSceneDraws = fi > 0 && wi > fi && zi > wi;
+      const m2 = state.money; setVivScene(v, null);
+      out.vivSceneClears = v.vivScene === null && state.money === m2 + Math.round(VIV_SCENE.price * COST.refundShare) && habitatScore(v).delta === bare;
+      // an old save: a case's plants become the scene of its biome and its animals' era, and an empty case gets none
+      const old = JSON.parse(JSON.stringify(state)); delete old.vivScene;
+      const ov = old.exhibits.find(e => e.id === "e-vp"), plant = PLANTS_OF.Permian.wetland[0];
+      delete ov.vivScene; ov.biome = "wetland"; ov.land = (ov.land || []).concat([{id:"l-op", type:plant, x:905, y:905, k:VIV_PLANT.scale}]);
+      old.exhibits.push({id:"e-ov2", name:"Empty", viv:"S", points:[[0,0],[6,0],[6,4],[0,4]], animals:[], happy:70, land:[]});
+      const up = upgradeSave(old), uv = up.exhibits.find(e => e.id === "e-vp");
+      out.vivSceneUpgrade = up.vivScene === 1 && uv.vivScene && uv.vivScene.era === "paleozoic" && uv.vivScene.biome === "wetland" && !uv.land.some(f => f.type === plant) && up.exhibits.find(e => e.id === "e-ov2").vivScene === null;
+      state.exhibits.splice(state.exhibits.indexOf(v), 1); state.money = m0;
     }
     state.zones = zs;
     Object.assign(state, {paths:tSaved.paths, buildings:tSaved.buildings, exhibits:tSaved.exhibits, themes:tSaved.themes, rating:tSaved.rating, money:tSaved.money}); state.science.tech = tSaved.tech; recompute(); render();

@@ -261,7 +261,7 @@ function exhibitHtml(e){
     h += `</section>`;
   }
 
-  if(e.viv) h += biomeHtml(e) + vivPlantsHtml(e) + vivToysHtml(e);
+  if(e.viv) h += biomeHtml(e) + vivSceneHtml(e) + vivToysHtml(e);
 
   h += themeHtml("exhibit", e);
 
@@ -328,21 +328,20 @@ function biomeHtml(e){
   h += fits() + `</section>`;
   return h;
 }
-// A vivarium's plants: the biome's plants by period (the animals' own periods first), what's in there, and a remove button for each
-const vivTabs = {ex:null, period:null};
-function vivPlantsHtml(e){
-  const b = biomeOf(e), periods = Object.keys(PLANTS_OF).filter(p => PLANTS_OF[p][b]), own = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp].period))];
-  if(vivTabs.ex !== e.id){ vivTabs.ex = e.id; vivTabs.period = null; }
-  if(!periods.includes(vivTabs.period)) vivTabs.period = periods.find(p => own.includes(p)) || periods[0];
-  const lp = vivTabs.period, here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora);
-  let h = `<section><h3>Plants</h3><div class="meta">Only ${esc(BIOMES[b].label.toLowerCase())} plants grow here. Animals count the ones from their own period.${own.length ? ` Here: ${esc(own.join(", "))}.` : ""}</div>`;
-  if(!periods.length) return h + `<div class="meta" style="margin-top:6px">No plants grow in ${esc(BIOMES[b].label.toLowerCase())}. Regrade the ground above.</div></section>`;
-  h += `<div style="margin-top:6px">${tabBar("vperiod", periods.map(x => ({key:x, label:x + (own.includes(x) ? " (here)" : ""), color:PERIOD_COLOR[x]})), lp)}</div>`;
-  h += `<div class="row" style="margin-top:6px">${PLANTS_OF[lp][b].concat(lp === "Quaternary" ? (PARK_PLANTS_OF[b] || []).filter(k => !LAND[k].aquatic) : []).map(k => { const t = LAND[k], why = vivPlantProblem(e, k); return `<button class="btn" data-action="vivPlant" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}><b>${esc(t.size)}</b> ${esc(t.label)}, ${money(t.price)}${potKey(t) ? " + plant" : ""}</button>`; }).join("")}</div>`;
-  if(e.animals.length){
-    h += [...new Set(e.animals.map(a => a.sp))].map(sp => { const s = SPECIES_BY_ID[sp], f = speciesFit(e, s); return f.w.plants <= 0 ? "" : `<div class="need-line ${f.plants >= .99 ? "ok" : f.plants > 0 ? "mid" : "no"}">${esc(s.name)}: ${f.h.plants}/${f.w.plants} m² of ${esc(s.period)} plants.</div>`; }).join("");
+// A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
+function vivSceneHtml(e){
+  const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
+  const era0 = sc ? sc.era : (kinds.length ? ERA_OF[kinds[0].period] : ""), bio0 = sc ? sc.biome : biomeOf(e);
+  let h = `<section><h3>Scene</h3><div class="meta">A painted back wall and floor. Animals settle in best with a scene from their own era and biome. Any change costs ${money(VIV_SCENE.price)}.</div>`;
+  h += `<div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(ERA_LABEL[sc.era])} ${esc(BIOMES[sc.biome].label.toLowerCase())}</b>.` : "No scene yet."}</div>`;
+  const sel = `style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"`;
+  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="vivEraSel" ${sel}><option value="">No scene</option>${VIV_SCENE.eras.map(x => `<option value="${x}"${x === era0 ? " selected" : ""}>${esc(ERA_LABEL[x])}</option>`).join("")}</select>`;
+  h += `<select id="vivBiomeSel" ${sel}>${Object.entries(BIOMES).map(([k, x]) => `<option value="${k}"${k === bio0 ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`;
+  h += `<button class="btn" data-action="vivScene">Set, ${money(VIV_SCENE.price)}</button></div>`;
+  for(const s of kinds){
+    const era = sc && ERA_OF[s.period] === sc.era, bio = sc && biomeFit(s, sc.biome) !== "away";
+    h += `<div class="need-line ${era && bio ? "ok" : era || bio ? "mid" : "no"}">${esc(s.name)}: ${esc(ERA_LABEL[ERA_OF[s.period]])}, at home in ${esc(biomesOf(s) ? biomeNames(s) : "any biome")}.${sc ? ` ${era ? "Right era" : "Wrong era"}, ${bio ? "right biome" : "wrong biome"}.` : ""}</div>`;
   }
-  if(here.length) h += `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${PERIOD_COLOR[t.period]}"></span><span>${esc(t.label)} (${esc(t.size)}, ${esc(t.period)})</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>`;
   return h + `</section>`;
 }
 // Vivarium fittings and enrichment: pick one from a list and it's set in the glass wherever there's room
@@ -849,8 +848,7 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; ui.panel(); return; }
-  if(a === "vperiod"){ vivTabs.period = b.dataset.k; ui.panel(); return; }
-  if(a === "vivPlant"){ const why = vivPlantProblem(it, b.dataset.key); if(why){ ui.toast(why, "bad"); return; } addVivPlant(it, b.dataset.key); afterChange(); render(); return; }
+  if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivPlantOff"){ const f = landOf(it).find(x => x.id === b.dataset.id); if(f){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); it.land.splice(it.land.indexOf(f), 1); regatherViv(it); afterChange(); render(); } return; }

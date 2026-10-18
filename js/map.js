@@ -288,7 +288,7 @@ function render(){
     const kinds34 = e.grid ? sideKinds(e).map(b => BARRIERS[b].hedge ? "hedge" : b) : e.barrier || "wood";
     const gi = tilt ? gateSide34(e, kinds34) : -1;
     if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
-    if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) : fence34(e.points, true, kinds34, "back", fo34);
+    if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) + vivScene34(e, "wall") : fence34(e.points, true, kinds34, "back", fo34);
     if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
       if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
@@ -772,7 +772,16 @@ function vivFloor34(e, c, dead, on, reach){
     det = vivSubCache[key] = `${strips}<path d="${dk}" fill="${dark}" shape-rendering="crispEdges" pointer-events="none"/><path d="${lt}" fill="${light}" shape-rendering="crispEdges" pointer-events="none"/>`;
   }
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
+  const scene = vivScene34(e, "floor");   // a scene's floor takes the place of the plain substrate; the outline goes back over it
+  if(scene) return flatPoly34(P, sub) + scene + (stroke ? flatPoly34(P, "none", stroke, true) : "") + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "");
   return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
+}
+// A vivarium's scene (tools/pixelvivscene.py): "floor" lies over the whole floor; "wall" fills the back pane from the top of the sill to the top of the glass
+function vivScene34(e, layer){
+  if(!e.vivScene || !VIVARIUMS[e.viv]) return "";
+  const bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, H = VIVARIUMS[e.viv].d * .45, n2 = v => v.toFixed(2);
+  const [a, b] = layer === "wall" ? [flatSnap34([bb.x0, bb.y0 - H / TILT]), flatSnap34([bb.x1, bb.y0 - K.sill / TILT])] : [flatSnap34([bb.x0, bb.y0]), flatSnap34([bb.x1, bb.y1])];
+  return `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-${layer}.png`)}" x="${n2(a[0])}" y="${n2(a[1])}" width="${n2(b[0] - a[0])}" height="${n2(b[1] - a[1])}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 // A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
 function viv34(e, which, hi){
@@ -2591,7 +2600,7 @@ function placeBuilding(e){
     // a vivarium is an exhibit, just one that comes pre-built
     const used = new Set(state.exhibits.map(x => x.name));
     let n = 1; while(used.has(`${t.label} ${n}`)) n++;
-    const e = {id:uid("e-"), name:`${t.label} ${n}`, points:ghost.pts, animals:[], happy:70, viv:t.viv};
+    const e = {id:uid("e-"), name:`${t.label} ${n}`, points:ghost.pts, animals:[], happy:70, viv:t.viv, vivScene:null};
     autoZone(e);
     themeNew("exhibit", e);
     state.exhibits.push(e);
