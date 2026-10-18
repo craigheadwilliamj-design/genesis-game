@@ -787,9 +787,9 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 // One body of water, in an exhibit or out in the park
 // Biomes whose water is drawn from a pixel tile (sprites/water/<biome>.png, the #w-<biome> pattern in index.html); the rest are flat blue
 // per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims. A biome with `shore` draws that one color
-// on all four edges instead of the lit and dark rims, and with no `damp` or `mud` has no bank
+// on all four edges instead of the lit and dark rims (`shoreW` px wide, default 1), and with no `damp` or `mud` has no bank
 const WATER_TEX = {
-  wetland:  {shore:"#827B24", lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
+  wetland:  {shore:"#827B24", shoreW:2, lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   fern:     {damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
@@ -811,11 +811,12 @@ const waterMasks = new Map();
 // of the world position (so the edge stair-steps in short runs, and the same shape always gives the same edge), and the sharp convex corners are chipped twice.
 // Only pixels of those kinds are removed, and only ever pixels touching land (not water of another kind), so nothing opens up inside a lake or between bodies.
 const SHORE_NOISE = 5, SHORE_ERODE = [.5, .85], SHORE_CHIP = 2;   // lattice px; the share of shore at 0 and at 0 or 1 px of erosion; passes of corner chipping
+// Returns {kind: rows} of the shore band for each such kind: its pixels within `shoreW` of land, which waterMask draws in the shore color.
 function softenShore(rowsOf, kinds, r0, r1){
-  const wob = kinds.filter(k => WATER_TEX[k] && WATER_TEX[k].shore); if(!wob.length) return;
+  const wob = kinds.filter(k => WATER_TEX[k] && WATER_TEX[k].shore), bands = {}; if(!wob.length) return bands;
   let c0 = Infinity, c1 = -Infinity;
   for(const k of kinds) for(const runs of rowsOf[k].values()) for(const [a, b] of runs){ c0 = Math.min(c0, a); c1 = Math.max(c1, b); }
-  if(c0 > c1) return;
+  if(c0 > c1) return bands;
   const pad = 4, X0 = c0 - pad, Y0 = r0 - pad, w = c1 - c0 + pad * 2, h = r1 - r0 + 1 + pad * 2, at = (c, r) => (r - Y0) * w + (c - X0);
   const A = new Uint8Array(w * h), own = {};
   for(const k of kinds){ const mine = wob.includes(k); if(mine) own[k] = new Uint8Array(w * h);
@@ -851,7 +852,19 @@ function softenShore(rowsOf, kinds, r0, r1){
       }
       rowsOf[k].set(r, runs);
     }
+    const W = WATER_TEX[k].shoreW || 1; let E = A; for(let j = 0; j < W; j++) E = inner(E);
+    const band = new Map();
+    for(let r = r0; r <= r1; r++){
+      const runs = []; let a = null;
+      for(let c = X0; c <= X0 + w; c++){
+        const i = c < X0 + w ? at(c, r) : 0, on = c < X0 + w && G[i] && A[i] && !E[i];
+        if(on && a === null) a = c; else if(!on && a !== null){ runs.push([a, c]); a = null; }
+      }
+      band.set(r, runs);
+    }
+    bands[k] = band;
   }
+  return bands;
 }
 function waterMask(items){
   const key = items.map(it => it.kind + ":" + it.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ")).join("|"); let m = waterMasks.get(key); if(m) return m;
@@ -872,7 +885,7 @@ function waterMask(items){
     }
     rowsOf[k] = rows;
   }
-  softenShore(rowsOf, kinds, r0, r1);
+  const bands = softenShore(rowsOf, kinds, r0, r1);
   for(let r = r0; r <= r1; r++) all.set(r, join(kinds.flatMap(k => rowsOf[k].get(r).map(s => [...s]))));
   const covered = (r, x) => (all.get(r) || []).some(([a, b]) => x >= a && x < b);
   const minus = (run, others) => { let out = [run]; for(const [oa, ob] of others) out = out.flatMap(([a, b]) => oa >= b || ob <= a ? [[a, b]] : [[a, Math.min(b, oa)], [Math.max(a, ob), b]].filter(([x, y]) => y > x)); return out; };
@@ -886,11 +899,13 @@ function waterMask(items){
     const rows = rowsOf[k]; let body = "", lit = "", dark = "";
     for(const [r, runs] of rows) for(const [a, b] of runs){
       body += rect(a, b, r);
+      if(bands[k]) continue;
       for(const [x, y] of minus([a, b], all.get(r - 1) || [])) lit += rect(x, y, r);    // top edge, only where no water of any kind is above
       for(const [x, y] of minus([a, b], all.get(r + 1) || [])) dark += rect(x, y, r);  // bottom edge, likewise
       if(!covered(r, a - 1)) lit += rect(a, a + 1, r);                                  // left and right ends, only against dry ground
       if(!covered(r, b)) dark += rect(b - 1, b, r);
     }
+    if(bands[k]) lit = paint(bands[k]);   // a kind with a shore band draws it, in place of the lit and dark rims
     by[k] = {body, lit, dark, mud:paint(dilate(rows, 2)), damp:paint(dilate(rows, 3))};
   }
   m = {kinds, by}; waterMasks.set(key, m); if(waterMasks.size > 200) waterMasks.delete(waterMasks.keys().next().value);
