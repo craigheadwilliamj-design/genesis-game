@@ -91,6 +91,9 @@ for(const [k, S] of Object.entries(PLANT_SPRITES)){
     t.footD = FOOT.side[k] || Math.max(.5, Math.round(t.footW * FOOT.depth * 2) / 2);
   }
 }
+for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES})){   // a pictured shelter or tray takes a square as wide as its picture
+  const t = LAND[k], h = SPRITE_HIT[k]; if(t && h) t.footSide = Math.max(1, Math.round(h[3] * 2 * ROCK_MPP));
+}
 for(const t of Object.values(LAND)) if(t.flora && !t.footSide) t.footSide = FOOT.plain[t.size] || 2;
 for(const type of ROCK_TYPES){
   if(LAND[type]) LAND[type].footSide = FOOT.plain[type];
@@ -167,15 +170,15 @@ function snapFootprints(s){
   const groups = s.exhibits.filter(e => !e.viv && e.land).map(e => [e, e.land]).concat([[null, s.decor || []]]);
   const offs = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]];
   for(const [e, list] of groups){
-    const items = list.filter(f => LAND[f.type]);
+    const items = list.filter(f => LAND[f.type]), snapped = f => footSquare(f.type) && !SHELTER_SPRITES[f.type] && !TRAY_SPRITES[f.type];   // barns, caves and trays keep their old spots
     const rockOf = f => ROCK_TYPES.includes(f.type), biomeOfF = f => BIOMES[f.biome] ? f.biome : homeBiome(e);
     const picOf = f => rockOf(f) ? rockPicIndex(f, biomeOfF(f)) : null;
     const boxAt = (f, x, y) => footRectsAt(f.type, picOf(f), biomeOfF(f), x, y);
     // saves from before boxes stood on their base: slide each picture down to the bottom of its old box, so every box stays exactly where it was
     if(!s.footBase) for(const f of items) if(footSquare(f.type) && footBased(f.type, rockOf(f) ? biomeOfF(f) : null)) f.y += footSideFor(f.type, picOf(f), biomeOfF(f)) * (f.k || 1) / 2;
-    for(const f of items) if(footSquare(f.type)){ [f.x, f.y] = footSnap(f.type, picOf(f), biomeOfF(f), f.x, f.y); }
-    const placed = items.filter(f => !footSquare(f.type)).map(f => boxAt(f, f.x, f.y));
-    for(const f of items.filter(f => footSquare(f.type))){
+    for(const f of items) if(snapped(f)){ [f.x, f.y] = footSnap(f.type, picOf(f), biomeOfF(f), f.x, f.y); }
+    const placed = items.filter(f => !snapped(f)).map(f => boxAt(f, f.x, f.y));
+    for(const f of items.filter(snapped)){
       const free = (b, inside) => !placed.some(o => rectsHit(b, o)) && (!inside || !e || rectsInside(b, e.points));
       let at = null;
       for(const inside of [true, false]){ for(const [dx, dy] of offs) if(free(boxAt(f, f.x + dx, f.y + dy), inside)){ at = [f.x + dx, f.y + dy]; break; } if(at) break; }
@@ -1205,6 +1208,27 @@ function vivPropSvg(f, t){
   }
   return s;
 }
+// A shelter from its picture (SHELTER_SPRITES, tools/pixelshelter.py): it stands on its spot with the base `b` radii below it, not flipped so a barn's open front faces the viewer
+function shelterSpriteSvg(f, t, S, dead, pick){
+  const w = S.w * ROCK_MPP, h = S.h * ROCK_MPP, x = f.x - w / 2, y = f.y + t.r * S.b - h, n2 = v => v.toFixed(2);
+  return `<image href="${spriteUrl(`sprites/shelter/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>${hitShape(f.type, x, y, ROCK_MPP, pick, dead)}`;
+}
+// A food tray from its picture (TRAY_SPRITES): a flat steel dish, with the food drawn into its well as stepped rows, its area by how full it is
+function traySpriteSvg(f, t, S, dead, pick){
+  const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y - h / 2, n2 = v => v.toFixed(2), [cx, cy, rx, ry] = S.well;
+  let s = `<image href="${spriteUrl(`sprites/tray/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
+  const main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0], fill = t.tray ? clamp(trayHas(f) / t.tray, 0, 1) : 0;
+  if(main && fill > 0){
+    const k = Math.sqrt(fill), fx = Math.max(1.5, (rx - .5) * k), fy = Math.max(1, (ry - .4) * k), col = FOOD_COLOR[main[0]] || "#999999", lit = mixHex(col, "#ffffff", .3);
+    let first = true;
+    for(let j = Math.floor(cy - fy); j < Math.ceil(cy + fy); j++){
+      const dy = (j + .5 - cy) / fy; if(Math.abs(dy) >= 1) continue;
+      const hw = fx * Math.sqrt(1 - dy * dy), x0 = Math.round(cx - hw), x1 = Math.round(cx + hw); if(x1 <= x0) continue;
+      s += `<rect x="${n2(x + x0 * P)}" y="${n2(y + j * P)}" width="${n2((x1 - x0) * P)}" height="${n2(P)}" fill="${first ? lit : col}" pointer-events="none"/>`; first = false;
+    }
+  }
+  return s + hitShape(f.type, x, y, P, pick, dead);
+}
 // The warm pool of light under a basking lamp: flat on the floor, under the animals (landSvg)
 const lampLightSvg = f => `<g data-y="${f.y - 1001}"><image href="${spriteUrl("sprites/viv/vlamp-pool.png")}" style="image-rendering:pixelated" pointer-events="none" x="${(f.x - 22 * ROCK_MPP).toFixed(2)}" y="${(f.y + .6 - 10 * ROCK_MPP).toFixed(2)}" width="${(44 * ROCK_MPP).toFixed(2)}" height="${(20 * ROCK_MPP).toFixed(2)}"/></g>`;
 // One rock, plant, shelter, tray or statue. biome is the ground it stands on (rocks take their stone color from it).
@@ -1216,6 +1240,8 @@ function featSvg(f, biome, pick, isDead){
   let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included
   const up = tilted() && !f.k;
   if(VIV_SPRITES[f.type]) s += vivPropSvg(f, t);
+  else if(SHELTER_SPRITES[f.type] && !f.k) s += shelterSpriteSvg(f, t, SHELTER_SPRITES[f.type], dead, pick);
+  else if(TRAY_SPRITES[f.type] && !f.k) s += traySpriteSvg(f, t, TRAY_SPRITES[f.type], dead, pick);
   else if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
   else if(up && t.look === "burrow") s += rock34(f, {...t, r:t.r * .8}, {fill:t.color, light:mixHex(t.color, "#ffffff", .2), dark:mixHex(t.color, "#000000", .3)}, edge, dead ? 3 : 1.5, true);
   else if(up && t.look === "canopy") s += canopy34(f, t, edge, dead ? 3 : 1.5);

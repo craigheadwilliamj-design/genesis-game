@@ -947,6 +947,13 @@ function wallStrips34(){
     for(const f of landOf(e)){   // a barn, cave or burrow, from its front edge up to its far eave and a bit of the ridge
       const t = LAND[f.type];
       if(!t || !t.slots || f.k || t.look === "canopy") continue;
+      const S = SHELTER_SPRITES[f.type];
+      if(S){   // a pictured one covers what its picture covers: a barn its whole rectangle, a cave or burrow its dome
+        const w = S.w * ROCK_MPP / 2, h = S.h * ROCK_MPP, yb = f.y + t.r * S.b;
+        if(t.look === "cave" || t.look === "burrow") out.push({x0:f.x - w, x1:f.x + w, P:Array.from({length:13}, (_, i) => { const q = i * Math.PI / 12; return [f.x + w * Math.cos(q), yb - Math.min(h, h * 1.04 * Math.sin(q))]; }), up:0});
+        else out.push({x0:f.x - w, x1:f.x + w, a:[f.x - w, yb], b:[f.x + w, yb], up:h});
+        continue;
+      }
       if(t.look === "cave" || t.look === "burrow"){   // the lumpy outline rock34 draws, swept up by the mound's height
         const r = t.look === "burrow" ? t.r * .8 : t.r, P = blobPts(f.x, f.y, r, seedOf(f), true);
         out.push({x0:Math.min(...P.map(q => q[0])), x1:Math.max(...P.map(q => q[0])), P, up:r * .85 / TILT});

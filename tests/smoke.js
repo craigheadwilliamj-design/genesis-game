@@ -1607,6 +1607,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const cover = all.every(o => { const h = SPRITE_HIT[o.name]; if(!h) return true; const area = o.v.rects.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), sil = h[4].split(",").reduce((n, b) => { if(!b) return n; const [a, z] = b.split("-").map(Number); return n + (z - a + 1) * 4 * ROCK_MPP * ROCK_MPP; }, 0); return area >= sil * .5 && area <= sil * 1.6; });
         const tap = all.every(o => !SPRITE_HIT[o.name] || /^M/.test(spriteHitPath(o.name, 0, 0, ROCK_MPP)));
         return tall && wide && notSquare && cover && tap; })();
+      // shelters and trays are drawn from pictures: each has a tap shape and a footprint, featSvg draws the picture, and a tray's food shows in its color (none when empty)
+      out.shelterTraySprites = (() => {
+        const keys = [...Object.keys(SHELTER_SPRITES), ...Object.keys(TRAY_SPRITES)], svg = (k, food) => featSvg({id:"t-" + k, type:k, x:50, y:50, food}, "temperate", null, () => false);
+        const all = keys.every(k => SPRITE_HIT[k] && LAND[k].footSide >= 1 && svg(k, {}).includes(`sprites/${SHELTER_SPRITES[k] ? "shelter" : "tray"}/${k}.png`) && /^M/.test(spriteHitPath(k, 0, 0, ROCK_MPP)));
+        const full = svg("traymd", {meat:15}), empty = svg("traymd", {}), col = FOOD_COLOR.meat.toLowerCase();
+        return all && full.toLowerCase().includes(`fill="${col}"`) && !empty.toLowerCase().includes(`fill="${col}"`) && (svg("traymd", {meat:30}).match(/<rect/g) || []).length > (full.match(/<rect/g) || []).length; })();
       // rects are tested one by one: a cell in a rock's notch is free ground, the cells it covers are not, a flipped rock takes the same ground as its ghost did, and an animal walks round each rect
       out.footRockRects = (() => { const m0 = state.money, land0 = gx.land, biome = "desert"; state.money = 1e6; gx.land = []; gx.biome = biome;
         try {
