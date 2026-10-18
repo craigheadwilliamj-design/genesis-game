@@ -1449,9 +1449,10 @@ function vivBody(h){
   const S = SPRITES[h.sp], w = S ? 2 * (S.size || 1) * (h.r || 1) : (h.r || 1), ht = S ? 4 * (S.size || 1) * (h.r || 1) / S.ratio : (h.r || 1) * 2;
   return {hw:w, hh:ht * .15 / TILT};
 }
-// Would the animal at p overlap another in its case (picture against picture)?
+// Would the animal at p overlap another in its case (picture against picture), or stand behind a fitting's base (it's drawn over the fittings, so it would hover over the base)?
 function vivCrowd(h, p){
-  const a = vivBody(h);
+  const a = vivBody(h), e = state.exhibits.find(x => x.id === h.exhibitId);
+  if(e) for(const f of landOf(e)){ const t = LAND[f.type]; if(t && !t.flat && !t.tray && p[1] < f.y - .1 && Math.abs(f.x - p[0]) < a.hw + t.r * (f.k || 1)) return true; }
   for(const o of herd.values()){
     if(o === h || o.exhibitId !== h.exhibitId || !o.placed) continue;
     const b = vivBody(o);
