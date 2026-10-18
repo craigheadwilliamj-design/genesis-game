@@ -181,22 +181,27 @@ function groundPicks(plain, detail, share, salt = 0){
 function buildGroundTiles(table = GROUND_TILES, sel = biome => `#p-${biome} image, #b-${biome} image`, dir = "ground", salt = 0){
   Object.entries(table).forEach(([biome, T]) => {
     const imgs = document.querySelectorAll(sel(biome)); if(!imgs.length) return;
-    const n = T.plain + T.detail; let left = n; const tiles = [];
+    const gl = T.glint || 0, n = T.plain + T.detail + gl; let left = n; const tiles = [];
     for(let i = 0; i < n; i++){
       const t = new Image(); tiles.push(t);
       t.onload = () => {
         if(--left) return;
-        const c = document.createElement("canvas"), px = GROUND_SPAN * GROUND_TILE_PX; c.width = c.height = px;
-        const g = c.getContext("2d"), pick = groundPicks(T.plain, T.detail, T.share, salt); g.imageSmoothingEnabled = false;
-        for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
-          const t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8), h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
-          g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
-          g.drawImage(tiles[t], -h, -h);
+        const px = GROUND_SPAN * GROUND_TILE_PX, pick = groundPicks(T.plain, T.detail, T.share, salt), urls = [];
+        // glint tiles (after the detail ones) play as the first `glint` of `frames` frames on every plain cell, each cell starting at its own frame; the other frames show its plain tile
+        for(let f = 0; f < (gl ? T.frames : 1); f++){
+          const c = document.createElement("canvas"); c.width = c.height = px;
+          const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+          for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
+            let t = pick[x * GROUND_SPAN + y]; const o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8), h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+            if(gl && t < T.plain){ const k = (f + cellHash(x + 9001 + salt, y + 31337)) % T.frames; if(k < gl) t = T.plain + T.detail + k; }
+            g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
+            g.drawImage(tiles[t], -h, -h);
+          }
+          try { urls.push(c.toDataURL()); } catch(e){ return; }
         }
-        try {
-          const url = c.toDataURL();
-          imgs.forEach(img => { img.setAttribute("href", url); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
-        } catch(e){}
+        const show = u => imgs.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
+        show(urls[0]);
+        if(urls.length > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % urls.length]), 1000 / T.fps); }
       };
       t.src = spriteUrl(`sprites/${dir}/${biome}-${i + 1}.png`);
     }

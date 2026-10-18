@@ -1799,8 +1799,9 @@ const ROCK_MPP = .13;
 const GROUND_TILES = {grassland:{plain:1, detail:2, share:.1, still:[2]}, boreal:{plain:1, detail:2, share:.1, still:[3]}, wetland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, scrubland:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, fern:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, desert:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, temperate:{plain:1, detail:2, share:.1, still:[1, 2, 3]}, tundra:{plain:1, detail:2, share:.1, still:[1, 2]}, tropical:{plain:1, detail:2, share:.1, still:[1, 2, 3]}};
 // Water made of 1 m tiles, laid out like GROUND_TILES (same builder, in biomepaint.js): sprites/water/<biome>-<n>.png, 8 x 8 px each, the pattern behind that biome's water (#w-<biome>).
 // `plain` tiles are one solid color, the next `detail` tiles carry a mark; `share` of the cells in each 5 m chunk take a detail tile. `turn: false` means mirrored only, never turned.
+// `glint` more tiles after the detail ones are an animation: they play as the first `glint` of `frames` frames on every plain cell (each at its own random start, `fps` frames a second), the other frames are the plain tile.
 // A biome not listed keeps its sprites/water/<biome>.png tile.
-const WATER_TILES = {wetland:{plain:1, detail:1, share:.075, turn:false}};
+const WATER_TILES = {wetland:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
