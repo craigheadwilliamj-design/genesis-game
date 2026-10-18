@@ -774,7 +774,7 @@ function vivFloor34(e, c, dead, on, reach){
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
   return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
 }
-// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill, label plate and the lid glass. All glass but the base: no posts, beams, edges or lamp bars
+// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill, label plate and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
 function viv34(e, which, hi){
   const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
@@ -791,6 +791,13 @@ function viv34(e, which, hi){
       s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]);
       if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
     }
+  }
+  // a one-pixel light blue, see-through border: the floor's edges behind the animals, the lid's in front, and the corner edges from the foot of the base up
+  const ln = (a, b) => `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#BFE6F5" stroke-opacity=".6" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`;
+  for(let i = 0; i < P.length; i++){
+    const a = P[i], b = P[(i + 1) % P.length];
+    s += back ? ln(a, b) : ln(up(a), up(b));
+    if(back ? a[1] <= cy : a[1] > cy) s += ln(a, up(a));
   }
   if(!back){
     if(front >= 0){
