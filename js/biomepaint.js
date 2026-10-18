@@ -188,12 +188,16 @@ function buildGroundTiles(table = GROUND_TILES, sel = biome => `#p-${biome} imag
         if(--left) return;
         const px = GROUND_SPAN * GROUND_TILE_PX, pick = groundPicks(T.plain, T.detail, T.share, salt), urls = [];
         // glint tiles (after the detail ones) play as the first `glint` of `frames` frames on every plain cell, each cell starting at its own frame, or by its diagonal (x + y) when `wave` is set, which makes a band of glints sweep down and right; the other frames show its plain tile
-        for(let f = 0; f < (gl ? T.frames : 1); f++){
+        const lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0]), 1) : T.frames;
+        for(let f = 0; f < F; f++){
           const c = document.createElement("canvas"); c.width = c.height = px;
           const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
           for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
             let t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8);
-            if(gl && t < T.plain){ const k = (f + (T.wave ? T.frames - Math.floor((x + y) % T.wave * T.frames / T.wave) : cellHash(x + 9001 + salt, y + 31337))) % T.frames; if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
+            if(gl && t < T.plain){ let k = gl;
+              if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const q = (f + P - Math.floor((x + y) % W * P / W) + j) % P; if(q < gl){ k = q; break; } } }
+              else k = (f + cellHash(x + 9001 + salt, y + 31337)) % T.frames;
+              if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
             const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
             g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
             g.drawImage(tiles[t], -h, -h);
