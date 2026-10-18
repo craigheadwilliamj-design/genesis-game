@@ -3476,18 +3476,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         ev.points = rectPts(260, 300, V.w, V.d, 0); syncAnimals();   // moving the case brings them along
         out.vivAnimalsFollowMove = hs.every(h => vivSpot(h, ev, [h.x, h.y])); state.exhibits.pop(); }
       // vivarium fittings fill from the front middle, behind the sill margin; old back-left layouts are re-laid once; jumps stay inside the glass
-      { let front = true, mid = true, noOverlap = true, jumpsFit = true, homesMid = true;
+      { let spread = true, front = true, mid = true, noOverlap = true, jumpsFit = true, homesMid = true;
         for(const sz of ["S", "M", "L"]){
           const V = VIVARIUMS[sz], K = VIV34[sz], m = K.sill / TILT + .15, ev = {id:"e-lay" + sz, name:"Lay", viv:sz, points:rectPts(200, 300, V.w, V.d, 0), animals:["tikt", "tikt", "tikt"].map((x, i) => ({id:"ly" + sz + i, sp:x})), happy:70, biome:"tropical", land:[]};
           state.money = 1e6; for(const k of ["vdish", "vlamp", "vpool", "vbark", "vbranch"]) if(vivPlantSpot(ev, k)) addVivToy(ev, k);
           const bb = bbox(ev.points), cx = (bb.x0 + bb.x1) / 2;
           front = front && ev.land.every(f => f.y <= bb.y1 - m + 1e-6);
-          mid = mid && Math.abs(ev.land[0].x - cx) < 1.5 && ev.land[0].y > bb.y1 - m - 2;
+          mid = mid && Math.abs(ev.land[0].x - cx) < 1.5 && Math.abs(ev.land[0].y - ((bb.y0 + bb.y1) / 2 + VIV_PLANT.shift)) < 1.5;
+          { const xs = ev.land.map(f => f.x); spread = spread && Math.max(...xs) - Math.min(...xs) > V.w * .25; }
           noOverlap = noOverlap && ev.land.every((f, i) => ev.land.every((g, j) => i === j || Math.hypot(f.x - g.x, f.y - g.y) >= LAND[f.type].r + LAND[g.type].r - 1e-6));
           // an old save: everything stacked from the back-left
           const old = JSON.parse(JSON.stringify(ev)); old.land.forEach((f, i) => { f.x = bb.x0 + 1 + i * 2; f.y = bb.y0 + 1; });
           const sv = upgradeSave({...JSON.parse(JSON.stringify(state)), exhibits:[old], vivLay:0});
-          front = front && sv.vivLay === 1 && sv.exhibits[0].land.every(f => f.y <= bb.y1 - m + 1e-6 && f.y > bb.y0 + 1.5);
+          front = front && sv.vivLay === 1 && sv.exhibits[0].land.every(f => f.y <= bb.y1 - m + 1e-6) && sv.exhibits[0].land.reduce((n, f) => n + f.y, 0) / sv.exhibits[0].land.length > bb.y0 + V.d * .35;
           state.exhibits.push(ev); syncAnimals();
           const hs = [...herd.values()].filter(h => h.exhibitId === ev.id);
           for(const act of ["eat", "rest", "hide", "forage", "drink", "pace"]) for(const h of hs){ h.a.act = act; vivJump(h, ev); jumpsFit = jumpsFit && vivSpot(h, ev, [h.x, h.y]); }
@@ -3498,7 +3499,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           homesMid = homesMid && h2.y >= bb.y0 + V.d / 3 - 1e-6 && h2.y <= bb.y0 + V.d * 2 / 3 + 1e-6;
           state.exhibits.pop(); syncAnimals();
         }
-        out.vivFittingsFront = front; out.vivFirstFrontMiddle = mid; out.vivFittingsApart = noOverlap; out.vivJumpsInsideGlass = jumpsFit; out.vivHomesMiddleDepth = homesMid; }
+        out.vivFittingsFront = front; out.vivFirstFrontMiddle = mid; out.vivFittingsSpread = spread; out.vivFittingsApart = noOverlap; out.vivJumpsInsideGlass = jumpsFit; out.vivHomesMiddleDepth = homesMid; }
       { const fs = new Set(); for(let i = 0; i < 40; i++) fs.add(nameAnimal({id:"fz" + i, sp:"tikt"}).face); out.cloneFaceRandom = fs.size === 2 && [...fs].every(f => f === 1 || f === -1);
         const keep = nameAnimal({id:"fk", sp:"tikt", face:-1}); out.faceKept = keep.face === -1; }
       const oldV = JSON.parse(JSON.stringify(newPark()));
