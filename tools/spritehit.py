@@ -1,4 +1,4 @@
-"""Measures every plant and rock picture in sprites/plants and sprites/rocks and writes SPRITE_HIT into js/data.js (between the SPRITE_HIT markers).
+"""Measures every plant, rock, shelter and tray picture in sprites/plants, rocks, shelter and tray and writes SPRITE_HIT into js/data.js (between the SPRITE_HIT markers).
 Each entry is [width px, height px, base half-width px, whole half-width px, bands], where the base is the bottom quarter of the opaque pixels and bands is
 the silhouette in 4 px rows ("x0-x1" per row, empty where a row is clear). The game uses it for the footprint a plant or rock takes up and for the shape you tap.
 Run: python3 -I tools/spritehit.py"""
@@ -6,7 +6,7 @@ import glob, os, re
 from PIL import Image
 B = 4
 out = []
-for d, pre in (("plants", ""), ("rocks", "")):
+for d, pre in (("plants", ""), ("rocks", ""), ("shelter", ""), ("tray", "")):
     for f in sorted(glob.glob(f"sprites/{d}/*.png")):
         im = Image.open(f).convert("RGBA"); a = im.split()[3].load(); w, h = im.size
         rows = [[x for x in range(w) if a[x, y] > 20] for y in range(h)]
