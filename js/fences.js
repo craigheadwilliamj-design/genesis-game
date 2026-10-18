@@ -179,12 +179,12 @@ function pieceSpotProblem(k, with_ = new Set()){
   for(const e of state.exhibits){
     if(!e.grid){ if(lineEntersShape(seg, e.points) || (e.viv && lineShapeDist(seg, e.points) < .1)) return `It runs into ${e.name}.`; continue; }
     if(waterOf(e).some(w => lineThroughShape(seg, w.points))) return `It runs into the water in ${e.name}.`;
-    if(landOf(e).some(f => LAND[f.type] && lineHitsBox(footBox(f, e), seg))) return `It runs into something in ${e.name}. Bulldoze it first.`;
+    if(landOf(e).some(f => LAND[f.type] && rectsHitLine(footRects(f, e), seg))) return `It runs into something in ${e.name}. Bulldoze it first.`;
   }
   if(state.buildings.some(b => !b.exhibitId && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
   if(state.paths.some(p => !p.d && (linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) || pieceOnPath(k)) return "It runs into a path.";
   if(parkWater().some(w => lineThroughShape(seg, w.points))) return "It runs into water.";
-  if(decorOf().some(f => LAND[f.type] && lineHitsBox(footBox(f, null), seg))) return "It runs into a plant, rock or statue.";
+  if(decorOf().some(f => LAND[f.type] && rectsHitLine(footRects(f, null), seg))) return "It runs into a plant, rock or statue.";
   if(fenceLines().some(l => linesCross(l.points, seg))) return "It runs into a fence.";
   if(lineDist(state.gate[0], state.gate[1], seg) < 8.5) return "Keep clear of the entrance.";
   return null;
