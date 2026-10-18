@@ -272,6 +272,16 @@ function upgradeSave(s){
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
   for(const b of s.buildings) if(BUILDINGS[b.type] && BUILDINGS[b.type].prop && b.rot === undefined) b.rot = 0;   // path objects: 45° turns the player gave them (see propart.js)
+  // which way a building's door looks: older ones get the side facing their nearest path chunk (south when there is none)
+  const chunkPts = Object.keys(s.pathChunks).map(k => k.split(",").map(Number));
+  for(const b of s.buildings) if(BUILDINGS[b.type] && !BUILDINGS[b.type].prop && b.face === undefined && b.points && b.points.length >= 3){
+    let best = 2, bd = Infinity;
+    for(const f of [2, 1, 3, 0]){
+      const [mx, my] = doorPoint({points:b.points, face:f});
+      for(const [cx, cy] of chunkPts){ const d = Math.hypot(Math.max(cx * CHUNK - mx, 0, mx - (cx + 1) * CHUNK), Math.max(cy * CHUNK - my, 0, my - (cy + 1) * CHUNK)); if(d < bd - 1e-9){ bd = d; best = f; } }
+    }
+    b.face = best;
+  }
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
   if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
   for(const b of s.buildings) if(b.type === "edcenter" && !b.mods) b.mods = [];   // modules and focus, see services.js   // museum attractions, see services.js
@@ -586,7 +596,7 @@ function recompute(){
   const reach = {}, reports = {}, themes = {};
   // Guests reach exhibits and shops by footpath. Staff reach backstage buildings by footpath or service road.
   for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths, false); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
-  for(const b of state.buildings) reach[b.id] = near(b.points, BUILDINGS[b.type].dept ? anyPaths : guestPaths, !!BUILDINGS[b.type].dept);
+  for(const b of state.buildings){ const staff = !!BUILDINGS[b.type].dept; reach[b.id] = (!BUILDINGS[b.type].prop && doorNear(b, !staff)) || near(b.points, staff ? anyPaths : guestPaths, staff); }   // the door side first, then any side
 
   // How much guests want to visit
   let appeal = 0, animals = 0, happySum = 0;

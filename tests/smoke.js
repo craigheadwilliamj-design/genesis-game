@@ -1814,6 +1814,51 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.pathChunks = K.C; state.pathFixed = K.F; state.paths = K.P; state.buildings = K.B; state.fences = K.Fe; state.water = K.W; state.money = K.money; state.sandbox = K.sb; rot = K.rot; pathVer++; recompute(); buildGuestGraph();
     }
 
+    // building facing: b.face (0-3 = N/E/S/W) is saved, R turns it with the walls, the door arrow shows, old saves get the side nearest a path
+    {
+      const K = {C:state.pathChunks, F:state.pathFixed, P:state.paths, B:state.buildings, Fe:state.fences, W:state.water, money:state.money, sb:state.sandbox, rot};
+      const W = mainWalkChunks([200, 300]);
+      state.pathChunks = W.C; state.pathFixed = W.F; state.paths = []; state.buildings = []; state.fences = []; state.water = []; state.sandbox = true; state.money = 1e7;
+      pathVer++; recompute(); buildGuestGraph();
+      const rc = svg.getBoundingClientRect(), px = (x, y) => [rc.left + view.tx + x * view.k, rc.top + view.ty + y * ky()];
+      const at = (x, y) => { placeGhost(...px(x, y)); return ghost; }, stat = () => $("#dStat").textContent;
+      setTool("restroom"); rot = 0; lastPtr = null;
+      const f0 = at(211, 270).face, seq = [];
+      for(let i = 0; i < 4; i++){ rotateTool(); seq.push(ghost.face); }
+      out.faceCyclesWithR = f0 === 2 && seq.join() === "3,0,1,2" && rot === 0;
+      out.faceDoorArrow = renderOverlay.toString().includes("doorArrowSvg") && doorArrowSvg(ghost.pts, ghost.face, "red", 1).includes("<path");
+      rot = 2; at(211, 270); placeBuilding({clientX:lastPtr.x, clientY:lastPtr.y});
+      const placed = state.buildings[state.buildings.length - 1];
+      out.facePlacedSaved = !!placed && placed.type === "restroom" && placed.face === 3 && !state.buildings.some(b => BUILDINGS[b.type].prop && b.face !== undefined);
+      // the door point is the middle of the wall that faces that way
+      const sq = rectPts(211, 270, 8, 6, 0), dp = f => doorPoint({points:sq, face:f}).map(v => Math.round(v * 1e6) / 1e6).join();
+      out.faceDoorPoint = dp(0) === "211,267" && dp(1) === "215,270" && dp(2) === "211,273" && dp(3) === "207,270";
+      // Move: turning swings the door the same way
+      state.buildings = [{id:"b-fm", type:"restroom", points:sq, face:2, day:0}]; recompute(); setTool("move"); mvSel = "b-fm";
+      rotateMoved(); out.faceMoveTurns = state.buildings[0].face === 3; setTool("select"); mvSel = null;
+      // old saves: the side facing the nearest path chunk (the walk runs north of the gate, so a building south of it looks north; one beside it looks at it)
+      const sv = JSON.parse(JSON.stringify(state)); sv.buildings = [{id:"b-o1", type:"restroom", points:rectPts(206, 340, 8, 6, 0), day:0}, {id:"b-o2", type:"restroom", points:rectPts(211, 270, 8, 6, 0), day:0}, {id:"b-o3", type:"bench", points:rectPts(207, 280, 1, 1, 0), day:0}];
+      upgradeSave(sv); out.faceOldSaveNearestPath = sv.buildings[0].face === 0 && sv.buildings[1].face === 3 && sv.buildings[2].face === undefined;
+      // guests walk to the path point nearest the door, not the middle
+      state.buildings = [{id:"b-fa", type:"restroom", points:sq, face:0, day:0}]; recompute(); buildGuestGraph(); const aN = gGraph.anchors["b-fa"];
+      state.buildings[0].face = 2; recompute(); buildGuestGraph(); const aS = gGraph.anchors["b-fa"];
+      out.faceGuestStopAtDoor = !!aN && !!aS && aN.y < aS.y - 3;
+      // reach: a door facing away from the path still works, but the ghost says so
+      state.buildings = [{id:"b-fb", type:"restroom", points:sq, face:1, day:0}]; recompute(); const awayOk = isReachable(state.buildings[0]);
+      state.buildings = []; setTool("restroom"); rot = 6; at(211, 270); const hint = stat().includes("door faces away"); rot = 2; at(211, 270);
+      out.faceReachDoorAway = awayOk && hint && ghost.ok && !stat().includes("door faces away"); rot = 0;
+      // every look draws in all four facings, with the door and the name where the camera can see them
+      const types = ["restroom", "food", "restaurant", "workshop", "farm", "closet", "lodge", "oracle", "greenhouse"], bad = [];
+      for(const ty of types) for(let f = 0; f < 4; f++){
+        const bl = {id:"b-v", type:ty, points:rectPts(211, 270, BUILDINGS[ty].w, BUILDINGS[ty].d, 0), face:f, day:0};
+        let svgS = ""; try { svgS = building34(bl, BUILDINGS[ty], false, false, true, 1); } catch(e){ bad.push(ty + f + " " + e.message); continue; }
+        const sign = esc(STAND34[ty].sign || BUILDINGS[ty].tag || BUILDINGS[ty].label);
+        if(f !== 2 && !(svgS.includes(`fill="${FLAT34.door}"`) && (f !== 0 || svgS.includes(">" + sign + "<")))) bad.push(ty + f + " no mark");
+      }
+      out.faceDrawsAllLooks = bad.length === 0 || bad.join("; ");
+      state.pathChunks = K.C; state.pathFixed = K.F; state.paths = K.P; state.buildings = K.B; state.fences = K.Fe; state.water = K.W; state.money = K.money; state.sandbox = K.sb; rot = K.rot; pathVer++; recompute(); buildGuestGraph(); setTool("select");
+    }
+
     // tram: track is drawn like a path, guests ride it between stations, and nobody walks it
     const trSaved = {paths:state.paths, buildings:state.buildings, tech:state.science.tech.slice(), money:state.money, fares:state.today.fares};
     state.science.tech = state.science.tech.filter(t => t !== "transit"); state.money = 1e6; state.today.fares = 0;

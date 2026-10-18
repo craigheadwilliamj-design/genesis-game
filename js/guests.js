@@ -37,8 +37,8 @@ function buildGuestGraph(){
   };
   const stop = (id, best) => { if(best) best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); };
   for(const b of state.buildings) if(guestBuilding(b) && isReachable(b)){
-    const t = BUILDINGS[b.type], [cx, cy] = centroid(b.points);
-    stop(b.id, nearest(cx, cy, Math.hypot(t.w, t.d) / 2 + REACH));
+    const t = BUILDINGS[b.type], [cx, cy] = centroid(b.points), [dx, dy] = doorPoint(b), range = Math.hypot(t.w, t.d) / 2 + REACH;
+    stop(b.id, nearest(dx, dy, range) || nearest(cx, cy, range));   // guests walk to the path point nearest the door; if the door side has none in range, to the one nearest the middle
   }
   // guests look in from a spot beside the fence, as near the middle of the exhibit as the paths go
   for(const e of state.exhibits){

@@ -836,7 +836,7 @@ function cyl34(x, y, r, h, fill, ln){
 // labs and the resort: a flat roofed block, windows floor by floor, the theme's roof art on top
 function block34(bl, t, S, P, col, line, inv){
   const W = S.wall, wallCol = S.wallCol || WALL34, glass = "#3B5566", thin = `stroke="#1D2B22" stroke-width="1" vector-effect="non-scaling-stroke"`;
-  const gc = S.glassCol || "#9FCFC0", w = walls34(P, 0, W, S.glass ? gc : wallCol, line), main = w.main;
+  const gc = S.glassCol || "#9FCFC0", w = walls34(P, 0, W, S.glass ? gc : wallCol, line), fe = faceEdge(P, bl.face === undefined ? 2 : bl.face), main = norm34(P, fe)[1] > .05 ? fe : -1, graf = main >= 0 ? main : w.main;   // the door wall, unless the camera can't see it
   let s = w.s;
   for(const i of [...Array(P.length).keys()].filter(j => norm34(P, j)[1] > .05)){
     const L = edgeLen34(P, i);
@@ -867,17 +867,18 @@ function block34(bl, t, S, P, col, line, inv){
       for(let b = 0; b + 3 < W; b += 3.3) s += quad34(P, i, .05, .95, b + 1.1, b + 2.3, glass) + quad34(P, i, .05, .55, b + 1.9, b + 2.3, "#fff", `fill-opacity=".12"`);
       s += quad34(P, i, 0, 1, W - 1, W - .25, col);
     }
-    if(i !== main) continue;
-    // the way in: glass doors under a canopy, and the name on the band above
-    const dw = Math.min(1.6, L * .08) / L;
-    if(!S.doors){
-    s += quad34(P, i, .5 - dw, .5 + dw, 0, 2.6, S.front === "resort" ? "#2B2418" : "#22313A");
-    const cv = [onEdge34(P, i, .5 - dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3, 1.8), onEdge34(P, i, .5 - dw*1.6, 3, 1.8)];
-    s += `<polygon points="${polyStr(cv)}" fill="${S.front === "resort" ? col : wallCol}" ${thin}/>` + shade34(cv, .4);
+    if(i === main){
+      // the way in: glass doors under a canopy, and the name on the band above
+      const dw = Math.min(1.6, L * .08) / L;
+      if(!S.doors){
+      s += quad34(P, i, .5 - dw, .5 + dw, 0, 2.6, S.front === "resort" ? "#2B2418" : "#22313A");
+      const cv = [onEdge34(P, i, .5 - dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3), onEdge34(P, i, .5 + dw*1.6, 3, 1.8), onEdge34(P, i, .5 - dw*1.6, 3, 1.8)];
+      s += `<polygon points="${polyStr(cv)}" fill="${S.front === "resort" ? col : wallCol}" ${thin}/>` + shade34(cv, .4);
+      }
+      if(S.top === "cross"){ const h = W - 2.6, cw = .35 / L; s += quad34(P, i, .5 - cw, .5 + cw, h - 1.3, h + .3, "#D9363E") + quad34(P, i, .5 - cw * 3.4, .5 + cw * 3.4, h - .75, h - .25, "#D9363E"); }
+      s += sign34(P, i, W - .62, esc(S.front === "resort" ? "RESORT" : (t.tag || t.label)), Math.min(.6, L * .04));
     }
-    if(S.top === "cross"){ const h = W - 2.6, cw = .35 / L; s += quad34(P, i, .5 - cw, .5 + cw, h - 1.3, h + .3, "#D9363E") + quad34(P, i, .5 - cw * 3.4, .5 + cw * 3.4, h - .75, h - .25, "#D9363E"); }
-    s += sign34(P, i, W - .62, esc(S.front === "resort" ? "RESORT" : (t.tag || t.label)), Math.min(.6, L * .04));
-    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
+    if(i === graf && (bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
       s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
   }
   // the roof: the same art as the flat map (rooftop units), just lifted
@@ -902,6 +903,7 @@ function block34(bl, t, S, P, col, line, inv){
   if(S.top === "cross"){ const [x, y] = spot(.55), a = 1.6, b = .5; s += `<path d="M${x - b} ${y - a}h${2*b}v${a - b}h${a - b}v${2*b}h${b - a}v${a - b}h${-2*b}v${b - a}h${b - a}v${-2*b}h${a - b}Z" fill="#D9363E" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
   // the name on the roof once there's room for it, like the flat map
   if(t.d * k >= 26 && S.front !== "resort") s += `<text class="glyph" x="${rx.toFixed(2)}" y="${ry.toFixed(2)}" font-size="${Math.min(t.d * .42, 15*inv)}" letter-spacing=".04em">${t.tag || t.label}</text>`;
+  if(main < 0) s += faceMark34(P, fe, W, graf, esc(S.front === "resort" ? "RESORT" : (t.tag || t.label)));
   return s;
 }
 // the dark flap on a tent's front gable
@@ -1100,6 +1102,22 @@ function entrance34(inv){
   s += face(-E.half - .3, E.half + .3, E.pillar, E.pillar + .3, E.depth + .3, FLAT34.eave) + flatLine34(up(E.pillar + .3)([gx - E.half - .3, gy + E.depth + .3]), up(E.pillar + .3)([gx + E.half + .3, gy + E.depth + .3]), FLAT34.gold, px);
   return s + `</g>`;
 }
+// A door on a wall the camera can't see. North: the name plaque stands on the roof's far edge with a door tab hanging under it. East or west: the wall is edge-on, so the door is a column on that edge, and the name goes on the front wall's top band (m, the widest visible wall).
+function faceMark34(P, i, wall, m, text){
+  const L = edgeLen34(P, i), [nx, ny] = norm34(P, i), px = FLAT34.px, F = FLAT34, name = (Q, h) => `<text class="glyph" x="${Q[0].toFixed(2)}" y="${Q[1].toFixed(2)}" font-size="${h}" style="fill:#2E3A33;stroke:none" pointer-events="none">${text}</text>`;
+  let s = "";
+  if(ny < -.05){
+    const dw = Math.min(.75, L * .1) / L, e = px / L;
+    s += flatQuad34(P, i, .18, .82, wall + .05, wall + 1.15, F.wall[0]) + flatQuad34(P, i, .18, .82, wall + .05, wall + .05 + px, F.wall[2]) + name(onEdge34(P, i, .5, wall + .45), Math.min(.5, L * .05).toFixed(2));
+    s += flatQuad34(P, i, .5 - dw, .5 + dw, wall - 1.5, wall, F.door) + flatQuad34(P, i, .5 - dw, .5 - dw + e, wall - 1.5, wall, F.doorEdge) + flatQuad34(P, i, .5 + dw - 2 * e, .5 + dw - e, wall - .9, wall - .9 + px, F.gold);
+  } else {
+    const sx = nx > 0 ? 1 : -1, [mx, my] = [(P[i][0] + P[(i + 1) % P.length][0]) / 2, (P[i][1] + P[(i + 1) % P.length][1]) / 2], up = h => lift34(h), x1 = mx + sx * px * 5;
+    s += flatPoly34([up(0)([mx, my]), up(0)([x1, my]), up(2.1)([x1, my]), up(2.1)([mx, my])], F.door, "", true) + flatPoly34([up(0)([mx, my]), up(0)([mx + sx * px, my]), up(2.1)([mx + sx * px, my]), up(2.1)([mx, my])], F.doorEdge, "", true);
+    s += flatPoly34([up(.55)([x1 - sx * px, my]), up(.55)([x1, my]), up(.55 + px)([x1, my]), up(.55 + px)([x1 - sx * px, my])], F.gold, "", true);
+    if(m >= 0) s += flatQuad34(P, m, .15, .85, wall - 1.05, wall - .15, F.wall[0]) + name(onEdge34(P, m, .5, wall - .75), Math.min(.5, edgeLen34(P, m) * .05).toFixed(2));
+  }
+  return s;
+}
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
   const edge = dead ? "var(--bad)" : on ? "var(--sel)" : reach ? T.edge : "var(--bad)";
@@ -1128,7 +1146,7 @@ function building34(bl, t, on, dead, reach, inv){
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
   const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
-  const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), i = w.main;
+  const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), fe = faceEdge(P, bl.face === undefined ? 2 : bl.face), i = norm34(P, fe)[1] > .05 ? fe : -1;   // the door wall, unless the camera can't see it
   s += w.s;
   if(i >= 0){
     const L = edgeLen34(P, i);
@@ -1172,11 +1190,12 @@ function building34(bl, t, on, dead, reach, inv){
       const dw = 2.2 / L; s += quad34(P, i, .5 - dw/2, .5 + dw/2, 0, 2.5, DARK34);
       s += quad34(P, i, .04, .96, S.wall - .1, S.wall - .9, col) + sign34(P, i, S.wall - .5, S.sign, .7);
     }
-    if((bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, i, .3, 1.1), [x1] = onEdge34(P, i, .7, 1.1), g = (x1 - x0)/4;
-      s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; }
   }
-  if(flat) return s + flatRoof34(P, S.wall, S.rise, ln);
-  return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)));
+  { const gi = i >= 0 ? i : w.main; if(gi >= 0 && (bl.graffiti || 0) >= VANDAL.grossAt){ const [x0, y0] = onEdge34(P, gi, .3, 1.1), [x1] = onEdge34(P, gi, .7, 1.1), g = (x1 - x0)/4;
+      s += `<path d="M${x0} ${y0}q${g/2} ${-g*.8} ${g} 0t${g} 0t${g} 0t${g} 0" fill="none" stroke="#C04BD8" stroke-width="${Math.max(.6, 2.2*inv)}" stroke-linecap="round" pointer-events="none"/>`; } }
+  const mark = i < 0 ? faceMark34(P, fe, S.wall, w.main, esc(S.sign || t.tag || t.label)) : "";   // the door is on a wall we can't see: the plaque and door tab go over the roof edge
+  if(flat) return s + flatRoof34(P, S.wall, S.rise, ln) + mark;
+  return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34))) + mark;
 }
 
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
@@ -1210,6 +1229,14 @@ function fenceGhostSvg(keys, kind, bad, inv, shift){
   let last = pieceEnds(keys[keys.length - 1])[1]; const shl = shift && shift[keys[keys.length - 1]]; if(shl) last = [last[0] + shl[0], last[1] + shl[1]];
   if(tilt){ const tl = lift34(H)(last); s += `<line x1="${n2(last[0])}" y1="${n2(last[1])}" x2="${n2(tl[0])}" y2="${n2(tl[1])}" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke"/>`; }
   return s + `</g>`;
+}
+// An arrow out of a building's door wall, for the ghost and the Move selection
+function doorArrowSvg(pts, face, col, inv){
+  const i = faceEdge(pts, face), a = pts[i], c = pts[(i + 1) % pts.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, [cx, cy] = centroid(pts);
+  let nx = (c[1] - a[1]) / L, ny = -(c[0] - a[0]) / L; const mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2;
+  if(nx * (mx - cx) + ny * (my - cy) < 0){ nx = -nx; ny = -ny; }
+  const len = Math.min(2.2, Math.max(1.2, L * .25)), hx = mx + nx * len, hy = my + ny * len, w = Math.max(.35, 5 * inv);
+  return `<path d="M${mx.toFixed(2)} ${my.toFixed(2)}L${hx.toFixed(2)} ${hy.toFixed(2)}M${(hx - nx * w + ny * w).toFixed(2)} ${(hy - ny * w - nx * w).toFixed(2)}L${hx.toFixed(2)} ${hy.toFixed(2)}L${(hx - nx * w - ny * w).toFixed(2)} ${(hy - ny * w + nx * w).toFixed(2)}" fill="none" stroke="${col}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
 }
 function renderOverlay(){
   const inv = 1/view.k;
@@ -1269,6 +1296,7 @@ function renderOverlay(){
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  if(mb && !BUILDINGS[mb.type].prop) s += doorArrowSvg(mb.points, mb.face === undefined ? 2 : mb.face, "var(--sel)", inv);
   if(ghost){
     const col = ghost.ok ? "var(--sel)" : "var(--bad)", t = BUILDINGS[tool];
     const gk = themeFor("building", {type:tool, points:ghost.pts}), gb = gk ? {theme:gk} : null;
@@ -1282,6 +1310,7 @@ function renderOverlay(){
       s += `<polygon points="${polyStr(ghost.pts)}" fill="${gb ? "none" : t.color}" fill-opacity=".55" stroke="${col}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
       s += `<text class="glyph" x="${ghost.x}" y="${ghost.y}" font-size="${Math.min(t.w, t.d)*.55}">${t.glyph}</text>`;
       if(t.prop) s += propFrontMark({points:ghost.pts}, Math.max(t.w, t.d) / 2);
+      else s += doorArrowSvg(ghost.pts, ghost.face, col, inv);
     }
   }
   if(gateGhost && !gateGhost.loose){
@@ -2480,11 +2509,13 @@ function placeGhost(clientX, clientY){
   if(!why && !t.onPath && (shapeOnChunks(pts) || state.paths.some(q => !q.d && lineEntersShape(q.points, pts)))) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
-  ghost = {pts, x, y, angle, ok:!why, why};
+  const face = t.prop ? undefined : (2 + rot / 2) % 4;   // a fresh building looks south; each quarter turn swings its door with it
+  ghost = {pts, x, y, angle, ok:!why, why, face};
   // does it work where it stands? Same reach test as recompute: guests walk to it by footpath, staff by any path (depots by staff path)
   const reached = t.onPath ? !!best : nearCells(pts, REACH - PATH_HALF_WIDTH, !t.dept) && (!t.serviceOnly || nearCells(pts, REACH - PATH_HALF_WIDTH, false, false, "s"));
+  const doorAway = !t.onPath && reached && !doorNear({points:pts, face}, !t.dept) ? " Its door faces away from the path." : "";
   const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
-  setStat(why || `${money(t.price)}. Tap to build.${reached ? "" : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
+  setStat(why || `${money(t.price)}. Tap to build.${reached ? doorAway : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
 }
 
 // Turn the building being placed (a quarter turn, or 45° for path props), and redraw the ghost where the pointer is
@@ -2503,6 +2534,7 @@ function rotateMoved(){
   const why = moveProblem("building", it);
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
   if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + turnStep(it.type)) % 8;
+  else it.face = ((it.face === undefined ? 2 : it.face) + 1) % 4;   // the door turns with the walls
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
   setStat(reach ? "Turned." : "Turned, but it has no path to the entrance, so it won't work.", !reach);
@@ -2527,6 +2559,7 @@ function placeBuilding(e){
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
   if(t.prop) b.rot = rot;   // how many 45° turns the player gave it; its front is read off the points (propFront)
+  else b.face = ghost.face;   // which wall has the door and sign: 0-3 = N/E/S/W
   autoZone(b);
   themeNew("building", b);
   state.buildings.push(b);
