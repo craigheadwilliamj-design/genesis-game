@@ -242,7 +242,7 @@ function exhibitHtml(e){
   // barriers, moats, and aviary netting
   if(!e.viv){
     const cur = e.barrier || "wood";
-    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).filter(([key, b]) => !b.deco || key === cur).map(([key, b]) => {
+    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).map(([key, b]) => {
       const locked = b.tech && !hasTech(b.tech), cost = key === cur ? 0 : upgradeCost(e, key);
       return `<option value="${key}"${key === cur ? " selected" : ""}${locked ? " disabled" : ""}>${b.label}, strength ${b.strength}${locked ? " (research at ORACLE)" : key === cur ? " (current)" : cost ? `, ${money(cost)}` : ", free"}</option>`;
     }).join("")}</select></label>`;
@@ -937,7 +937,6 @@ panelEl.addEventListener("change", ev => {
   if(ev.target.id !== "barrierSel") return;
   const e = selItem(), key = ev.target.value; if(!e) return;
   const b = BARRIERS[key], cost = upgradeCost(e, key);
-  if(b.deco){ ui.toast(DECO_WHY, "bad"); ui.panel(); return; }
   if((b.tech && !hasTech(b.tech)) || !canAfford(cost)){ ui.toast(!canAfford(cost) ? `That costs ${money(cost)}.` : "Research it at ORACLE first.", "bad"); ui.panel(); return; }
   spend(cost, "built"); if(e.grid) refenceExhibit(e, key); else e.barrier = key;
   ui.toast(`${e.name} now has ${b.label.toLowerCase()}${cost ? ` (${money(cost)})` : ""}.`);

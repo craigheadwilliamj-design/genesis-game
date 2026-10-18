@@ -2548,7 +2548,6 @@ function findGateSpot(clientX, clientY){
     const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
     return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
   }
-  if(best.pen && penProblem(best.pen)) return {...best, ok:false, deco:true, why:penProblem(best.pen)};   // a hedge or rope pen can't be an exhibit
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
@@ -2568,7 +2567,7 @@ function gateHover(e){
 function gateTap(e){
   const g = findGateSpot(e.clientX, e.clientY);
   if(!g){ setStat("Tap right on an exhibit's fence, or a closed pen.", true); return; }
-  if(g.loose || g.deco){ setStat(g.why, true); return; }
+  if(g.loose){ setStat(g.why, true); return; }
   const cost = g.pen ? penCost(g.pen) : g.e.gate ? 0 : GATE_COST;
   if(!canAfford(cost)){ setStat(`That costs ${money(cost)}.`, true); return; }
   spend(cost, "built");
@@ -3299,6 +3298,7 @@ buildMenu();
 const sideOpen = on => {
   $("#sideTab").setAttribute("aria-expanded", on); $("#sideBody").hidden = !on; mapwrap.classList.toggle("side-open", on);
   try{ localStorage.setItem("genesis-side-open", on ? "1" : "0"); }catch{}
+  if(typeof render === "function" && state) render();   // the fence end rings follow the menu
 };
 // Tapping a tool picks it and tucks the menu away so the map is clear. Tapping it again goes back to Select.
 document.querySelectorAll("[data-tool]").forEach(b => b.addEventListener("click", () => {

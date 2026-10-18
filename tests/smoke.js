@@ -1317,9 +1317,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.decoRingOnlyWhileFencing = ringOpen && !ringShut;
       for(const [a, b] of [[[230,150],[280,150]], [[280,150],[280,200]], [[280,200],[230,200]], [[230,200],[230,150]]]) layPieces(pieceLine(a, b).keys, "hedge");
       out.fencePenNoGate = state.exhibits.length === 0 && penFaces().length === 1;
-      const pf = penFaces()[0]; const hedgePenRefused = penProblem(pf) === DECO_WHY + " Fence it with something strong first."; adoptPen(pf, pf.pts[0].slice());
+      const pf = penFaces()[0]; adoptPen(pf, pf.pts[0].slice());
       const ne = state.exhibits[state.exhibits.length - 1];
-      out.decoCantHouse = hedgePenRefused && planPieces(loopPieces(ne.points), "rope").why === DECO_WHY && BARRIERS.hedge.deco && BARRIERS.rope.deco && !BARRIERS.wood.deco;
+      out.decoCanHouse = !!ne && planPieces(loopPieces(ne.points), "rope").why !== "Hedges and rope fences are only for show. They can't hold animals.";
       out.fenceToolCloses = !!ne && ne.grid && ne.barrier === "hedge" && biomeOf(ne) === "desert" && area(ne.points) === 2500;
       setTool("select"); fenceSel = "wood";
       // guests enjoy the gardens and read the plaques
@@ -1447,8 +1447,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         // the other pen's side takes concrete without touching the first
         layPieces(wall, "concrete", {dir:[0,1], side:-1});
         out.sharedWallOtherSide = wall.every(k => pieceKind(fencePieces()[k], true) === "bars" && pieceKind(fencePieces()[k], false) === "concrete") && wallKinds(E).join() === "concrete" && wallKinds(W).join() === "bars";
-        // a deco fence can't take an exhibit's side of the wall
-        out.sharedWallNoDeco = planPieces(wall, "rope", {dir:[0,1], side:1}).why === DECO_WHY;
         // pointer on the wall changes both sides; it costs one fence's worth a piece
         const cost = planPieces(wall, "bars", {dir:[0,1], side:0}).cost;
         out.sharedWallBoth = cost === Math.round(wall.length * fenceRate("bars")) && layPieces(wall, "bars", {dir:[0,1], side:0}) && wall.every(k => !pieceSplit(fencePieces()[k]) && pieceType(fencePieces()[k]) === "bars");
