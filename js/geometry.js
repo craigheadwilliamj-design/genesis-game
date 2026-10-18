@@ -110,7 +110,8 @@ function shapesOverlap(A, B){
   const closedA = A.concat([A[0]]);
   if(lineEntersShape(closedA, B)) return true;
   for(const p of B) if(deepInside(p[0], p[1], A, 0.5)) return true;
-  return false;
+  const [ax, ay] = centroid(A), [bx, by] = centroid(B);   // the same shape on the same spot has no corner deep inside the other
+  return inPoly(bx, by, A) || inPoly(ax, ay, B);
 }
 
 // Does a self-crossing shape (like a figure 8) exist? Those make bad exhibits.

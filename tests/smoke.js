@@ -1776,6 +1776,30 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       at(205 + 5 + 3, 270); const nearOk = ghost.ok && !stat().includes("No path nearby");
       at(205 + 5 + 4, 270); const farWarn = ghost.ok && stat().includes("No path nearby");
       out.placeReachWarning = nearOk && farWarn;
+      // path props: 1 m grid anywhere fully on a guest chunk, front toward the nearest fence or path edge
+      try { const added = [], ex0 = state.exhibits;
+        for(let y = 50; y < 59; y++) for(const cx of [39, 41]){ state.pathChunks[cx + "," + y] = "g"; added.push(cx + "," + y); }
+        pathVer++; recompute(); setTool("bench"); rot = 0; lastPtr = null;
+        const mid1 = at(202.4, 270.4), fr = g => propFront({points:g.pts});
+        out.propMidWalk = mid1.ok && Math.abs(mid1.x - 202) < 1e-9 && Math.abs(mid1.y - 270) < 1e-9;
+        out.propFrontsEdge = (f => f[0] < -.99 && Math.abs(f[1]) < 1e-6)(fr(mid1));
+        const a0 = mid1.angle; rotateTool(); out.propRotate45 = Math.abs(ghost.angle - a0 - Math.PI/4) < 1e-9; rot = 0;
+        const offG = at(190, 270), halfG = at(195, 270), nearEdgeG = at(196, 270);
+        out.propOffPathRefused = !offG.ok && offG.why === "Keep it on a path." && !halfG.ok && halfG.why === "Keep it on a path." && nearEdgeG.ok;
+        state.exhibits = [{id:"pe", points:[[207, 265], [213, 265], [213, 275], [207, 275]]}];
+        out.propFrontsExhibit = (f => f[0] > .99 && Math.abs(f[1]) < 1e-6)(fr(at(202, 270)));
+        state.exhibits = [{id:"pe", points:[[202.3, 265], [213, 265], [213, 275], [202.3, 275]]}];
+        const sl = at(202, 270); out.propFenceSlide = sl.ok && sl.x < 202 && sl.x > 200;
+        state.exhibits = ex0;
+        const first = {id:"b-pp1", type:"bench", points:at(202, 270).pts};
+        state.buildings.push(first);
+        const dup = at(202, 270), beside = at(202, 273);
+        out.propNoOverlap = !dup.ok && dup.why === "It overlaps another building." && beside.ok;
+        const shifted = {...first, points:first.points.map(q => [q[0] - 20, q[1]])};
+        out.propMoveRule = moveProblem("building", first) === null && moveProblem("building", shifted) === "Keep it on a path.";
+        afterChange();
+        out.propGuestsFindIt = !!gGraph.anchors["b-pp1"] && isReachable(first);
+        state.buildings = state.buildings.filter(b => b !== first); for(const k of added) delete state.pathChunks[k]; pathVer++; recompute(); buildGuestGraph(); setTool("food"); } catch(x){ out.propBlockThrew = String(x.stack).slice(0, 400); }
       // fences, water, exhibits and buildings
       state.fences = [{points:[[230, 265], [230, 275]], barrier:"wood"}]; out.placeRefusesFence = !at(230, 270).ok && at(230, 270).why.includes("fence"); state.fences = [];
       state.water = [{id:"w-pg", points:[[225, 262], [235, 262], [235, 278], [225, 278]]}]; out.placeRefusesWater = !at(230, 270).ok && at(230, 270).why.includes("water"); state.water = [];
@@ -3074,12 +3098,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.sandbox = true; state.over = false; state.money = 1e7;
     let placed = null;
     for(let y = 40; y < 700 && !placed; y += 12){
-      state.paths.push({id:"p-prop", points:[[60, y], [160, y]]});
+      const pk = []; for(let cx = 20; cx < 23; cx++) for(let cy = Math.floor(y / 5); cy < Math.floor(y / 5) + 3; cy++){ const k = chunkKey(cx, cy); if(!state.pathChunks[k]){ state.pathChunks[k] = "g"; pk.push(k); } }
+      pathVer++; recompute();
       setTool("bench"); for(let i = 0; i < 3; i++) rotateTool();
       const r = svg.getBoundingClientRect(), px = (x, yy) => [r.left + view.tx + x * view.k, r.top + view.ty + yy * ky()];
       placeGhost(...px(110, y + 1));
       if(ghost && ghost.ok){ placeBuilding({clientX:px(110, y + 1)[0], clientY:px(110, y + 1)[1]}); placed = state.buildings[state.buildings.length - 1]; }
-      else state.paths.pop();
+      else { for(const k of pk) delete state.pathChunks[k]; pathVer++; }
     }
     out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 3 && rot === 3;
     if(placed){ const old = JSON.parse(JSON.stringify(placed)); delete old.rot; const snap = JSON.parse(JSON.stringify(state)); snap.buildings = snap.buildings.map(b => b.id === old.id ? old : b); upgradeSave(snap);
