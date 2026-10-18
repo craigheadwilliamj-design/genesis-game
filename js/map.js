@@ -1604,10 +1604,21 @@ function walkRoute(a, b, A){
   return out;
 }
 
+// A land animal caught in a pond (one drawn over it, or a spawn with no dry spot) heads for the nearest dry ground, or hops there if no route exists
+function wadeOut(h, e){
+  const A = walkArea(h, e); if(!inWater([h.x, h.y], A)) return false;
+  let best = null, bd = Infinity;
+  for(let i = 0; i < 80; i++){ const p = randomInside(e.points); if(!standable(p, A)) continue; const d = Math.hypot(p[0] - h.x, p[1] - h.y); if(d < bd){ bd = d; best = p; } }
+  if(!best) return false;
+  h.path = walkRoute([h.x, h.y], best, A) || [best];
+  return true;
+}
+
 // Pick a new spot to walk to and the route there; an animal that finds none just stays put
 function animalWander(h, e){
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
+  if(!e.viv && wadeOut(h, e)) return;
   const A = walkArea(h, e), ws = swims(SPECIES_BY_ID[h.sp]) ? waterOf(e) : [];
   const toWater = h.swim ? .15 : .5;   // swimmers spend about half their time in the water, but one already in it mostly heads out (else a big pond by the fence traps it)
   for(let i = 0; i < 8; i++){
@@ -1734,6 +1745,7 @@ function animalPlan(h, e){
   if(!a || !a.act){ animalWander(h, e); return; }
   h.key = JSON.stringify(e.points); h.path = [];
   if(!inPoly(h.x, h.y, e.points)){ [h.x, h.y] = randomInside(e.points); }
+  if(!e.viv && wadeOut(h, e)) return;
   if(a.act === "pace"){ const r = paceRoute(h, e); if(r){ h.path = r; return; } }
   if(a.act === "patrol"){ const r = patrolRoute(h, e); if(r){ h.path = r; return; } }
   // only a barn is walked into (featSpot sends it to the middle); every other spot steps clear of rocks and trees
