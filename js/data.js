@@ -2240,9 +2240,9 @@ const BIOME_HAPPY = {home:8, near:3, away:-6};   // happiness in an animal's hom
 const DEFAULT_BIOME = "grassland";              // new exhibits start out as plain ground
 // Each animal's home biome, then the one it gets by in. Vivarium animals count too: a vivarium is laid out as a biome like any exhibit.
 const SPECIES_BIOMES = Object.fromEntries(Object.entries({
-  eryo:"wetland tropical",    lyst:"scrubland desert",     mosc:"scrubland desert",     dime:"scrubland wetland",
-  scut:"desert scrubland",    este:"temperate wetland",    coty:"scrubland desert",     ante:"wetland temperate",
-  inos:"scrubland temperate", prio:"wetland tropical",     sile:"scrubland desert",     coel:"desert scrubland",
+  eryo:"wetland tropical",    lyst:"fern scrubland",     mosc:"fern scrubland",     dime:"scrubland wetland",
+  scut:"desert scrubland",    este:"temperate wetland",    coty:"scrubland desert",     ante:"wetland fern",
+  inos:"scrubland fern", prio:"wetland tropical",     sile:"scrubland desert",     coel:"desert scrubland",
   herr:"scrubland temperate", desm:"scrubland desert",     plat:"temperate scrubland",  post:"scrubland tropical",
   eryt:"desert scrubland",    liso:"scrubland temperate",  hete:"desert scrubland",     orni:"temperate scrubland",
   dryo:"grassland temperate", dimo:"tropical wetland",     scel:"temperate wetland",    dilo:"tropical scrubland",
