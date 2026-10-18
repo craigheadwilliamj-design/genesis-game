@@ -1262,6 +1262,29 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.landRefund = refundFor("land", f0) === Math.round(LAND[f0.type].price * COST.refundShare) && refundFor("water", lx.water[0]) === Math.round(waterCost(pool) * COST.refundShare) && landRefund(lx) > 0;
     removeItem("land", f0); removeItem("water", lx.water[0]);
     out.landBulldoze = lx.land.length === n0 - 1 && !lx.land.includes(f0) && lx.water.length === 0;
+    // the Move tool picks rocks up: inside the exhibit, into another, out in the park, and back, keeping the id and charging nothing
+    {
+      const lx2 = {id:"e-land2", name:"Land test 2", points:[[170,100],[210,100],[210,140],[170,140]], animals:[], happy:70, cond:100, land:[], water:[]};
+      state.exhibits = [lx, lx2]; lx.land = []; lx.water = [];
+      const rk = placeLand(lx, "rock", 110, 110), blocker = placeLand(lx, "rock", 130, 130), cash = state.money;
+      const mvTo = (m, x, y) => { m.spot = landMoveSpot(m, m.wx + x - m.x0, m.wy + y - m.y0); moveBy(m, m.spot.x - m.x0, m.spot.y - m.y0); return m.spot; };
+      let m = startMove(rk, "land", {clientX:0, clientY:0});
+      out.landMoveTarget = moveTarget({kind:"land", id:rk.id}) === rk;
+      out.landMoveRefusesOverlap = !mvTo(m, 130, 130).ok && /overlaps/.test(m.spot.why);
+      out.landMoveToPark = mvTo(m, 20, 20).ok && m.spot.e === null;
+      out.landMoveRefusesFence = !mvTo(m, 101, 101).ok;
+      moveBy(m, 0, 0); out.landMoveRestores = rk.x === 110 && rk.y === 110;
+      mvTo(m, 120, 140); const inner = m.spot; dropMove(m);
+      out.landMoveInside = inner.ok && lx.land.includes(rk) && rk.x === inner.x && rk.y === inner.y && state.money === cash;
+      const id = rk.id, biome = biomeOf(lx);
+      m = startMove(rk, "land", {clientX:0, clientY:0}); mvTo(m, 190, 120); dropMove(m);
+      out.landMoveBetween = !lx.land.includes(rk) && lx2.land.includes(rk) && rk.id === id && state.money === cash && rk.biome === biome;
+      m = startMove(rk, "land", {clientX:0, clientY:0}); mvTo(m, 10, 10); dropMove(m);
+      out.landMovePark = !lx2.land.includes(rk) && state.decor.includes(rk) && rk.id === id && state.money === cash;
+      m = startMove(rk, "land", {clientX:0, clientY:0}); mvTo(m, 120, 140); dropMove(m);
+      out.landMoveBack = lx.land.includes(rk) && !state.decor.includes(rk) && rk.id === id && lx.land.includes(blocker);
+      removeItem("land", rk); removeItem("land", blocker);
+    }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
     // old saves get an empty list for open exhibits only
     const oldL = JSON.parse(JSON.stringify(newPark()));

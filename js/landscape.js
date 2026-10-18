@@ -704,15 +704,24 @@ function landProblem(e, key, x, y, pic, biome){
   if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at ORACLE first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(t.ceres && state.ceres.stock < t.ceres) return `Takes ${t.ceres} Paleoflora from CERES, which has ${Math.floor(state.ceres.stock)}.`;
+  const why = landFit(e, key, x, y, pic, biome);
+  if(why) return why;
+  if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
+  return null;
+}
+// Whether the thing fits at (x, y) in this open exhibit, ignoring price and research; `skip` is an item being moved, which doesn't block itself
+function landFit(e, key, x, y, pic, biome, skip){
+  const t = LAND[key];
+  if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
+  if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   const box = footBoxAt(key, pic, biome || (ROCK_TYPES.includes(key) ? biomeOf(e) : null), x, y);
   if(!boxInside(box, e.points)) return "Keep it inside the fence.";
-  if(landOf(e).some(f => LAND[f.type] && boxesHit(box, footBox(f, e)))) return "It overlaps something already there.";
+  if(landOf(e).some(f => f !== skip && LAND[f.type] && boxesHit(box, footBox(f, e)))) return "It overlaps something already there.";
   if(!t.wet && waterOf(e).some(w => boxHitsPoly(box, w.points))) return "It's in the water.";
   if(t.aquatic && !waterOf(e).some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Place it in the exhibit's water.`;
   if(state.buildings.some(b => b.exhibitId === e.id && boxHitsPoly(box, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && boxPointDist(box, e.gate[0], e.gate[1]) < 3) return "Keep clear of the gate.";
   if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
-  if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
 }
 // What's under the pointer: the open exhibit it's in (null out in the park), and whether the feature fits there
@@ -735,6 +744,16 @@ function decorProblem(key, x, y, pic, biome){
   if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
   if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
+  const why = decorFit(key, x, y, pic, biome);
+  if(why) return why;
+  if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
+  return null;
+}
+// Whether the thing fits at (x, y) out in the park, ignoring price and research; `skip` is an item being moved
+function decorFit(key, x, y, pic, biome, skip){
+  const t = LAND[key];
+  if(t.vivToy) return `${t.label} only goes in a vivarium.`;
+  if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   const box = footBoxAt(key, pic, biome || (ROCK_TYPES.includes(key) ? parkBiome() : null), x, y);
   if(!insidePlot(boxPts(box), true)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(o => boxHitsPoly(box, o.points))) return "Keep it clear of exhibit fences.";
@@ -742,12 +761,30 @@ function decorProblem(key, x, y, pic, biome){
   if(state.paths.some(p => !p.d && lineHitsBox(box, p.points, halfWidth(p))) || boxOnChunk(box)) return "It's on a path.";
   if(boxPointDist(box, state.gate[0], state.gate[1]) < 9) return "Keep clear of the entrance.";
   if(parkFences().some(l => lineHitsBox(box, l.points))) return "It's on a fence.";
-  if(decorOf().some(f => LAND[f.type] && boxesHit(box, footBox(f, null)))) return "It overlaps something already there.";
+  if(decorOf().some(f => f !== skip && LAND[f.type] && boxesHit(box, footBox(f, null)))) return "It overlaps something already there.";
   const wet = parkWater().find(w => boxHitsPoly(box, w.points));
   if(t.aquatic && !parkWater().some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Draw a pond first, then place it in the water.`;
   if(wet && !t.wet) return "It's in the water.";
-  if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   return null;
+}
+// Moving a land item: where the pointer's (wx, wy) puts item m.it, and whether it fits there. The target is the open exhibit under the spot (null: the park);
+// a vivarium fitting stays in its own case, and nothing else goes into one.
+function landMoveSpot(m, wx, wy){
+  const f = m.it, key = f.type, src = m.from, rock = ROCK_TYPES.includes(key);
+  const x0 = m.x0 + wx - m.wx, y0 = m.y0 + wy - m.wy;
+  const viv = state.exhibits.find(o => o.viv && inPoly(x0, y0, o.points));
+  if(src && src.viv){
+    const [x, y] = footSnap(key, null, null, x0, y0), r = LAND[key].r * (f.k || 1);
+    const why = !deepInside(x, y, src.points, r + .3) ? "Keep it inside the glass." : landOf(src).some(g => g !== f && LAND[g.type] && Math.hypot(g.x - x, g.y - y) < r + LAND[g.type].r * (g.k || 1)) ? "It overlaps something already there." : null;
+    return {e:src, x, y, ok:!why, why, key};
+  }
+  if(viv) return {e:null, x:x0, y:y0, ok:false, why:"Vivarium fittings are set from the vivarium's own panel.", key};
+  const e = state.exhibits.find(o => !o.viv && inPoly(x0, y0, o.points)) || null;
+  const biome = rock ? (BIOMES[f.biome] ? f.biome : src ? biomeOf(src) : parkBiome()) : null;
+  const pic = rock ? rockPicIndex(f, biome) : null;
+  const [x, y] = footSnap(key, pic, biome, x0, y0);
+  const why = e ? landFit(e, key, x, y, pic, biome, f) : decorFit(key, x, y, pic, biome, f);
+  return {e, x, y, ok:!why, why, key, pic};
 }
 function placeLand(e, key, x, y, biome, pic){
   const t = LAND[key];
