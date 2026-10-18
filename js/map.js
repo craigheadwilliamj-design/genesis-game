@@ -774,56 +774,33 @@ function vivFloor34(e, c, dead, on, reach){
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
   return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
 }
-// "back" draws the far panes, posts and rim (before what's inside); "front" the near panes, sill, posts, label plate, the lid and its lamp bars, all see-through but the frame
+// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
 function viv34(e, which, hi){
   const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
-  let s = "", front = -1;
+  let s = "";
   for(let i = 0; i < P.length; i++){
     const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
     const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
     s += wallQ(i, 0, 1, 0, H, VIV_GLASS34[f], back ? .42 : .17);
-    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]) + wallQ(i, 0, 1, H - rim, H, fr[ft]);
+    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]);
     else {
       const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
       s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
-      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]) + wallQ(i, 0, 1, H - rim, H, fr[f]);
-      if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
+      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]);
     }
   }
-  // corner posts: the far ones behind, the near ones in front; the left ones catch the light
-  for(const p of P){
-    if(back ? p[1] > cy : p[1] <= cy) continue;
-    const t = p[0] < cx - .01 ? 0 : p[0] > cx + .01 ? 2 : 1, w = K.post / 2;
-    s += flatPoly34([[p[0] - w, p[1]], [p[0] + w, p[1]], [p[0] + w, up(p)[1]], [p[0] - w, up(p)[1]]], fr[t], "", true);
+  // a one-pixel light blue, see-through border: the floor's edges behind the animals, the lid's in front, and the corner edges from the foot of the base up
+  const ln = (a, b) => `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#BFE6F5" stroke-opacity=".6" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`;
+  for(let i = 0; i < P.length; i++){
+    const a = P[i], b = P[(i + 1) % P.length];
+    s += back ? ln(a, b) : ln(up(a), up(b));
+    if(back ? a[1] <= cy : a[1] > cy) s += ln(a, up(a));
   }
   if(!back){
-    if(front >= 0){
-      const L = edgeLen34(P, front), fl = P[(front + 1) % P.length][0] < P[front][0], e1 = FLAT34.px / L;
-      const Q = (f0, f1, h0, h1, fill) => wallQ(front, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
-      if(K.mullion) s += Q(.5 - K.post / 2 / L, .5 + K.post / 2 / L, 0, H - rim, fr[1]) + Q(.5 - K.post / 2 / L, .5 - K.post / 2 / L + e1, K.sill, H - rim, fr[0]);
-      const pw = Math.min(.45 / L, .12), pf = .22;   // the label plate: a dark plate with a pale rim and the size's letter
-      s += Q(pf - pw - e1, pf + pw + e1, .38, 1.37, "#C9CFD3") + Q(pf - pw, pf + pw, .38 + FLAT34.px, 1.37 - FLAT34.px, "#2B3338") + flatText34(Q, L, pf, .55, K.label, "#F1E7C4");
-    }
-    // the lid: clear glass in the frame's rim, and the lamp bars standing on it
+    // the lid: clear glass
     s += flatPoly34(P.map(up), "#DDEFF2", op(.16), true);
-    for(let i = 0; i < P.length; i++){
-      const a = P[i], b = P[(i + 1) % P.length], n = norm34(P, i), w = K.post;
-      s += flatPoly34([up(a), up(b), up([b[0] - n[0]*w, b[1] - n[1]*w]), up([a[0] - n[0]*w, a[1] - n[1]*w])], K.top, "", true);
-    }
-    let m = 0; for(let i = 1; i < P.length; i++) if(edgeLen34(P, i) > edgeLen34(P, m)) m = i;
-    const A = P[m], B = P[(m + 1) % P.length], ln = edgeLen34(P, m); let u = [(B[0] - A[0]) / ln, (B[1] - A[1]) / ln]; if(u[0] < 0) u = [-u[0], -u[1]];
-    let v = [-u[1], u[0]]; if(v[1] < 0) v = [-v[0], -v[1]];
-    const span = Math.min(...[...Array(P.length).keys()].map(i => edgeLen34(P, i))), l = ln * .55, t = .45, bh = .22;
-    for(let k = 0; k < K.lamps; k++){
-      const off = K.lamps === 1 ? 0 : (k ? .22 : -.22) * span, c0 = [cx + v[0]*off, cy + v[1]*off];
-      const at = (su, sv, h) => lift34(h)([c0[0] + u[0]*l/2*su + v[0]*t/2*sv, c0[1] + u[1]*l/2*su + v[1]*t/2*sv]);
-      s += flatPoly34([at(1, -1, H), at(1, 1, H), at(1, 1, H + bh), at(1, -1, H + bh)], vivMix34(K.frame[2], "#000000", .2), "", true);   // right end
-      s += flatPoly34([at(-1, 1, H), at(1, 1, H), at(1, 1, H + bh), at(-1, 1, H + bh)], K.frame[1], "", true);   // front face
-      s += flatPoly34([at(-1, -1, H + bh), at(1, -1, H + bh), at(1, 1, H + bh), at(-1, 1, H + bh)], K.top, "", true);   // top
-      s += flatPoly34([at(-.9, 1, H + .02), at(.9, 1, H + .02), at(.9, 1, H + .15), at(-.9, 1, H + .15)], "#FFD98A", "", true);   // the lens
-    }
     if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(up))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   }
   return `<g pointer-events="none">${s}</g>`;
@@ -1387,6 +1364,12 @@ function indexDepth34(){
 function place34(h){
   const z = tilt && depth34.get(h.exhibitId);
   if(!z){ if(h.el.parentNode !== animalLayer) animalLayer.appendChild(h.el); h.slot = -1; return; }
+  // in a vivarium the animals stand over every fitting, among themselves north to south
+  if(h.viv){
+    let next = null;
+    for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.el.parentNode === z.g && o.y > h.y && (!next || o.y < next.y)) next = o;
+    h.slot = -1; z.g.insertBefore(h.el, next ? next.el : null); return;
+  }
   let lo = 0, hi = z.ys.length; while(lo < hi){ const m = (lo + hi) >> 1; if(z.ys[m] <= h.y) lo = m + 1; else hi = m; }
   if(h.el.parentNode === z.g && h.slot === lo) return;
   h.slot = lo; z.g.insertBefore(h.el, z.kids[lo] || null);
@@ -1461,8 +1444,45 @@ function vivSpot(h, e, p){
   const K = VIV34[e.viv] || VIV34.M, S = SPRITES[h.sp], hw = (S ? 2 * (S.size || 1) : 1) * (h.r || 1) + K.post, m = K.sill / TILT + .15, P = e.points;
   return inPoly(p[0], p[1], P) && inPoly(p[0] - hw, p[1], P) && inPoly(p[0] + hw, p[1], P) && inPoly(p[0], p[1] + m, P) && inPoly(p[0] - hw, p[1] + m, P) && inPoly(p[0] + hw, p[1] + m, P);
 }
-// a vivarium animal stays put, so keep new ones a couple of bodies apart
-function cramped(h, p, k = 4){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * k) return true; return false; }
+// The room a vivarium animal's picture takes: half its width, and half the height of its body (a fraction of the picture's box) in the case's depth
+function vivBody(h){
+  const S = SPRITES[h.sp], w = S ? 2 * (S.size || 1) * (h.r || 1) : (h.r || 1), ht = S ? 4 * (S.size || 1) * (h.r || 1) / S.ratio : (h.r || 1) * 2;
+  return {hw:w, hh:ht * .15 / TILT};
+}
+// Would the animal at p overlap another in its case (picture against picture), or stand behind a fitting's base (it's drawn over the fittings, so it would hover over the base)?
+function vivCrowd(h, p){
+  const a = vivBody(h), e = state.exhibits.find(x => x.id === h.exhibitId);
+  if(e) for(const f of landOf(e)){ const t = LAND[f.type]; if(t && !t.flat && !t.tray && p[1] < f.y - .1 && Math.abs(f.x - p[0]) < a.hw + t.r * (f.k || 1)) return true; }
+  for(const o of herd.values()){
+    if(o === h || o.exhibitId !== h.exhibitId || !o.placed) continue;
+    const b = vivBody(o);
+    if(Math.abs(o.x - p[0]) < a.hw + b.hw && Math.abs(o.y - p[1]) < a.hh + b.hh) return true;
+  }
+  return false;
+}
+// The spot nearest p where the animal fits the glass and overlaps no other (p itself if it has no room anywhere: the case is full)
+function vivClear(h, e, p){
+  if(!vivCrowd(h, p)) return p;
+  const bb = bbox(e.points); let best = null, bd = Infinity;
+  for(let y = bb.y0; y <= bb.y1; y += .5) for(let x = bb.x0; x <= bb.x1; x += .5){
+    const d = Math.hypot(x - p[0], (y - p[1]) * 2); if(d >= bd) continue;
+    const q = [x, y]; if(vivSpot(h, e, q) && !vivCrowd(h, q)){ bd = d; best = q; }
+  }
+  return best || p;
+}
+// A spot for a vivarium animal in the middle third of the case's depth (fits the glass, out of pools), the one furthest from the other animals and the fittings so they spread out and none hides behind another, or null
+function vivMidSpot(h, e){
+  const bb = bbox(e.points), d = bb.y1 - bb.y0, land = landOf(e).filter(f => LAND[f.type]); let best = null, bs = -1;
+  for(let t = 0; t < 120; t++){
+    const p = randomInside(e.points);
+    if(p[1] < bb.y0 + d / 3 || p[1] > bb.y0 + d * 2 / 3 || !vivSpot(h, e, p) || vivCrowd(h, p) || vivPoolAt(e, p[0], p[1])) continue;
+    let g = Infinity;
+    for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed) g = Math.min(g, Math.hypot(o.x - p[0], o.y - p[1]));
+    for(const f of land) g = Math.min(g, Math.hypot(f.x - p[0], f.y - p[1]) * 1.5);
+    if(g > bs){ bs = g; best = p; }
+  }
+  return best;
+}
 // A spot in a lamp's glow or a pool for a vivarium animal (a home from vivHomes): a few huddle together, and one too near a wall for its picture is nudged toward the middle of the case
 function vivHomeSpot(h, e, hm){
   const [cx, cy] = centroid(e.points);
@@ -1470,7 +1490,7 @@ function vivHomeSpot(h, e, hm){
     const p = [hm.x + (Math.random() * 2 - 1) * hm.rx, hm.y + (Math.random() * 2 - 1) * hm.ry];
     for(let f = 1; f >= .5; f -= .1){
       const q = [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f];
-      if(!vivSpot(h, e, q) || cramped(h, q, 2.2)) continue;
+      if(!vivSpot(h, e, q) || vivCrowd(h, q)) continue;
       if(hm.pool ? vivPoolAt(e, q[0], q[1]) : Math.hypot(q[0] - hm.x, (q[1] - hm.y) * 2) <= hm.rx + 2.2) return q;
       break;
     }
@@ -1503,16 +1523,17 @@ function syncAnimals(){
       if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
       if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
         for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
-        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
+        if(e.viv && !ok){ const p = vivMidSpot(h, e); if(p){ [h.x, h.y] = p; ok = true; } }
+        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !vivCrowd(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
       // in a vivarium pool: the body is cut at the waterline, with a ripple over the cut
       const pool = e.viv && vivPoolAt(e, h.x, h.y), body = sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` + (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
       h.sub = !!pool;
-      const subSvg = () => { const S = SPRITES[a.sp], w = sprite ? r * 4 * (S.size || 1) : r * 2, ht = sprite ? w / S.ratio : r * 2, cut = sprite ? r * .5 - ht * .09 : r * .1, cid = "vc-" + esc(a.id);
+      const subSvg = () => { const S = SPRITES[a.sp], w = sprite ? r * 4 * (S.size || 1) : r * 2, ht = sprite ? w / S.ratio : r * 2, wl = sprite ? r * .5 - ht * .09 : r * .1, cut = wl + (sprite && e.viv ? ht * (1 - (S.foot || 1)) * .7 : 0), cid = "vc-" + esc(a.id);
         return `<clipPath id="${cid}"><rect x="${(-w).toFixed(2)}" y="${(-ht * 3).toFixed(2)}" width="${(2 * w).toFixed(2)}" height="${(ht * 3 + cut).toFixed(2)}"/></clipPath><g clip-path="url(#${cid})">${body}</g>`
-          + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${cut.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(cut + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
+          + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${wl.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(wl + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
       h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
         (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
         (pool ? subSvg() : body);
@@ -1690,6 +1711,7 @@ function gateSpot(e){
 }
 // A spot as far from the guest paths as the exhibit allows
 function quietSpot(e){
+  if(e.viv){ const bb = bbox(e.points); return [(bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2]; }   // behind glass, paths don't matter: the middle of the case
   const far = p => state.paths.reduce((m, q) => Math.min(m, lineDist(p[0], p[1], q.points)), 60);
   let best = null, bd = -1;
   for(const p of cornerNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
@@ -1804,11 +1826,17 @@ function animalPlan(h, e){
 function vivJump(h, e){
   if(!h.a) return;
   if(!h.home) h.home = [h.x, h.y];   // the spot it first appeared at
-  if(!inPoly(h.home[0], h.home[1], e.points)) h.home = randomInside(e.points);
-  const g = actGoal(h, e, h.a), inside = g && inPoly(g[0], g[1], e.points);
-  [h.x, h.y] = inside ? g : h.home;
+  if(!vivSpot(h, e, h.home)) h.home = vivMidSpot(h, e) || vivPull(h, e, h.home) || centroid(e.points);
+  const g = actGoal(h, e, h.a), spot = g && vivSpot(h, e, g) ? g : g && vivPull(h, e, g);
+  [h.x, h.y] = vivClear(h, e, spot || h.home);   // and not on top of another animal
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
   place34(h);
+}
+// p moved toward the middle of the case until the animal's picture fits there, or null
+function vivPull(h, e, p){
+  const [cx, cy] = centroid(e.points);
+  for(let f = 1; f >= 0; f -= .1){ const q = [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f]; if(vivSpot(h, e, q)) return q; }
+  return null;
 }
 
 // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto (a species with a swim strip draws it in place of its walk picture or rig)

@@ -153,7 +153,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, parkClosed:false,
+    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{},
@@ -195,6 +195,8 @@ function upgradeSave(s){
     }
     s.vivDish = 1;
   }
+  // fittings used to fill the back-left first: lay each case out again from the front middle, once
+  if(s.vivLay !== 1){ for(const e of s.exhibits || []) if(e.viv) relayViv(e); s.vivLay = 1; }
   if(s.tiles && (!s.paths || !s.paths.length)) s.paths = linesFromTiles(s.tiles);
   // paths became sets of 1 m cells: line paths are rasterized once (the tram track stays a line); derived strips are never saved
   s.paths = (s.paths || []).filter(p => !p.d);

@@ -1360,7 +1360,7 @@ const TRAY = {
 // Groves give shade too: this many shelter slots each, scaled by how much the weather lets trees help (WEATHER grove)
 for(const t of Object.values(LAND)) if(t.flora && !t.shade) t.shade = 8;
 // Vivariums take plants too, shrunk to fit the glass: radius scale, and happiness for a full planting of what the animals want
-const VIV_PLANT = {scale:.5, bonus:6};
+const VIV_PLANT = {scale:.5, bonus:6, shift:.26, apart:3};   // shift: how far toward the front (m, 2 px) a case's first fitting sits; apart: the gap (m) fittings are spread to before they just pack in
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after
