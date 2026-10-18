@@ -142,13 +142,17 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .drawbar .dh{font-size:13px;opacity:.8}
 .drawbar .ds{font-size:13px;color:var(--money);font-weight:600;min-height:1em;font-variant-numeric:tabular-nums}
 .drawbar .ds.err{color:#FF9C8F}
-.drawbar .dbtns{display:flex;gap:6px;flex-shrink:0}
+.drawbar .dbtns{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;min-width:0;max-width:100%}
 .drawbar button{padding:6px 10px;border-radius:7px;border:1px solid rgba(243,239,217,.3);background:transparent;color:var(--on-forest);white-space:nowrap}
 .drawbar button:hover{background:rgba(243,239,217,.12)}
 .drawbar button.primary{background:var(--money);border-color:var(--money);color:#1D2B22;font-weight:600}
 .drawbar button:disabled{opacity:.4}
-.drawbar .sizes{display:flex;flex-wrap:wrap;border:1px solid rgba(243,239,217,.3);border-radius:7px;overflow:hidden}
+.drawbar .sizes{display:flex;flex-wrap:wrap;max-width:100%;border:1px solid rgba(243,239,217,.3);border-radius:7px;overflow:hidden}
 .drawbar .sizes[hidden]{display:none}
+.drawbar .sizes.grid{display:grid;grid-template-columns:repeat(var(--cols,5),1fr);flex:1 1 100%;gap:1px;background:rgba(243,239,217,.25)}
+.drawbar .sizes.grid button{background:var(--forest);border-left:0}
+.drawbar .sizes.grid button:hover{background:color-mix(in srgb,var(--forest),#F3EFD9 12%)}
+.drawbar .sizes.grid button[aria-pressed="true"]{background:var(--money)}
 .drawbar .sizes button{border:0;border-radius:0}
 .drawbar .sizes button+button{border-left:1px solid rgba(243,239,217,.25)}
 .drawbar .sizes button[aria-pressed="true"]{background:var(--money);color:#1D2B22;font-weight:600}
@@ -330,9 +334,10 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .zoombar{left:8px;bottom:58px}
   .tools{max-height:calc(100% - 112px)}
   .toasts{bottom:58px}
-  .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:none;width:auto;flex-wrap:wrap;gap:8px}
+  .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:calc(100vw - 70px);margin-inline:0;width:auto;flex-wrap:wrap;gap:8px}
   .drawbar .dbtns{width:100%}
   .drawbar .dbtns button{flex:1}
+  .drawbar .sizes.grid{grid-template-columns:repeat(2,1fr)}
 }
 .app.focus main{grid-template-columns:1fr}
 .app.focus #aside,.app.focus #sideMenu{display:none}

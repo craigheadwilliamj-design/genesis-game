@@ -2024,6 +2024,8 @@ function setTool(t){
   }
   if(t === "paint"){ paintBar(); }
   if(t === "water"){ waterBar(); }
+  const nSz = $("#dSizes").children.length;   // long lists (biomes) go in an even grid of at most 5 columns
+  $("#dSizes").classList.toggle("grid", nSz > 5); $("#dSizes").style.setProperty("--cols", Math.ceil(nSz / Math.ceil(nSz / 5)));
   mapwrap.className = "mapwrap tool-" + t;
   if(isDrawTool(t)) startDraw(t);
   else if(t === "exhibit") fenceBar();
