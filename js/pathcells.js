@@ -282,6 +282,11 @@ function shapeOnChunks(shape){
     if(C[chunkKey(cx, cy)] && shapesOverlap(chunkRect(cx, cy), shape)) return true;
   return false;
 }
+// Is every corner of a shape on a guest or bridge chunk? (corners are pulled a hair inward so one flush with a chunk edge counts as inside) Path props use this.
+function shapeOnGuestPath(shape){
+  const [cx, cy] = centroid(shape);
+  return shape.every(([x, y]) => { const k = pathAt(x + (cx - x) * .01, y + (cy - y) * .01); return !!k && guestCell(k); });
+}
 // Did these chunks (keys) just join the entrance? (guests: guest and bridge chunks only)
 function chunksJoined(keys, guests){
   const set = pathReach()[guests ? "G" : "A"];
