@@ -1463,14 +1463,18 @@ function vivSpot(h, e, p){
 }
 // a vivarium animal stays put, so keep new ones a couple of bodies apart
 function cramped(h, p, k = 4){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * k) return true; return false; }
-// A spot for a vivarium animal in the middle third of the case's depth (fits the glass, out of pools, not crowding the others), or null
+// A spot for a vivarium animal in the middle third of the case's depth (fits the glass, out of pools), the one furthest from the other animals and the fittings so they spread out and none hides behind another, or null
 function vivMidSpot(h, e){
-  const bb = bbox(e.points), d = bb.y1 - bb.y0;
-  for(let t = 0; t < 80; t++){
+  const bb = bbox(e.points), d = bb.y1 - bb.y0, land = landOf(e).filter(f => LAND[f.type]); let best = null, bs = -1;
+  for(let t = 0; t < 120; t++){
     const p = randomInside(e.points);
-    if(p[1] >= bb.y0 + d / 3 && p[1] <= bb.y0 + d * 2 / 3 && vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1])) return p;
+    if(p[1] < bb.y0 + d / 3 || p[1] > bb.y0 + d * 2 / 3 || !vivSpot(h, e, p) || vivPoolAt(e, p[0], p[1])) continue;
+    let g = Infinity;
+    for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed) g = Math.min(g, Math.hypot(o.x - p[0], o.y - p[1]));
+    for(const f of land) g = Math.min(g, Math.hypot(f.x - p[0], f.y - p[1]) * 1.5);
+    if(g > bs){ bs = g; best = p; }
   }
-  return null;
+  return best;
 }
 // A spot in a lamp's glow or a pool for a vivarium animal (a home from vivHomes): a few huddle together, and one too near a wall for its picture is nudged toward the middle of the case
 function vivHomeSpot(h, e, hm){

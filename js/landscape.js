@@ -706,16 +706,21 @@ function statueSeen(p, id){
 }
 
 /* ---------- vivarium plants ---------- */
-// A plant goes at the free spot nearest the middle of the case (a hair toward the front), filling a row across its width before the next row, so nothing piles up at the back or the front. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in.
-// The front keeps the sill margin (like vivSpot) so nothing hides behind the front frame. `skip` is an item being re-laid, `k` its scale.
+// A fitting goes where it's furthest from the others, so they spread over the whole floor: the first sits at the middle of the case (`VIV_PLANT.shift` toward the front), the next at the emptiest spot, and so on.
+// The front keeps the sill margin (like vivSpot) so nothing hides behind the front frame. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in. `skip` is an item being re-laid, `k` its scale.
 function vivPlantSpot(e, key, skip, k){
   const t = LAND[key], r = t.r * (k || (t.vivToy ? 1 : VIV_PLANT.scale)), bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, m = K.sill / TILT + .15;
-  const ax = (bb.x0 + bb.x1) / 2, front = bb.y1 - m, ay = Math.min((bb.y0 + bb.y1) / 2 + VIV_PLANT.shift, front), others = landOf(e).filter(f => f !== skip && LAND[f.type]), spots = [];
-  for(let y = bb.y0 + r; y <= front + 1e-6; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5) spots.push([x, y]);
-  spots.sort((a, b) => Math.hypot((a[0] - ax) * .5, (a[1] - ay) * 2) - Math.hypot((b[0] - ax) * .5, (b[1] - ay) * 2) || Math.abs(a[0] - ax) - Math.abs(b[0] - ax));
-  for(const [x, y] of spots)
-    if(deepInside(x, y, e.points, r + .3) && !others.some(f => Math.hypot(f.x - x, f.y - y) < r + LAND[f.type].r * (f.k || 1))) return [x, y];
-  return null;
+  const ax = (bb.x0 + bb.x1) / 2, front = bb.y1 - m, ay = Math.min((bb.y0 + bb.y1) / 2 + VIV_PLANT.shift, front), others = landOf(e).filter(f => f !== skip && LAND[f.type]);
+  let best = null, bs = -Infinity;
+  for(let y = bb.y0 + r; y <= front + 1e-6; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5){
+    if(!deepInside(x, y, e.points, r + .3)) continue;
+    let gap = Infinity;   // the room left to the nearest fitting
+    for(const f of others) gap = Math.min(gap, Math.hypot(f.x - x, f.y - y) - r - LAND[f.type].r * (f.k || 1));
+    if(gap < 0) continue;
+    const sc = (others.length ? Math.min(gap, VIV_PLANT.apart) : 0) - Math.hypot((x - ax) * .3, y - ay) * .01;   // roomy enough is enough; then nearest the middle
+    if(sc > bs){ bs = sc; best = [x, y]; }
+  }
+  return best;
 }
 // Lay a case's fittings out again from the front middle (cases from before that layout had them stacked at the back-left)
 function relayViv(e){

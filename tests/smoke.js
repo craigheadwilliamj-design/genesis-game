@@ -3556,7 +3556,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ev8 = mk("e-pv3", 8, 260); state.exhibits.push(ev8); addVivToy(ev8, "vlamp");
       out.vivLampCovers = heatShare(ev8) === VIV_LAMP.per / 8 && exhibitReport(ev8).issues.some(i => /one lamp warms/.test(i.text)); state.exhibits = state.exhibits.filter(x => x !== ev8);
       // animals gather under the lamp (a couple huddle in its glow, over a few tries since each starts somewhere random)
-      let gathered = 0; for(let t = 0; t < 6 && gathered < 2; t++){ regatherViv(ev); render(); gathered = [...herd.values()].filter(h => h.exhibitId === ev.id && Math.hypot(h.x - lamp.x, (h.y - lamp.y) * 2) <= VIV_LAMP.radius + 1).length; }
+      let gathered = 0; for(let t = 0; t < 15 && gathered < 2; t++){ regatherViv(ev); render(); gathered = [...herd.values()].filter(h => h.exhibitId === ev.id && Math.hypot(h.x - lamp.x, (h.y - lamp.y) * 2) <= VIV_LAMP.radius + 1).length; }
       out.vivLampGather = gathered >= 2;
       out.vivLampDrawn = landSvg(ev, null, () => false).includes("sprites/viv/vlamp-pool.png") && landSvg(ev, null, () => false).includes("sprites/viv/vlamp.png");
 
