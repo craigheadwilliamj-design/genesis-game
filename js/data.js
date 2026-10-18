@@ -915,7 +915,7 @@ const CLEAN = {
 //   perMeter   cost to upgrade, per meter of fence
 //   view       how well guests can see in (concrete hides the animals)
 //   tech       what ORACLE has to research first
-//   deco       decoration only (hedge, rope): it marks off ground and guests like it, but it can't hold animals, so it never becomes an exhibit's wall
+//   deco       decoration (hedge, rope): guests like it, and it holds animals like any other wall
 const BARRIERS = {
   wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
   hedge:    {label:"Hedge row",         strength:12,  perMeter:5,   view:.85,  tech:null,       color:"#3F6B35", hedge:true, deco:true},
