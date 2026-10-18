@@ -48,7 +48,6 @@ const FAMILIES = {
 const familyOf = t => Object.keys(FAMILIES).find(f => FAMILIES[f].tools.includes(t)) || null;
 let fenceSel = "wood";             // fence type the next exhibit is built with
 let fenceMeet = false;             // the fence tool keeps other fence where it stands and lays against it, instead of replacing it
-const SNAP_REACH = 6;              // meters past a path's edge where a new building still snaps to it
 const GRID_STEP = 1;               // meters between grid-snap points
 const isDrawTool = t => t === "tram" || t === "zone";
 const PATH_TOOLS = {path:"g", service:"s", bridge:"b"};   // drag-and-drop path tools and the chunk kind each lays (js/pathcells.js)
@@ -2053,15 +2052,14 @@ function setTool(t){
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
-    const free = " Place it anywhere, but it only works once a path reaches it.", spin = " Rotate turns it 45° (R).";
-    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Point beside a ${b.serviceOnly ? "service road" : "path or service road"} and it snaps on.${free}${spin}`
+    const free = " Place it anywhere clear of paths, but it only works once a path reaches it.", spin = b.onPath ? " Rotate turns it 45° (R)." : " Rotate turns it 90° (R).";
+    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Tap beside a ${b.serviceOnly ? "service road" : "path or service road"}. It snaps to the 1 m grid.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
-      : b.tram ? `Point beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
+      : b.tram ? `Tap beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
       : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
       : b.type === "lamp" ? `Point at a path and tap. After dark it lights about ${LAMP.radius} m around it: guests feel safe on lit paths, and vandals and cameras notice it.${spin}`
       : b.onPath ? `Point at a path and tap. It sits on the edge you point at.${spin}`
-      : b.prop ? `Point beside a path and it snaps on.${free}${spin}`
-      : `Point beside a path and it turns to face it.${free}${spin}`,
+      : `Tap beside a path. It snaps to the 1 m grid.${free}${spin}`,
       `${money(b.price)}${b.dept ? "" : " each"}, ${money(b.upkeep)} a day to run`, {undo:true, finish:false, cancel:"Done", undoText:"Rotate"});
   }
   else if(t === "zoneedit" && zedit){
@@ -2073,7 +2071,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 45°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
+    showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 90°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift what you sweep over. On bare ground, a tap takes the path chunk under it and a drag box takes every path chunk it touches (lit red as you drag) and lifts the fence in it; with no path or fence in it, it takes off painted biome ground. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
@@ -2438,84 +2436,76 @@ function placeGhost(clientX, clientY){
   lastPtr = {x:clientX, y:clientY};
   const t = BUILDINGS[tool];
   const p = toWorld(clientX, clientY);
-  let best = null;
-  // guest buildings face footpaths; backstage departments can face service roads too
-  for(const q of state.paths){
-    if(isTram(q)) continue;   // buildings face footpaths, not the tram track
-    if(isService(q) && !t.dept) continue;
-    if(t.serviceOnly && !isService(q)) continue;   // depots go on service roads, where ATVs can drive
-    for(let i = 1; i < q.points.length; i++){
-      const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
-      if(r.d < (t.onPath ? 30 + t.d/2 : halfWidth(q) + t.d/2 + SNAP_REACH) && (!best || r.d < best.d)) best = {...r, a:q.points[i-1], b:q.points[i], hw:halfWidth(q)};
-    }
-  }
-  let x = p.x, y = p.y, angle = 0, why = null;
+  let why = null;
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
   if(!why && buildingHidden(tool)) why = "That isn't available yet.";
   if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && !state.sandbox && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
-  if(best){
-    // slide along the path in grid steps: round the touch point to the grid, then put it back on the path
-    const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
-    best.x = r.x; best.y = r.y;
+  let x, y, angle = rot * Math.PI/4, best = null;
+  if(t.onPath){
+    // path props snap to the footpath nearest the pointer, on the grid along it, and sit on the edge you point at
+    for(const q of state.paths){
+      if(isTram(q) || isService(q)) continue;
+      for(let i = 1; i < q.points.length; i++){
+        const r = segProj(p.x, p.y, q.points[i-1], q.points[i]);
+        if(r.d < 30 + t.d/2 && (!best || r.d < best.d)) best = {...r, a:q.points[i-1], b:q.points[i], hw:halfWidth(q)};
+      }
+    }
+    if(best){
+      const r = segProj(Math.round(best.x / GRID_STEP) * GRID_STEP, Math.round(best.y / GRID_STEP) * GRID_STEP, best.a, best.b);
+      best.x = r.x; best.y = r.y;
+      const dx = best.b[0] - best.a[0], dy = best.b[1] - best.a[1], L = Math.hypot(dx, dy) || 1;
+      const nx = -dy/L, ny = dx/L;
+      // a sign goes on the edge of the path that faces the exhibit fence closest to where you point (so you can pick either side of a path); everything else on the side you point at
+      let fx = p.x, fy = p.y;
+      if(tool === "sign" || tool === "nofeed" || tool === "quiet"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
+      const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
+      const ra = rot*Math.PI/4, dn = Math.abs(t.w*Math.sin(ra)) + Math.abs(t.d*Math.cos(ra));   // how deep it is across the path once turned
+      let off = Math.max(0, best.hw - dn/2 - .1);   // props sit on the path, hugging the edge on the side you point at
+      // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
+      while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + ra), e.points))) off = Math.max(0, off - .1);
+      x = best.x + nx*side*off; y = best.y + ny*side*off;
+      angle += Math.atan2(dy, dx) + (side > 0 ? Math.PI : 0);   // a path object's front (+v) faces the path it stands by
+    } else { x = p.x; y = p.y; why = why || "Move it next to a path."; }
+  } else {
+    // everything else goes on the 1 m grid at the pointer, square to the map
+    x = Math.round(p.x / GRID_STEP) * GRID_STEP; y = Math.round(p.y / GRID_STEP) * GRID_STEP;
   }
-  if(best){
-    const dx = best.b[0] - best.a[0], dy = best.b[1] - best.a[1], L = Math.hypot(dx, dy) || 1;
-    const nx = -dy/L, ny = dx/L;
-    // a sign goes on the edge of the path that faces the exhibit fence closest to where you point (so you can pick either side of a path); everything else on the side you point at
-    let fx = p.x, fy = p.y;
-    if(tool === "sign" || tool === "nofeed" || tool === "quiet"){ let sd = EDU.signReach + best.hw; for(const e of state.exhibits) for(let i = 0; i < e.points.length; i++){ const r = segProj(p.x, p.y, e.points[i], e.points[(i+1) % e.points.length]); if(r.d < sd){ sd = r.d; fx = r.x; fy = r.y; } } }
-    const side = ((fx - best.x)*nx + (fy - best.y)*ny) >= 0 ? 1 : -1;
-    const ra = rot*Math.PI/4, dn = Math.abs(t.w*Math.sin(ra)) + Math.abs(t.d*Math.cos(ra));   // how deep it is across the path once turned
-    let off = t.onPath ? Math.max(0, best.hw - dn/2 - .1) : dn/2 + best.hw + .5;   // props sit on the path, hugging the edge on the side you point at
-    // a fence right at the path edge (older, narrower paths): slide in until the prop clears it
-    if(t.onPath) while(off > 0 && state.exhibits.some(e => shapesOverlap(rectPts(best.x + nx*side*off, best.y + ny*side*off, t.w, t.d, Math.atan2(dy, dx) + ra), e.points))) off = Math.max(0, off - .1);
-    x = best.x + nx*side*off; y = best.y + ny*side*off;
-    angle = Math.atan2(dy, dx) + (t.prop && side > 0 ? Math.PI : 0);   // a path object's front (+v) faces the path it stands by
-  } else if(t.onPath) why = why || "Move it next to a path.";
-  angle += rot * Math.PI/4;
-  if(!best){ x = Math.round(x / GRID_STEP) * GRID_STEP; y = Math.round(y / GRID_STEP) * GRID_STEP; }
-  const pts = rectPts(x, y, t.w, t.d, angle);
+  const pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
-  if(!why && !t.onPath && state.paths.some(q => lineEntersShape(q.points, pts))) why = "It sits on a path.";
+  if(!why && !t.onPath && (shapeOnChunks(pts) || state.paths.some(q => !q.d && lineEntersShape(q.points, pts)))) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why};
+  // does it work where it stands? Same reach test as recompute: guests walk to it by footpath, staff by any path (depots by staff path)
+  const reached = t.onPath ? !!best : nearCells(pts, REACH - PATH_HALF_WIDTH, !t.dept) && (!t.serviceOnly || nearCells(pts, REACH - PATH_HALF_WIDTH, false, false, "s"));
   const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
-  setStat(why || `${money(t.price)}. Tap to build.${best ? "" : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
+  setStat(why || `${money(t.price)}. Tap to build.${reached ? "" : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
 }
 
-// Turn the building being placed 45°, and redraw the ghost where the pointer is
+// Turn the building being placed (a quarter turn, or 45° for path props), and redraw the ghost where the pointer is
+const turnStep = type => BUILDINGS[type].onPath ? 1 : 2;   // in 45° steps
 function rotateTool(){
-  rot = (rot + 1) % 8;
+  rot = (rot + turnStep(tool)) % 8;
   if(lastPtr){ placeGhost(lastPtr.x, lastPtr.y); renderOverlay(); }
-  else setStat(`Turned 45°. Tap to place it.`);
+  else setStat(`Turned ${turnStep(tool) * 45}°. Tap to place it.`);
 }
-// Turn the building picked with the Move tool 45° about its middle, if it fits there
+// Turn the building picked with the Move tool about its middle, if it fits there
 function rotateMoved(){
   const it = mvSel && findItem("building", mvSel);
   if(!it){ setStat("Tap a building first, then Rotate.", true); return; }
-  const orig = it.points, [cx, cy] = centroid(orig);
-  const c45 = Math.SQRT1_2;
-  it.points = orig.map(([x, y]) => [cx + (x - cx)*c45 - (y - cy)*c45, cy + (x - cx)*c45 + (y - cy)*c45]);
-  const turned = it.points;
-  let why = moveProblem("building", it), nudged = false;
-  // buildings sit right against their path, so a turn often clips it: slide to the nearest spot where the turned shape fits
-  if(why){
-    const offs = [];
-    for(let dx = -10; dx <= 10; dx += .5) for(let dy = -10; dy <= 10; dy += .5) offs.push([dx, dy]);
-    offs.sort((p, q) => Math.hypot(p[0], p[1]) - Math.hypot(q[0], q[1]));
-    for(const [dx, dy] of offs){ it.points = shiftPts(turned, dx, dy); if(!moveProblem("building", it)){ why = null; nudged = true; break; } }
-  }
+  const orig = it.points, [cx, cy] = centroid(orig), a = turnStep(it.type) * Math.PI/4, c = Math.cos(a), s = Math.sin(a);
+  it.points = orig.map(([x, y]) => [Math.round((cx + (x - cx)*c - (y - cy)*s) * 1e6) / 1e6, Math.round((cy + (x - cx)*s + (y - cy)*c) * 1e6) / 1e6]);
+  const why = moveProblem("building", it);
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
-  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + 1) % 8;
+  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + turnStep(it.type)) % 8;
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
-  setStat(reach ? (nudged ? "Turned, and nudged to fit." : "Turned.") : "Turned, but it has no path to the entrance, so it won't work.", !reach);
+  setStat(reach ? "Turned." : "Turned, but it has no path to the entrance, so it won't work.", !reach);
 }
 
 function placeBuilding(e){
@@ -2928,7 +2918,7 @@ function moveProblem(kind, it){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!nearCells(pts, 0, true, true) && !state.paths.some(p => !p.d && !isService(p) && !isTram(p) && lineShapeDist(p.points, pts) <= PATH_HALF_WIDTH)) return "Keep it on a path."; }
-    else if(state.paths.some(p => lineEntersShape(p.points, pts))) return "It sits on a path.";
+    else if(shapeOnChunks(pts) || state.paths.some(p => !p.d && lineEntersShape(p.points, pts))) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
     const keep = state.fences; state.fences = keep.filter(l => l !== it);
