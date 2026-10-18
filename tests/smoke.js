@@ -19,7 +19,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const out = {};
     // start screen: shown first, no Continue without a save, a new park picks its biome, and nothing changes it mid-park
     const q = x => document.querySelector(x), sb = state.biome;
-    out.startScreenShown = q("#dlgStart").open && q("#startContinue").hidden && /PALEO-TYCOON/.test(document.title) && /PALEO-TYCOON/.test(q("#dlgStart").textContent);
+    out.startScreenShown = q("#dlgStart").open && q("#startContinue").hidden && /PALEO-PARK TYCOON/.test(document.title) && /PALEO-PARK TYCOON/.test(q("#dlgStart").textContent);
     q("#startNew").click();
     const pickK = Object.keys(BIOMES).find(k => k !== DEFAULT_PARK_BIOME);
     q(`#startBiomes [data-biome="${pickK}"]`).click(); q("#startName").value = "Smoke Park"; q("#startGo").click();

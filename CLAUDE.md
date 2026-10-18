@@ -1,4 +1,4 @@
-# PALEO-TYCOON (repo: Genesis Park Tycoon)
+# PALEO-PARK TYCOON (repo: Genesis Park Tycoon)
 
 Browser park-builder game (Jurassic Park style). Plain JS, no build step, no modules: every file is a classic `<script>` sharing one global scope. Published as a claude.ai Artifact.
 
