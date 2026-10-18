@@ -807,6 +807,52 @@ const waterMasks = new Map();
 // items are the textured boxes {points, kind}; each kind (a WATER_TEX key) is drawn in its own texture. Boxes of one kind that touch are joined row by row,
 // and the shoreline (lit and dark rims, mud and damp banks) is cut against ALL the water, so water touching water of any kind has no border between it.
 // Returns {kinds, by:{kind:{body, lit, dark, mud, damp}}}.
+// Soften the shore of the kinds that have `shore` (wetland): the row runs are cut on the pixel grid, then the pixels next to land are eroded by 0, 1 or 2 px by smooth noise
+// of the world position (so the edge stair-steps in short runs, and the same shape always gives the same edge), and the sharp convex corners are chipped twice.
+// Only pixels of those kinds are removed, and only ever pixels touching land (not water of another kind), so nothing opens up inside a lake or between bodies.
+const SHORE_NOISE = 5, SHORE_ERODE = [.5, .85], SHORE_CHIP = 2;   // lattice px; the share of shore at 0 and at 0 or 1 px of erosion; passes of corner chipping
+function softenShore(rowsOf, kinds, r0, r1){
+  const wob = kinds.filter(k => WATER_TEX[k] && WATER_TEX[k].shore); if(!wob.length) return;
+  let c0 = Infinity, c1 = -Infinity;
+  for(const k of kinds) for(const runs of rowsOf[k].values()) for(const [a, b] of runs){ c0 = Math.min(c0, a); c1 = Math.max(c1, b); }
+  if(c0 > c1) return;
+  const pad = 4, X0 = c0 - pad, Y0 = r0 - pad, w = c1 - c0 + pad * 2, h = r1 - r0 + 1 + pad * 2, at = (c, r) => (r - Y0) * w + (c - X0);
+  const A = new Uint8Array(w * h), own = {};
+  for(const k of kinds){ const mine = wob.includes(k); if(mine) own[k] = new Uint8Array(w * h);
+    for(const [r, runs] of rowsOf[k]) for(const [a, b] of runs) for(let c = a; c < b; c++){ A[at(c, r)] = 1; if(mine) own[k][at(c, r)] = 1; } }
+  const inner = G => { const o = new Uint8Array(w * h); for(let r = 1; r < h - 1; r++) for(let c = 1; c < w - 1; c++){ const i = r * w + c; o[i] = G[i] && G[i - 1] && G[i + 1] && G[i - w] && G[i + w] ? 1 : 0; } return o; };
+  const mineAt = i => wob.some(k => own[k][i]), D1 = inner(A), D2 = inner(D1);
+  const lat = (u, v) => (cellHash(u + 7001, v + 913) >>> 8) / 16777216;
+  const noise = (c, r) => { const S = SHORE_NOISE, u = Math.floor(c / S), v = Math.floor(r / S), fx = c / S - u, fy = r / S - v, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return (lat(u, v) * (1 - sx) + lat(u + 1, v) * sx) * (1 - sy) + (lat(u, v + 1) * (1 - sx) + lat(u + 1, v + 1) * sx) * sy; };
+  const gone = new Uint8Array(w * h);
+  for(let r = 1; r < h - 1; r++) for(let c = 1; c < w - 1; c++){
+    const i = r * w + c; if(!A[i] || !mineAt(i)) continue;
+    const depth = !D1[i] ? 0 : !D2[i] ? 1 : 2, v = noise(c + X0, r + Y0), n = v < SHORE_ERODE[0] ? 0 : v < SHORE_ERODE[1] ? 1 : 2;
+    if(depth < n) gone[i] = 1;
+  }
+  for(let i = 0; i < A.length; i++) if(gone[i]) A[i] = 0;
+  for(let pass = 0; pass < SHORE_CHIP; pass++){
+    const chip = [];
+    for(let r = 1; r < h - 1; r++) for(let c = 1; c < w - 1; c++){
+      const i = r * w + c; if(!A[i] || !mineAt(i)) continue;
+      const n = !A[i - w], s = !A[i + w], e = !A[i + 1], ww = !A[i - 1];
+      if((n || s) && (e || ww)) chip.push(i);
+    }
+    for(const i of chip) A[i] = 0;
+  }
+  for(const k of wob){
+    const G = own[k];
+    for(let r = r0; r <= r1; r++){
+      const runs = []; let a = null;
+      for(let c = X0; c <= X0 + w; c++){
+        const on = c < X0 + w && G[at(c, r)] && A[at(c, r)];
+        if(on && a === null) a = c; else if(!on && a !== null){ runs.push([a, c]); a = null; }
+      }
+      rowsOf[k].set(r, runs);
+    }
+  }
+}
 function waterMask(items){
   const key = items.map(it => it.kind + ":" + it.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ")).join("|"); let m = waterMasks.get(key); if(m) return m;
   const P = ROCK_MPP, ys = items.flatMap(it => it.points.map(p => p[1])), r0 = Math.floor(Math.min(...ys) / P), r1 = Math.ceil(Math.max(...ys) / P);
@@ -826,6 +872,7 @@ function waterMask(items){
     }
     rowsOf[k] = rows;
   }
+  softenShore(rowsOf, kinds, r0, r1);
   for(let r = r0; r <= r1; r++) all.set(r, join(kinds.flatMap(k => rowsOf[k].get(r).map(s => [...s]))));
   const covered = (r, x) => (all.get(r) || []).some(([a, b]) => x >= a && x < b);
   const minus = (run, others) => { let out = [run]; for(const [oa, ob] of others) out = out.flatMap(([a, b]) => oa >= b || ob <= a ? [[a, b]] : [[a, Math.min(b, oa)], [Math.max(a, ob), b]].filter(([x, y]) => y > x)); return out; };
