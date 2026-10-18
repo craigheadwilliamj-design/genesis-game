@@ -297,7 +297,7 @@ function render(){
     // catch netting hangs just inside the fence rail: stroke the inset outline twice as wide and clip it to itself, so only the inner half shows
     if(e.net && !e.viv && !e.aviary){ const np = polyStr(insetRect(e.points, .96)), nid = `nc-${esc(e.id)}`; s += `<clipPath id="${nid}"><polygon points="${np}"/></clipPath><polygon points="${np}" fill="none" stroke="url(#netx)" stroke-width="2" stroke-linejoin="round" clip-path="url(#${nid})" pointer-events="none"/>`; }
     if(tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;   // under the animals in the 3/4 view
-    s += landSvg(e, tool === "bulldoze", isDoomed);
+    s += landSvg(e, tool === "bulldoze" || tool === "move", isDoomed);
     if(tilt && !e.open) s += e.viv ? viv34(e, "front", hi34) : fence34(e.points, true, kinds34, "front", fo34);
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
@@ -316,7 +316,7 @@ function render(){
 
   // plants, rocks and statues out in the park stand over the path edges
   // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
-  const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze", isDoomed)}));
+  const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze" || tool === "move", isDoomed)}));
   for(const q of looseLeft) standing.push(q);
   standing.push({y:state.gate[1], o:2, svg:entrance34(inv)});   // the entrance building stands on the south edge, so it sorts in too
   standing.sort((p, q) => p.y - q.y || p.o - q.o);
@@ -1293,6 +1293,11 @@ function renderOverlay(){
     const gb = rockBiome || (landGhost.e ? biomeOf(landGhost.e) : parkBiome()), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : landGhost.pic != null ? landGhost.pic : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
     if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb, pic:gp != null ? gp : undefined}, gb, false)}</g>${footGhostSvg(landGhost, gb, ring)}`;
     else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>${footSquare(landGhost.key) ? footGhostSvg(landGhost, gb, ring) : ""}`;
+  }
+  const lm = tool === "move" && drag && drag.mv && drag.mv.kind === "land" && drag.mv.spot;
+  if(lm){   // the item rides along live; this shows the footprint it will take, red when it won't fit
+    const f = drag.mv.it, gb = BIOMES[f.biome] ? f.biome : lm.e ? biomeOf(lm.e) : drag.mv.from ? biomeOf(drag.mv.from) : parkBiome();
+    s += footGhostSvg({key:f.type, x:lm.x, y:lm.y, pic:lm.pic, ok:lm.ok}, gb, `stroke="${lm.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"`);
   }
   const mb = tool === "move" && mvSel && findItem("building", mvSel);
   if(mb) s += `<polygon points="${polyStr(mb.points)}" fill="none" stroke="var(--sel)" stroke-width="3" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
@@ -2934,7 +2939,7 @@ function removeItem(kind, it, opts = {}){
 function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
-  if(!it || !["exhibit", "path", "building", "fence"].includes(hit.kind)) return null;
+  if(!it || !["exhibit", "path", "building", "fence", "land"].includes(hit.kind)) return null;
   if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
   if(it.grid){ setStat("A fenced exhibit stays where its fence is. Lift the fence with Bulldoze and lay it again.", true); return null; }
   return it;
@@ -2968,6 +2973,7 @@ function moveProblem(kind, it){
 // Everything that moves with the item: its own points, an exhibit's gate and platforms, and the animals wandering inside
 function moveBy(m, dx, dy){
   const it = m.it;
+  if(m.kind === "land"){ it.x = m.x0 + dx; it.y = m.y0 + dy; m.dx = dx; m.dy = dy; return; }
   it.points = shiftPts(m.orig, dx, dy);
   if(m.gate) it.gate = [m.gate[0] + dx, m.gate[1] + dy];
   for(const pl of m.plats) pl.b.points = shiftPts(pl.pts, dx, dy);
@@ -2977,6 +2983,7 @@ function moveBy(m, dx, dy){
 }
 function startMove(it, kind, e){
   const w = toWorld(e.clientX, e.clientY);
+  if(kind === "land") return {it, kind, wx:w.x, wy:w.y, dx:0, dy:0, x0:it.x, y0:it.y, from:state.exhibits.find(o => landOf(o).includes(it)) || null, spot:null};
   return {it, kind, wx:w.x, wy:w.y, dx:0, dy:0, orig:it.points.map(p => p.slice()), gate:it.gate ? it.gate.slice() : null,
     plats:kind === "exhibit" ? state.buildings.filter(b => b.exhibitId === it.id).map(b => ({b, pts:b.points.map(p => p.slice())})) : [],
     land:kind === "exhibit" ? landOf(it).map(f => ({f, x:f.x, y:f.y})) : [],
@@ -2985,14 +2992,38 @@ function startMove(it, kind, e){
 // An exhibit that holds water moves in whole 5 m chunks, so its water stays on the chunk grid like paths and paint
 const moveStep = m => m.water.length ? CHUNK : GRID_STEP;
 function dragMove(m, e){
-  const w = toWorld(e.clientX, e.clientY), g = moveStep(m);
+  const w = toWorld(e.clientX, e.clientY);
+  if(m.kind === "land"){
+    const sp = m.spot = landMoveSpot(m, w.x, w.y);
+    moveBy(m, sp.x - m.x0, sp.y - m.y0);
+    setStat(sp.why || "Let go to drop it here.", !sp.ok);
+    queueRender(); renderOverlay(); return;
+  }
+  const g = moveStep(m);
   const dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
   moveBy(m, dx, dy);
   const why = moveProblem(m.kind, m.it);
   m.why = why; setStat(why || "Let go to drop it here.", !!why);
   queueRender();
 }
+// Drop a land item: it keeps its id and moves between exhibits and the park's decor for free
+function dropLand(m){
+  const sp = m.spot, f = m.it, from = m.from;
+  if(!sp || !sp.ok || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(sp && !sp.ok) ui.toast(`Couldn't move it. ${sp.why}`, "bad"); setStat(""); render(); return; }
+  const to = sp.e;
+  if(to !== from){
+    const old = from ? from.land : state.decor;
+    old.splice(old.indexOf(f), 1);
+    if(ROCK_TYPES.includes(f.type) && !BIOMES[f.biome]) f.biome = from ? biomeOf(from) : parkBiome();   // a rock keeps the stone it had
+    if(to) (to.land = to.land || []).push(f); else (state.decor = state.decor || []).push(f);
+    for(const h of herd.values()) if(h.exhibitId === (from && from.id) || h.exhibitId === (to && to.id)) h.path = null;
+  }
+  if(sp.pic != null && ROCK_TYPES.includes(f.type) && f.pic == null) f.pic = sp.pic;   // pin the picture it was showing
+  if(from && from.viv) regatherViv(from);
+  afterChange(); render(); ui.toast("Moved."); setStat("");
+}
 function dropMove(m){
+  if(m.kind === "land"){ dropLand(m); return; }
   const why = moveProblem(m.kind, m.it);
   if(why || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(why) ui.toast(`Couldn't move it. ${why}`, "bad"); setStat(""); render(); return; }
   if(m.kind === "exhibit"){
