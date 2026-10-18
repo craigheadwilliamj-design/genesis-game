@@ -268,6 +268,13 @@ function nearCells(shape, d, guests, any, kind){
   }
   return false;
 }
+// Is the wall with a building's door within reach of a joined chunk? (the door side is tried before the other sides)
+function doorNear(b, guests){
+  const P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % P.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+  const [cx, cy] = centroid(P); let nx = (c[1] - a[1]) / L, ny = -(c[0] - a[0]) / L;
+  if(nx * ((a[0] + c[0]) / 2 - cx) + ny * ((a[1] + c[1]) / 2 - cy) < 0){ nx = -nx; ny = -ny; }
+  return nearCells([a, c, [c[0] + nx * .01, c[1] + ny * .01], [a[0] + nx * .01, a[1] + ny * .01]], REACH - PATH_HALF_WIDTH, guests);
+}
 // Does a shape sit on any path chunk? Touching a chunk's edge doesn't count.
 function shapeOnChunks(shape){
   const C = pathChunks(), b = bbox(shape);

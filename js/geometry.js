@@ -129,6 +129,25 @@ function rectPts(x, y, w, d, angle){
   return [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([u,v]) => [x + u*c - v*s, y + u*s + v*c]);
 }
 
+// Which way a building's door looks: 0-3 = north, east, south, west (screen up, right, down, left). Saved as b.face.
+const FACE_DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+// The footprint edge whose outward side points most nearly the way `face` looks
+function faceEdge(P, face){
+  const [cx, cy] = centroid(P), [dx, dy] = FACE_DIR[((face % 4) + 4) % 4]; let best = 0, bd = -Infinity;
+  for(let i = 0; i < P.length; i++){
+    const a = P[i], b = P[(i + 1) % P.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    let nx = (b[1] - a[1]) / L, ny = -(b[0] - a[0]) / L;
+    if(nx * ((a[0] + b[0]) / 2 - cx) + ny * ((a[1] + b[1]) / 2 - cy) < 0){ nx = -nx; ny = -ny; }
+    const v = nx * dx + ny * dy; if(v > bd + 1e-9){ bd = v; best = i; }
+  }
+  return best;
+}
+// The middle of a building's door wall, on the ground
+function doorPoint(b){
+  const P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % P.length];
+  return [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2];
+}
+
 // A random point inside a shape
 function randomInside(pts){
   const b = bbox(pts);
