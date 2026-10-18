@@ -261,7 +261,7 @@ function exhibitHtml(e){
     h += `</section>`;
   }
 
-  if(e.viv) h += biomeHtml(e) + vivSceneHtml(e) + vivToysHtml(e);
+  if(e.viv) h += vivSceneHtml(e) + vivToysHtml(e);
 
   h += themeHtml("exhibit", e);
 
@@ -310,23 +310,14 @@ function cloneHtml(e, rep){
   return h;
 }
 
-// The biome the exhibit is laid out as: the ground picker and how each animal feels about it
+// An open exhibit's biome (painted ground) and how each animal feels about it; a vivarium's biome is its scene's (vivSceneHtml)
 function biomeHtml(e){
-  let h = "";
   const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
   const fits = () => kinds.map(s => { const n = esc(s.name);
     return biomeFit(s, b) === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line no">${n} prefers ${esc(biomeNames(s))}.</div>`; }).join("");
-  if(!e.viv){
-    // open exhibits are painted with the Paint Ground tool; the biome with the most ground wins
-    const sh = paintShare(e), parts = Object.entries(sh.counts).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${esc(BIOMES[k].label)} ${Math.round(n / sh.n * 100)}%`).join(", ");
-    return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button><p class="meta">The biome with the most ground in the exhibit is the one the animals and plants count.</p>${fits()}</section>`;
-  }
-  h += `<section><h3>Biome</h3><label class="field"><span>Ground</span><select id="biomeSel">${Object.entries(BIOMES).map(([k, x]) => {
-    const n = kinds.filter(s => biomeFit(s, k) === "home").length, fit = n ? `, home to ${n === kinds.length ? (n === 1 ? "it" : "all") : `${n} of ${kinds.length}`}` : "";
-    return `<option value="${k}"${k === b ? " selected" : ""}${k !== b && regradeProblem(e, k) ? " disabled" : ""}>${x.label}: ${x.ground}${k === b ? " (current)" : `, ${money(regradeCost(e, k))}`}${fit}</option>`;
-  }).join("")}</select></label>`;
-  h += fits() + `</section>`;
-  return h;
+  // open exhibits are painted with the Paint Ground tool; the biome with the most ground wins
+  const sh = paintShare(e), parts = Object.entries(sh.counts).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${esc(BIOMES[k].label)} ${Math.round(n / sh.n * 100)}%`).join(", ");
+  return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button><p class="meta">The biome with the most ground in the exhibit is the one the animals and plants count.</p>${fits()}</section>`;
 }
 // A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
 function vivSceneHtml(e){
@@ -907,20 +898,6 @@ panelEl.addEventListener("input", e => {
   if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
 });
 $("#sheetToggle").onclick = () => aside.classList.toggle("open");
-
-// Regrading an exhibit to another biome
-panelEl.addEventListener("change", ev => {
-  if(ev.target.id !== "biomeSel") return;
-  const e = selItem(), key = ev.target.value; if(!e) return;
-  const why = regradeProblem(e, key), cost = regradeCost(e, key);
-  if(why){ ui.toast(why, "bad"); ui.panel(); return; }
-  spend(cost, "built"); e.biome = key;
-  // a vivarium's old plants don't grow in the new ground, so they're cleared and refunded
-  const dead = e.viv ? landOf(e).filter(f => LAND[f.type] && LAND[f.type].flora && !plantHere(LAND[f.type], e)) : [];
-  for(const f of dead){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); e.land.splice(e.land.indexOf(f), 1); }
-  ui.toast(`${e.name} is now ${BIOMES[key].label.toLowerCase()} (${money(cost)}).${dead.length ? ` Its ${dead.length} old plant${dead.length === 1 ? "" : "s"} were cleared and refunded.` : ""}`, "good");
-  afterChange(); render();
-});
 
 // Setting what a food tray holds: changing it empties the tray
 panelEl.addEventListener("change", ev => {
