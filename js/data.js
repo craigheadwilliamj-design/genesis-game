@@ -1570,7 +1570,7 @@ const BIOMES = {
   tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#C3CDD4", park:"#C3CDD4", perSqM:.6, rock:1.4, plants:0.02},
 };
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
-// (The fern plants are placeholders named for their period until the real list.)
+// (The Permian fern plants are placeholders named for their period until the real list.)
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").
 // A biome missing from a period has no plants there (no grassland before the Neogene). They go in LAND below as keys like "jur-tropical-small".
 const PLANT_TABLE = {
@@ -1586,7 +1586,7 @@ const PLANT_TABLE = {
     temperate:"Ginkgoites|Czekanowskia|Araucarites", desert:"Pachypteris|Hirmeriella|Cupressinocladus", boreal:"Phoenicopsis|Pityophyllum|Elatides"},
   Cretaceous:{fern:"Gleichenites|Equisetum burejense|Dicksonia", tropical:"Nilssoniopteris|Sabalites|Sapindopsis", wetland:"Archaefructus|Nelumbites|Glyptostrobus", scrubland:"Ruffordia|Pseudofrenelopsis|Eucalyptophyllum",
     temperate:"Ficophyllum|Credneria|Sequoia", desert:"Ephedra|Welwitschiophyllum|Tempskya", boreal:"Birisia|Heilungia|Parataxodium"},
-  Paleogene:{fern:"Paleogene Fern|Paleogene Horsetail|Paleogene Tree Fern", tropical:"Climbing Fern|Nipa Palm|Dipterocarp Tree", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
+  Paleogene:{fern:"Onoclea|Equisetum parlatorii|Cyathea", tropical:"Climbing Fern|Nipa Palm|Dipterocarp Tree", wetland:"Mosquito Fern|Floating Fern|Bald Cypress", temperate:"Zelkova|Quercus|Metasequoia",
     boreal:"Royal Fern|Birch|Larch", scrubland:"Hopbush|Acacia|Eucalyptus", desert:"Tamarisk|Saxaul|Honey Mesquite"},
   Neogene:{grassland:"Bluegrass|Kangaroo Grass|Pampas Grass", tropical:"Heliconia|Banana|Kapok", wetland:"Cattail|Common Reed|Tupelo", scrubland:"Sagebrush|Saltbush|Juniper",
     temperate:"Anemone|Acer|Fagus", boreal:"Blueberry|Alder|Spruce", desert:"Cholla|Century Plant|Saguaro", tundra:"Cottongrass|Crowberry|Arctic Willow"},
@@ -2256,8 +2256,8 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   dsuc:"wetland tropical",    yutt:"boreal temperate",     anky:"temperate fern",  tric:"fern temperate",
   cnot:"fern scrubland", dche:"wetland temperate",    quet:"fern scrubland",  spin:"wetland tropical",
   pata:"fern boreal", carc:"desert scrubland",     trex:"temperate fern",  proc:"tropical temperate",
-  hyae:"temperate scrubland", ambu:"wetland tropical",     uint:"temperate wetland",    andr:"scrubland grassland",
-  bari:"tropical wetland",    arge:"grassland scrubland",  arsi:"wetland tropical",     tita:"tropical wetland",
+  hyae:"fern scrubland", ambu:"wetland tropical",     uint:"boreal wetland",    andr:"scrubland fern",
+  bari:"tropical wetland",    arge:"fern scrubland",  arsi:"wetland tropical",     tita:"tropical wetland",
   dino:"grassland scrubland", daeo:"grassland scrubland",  aepy:"grassland scrubland",  kele:"grassland scrubland",
   thyl:"scrubland temperate", mchl:"scrubland tropical",   chal:"temperate tropical",   aind:"tropical temperate",
   drom:"scrubland grassland", plty:"wetland grassland",    amph:"temperate grassland",  gpit:"tropical temperate",
@@ -2271,8 +2271,8 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   long:"temperate wetland",   gigt:"scrubland tropical",   anch:"temperate boreal",   comp:"scrubland temperate",
   yiqi:"temperate boreal",    arch:"scrubland temperate",  beel:"scrubland tropical",   mono:"desert scrubland",
   mcer:"temperate fern", scan:"temperate boreal",     micr:"temperate boreal",     kool:"boreal wetland",
-  simo:"tropical wetland",    ples:"temperate tropical",   paki:"wetland tropical",     lept:"temperate tropical",
-  sifr:"temperate grassland", ptil:"temperate grassland",  miac:"temperate tropical",    waim:"temperate wetland",
+  simo:"tropical wetland",    ples:"temperate boreal",   paki:"wetland tropical",     lept:"temperate tropical",
+  sifr:"temperate fern", ptil:"temperate fern",  miac:"temperate boreal",    waim:"temperate wetland",
   tmyr:"tropical temperate",  dgal:"scrubland temperate",  nura:"scrubland temperate",  hopl:"scrubland temperate",
   psil:"grassland scrubland", ornw:"scrubland temperate",  dodo:"tropical scrubland",    ppig:"temperate grassland",
   gtod:"tropical temperate",  rmlo:"grassland scrubland",  sdel:"scrubland temperate",
