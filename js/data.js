@@ -1562,7 +1562,7 @@ const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepu
 
 // Biomes: the ground an open exhibit is laid out as. Each animal has two biomes it is equally at home in.
 //   color    floor color on the map (the pattern id is "b-" + the key)
-//   perSqM   cost to regrade an exhibit to this biome
+//   perSqM   cost to paint a square meter of ground this biome
 //   wet      counts as this share of the water that fully satisfies water lovers
 //   rock     how many rocks animals want here, next to grassland's 1 (see HAB.rockEvery)
 //   plants   share of the floor animals want planted here (see HAB.plantMax)

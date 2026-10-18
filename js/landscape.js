@@ -237,14 +237,8 @@ function spriteHitPath(name, x, y, k){
 }
 const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
 // The exhibit's biome (vivariums too), and how well it suits one species: "home" (either of its two biomes), "away", or null for animals with no biome
-const biomeOf = e => { const b = paintedBiome(e); return BIOMES[b] ? b : DEFAULT_BIOME; };   // open exhibits: the biome with the most ground, painted or not (js/biomepaint.js)
+const biomeOf = e => { const b = e.viv && e.vivScene ? e.vivScene.biome : paintedBiome(e); return BIOMES[b] ? b : DEFAULT_BIOME; };   // open exhibits: the biome with the most ground, painted or not (js/biomepaint.js); a vivarium: its scene's
 function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l.includes(b) ? "home" : "away"; }
-const regradeCost = (e, b) => Math.round(area(e.points) * BIOMES[b].perSqM);
-function regradeProblem(e, b){
-  if(!BIOMES[b]) return "Unknown biome.";
-  if(biomeOf(e) === b) return `${e.name} is already ${BIOMES[b].label.toLowerCase()}.`;
-  return canAfford(regradeCost(e, b)) ? null : `Costs ${money(regradeCost(e, b))}.`;
-}
 // How much of the exhibit is water, rock, and groves from each era: 0 to 1 each, where 1 satisfies the animals that like it
 function habitatOf(e){
   const a = area(e.points) || 1, land = landOf(e).filter(f => LAND[f.type]);

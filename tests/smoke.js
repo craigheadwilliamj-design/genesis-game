@@ -1712,8 +1712,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
-    state.money = 1e6; out.regradeAlready = /already/.test(regradeProblem(bx, "wetland") || ""); out.regradeVivOk = !regradeProblem({viv:"S", points:bx.points, animals:[]}, "desert") && regradeProblem({viv:"S", points:bx.points, animals:[]}, DEFAULT_BIOME) !== null;
-    state.money = 0; out.regradeNeedsMoney = /Costs/.test(regradeProblem(bx, "desert") || "") && regradeCost(bx, "desert") === Math.round(3600 * BIOMES.desert.perSqM);
+    // a vivarium has no ground picker: its biome is its scene's (else the biome it was built with)
+    { const vb = {viv:"S", biome:"wetland", points:bx.points, animals:[], vivScene:null}; const before = biomeOf(vb); vb.vivScene = {era:"mesozoic", biome:"desert"};
+      out.vivBiomeIsScene = before === "wetland" && biomeOf(vb) === "desert" && typeof regradeProblem === "undefined"; }
     { const sp = SPECIES.find(s => !s.viv && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
       const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
       out.wantsBySize = wantsOf({points:pts.map(([x,y]) => [x*2,y*2]), biome:"tropical"}, sp).plants > tW.plants;
@@ -2317,10 +2318,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.vivSceneCharges = ok && state.money === m1 - VIV_SCENE.price && v.vivScene.era === "paleozoic" && !!vivSceneProblem(v, {era:"paleozoic", biome:"desert"});
       setVivScene(v, {era:"paleozoic", biome:"tropical"});
       const full = habitatScore(v).delta;
-      out.vivSceneBonus = halfFit === .5 && sceneFit(v, s) === 1 && bare < half && half < full && Math.abs(full - bare - VIV_PLANT.bonus) < .01 && speciesFit(v, s).plants === 1;
+      out.vivSceneBonus = halfFit === .5 && sceneFit(v, s) === 1 && half < full && Math.abs(full - bare - VIV_PLANT.bonus) < .01 && speciesFit(v, s).plants === 1;
       out.vivEra = !exhibitReport(v).issues.some(i => /another era/.test(i.text));
       state.money = 0; out.vivSceneBroke = !!vivSceneProblem(v, {era:"mesozoic", biome:"tropical"}); state.money = 1e5;
-      const html = vivSceneHtml(v); out.vivSceneUi = html.includes("vivEraSel") && html.includes("vivBiomeSel") && html.includes('data-action="vivScene"') && !html.includes("vivPlant\"") && vivToysHtml(v).includes("Enrichment");
+      const html = vivSceneHtml(v); out.vivNoGround = !exhibitHtml(v).includes("biomeSel") && biomeOf(v) === "tropical"; out.vivSceneUi = html.includes("vivEraSel") && html.includes("vivBiomeSel") && html.includes('data-action="vivScene"') && !html.includes("vivPlant\"") && vivToysHtml(v).includes("Enrichment");
       render(); const w = world.innerHTML, fi = w.indexOf("sprites/vivscene/paleozoic-tropical-L-floor.png"), wi = w.indexOf("sprites/vivscene/paleozoic-tropical-L-wall.png"), zi = w.indexOf('data-z34="e-vp"');
       out.vivSceneDraws = fi > 0 && wi > fi && zi > wi;
       const m2 = state.money; setVivScene(v, null);
