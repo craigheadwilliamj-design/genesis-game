@@ -167,28 +167,29 @@ function exhibitPaintCost(box, biome){
 const GROUND_SPAN = 100, GROUND_TILE_PX = 8;
 const cellHash = (x, y) => { let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; };
 // which tile (0-based) each cell of the GROUND_SPAN square shows, as a flat array
-function groundPicks(plain, detail, share){
+function groundPicks(plain, detail, share, salt = 0){
   const out = new Array(GROUND_SPAN * GROUND_SPAN).fill(0);
   for(let cx = 0; cx < GROUND_SPAN; cx += CHUNK) for(let cy = 0; cy < GROUND_SPAN; cy += CHUNK){
-    const cells = []; for(let x = cx; x < cx + CHUNK; x++) for(let y = cy; y < cy + CHUNK; y++) cells.push([cellHash(x + 31, y + 57), x, y]);
+    const cells = []; for(let x = cx; x < cx + CHUNK; x++) for(let y = cy; y < cy + CHUNK; y++) cells.push([cellHash(x + 31 + salt, y + 57), x, y]);
     cells.sort((a, b) => a[0] - b[0]);
-    const want = CHUNK * CHUNK * share, k = Math.floor(want) + (cellHash(cx + 5, cy + 9) % 1000 / 1000 < want % 1 ? 1 : 0);
-    cells.forEach(([h, x, y], i) => { out[x * GROUND_SPAN + y] = i < k ? plain + cellHash(x + 11, y + 13) % detail : cellHash(x + 17, y + 19) % plain; });
+    const want = CHUNK * CHUNK * share, k = Math.floor(want) + (cellHash(cx + 5 + salt, cy + 9) % 1000 / 1000 < want % 1 ? 1 : 0);
+    cells.forEach(([h, x, y], i) => { out[x * GROUND_SPAN + y] = i < k ? plain + cellHash(x + 11 + salt, y + 13) % detail : cellHash(x + 17 + salt, y + 19) % plain; });
   }
   return out;
 }
-function buildGroundTiles(){
-  Object.entries(GROUND_TILES).forEach(([biome, T]) => {
-    const imgs = document.querySelectorAll(`#p-${biome} image, #b-${biome} image`); if(!imgs.length) return;
+// the same builder lays WATER_TILES into #w-<biome> from sprites/water/ (its own salt, so marks in the water don't land on the ground's)
+function buildGroundTiles(table = GROUND_TILES, sel = biome => `#p-${biome} image, #b-${biome} image`, dir = "ground", salt = 0){
+  Object.entries(table).forEach(([biome, T]) => {
+    const imgs = document.querySelectorAll(sel(biome)); if(!imgs.length) return;
     const n = T.plain + T.detail; let left = n; const tiles = [];
     for(let i = 0; i < n; i++){
       const t = new Image(); tiles.push(t);
       t.onload = () => {
         if(--left) return;
         const c = document.createElement("canvas"), px = GROUND_SPAN * GROUND_TILE_PX; c.width = c.height = px;
-        const g = c.getContext("2d"), pick = groundPicks(T.plain, T.detail, T.share); g.imageSmoothingEnabled = false;
+        const g = c.getContext("2d"), pick = groundPicks(T.plain, T.detail, T.share, salt); g.imageSmoothingEnabled = false;
         for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
-          const t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919, y + 104729) % 8, h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+          const t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8), h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
           g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
           g.drawImage(tiles[t], -h, -h);
         }
@@ -197,8 +198,9 @@ function buildGroundTiles(){
           imgs.forEach(img => { img.setAttribute("href", url); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
         } catch(e){}
       };
-      t.src = spriteUrl(`sprites/ground/${biome}-${i + 1}.png`);
+      t.src = spriteUrl(`sprites/${dir}/${biome}-${i + 1}.png`);
     }
   });
 }
 buildGroundTiles();
+buildGroundTiles(WATER_TILES, biome => `#w-${biome} image`, "water", 4000);
