@@ -786,9 +786,10 @@ function blobPath(x, y, r, seed, sharp){
 const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(id)}" style="cursor:pointer"` : ` pointer-events="none"`;
 // One body of water, in an exhibit or out in the park
 // Biomes whose water is drawn from a pixel tile (sprites/water/<biome>.png, the #w-<biome> pattern in index.html); the rest are flat blue
-// per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims
+// per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims. A biome with `shore` draws that one color
+// on all four edges instead of the lit and dark rims, and with no `damp` or `mud` has no bank
 const WATER_TEX = {
-  wetland:  {damp:"#6A8358", mud:"#566648", lit:"#7FAA9C", dark:"#4A7872"},
+  wetland:  {shore:"#827B24", lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   fern:     {damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
@@ -856,9 +857,9 @@ function watersSvg(list, biome){
   for(const w of list){ const k = WATER_TEX[w.kind] ? w.kind : WATER_TEX[biome] ? biome : null; if(k) items.push({w, kind:k, points:w.points}); else flat.push(w); }
   let s = flat.map(flatWaterSvg).join("");
   if(!items.length) return s;
-  const m = waterMask(items), T = WATER_TEX, layer = (part, fill) => m.kinds.map(k => `<path d="${m.by[k][part]}" fill="${fill(k)}"/>`).join("");
+  const m = waterMask(items), T = WATER_TEX, layer = (part, fill) => m.kinds.map(k => fill(k) ? `<path d="${m.by[k][part]}" fill="${fill(k)}"/>` : "").join("");
   s += `<g pointer-events="none" shape-rendering="crispEdges">` + layer("damp", k => T[k].damp) + layer("mud", k => T[k].mud) + layer("body", k => `url(#w-${k})`)
-    + layer("lit", k => T[k].lit) + layer("dark", k => T[k].dark) + `</g>`;
+    + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;
 }
 function flatWaterSvg(w){
