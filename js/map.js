@@ -792,6 +792,9 @@ function viv34(e, which, hi){
       if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
     }
   }
+  // the cube's outline, one pixel wide: the floor's edges behind everything, the lid's edges in front (the side edges run front to back, so the walls alone don't draw them)
+  const edge = pts => `<polygon points="${polyStr(pts)}" fill="none" stroke="${K.top}" stroke-width="${FLAT34.px}" stroke-linejoin="miter" shape-rendering="crispEdges"/>`;
+  s += back ? edge(P) : edge(P.map(up));
   // thin corner edges, one pixel wide, from the bottom of the base up (the far ones behind, the near ones in front)
   for(const p of P){
     if(back ? p[1] > cy : p[1] <= cy) continue;
