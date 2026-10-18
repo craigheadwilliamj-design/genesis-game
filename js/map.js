@@ -774,12 +774,12 @@ function vivFloor34(e, c, dead, on, reach){
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
   return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
 }
-// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill, label plate and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
+// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
 function viv34(e, which, hi){
   const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
-  let s = "", front = -1;
+  let s = "";
   for(let i = 0; i < P.length; i++){
     const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
     const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
@@ -789,7 +789,6 @@ function viv34(e, which, hi){
       const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
       s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
       s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]);
-      if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
     }
   }
   // a one-pixel light blue, see-through border: the floor's edges behind the animals, the lid's in front, and the corner edges from the foot of the base up
@@ -800,12 +799,6 @@ function viv34(e, which, hi){
     if(back ? a[1] <= cy : a[1] > cy) s += ln(a, up(a));
   }
   if(!back){
-    if(front >= 0){
-      const L = edgeLen34(P, front), fl = P[(front + 1) % P.length][0] < P[front][0], e1 = FLAT34.px / L;
-      const Q = (f0, f1, h0, h1, fill) => wallQ(front, fl ? 1 - f0 : f0, fl ? 1 - f1 : f1, h0, h1, fill);
-      const pw = Math.min(.45 / L, .12), pf = .22;   // the label plate: a dark plate with a pale rim and the size's letter
-      s += Q(pf - pw - e1, pf + pw + e1, .38, 1.37, "#C9CFD3") + Q(pf - pw, pf + pw, .38 + FLAT34.px, 1.37 - FLAT34.px, "#2B3338") + flatText34(Q, L, pf, .55, K.label, "#F1E7C4");
-    }
     // the lid: clear glass
     s += flatPoly34(P.map(up), "#DDEFF2", op(.16), true);
     if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(up))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
