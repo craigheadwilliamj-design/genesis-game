@@ -792,10 +792,10 @@ function viv34(e, which, hi){
       if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
     }
   }
-  // thin corner edges, one pixel wide, from the sill up (the far ones behind, the near ones in front)
+  // thin corner edges, one pixel wide, from the bottom of the base up (the far ones behind, the near ones in front)
   for(const p of P){
     if(back ? p[1] > cy : p[1] <= cy) continue;
-    const w = FLAT34.px / 2, lo = lift34(K.sill)(p)[1];
+    const w = FLAT34.px / 2, lo = p[1];
     s += flatPoly34([[p[0] - w, lo], [p[0] + w, lo], [p[0] + w, up(p)[1]], [p[0] - w, up(p)[1]]], K.top, "", true);
   }
   if(!back){
