@@ -791,7 +791,7 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 const WATER_TEX = {
   wetland:  {shore:"#827B24", shoreW:2, lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
-  fern:     {damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
+  fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
   desert:   {damp:"#CDB178", mud:"#B89A60", lit:"#7CCFC0", dark:"#2C7C86"},
   grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},
@@ -807,7 +807,7 @@ const waterMasks = new Map();
 // items are the textured boxes {points, kind}; each kind (a WATER_TEX key) is drawn in its own texture. Boxes of one kind that touch are joined row by row,
 // and the shoreline (lit and dark rims, mud and damp banks) is cut against ALL the water, so water touching water of any kind has no border between it.
 // Returns {kinds, by:{kind:{body, lit, dark, mud, damp}}}.
-// Soften the shore of the kinds that have `shore` (wetland): the row runs are cut on the pixel grid, then the pixels next to land are eroded by 0, 1 or 2 px by smooth noise
+// Soften the shore of the kinds that have `shore` (wetland, fern): the row runs are cut on the pixel grid, then the pixels next to land are eroded by 0, 1 or 2 px by smooth noise
 // of the world position (so the edge stair-steps in short runs, and the same shape always gives the same edge), and the sharp convex corners are chipped twice.
 // Only pixels of those kinds are removed, and only ever pixels touching land (not water of another kind), so nothing opens up inside a lake or between bodies.
 const SHORE_NOISE = 5, SHORE_ERODE = [.5, .85], SHORE_CHIP = 2;   // lattice px; the share of shore at 0 and at 0 or 1 px of erosion; passes of corner chipping

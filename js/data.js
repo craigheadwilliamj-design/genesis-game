@@ -1801,7 +1801,9 @@ const GROUND_TILES = {grassland:{plain:1, detail:2, share:.1, still:[2]}, boreal
 // `plain` tiles are one solid color, the next `detail` tiles carry a mark; `share` of the cells in each 5 m chunk take a detail tile. `turn: false` means mirrored only, never turned.
 // `glint` more tiles after the detail ones are an animation: they play as the first `glint` of `frames` frames on every plain cell (each at its own random start, or with `waves`, a list of [period in frames, wavelength in cells] (each wavelength must divide GROUND_SPAN) that makes bands sweep down and right by the cell's x + y; the loop is the least common multiple of the periods, so waves of different periods drift in and out of step; `fps` frames a second), the other frames are the plain tile.
 // A biome not listed keeps its sprites/water/<biome>.png tile.
-const WATER_TILES = {wetland:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]}};
+const WATER_TILES = {
+  wetland:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
+  fern:{plain:1, detail:1, share:.075, turn:false, glint:2, frames:8, fps:4, waves:[[12, 10], [24, 25]]}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
