@@ -137,11 +137,6 @@ function weakestOf(pts){
   for(const {k, fwd} of loopSteps(pts)){ const t = P[k] ? pieceKind(P[k], fwd) : null; if(t && (!w || BARRIERS[t].strength < BARRIERS[w].strength)) w = t; }
   return w || "wood";
 }
-// Decoration fences (hedge, rope) can't hold animals: the reason a pen or exhibit can't use them, or null
-const DECO_WHY = "Hedges and rope fences are only for show. They can't hold animals.";
-const decoSteps = pts => loopSteps(pts).filter(s => fencePieces()[s.k] && BARRIERS[pieceKind(fencePieces()[s.k], s.fwd)].deco);
-// Why a closed pen can't be made an exhibit (a gate on it), or null
-const penProblem = f => decoSteps(f.pts).length ? DECO_WHY + " Fence it with something strong first." : null;
 // The first step of each side of a closed grid exhibit's loop: [{k, fwd}] a side
 const sideStart = (e, i) => { const P = e.points, a = P[i], b = P[(i + 1) % P.length], k = pieceBetween(a, [a[0] + Math.sign(b[0] - a[0]), a[1] + Math.sign(b[1] - a[1])]); return {k, fwd:stepFwd(k, a)}; };
 // The kind of fence along each side of a closed grid exhibit, on the exhibit's own side of the wall
@@ -248,10 +243,6 @@ function planPieces(keys, barrier, o = {}){
   }
   const todo = out.todo;
   if(!todo.length) return {...out, why:kept ? "Other fence is in the way. Switch the bar to Replace to change it." : keys.length ? "That fence is already there." : ""};
-  if(B.deco){   // it can't take the place of an exhibit's wall on the exhibit's own side
-    const held = claimedSides();
-    for(const k of todo) for(const fwd of [true, false]) if(BARRIERS[pieceKind(out.next[k], fwd)].deco && held.has(k + "|" + (fwd ? 1 : 0))) return {...out, why:DECO_WHY};
-  }
   const all = new Set(todo);
   for(const k of todo){ const why = pieceSpotProblem(k, all); if(why) return {...out, why}; }
   const trial = {...P}; for(const k of todo) trial[k] = out.next[k];
@@ -376,7 +367,6 @@ function rehomeContents(notes){
 }
 // Change every piece around a grid exhibit to one kind of fence (the panel's wall picker). A wall it shares with another pen changes on its own side only.
 function refenceExhibit(e, barrier){
-  if(BARRIERS[barrier].deco) return;
   const P = fencePieces(), dirs = faceDirs();
   for(const {k, fwd} of loopSteps(e.points)){
     const old = P[k];
@@ -418,21 +408,20 @@ function fenceRunSvg(pts, b, themed){
   if(b === "bars") s += `<polyline points="${p}" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" ${ns}/>`;
   return s;
 }
-// Makes connections readable at a glance: a dark footing line under every piece, a post cap where pieces meet, and an amber ring on each loose end that joins nothing (a gap or an unfinished pen). Decoration fences (hedge, rope) don't need closing, so their loose ends only show the ring while the fence tool is open.
+// Makes connections readable at a glance: a dark footing line under every piece, a post cap where pieces meet, and an amber ring on each loose end that joins nothing (a gap or an unfinished pen). The rings only show while the build menu is open or the fence tool is active, so a lone wall can be scenery.
 function fenceJointsSvg(inv){
   const P = fencePieces(), keys = Object.keys(P); if(!keys.length) return "";
-  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), solid = new Set(), n2 = v => v.toFixed(2), fencing = tool === "exhibit";
+  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), n2 = v => v.toFixed(2), fencing = tool === "exhibit" || !$("#sideBody").hidden;
   let foot = "", s = "";
   for(const k of keys){
     const [a, b] = pieceEnds(k), loose = !claimed.has(k);
     foot += `M${a[0]} ${a[1]}L${b[0]} ${b[1]}`;
-    const deco = pieceKinds(P[k]).every(t => BARRIERS[t].deco);
-    for(const p of [a, b]){ const id = p[0] + "," + p[1], v = deg.get(id) || 0; deg.set(id, v + 1); if(!deco) solid.add(id); (dirs.get(id) || dirs.set(id, new Set()).get(id)).add(k.split(",")[2]); if(loose) at.set(id, p); else if(!at.has(id)) at.set(id, null); }
+    for(const p of [a, b]){ const id = p[0] + "," + p[1], v = deg.get(id) || 0; deg.set(id, v + 1); (dirs.get(id) || dirs.set(id, new Set()).get(id)).add(k.split(",")[2]); if(loose) at.set(id, p); else if(!at.has(id)) at.set(id, null); }
   }
   s += `<path d="${foot}" fill="none" stroke="#1D2B22" stroke-opacity=".38" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   const r = Math.max(.28, 3.5 * inv);
   for(const [id, n] of deg){
-    const [x, y] = id.split(",").map(Number), open = n === 1 && at.get(id) && (fencing || solid.has(id));
+    const [x, y] = id.split(",").map(Number), open = n === 1 && at.get(id) && fencing;
     if(open) s += `<circle cx="${x}" cy="${y}" r="${n2(r * 1.5)}" fill="#E08A2E" fill-opacity=".28" stroke="#E08A2E" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
     else if(n > 2 || dirs.get(id).size > 1) s += `<rect x="${n2(x - r * .6)}" y="${n2(y - r * .6)}" width="${n2(r * 1.2)}" height="${n2(r * 1.2)}" fill="#1D2B22" fill-opacity=".7" pointer-events="none"/>`;
   }
