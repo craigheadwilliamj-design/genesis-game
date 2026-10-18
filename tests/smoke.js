@@ -1643,6 +1643,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     bx.biome = away; const awayT = exhibitReport(bx).target, awayFlag = exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text));
     bx.biome = "desert"; const homeT = exhibitReport(bx).target;
     out.biomeHomeHappier = biomeOf({}) === DEFAULT_BIOME && awayFlag && homeD - awayD === BIOME_HAPPY.home - BIOME_HAPPY.away && homeT > awayT && exhibitReport(bx).issues.some(i => /At home in the/.test(i.text));
+    { const second = biomesOf(desertSp)[1]; out.biomeEitherHome = biomeFit(desertSp, second) === "home" && biomeD(second) === homeD && !exhibitReport(bx).issues.some(i => i.bad && /Wrong biome/.test(i.text)); bx.biome = "desert"; }
     const fishy = SPECIES.find(s => !s.viv && thirsty({viv:false, land:[], water:[], points:bx.points}, s));
     bx.biome = "grassland"; const dryNow = thirsty(bx, fishy); bx.biome = "wetland";
     out.wetlandWaters = dryNow && !thirsty(bx, fishy);
@@ -1657,6 +1658,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     try { const h = landHtml(bx); out.landPanelRenders = /Plant Cover: ?<\/b>|Plant Cover/.test(h) && /Rock Coverage/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
     try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Dirtiness/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
+    out.fernPrairie = !!BIOMES.fern && ["Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene"].every(p => PLANTS_OF[p].fern && PLANTS_OF[p].fern.length === 3) && ["Devonian", "Carboniferous", "Neogene", "Quaternary"].every(p => !PLANTS_OF[p].fern) && !!document.querySelector('#b-fern') && !!document.querySelector('#p-fern') && !!document.querySelector('#w-fern') && !!WATER_TEX.fern && !!ROCK_SPRITES.fern;
     state.exhibits = keepEx; state.money = keepMoney; render();
 
     // weather: tomorrow's forecast comes true, animals without cover suffer, shelters and groves help

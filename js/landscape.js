@@ -171,9 +171,9 @@ function spriteHitPath(name, x, y, k){
   return bands.map((b, i) => b ? `M${(x + b[0] * k).toFixed(2)} ${(y + i * 4 * k).toFixed(2)}h${((b[1] - b[0] + 1) * k).toFixed(2)}v${(4 * k).toFixed(2)}h${(-(b[1] - b[0] + 1) * k).toFixed(2)}z` : "").join("");
 }
 const landM2 = f => Math.PI * (LAND[f.type].r * (f.k || 1)) ** 2;   // f.k shrinks a vivarium's plants
-// The exhibit's biome (vivariums too), and how well it suits one species: "home", "near", "away", or null for animals with no biome
+// The exhibit's biome (vivariums too), and how well it suits one species: "home" (either of its two biomes), "away", or null for animals with no biome
 const biomeOf = e => { const b = paintedBiome(e); return BIOMES[b] ? b : DEFAULT_BIOME; };   // open exhibits: the biome with the most ground, painted or not (js/biomepaint.js)
-function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l[0] === b ? "home" : l.includes(b) ? "near" : "away"; }
+function biomeFit(s, b){ const l = biomesOf(s); return !l ? null : l.includes(b) ? "home" : "away"; }
 const regradeCost = (e, b) => Math.round(area(e.points) * BIOMES[b].perSqM);
 function regradeProblem(e, b){
   if(!BIOMES[b]) return "Unknown biome.";
@@ -302,14 +302,13 @@ function exposure(e){
 }
 const WEATHER_TEXT = {hot:"no shade. Shelters and groves give shade", cold:"nowhere warm. Shelters keep them warm", storm:"nowhere to shelter. Shelters help most, and groves a little"};
 
-// What the exhibit's biome does to happiness: each animal's home ground, the one it gets by in, or neither
+// What the exhibit's biome does to happiness: each animal is either on one of its two biomes or not
 function biomeScore(e, out, n){
-  const b = biomeOf(e), fit = {home:[], near:[], away:[]};
+  const b = biomeOf(e), fit = {home:[], away:[]};
   for(const [sp, c] of speciesCounts(e)){ const s = SPECIES_BY_ID[sp], f = biomeFit(s, b); if(f){ out.delta += BIOME_HAPPY[f] * c / n; fit[f].push(s); } }
-  const names = l => l.map(s => s.name).join(", "), homes = l => [...new Set(l.map(s => BIOMES[biomesOf(s)[0]].label.toLowerCase()))].join(" or ");
-  if(fit.away.length) out.issues.push({bad:true, text:`Wrong biome. ${names(fit.away)} ${fit.away.length === 1 ? "doesn't" : "don't"} belong in ${BIOMES[b].label.toLowerCase()}. ${[...new Set(fit.away.map(s => BIOMES[biomesOf(s)[0]].label))].join(" or ")} would suit ${fit.away.length === 1 ? "it" : "them"}.`});
-  if(fit.near.length) out.issues.push({bad:false, text:`${names(fit.near)} ${fit.near.length === 1 ? "gets" : "get"} by in ${BIOMES[b].label.toLowerCase()}, but would rather live in ${homes(fit.near)}.`});
-  if(fit.home.length && !fit.away.length && !fit.near.length) out.issues.push({bad:false, text:`At home in the ${BIOMES[b].ground}.`});
+  const names = l => l.map(s => s.name).join(", ");
+  if(fit.away.length) out.issues.push({bad:true, text:`Wrong biome. ${names(fit.away)} ${fit.away.length === 1 ? "doesn't" : "don't"} belong in ${BIOMES[b].label.toLowerCase()}. ${[...new Set(fit.away.flatMap(s => biomesOf(s)).map(k => BIOMES[k].label))].join(" or ")} would suit ${fit.away.length === 1 ? "it" : "them"}.`});
+  if(fit.home.length && !fit.away.length) out.issues.push({bad:false, text:`At home in the ${BIOMES[b].ground}.`});
   return out;
 }
 // What the landscaping does to an exhibit's happiness, for exhibitReport
@@ -782,6 +781,7 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 const WATER_TEX = {
   wetland:  {damp:"#6A8358", mud:"#566648", lit:"#7FAA9C", dark:"#4A7872"},
   scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
+  fern:     {damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
   desert:   {damp:"#CDB178", mud:"#B89A60", lit:"#7CCFC0", dark:"#2C7C86"},
   grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},

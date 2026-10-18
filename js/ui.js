@@ -314,8 +314,8 @@ function cloneHtml(e, rep){
 function biomeHtml(e){
   let h = "";
   const b = biomeOf(e), kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]).filter(biomesOf);
-  const fits = () => kinds.map(s => { const f = biomeFit(s, b), n = esc(s.name), home = BIOMES[biomesOf(s)[0]].label;
-    return f === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line ${f === "near" ? "mid" : "no"}">${n} prefers ${esc(home)}.</div>`; }).join("");
+  const fits = () => kinds.map(s => { const n = esc(s.name);
+    return biomeFit(s, b) === "home" ? `<div class="need-line ok">${n} is happy with its biome.</div>` : `<div class="need-line no">${n} prefers ${esc(biomeNames(s))}.</div>`; }).join("");
   if(!e.viv){
     // open exhibits are painted with the Paint Ground tool; the biome with the most ground wins
     const sh = paintShare(e), parts = Object.entries(sh.counts).sort((x, y) => y[1] - x[1]).map(([k, n]) => `${esc(BIOMES[k].label)} ${Math.round(n / sh.n * 100)}%`).join(", ");
@@ -374,7 +374,7 @@ function needsHtml(e){
   const li = (lv, t) => `<div class="need-line ${lv}">${t}</div>`;
   const pc = x => `${Math.round(x * 1000) / 10}%`;
   const body = kinds.map(s => {
-    const f = speciesFit(e, s), n = esc(s.name), ex = esc(e.name), home = biomesOf(s) && biomeFit(s, b) !== "home" ? BIOMES[biomesOf(s)[0]].label : "";
+    const f = speciesFit(e, s), n = esc(s.name), ex = esc(e.name), home = biomesOf(s) && biomeFit(s, b) !== "home" ? biomeNames(s) : "";
     const fine = (what, have, want, extra) => {
       const bad = [];
       if(have < want) bad.push(`${n} would prefer more ${what} in ${ex}.`);
@@ -583,7 +583,7 @@ $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
-const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `Home biome ${BIOMES[biomesOf(s)[0]].label.toLowerCase()}, gets by in ${BIOMES[biomesOf(s)[1]].label.toLowerCase()}. ` : "") + traitText(s) + ". ";
+const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `At home in ${biomeNames(s)}. ` : "") + traitText(s) + ". ";
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
