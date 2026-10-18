@@ -16,7 +16,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | boreal | done | done | 18/18 | 2/2 | done |
 | grassland | done | done | 6/6 | 1/1 | done |
 | tundra | done | done | 6/6 | 1/1 | done |
-| fern (Fern Prairie) | placeholder (scrubland's) | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | placeholder (scrubland's) |
+| fern (Fern Prairie) | placeholder (scrubland's) | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | texture done (`fern-1..4`), shore to do |
 
 Boreal is done (`tools/pixelplants_boreal.py`; its Quaternary Labrador Tea is called Marsh Rosemary, to keep tundra's Park Plant name unique). A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
