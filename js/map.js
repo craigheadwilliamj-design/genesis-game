@@ -774,7 +774,7 @@ function vivFloor34(e, c, dead, on, reach){
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
   return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
 }
-// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill, label plate and the lid glass, with a thin top edge. No posts, beams or lamp bars
+// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill, label plate and the lid glass. All glass but the base: no posts, beams, edges or lamp bars
 function viv34(e, which, hi){
   const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
@@ -784,22 +784,13 @@ function viv34(e, which, hi){
     const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
     const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
     s += wallQ(i, 0, 1, 0, H, VIV_GLASS34[f], back ? .42 : .17);
-    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]) + wallQ(i, 0, 1, H - FLAT34.px, H, K.top);
+    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]);
     else {
       const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
       s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
-      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]) + wallQ(i, 0, 1, H - FLAT34.px, H, K.top);
+      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]);
       if(front < 0 || edgeLen34(P, i) > edgeLen34(P, front)) front = i;
     }
-  }
-  // the cube's outline, one pixel wide: the floor's edges behind everything, the lid's edges in front (the side edges run front to back, so the walls alone don't draw them)
-  const edge = pts => `<polygon points="${polyStr(pts)}" fill="none" stroke="${K.top}" stroke-width="${FLAT34.px}" stroke-linejoin="miter" shape-rendering="crispEdges"/>`;
-  s += back ? edge(P) : edge(P.map(up));
-  // thin corner edges, one pixel wide, from the bottom of the base up (the far ones behind, the near ones in front)
-  for(const p of P){
-    if(back ? p[1] > cy : p[1] <= cy) continue;
-    const w = FLAT34.px / 2, lo = p[1];
-    s += flatPoly34([[p[0] - w, lo], [p[0] + w, lo], [p[0] + w, up(p)[1]], [p[0] - w, up(p)[1]]], K.top, "", true);
   }
   if(!back){
     if(front >= 0){
