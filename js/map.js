@@ -1463,6 +1463,15 @@ function vivSpot(h, e, p){
 }
 // a vivarium animal stays put, so keep new ones a couple of bodies apart
 function cramped(h, p, k = 4){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * k) return true; return false; }
+// A spot for a vivarium animal in the middle third of the case's depth (fits the glass, out of pools, not crowding the others), or null
+function vivMidSpot(h, e){
+  const bb = bbox(e.points), d = bb.y1 - bb.y0;
+  for(let t = 0; t < 80; t++){
+    const p = randomInside(e.points);
+    if(p[1] >= bb.y0 + d / 3 && p[1] <= bb.y0 + d * 2 / 3 && vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1])) return p;
+  }
+  return null;
+}
 // A spot in a lamp's glow or a pool for a vivarium animal (a home from vivHomes): a few huddle together, and one too near a wall for its picture is nudged toward the middle of the case
 function vivHomeSpot(h, e, hm){
   const [cx, cy] = centroid(e.points);
@@ -1503,6 +1512,7 @@ function syncAnimals(){
       if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
       if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
         for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
+        if(e.viv && !ok){ const p = vivMidSpot(h, e); if(p){ [h.x, h.y] = p; ok = true; } }
         for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
@@ -1690,6 +1700,7 @@ function gateSpot(e){
 }
 // A spot as far from the guest paths as the exhibit allows
 function quietSpot(e){
+  if(e.viv){ const bb = bbox(e.points); return [(bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2]; }   // behind glass, paths don't matter: the middle of the case
   const far = p => state.paths.reduce((m, q) => Math.min(m, lineDist(p[0], p[1], q.points)), 60);
   let best = null, bd = -1;
   for(const p of cornerNodes(e.points).concat([centroid(e.points)])) if(inPoly(p[0], p[1], e.points)){ const d = far(p); if(d > bd){ bd = d; best = p; } }
@@ -1804,11 +1815,17 @@ function animalPlan(h, e){
 function vivJump(h, e){
   if(!h.a) return;
   if(!h.home) h.home = [h.x, h.y];   // the spot it first appeared at
-  if(!inPoly(h.home[0], h.home[1], e.points)) h.home = randomInside(e.points);
-  const g = actGoal(h, e, h.a), inside = g && inPoly(g[0], g[1], e.points);
-  [h.x, h.y] = inside ? g : h.home;
+  if(!vivSpot(h, e, h.home)) h.home = vivMidSpot(h, e) || vivPull(h, e, h.home) || centroid(e.points);
+  const g = actGoal(h, e, h.a), spot = g && vivSpot(h, e, g) ? g : g && vivPull(h, e, g);
+  [h.x, h.y] = spot || h.home;
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
   place34(h);
+}
+// p moved toward the middle of the case until the animal's picture fits there, or null
+function vivPull(h, e, p){
+  const [cx, cy] = centroid(e.points);
+  for(let f = 1; f >= 0; f -= .1){ const q = [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f]; if(vivSpot(h, e, q)) return q; }
+  return null;
 }
 
 // swimmers in a pond get a `swimming` flag and class, for a swim picture to hook onto (a species with a swim strip draws it in place of its walk picture or rig)
