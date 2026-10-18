@@ -1364,6 +1364,12 @@ function indexDepth34(){
 function place34(h){
   const z = tilt && depth34.get(h.exhibitId);
   if(!z){ if(h.el.parentNode !== animalLayer) animalLayer.appendChild(h.el); h.slot = -1; return; }
+  // in a vivarium the animals stand over every fitting, among themselves north to south
+  if(h.viv){
+    let next = null;
+    for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.el.parentNode === z.g && o.y > h.y && (!next || o.y < next.y)) next = o;
+    h.slot = -1; z.g.insertBefore(h.el, next ? next.el : null); return;
+  }
   let lo = 0, hi = z.ys.length; while(lo < hi){ const m = (lo + hi) >> 1; if(z.ys[m] <= h.y) lo = m + 1; else hi = m; }
   if(h.el.parentNode === z.g && h.slot === lo) return;
   h.slot = lo; z.g.insertBefore(h.el, z.kids[lo] || null);
@@ -1438,14 +1444,37 @@ function vivSpot(h, e, p){
   const K = VIV34[e.viv] || VIV34.M, S = SPRITES[h.sp], hw = (S ? 2 * (S.size || 1) : 1) * (h.r || 1) + K.post, m = K.sill / TILT + .15, P = e.points;
   return inPoly(p[0], p[1], P) && inPoly(p[0] - hw, p[1], P) && inPoly(p[0] + hw, p[1], P) && inPoly(p[0], p[1] + m, P) && inPoly(p[0] - hw, p[1] + m, P) && inPoly(p[0] + hw, p[1] + m, P);
 }
-// a vivarium animal stays put, so keep new ones a couple of bodies apart
-function cramped(h, p, k = 4){ for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed && Math.hypot(o.x - p[0], o.y - p[1]) < h.r * k) return true; return false; }
+// The room a vivarium animal's picture takes: half its width, and half the height of its body (a fraction of the picture's box) in the case's depth
+function vivBody(h){
+  const S = SPRITES[h.sp], w = S ? 2 * (S.size || 1) * (h.r || 1) : (h.r || 1), ht = S ? 4 * (S.size || 1) * (h.r || 1) / S.ratio : (h.r || 1) * 2;
+  return {hw:w, hh:ht * .15 / TILT};
+}
+// Would the animal at p overlap another in its case (picture against picture)?
+function vivCrowd(h, p){
+  const a = vivBody(h);
+  for(const o of herd.values()){
+    if(o === h || o.exhibitId !== h.exhibitId || !o.placed) continue;
+    const b = vivBody(o);
+    if(Math.abs(o.x - p[0]) < a.hw + b.hw && Math.abs(o.y - p[1]) < a.hh + b.hh) return true;
+  }
+  return false;
+}
+// The spot nearest p where the animal fits the glass and overlaps no other (p itself if it has no room anywhere: the case is full)
+function vivClear(h, e, p){
+  if(!vivCrowd(h, p)) return p;
+  const bb = bbox(e.points); let best = null, bd = Infinity;
+  for(let y = bb.y0; y <= bb.y1; y += .5) for(let x = bb.x0; x <= bb.x1; x += .5){
+    const d = Math.hypot(x - p[0], (y - p[1]) * 2); if(d >= bd) continue;
+    const q = [x, y]; if(vivSpot(h, e, q) && !vivCrowd(h, q)){ bd = d; best = q; }
+  }
+  return best || p;
+}
 // A spot for a vivarium animal in the middle third of the case's depth (fits the glass, out of pools), the one furthest from the other animals and the fittings so they spread out and none hides behind another, or null
 function vivMidSpot(h, e){
   const bb = bbox(e.points), d = bb.y1 - bb.y0, land = landOf(e).filter(f => LAND[f.type]); let best = null, bs = -1;
   for(let t = 0; t < 120; t++){
     const p = randomInside(e.points);
-    if(p[1] < bb.y0 + d / 3 || p[1] > bb.y0 + d * 2 / 3 || !vivSpot(h, e, p) || vivPoolAt(e, p[0], p[1])) continue;
+    if(p[1] < bb.y0 + d / 3 || p[1] > bb.y0 + d * 2 / 3 || !vivSpot(h, e, p) || vivCrowd(h, p) || vivPoolAt(e, p[0], p[1])) continue;
     let g = Infinity;
     for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.placed) g = Math.min(g, Math.hypot(o.x - p[0], o.y - p[1]));
     for(const f of land) g = Math.min(g, Math.hypot(f.x - p[0], f.y - p[1]) * 1.5);
@@ -1460,7 +1489,7 @@ function vivHomeSpot(h, e, hm){
     const p = [hm.x + (Math.random() * 2 - 1) * hm.rx, hm.y + (Math.random() * 2 - 1) * hm.ry];
     for(let f = 1; f >= .5; f -= .1){
       const q = [cx + (p[0] - cx) * f, cy + (p[1] - cy) * f];
-      if(!vivSpot(h, e, q) || cramped(h, q, 2.2)) continue;
+      if(!vivSpot(h, e, q) || vivCrowd(h, q)) continue;
       if(hm.pool ? vivPoolAt(e, q[0], q[1]) : Math.hypot(q[0] - hm.x, (q[1] - hm.y) * 2) <= hm.rx + 2.2) return q;
       break;
     }
@@ -1494,7 +1523,7 @@ function syncAnimals(){
       if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
         for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
         if(e.viv && !ok){ const p = vivMidSpot(h, e); if(p){ [h.x, h.y] = p; ok = true; } }
-        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !cramped(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
+        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !vivCrowd(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
       h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
@@ -1798,7 +1827,7 @@ function vivJump(h, e){
   if(!h.home) h.home = [h.x, h.y];   // the spot it first appeared at
   if(!vivSpot(h, e, h.home)) h.home = vivMidSpot(h, e) || vivPull(h, e, h.home) || centroid(e.points);
   const g = actGoal(h, e, h.a), spot = g && vivSpot(h, e, g) ? g : g && vivPull(h, e, g);
-  [h.x, h.y] = spot || h.home;
+  [h.x, h.y] = vivClear(h, e, spot || h.home);   // and not on top of another animal
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
   place34(h);
 }

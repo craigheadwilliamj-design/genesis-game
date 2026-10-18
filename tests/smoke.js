@@ -3499,6 +3499,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           homesMid = homesMid && h2.y >= bb.y0 + V.d / 3 - 1e-6 && h2.y <= bb.y0 + V.d * 2 / 3 + 1e-6;
           state.exhibits.pop(); syncAnimals();
         }
+        // three big animals in an L case never overlap, and stand over the fittings
+        { const V = VIVARIUMS.L, ev = {id:"e-lo", name:"Lo", viv:"L", points:rectPts(200, 300, V.w, V.d, 0), animals:[0, 1, 2].map(i => ({id:"lo" + i, sp:"arth"})), happy:70, biome:"tropical", land:[]};
+          state.money = 1e6; state.exhibits.push(ev); for(const k of ["vdish", "vlamp", "vpool", "vbark"]) if(vivPlantSpot(ev, k)) addVivToy(ev, k);
+          syncAnimals(); render();
+          const hs = [...herd.values()].filter(h => h.exhibitId === "e-lo"); let apart = hs.length === 3;
+          for(const act of ["eat", "rest", "hide", "forage", "drink", "play"]){ for(const h of hs){ h.a.act = act; vivJump(h, ev); } apart = apart && hs.every(h => !vivCrowd(h, [h.x, h.y])); }
+          out.vivBigAnimalsApart = apart;
+          const z = depth34.get("e-lo"); out.vivAnimalsOverProps = !z || hs.every(h => h.el.parentNode === z.g && z.kids.every(k => !(k.compareDocumentPosition(h.el) & Node.DOCUMENT_POSITION_PRECEDING)));
+          state.exhibits.pop(); syncAnimals(); }
         out.vivFittingsFront = front; out.vivFirstFrontMiddle = mid; out.vivFittingsSpread = spread; out.vivFittingsApart = noOverlap; out.vivJumpsInsideGlass = jumpsFit; out.vivHomesMiddleDepth = homesMid; }
       { const fs = new Set(); for(let i = 0; i < 40; i++) fs.add(nameAnimal({id:"fz" + i, sp:"tikt"}).face); out.cloneFaceRandom = fs.size === 2 && [...fs].every(f => f === 1 || f === -1);
         const keep = nameAnimal({id:"fk", sp:"tikt", face:-1}); out.faceKept = keep.face === -1; }
