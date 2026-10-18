@@ -1530,7 +1530,7 @@ function walkArea(h, e){
       if(t.look === "conifer" || treeLift(t)){
         if(t.footW){ const b = footBox(f, e); obs.push({x:(b[0] + b[2]) / 2, y:(b[1] + b[3]) / 2, hx:(b[2] - b[0]) / 2, hy:(b[3] - b[1]) / 2, c:body}); }   // a pictured tree's base
         else { const h = Math.max(.5, footBox(f, e)[2] - f.x) * .36; obs.push({x:f.x, y:f.y, hx:h, hy:h, c:body}); } }
-    } else if(ROCK_TYPES.includes(f.type)){ const b = footBox(f, e), h = (b[2] - b[0]) / 2; obs.push({x:f.x, y:(b[1] + b[3]) / 2, hx:h, hy:h, c:body}); }   // a rock keeps off its whole square
+    } else if(ROCK_TYPES.includes(f.type)){ for(const b of footRects(f, e)) obs.push({x:(b[0] + b[2]) / 2, y:(b[1] + b[3]) / 2, hx:(b[2] - b[0]) / 2, hy:(b[3] - b[1]) / 2, c:body}); }   // a rock keeps off each rect of its footprint
     else {
       const R = t.look === "cave" || t.look === "burrow" ? r * .85 : t.slots ? (t.look ? 0 : r) : t.tray || t.toy || t.toyFor || t.statue ? 0 : footR(t) * (f.k || 1) * .9;
       if(R) obs.push({x:f.x, y:f.y, hx:0, hy:0, c:R + body});
@@ -3071,7 +3071,7 @@ function reshapeProblem(e, orig){
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
   if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
-  if(landOf(e).some(f => LAND[f.type] && !boxInside(footBox(f, e), pts))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
+  if(landOf(e).some(f => LAND[f.type] && !rectsInside(footRects(f, e), pts))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
   if(diff > 0 && !canAfford(diff)) return `The new fence costs ${money(diff)} more. You have ${money(state.money)}.`;

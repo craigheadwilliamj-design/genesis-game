@@ -2122,15 +2122,17 @@ const SPRITE_HIT = {
   "rock-wetland-5":[41,29,16,17,",18-33,7-35,4-36,3-36,3-34,11-15"],
 };
 // SPRITE_HIT:end
-// Ground footprint of a plant, rock or boulder: a square of whole 1 m cells (landscape.js footBox). A pictured plant in FOOT.rect has a box its base width by a share of it deep (FOOT.depth), any other pictured plant or rock its square; all end at the base and run back up the map. Each picture's side comes from its own sprite
-// (SPRITE_HIT), rounded to whole meters and held to its kind's range. side: key -> meters, to override one by hand.
+// Ground footprint of a plant, rock or boulder (landscape.js footBox, footRects). A plant takes a square of whole 1 m cells, or in FOOT.rect a base width by a share of it deep; a pictured rock or boulder takes a few
+// whole-cell rects cut from its silhouette (SPRITE_HIT, ROCK_FOOT in landscape.js). All stand on the picture's base and run back up the map. A plant's side comes from its own sprite, rounded to whole meters and held to its kind's range.
+// side: key -> meters, to override one picture by hand with a square.
 const FOOT = {
-  range:{small:[1, 2], medium:[3, 5], large:[3, 3], rock:[2, 4], boulder:[6, 8]},
-  plain:{small:2, medium:4, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
+  range:{small:[1, 2], medium:[2, 4], large:[3, 3]},
+  plain:{small:2, medium:3, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
   rect:["dev-tropical-small"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  rockK:.8,    // a rock's or boulder's side is this share of its picture's width
+  rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
+  rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}
 };
 const plantMix = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");

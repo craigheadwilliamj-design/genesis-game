@@ -42,18 +42,50 @@ const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : nu
 const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
 const potName = t => `${t.period || ERA_LABEL[t.flora]} ${t.size} plants`;
 
-// Footprint: the ground a thing takes up. Plants, rocks and boulders take a SQUARE of whole 1 m cells (FOOT in data.js; footSide, footBox): the side comes from the
-// picture's own size (SPRITE_HIT), rounded to meters and held to the kind's range. An odd side is centered on a cell, an even one on a grid corner, so the square always
-// covers whole cells. Everything else (barns, trays, toys) keeps a box 2 * footR wide. Crowding, fences, paths, buildings, water, animals and the placement ghost use the
-// box; t.r still sizes the drawing and the habitat math, and the tap shape stays the silhouette.
+// Footprint: the ground a thing takes up. Plants take a SQUARE of whole 1 m cells (FOOT in data.js; footSide, footBox): the side comes from the picture's own size
+// (SPRITE_HIT), rounded to meters and held to the kind's range. A pictured rock or boulder takes a few whole-cell rects cut from its silhouette (ROCK_FOOT, footRects),
+// so a tall or odd one doesn't claim a square. An odd side or width is centered on a cell, an even one on a grid corner, so a footprint always covers whole cells.
+// Everything else (barns, trays, toys) keeps a box 2 * footR wide. Crowding, fences, paths, buildings, water, animals and the placement ghost use the box or rects;
+// t.r still sizes the drawing and the habitat math, and the tap shape stays the silhouette.
 const footR = t => t.fr || t.r;
 const ROCK_TYPES = ["rock", "boulder"];
 const FOOT_EPS = 1e-4;
-const ROCK_SIDE = {rock:{}, boulder:{}};   // type -> biome -> a side per picture, in ROCK_SPRITES order
+const ROCK_FOOT = {rock:{}, boulder:{}};   // type -> biome -> a {w, rects} per picture, in ROCK_SPRITES order
+// One rock picture's ground: rects [x0, y0, x1, y1] in meters from its point (x centered, y up the map is negative), whole cells wide, standing on the point. Cut from the
+// silhouette bands, mirrored so a flipped rock (flip comes from its id, unknown to the ghost) takes the same ground, with the 4 px the picture sinks below its point left out.
+// A cell is taken when the silhouette covers FOOT.rockCover of it; each row runs from its first to its last taken cell, and rows of the same run join into one rect.
+function rockFootOf(name, type){
+  const h = SPRITE_HIT[name], side = FOOT.side[name] || (!h && FOOT.plain[type]);
+  if(side) return {w:side, rects:[[-side / 2, -side, side / 2, 0]]};
+  const P = ROCK_MPP, [pw, ph] = h, segs = [];
+  h[4].split(",").forEach((b, i) => {
+    const top = (ph - 4 * i - 4) * P; if(!b || top <= 0) return;
+    const [x0, x1] = b.split("-").map(Number);
+    segs.push([(Math.min(x0, pw - 1 - x1) - pw / 2) * P, (Math.max(x1, pw - 1 - x0) + 1 - pw / 2) * P, Math.max(0, top - 4 * P), top]);
+  });
+  if(!segs.length) return {w:1, rects:[[-.5, -1, .5, 0]]};
+  const W = Math.max(1, Math.round(2 * Math.max(...segs.map(q => q[1])) * FOOT.rockWide)), rows = [];
+  for(let j = 0; j < Math.ceil(Math.max(...segs.map(q => q[3]))); j++){
+    let c0 = -1, c1 = -1;
+    for(let c = 0; c < W; c++){
+      const x0 = c - W / 2, cover = segs.reduce((n, q) => n + Math.max(0, Math.min(q[1], x0 + 1) - Math.max(q[0], x0)) * Math.max(0, Math.min(q[3], j + 1) - Math.max(q[2], j)), 0);
+      if(cover >= FOOT.rockCover){ if(c0 < 0) c0 = c; c1 = c; }
+    }
+    rows.push(c0 < 0 ? null : [c0, c1]);
+  }
+  const first = rows.findIndex(Boolean), rects = [];
+  if(first < 0) return {w:W, rects:[[-W / 2 + Math.floor(W / 2), -1, -W / 2 + Math.floor(W / 2) + 1, 0]]};
+  for(let j = first, r; j < rows.length; j++){
+    const q = rows[j]; if(!q){ r = null; continue; }
+    if(r && r.c0 === q[0] && r.c1 === q[1]) r.j1 = j - first + 1;
+    else rects.push(r = {c0:q[0], c1:q[1], j0:j - first, j1:j - first + 1});
+  }
+  return {w:W, rects:rects.map(q => [q.c0 - W / 2, -q.j1, q.c1 + 1 - W / 2, -q.j0])};
+}
 for(const [k, S] of Object.entries(PLANT_SPRITES)){
   const t = LAND[k], h = SPRITE_HIT[k]; if(!t || !h) continue;
   const mpp = t.r * 2 * (S.size || 1) / h[0], range = FOOT.range[t.size];
-  t.footSide = FOOT.side[k] || clamp(Math.round(Math.max(h[2] * mpp * 2, h[3] * mpp * 2 * FOOT.crown)), range[0], range[1]);   // the old whole-cell square: rocks, and where an old save's box stood
+  t.footSide = FOOT.side[k] || clamp(Math.round(Math.max(h[2] * mpp * 2, h[3] * mpp * 2 * FOOT.crown)), range[0], range[1]);   // the old whole-cell square: where an old save's box stood
   if(FOOT.rect.includes(k)){   // a redrawn plant: its box is its base width, down to the half meter, by a share of it deep
     t.footW = FOOT.side[k] || clamp(Math.floor(h[2] * mpp * 4) / 2, .5, range[1]);
     t.footD = FOOT.side[k] || Math.max(.5, Math.round(t.footW * FOOT.depth * 2) / 2);
@@ -62,17 +94,16 @@ for(const [k, S] of Object.entries(PLANT_SPRITES)){
 for(const t of Object.values(LAND)) if(t.flora && !t.footSide) t.footSide = FOOT.plain[t.size] || 2;
 for(const type of ROCK_TYPES){
   if(LAND[type]) LAND[type].footSide = FOOT.plain[type];
-  for(const [biome, kinds] of Object.entries(ROCK_SPRITES)) ROCK_SIDE[type][biome] = (kinds[type] || []).map((_, i) => {
-    const name = `${type}-${biome}-${i + 1}`, h = SPRITE_HIT[name], r = FOOT.range[type];
-    return FOOT.side[name] || (h ? clamp(Math.round(h[3] * 2 * ROCK_MPP * FOOT.rockK), r[0], r[1]) : FOOT.plain[type]);
-  });
+  for(const [biome, kinds] of Object.entries(ROCK_SPRITES)) ROCK_FOOT[type][biome] = (kinds[type] || []).map((_, i) => rockFootOf(`${type}-${biome}-${i + 1}`, type));
 }
 // The picture a placed rock shows: its f.pic, else one picked by its id (the same pick rockSpriteSvg makes)
 function rockPicIndex(f, biome){ const l = (ROCK_SPRITES[biome] || {})[f.type]; return !l ? null : f.pic != null && f.pic >= 0 && f.pic < l.length ? f.pic : seedOf(f) % l.length; }
-// Side in meters of a plant or rock of this kind, given the picture index (rocks) and the biome it is drawn in; other things are 2 * footR wide
+// A pictured rock's ground ({w, rects}), given the picture index and the biome it is drawn in; null for anything else
+const rockFootAt = (key, pic, biome) => ROCK_TYPES.includes(key) && pic != null ? ((ROCK_FOOT[key] || {})[biome] || [])[pic] || null : null;
+// Side in meters of a plant, or width of a pictured rock's footprint, of this kind (rocks: given the picture index and the biome it is drawn in); other things are 2 * footR wide
 function footSideFor(key, pic, biome){
   const t = LAND[key]; if(!t) return 0;
-  if(ROCK_TYPES.includes(key)){ const v = pic != null && ((ROCK_SIDE[key] || {})[biome] || [])[pic]; return v || t.footSide; }
+  if(ROCK_TYPES.includes(key)){ const v = rockFootAt(key, pic, biome); return v ? v.w : t.footSide; }
   return t.footSide || 2 * footR(t);
 }
 const footSquare = key => !!LAND[key] && (!!LAND[key].footSide);
@@ -83,15 +114,23 @@ const footBased = (key, biome) => !!PLANT_SPRITES[key] || (ROCK_TYPES.includes(k
 // Width and depth in meters of a thing's box: a pictured plant's base, else a square
 const footDims = (key, pic, biome) => { const t = LAND[key]; if(t && t.footW) return [t.footW, t.footD]; const s = footSideFor(key, pic, biome); return [s, s]; };
 // A placed thing's box [x0, y0, x1, y1]; e is the exhibit it stands in (null: out in the park)
-function footBox(f, e){
-  const t = LAND[f.type]; if(!t) return [f.x, f.y, f.x, f.y];
-  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null;
-  return boxFrom(f.x, f.y, footDims(f.type, rb && rockPicIndex(f, rb), rb).map(v => v * k), footBased(f.type, rb));
+// A pictured rock is several rects, so footRects is the exact ground; footBox is the one box around them
+function footRects(f, e){
+  const t = LAND[f.type]; if(!t) return [[f.x, f.y, f.x, f.y]];
+  const k = f.k || 1, rb = ROCK_TYPES.includes(f.type) ? featBiome(f, e) : null, pic = rb && rockPicIndex(f, rb), rf = rockFootAt(f.type, pic, rb);
+  return rf ? rf.rects.map(q => [f.x + q[0] * k, f.y + q[1] * k, f.x + q[2] * k, f.y + q[3] * k]) : [boxFrom(f.x, f.y, footDims(f.type, pic, rb).map(v => v * k), footBased(f.type, rb))];
 }
+const boundsOf = R => R.length === 1 ? R[0] : [Math.min(...R.map(b => b[0])), Math.min(...R.map(b => b[1])), Math.max(...R.map(b => b[2])), Math.max(...R.map(b => b[3]))];
+const footBox = (f, e) => boundsOf(footRects(f, e));
 // A box of these meters [width, depth] at (x, y): standing on its base (front edge at y), or centered
 const boxFrom = (x, y, [w, d], based) => based ? [x - w / 2, y - d, x + w / 2, y] : [x - w / 2, y - d / 2, x + w / 2, y + d / 2];
 // The box a new one of this kind would take at (x, y)
-function footBoxAt(key, pic, biome, x, y){ return boxFrom(x, y, footDims(key, pic, biome), footBased(key, biome)); }
+function footBoxAt(key, pic, biome, x, y){ return boundsOf(footRectsAt(key, pic, biome, x, y)); }
+// The rects a new one would take at (x, y): a pictured rock's, else its one box
+function footRectsAt(key, pic, biome, x, y){
+  const rf = rockFootAt(key, pic, biome);
+  return rf ? rf.rects.map(q => [x + q[0], y + q[1], x + q[2], y + q[3]]) : [boxFrom(x, y, footDims(key, pic, biome), footBased(key, biome))];
+}
 // Snap a point so a footprint of this kind covers whole cells: odd sides center on a cell across, even on a grid corner. Down the map the box ends at the point when it stands on a base, so that is a grid line for any side; else it is centered like across. A pictured plant's box snaps to the half meter instead (its edges, not its center). Other things keep the grid corner.
 function footSnap(key, pic, biome, x, y){
   if(!footSquare(key)) return [Math.round(x), Math.round(y)];
@@ -102,9 +141,23 @@ function footSnap(key, pic, biome, x, y){
 // The ghost's footprint: its square on the grid (plants, rocks), else a ring
 function footGhostSvg(g, biome, attrs){
   if(!footSquare(g.key)) return `<circle cx="${g.x}" cy="${g.y}" r="${footR(LAND[g.key])}" fill="none" ${attrs}/>`;
-  const b = footBoxAt(g.key, g.pic, biome, g.x, g.y);
-  return `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="${g.ok ? "var(--sel)" : "var(--bad)"}" fill-opacity=".12" ${attrs}/>`;
+  const R = footRectsAt(g.key, g.pic, biome, g.x, g.y), fill = g.ok ? "var(--sel)" : "var(--bad)", n = v => +v.toFixed(2);
+  if(R.length === 1){ const b = R[0]; return `<rect x="${b[0]}" y="${b[1]}" width="${b[2] - b[0]}" height="${b[3] - b[1]}" fill="${fill}" fill-opacity=".12" ${attrs}/>`; }
+  // several rects: the fill, and one dashed outline round the whole shape (their shared edges aren't stroked)
+  const cells = new Set(), at = (x, y) => cells.has(x + "," + y), d = [];
+  for(const b of R) for(let x = Math.round(b[0]); x < Math.round(b[2]); x++) for(let y = Math.round(b[1]); y < Math.round(b[3]); y++) cells.add(x + "," + y);
+  for(const c of cells){ const [x, y] = c.split(",").map(Number);
+    if(!at(x, y - 1)) d.push(`M${x} ${y}h1`); if(!at(x, y + 1)) d.push(`M${x} ${y + 1}h1`);
+    if(!at(x - 1, y)) d.push(`M${x} ${y}v1`); if(!at(x + 1, y)) d.push(`M${x + 1} ${y}v1`); }
+  return `<path d="${R.map(b => `M${n(b[0])} ${n(b[1])}h${n(b[2] - b[0])}v${n(b[3] - b[1])}h${n(b[0] - b[2])}z`).join("")}" fill="${fill}" fill-opacity=".12" stroke="none"/><path d="${d.join("")}" fill="none" ${attrs}/>`;
 }
+// Helpers for checks against a thing's rects (an array of boxes), the same tests as for one box
+const rectsInside = (R, pts) => R.every(b => boxInside(b, pts));
+const rectsHitPoly = (R, pts) => R.some(b => boxHitsPoly(b, pts));
+const rectsHitLine = (R, pts, hw) => R.some(b => lineHitsBox(b, pts, hw));
+const rectsDist = (R, x, y) => Math.min(...R.map(b => boxPointDist(b, x, y)));
+const rectsOnChunk = R => R.some(boxOnChunk);
+const rectsHit = (A, B) => A.some(a => B.some(b => boxesHit(a, b)));
 const boxPts = b => [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
 const shrinkBox = b => [b[0] + FOOT_EPS, b[1] + FOOT_EPS, b[2] - FOOT_EPS, b[3] - FOOT_EPS];
 // Old saves: snap every plant and rock to its square (odd sides on a cell center, even on a grid corner), and where two squares now overlap nudge one by up to a cell,
@@ -117,13 +170,13 @@ function snapFootprints(s){
     const items = list.filter(f => LAND[f.type]);
     const rockOf = f => ROCK_TYPES.includes(f.type), biomeOfF = f => BIOMES[f.biome] ? f.biome : homeBiome(e);
     const picOf = f => rockOf(f) ? rockPicIndex(f, biomeOfF(f)) : null;
-    const boxAt = (f, x, y) => footBoxAt(f.type, picOf(f), biomeOfF(f), x, y);
+    const boxAt = (f, x, y) => footRectsAt(f.type, picOf(f), biomeOfF(f), x, y);
     // saves from before boxes stood on their base: slide each picture down to the bottom of its old box, so every box stays exactly where it was
     if(!s.footBase) for(const f of items) if(footSquare(f.type) && footBased(f.type, rockOf(f) ? biomeOfF(f) : null)) f.y += footSideFor(f.type, picOf(f), biomeOfF(f)) * (f.k || 1) / 2;
     for(const f of items) if(footSquare(f.type)){ [f.x, f.y] = footSnap(f.type, picOf(f), biomeOfF(f), f.x, f.y); }
     const placed = items.filter(f => !footSquare(f.type)).map(f => boxAt(f, f.x, f.y));
     for(const f of items.filter(f => footSquare(f.type))){
-      const free = (b, inside) => !placed.some(o => boxesHit(b, o)) && (!inside || !e || boxInside(b, e.points));
+      const free = (b, inside) => !placed.some(o => rectsHit(b, o)) && (!inside || !e || rectsInside(b, e.points));
       let at = null;
       for(const inside of [true, false]){ for(const [dx, dy] of offs) if(free(boxAt(f, f.x + dx, f.y + dy), inside)){ at = [f.x + dx, f.y + dy]; break; } if(at) break; }
       if(at){ f.x = at[0]; f.y = at[1]; }
@@ -429,7 +482,7 @@ function waterProblem(pts, e, skip, cost, over){
   if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";
   if(area(pts) < WATER.minArea) return `Too small. Water needs at least ${WATER.minArea} m².`;
   if(!over && waterOf(e).some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
-  if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && boxHitsPoly(footBox(f, e), pts))) return "It overlaps a rock, grove or shelter.";
+  if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && rectsHitPoly(footRects(f, e), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -445,7 +498,7 @@ function parkWaterProblem(pts, skip, cost, over){
   if(state.paths.some(p => !isBridge(p) && lineShapeDist(p.points, pts) < halfWidth(p))) return "It runs into a path. Only a wooden bridge can cross water.";
   if(!over && parkWater().some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
-  if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && boxHitsPoly(footBox(f, null), pts))) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && !LAND[f.type].wet && rectsHitPoly(footRects(f, null), pts))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(inPoly(state.gate[0], state.gate[1], pts) || distToEdge(state.gate[0], state.gate[1], pts) < 9) return "Keep clear of the entrance.";
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -569,14 +622,14 @@ const waterById = id => { for(const e of state.exhibits) for(const w of waterOf(
 // For an exhibit or building outline: water, plants, rocks and statues, and open fences
 function shapeHitsLandscape(pts){
   if(parkWater().some(w => shapesOverlap(pts, w.points) || shapesOverlap(w.points, pts))) return "It's in the water.";
-  if(decorOf().some(f => LAND[f.type] && boxHitsPoly(footBox(f, null), pts))) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && rectsHitPoly(footRects(f, null), pts))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(parkFences().some(l => lineEntersShape(l.points, pts))) return "A fence runs through it.";
   return null;
 }
 // For a path hw meters either side of its line. Only a bridge crosses water.
 function lineHitsLandscape(pts, hw, bridge){
   if(!bridge && parkWater().some(w => lineShapeDist(pts, w.points) < hw)) return "Paths can't cross water. Draw a wooden bridge over it.";
-  if(decorOf().some(f => LAND[f.type] && lineHitsBox(footBox(f, null), pts, hw))) return "It runs into a plant, rock or statue. Bulldoze it first.";
+  if(decorOf().some(f => LAND[f.type] && rectsHitLine(footRects(f, null), pts, hw))) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(parkFences().some(l => linesCross(l.points, pts) || lineLineDist(l.points, pts) < hw - .3)) return "It runs into a fence.";
   return null;
 }
@@ -594,7 +647,7 @@ function fenceProblem(pts, barrier, free){
   if(state.buildings.some(b => lineEntersShape(pts, b.points) || lineShapeDist(pts, b.points) < .3)) return "It runs into a building.";
   if(state.paths.some(p => linesCross(pts, p.points) || lineLineDist(pts, p.points) < halfWidth(p) - .3)) return "It runs into a path.";
   if(parkWater().some(w => lineShapeDist(pts, w.points) < .3)) return "It runs into water.";
-  if(decorOf().some(f => LAND[f.type] && lineHitsBox(footBox(f, null), pts))) return "It runs into a plant, rock or statue.";
+  if(decorOf().some(f => LAND[f.type] && rectsHitLine(footRects(f, null), pts))) return "It runs into a plant, rock or statue.";
   const cost = fenceLineCost(pts, barrier);
   if(!free && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
@@ -714,13 +767,13 @@ function landFit(e, key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  const box = footBoxAt(key, pic, biome || (ROCK_TYPES.includes(key) ? biomeOf(e) : null), x, y);
-  if(!boxInside(box, e.points)) return "Keep it inside the fence.";
-  if(landOf(e).some(f => f !== skip && LAND[f.type] && boxesHit(box, footBox(f, e)))) return "It overlaps something already there.";
-  if(!t.wet && waterOf(e).some(w => boxHitsPoly(box, w.points))) return "It's in the water.";
+  const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? biomeOf(e) : null), x, y);
+  if(!rectsInside(box, e.points)) return "Keep it inside the fence.";
+  if(landOf(e).some(f => f !== skip && LAND[f.type] && rectsHit(box, footRects(f, e)))) return "It overlaps something already there.";
+  if(!t.wet && waterOf(e).some(w => rectsHitPoly(box, w.points))) return "It's in the water.";
   if(t.aquatic && !waterOf(e).some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Place it in the exhibit's water.`;
-  if(state.buildings.some(b => b.exhibitId === e.id && boxHitsPoly(box, b.points))) return "It overlaps a viewing platform.";
-  if(e.gate && boxPointDist(box, e.gate[0], e.gate[1]) < 3) return "Keep clear of the gate.";
+  if(state.buildings.some(b => b.exhibitId === e.id && rectsHitPoly(box, b.points))) return "It overlaps a viewing platform.";
+  if(e.gate && rectsDist(box, e.gate[0], e.gate[1]) < 3) return "Keep clear of the gate.";
   if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
   return null;
 }
@@ -754,15 +807,15 @@ function decorFit(key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
-  const box = footBoxAt(key, pic, biome || (ROCK_TYPES.includes(key) ? parkBiome() : null), x, y);
-  if(!insidePlot(boxPts(box), true)) return "Keep it inside the park boundary.";
-  if(state.exhibits.some(o => boxHitsPoly(box, o.points))) return "Keep it clear of exhibit fences.";
-  if(state.buildings.some(b => boxHitsPoly(box, b.points))) return "It overlaps a building.";
-  if(state.paths.some(p => !p.d && lineHitsBox(box, p.points, halfWidth(p))) || boxOnChunk(box)) return "It's on a path.";
-  if(boxPointDist(box, state.gate[0], state.gate[1]) < 9) return "Keep clear of the entrance.";
-  if(parkFences().some(l => lineHitsBox(box, l.points))) return "It's on a fence.";
-  if(decorOf().some(f => f !== skip && LAND[f.type] && boxesHit(box, footBox(f, null)))) return "It overlaps something already there.";
-  const wet = parkWater().find(w => boxHitsPoly(box, w.points));
+  const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? parkBiome() : null), x, y);
+  if(!box.every(b => insidePlot(boxPts(b), true))) return "Keep it inside the park boundary.";
+  if(state.exhibits.some(o => rectsHitPoly(box, o.points))) return "Keep it clear of exhibit fences.";
+  if(state.buildings.some(b => rectsHitPoly(box, b.points))) return "It overlaps a building.";
+  if(state.paths.some(p => !p.d && rectsHitLine(box, p.points, halfWidth(p))) || rectsOnChunk(box)) return "It's on a path.";
+  if(rectsDist(box, state.gate[0], state.gate[1]) < 9) return "Keep clear of the entrance.";
+  if(parkFences().some(l => rectsHitLine(box, l.points))) return "It's on a fence.";
+  if(decorOf().some(f => f !== skip && LAND[f.type] && rectsHit(box, footRects(f, null)))) return "It overlaps something already there.";
+  const wet = parkWater().find(w => rectsHitPoly(box, w.points));
   if(t.aquatic && !parkWater().some(w => inPoly(x, y, w.points))) return `${t.label} only grows in water. Draw a pond first, then place it in the water.`;
   if(wet && !t.wet) return "It's in the water.";
   return null;

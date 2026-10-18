@@ -57,7 +57,7 @@ function pathCtx(){
     ex: state.exhibits.map(e => ({...box(e.points), name:e.name})),
     bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath).map(b => box(b.points)),
     water: parkWater().map(w => box(w.points)),
-    decor: decorOf().filter(f => LAND[f.type]).map(f => footBox(f, null)),
+    decor: decorOf().filter(f => LAND[f.type]).flatMap(f => footRects(f, null)),
     lines: (state.fences || []).map(l => l.points),
     diag
   };

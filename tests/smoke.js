@@ -1591,16 +1591,43 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // square footprints (S47): plants and rocks take whole-cell squares inside their size range, sides from their own pictures
     { const rng = FOOT.range, sizes = [], bad = [];
       for(const [k, t] of Object.entries(LAND)){ if(!t.flora || t.vivToy) continue; const r = rng[t.size]; if(!(Number.isInteger(t.footSide) && t.footSide >= r[0] && t.footSide <= r[1])) bad.push(k); sizes.push(t.footSide); }
-      for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_SIDE[type])) for(const v of l) if(!(Number.isInteger(v) && v >= rng[type][0] && v <= rng[type][1])) bad.push(type + b);
+      for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_FOOT[type])) for(const v of l) if(!(Number.isInteger(v.w) && v.w >= 1 && v.rects.length >= 1 && v.rects.length <= 5 && v.rects.every(q => q.every(c => Number.isInteger(c * 2)) && q[3] <= 0 && q[2] > q[0] && q[3] > q[1]))) bad.push(type + b);
       out.footWithinRange = bad.length === 0 && sizes.length > 100;
-      out.footVaries = new Set(Object.values(ROCK_SIDE.rock).flat()).size > 1 && new Set(PLANTS_OF.Permian.scrubland.concat(PLANTS_OF.Jurassic.tropical, PLANTS_OF.Cretaceous.temperate).map(k => LAND[k].footSide)).size > 2;
+      out.footVaries = new Set(Object.values(ROCK_FOOT.rock).flat().map(v => v.rects.length + ":" + v.w + ":" + boundsOf(v.rects).join())).size > 1 && new Set(PLANTS_OF.Permian.scrubland.concat(PLANTS_OF.Jurassic.tropical, PLANTS_OF.Cretaceous.temperate).map(k => LAND[k].footSide)).size > 2;
       // a rock's odd sides center on a cell, even on a grid corner, so its square covers whole cells; a pictured plant's box is its base width by a share of it deep, on half meters
       let whole = true;
       for(const key of ["rock", "boulder"]) for(const [x, y] of [[10.3, 20.8], [11, 21], [12.5, 7.49]]){
         const [sx, sy] = footSnap(key, 0, "desert", x, y), b = footBoxAt(key, 0, "desert", sx, sy);
-        whole = whole && b.every(v => Number.isInteger(v)) && b[2] - b[0] === b[3] - b[1];
+        whole = whole && b.every(v => Number.isInteger(v)) && footRectsAt(key, 0, "desert", sx, sy).every(q => q.every(v => Number.isInteger(v)));
       }
+      // a rock takes the ground its picture covers, not a square: a tall boulder is taller than wide, a wide rock wider, every cell it takes is mostly under the silhouette, and the tap shape is still the silhouette
+      out.footRockShape = (() => { const all = [];
+        for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_FOOT[type])) l.forEach((v, i) => all.push({type, b, i, v, name:`${type}-${b}-${i + 1}`, bb:boundsOf(v.rects)}));
+        const tall = all.some(o => o.bb[3] - o.bb[1] > o.bb[2] - o.bb[0] + 1), wide = all.some(o => o.bb[2] - o.bb[0] > o.bb[3] - o.bb[1] + 1), notSquare = all.filter(o => o.v.rects.length > 1).length > 3;
+        const cover = all.every(o => { const h = SPRITE_HIT[o.name]; if(!h) return true; const area = o.v.rects.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), sil = h[4].split(",").reduce((n, b) => { if(!b) return n; const [a, z] = b.split("-").map(Number); return n + (z - a + 1) * 4 * ROCK_MPP * ROCK_MPP; }, 0); return area >= sil * .5 && area <= sil * 1.6; });
+        const tap = all.every(o => !SPRITE_HIT[o.name] || /^M/.test(spriteHitPath(o.name, 0, 0, ROCK_MPP)));
+        return tall && wide && notSquare && cover && tap; })();
+      // rects are tested one by one: a cell in a rock's notch is free ground, the cells it covers are not, a flipped rock takes the same ground as its ghost did, and an animal walks round each rect
+      out.footRockRects = (() => { const m0 = state.money, land0 = gx.land, biome = "desert"; state.money = 1e6; gx.land = []; gx.biome = biome;
+        try {
+          const pic = ROCK_FOOT.boulder[biome].findIndex(v => v.rects.length > 1); if(pic < 0) return false;
+          const [sx, sy] = footSnap("boulder", pic, biome, 120, 120), R = footRectsAt("boulder", pic, biome, sx, sy), bb = boundsOf(R);
+          const f = placeLand(gx, "boulder", sx, sy, biome, pic);
+          const same = [0, 1, 2, 3, 4, 5].every(n => { f.id = "l-flip" + n; return JSON.stringify(footRects(f, gx)) === JSON.stringify(R); });
+          const cell = (x, y) => [x, y, x + 1, y + 1], notch = [];
+          for(let x = bb[0]; x < bb[2]; x++) for(let y = bb[1]; y < bb[3]; y++) if(!rectsHit([cell(x, y)], R)) notch.push([x, y]);
+          LAND["t-one"] = {label:"One cell", price:0, r:.5, footSide:1, color:"#000", flora:"cenozoic", size:"small"};   // a stand-in that takes a single cell
+          let open, blocked;
+          try {
+            const at = (x, y) => landFit(gx, "t-one", ...footSnap("t-one", null, null, x + .5, y + .5), null, null);
+            open = notch.every(([x, y]) => at(x, y) === null);
+            blocked = R.every(q => at(q[0], q[1]) === "It overlaps something already there.");
+          } finally { delete LAND["t-one"]; }
+          const obs = walkArea({r:1}, gx).obs;
+          return same && notch.length > 0 && open && blocked && obs.length === R.length;
+        } finally { gx.land = land0; state.money = m0; } })();
       out.footCoversWholeCells = whole;
+      out.footMediumPlants = FOOT.range.medium.join() === "2,4" && FOOT.plain.medium === 3 && Object.values(LAND).filter(t => t.flora && t.size === "medium" && !t.vivToy).every(t => t.footSide >= 2 && t.footSide <= 4);   // groves of medium plants sit closer
       out.footPlantBase = (() => { let ok = true, thin = false;
         for(const key of FOOT.rect) for(const [x, y] of [[10.3, 20.8], [11, 21], [12.5, 7.49]]){
           const t = LAND[key], [sx, sy] = footSnap(key, 0, null, x, y), b = footBoxAt(key, 0, null, sx, sy);
