@@ -106,13 +106,20 @@ The Park Plants and Quaternary plants lists in the build menu already show each 
 
 ### 5. Water
 
-Wetland shows the whole pattern. For a new biome:
+Water has two art styles. **Wetland uses the tile style** (the model); the other biomes still use the older textured tile, and moving one over is the steps below.
 
-- Generate `sprites/water/<biome>.png` with `tools/pixelwater_flat.py` (add a function and a save line; the wetland one is the model). 144 px, opaque, same 2x2 wash of two tones plus ripple dashes, glints and flecks. Pick the base color to read as that biome's water, darker than the ground but not black so animals stay readable.
-- Add `<pattern id="w-<biome>" ...>` next to the others in `index.html`, same form as `w-wetland`.
-- **The one code change:** `waterSvg` in `js/landscape.js` has the wetland bank colors hard-coded (`#6A8358` damp outer ring, `#566648` mud band, `#7FAA9C` lit rim, `#4A7872` dark rim). Change `WATER_TEX` from `{wetland:1}` to an object of per-biome colors, for example `{wetland:{damp:"#6A8358", mud:"#566648", lit:"#7FAA9C", dark:"#4A7872"}, ...}`, and have `waterSvg` read the biome's entry for those four colors. Keep the `waterMask` logic as it is. Re-test wetland after (nothing should change).
-- Biome ideas: desert, a clear turquoise oasis with pale sandy banks and a very faint algae speck; tropical, clear blue-green with bright glints and dark leaf-litter mud; grassland, a murky brown-green river with silt; temperate, a blue-green pond; boreal, cold dark blue with moss banks; tundra, pale glacial blue-grey with an ice-white rim instead of mud and a little snow-dust on the bank; scrubland, a flat tan-grey brackish pool with a crusty salt-pale bank.
-- Also do the shoreline fully on the grid. The mud bank adds about 3 px of ground-colored margin around every pond (a small visual enlargement; accepted).
+**Tile style** (wetland). Water is drawn as 1 m cells (8 x 8 px, 0.125 m a pixel), the same way `GROUND_TILES` does ground:
+
+- `sprites/water/<biome>-1.png` is the plain tile, one solid color. Then the `detail` tiles (a mark like a reed clump), then the `glint` tiles of the shimmer. File numbers run in that order: wetland is `-1` plain, `-2` clump, `-3` to `-5` glints (a sparkle that moves left to right, never mirrored).
+- Add the biome to `WATER_TILES` in `js/data.js`: `{plain, detail, share, turn, glint, frames, fps, waves}`. `share` is the part of each 5 m chunk's cells that take a detail tile (wetland .075, so 1 or 2 per chunk). `turn:false` mirrors but never turns. `waves` is a list of `[period in frames, wavelength in cells]`; each wavelength must divide 100, and the loop is the least common multiple of the periods (wetland 24 frames). Leave `waves` out for glints at random starts. The comment above `WATER_TILES` explains each field.
+- In `index.html` change the biome's `<pattern id="w-<biome>">` to `width="1" height="1"` and its image to `sprites/water/<biome>-1.png` at 1 x 1 (the code resizes it to the 100 m pattern at load).
+- In `WATER_TEX` (`js/landscape.js`) give the biome `{shore:"#hex", shoreW:2, lit:..., dark:...}` and no `damp` or `mud`. `shore` is the bank line's color, `shoreW` its width in px; `lit` and `dark` are still used by animals' waterlines and the park map. `softenShore` then stair-steps the edge and rounds the corners with no extra work (tune `SHORE_NOISE`, `SHORE_ERODE`, `SHORE_CHIP`). The irregular coast is opt-in: only a biome with `shore` gets it (the older textured biomes keep straight lit and dark rims until moved over). It is drawing only and only removes water pixels, never adds any, by 0 to 2 px; keep it at 2 so a shore can't get near the 0.5 m margin water keeps from fences. `SHORE_NOISE`, `SHORE_ERODE` and `SHORE_CHIP` are shared by every biome, so a different wobble for one biome needs a per-biome override in its `WATER_TEX` entry.
+- Delete the old `sprites/water/<biome>.png` and its entry in `tools/pixelwater_flat.py`. Run `python3 tools/packsprites.py` and commit `js/spritepack.js`.
+- Check it with Playwright: lay water boxes with `watersSvg([{kind:"<biome>", points:[...]}], "<biome>")` into a page, look at a few frames and at a join with another kind (no gap), and run `node tests/smoke.js`.
+
+**Older textured style** (every other biome today). `sprites/water/<biome>.png` is a 144 px opaque tile from `tools/pixelwater_flat.py` (a function or `PAL` entry plus a save line). The `<pattern id="w-<biome>" ...>` in `index.html` is 18 x 18, and the biome has a `WATER_TEX` entry with `damp`, `mud`, `lit` and `dark` bank colors (the mud bank adds about 3 px of ground-colored margin around every pond; accepted). Pick a base color that reads as the biome's water, darker than the ground but not black so animals stay readable.
+
+Biome ideas: desert, a clear turquoise oasis with pale sandy banks; tropical, clear blue-green with bright glints and dark leaf-litter mud; grassland, a murky brown-green river with silt; temperate, a blue-green pond; boreal, cold dark blue with moss banks; tundra, pale glacial blue-grey with an ice-white rim and a little snow-dust on the bank (tundra's floes would be its detail tiles); scrubland, a flat tan-grey brackish pool with a crusty salt-pale bank.
 
 ## Names
 
@@ -146,5 +153,5 @@ Biome notes for the common-name pass (a suggestion, adjust as you see fit): dese
 ## Known loose ends (not part of the brief, but you will notice them)
 
 - Wetland's Pecopteris and Cladophlebis are very similar; the Weeping Willow and Salix are close cousins on purpose.
-- The `WATER_TEX` change above is done (wetland and scrubland entries in `js/landscape.js`); a new biome adds an entry and a palette in `tools/pixelwater_flat.py`'s `PAL`.
+- `WATER_TEX` has an entry for every biome in `js/landscape.js`; wetland is on the tile style (`WATER_TILES`), the rest on the older textured tile (a new one adds a `PAL` entry in `tools/pixelwater_flat.py`).
 - Lystrosaurus `rest:7, restMs:260, holdMs:1400` is in `SPRITES` but there is no matching code in git; it lives in the published game. Someone should find where that work went.
