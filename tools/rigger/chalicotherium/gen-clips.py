@@ -20,8 +20,18 @@ W0 = R.worlds({})
 for th, sh, ft, off, fore in LEGS: STAND[th] = (W0[ft][4], W0[ft][5])   # the ankle's world place standing
 short = [0.0]
 
-def limb(p, th, sh, ft, x, y, fr=0.0, knee=1):
-  short[0] = max(short[0], R.leg(p, th, sh, ft, (x, y), fr, knee))
+def elbow_back(p, th, sh, ft):
+  """how far the elbow sits behind the shoulder-to-wrist line (px; negative means it points forward, which hyperextends an arm)"""
+  W = R.worlds(p); s, e, h = W[th], W[sh], W[ft]
+  dx, dy = h[4] - s[4], h[5] - s[5]
+  return ((e[4] - s[4])*(-dy) + (e[5] - s[5])*dx)/math.hypot(dx, dy)
+def limb(p, th, sh, ft, x, y, fr=0.0, knee=1, arm=False):
+  """an arm's elbow always points back: the solver's default side differs from one arm's art to the other's, so try both and keep the one that does"""
+  q = dict(p); best = None
+  for k in ((1, -1) if arm else (knee,)):
+    t = dict(q); sf = R.leg(t, th, sh, ft, (x, y), fr, k)
+    if not arm or elbow_back(t, th, sh, ft) > 0: best = (t, sf); break
+  p.update(best[0]); short[0] = max(short[0], best[1])
 
 # ---- walk
 frames = []
@@ -42,7 +52,7 @@ for i in range(K['N']):
     if fl < K['ds']: x = ax + S/2 - S*fl/K['ds']; lift = 0.0; fr = 0.0
     else:
       t = (fl - K['ds'])/(1 - K['ds']); x = ax - S/2 + S*sm(t); lift = (K['liftF'] if fore else K['lift'])*math.sin(math.pi*t); fr = (K['curl'] if fore else -9)*math.sin(math.pi*t)   # hind toes up, hand fingers hanging in the swing
-    limb(p, th, sh, ft, x, ay - lift, fr, -1 if fore else 1)
+    limb(p, th, sh, ft, x, ay - lift, fr, 1, bool(fore))
   frames.append(p)
 walk = {'name': 'walk', 'fps': K['fps'], 'frames': unwrap(frames)}
 print('walk: %d frames; leg reach short by up to %.2f px' % (len(frames), short[0]))
