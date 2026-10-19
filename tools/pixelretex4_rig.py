@@ -16,10 +16,10 @@ SPECIES = {
         "dir": "allosaurus", "files": ["allosaurus-rig.json", "allosaurus-clips.json"],
         "map": {"#b08756": "base", "#b58e60": "base", "#9e774a": "far", "#8a6740": "belly", "#892929": "mark", "#952d2d": "mark", "#c3c3c3": "band", "#d3d3d3": "band",
                 "#bf8a5a": "base"},
-        "new": {"base": "#b98e5a", "hi": "#d0a874", "lo": "#94693f", "scale": "#a97f4d", "far": "#9a7447",
+        "new": {"base": "#b98e5a", "hi": "#d4ae7a", "hi2": "#c79c68", "lo": "#8f643c", "scale": "#a97f4d", "far": "#9a7447",
                 "belly": "#d9bf8a", "bellyhi": "#e8d3a3", "bellylo": "#b8985f", "rib": "#c7a96f",
                 "mark": "#8e2b2b", "markhi": "#b04438", "marklo": "#681d22", "band": "#cfcbbd", "bandhi": "#e6e3d6", "bandlo": "#a6a294"},
-        "scale": True, "ribs": True, "soft": True,
+        "scale": True, "ribs": True, "soft": True, "deep": True, "deephead": True,
     },
     "dryo": {
         "dir": "dryosaurus", "files": ["dryosaurus-rig.json", "dryosaurus-clips.json"],
@@ -86,9 +86,10 @@ def shade(grid, name, sp):
                     elif lf is None: n = "hi"
                     elif (rt is None or dn is None) and not sp.get("soft"): n = "lo"
                 elif jaw: n = "lo" if dn is None else "hi" if up is None else c
-                elif top and not head and top[y][x] == 0: n = "hi"                  # depth shading: two lit rows along the back
-                elif top and not head and top[y][x] == 1 and dn is not None: n = "hi2"
-                elif top and not head and (bot[y][x] == 0 or (bot[y][x] == 1 and dn == "base" and g(x, y + 2) == "belly")): n = "lo"   # shade where the flank turns under
+                elif top and (sp.get("deephead") or not head) and top[y][x] == 0: n = "hi"                  # depth shading: two lit rows along the back
+                elif top and (sp.get("deephead") or not head) and top[y][x] == 1 and dn is not None: n = "hi2"
+                elif top and (sp.get("deephead") or not head) and (bot[y][x] == 0 or (bot[y][x] == 1 and dn == "base" and g(x, y + 2) == "belly")): n = "lo"   # shade where the flank turns under
+                elif top and not head and bot[y][x] == 2 and top[y][x] + bot[y][x] >= 8: n = "scale"   # a mid-tone band on a deep flank
                 elif up is None: n = "hi"
                 elif sp.get("soft") and head: n = c
                 elif dn is None or (head and (rt is None or dn == "belly")): n = "lo"
