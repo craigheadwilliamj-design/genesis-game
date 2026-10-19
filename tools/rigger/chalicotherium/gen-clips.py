@@ -1,7 +1,7 @@
 # Writes the Chalicotherium walk and rest clips into a rigger project (parts and the idle clips are left alone).
 #   python3 tools/rigger/chalicotherium/gen-clips.py chalicotherium-rig.json chalicotherium-clips.json ['{"S":9,"crouch":2.5}']
-# Faces right. All four limbs are 2-bone IK (rigkit.py): a lateral-sequence walk (near hind, near fore, far hind, far fore, a quarter
-# cycle apart), each foot planted flat and sliding back at body speed, then swung forward lifted. The body crouches a little so the
+# Faces right. All four limbs are 2-bone IK (rigkit.py): a diagonal-sequence walk like an ape's (near hind, far fore, far hind, near fore, a quarter
+# cycle apart); the forelimbs are arms: the elbow bends back (knee=-1), the hand swings forward lifted with the fingers hanging, and plants as a knuckle-walk, each foot planted flat and sliding back at body speed, then swung forward lifted. The body crouches a little so the
 # straight standing legs have reach to spare, rises over the planted feet, rocks, and the neck and head swing against it.
 # Rest: lies down on its belly, hind feet drawn under, forelegs folded forward, then the head sinks and it sleeps.
 # SHEETS=<dir> also writes contact sheets and GIFs of both clips there.
@@ -9,19 +9,19 @@ import json, math, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'carcharodontosaurus'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from rigkit import Rig, rd, sm, unwrap
-K = dict(N=12, fps=8, ds=.66, S=13.5, SF=12.0, crouch=3.5, lift=3.0, bob=.7, pitch=.7, neck=1.6, ear=6.0,
+K = dict(N=12, fps=8, ds=.66, S=13.5, SF=12.0, crouch=3.5, lift=3.0, liftF=5.5, curl=22.0, bob=.7, pitch=.7, neck=1.6, ear=6.0,
          lie=9, drop=18.0, fps_rest=6, hind_in=9.0, fore_out=15.0, head_down=24.0)
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); R = Rig(P)
 BODY, NECK, HEAD, JAW, EAR = 'n320', 'n312', 'n318', 'n314', 'n316'
-LEGS = [('n298', 'n296', 'n294', 0, 0), ('n310', 'n308', 'n306', .25, 1), ('n292', 'n290', 'n288', .5, 0), ('n304', 'n302', 'n300', .75, 1)]   # thigh, shin, foot, phase, 1 for a foreleg
+LEGS = [('n298', 'n296', 'n294', 0, 0), ('n304', 'n302', 'n300', .25, 1), ('n292', 'n290', 'n288', .5, 0), ('n310', 'n308', 'n306', .75, 1)]   # thigh, shin, foot, phase, 1 for a foreleg
 STAND = {}
 W0 = R.worlds({})
 for th, sh, ft, off, fore in LEGS: STAND[th] = (W0[ft][4], W0[ft][5])   # the ankle's world place standing
 short = [0.0]
 
-def limb(p, th, sh, ft, x, y, fr=0.0):
-  short[0] = max(short[0], R.leg(p, th, sh, ft, (x, y), fr))
+def limb(p, th, sh, ft, x, y, fr=0.0, knee=1):
+  short[0] = max(short[0], R.leg(p, th, sh, ft, (x, y), fr, knee))
 
 # ---- walk
 frames = []
@@ -41,8 +41,8 @@ for i in range(K['N']):
     fl = (f + off) % 1
     if fl < K['ds']: x = ax + S/2 - S*fl/K['ds']; lift = 0.0; fr = 0.0
     else:
-      t = (fl - K['ds'])/(1 - K['ds']); x = ax - S/2 + S*sm(t); lift = K['lift']*math.sin(math.pi*t); fr = -9*math.sin(math.pi*t)   # toes up in the swing
-    limb(p, th, sh, ft, x, ay - lift, fr)
+      t = (fl - K['ds'])/(1 - K['ds']); x = ax - S/2 + S*sm(t); lift = (K['liftF'] if fore else K['lift'])*math.sin(math.pi*t); fr = (K['curl'] if fore else -9)*math.sin(math.pi*t)   # hind toes up, hand fingers hanging in the swing
+    limb(p, th, sh, ft, x, ay - lift, fr, -1 if fore else 1)
   frames.append(p)
 walk = {'name': 'walk', 'fps': K['fps'], 'frames': unwrap(frames)}
 print('walk: %d frames; leg reach short by up to %.2f px' % (len(frames), short[0]))
