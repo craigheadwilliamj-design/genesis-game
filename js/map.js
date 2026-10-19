@@ -1888,7 +1888,7 @@ function animateAnimals(dt){
     if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
     if(d < .3){ h.wp = h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
-    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * dt);
+    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * dt);
     h.x += dx/d * step; h.y += dy/d * step;
     swimCheck(h, e);
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
