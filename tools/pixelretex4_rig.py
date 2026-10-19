@@ -19,7 +19,7 @@ SPECIES = {
         "new": {"base": "#b98e5a", "hi": "#d4ae7a", "hi2": "#c79c68", "lo": "#8f643c", "scale": "#a97f4d", "far": "#9a7447",
                 "belly": "#d9bf8a", "bellyhi": "#e8d3a3", "bellylo": "#b8985f", "rib": "#c7a96f",
                 "mark": "#8e2b2b", "markhi": "#b04438", "marklo": "#681d22", "band": "#cfcbbd", "bandhi": "#e6e3d6", "bandlo": "#a6a294"},
-        "scale": True, "ribs": True, "soft": True, "deep": True, "deephead": True,
+        "scale": True, "ribs": True, "soft": True, "deep": True, "deephead": True, "deepthigh": True,
     },
     "dryo": {
         "dir": "dryosaurus", "files": ["dryosaurus-rig.json", "dryosaurus-clips.json"],
@@ -81,7 +81,17 @@ def shade(grid, name, sp):
                 if up is None or (up != c and up in ("base", "belly")): n = c + "hi"
                 elif dn is None or (dn != c and dn in ("base", "belly")): n = c + "lo"
             elif c == "base":
-                if limb:
+                if limb and sp.get("deepthigh") and "THIGH" in name:
+                    l = r = 0                                                  # a big thigh: two lit columns left, shade down the right, a muscle crease; the top and knee ends stay as they are so no seam shows
+                    while g(x - l - 1, y) is not None: l += 1
+                    while g(x + r + 1, y) is not None: r += 1
+                    wide = l + r + 1 >= 5
+                    if l == 0: n = "hi"
+                    elif l == 1 and wide: n = "hi2"
+                    elif r == 0: n = "lo"
+                    elif r == 1 and wide: n = "scale"
+                    elif wide and l >= 2 and r >= 2 and y - 4 >= 0 and (x - 2) == (y - 4) // 2 and 4 <= y <= 11: n = "scale"
+                elif limb:
                     if sp.get("soft") and ("THIGH" not in name or sp.get("flatthigh")): pass   # a lit edge on a thin limb reads as a line down the leg
                     elif lf is None: n = "hi"
                     elif (rt is None or dn is None) and not sp.get("soft"): n = "lo"
