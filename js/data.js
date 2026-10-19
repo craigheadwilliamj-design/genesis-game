@@ -1812,7 +1812,8 @@ const GROUND_TILES = {grassland:{plain:1, detail:2, share:.1, still:[2]}, boreal
 // A biome not listed keeps its sprites/water/<biome>.png tile.
 const WATER_TILES = {
   wetland:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
-  fern:{plain:1, detail:1, share:.075, turn:false, glint:2, frames:8, fps:4, waves:[[12, 10], [24, 25]]}};
+  fern:{plain:1, detail:1, share:.075, turn:false, glint:2, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
+  scrubland:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]}};
 const ROCK_SPRITES = {
   desert:{
     boulder:[[72, 61], [36, 60], [76, 63], [53, 64]],
