@@ -1604,7 +1604,8 @@ function walkClear(a, b, A){
     if(obsDist(o, a[0], a[1]) < o.c || obsDist(o, b[0], b[1]) < o.c) continue;
     if(segBoxDist(a, b, [o.x - o.hx, o.y - o.hy, o.x + o.hx, o.y + o.hy]) < o.c) return false;
   }
-  // not across a pond (one it's standing in doesn't count, so it can wade out)
+  // not into or across a pond (one it's standing in doesn't count, so it can wade out)
+  if(A.wat.length && !inWater(a, A) && inWater(b, A)) return false;
   if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length])) return false;
   for(const t of [.25, .5, .75]) if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false;
   return true;
