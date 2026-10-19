@@ -900,7 +900,7 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 // on all four edges instead of the lit and dark rims (`shoreW` px wide, default 1), and with no `damp` or `mud` has no bank
 const WATER_TEX = {
   wetland:  {shore:"#827B24", shoreW:2, lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
-  scrubland:{damp:"#A8935A", mud:"#D9D0AE", lit:"#B4B8A0", dark:"#6C7358"},
+  scrubland:{shore:"#B59A6D", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
   desert:   {damp:"#CDB178", mud:"#B89A60", lit:"#7CCFC0", dark:"#2C7C86"},
