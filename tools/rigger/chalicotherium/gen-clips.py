@@ -9,7 +9,7 @@ import json, math, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'carcharodontosaurus'))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 from rigkit import Rig, rd, sm, unwrap
-K = dict(N=12, fps=8, ds=.66, S=9.0, SF=8.0, crouch=2.5, lift=3.0, bob=.7, pitch=.7, neck=1.6, ear=6.0,
+K = dict(N=12, fps=8, ds=.66, S=13.5, SF=12.0, crouch=3.5, lift=3.0, bob=.7, pitch=.7, neck=1.6, ear=6.0,
          lie=9, drop=18.0, fps_rest=6, hind_in=9.0, fore_out=15.0, head_down=24.0)
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); R = Rig(P)
