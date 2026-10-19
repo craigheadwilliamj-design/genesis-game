@@ -369,7 +369,7 @@ def arctostaphylos():   # large: manzanita, a few smooth red-brown crooked limbs
     return sp
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("dev-scrubland-small", hostinella), ("dev-scrubland-medium", sawdonia), ("dev-scrubland-large", drepanophycus),
+for key, fn in (("dev-scrubland-medium", sawdonia), ("dev-scrubland-large", drepanophycus),
                 ("jur-scrubland-small", otozamites), ("jur-scrubland-medium", ptilophyllum), ("jur-scrubland-large", brachyphyllum),
                 ("cre-scrubland-small", ruffordia), ("cre-scrubland-medium", pseudofrenelopsis), ("cre-scrubland-large", eucalyptophyllum),
                 ("pal-scrubland-small", dodonaea), ("pal-scrubland-medium", acacia), ("pal-scrubland-large", eucalyptus),

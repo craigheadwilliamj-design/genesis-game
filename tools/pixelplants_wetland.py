@@ -449,7 +449,7 @@ def q_cypress_knees():   # small: five knobbly woody knees apart from each other
     return sp
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-REG = [("dev-wetland-small", rhynia), ("dev-wetland-medium", aglaophyton), ("dev-wetland-large", pseudosporochnus),
+REG = [("dev-wetland-medium", aglaophyton), ("dev-wetland-large", pseudosporochnus),
        ("car-wetland-small", asterophyllites), ("car-wetland-medium", medullosa), ("car-wetland-large", sigillaria),
        ("jur-wetland-small", coniopteris), ("jur-wetland-medium", todites), ("jur-wetland-large", matonidium)]
 REG += [("cre-wetland-small", archaefructus), ("cre-wetland-medium", nelumbites), ("cre-wetland-large", glyptostrobus),
