@@ -24,9 +24,9 @@ SPECIES = {
     "dryo": {
         "dir": "dryosaurus", "files": ["dryosaurus-rig.json", "dryosaurus-clips.json"],
         "map": {"#2e4e3e": "base", "#223a2e": "far", "#71643c": "belly", "#3b4a33": "base"},
-        "new": {"base": "#35604a", "hi": "#4b7d62", "lo": "#25443a", "scale": "#2d5240", "far": "#244436",
-                "belly": "#7d6f44", "bellyhi": "#8d7f50", "bellylo": "#65593a", "rib": "#756839"},
-        "scale": True, "ribs": True, "soft": True, "flatthigh": True,
+        "new": {"base": "#35604a", "hi": "#5a9674", "hi2": "#46805f", "lo": "#223f30", "scale": "#2a4c3a", "far": "#244436",
+                "belly": "#8a7a4b", "bellyhi": "#a69658", "bellylo": "#5e5334", "rib": "#7a6b40"},
+        "scale": True, "ribs": True, "soft": True, "flatthigh": True, "deep": True,
     },
     "comp": {
         "dir": "compsognathus", "files": ["compsognathus-rig.json", "compsognathus-clips.json"],
@@ -50,10 +50,21 @@ SPECIES = {
     },
 }
 
+def depths(grid):
+    # how many pixels of the part sit above / below each pixel in its column (0 = the edge row), for the depth shading
+    h, w = len(grid), len(grid[0]); top = [[0] * w for _ in range(h)]; bot = [[0] * w for _ in range(h)]
+    for x in range(w):
+        for y in range(h):
+            if grid[y][x] is not None: top[y][x] = top[y - 1][x] + 1 if y and grid[y - 1][x] is not None else 0
+        for y in range(h - 1, -1, -1):
+            if grid[y][x] is not None: bot[y][x] = bot[y + 1][x] + 1 if y < h - 1 and grid[y + 1][x] is not None else 0
+    return top, bot
+
 def shade(grid, name, sp):
     h, w = len(grid), len(grid[0]); g = lambda x, y: grid[y][x] if 0 <= x < w and 0 <= y < h else None
     out = [row[:] for row in grid]
     limb = any(k in name for k in ("THIGH", "LEG", "FOREARM", "UPARM", "UP.ARM"))
+    top, bot = depths(grid) if sp.get("deep") else (None, None)
     head, jaw, tail, neck = "HEAD" in name, "JAW" in name, "TAIL" in name, "NECK" in name
     for y in range(h):
         for x in range(w):
@@ -75,6 +86,9 @@ def shade(grid, name, sp):
                     elif lf is None: n = "hi"
                     elif (rt is None or dn is None) and not sp.get("soft"): n = "lo"
                 elif jaw: n = "lo" if dn is None else "hi" if up is None else c
+                elif top and not head and top[y][x] == 0: n = "hi"                  # depth shading: two lit rows along the back
+                elif top and not head and top[y][x] == 1 and dn is not None: n = "hi2"
+                elif top and not head and (bot[y][x] == 0 or (bot[y][x] == 1 and dn == "base" and g(x, y + 2) == "belly")): n = "lo"   # shade where the flank turns under
                 elif up is None: n = "hi"
                 elif sp.get("soft") and head: n = c
                 elif dn is None or (head and (rt is None or dn == "belly")): n = "lo"
@@ -91,7 +105,7 @@ def run(key):
     # a role that has no shade of its own in NEW (e.g. "hi" on a species without one) falls back to the base color
     new = {k: H(v) for k, v in sp["new"].items()}
     for k, v in new.items():                                                      # its own colors read back to their role, so a second run gives the same result
-        base = {"hi": "base", "lo": "base", "scale": "base", "bellyhi": "belly", "bellylo": "belly", "rib": "belly"}.get(k, k)
+        base = {"hi": "base", "hi2": "base", "lo": "base", "scale": "base", "bellyhi": "belly", "bellylo": "belly", "rib": "belly"}.get(k, k)
         for suf in ("hi", "lo"):
             if base.endswith(suf) and base[:-len(suf)] in new: base = base[:-len(suf)]
         rev.setdefault(v, base)
