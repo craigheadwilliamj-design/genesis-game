@@ -1109,7 +1109,7 @@ function faceMark34(P, i, wall, m, text){
 // The Genesis restroom as one picture (sprites/bld/restroom-front.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash.
 function restroomSprite34(bl, P, on, dead, reach, line){
   const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 71 * px / TILT]);
-  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl("sprites/bld/restroom-front.png")}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" style="image-rendering:pixelated" pointer-events="none"/>`;
+  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl("sprites/bld/restroom-front.png")}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
