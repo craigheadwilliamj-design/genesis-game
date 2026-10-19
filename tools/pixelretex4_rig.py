@@ -19,14 +19,14 @@ SPECIES = {
         "new": {"base": "#b98e5a", "hi": "#d0a874", "lo": "#94693f", "scale": "#a97f4d", "far": "#9a7447",
                 "belly": "#d9bf8a", "bellyhi": "#e8d3a3", "bellylo": "#b8985f", "rib": "#c7a96f",
                 "mark": "#8e2b2b", "markhi": "#b04438", "marklo": "#681d22", "band": "#cfcbbd", "bandhi": "#e6e3d6", "bandlo": "#a6a294"},
-        "scale": True, "ribs": True,
+        "scale": True, "ribs": True, "soft": True,
     },
     "dryo": {
         "dir": "dryosaurus", "files": ["dryosaurus-rig.json", "dryosaurus-clips.json"],
         "map": {"#2e4e3e": "base", "#223a2e": "far", "#71643c": "belly", "#3b4a33": "base"},
         "new": {"base": "#35604a", "hi": "#4b7d62", "lo": "#25443a", "scale": "#2d5240", "far": "#244436",
-                "belly": "#9d8f58", "bellyhi": "#b5a76e", "bellylo": "#7a6d42", "rib": "#8f814e"},
-        "scale": True, "ribs": True,
+                "belly": "#7d6f44", "bellyhi": "#8d7f50", "bellylo": "#65593a", "rib": "#756839"},
+        "scale": True, "ribs": True, "soft": True, "flatthigh": True,
     },
     "comp": {
         "dir": "compsognathus", "files": ["compsognathus-rig.json", "compsognathus-clips.json"],
@@ -60,6 +60,8 @@ def shade(grid, name, sp):
             c = grid[y][x]
             if not isinstance(c, str) or c == "far": continue
             up, dn, lf, rt = g(x, y - 1), g(x, y + 1), g(x - 1, y), g(x + 1, y); n = c
+            if sp.get("soft"):                                                 # soft: no seams where parts meet, nothing on the jaw, the tail tip or a one-pixel run
+                if jaw or "TAIL_END" in name or (up is None and dn is None): continue
             fam = {"sailA": "sailA", "sailB": "sailB", "mark": "mark", "band": "band", "dark": "dark", "tail": "tail", "tailhi": "tailhi"}.get(c)
             if c in ("sailA", "sailB"):                                        # the sail: a lit upper left rim, a shaded lower right one
                 if up is None or lf is None: n = c + "hi"
@@ -69,10 +71,12 @@ def shade(grid, name, sp):
                 elif dn is None or (dn != c and dn in ("base", "belly")): n = c + "lo"
             elif c == "base":
                 if limb:
-                    if lf is None: n = "hi"
-                    elif rt is None or dn is None: n = "lo"
+                    if sp.get("soft") and ("THIGH" not in name or sp.get("flatthigh")): pass   # a lit edge on a thin limb reads as a line down the leg
+                    elif lf is None: n = "hi"
+                    elif (rt is None or dn is None) and not sp.get("soft"): n = "lo"
                 elif jaw: n = "lo" if dn is None else "hi" if up is None else c
                 elif up is None: n = "hi"
+                elif sp.get("soft") and head: n = c
                 elif dn is None or (head and (rt is None or dn == "belly")): n = "lo"
                 elif sp["scale"] and not head and y % 3 == 1 and ((x + 2 * (y // 3)) % 4) < 2 and up not in ("mark", "band", "dark") and dn not in ("mark", "band", "dark"): n = "scale"
             elif c == "belly":
@@ -87,11 +91,9 @@ def run(key):
     # a role that has no shade of its own in NEW (e.g. "hi" on a species without one) falls back to the base color
     new = {k: H(v) for k, v in sp["new"].items()}
     for k, v in new.items():                                                      # its own colors read back to their role, so a second run gives the same result
-        base = k
+        base = {"hi": "base", "lo": "base", "scale": "base", "bellyhi": "belly", "bellylo": "belly", "rib": "belly"}.get(k, k)
         for suf in ("hi", "lo"):
-            if k.endswith(suf) and k[:-len(suf)] in new: base = k[:-len(suf)]
-        base = {"scale": "base", "rib": "belly"}.get(base, base)
-        if base in ("bellyhi", "bellylo"): base = "belly"
+            if base.endswith(suf) and base[:-len(suf)] in new: base = base[:-len(suf)]
         rev.setdefault(v, base)
     for f in sp["files"]:
         path = os.path.join(HERE, "rigger", sp["dir"], f)
