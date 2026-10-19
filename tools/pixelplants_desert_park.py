@@ -234,5 +234,5 @@ def q_agave():   # small: a compact rounded rosette of broad blades with cream e
     return sp
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("q-mesquite", q_mesquite), ("q-sagebrush", q_sagebrush), ("q-prickly-pear", q_prickly_pear), ("q-agave", q_agave)):
+for key, fn in (("q-mesquite", q_mesquite), ):
     fn().save(f"{out}/{key}.png")

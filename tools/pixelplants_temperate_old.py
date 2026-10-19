@@ -274,7 +274,7 @@ def ginkgophyllum():   # large: a tree hung with deeply cut fan leaves, a gappy 
     return sp
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("dev-temperate-small", gosslingia), ("dev-temperate-medium", barinophyton), ("dev-temperate-large", archaeopteris),
+for key, fn in (("dev-temperate-medium", barinophyton), ("dev-temperate-large", archaeopteris),
                 ("car-temperate-small", neuropteris), ("car-temperate-medium", alethopteris), ("car-temperate-large", cordaites),
                 ("per-temperate-small", sphenobaiera), ("per-temperate-medium", rufloria), ("per-temperate-large", ginkgophyllum)):
     fn().save(f"{out}/{key}.png")

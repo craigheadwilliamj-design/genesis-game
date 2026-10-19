@@ -228,7 +228,7 @@ def q_lilac():   # medium: a many-stemmed shrub of heart-shaped leaves, upright 
 
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("qua-temperate-small", trillium), ("qua-temperate-medium", corylus), ("qua-temperate-large", tilia)):
+for key, fn in (("qua-temperate-medium", corylus), ("qua-temperate-large", tilia)):
     fn().save(f"{out}/{key}.png")
 REG = [("q-white-oak", q_white_oak), ("q-sugar-maple", q_sugar_maple), ("q-dawn-redwood", q_dawn_redwood), ("q-japanese-cherry", q_japanese_cherry),
        ("q-rose-bush", q_rose_bush), ("q-ginkgo", q_ginkgo), ("q-lilac", q_lilac)]

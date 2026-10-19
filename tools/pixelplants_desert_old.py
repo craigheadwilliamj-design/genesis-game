@@ -268,7 +268,7 @@ def pseudovoltzia():   # large: a layered, umbrella crown, a tall trunk with tie
     return sp
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/plants"
-for key, fn in (("dev-desert-small", zosterophyllum), ("dev-desert-medium", psilophyton), ("dev-desert-large", prototaxites),
+for key, fn in (("dev-desert-medium", psilophyton), ("dev-desert-large", prototaxites),
                 ("car-desert-small", sphenopteris), ("car-desert-medium", callipteris), ("car-desert-large", walchia),
                 ("per-desert-small", supaia), ("per-desert-medium", ullmannia), ("per-desert-large", pseudovoltzia)):
     fn().save(f"{out}/{key}.png")
