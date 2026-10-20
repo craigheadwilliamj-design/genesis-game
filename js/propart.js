@@ -116,10 +116,10 @@ function propArt(bl, inv, on, dead){
 }
 // Genesis path objects drawn as pictures in the restroom's style (sprites/bld/<type>-<front|back|left|right>[-full|-broken].png, made by tools/pixelbin.py and tools/pixelbench.py), picked by where the item's front looks.
 // Each view is [width, height, front]: the picture is centered across, and the bottom of its base (the third row from the bottom, above the 2 shadow rows) sits `front` m in front of the middle, scaled by k like the drawn props.
-// A bench turned end on runs back into the picture, so its side views are tall and narrow, and its front edge is the near end.
+// A bench's end-on views cheat the projection (its end profile with a short top, not two tall strips running back), standing in the middle of the footprint.
 const PROP_PICS = {
   bin:{front:[14, 21, .45], back:[14, 21, .45], left:[14, 21, .45], right:[14, 21, .45]},
-  bench:{front:[26, 16, .5], back:[26, 12, .5], left:[12, 27, 1.15], right:[12, 27, 1.15]},
+  bench:{front:[26, 16, .5], back:[26, 12, .5], left:[12, 15, .5], right:[12, 15, .5]},
 };
 function propSprite34(bl, k, st, on, dead){
   const [fx, fy] = propFront(bl), view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
