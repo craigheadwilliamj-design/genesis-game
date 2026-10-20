@@ -622,28 +622,20 @@ let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
 // Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
 const WX_SCALE = 3, WX_N = {cold:36, storm:60};
-const WX_TINT = {hot:"rgba(255,170,70,.05)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+const WX_TINT = {hot:"rgba(255,170,70,.07)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
 let wxKind = "fair", wxFlash = 0, wxNext = 0;
 function drawWeather(now){
   const k = state.weather ? state.weather.today : "fair";
-  if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxPool.length = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
+  if(k !== wxKind){ wxKind = k; $("#map").style.filter = k === "hot" ? "url(#heatWarp)" : ""; wxCan.dataset.kind = k; wxFlash = 0; wxPool.length = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
   if(k === "fair") return;
   const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
   if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
   const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
   c.clearRect(0, 0, w, h);
   c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
-  if(k === "hot"){   // heat haze: short wobbly wisps that rise off the ground and fade, scattered so no two line up
-    while(wxPool.length < 18) wxPool.push({x:Math.random() * 400, y:Math.random() * 300, len:10 + Math.random() * 16, ph:Math.random() * 6.3, life:Math.random()});
-    for(let i = 0; i < 18; i++){
-      const p = wxPool[i];
-      p.life += dt / 5;
-      if(p.life >= 1){ p.life = 0; p.x = Math.random() * w; p.y = h * (.3 + Math.random() * .7); p.len = 10 + Math.random() * 16; p.ph = Math.random() * 6.3; }
-      const a = Math.sin(p.life * Math.PI) * .13, y0 = p.y - p.life * 28;
-      c.fillStyle = `rgba(255,244,214,${a.toFixed(3)})`;
-      for(let r = 0; r < 3; r++) c.fillRect(Math.floor(p.x + Math.sin(now / 500 + p.ph + r * 1.3) * 3 - p.len / 2), Math.floor(y0) + r, Math.round(p.len * (1 - r * .25)), 1);
-    }
+  if(k === "hot"){   // the shimmer is an SVG warp on the map (#heatWarp); its noise only drifts about 8 times a second, to stay cheap
+    if(now > wxNext){ wxNext = now + 120; $("#heatNoise").setAttribute("baseFrequency", `${(.007 + .002 * Math.sin(now / 2300)).toFixed(4)} ${(.055 + .015 * Math.sin(now / 1700)).toFixed(4)}`); }
     return;
   }
   const n = WX_N[k];
