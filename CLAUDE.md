@@ -31,6 +31,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 
 ## Art direction (locked; full version in docs/art.md)
 Flat, simple, cartoony pixel art, with the Dimetrodon as reference: flat fills, no outlines, stair-stepped silhouettes, ~8 base colors each with a lighter and darker shade, structured texture (never noise or dithering), light from the top left, 0.13 m a pixel everywhere. Exhibits are 2D with upright side-on sprites; buildings are 3/4 front-facing, snapped by `flatSnap34`. Don't render animals from 3D models. Check pixels at game zoom and zoomed in.
+Buildings, props and paths now follow the **park style**, with the Genesis restroom as the template: the shared palette in `tools/genesis_style.py`, dark edges tinted to each material (not black), a pixel generator script per item, four views (things face north, south, east or west only). Read "Park style" in docs/art.md before drawing any of them.
 
 ## Rules
 - Escape user text with `esc()` before putting it in HTML. Toasts take plain text (textContent) unless the third `html` arg is used.
