@@ -1114,7 +1114,7 @@ function faceMark34(P, i, wall, m, text){
   }
   return s;
 }
-// The Genesis restroom as one picture (sprites/bld/restroom-<front|back|left|right>.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash. The picture is picked by where the door looks: down the screen front, up back, left or right the side with the door at that end.
+// The Genesis restroom as one picture (sprites/bld/restroom-<front|back|left|right>.png, 80 x 80 px at ROCK_MPP): the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash. The picture is picked by where the door looks: down the screen front, up back, left or right the side with the door at that end.
 function restroomSprite34(bl, P, on, dead, reach, line){
   const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 71 * px / TILT]);
   const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), view = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right";
