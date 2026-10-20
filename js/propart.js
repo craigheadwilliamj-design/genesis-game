@@ -52,7 +52,8 @@ function propArt(bl, inv, on, dead){
   const k = Math.max(1, 4.5*inv / (Math.max(t.w, t.d) / 2));   // never smaller than a tappable size when far out
   const F = {c, u:[uu[0] / ul, uu[1] / ul], v:fv, k, px:px0 / k};
   const broken = isBroken(bl), full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
-  const col = broken ? PROP_BROKEN : full ? PROP_FULL : themeFill(bl, t.color);
+  if(bl.type === "bin" && T === THEMES.genesis) return binSprite34(bl, k, broken ? "-broken" : full ? "-full" : "", on, dead);
+  const col =broken ? PROP_BROKEN : full ? PROP_FULL : themeFill(bl, t.color);
   const metal = broken ? PROP_BROKEN : T === THEMES.genesis ? PROP_METAL : mixHex(PROP_METAL, T.edge, .35);
   const TC = propTones(col), TM = propTones(metal), TD = propTones(mixHex(col, "#000000", .22)), px = F.px;
   const bx = (u0, u1, v0, v1, h0, h1, tone, deco, slats) => ({u0, u1, v0, v1, h0, h1, tone, deco, slats});
@@ -112,6 +113,14 @@ function propArt(bl, inv, on, dead){
   for(const b of boxes) s += pbox(F, b);
   if(on || dead) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   return s;
+}
+// The Genesis bin as one picture in the restroom's style (sprites/bld/bin-<front|back|left|right>[-full|-broken].png, 14 x 21 px, tools/pixelbin.py): the 10 px body is centered,
+// the bottom of its base (picture row 18, not the 2 shadow rows below) sits on the body's front edge, and it's scaled by k like the drawn props. The picture is picked by where the flap looks.
+function binSprite34(bl, k, st, on, dead){
+  const px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [fx, fy] = propFront(bl), [x, y] = flatSnap34([cx - 7 * px, cy + .45 * k - 19 * px / TILT]);
+  const view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
+  return `<image href="${spriteUrl(`sprites/bld/bin-${view}${st}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(14 * px).toFixed(2)}" height="${(21 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`
+    + (on || dead ? `<polygon points="${polyStr(bl.points)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "");
 }
 // the flat (top-down) view's front mark: a short bar from the middle out through the front edge, so rotation shows there too
 function propFrontMark(bl, r){

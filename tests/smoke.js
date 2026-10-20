@@ -3167,7 +3167,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
     const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"];
-    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
+    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return (ty === "bin" ? /<image href="[^"]+"/.test(a) : a.length > 200 && (a.match(/<polygon/g) || []).length > 3) && !/NaN/.test(a); }); });
+    // the Genesis bin is one picture, picked by where its flap looks (diagonals go to the front or back picture)
+    { const want = ["front", "front", "left", "back", "back", "back", "right", "front"], drawn = (bl, p) => propArt(bl, .1, false, false).includes(`href="${spriteUrl(p)}"`);
+      out.binSpriteByFacing = want.every((v, r) => drawn({id:"pb", type:"bin", points:rectPts(150, 150, 1.6, 1.6, r * Math.PI / 4)}, `sprites/bld/bin-${v}.png`))
+        && drawn({id:"pb", type:"bin", fill:LITTER.binCap, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-full.png")
+        && drawn({id:"pb", type:"bin", cond:0, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-broken.png"); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
     out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
