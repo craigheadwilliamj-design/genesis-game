@@ -634,9 +634,17 @@ function drawWeather(now){
   const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
   c.clearRect(0, 0, w, h);
   c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
-  if(k === "hot"){   // gentle shimmer: a few faint pale rows that slide sideways
+  if(k === "hot"){   // gentle shimmer: faint pale rows, each broken into short dashes of different lengths that drift sideways at their own pace
     c.fillStyle = "rgba(255,230,160,.07)";
-    for(let i = 0; i < 6; i++){ const y = Math.floor(((now / 40 + i * h / 6) % h)), x = Math.floor(Math.sin(now / 700 + i) * 4 + 6); c.fillRect(x, y, w - 12, 1); }
+    for(let i = 0; i < 9; i++){
+      const y = Math.floor((now / 40 * (.7 + i % 3 * .25) + i * h / 9) % h), sp = (i % 2 ? 1 : -1) * (.012 + i % 4 * .006);
+      for(let j = 0, x = (i * 37) % 23; x < w + 40; j++){
+        const len = 8 + (i * 13 + j * 29) % 31, gap = 10 + (i * 7 + j * 19) % 41;
+        const xx = ((x + now * sp + Math.sin(now / 700 + i + j) * 3) % (w + 40) + w + 40) % (w + 40) - 20;
+        c.fillRect(Math.floor(xx), y, len, 1);
+        x += len + gap;
+      }
+    }
     return;
   }
   const n = WX_N[k];
