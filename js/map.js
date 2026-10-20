@@ -622,20 +622,29 @@ let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
 // Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
 const WX_SCALE = 3, WX_N = {cold:36, storm:60};
-const WX_TINT = {hot:"rgba(255,170,70,.07)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+const WX_TINT = {hot:"rgba(255,150,40,.08)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
 let wxKind = "fair", wxFlash = 0, wxNext = 0;
 function drawWeather(now){
   const k = state.weather ? state.weather.today : "fair";
-  if(k !== wxKind){ wxKind = k; $("#map").style.filter = k === "hot" ? "url(#heatWarp)" : ""; wxCan.dataset.kind = k; wxFlash = 0; wxPool.length = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
+  if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
   if(k === "fair") return;
   const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
   if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
   const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
   c.clearRect(0, 0, w, h);
   c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
-  if(k === "hot"){   // the shimmer is an SVG warp on the map (#heatWarp); its noise only drifts about 8 times a second, to stay cheap
-    if(now > wxNext){ wxNext = now + 120; $("#heatNoise").setAttribute("baseFrequency", `${(.007 + .002 * Math.sin(now / 2300)).toFixed(4)} ${(.055 + .015 * Math.sin(now / 1700)).toFixed(4)}`); }
+  if(k === "hot"){   // gentle shimmer: faint pale rows, each broken into short dashes of different lengths that drift sideways at their own pace
+    c.fillStyle = "rgba(255,230,160,.07)";
+    for(let i = 0; i < 9; i++){
+      const y = Math.floor((now / 40 * (.7 + i % 3 * .25) + i * h / 9) % h), sp = (i % 2 ? 1 : -1) * (.012 + i % 4 * .006);
+      for(let j = 0, x = (i * 37) % 23; x < w + 40; j++){
+        const len = 8 + (i * 13 + j * 29) % 31, gap = 10 + (i * 7 + j * 19) % 41;
+        const xx = ((x + now * sp + Math.sin(now / 700 + i + j) * 3) % (w + 40) + w + 40) % (w + 40) - 20;
+        c.fillRect(Math.floor(xx), y, len, 1);
+        x += len + gap;
+      }
+    }
     return;
   }
   const n = WX_N[k];
