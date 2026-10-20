@@ -1842,7 +1842,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const mid1 = at(202.4, 270.4), fr = g => propFront({points:g.pts});
         out.propMidWalk = mid1.ok && Math.abs(mid1.x - 202) < 1e-9 && Math.abs(mid1.y - 270) < 1e-9;
         out.propFrontsEdge = (f => f[0] < -.99 && Math.abs(f[1]) < 1e-6)(fr(mid1));
-        const a0 = mid1.angle; rotateTool(); out.propRotate45 = Math.abs(ghost.angle - a0 - Math.PI/4) < 1e-9; rot = 0;
+        const a0 = mid1.angle; rotateTool(); out.propRotate90 = Math.abs(ghost.angle - a0 - Math.PI/2) < 1e-9; rot = 0;
         const offG = at(190, 270), halfG = at(195, 270), nearEdgeG = at(196, 270);
         out.propOffPathRefused = !offG.ok && offG.why === "Keep it on a path." && !halfG.ok && halfG.why === "Keep it on a path." && nearEdgeG.ok;
         state.exhibits = [{id:"pe", points:[[207, 265], [213, 265], [213, 275], [207, 275]]}];
@@ -3167,7 +3167,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
     const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"];
-    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 1, 2, 3, 4, 5, 6, 7].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return a.length > 200 && (a.match(/<polygon/g) || []).length > 3 && !/NaN/.test(a); }); });
+    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 2, 4, 6].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return (ty === "bin" ? /<image href="[^"]+"/.test(a) : a.length > 200 && (a.match(/<polygon/g) || []).length > 3) && !/NaN/.test(a); }); });
+    // older saves: a prop left on a 45° turn squares up to the nearest of north, south, east or west, about its middle, and its turn count goes even
+    { const sv = JSON.parse(JSON.stringify(state)), c0 = [150.3, 150.7]; sv.buildings = [{id:"pdg", type:"bench", rot:1, day:0, points:rectPts(c0[0], c0[1], BUILDINGS.bench.w, BUILDINGS.bench.d, Math.PI / 4)}];
+      upgradeSave(sv); const b = sv.buildings[0], f = propFront(b), c = centroid(b.points);
+      out.propDiagonalSquares = (Math.abs(Math.abs(f[0]) - 1) < 1e-6 || Math.abs(Math.abs(f[1]) - 1) < 1e-6) && Math.hypot(c[0] - c0[0], c[1] - c0[1]) < 1e-6 && b.rot % 2 === 0; }
+    // the Genesis bin is one picture, picked by where its flap looks
+    { const want = ["front", "left", "back", "right"], drawn = (bl, p) => propArt(bl, .1, false, false).includes(`href="${spriteUrl(p)}"`);
+      out.binSpriteByFacing = want.every((v, r) => drawn({id:"pb", type:"bin", points:rectPts(150, 150, 1.6, 1.6, r * Math.PI / 2)}, `sprites/bld/bin-${v}.png`))
+        && drawn({id:"pb", type:"bin", fill:LITTER.binCap, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-full.png")
+        && drawn({id:"pb", type:"bin", cond:0, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-broken.png"); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
     out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
@@ -3184,7 +3193,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       if(ghost && ghost.ok){ placeBuilding({clientX:px(110, y + 1)[0], clientY:px(110, y + 1)[1]}); placed = state.buildings[state.buildings.length - 1]; }
       else { for(const k of pk) delete state.pathChunks[k]; pathVer++; }
     }
-    out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 3 && rot === 3;
+    out.placingStoresRotation = !!placed && placed.type === "bench" && placed.rot === 6 && rot === 6;   // three quarter turns, counted in 45° steps
     if(placed){ const old = JSON.parse(JSON.stringify(placed)); delete old.rot; const snap = JSON.parse(JSON.stringify(state)); snap.buildings = snap.buildings.map(b => b.id === old.id ? old : b); upgradeSave(snap);
       out.oldSaveGetsRot = snap.buildings.find(b => b.id === old.id).rot === 0; }
     setTool("select"); render();
