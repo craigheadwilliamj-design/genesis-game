@@ -3167,16 +3167,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // path objects: rotation is stored on the item, old saves load, and every type draws at every turn
   const props = await page.evaluate(() => {
     const out = {}, names = ["bin", "bench", "picnic", "lamp", "camera", "donate", "sign", "nofeed", "quiet"];
-    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 2, 4, 6].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return (ty === "bin" ? /<image href="[^"]+"/.test(a) : a.length > 200 && (a.match(/<polygon/g) || []).length > 3) && !/NaN/.test(a); }); });
+    out.propsDrawAtEveryTurn = names.every(ty => { const t = BUILDINGS[ty]; return [0, 2, 4, 6].every(r => { const bl = {id:"pp-" + ty + r, type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}; const a = propArt(bl, .1, false, false); return (PROP_PICS[ty] ? /<image href="[^"]+"/.test(a) : a.length > 200 && (a.match(/<polygon/g) || []).length > 3) && !/NaN/.test(a); }); });
     // older saves: a prop left on a 45° turn squares up to the nearest of north, south, east or west, about its middle, and its turn count goes even
     { const sv = JSON.parse(JSON.stringify(state)), c0 = [150.3, 150.7]; sv.buildings = [{id:"pdg", type:"bench", rot:1, day:0, points:rectPts(c0[0], c0[1], BUILDINGS.bench.w, BUILDINGS.bench.d, Math.PI / 4)}];
       upgradeSave(sv); const b = sv.buildings[0], f = propFront(b), c = centroid(b.points);
       out.propDiagonalSquares = (Math.abs(Math.abs(f[0]) - 1) < 1e-6 || Math.abs(Math.abs(f[1]) - 1) < 1e-6) && Math.hypot(c[0] - c0[0], c[1] - c0[1]) < 1e-6 && b.rot % 2 === 0; }
-    // the Genesis bin is one picture, picked by where its flap looks
+    // the Genesis bin and bench are pictures, picked by where the front looks
     { const want = ["front", "left", "back", "right"], drawn = (bl, p) => propArt(bl, .1, false, false).includes(`href="${spriteUrl(p)}"`);
       out.binSpriteByFacing = want.every((v, r) => drawn({id:"pb", type:"bin", points:rectPts(150, 150, 1.6, 1.6, r * Math.PI / 2)}, `sprites/bld/bin-${v}.png`))
         && drawn({id:"pb", type:"bin", fill:LITTER.binCap, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-full.png")
-        && drawn({id:"pb", type:"bin", cond:0, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-broken.png"); }
+        && drawn({id:"pb", type:"bin", cond:0, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-broken.png");
+      out.benchSpriteByFacing = want.every((v, r) => drawn({id:"pc", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 2)}, `sprites/bld/bench-${v}.png`))
+        && drawn({id:"pc", type:"bench", cond:0, points:rectPts(150, 150, 3, 1.4, Math.PI)}, "sprites/bld/bench-back-broken.png"); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
     out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);

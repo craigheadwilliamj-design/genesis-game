@@ -52,7 +52,7 @@ function propArt(bl, inv, on, dead){
   const k = Math.max(1, 4.5*inv / (Math.max(t.w, t.d) / 2));   // never smaller than a tappable size when far out
   const F = {c, u:[uu[0] / ul, uu[1] / ul], v:fv, k, px:px0 / k};
   const broken = isBroken(bl), full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
-  if(bl.type === "bin" && T === THEMES.genesis) return binSprite34(bl, k, broken ? "-broken" : full ? "-full" : "", on, dead);
+  if(PROP_PICS[bl.type] && T === THEMES.genesis) return propSprite34(bl, k, broken ? "-broken" : full ? "-full" : "", on, dead);
   const col =broken ? PROP_BROKEN : full ? PROP_FULL : themeFill(bl, t.color);
   const metal = broken ? PROP_BROKEN : T === THEMES.genesis ? PROP_METAL : mixHex(PROP_METAL, T.edge, .35);
   const TC = propTones(col), TM = propTones(metal), TD = propTones(mixHex(col, "#000000", .22)), px = F.px;
@@ -114,12 +114,17 @@ function propArt(bl, inv, on, dead){
   if(on || dead) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   return s;
 }
-// The Genesis bin as one picture in the restroom's style (sprites/bld/bin-<front|back|left|right>[-full|-broken].png, 14 x 21 px, tools/pixelbin.py): the 10 px body is centered,
-// the bottom of its base (picture row 18, not the 2 shadow rows below) sits on the body's front edge, and it's scaled by k like the drawn props. The picture is picked by where the flap looks.
-function binSprite34(bl, k, st, on, dead){
-  const px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [fx, fy] = propFront(bl), [x, y] = flatSnap34([cx - 7 * px, cy + .45 * k - 19 * px / TILT]);
-  const view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
-  return `<image href="${spriteUrl(`sprites/bld/bin-${view}${st}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(14 * px).toFixed(2)}" height="${(21 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`
+// Genesis path objects drawn as pictures in the restroom's style (sprites/bld/<type>-<front|back|left|right>[-full|-broken].png, made by tools/pixelbin.py and tools/pixelbench.py), picked by where the item's front looks.
+// Each view is [width, height, front]: the picture is centered across, and the bottom of its base (the third row from the bottom, above the 2 shadow rows) sits `front` m in front of the middle, scaled by k like the drawn props.
+// A bench's end-on views cheat the projection (its end profile with a short top, not two tall strips running back), standing in the middle of the footprint.
+const PROP_PICS = {
+  bin:{front:[14, 21, .45], back:[14, 21, .45], left:[14, 21, .45], right:[14, 21, .45]},
+  bench:{front:[26, 16, .5], back:[26, 12, .5], left:[12, 15, .5], right:[12, 15, .5]},
+};
+function propSprite34(bl, k, st, on, dead){
+  const [fx, fy] = propFront(bl), view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
+  const [w, h, e] = PROP_PICS[bl.type][view], px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [x, y] = flatSnap34([cx - w / 2 * px, cy + e * k - (h - 2) * px / TILT]);
+  return `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${st}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(w * px).toFixed(2)}" height="${(h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`
     + (on || dead ? `<polygon points="${polyStr(bl.points)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "");
 }
 // the flat (top-down) view's front mark: a short bar from the middle out through the front edge, so rotation shows there too
