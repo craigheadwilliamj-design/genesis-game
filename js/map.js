@@ -622,7 +622,7 @@ let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
 // Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
 const WX_SCALE = 3, WX_N = {cold:36, storm:60};
-const WX_TINT = {hot:"rgba(255,150,40,.08)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+const WX_TINT = {hot:"rgba(255,140,30,.17)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
 let wxKind = "fair", wxFlash = 0, wxNext = 0;
 function drawWeather(now){
