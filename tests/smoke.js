@@ -642,8 +642,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // a full day: guests come, go, and leave a mood behind for the rating
     resetParties(); state.minute = DAWN_MIN; state.today = freshLedger(); state.guestLog = freshGuestLog();
-    const day = state.day;
+    // every party plans the shortest stay, so the early ones are sure to leave before the rollover (a random stay could keep them all in till tomorrow)
+    const day = state.day, stay0 = GUEST.stay; GUEST.stay = [stay0[0], stay0[0]];
     while(state.day === day) tick(2);
+    GUEST.stay = stay0;
     const h = state.history[state.history.length - 1];
     out.dayOfGuests = h.guests > 5 && state.guestLog.mood > 20 && state.guestLog.last.guests + guestCount() === h.guests && state.guestLog.last.guests > 0;   // some left during the day; the rest are still in the park, since the day turns over at the rollover hour and nobody is sent home at closing
     out.comfortFromMood = derived.parts.find(x => x.label === "Guest comfort").score === clamp((state.guestLog.mood - GUEST.badMood) / (GUEST.goodMood - GUEST.badMood), 0, 1);
@@ -2514,7 +2516,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const held = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
       for(let i = 0; i < 80; i++) step("rest");
       const still = last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
+      const rr2 = Math.random; Math.random = () => .999;   // no idle clip rolls, so it ends standing in plain "idle"
       for(let i = 0; i < 80; i++) step("idle");
+      Math.random = rr2;
       out.rigRestHold = R.clips.rest.dense.length === 15 && held && still && rg.mode === "idle" && !last.every((v, i) => Math.abs(v - rg.cur[i]) < 1e-3);
       // standing still holds the idle clip's first frame; the clip plays when the animal stops (by chance) or after a while of standing, and once it starts it finishes (lock) and goes back to holding
       const f2 = {r:3, sp:"plat", stride:0, face:1, act:"patrol", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f2.el.innerHTML = rigSvg("plat", f2);
