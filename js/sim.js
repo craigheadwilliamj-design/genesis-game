@@ -289,6 +289,14 @@ function upgradeSave(s){
   // the day each building went up (older themed buildings weather more); ones from before this count as old
   for(const b of s.buildings) if(b.day === undefined) b.day = 0;
   for(const b of s.buildings) if(BUILDINGS[b.type] && BUILDINGS[b.type].prop && b.rot === undefined) b.rot = 0;   // path objects: 45° turns the player gave them (see propart.js)
+  // things only face north, south, east or west now: a path object left on a diagonal turns about its middle to the nearest of them
+  for(const b of s.buildings){
+    const t = BUILDINGS[b.type]; if(!t || !t.prop || !b.points || b.points.length !== 4) continue;
+    const v = [b.points[3][0] - b.points[0][0], b.points[3][1] - b.points[0][1]], a = Math.atan2(-v[0], v[1]), q = Math.round(a / (Math.PI/2)) * Math.PI/2;
+    if(Math.abs(a - q) < 1e-6) continue;
+    const [cx, cy] = centroid(b.points); b.points = rectPts(cx, cy, t.w, t.d, q).map(p => [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]);
+    b.rot = (Math.round((b.rot || 0) / 2) * 2) % 8;
+  }
   // which way a building's door looks: older ones get the side facing their nearest path chunk (south when there is none)
   const chunkPts = Object.keys(s.pathChunks).map(k => k.split(",").map(Number));
   for(const b of s.buildings) if(BUILDINGS[b.type] && !BUILDINGS[b.type].prop && b.face === undefined && b.points && b.points.length >= 3){

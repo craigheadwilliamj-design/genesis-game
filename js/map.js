@@ -55,7 +55,7 @@ const isPathTool = t => !!PATH_TOOLS[t];
 // Exhibits, zones and water are closed shapes. Paths are open lines.
 const isPoly = k => k === "exhibit" || k === "zone" || k === "water";
 let supplyOn = false;
-let rot = 0;                        // 45° steps a building is rotated by while placing it
+let rot = 0;                        // 45° steps a building is rotated by while placing it; Rotate moves it a quarter turn (2) at a time
 let lastPtr = null;                 // where the pointer last was while placing, so Rotate can redraw the ghost
 let mvSel = null;                   // building picked with the Move tool, the one Rotate turns
 let mvCorner = null;                // exhibit or water corner picked with the Move tool: {id, i}
@@ -2141,7 +2141,7 @@ function setTool(t){
   else if(isBuildTool(t)){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && vivRank(s.viv) <= vivRank(b.viv)).map(s => s.name) : [];
-    const free = " Place it anywhere clear of paths, but it only works once a path reaches it.", spin = b.onPath ? " Rotate turns it 45° (R)." : " Rotate turns it 90° (R).";
+    const free = " Place it anywhere clear of paths, but it only works once a path reaches it.", spin = " Rotate turns it 90° (R).";
     showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Tap beside a ${b.serviceOnly ? "service road" : "path or service road"}. It snaps to the 1 m grid.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m. Fits ${fits.join(", ")}.${free}${spin}`
       : b.tram ? `Tap beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
@@ -2521,7 +2521,7 @@ function drawTap(e){
 }
 
 /* ---------- placing guest buildings ---------- */
-// The way a path prop faces by default, a unit vector in 45° steps: toward the nearer of the closest exhibit fence and the closest path edge (a fence wins a tie). South when neither is near.
+// The way a path prop faces by default, a unit vector due north, south, east or west: toward the nearer of the closest exhibit fence and the closest path edge (a fence wins a tie). South when neither is near.
 function propFacing(x, y, type){
   let best = null;
   const reach = type === "sign" || type === "nofeed" || type === "quiet" ? EDU.signReach : 8;
@@ -2529,9 +2529,9 @@ function propFacing(x, y, type){
     const r = segProj(x, y, e.points[i], e.points[(i+1) % e.points.length]);
     if(r.d <= reach && r.d > 0 && (!best || r.d < best.d)) best = {d:r.d, dx:r.x - x, dy:r.y - y};
   }
-  const o = best ? Math.round(Math.atan2(best.dy, best.dx) / (Math.PI/4)) : null;
+  const o = best ? (Math.round(Math.atan2(best.dy, best.dx) / (Math.PI/2)) * 2 + 8) % 8 : null;
   let edge = null;
-  for(let k = 0; k < 8; k++){
+  for(let k = 0; k < 8; k += 2){
     const dx = Math.round(Math.cos(k * Math.PI/4) * 1e6) / 1e6, dy = Math.round(Math.sin(k * Math.PI/4) * 1e6) / 1e6;
     let s = .25; while(s <= 12 && guestCell(pathAt(x + dx*s, y + dy*s))) s += .25;   // guestCell is false for no chunk
     if(s <= 12 && (!edge || s < edge.d)) edge = {d:s, k};
@@ -2552,7 +2552,7 @@ function placeGhost(clientX, clientY){
   if(!why && t.rooms) why = hotelLocked(tool);
   let x, y, angle = rot * Math.PI/4;
   if(t.onPath){
-    // path props go on the 1 m grid at the pointer, anywhere they sit fully on a path; the front defaults to the nearest exhibit or path edge, and Rotate turns it 45° from there
+    // path props go on the 1 m grid at the pointer, anywhere they sit fully on a path; the front defaults to the nearest exhibit or path edge, and Rotate turns it 90° from there
     x = Math.round(p.x / GRID_STEP) * GRID_STEP; y = Math.round(p.y / GRID_STEP) * GRID_STEP;
     const fv = propFacing(x, y, tool);
     angle = Math.atan2(fv[1], fv[0]) - Math.PI/2 + rot*Math.PI/4;
@@ -2580,22 +2580,21 @@ function placeGhost(clientX, clientY){
   setStat(why || `${money(t.price)}. Tap to build.${reached ? doorAway : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
 }
 
-// Turn the building being placed (a quarter turn, or 45° for path props), and redraw the ghost where the pointer is
-const turnStep = type => BUILDINGS[type].onPath ? 1 : 2;   // in 45° steps
+// Turn the building being placed a quarter turn, and redraw the ghost where the pointer is. Everything faces north, south, east or west.
 function rotateTool(){
-  rot = (rot + turnStep(tool)) % 8;
+  rot = (rot + 2) % 8;
   if(lastPtr){ placeGhost(lastPtr.x, lastPtr.y); renderOverlay(); }
-  else setStat(`Turned ${turnStep(tool) * 45}°. Tap to place it.`);
+  else setStat("Turned 90°. Tap to place it.");
 }
 // Turn the building picked with the Move tool about its middle, if it fits there
 function rotateMoved(){
   const it = mvSel && findItem("building", mvSel);
   if(!it){ setStat("Tap a building first, then Rotate.", true); return; }
-  const orig = it.points, [cx, cy] = centroid(orig), a = turnStep(it.type) * Math.PI/4, c = Math.cos(a), s = Math.sin(a);
+  const orig = it.points, [cx, cy] = centroid(orig), a = Math.PI/2, c = Math.cos(a), s = Math.sin(a);
   it.points = orig.map(([x, y]) => [Math.round((cx + (x - cx)*c - (y - cy)*s) * 1e6) / 1e6, Math.round((cy + (x - cx)*s + (y - cy)*c) * 1e6) / 1e6]);
   const why = moveProblem("building", it);
   if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
-  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + turnStep(it.type)) % 8;
+  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + 2) % 8;
   else it.face = ((it.face === undefined ? 2 : it.face) + 1) % 4;   // the door turns with the walls
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
@@ -2620,7 +2619,7 @@ function placeBuilding(e){
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
-  if(t.prop) b.rot = rot;   // how many 45° turns the player gave it; its front is read off the points (propFront)
+  if(t.prop) b.rot = rot;   // how many 45° turns the player gave it (always even now); its front is read off the points (propFront)
   else b.face = ghost.face;   // which wall has the door and sign: 0-3 = N/E/S/W
   autoZone(b);
   themeNew("building", b);
