@@ -1114,11 +1114,11 @@ function faceMark34(P, i, wall, m, text){
   }
   return s;
 }
-// The Genesis restroom as one picture (sprites/bld/restroom-<front|back>.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash. The back shows when the door wall faces away from the camera; side views still use the front.
+// The Genesis restroom as one picture (sprites/bld/restroom-<front|back|left|right>.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash. The picture is picked by where the door looks: down the screen front, up back, left or right the side with the door at that end.
 function restroomSprite34(bl, P, on, dead, reach, line){
   const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 71 * px / TILT]);
-  const back = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face))[1] < -.5;
-  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl(`sprites/bld/restroom-${back ? "back" : "front"}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
+  const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), view = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right";
+  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl(`sprites/bld/restroom-${view}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
@@ -1147,7 +1147,7 @@ function building34(bl, t, on, dead, reach, inv){
   if(S.front === "deck") return deckArt(bl, inv, on, dead, reach);   // flat pixel style, propart.js
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
-  if(S.front === "wc" && T === THEMES.genesis) return restroomSprite34(bl, P, on, dead, reach, line);   // front or back picture by facing (sides to come)
+  if(S.front === "wc" && T === THEMES.genesis) return restroomSprite34(bl, P, on, dead, reach, line);   // the front, back or side picture by facing
   const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
   const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), fe = faceEdge(P, bl.face === undefined ? 2 : bl.face), i = norm34(P, fe)[1] > .05 ? fe : -1;   // the door wall, unless the camera can't see it
   s += w.s;
