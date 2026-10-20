@@ -2124,7 +2124,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         state.pathChunks["32,29"] = "g"; state.pathChunks["33,29"] = "g"; pathVer++; recompute(); render();
         const html = world.innerHTML, at = html.indexOf('id="pathLayer"');
         const later = ['data-kind="exhibit"', 'data-kind="building"', "<image"].map(t => html.indexOf(t)).filter(i => i >= 0);
-        out.pathLayerBelowStanding = at >= 0 && later.every(i => i > at) && !/data-kind="path"[^>]*>\s*<[^>]*fill="#C9BFA8"/.test(html);
+        out.pathLayerBelowStanding = at >= 0 && later.every(i => i > at) && !/data-kind="path"[^>]*>\s*<[^>]*fill="#C6BC93"/.test(html);
         delete state.pathChunks["32,29"]; delete state.pathChunks["33,29"]; pathVer++; recompute(); render();
         out.pathNoBeigeBlocks = typeof chunksSvg === "undefined";
       }

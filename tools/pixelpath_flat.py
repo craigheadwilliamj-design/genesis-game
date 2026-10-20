@@ -1,4 +1,4 @@
-# Draws the seamless path tiles in the Dimetrodon's flat, simple style: sprites/path/guest.png (warm concrete paving square slabs), staff.png (dark asphalt with gravel dashes
+# Draws the seamless path tiles in the Dimetrodon's flat, simple style: sprites/path/guest.png (paving slabs in the Genesis restroom's tans), staff.png (dark asphalt with gravel dashes
 # ; the pour seams between chunks are drawn by pathart.js on the 5 m chunk grid, not in the tile) and bridge.png (wooden planks with butt joints and nails). Each is 96 px = 12.48 m at ROCK_MPP (0.13 m a pixel, the same grid the path layer's edges are cut to,
 # so the tile and the stair-stepped outline share pixels). Fully opaque, used as the #pt-<kind> patterns (index.html) behind the path chunks (pathart.js). Everything is
 # structured and rhythmic (rows of dashes, plank gaps) with no random scatter, light from the top left, a lit top-left row and a shaded bottom-right row on each slab or plank.
@@ -14,13 +14,21 @@ N = 96
 def hsh(a, b): return ((a * 73856093) ^ (b * 19349663) ^ 0x5bd1e995) * 2654435761 >> 7 & 0xffff
 
 def guest():
-    BASE = hexc("#C9BFA8")   # PATH_CELLS.kinds.g.color: plain poured concrete, no slabs or joints
-    dash = mix(BASE, BLACK, .08); lite = mix(BASE, WHITE, .07)
-    px = {(x, y): BASE for x in range(N) for y in range(N)}
-    for r in range(N // 8):   # faint trowel dashes on a fixed lattice, a darker run and a lighter one in alternate rows
-        for k in range(3):
-            x = (r * 11 + k * 32 + 4) % N; y = r * 8 + 3
-            for i in range(5): px[((x + i) % N, y)] = dash if (r + k) % 2 else lite
+    # paving in the Genesis restroom's style (tools/genesis_style.py): its plaster tans laid as staggered 2.08 x 1.56 m slabs, each with a lit top row and left column,
+    # in a darker joint; the brown curb is the path layer's edge (PATH_TEX in pathart.js)
+    SLAB, LIT, JOINT, SHADE = (198, 188, 147), (210, 201, 164), (172, 162, 125), (190, 180, 140)
+    px = {}
+    W, H = 16, 12
+    for row in range(N // H):
+        for col in range(N // W):
+            x0, y0 = col * W + (W // 2 if row % 2 else 0), row * H
+            for y in range(H):
+                for x in range(W):
+                    c = SLAB
+                    if y == H - 1 or x == W - 1: c = JOINT
+                    elif y == 0 or x == 0: c = LIT
+                    elif y == H - 2: c = SHADE
+                    px[((x0 + x) % N, (y0 + y) % N)] = c
     return px
 
 def staff():

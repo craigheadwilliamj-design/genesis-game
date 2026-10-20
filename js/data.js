@@ -2632,7 +2632,7 @@ const THEME = {radius:45, minNear:2, appeal:.08, fitHappy:6, fitAppeal:.05};
 const SERVICE_ROAD = {perMeter:10, upkeepPerMeter:0.1, halfWidth:1.5};
 // Paths are 5 m x 5 m chunks (js/pathcells.js). A chunk is 5 m of path, so it costs perMeter times 5.
 const PATH_CELLS = {width:5, kinds:{
-  g:{label:"Guest path",     perMeter:COST.pathPerMeter,   upkeepPerMeter:UPKEEP.pathPerMeter,         color:"#C9BFA8"},
+  g:{label:"Guest path",     perMeter:COST.pathPerMeter,   upkeepPerMeter:UPKEEP.pathPerMeter,         color:"#C6BC93"},
   s:{label:"Staff path",     perMeter:SERVICE_ROAD.perMeter, upkeepPerMeter:SERVICE_ROAD.upkeepPerMeter, color:"#5A5F64"},
   b:{label:"Wooden bridge",  perMeter:BRIDGE.perMeter,     upkeepPerMeter:BRIDGE.upkeepPerMeter,      color:"#A9825A"}
 }};

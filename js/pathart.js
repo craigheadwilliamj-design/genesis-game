@@ -4,7 +4,7 @@
    under fences, exhibits, props, plants, buildings, animals and people (all of which render later). */
 // The tile for each kind: sprites/path/<tile>.png behind the #pt-<kind> pattern in index.html (12.48 m = 96 px at ROCK_MPP), and the edge colors
 const PATH_TEX = {
-  g:{lit:"#E4DDCB", dark:"#8C8470"},   // plain warm concrete
+  g:{lit:"#A57D4A", dark:"#42351D"},   // paving slabs in the Genesis restroom's tans, with a brown curb like its base
   s:{lit:"#7C8187", dark:"#34383C", seam:"#4A4F54"},   // dark asphalt
   b:{lit:"#D0A67A", dark:"#5E4429"},   // planks
 };
