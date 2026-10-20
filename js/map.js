@@ -213,11 +213,6 @@ function render(){
     }
     over += `<g data-kind="path" data-id="${esc(p.id)}" style="cursor:pointer">${cut(body)}${tp}</g>`;
   }
-  // Genesis buildings get a narrow pale gravel strip so they stand off the grass; all strips go in one pass under the paths and every roof, so none paints over a neighbor
-  for(const bl of state.buildings){
-    if(BUILDINGS[bl.type].prop || bl.type === "platform" || themeKey(bl) !== "genesis") continue;   // a platform juts over the habitat, so no path-like gravel under it
-    s += `<polygon points="${polyStr(bl.points)}" fill="#CBC5B4" stroke="#CBC5B4" stroke-width="3" stroke-linejoin="round" pointer-events="none"/><polygon points="${polyStr(bl.points)}" fill="none" stroke="url(#t-genesis)" stroke-width="3" stroke-linejoin="round" pointer-events="none"/>`;
-  }
   // path surface doesn't show under a viewing platform's deck: mask the footprints out of the paths
   const decks = state.buildings.filter(b => b.type === "platform");
   if(decks.length) s += `<mask id="deckcut" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000"><rect x="-100000" y="-100000" width="200000" height="200000" fill="#fff"/>${decks.map(b => `<polygon points="${polyStr(b.points)}" fill="#000"/>`).join("")}</mask>`;
@@ -1111,10 +1106,10 @@ function faceMark34(P, i, wall, m, text){
   }
   return s;
 }
-// The Genesis restroom as one picture (sprites/bld/restroom-front.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, its base slab sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash.
+// The Genesis restroom as one picture (sprites/bld/restroom-front.png, 80 x 80 px at ROCK_MPP): the 61 px wall is the 8 m footprint, the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash.
 function restroomSprite34(bl, P, on, dead, reach, line){
-  const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 75 * px / TILT]);
-  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl("sprites/bld/restroom-front.png")}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" style="image-rendering:pixelated" pointer-events="none"/>`;
+  const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 71 * px / TILT]);
+  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl("sprites/bld/restroom-front.png")}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
