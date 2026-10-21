@@ -5,8 +5,7 @@ Needs numpy, h5py and Pillow. The DEMs are Scotese & Wright 2018, "PALEOMAP Pale
 (PaleoDEMS) for the Phanerozoic", https://zenodo.org/records/5460860 (CC BY 4.0): unzip the 1x1 degree netCDF set
 and pass its folder.
 
-Each map is 130 x 65 px in the same Mollweide ellipse as the hand-drawn Devonian (its mask and navy rim are reused),
-in one flat palette: deep ocean, shallow sea (shelf above -200 m), land, mountains (the top 8% of each map's land,
+Each map is 260 x 130 px, a Mollweide ellipse with a 2 px navy rim, in one flat palette: deep ocean, shallow sea (shelf above -200 m), land, mountains (the top 8% of each map's land,
 at least 900 m), desert (land in the dry belts: 3 px from the sea at 20 to 30 degrees, needing more distance the further out of that band,
 so deserts swell in continental interiors) and ice (by hand-set rules
 per map below, since the DEMs carry none). These are drafts: tidy them in the pixel editor.
@@ -19,7 +18,8 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "maps")
-W, H = 130, 65
+W, H = 260, 130
+S = W / 130   # distances below are tuned in 130 px map pixels
 PAL = {
     "rim": (0x1A, 0x2B, 0x4C), "deep": (0x1B, 0x60, 0xB8), "shallow": (0x4C, 0x8F, 0xD8), "land": (0x03, 0xA7, 0x22),
     "mountain": (0x8B, 0x6B, 0x43), "desert": (0xD9, 0xC2, 0x7A), "ice": (0xEA, 0xF2, 0xF8),
@@ -27,7 +27,7 @@ PAL = {
 
 # Ice rules: (lat, lon, px from the sea) -> True where land is under ice. Paleo coordinates, as the DEM for that age
 # has them. Ice reaches further from the pole inland, so sheet edges aren't straight lines of latitude.
-inland = lambda d: min(d, 6) * 2 - 4
+inland = lambda d: min(d / S, 6) * 2 - 4
 south = lambda lim: lambda la, lo, d: la < lim + inland(d)
 def lgm(la, lo, d):   # last glacial maximum, modern coordinates
     return (la < -60 or (la > 60 and -75 < lo < -10)                                     # Antarctica, Greenland
@@ -115,16 +115,16 @@ def build(name, age, sea, ice, mask, folder):
                 la, lo = where[px, py]
                 if ice and ice(la, lo, dist[px, py] or 0): k = "ice"
                 elif elev[px, py] > mtn: k = "mountain"
-                elif (dist[px, py] or 0) >= 3 + max(0, abs(abs(la) - 25) - 5) / 2.5: k = "desert"
+                elif (dist[px, py] or 0) >= (3 + max(0, abs(abs(la) - 25) - 5) / 2.5) * S: k = "desert"
             img.putpixel((px, py), PAL[k] + (255,))
     img.save(os.path.join(OUT, name + ".png"))
     print(f"{name:18} {age:3} Ma  mountains above {mtn:.0f} m")
 
 def main():
     if len(sys.argv) < 2: sys.exit(__doc__)
-    hand = Image.open(os.path.join(OUT, "devonian-hand.png")).convert("RGBA")
-    rim = PAL["rim"] + (255,)
-    mask = [["out" if hand.getpixel((x, y))[3] == 0 else "rim" if hand.getpixel((x, y)) == rim else "in" for x in range(W)] for y in range(H)]
+    inside = lambda x, y: ((x + .5) / W * 2 - 1) ** 2 + ((y + .5) / H * 2 - 1) ** 2 <= 1
+    near_out = lambda x, y: any(not inside(x + i, y + j) for i in range(-2, 3) for j in range(-2, 3) if abs(i) + abs(j) <= 2)
+    mask = [["out" if not inside(x, y) else "rim" if near_out(x, y) else "in" for x in range(W)] for y in range(H)]
     for name, (age, sea, ice) in MAPS.items():
         build(name, age, sea, ice, mask, sys.argv[1])
 

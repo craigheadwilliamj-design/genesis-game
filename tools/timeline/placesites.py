@@ -23,7 +23,7 @@ SITES = {
 }
 
 def pixel(lat, lon):
-    """Latitude and longitude in degrees to a pixel on the 130 x 65 Mollweide map."""
+    """Latitude and longitude in degrees to a pixel on the Mollweide map."""
     phi, lam = math.radians(lat), math.radians(lon)
     t = phi
     for _ in range(50):
