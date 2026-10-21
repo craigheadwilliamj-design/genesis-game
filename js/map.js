@@ -1114,11 +1114,17 @@ function faceMark34(P, i, wall, m, text){
   }
   return s;
 }
-// The Genesis restroom as one picture (sprites/bld/restroom-<front|back|left|right>.png, 80 x 80 px at ROCK_MPP): the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the bottom of its base slab (picture row 71, not the 4 shadow rows below) sits on the footprint's front edge, the roof overhangs. A pixel is square on screen after the squash. The picture is picked by where the door looks: down the screen front, up back, left or right the side with the door at that end.
-function restroomSprite34(bl, P, on, dead, reach, line){
-  const px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - 40 * px, by - 71 * px / TILT]);
-  const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), view = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right";
-  return `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/><image href="${spriteUrl(`sprites/bld/restroom-${view}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(80 * px).toFixed(2)}" height="${(80 * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
+// Genesis buildings drawn as one picture per view (sprites/bld/<name>-<front|back|left|right>.png at ROCK_MPP), picked by where the door looks: down the screen front, up back, left or right the side with the door at that end. w x h is the picture in px, base the row under its base slab (the shadow rows below it hang past the footprint's front edge). A pixel is square on screen after the squash. Views not drawn yet fall back to the front. frames: an animation, <name>-<view>-2.png etc., cycling at 3 a second.
+// Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food cart: the front only so far, the vendor bobbing behind the counter.
+const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, views:["front"], frames:2}};
+function bldSprite34(bl, P, on, dead, reach, line){
+  const B = BLD_PICS[bl.type], px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - B.w / 2 * px, by - B.base * px / TILT]);
+  const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), v = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right", view = !B.views || B.views.includes(v) ? v : "front";
+  const img = (f, a) => `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${f > 1 ? "-" + f : ""}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(B.w * px).toFixed(2)}" height="${(B.h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated${a}" pointer-events="none"/>`;
+  const n = B.frames || 1, dur = n / 3, ph = (performance.now() / 1000 + [...String(bl.id)].reduce((a, c) => a + c.charCodeAt(0), 0) / 3) % dur;   // later frames blink on in turn over the first, kept in step across redraws, each building a beat apart
+  let s = `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/>` + img(1, "");
+  for(let f = 2; f <= n; f++) s += img(f, `;opacity:0;animation:frame${f}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`);
+  return s;
 }
 function building34(bl, t, on, dead, reach, inv){
   const S = STAND34[bl.type], P = bl.points, col = themeFill(bl, t.color), T = themeOf(bl), H = roofOf(T, bl), tex = H >= 0 ? pickFor(bl, T.roofs.btex[H]) : bldTex(T);
@@ -1126,6 +1132,7 @@ function building34(bl, t, on, dead, reach, inv){
   const line = `stroke="${edge}" stroke-width="${on || dead ? 3.5 : 1.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"`;
   const top = S.canopy || S.wall + S.rise, sh = top * .22;
   let s = `<polygon points="${polyStr(P.map(([x, y]) => [x + sh, y + sh*.8]))}" fill="#1D2B22" fill-opacity=".22" pointer-events="none"/><polygon points="${polyStr(P)}" fill="#8E8778"/>`;
+  if(BLD_PICS[bl.type] && T === THEMES.genesis) return bldSprite34(bl, P, on, dead, reach, line);   // the front, back or side picture by facing
   if(S.front === "cart"){
     // a cart: a colored counter under a striped canopy on four poles, on two wheels
     const w = walls34(P, 0, S.wall, col, line), i = w.main, C = insetRect(P, 1.12).map(lift34(S.canopy));
@@ -1147,7 +1154,6 @@ function building34(bl, t, on, dead, reach, inv){
   if(S.front === "deck") return deckArt(bl, inv, on, dead, reach);   // flat pixel style, propart.js
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
-  if(S.front === "wc" && T === THEMES.genesis) return restroomSprite34(bl, P, on, dead, reach, line);   // the front, back or side picture by facing
   const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
   const w = flat ? flatWalls34(P, S.wall, ln) : walls34(P, 0, S.wall, S.wallCol || WALL34, line), fe = faceEdge(P, bl.face === undefined ? 2 : bl.face), i = norm34(P, fe)[1] > .05 ? fe : -1;   // the door wall, unless the camera can't see it
   s += w.s;
