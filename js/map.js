@@ -1115,8 +1115,8 @@ function faceMark34(P, i, wall, m, text){
   return s;
 }
 // Genesis buildings drawn as one picture per view (sprites/bld/<name>-<front|back|left|right>.png at ROCK_MPP), picked by where the door looks: down the screen front, up back, left or right the side with the door at that end. w x h is the picture in px, base the row under its base slab (the shadow rows below it hang past the footprint's front edge). A pixel is square on screen after the squash. Views not drawn yet fall back to the front. frames: an animation, <name>-<view>-2.png etc., cycling at 3 a second.
-// Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food cart: the front only so far, the vendor bobbing behind the counter.
-const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, views:["front"], frames:2}};
+// Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food cart: front and back so far (the sides use the front), the vendor shifting behind the counter.
+const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, views:["front", "back"], frames:2}};
 function bldSprite34(bl, P, on, dead, reach, line){
   const B = BLD_PICS[bl.type], px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1])), [x, y] = flatSnap34([cx - B.w / 2 * px, by - B.base * px / TILT]);
   const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), v = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right", view = !B.views || B.views.includes(v) ? v : "front";

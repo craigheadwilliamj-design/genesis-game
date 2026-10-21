@@ -3179,10 +3179,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && drawn({id:"pb", type:"bin", cond:0, points:rectPts(150, 150, 1.6, 1.6, 0)}, "sprites/bld/bin-front-broken.png");
       out.benchSpriteByFacing = want.every((v, r) => drawn({id:"pc", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 2)}, `sprites/bld/bench-${v}.png`))
         && drawn({id:"pc", type:"bench", cond:0, points:rectPts(150, 150, 3, 1.4, Math.PI)}, "sprites/bld/bench-back-broken.png"); }
-    // Genesis buildings drawn as pictures: the restroom turns, the food cart has only a front so far, with its second frame blinking over the first
+    // Genesis buildings drawn as pictures: the restroom turns, the food cart has a front and back so far, with its second frame blinking over the first
     { const b34 = (ty, r) => building34({id:"pk", type:ty, points:rectPts(150, 150, BUILDINGS[ty].w, BUILDINGS[ty].d, r * Math.PI / 2)}, BUILDINGS[ty], false, false, true, .1);
       out.restroomSpriteByFacing = ["front", "left", "back", "right"].some(v => b34("restroom", 0).includes(spriteUrl(`sprites/bld/restroom-${v}.png`)));
-      out.kioskSpriteAnimates = [0, 1, 2, 3].every(r => { const a = b34("kiosk", r); return a.includes(spriteUrl("sprites/bld/kiosk-front.png")) && a.includes(spriteUrl("sprites/bld/kiosk-front-2.png")) && /animation:frame2of2 /.test(a) && !/NaN/.test(a); }); }
+      const kv = [0, 1, 2, 3].map(f => building34({id:"pk", type:"kiosk", face:f, points:rectPts(150, 150, 5, 4, 0)}, BUILDINGS.kiosk, false, false, true, .1)), has = v => kv.some(a => a.includes(spriteUrl(`sprites/bld/kiosk-${v}.png`)) && a.includes(spriteUrl(`sprites/bld/kiosk-${v}-2.png`)));
+      out.kioskSpriteAnimates = has("front") && has("back") && kv.every(a => /animation:frame2of2 /.test(a) && !/NaN/.test(a)); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
     out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
