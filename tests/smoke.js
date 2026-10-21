@@ -2683,6 +2683,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       select("animal", a1.id); animalLive(true);
       const inp = document.getElementById("aName");
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
+      // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
+      const hl = () => document.getElementById("anHealth").textContent;
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && /chance a day of falling ill/.test(hl());
+      a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
+      out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && !!document.querySelector("#anHealth .meter");
+      a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
+      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl());
+      delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
       out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");
       inp.value = "x".repeat(60); inp.dispatchEvent(new Event("change", {bubbles:true}));

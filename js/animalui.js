@@ -21,6 +21,25 @@ function animalStressors(a, e, s){
   if(rep) for(const i of rep.issues) if(i.bad) out.push(i.text.replace(/\.$/, ""));
   return [...new Set(out)];
 }
+// One animal's health as bulleted checks: [level, text]. Mild illness nobody has spotted yet doesn't show.
+function animalHealthItems(a, e, s){
+  const out = [], pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, sk = noticed(a) ? a.sick : null, hit = sk && sk.hit;
+  if(sk){
+    const what = sk.kind === "injury" ? "Injured" : "Ill", cause = sk.cause === "trash" ? " from eating trash" : hit ? (hit.how === "fight" ? `, wounded in a fight with a ${hit.by}` : `, bitten by a ${hit.by}`) : "";
+    out.push([sk.sev >= 40 ? "bad" : "warn", `${what}${cause}, ${Math.round(sk.sev)}% severe${sk.chronic ? " (chronic)" : ""}.`]);
+    out.push(["warn", sickStatus(e, a)]);
+  } else out.push(["ok", "Looks healthy."]);
+  const q = a.q ?? 90;
+  out.push([q < 50 ? "bad" : q < 70 ? "warn" : "ok", q < 50 ? `Frail clone, ${q}% DNA. It falls ill ${HEALTH.frail.below50} times as often.` : q < 70 ? `Sickly clone, ${q}% DNA. It falls ill ${HEALTH.frail.below70} times as often.` : `${q}% DNA.`]);
+  if(!a.sick){
+    const i = illChance(e, a), j = injuryChance(e, a), why = [...new Set(i.why.concat(j.why))];
+    out.push([i.p >= .05 ? "bad" : why.length || i.p >= .015 ? "warn" : "ok", `About a ${pct(i.p)} chance a day of falling ill${j.p ? ` and ${pct(j.p)} of getting hurt` : ""}.${why.length ? ` Raised by ${why.map(w => RISK_WHY[w] || w).join(", ")}.` : ""}`]);
+  }
+  if(anyMedTech() && e.medFeed) out.push(e.medFedOk ? ["ok", "Medicated today."] : ["bad", "Not medicated today."]);
+  const d = daysSinceCheck(e);
+  out.push([d === 0 ? "ok" : d >= HEALTH.checkEvery ? "bad" : "warn", d >= 99 ? "No vet check-up on this exhibit yet." : d === 0 ? "A vet checked the exhibit today." : `The exhibit's last vet check-up was ${d} day${d === 1 ? "" : "s"} ago.`]);
+  return {items:out, sev:sk ? sk.sev : null};
+}
 function animalHtml(a){
   const e = animalHome(a.id), s = SPECIES_BY_ID[a.sp];
   let h = `<button class="back" data-action="${e ? "animalBack" : "deselect"}" data-id="${e ? esc(e.id) : ""}">‹ ${esc(e ? e.name : "Park office")}</button>`;
@@ -31,6 +50,7 @@ function animalHtml(a){
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? sellBtn(a) : ""}</div>`;
   h += `<section><h3>Happiness <span class="num" id="anMoodN"></span></h3><div class="meter"><i id="anMoodBar"></i></div></section>`;
   h += `<section><h3>Needs</h3>${NEED_KEYS.map(k => `<div class="need-row"><span>${NEED_TEXT[k]}</span><span id="anN-${k}"></span></div><div class="meter"><i id="anB-${k}"></i></div>`).join("")}</section>`;
+  h += `<section><h3>Health</h3><div id="anHealth"></div></section>`;
   h += `<section><h3>Wants</h3><ul class="issues" id="anWants"></ul></section>`;
   h += `<section><h3>What's bothering it</h3><ul class="issues" id="anStress"></ul></section>`;
   return h;
@@ -53,6 +73,8 @@ function animalLive(force){
     set("anN-" + k, v >= 75 ? "Desperate" : v >= 50 ? "Needs attention" : v >= 25 ? "Getting there" : "Fine");
     if(b){ b.style.width = Math.round(v) + "%"; b.style.background = v >= 75 ? "#D9483B" : v >= 50 ? "#E3B23C" : "#3E9B4F"; }
   }
+  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items) + (hp.sev == null ? "" : Math.round(hp.sev));
+    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = (hp.sev == null ? "" : meter(hp.sev, hp.sev < 40 ? "var(--warn)" : "var(--bad)")) + `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul>`; } }
   const fill = (id, list, none, bad) => {
     const ul = document.getElementById(id), key = list.join("|");
     if(ul && ul.dataset.v !== key){ ul.dataset.v = key; ul.innerHTML = list.length ? list.map(t => `<li class="${bad ? "bad" : ""}"><span>${esc(t)}</span></li>`).join("") : `<li><span class="meta">${none}</span></li>`; }
