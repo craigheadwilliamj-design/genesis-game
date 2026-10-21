@@ -98,43 +98,31 @@ function trashNight(out){
 }
 
 /* ---------- genome therapy ---------- */
-// A vet lifts a clone's DNA quality (a.q) toward what the lab's genome for its species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
-// The player queues animals (a.gene), and a free vet does them one by one.
+// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
 const labQuality = sp => cloneQuality(sp);
 const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
-function geneProblem(a){
-  const s = SPECIES_BY_ID[a.sp], gain = geneGain(a);
+const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && geneGain(a) >= GENE.minGain) : [];
+// Why it can't be switched on, or null
+function geneProblem(){
   if(!hasTech("genetherapy")) return "Research Genome therapy at ORACLE first.";
   if(!dept("pmc")) return "Genome therapy needs a connected Paleo-Medicine Center.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
-  if(!cloneOpen(a.sp)) return `The lab needs at least ${CLONE_GENOME.min}% of the ${s.name} genome first.`;
-  if(gain < GENE.minGain) return `The lab's ${s.name} genome is only ${state.science.dna[a.sp].genome}% complete, good for ${labQuality(a.sp)}% quality. Send GHOST for more of it.`;
-  if(!canAfford(geneCost(gain))) return `The procedure costs ${money(geneCost(gain))}. You have ${money(state.money)}.`;
   return null;
 }
-// The next queued animal a vet can reach that no other vet has taken
-function pickGene(c){
-  if(!hasTech("genetherapy") || !dept("pmc")) return null;
-  const vz = vetZone(c), taken = new Set(vcrew.filter(x => x !== c && x.gene).map(x => x.gene.a));
-  for(const e of state.exhibits){
-    if(!kGraph.anchors[e.id] || (vz && e.zone !== vz)) continue;
-    for(const a of e.animals) if(a.gene && !a.sick && !a.darted && !taken.has(a.id) && geneGain(a) >= GENE.minGain) return {e, a};
+// How long a vet's check-up of an exhibit takes, with the genome therapy it will do
+const checkWork = e => HEALTH.checkMinutes + GENE.minutes * geneTargets(e).length;
+// Done in the check-up: each clone the lab can improve gets a procedure while the money lasts
+function geneTherapy(e, who){
+  let n = 0, short = false;
+  for(const a of geneTargets(e)){
+    const gain = geneGain(a), cost = geneCost(gain);
+    if(!canAfford(cost)){ short = true; break; }
+    spend(cost, "medicine"); a.q = (a.q ?? 90) + gain; n++;
   }
-  return null;
-}
-function geneDone(c){
-  const e = c.gene && state.exhibits.find(x => x.id === c.gene.e), a = e && e.animals.find(x => x.id === c.gene.a), v = state.staff.vets.find(x => x.id === c.id), who = v ? v.name : "A vet";
-  c.gene = null; c.job = "idle"; c.wait = 0;
-  if(!a) return;
-  delete a.gene;
-  const s = SPECIES_BY_ID[a.sp], gain = geneGain(a), cost = geneCost(gain);
-  if(gain < GENE.minGain){ events.toast(`${who} called off the genome therapy on a ${s.name} in ${e.name}. The lab has no better genome to give it.`, "bad"); events.changed(); return; }
-  if(!canAfford(cost)){ events.toast(`${who} couldn't afford genome therapy on a ${s.name} in ${e.name} (${money(cost)}).`, "bad"); events.changed(); return; }
-  spend(cost, "medicine");
-  a.q = (a.q ?? 90) + gain;
-  events.toast(`${who} improved a ${s.name}'s genome in ${e.name} to ${a.q}% DNA quality.`, "good");
-  events.changed();
+  if(n) events.toast(`${who} gave genome therapy to ${n} clone${n === 1 ? "" : "s"} in ${e.name}.`, "good");
+  if(short) events.toast(`${who} couldn't afford genome therapy for every clone in ${e.name}.`, "bad");
+  return n;
 }
 
 /* ---------- who gets sick ---------- */
@@ -190,6 +178,24 @@ function healthReport(e){
   for(const a of e.animals){ if(a.sick) continue; const i = illChance(e, a), j = injuryChance(e, a); ill += i.p; hurt += j.p; i.why.concat(j.why).forEach(w => why.add(w)); }
   const well = e.animals.length - sick.length;
   return {sick, hidden, ill:well ? ill / well : 0, hurt:well ? hurt / well : 0, why:[...why]};
+}
+
+// Low hunger, water and sanitation for some of an exhibit's animals, as health list items [level, text]. Only what is low shows.
+function basicsLow(e, list){
+  const out = [], one = list.length === 1, low = k => list.filter(a => a.need && a.need[k] >= 50), who = k => { const n = low(k).length; return n ? (one ? "It's" : `${n} of ${list.length} are`) : ""; };
+  const worst = k => Math.max(0, ...list.map(a => a.need ? a.need[k] : 0)), lvl = k => worst(k) >= 75 ? "bad" : "warn";
+  if(!freeFeeding()){
+    const need = dailyNeed(e), empty = Object.keys(need).filter(t => stockFor(e, t) <= .01), thin = Object.keys(need).filter(t => !empty.includes(t) && stockFor(e, t) < storeMax(e, t) * .25);
+    if(empty.length) out.push(["bad", `Out of ${empty.join(" and ")}.`]);
+    else if(thin.length) out.push(["warn", `Running low on ${thin.join(" and ")}.`]);
+  }
+  if(who("hunger")) out.push([lvl("hunger"), `${who("hunger")} hungry.`]);
+  const noWater = list.some(a => thirsty(e, SPECIES_BY_ID[a.sp]));
+  if(noWater) out.push(["bad", e.viv ? "No pool for the animals that need one." : "No water for the animals that need it."]);
+  if(who("thirst")) out.push([lvl("thirst"), `${who("thirst")} thirsty.`]);
+  const dirt = e.dirt || 0;
+  if(dirt >= CLEAN.dirtyAt) out.push([dirt >= 60 ? "bad" : "warn", `Sanitation is low (${Math.round(100 - dirt)}%).`]);
+  return out;
 }
 
 // What raises illness and injury risk, in words (the keys are the `why` lists from illChance and injuryChance)
@@ -280,7 +286,7 @@ function syncVets(){
   // a vet who was let go drops whatever they were chasing
   for(const c of vcrew) if(!ids.has(c.id) && c.loose){ c.loose.vet = null; if(c.loose.status === "darting") c.loose.status = "loose"; }
   vcrew = vcrew.filter(c => ids.has(c.id));
-  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null, gene:null});
+  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null});
 }
 
 function vetGo(c, n, job){
@@ -340,8 +346,6 @@ function vetDecide(c){
   const fx = c.focusEx; c.focusEx = null;
   const p = pickPatient(c, fx) || pickPatient(c);
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
-  const g = pickGene(c);
-  if(g){ c.gene = {e:g.e.id, a:g.a.id}; if(vetGo(c, kGraph.anchors[g.e.id], "toGene")) return; c.gene = null; }
   const ex = pickCheck(c);
   if(ex){ c.check = ex.id; if(vetGo(c, kGraph.anchors[ex.id], "toCheck")) return; c.check = null; }
   c.wait = 15;
@@ -360,7 +364,7 @@ function vetArrive(c){
   if(c.job === "toCall"){
     const call = callFor(c), e = call && state.exhibits.find(x => x.id === call.ex);
     if(call) state.staff.calls = state.staff.calls.filter(x => x !== call);
-    if(e && kGraph.anchors[e.id] === c.at){ c.check = e.id; c.focusEx = e.id; c.job = "checking"; c.work = HEALTH.checkMinutes; return; }
+    if(e && kGraph.anchors[e.id] === c.at){ c.check = e.id; c.focusEx = e.id; c.job = "checking"; c.work = checkWork(e); return; }
     c.job = "idle"; return;
   }
   if(c.job === "toPatient"){
@@ -373,14 +377,9 @@ function vetArrive(c){
     }
     c.patient = null; c.job = "idle"; return;
   }
-  if(c.job === "toGene"){
-    const e = c.gene && state.exhibits.find(x => x.id === c.gene.e), a = e && e.animals.find(x => x.id === c.gene.a);
-    if(a && a.gene && !a.sick && !a.darted && kGraph.anchors[e.id] === c.at){ c.job = "splicing"; c.work = GENE.minutes; return; }
-    c.gene = null; c.job = "idle"; return;
-  }
   if(c.job === "toCheck"){
     const e = state.exhibits.find(x => x.id === c.check);
-    if(e && kGraph.anchors[e.id] === c.at){ c.job = "checking"; c.work = HEALTH.checkMinutes; return; }
+    if(e && kGraph.anchors[e.id] === c.at){ c.job = "checking"; c.work = checkWork(e); return; }
     c.check = null; c.job = "idle"; return;
   }
   c.job = "idle";
@@ -392,6 +391,7 @@ function checkDone(c){
   c.check = null; c.job = "idle"; c.wait = 0;
   if(!e) return;
   e.vetCheck = state.day;
+  if(geneTherapy(e, v ? v.name : "A vet")) events.changed();
   const found = e.animals.filter(a => a.sick && a.sick.hidden);
   for(const a of found) delete a.sick.hidden;
   if(found.length){ events.toast(`${v ? v.name : "A vet"} found ${found.length === 1 ? `an early illness in a ${SPECIES_BY_ID[found[0].sp].name}` : `${found.length} animals with early illness`} in ${e.name}.`); events.changed(); }
@@ -437,9 +437,9 @@ function vetsTick(dtMin){
     while(left > 0 && steps++ < 40){
       const call = c.job !== "toCall" ? callFor(c) : null;
       if(call && !vetBusy(c) && c.t === 0){ takeVetCall(c, call); if(c.job === "toCall") continue; }
-      if(c.job === "darting" || c.job === "treating" || c.job === "checking" || c.job === "splicing"){
+      if(c.job === "darting" || c.job === "treating" || c.job === "checking"){
         const w = Math.min(c.work, left); c.work -= w; left -= w;
-        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone, splicing:geneDone})[c.job](c);
+        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone})[c.job](c);
         continue;
       }
       if(c.route.length){
@@ -456,7 +456,7 @@ function vetsTick(dtMin){
   }
 }
 
-function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.gene = null; c.focusEx = null; } }
+function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.focusEx = null; } }
 
 function hireVet(){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center first.";
@@ -469,10 +469,10 @@ function hireVet(){
 }
 function vetStatus(v){
   const c = vcrew.find(x => x.id === v.id); if(!c) return "Clocking in";
-  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.gene ? c.gene.e : c.check)), n = e ? e.name : "an exhibit";
+  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.check)), n = e ? e.name : "an exhibit";
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
-          toGene:`Heading to give genome therapy in ${n}`, splicing:`Giving genome therapy in ${n}`, toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
+          toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
           darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC"}[c.job] || "Waiting for work";
 }
 

@@ -483,12 +483,12 @@ function behaviorHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
-// Exhibit sanitation: the dirt meter
+// Exhibit sanitation: 100 is spotless, and it falls as dirt builds
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
   let h = `<section><h3>Sanitation</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
@@ -496,7 +496,7 @@ const hli = (level, text) => `<li class="hl ${level}">${text}</li>`;
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
   if(!e.animals.length && !away.length) return "";
-  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
+  const hr = healthReport(e), items = [];
   let h = `<section><h3>Health</h3>`;
   if(!healthActive()) items.push(hli("ok", `Animals start falling ill on ${fmtDate(state.health.from)}.`));
   if(hr.sick.length){
@@ -505,33 +505,30 @@ function healthHtml(e){
   } else if(e.animals.length) items.push(hli("ok", "Everyone looks healthy."));
   if(e.animals.length){
     const d = daysSinceCheck(e), late = d >= HEALTH.checkEvery;
-    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.`));
+    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`}`));
   }
   if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
-    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
+    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}`));
   }
-  if(e.animals.length > hr.sick.length){
-    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => RISK_WHY[w] || w).join(", ")}.` : ""}`));
-  }
+  if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  // genome therapy: lift a clone's DNA toward the lab's genome
+  // genome therapy: vets lift clones' DNA at each check-up
   if(e.animals.length && hasTech("genetherapy")){
-    const low = e.animals.filter(a => (a.q ?? 90) < 100);
-    h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
-      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${cloneOpen(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${cloneOpen(a.sp) ? "Lab genome isn't better" : `Needs ${CLONE_GENOME.min}% genome`}</span>`}</li>`; }).join("")}</ul>`;
-    h += `<div class="meta">A vet rewrites the animal's DNA up to what the lab's genome gives a clone today, at most ${GENE.step} points a go. To go further, send GHOST for more of the genome. Healthier DNA means fewer illnesses.</div>`;
+    const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} below the lab's quality</span></div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
-    h += `<div class="meta">${e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : ""}Medicated feed cuts illness by ${Math.round((1 - MEDICINE.feedCut) * 100)}% and clears up mild cases without a vet${treatable < e.animals.length ? `, but only for animals whose era's medicine ORACLE has researched (${treatable} of ${e.animals.length} here)` : ""}.</div>`;
+    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at ORACLE.` : "");
+    if(note) h += `<div class="meta">${note.trim()}</div>`;
   }
   return h + `</section>`;
 }
@@ -859,8 +856,7 @@ panelEl.addEventListener("click", e => {
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
-    const an = it.animals.find(x => x.id === b.dataset.id);
-    if(an){ if(an.gene) delete an.gene; else { const why = geneProblem(an); if(why) ui.toast(why, "bad"); else an.gene = true; } }
+    if(it.geneTherapy) it.geneTherapy = false; else { const why = geneProblem(); if(why) ui.toast(why, "bad"); else it.geneTherapy = true; }
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }

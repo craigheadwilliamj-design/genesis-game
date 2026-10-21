@@ -216,19 +216,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
-    // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
+    // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
     state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
-    out.geneNeedsTech = !!geneProblem(ga);
+    out.geneNeedsTech = !!geneProblem();
     state.science.tech.push("genetherapy");
     out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    out.geneOffDoesNothing = !viv.geneTherapy && geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 65;
-    out.geneNoBetterGenome = !!geneProblem(ga);
+    viv.geneTherapy = true; out.geneNoBetterGenome = geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 80;
-    out.geneQueues = !geneProblem(ga); ga.gene = true;
+    out.geneQueues = !geneProblem() && geneTargets(viv).includes(ga) && checkWork(viv) === HEALTH.checkMinutes + GENE.minutes * geneTargets(viv).length; delete viv.vetCheck;
     const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 70 && !ga.gene) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
+    out.geneVetDoesIt = run(600, () => ga.q === 70) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -2690,6 +2691,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && !!document.querySelector("#anHealth .meter");
       a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
       out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl());
+      // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low
+      const ex0 = animalHome(a1.id), dirtKeep = ex0.dirt, needKeep = {...a1.need};
+      ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);
+      out.animalHealthBasicsQuiet = !/hungry|thirsty|Sanitation is low/.test(hl());
+      ex0.dirt = 50; a1.need.hunger = 80; a1.need.thirst = 55; animalLive(true);
+      out.animalHealthBasics = /It's hungry/.test(hl()) && /It's thirsty/.test(hl()) && /Sanitation is low \(50%\)/.test(hl());
+      { const tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex0.id; exTabs.tab = "health"; const hh = exhibitHtml(ex0); exTabs.tab = tk; exTabs.ex = tx;
+        out.exhibitHealthBasics = /1 of \d+ are hungry|It's hungry/.test(hh) && /thirsty/.test(hh) && /Sanitation is low \(50%\)/.test(hh); }
+      ex0.dirt = dirtKeep; Object.assign(a1.need, needKeep);
       delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
       out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");

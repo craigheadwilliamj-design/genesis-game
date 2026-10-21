@@ -339,7 +339,7 @@ const callKind = x => x.kind || "keeper";
 const callFor = c => state.staff.calls.find(x => x.keeper === c.id) || null;
 const callBusy = c => c.cargo || c.hunt || c.job === "filling" || c.job === "sedating" || c.job === "hunting" || c.job === "toSedated" || c.job === "returning"
   || (state.safety && state.safety.loose.some(l => l.keeper === c.id));
-const vetBusy = c => c.loose || ["darting", "treating", "checking", "splicing", "hunting"].includes(c.job);
+const vetBusy = c => c.loose || ["darting", "treating", "checking", "hunting"].includes(c.job);
 const mechBusy = c => c.job === "inspecting" || c.job === "repairing";
 function callProblem(e, kind = "keeper"){
   const K = CALLS[kind];
@@ -377,7 +377,7 @@ function takeCall(c, call){
 }
 // A called vet drops a trip to a patient or check-up and goes to look the exhibit over
 function takeVetCall(c, call){
-  c.patient = null; c.gene = null; c.check = null;
+  c.patient = null; c.check = null;
   c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
   if(!vetGo(c, kGraph.anchors[call.ex], "toCall")) call.keeper = null;
 }

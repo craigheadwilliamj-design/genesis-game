@@ -460,7 +460,7 @@ function upgradeSave(s){
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   // animals from before behavior get a fresh set of needs (behavior.js)
-  for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; }   // who is indoors isn't saved: the shelters fill up again as the day goes
+  for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; delete a.gene; }   // who is indoors isn't saved: the shelters fill up again as the day goes
   // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
   if(!s.animalSeq) s.animalSeq = {};
   { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
