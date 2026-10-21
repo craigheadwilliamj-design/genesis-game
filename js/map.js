@@ -1116,14 +1116,17 @@ function faceMark34(P, i, wall, m, text){
 }
 // Genesis buildings drawn as one picture per view (sprites/bld/<name>-<front|back|left|right>.png at ROCK_MPP), picked by where the door looks: down the screen front, up back, left or right the side with the door at that end. w x h is the picture in px, base the row under its base slab (the shadow rows below it hang past the footprint's front edge; sideBase for the left and right pictures, when it differs). A pixel is square on screen after the squash. views lists the pictures drawn so far when some are missing; the rest fall back to the front. frames: an animation, <name>-<view>-2.png etc., cycling at 3 a second, one shown at a time.
 // Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food cart: the vendor shifting behind the counter; its side pictures sit two rows lower in the frame (sideBase), the right one the left mirrored.
-const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, sideBase:38, frames:2}};
+// card: the pictures are flat, with no roof depth drawn, so the back view stands on the door wall (the footprint's north edge) to meet the path it faces, not on the south edge. hit: the picture's opaque box per view [x0, y0, x1, y1] in px, tappable on top of the footprint.
+const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, sideBase:38, frames:2, card:true,
+  hit:{front:[2, 1, 37, 36], back:[2, 1, 37, 36], left:[6, 0, 33, 38], right:[7, 0, 34, 38]}}};
 function bldSprite34(bl, P, on, dead, reach, line){
-  const B = BLD_PICS[bl.type], px = FLAT34.px, [cx] = centroid(P), by = Math.max(...P.map(p => p[1]));
+  const B = BLD_PICS[bl.type], px = FLAT34.px, [cx] = centroid(P);
   const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), v = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right", view = !B.views || B.views.includes(v) ? v : "front";
-  const base = view === "left" || view === "right" ? B.sideBase || B.base : B.base, [x, y] = flatSnap34([cx - B.w / 2 * px, by - base * px / TILT]);
+  const by = (B.card && view === "back" ? Math.min : Math.max)(...P.map(p => p[1])), base = view === "left" || view === "right" ? B.sideBase || B.base : B.base, [x, y] = flatSnap34([cx - B.w / 2 * px, by - base * px / TILT]);
   const img = (f, a) => `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${f > 1 ? "-" + f : ""}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(B.w * px).toFixed(2)}" height="${(B.h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated${a}" pointer-events="none"/>`;
   const n = B.frames || 1, dur = n / 3, ph = (performance.now() / 1000 + [...String(bl.id)].reduce((a, c) => a + c.charCodeAt(0), 0) / 3) % dur;   // one frame shown at a time (the pictures have see-through bits, so stacking them ghosts), kept in step across redraws, each building a beat apart
-  let s = `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/>`;
+  const h = B.hit && B.hit[view];
+  let s = `<polygon points="${polyStr(P)}" fill="transparent" ${on || dead || !reach ? line : ""}/>` + (h ? `<rect x="${(x + h[0] * px).toFixed(2)}" y="${(y + h[1] * px / TILT).toFixed(2)}" width="${((h[2] - h[0]) * px).toFixed(2)}" height="${((h[3] - h[1]) * px / TILT).toFixed(2)}" fill="transparent"/>` : "");
   for(let f = 1; f <= n; f++) s += img(f, n < 2 ? "" : `;visibility:${f > 1 ? "hidden" : "visible"};animation:frame${f}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`);
   return s;
 }
