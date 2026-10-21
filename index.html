@@ -167,8 +167,9 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .toast td{padding:1px 0}
 .toast td:last-child{text-align:right}
 .toast .tot td{border-top:1px solid var(--line);font-weight:600;padding-top:3px}
-/* building animations (bldSprite34): frame f of n shows for its share of each cycle */
-@keyframes frame2of2{0%{opacity:0}50%{opacity:1}100%{opacity:1}}
+/* building animations (bldSprite34): frame f of n is the only one shown for its share of each cycle. Visibility, not opacity: an opacity animation moves the picture to the compositor, which can blur it. */
+@keyframes frame1of2{0%{visibility:visible}50%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame2of2{0%{visibility:hidden}50%{visibility:visible}100%{visibility:visible}}
 @keyframes tin{from{transform:translateY(8px);opacity:0}}
 @media (prefers-reduced-motion: reduce){.toast{animation:none}}
 
