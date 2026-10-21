@@ -3182,7 +3182,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // Genesis buildings drawn as pictures: the restroom turns, the food cart turns too, its two frames shown one at a time
     { const b34 = (ty, r) => building34({id:"pk", type:ty, points:rectPts(150, 150, BUILDINGS[ty].w, BUILDINGS[ty].d, r * Math.PI / 2)}, BUILDINGS[ty], false, false, true, .1);
       out.restroomSpriteByFacing = ["front", "left", "back", "right"].some(v => b34("restroom", 0).includes(spriteUrl(`sprites/bld/restroom-${v}.png`)));
-      const kv = [0, 1, 2, 3].map(f => building34({id:"pk", type:"kiosk", face:f, points:rectPts(150, 150, 5, 4, 0)}, BUILDINGS.kiosk, false, false, true, .1)), has = v => kv.some(a => a.includes(spriteUrl(`sprites/bld/kiosk-${v}.png`)) && a.includes(spriteUrl(`sprites/bld/kiosk-${v}-2.png`)));
+      const kv = [0, 1, 2, 3].map(f => building34({id:"pk", type:"kiosk", face:f, points:rectPts(150, 150, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}, BUILDINGS.kiosk, false, false, true, .1)), has = v => kv.some(a => a.includes(spriteUrl(`sprites/bld/kiosk-${v}.png`)) && a.includes(spriteUrl(`sprites/bld/kiosk-${v}-2.png`)));
+      // an old 5 x 4 m food cart shrinks to its picture's base, its door wall staying put
+      { const sv = JSON.parse(JSON.stringify(state)), old = rectPts(150, 150, 4, 5, 0); sv.buildings = [{id:"pko", type:"kiosk", face:1, day:0, points:old}];
+        upgradeSave(sv); const P = sv.buildings[0].points, b = bbox(P), b0 = bbox(old);
+        out.oldKioskShrinks = Math.abs(b.x1 - b0.x1) < 1e-6 && Math.abs((b.x1 - b.x0) - BUILDINGS.kiosk.d) < 1e-6 && Math.abs((b.y1 - b.y0) - BUILDINGS.kiosk.w) < 1e-6 && Math.abs((b.y0 + b.y1) - (b0.y0 + b0.y1)) < 1e-6
+          && JSON.stringify(upgradeSave(JSON.parse(JSON.stringify(sv))).buildings[0].points) === JSON.stringify(P); }
       out.kioskSpriteAnimates = ["front", "back", "left", "right"].every(has) && kv.every(a => /visibility:visible;animation:frame1of2 /.test(a) && /visibility:hidden;animation:frame2of2 /.test(a) && !/opacity/.test(a) && !/NaN/.test(a)); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});

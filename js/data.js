@@ -444,7 +444,8 @@ const STARTER_POOLS = {
 //   minRating  stars the park needs before you can build it
 const BUILDINGS = {
   // Dining and retail come in the same three tiers and sizes: cart (1 item), stand (3 items), and a large restaurant or shop (5 items)
-  kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5,  d:4,  kind:"food",  menuSlots:1, slots:2,  serveMin:3},
+  // the food cart's footprint is its picture's base (sprites/bld/kiosk-*.png: 29 px across the front, 20 px across the side)
+  kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:3.8, d:2.6, kind:"food",  menuSlots:1, slots:2,  serveMin:3},
   food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:8,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
   restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
   cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
