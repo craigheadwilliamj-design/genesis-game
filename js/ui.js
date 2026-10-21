@@ -240,23 +240,22 @@ function exhibitHtml(e){
 
   // barriers, moats, and aviary netting
   if(!e.viv){
-    const cur = e.barrier || "wood";
-    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).map(([key, b]) => {
-      const locked = b.tech && !hasTech(b.tech), cost = key === cur ? 0 : upgradeCost(e, key);
-      return `<option value="${key}"${key === cur ? " selected" : ""}${locked ? " disabled" : ""}>${b.label}, strength ${b.strength}${locked ? " (research at ORACLE)" : key === cur ? " (current)" : cost ? `, ${money(cost)}` : ", free"}</option>`;
-    }).join("")}</select></label>`;
-    if(cur === "electric") h += `<div class="row" style="margin-top:6px"><span class="status ${e.powered === false ? "no" : "ok"}">${e.powered === false ? "No power" : "Powered"}</span><span class="meta">Draws ${Math.round(fenceDraw(e))} kW. Park supply ${Math.round(powerSupply())} of ${Math.round(powerDemand())} kW needed.${generators().length ? "" : " Build a generator."}</span></div>`;
+    h += `<section><h3>Barrier</h3>`;
     const kc = knownCond(e), since = daysSinceInspect(e);
     h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(kc, kc >= 60 ? "var(--good)" : kc >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(kc)}%</span></div>`;
-    h += `<div class="meta">${e.open ? "<b style='color:var(--bad)'>There's a gap in the fence.</b> Animals can walk out until you close it. " : isBreached(e) ? "<b style='color:var(--bad)'>Broken.</b> Animals can walk out until a mechanic repairs it. " : ""}${since >= 99 ? "Never inspected." : since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago${since >= MAINT.inspectEvery ? ", overdue" : ""}.`} Wears about ${wearPerDay(e).toFixed(1)}% a day${wearPerDay(e) > barrierOf(e).wear + .01 ? ", partly from animals attacking it" : ""}.</div>`;
-    h += `<div class="meta" style="margin-top:4px">${cur === "concrete" ? "Concrete hides the animals, so guests enjoy this exhibit much less. A viewing platform fixes that." : cur === "acrylic" ? "Guests love seeing through acrylic." : cur === "brick" || cur === "stone" ? "Tough and only moderately tall, so guests can still see over it." : cur === "bamboo" ? "Cheap and weak, and it wears out fast. Only for animals that won't test it." : cur === "palisade" ? "Solid logs: strong for wood, but guests see little of the animals." : cur === "iron" ? "Strong, and guests see right through it." : cur === "drystone" ? "A low wall that holds small, calm animals and looks lovely." : cur === "adobe" ? "Thick, sun-baked walls. Guests see little, and the rain wears them down." : cur === "stake" ? "Crossed stakes, the old Scandinavian way. Light and cheap." : cur === "bone" ? "Mammoth ribs lashed to bone posts. Strong for something that looks this old." : ""} Changing walls has no refund.</div>`;
+    const notes = [];
+    if(e.open) notes.push(["bad", "There's a gap in the fence. Animals can walk out until you close it."]);
+    else if(isBreached(e)) notes.push(["bad", "Broken. Animals can walk out until a mechanic repairs it."]);
+    notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
+    h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
+    h += `<div class="meta" style="margin-top:6px">Guest appeal: ${Math.round(viewFactor(e, derived.reach) * 100)}%</div>`;
     h += `<div class="row" style="margin-top:8px">`;
     h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
     h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at ORACLE</span>`;
     h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at ORACLE</span>`;
     h += `</div>`;
     const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
-    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}Guests see in at ${Math.round(viewFactor(e, derived.reach) * 100)}%.${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
     h += `</section>`;
   }
 
@@ -893,17 +892,6 @@ panelEl.addEventListener("change", ev => {
   const e = selItem(), f = e && landOf(e).find(x => x.id === id); if(!f) return;
   f.set = ev.target.value || null; f.food = {};
   ui.panel();
-});
-
-// Changing an exhibit's wall type
-panelEl.addEventListener("change", ev => {
-  if(ev.target.id !== "barrierSel") return;
-  const e = selItem(), key = ev.target.value; if(!e) return;
-  const b = BARRIERS[key], cost = upgradeCost(e, key);
-  if((b.tech && !hasTech(b.tech)) || !canAfford(cost)){ ui.toast(!canAfford(cost) ? `That costs ${money(cost)}.` : "Research it at ORACLE first.", "bad"); ui.panel(); return; }
-  spend(cost, "built"); if(e.grid) refenceExhibit(e, key); else e.barrier = key;
-  ui.toast(`${e.name} now has ${b.label.toLowerCase()}${cost ? ` (${money(cost)})` : ""}.`);
-  afterChange(); render();
 });
 
 // A yes/no question inside the page
