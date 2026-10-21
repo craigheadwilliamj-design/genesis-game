@@ -227,6 +227,10 @@ let u = uAt(375e6), sel = null, target = null;
 // Missions run on a park clock in days (a game day is 240 s at 1x). A mission resolves when it gets back, and its
 // post-mission overview waits in reports until it's dismissed.
 const MAX_DRONES = 5, DAY_SECONDS = 240;
+// Drones are bought with money at GHOST (they replace Temporal Researchers and aren't staff: no wage). The first comes
+// with GHOST; each one after costs DRONE_PRICE.growth times the last.
+const DRONE_PRICE = {base:15000, growth:1.5};
+const dronePrice = () => Math.round(DRONE_PRICE.base * Math.pow(DRONE_PRICE.growth, fleet - 1) / 500) * 500;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch(e) { return d; } };
 const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
 let fleet = Math.min(Math.max(load("ghost-timeline-fleet", 1), 1), MAX_DRONES);
@@ -402,12 +406,13 @@ function renderFleet(){
   $("fleet").innerHTML = `<div class="head"><h2>GHOST Drones <span class="count">${fleet} of ${MAX_DRONES}</span></h2>
       <label class="clock">Day ${Math.floor(day)} · Speed <select id="speed">${[[0, "Paused"], [1, "1×"], [10, "10×"], [60, "60×"]].map(([v, l]) => `<option value="${v}"${v === speed ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
     <ul class="ships">${rows}</ul>
-    ${fleet < MAX_DRONES ? `<div class="btns"><button class="ghost" id="addDrone">Add a drone (test)</button></div>` : ""}
+    <div class="btns">${fleet < MAX_DRONES ? `<button id="addDrone">Buy a drone · $${dronePrice().toLocaleString("en-US")}</button>` : `<span class="note">GHOST's hangar is full.</span>`}${fleet > 1 ? `<button class="ghost" id="resetFleet">Reset drones (test)</button>` : ""}</div>
     ${reports.length ? `<div id="reports">${reports.map(reportHtml).join("")}</div>` : ""}`;
 }
 $("fleet").addEventListener("change", ev => { if(ev.target.id === "speed"){ speed = +ev.target.value; keep("ghost-timeline-speed", speed); } });
 $("fleet").addEventListener("click", ev => {
   if(ev.target.id === "addDrone" && fleet < MAX_DRONES){ fleet++; saveFleet(); renderFleet(); renderCard(); }
+  if(ev.target.id === "resetFleet"){ fleet = 1; missions = missions.filter(m => m.drone === 0); saveFleet(); renderFleet(); renderCard(); }
   if(ev.target.classList.contains("dismiss")) dismiss(+ev.target.dataset.r);
 });
 
