@@ -61,6 +61,13 @@ figcaption{font-size:13px;color:var(--dim)}
 .btns button.ghost{background:transparent;color:var(--ink)}
 .btns button:disabled{opacity:.45;cursor:default}
 button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.fauna{width:100%;border-collapse:collapse;font-size:14px}
+.fauna th{text-align:left;font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 0;border-bottom:1px solid var(--line)}
+.fauna th:last-child,.fauna td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.fauna td{padding:6px 0;border-bottom:1px solid var(--line)}
+.fauna label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.tag{font:500 11px var(--mono);color:var(--dim)}
+.result{margin:0;font-size:14px}
 .empty{color:var(--dim);font-size:14px;margin:0}
 </style>
 </head>
@@ -117,9 +124,14 @@ PERIODS.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
 // Maps by period, 130 x 65 px. Sites put their dot on a map by pixel.
 const MAPS = {Devonian:"maps/devonian.png"};
 const SITES = [
-  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:["Tiktaalik"], trip:3500, days:1.5, risk:.10},
-  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:["Ichthyostega"], trip:3500, days:1.5, risk:.10},
+  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:[{name:"Tiktaalik", space:10}], trip:3500, days:1.5, risk:.10},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:[{name:"Ichthyostega", space:8}], trip:3500, days:1.5, risk:.10},
 ];
+
+// Survey Success for one animal at a site, the game's tripOdds: bigger animals are harder to find (TRIP.fail by TRIP_SIZE), plus the site's own risk.
+const TRIP = {fail:[.1, .35]}, TRIP_SIZE = [10, 5000];
+const sizeT = space => Math.min(Math.max(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0), 1);
+const success = (s, a) => 1 - Math.min(Math.max(TRIP.fail[0] + (TRIP.fail[1] - TRIP.fail[0]) * sizeT(a.space) + s.risk, 0), .8);
 
 // Slider position u (0 = oldest, 1 = today) to years ago and back: equal bars, equal slices, log scale inside a slice.
 function yearsAt(u){
@@ -147,7 +159,8 @@ const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
 let lit = new Set();
 try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
 const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
-let u = uAt(375e6), sel = null;
+let u = uAt(375e6), sel = null, target = null, result = "";
+const found = new Set();
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
@@ -198,20 +211,29 @@ function renderCard(){
   const on = lit.has(s.id), win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
   const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`;
   c.innerHTML = on ? `<h2>${esc(s.name)}</h2><div class="where">${esc(s.where)}</div>
-    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>${s.fauna.map(esc).join(", ")}</dd>
-    <dt>Trip</dt><dd>${trip}</dd><dt>Survey Success</dt><dd>${Math.round((1 - s.risk) * 100)}%</dd></dl>
-    <div class="btns"><button id="go" disabled>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
+    <dl><dt>When</dt><dd>${win}</dd><dt>Trip</dt><dd>${trip}</dd></dl>
+    <table class="fauna"><thead><tr><th>Target</th><th>Survey Success</th></tr></thead><tbody>${s.fauna.map(a =>
+      `<tr><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}> ${esc(a.name)}${found.has(a.name) ? ' <span class="tag">found</span>' : ""}</label></td><td>${Math.round(success(s, a) * 100)}%</td></tr>`).join("")}</tbody></table>
+    ${result ? `<p class="result">${esc(result)}</p>` : ""}
+    <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
   : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
-    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Unknown until GHOST scouts it</dd><dt>Trip</dt><dd>${trip}</dd></dl>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>
     <div class="btns"><button id="survey">Send scouting trip</button></div>`;
 }
 
-function pick(id){ sel = id; render(); }
+function pick(id){ if(id !== sel){ target = null; result = ""; } sel = id; render(); }
 $("map").addEventListener("click", ev => { const g = ev.target.closest(".site"); if(g) pick(g.dataset.id); });
 $("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
 $("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
+$("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; result = ""; renderCard(); } });
 $("card").addEventListener("click", ev => {
   if(ev.target.id === "survey"){ lit.add(sel); saveLit(); render(); }
+  if(ev.target.id === "go"){
+    const s = SITES.find(x => x.id === sel), a = s.fauna.find(x => x.name === target);
+    if(Math.random() < success(s, a)){ result = found.has(a.name) ? `GHOST found more ${a.name} DNA.` : `GHOST found a ${a.name}. It's unlocked.`; found.add(a.name); }
+    else result = `GHOST came back from the ${s.name} empty-handed.`;
+    renderCard();
+  }
   if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); render(); }
 });
 
