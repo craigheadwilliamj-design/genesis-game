@@ -307,10 +307,10 @@ function upgradeSave(s){
     }
     b.face = best;
   }
-  // food carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in
+  // food carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in. Ones placed at the new size before the door wall snapped to the grid slide onto it (doorOnGrid, map.js), up to half a meter.
   for(const b of s.buildings) if(b.type === "kiosk" && b.points && b.points.length === 4){
     const t = BUILDINGS.kiosk, P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % 4], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
-    if(Math.abs(L - t.w) < 1e-3 && Math.abs(Math.hypot(P[(i + 2) % 4][0] - c[0], P[(i + 2) % 4][1] - c[1]) - t.d) < 1e-3) continue;
+    if(Math.abs(L - t.w) < 1e-3 && Math.abs(Math.hypot(P[(i + 2) % 4][0] - c[0], P[(i + 2) % 4][1] - c[1]) - t.d) < 1e-3){ b.points = doorOnGrid(P, b.face === undefined ? 2 : b.face); continue; }
     const ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L, [cx, cy] = centroid(P), mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2, out = -uy * (mx - cx) + ux * (my - cy) < 0 ? -1 : 1;
     b.points = rectPts(mx + uy * out * t.d / 2, my - ux * out * t.d / 2, t.w, t.d, Math.atan2(uy, ux)).map(p => [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]);
   }

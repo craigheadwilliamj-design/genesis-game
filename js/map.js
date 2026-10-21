@@ -2546,6 +2546,11 @@ function propFacing(x, y, type){
   const k = best && (!edge || best.d <= edge.d) ? o : edge ? edge.k : 2;
   return [Math.round(Math.cos(k * Math.PI/4) * 1e6) / 1e6, Math.round(Math.sin(k * Math.PI/4) * 1e6) / 1e6];
 }
+// Slide a building so the wall with its door lies on the grid, so it can stand flush against a path (whose edges are on whole meters) whatever its depth. 0-3 = N/E/S/W.
+function doorOnGrid(pts, face){
+  const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][face], d = Math.round(e / GRID_STEP) * GRID_STEP - e, ax = face % 2;
+  return pts.map(([x, y]) => [Math.round((x + (ax ? d : 0)) * 1e6) / 1e6, Math.round((y + (ax ? 0 : d)) * 1e6) / 1e6]);
+}
 function placeGhost(clientX, clientY){
   lastPtr = {x:clientX, y:clientY};
   const t = BUILDINGS[tool];
@@ -2570,7 +2575,9 @@ function placeGhost(clientX, clientY){
     // everything else goes on the 1 m grid at the pointer, square to the map
     x = Math.round(p.x / GRID_STEP) * GRID_STEP; y = Math.round(p.y / GRID_STEP) * GRID_STEP;
   }
-  const pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
+  const face = t.prop ? undefined : (2 + rot / 2) % 4;   // a fresh building looks south; each quarter turn swings its door with it
+  let pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
+  if(!t.prop && !t.viv) pts = doorOnGrid(pts, face);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
@@ -2578,7 +2585,6 @@ function placeGhost(clientX, clientY){
   if(!why && !t.onPath && (shapeOnChunks(pts) || state.paths.some(q => !q.d && lineEntersShape(q.points, pts)))) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
-  const face = t.prop ? undefined : (2 + rot / 2) % 4;   // a fresh building looks south; each quarter turn swings its door with it
   ghost = {pts, x, y, angle, ok:!why, why, face};
   // does it work where it stands? Same reach test as recompute: guests walk to it by footpath, staff by any path (depots by staff path)
   const reached = t.onPath ? nearCells(pts, 0, true) : nearCells(pts, REACH - PATH_HALF_WIDTH, !t.dept) && (!t.serviceOnly || nearCells(pts, REACH - PATH_HALF_WIDTH, false, false, "s"));
@@ -2598,11 +2604,12 @@ function rotateMoved(){
   const it = mvSel && findItem("building", mvSel);
   if(!it){ setStat("Tap a building first, then Rotate.", true); return; }
   const orig = it.points, [cx, cy] = centroid(orig), a = Math.PI/2, c = Math.cos(a), s = Math.sin(a);
+  const prop = BUILDINGS[it.type].prop, face0 = it.face, face = prop ? face0 : ((face0 === undefined ? 2 : face0) + 1) % 4;   // the door turns with the walls
   it.points = orig.map(([x, y]) => [Math.round((cx + (x - cx)*c - (y - cy)*s) * 1e6) / 1e6, Math.round((cy + (x - cx)*s + (y - cy)*c) * 1e6) / 1e6]);
+  if(!prop){ it.points = doorOnGrid(it.points, face); it.face = face; }
   const why = moveProblem("building", it);
-  if(why){ it.points = orig; setStat(`Can't turn it here. ${why}`, true); return; }
-  if(BUILDINGS[it.type].prop) it.rot = ((it.rot || 0) + 2) % 8;
-  else it.face = ((it.face === undefined ? 2 : it.face) + 1) % 4;   // the door turns with the walls
+  if(why){ it.points = orig; it.face = face0; setStat(`Can't turn it here. ${why}`, true); return; }
+  if(prop) it.rot = ((it.rot || 0) + 2) % 8;
   afterChange(); render(); updateMoveBar();
   const reach = isReachable(it);
   setStat(reach ? "Turned." : "Turned, but it has no path to the entrance, so it won't work.", !reach);
