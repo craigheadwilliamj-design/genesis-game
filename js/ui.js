@@ -483,13 +483,12 @@ function behaviorHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
-// Exhibit dirtiness: the meter and what it means
+// Exhibit sanitation: the dirt meter
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
-  let h = `<section><h3>Dirtiness</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
-    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
+  let h = `<section><h3>Sanitation</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
