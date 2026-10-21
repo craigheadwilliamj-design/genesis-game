@@ -10,7 +10,7 @@ const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="lo
 
 // Which tab is open in each department's panel
 const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"TAR", title:"TAR upgrades", color:"#4B3A8C"}, {key:"ghost", label:"GHOST", title:"GHOST upgrades", color:"#4B3A8C"}];
-let oracleMain = "manage", oracleManage = "barrier", oracleTab = null, oracleEra = "mesozoic", ghostTab = null, cerePeriod = "Jurassic";
+let oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
@@ -61,7 +61,7 @@ function projectRow(kind, id, label, text){
   const info = projectInfo(kind, id), sc = state.science, run = sc.projects.find(p => p.kind === kind && p.id === id);
   const prereq = info.needs && !hasTech(info.needs), why = info.done || run ? null : projectProblem(kind, id);
   let right;
-  if(info.done) right = `<span class="status ok">${kind === "species" ? "Unlocked" : "Researched"}</span>`;
+  if(info.done) right = `<span class="status ok">Researched</span>`;
   else if(run) right = `<span class="meta">${leftText(run.end)} left</span>`;
   else right = `<button class="buy" data-action="research" data-kind="${kind}" data-id="${esc(id)}"${why ? ` disabled title="${esc(why)}"` : ""}>${info.points} pts, ${spanText(projectMinutes(info.points))}</button>`;
   const need = prereq && !info.done ? ` Needs ${esc(projectInfo("tech", info.needs).label)} first.` : "";
@@ -74,24 +74,15 @@ function oracleHtml(b){
   let h = deptHead(b);
   h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">research points. ${n ? `+${idle * RESEARCH_PER_PALEO} a day from ${idle} researcher${idle === 1 ? "" : "s"} on general research${idle < n ? ` (${n - idle} busy on projects)` : ""}.` : "Hire a researcher to earn them."} Educated guests add more when they leave. Research takes time: ${spanText(projectMinutes(30))} for every 30 points.</span></div></section>`;
   h += sciStaffHtml("paleo");
-  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), p.kind === "species" ? "genome" : "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `On general research: +${RESEARCH_PER_PALEO} points a day. Pick a project below to assign them.`);
+  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `On general research: +${RESEARCH_PER_PALEO} points a day. Pick a project below to assign them.`);
   const block = labBlocker();
   if(block) h = h.replace(/<\/section>$/, `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div></section>`);
 
-  h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"animals", label:"Animals", color:"#1F6F73"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
+  h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
   if(oracleMain === "manage"){
     const secs = MANAGE_TABS.find(t => t.key === oracleManage) || MANAGE_TABS[0];
     h += tabBar("omanage", MANAGE_TABS, secs.key);
     h += `<h3 style="margin-top:8px">${secs.title}</h3><ul class="shop">${techRows(secs.key)}</ul>`;
-  } else if(oracleMain === "animals"){
-    if(!oracleTab) oracleTab = PERIOD_ORDER.find(id => speciesToUnlock().some(s => s.period === id && isUnlocked(s.id))) || "Quaternary";
-    h += `<div class="meta" style="margin-bottom:8px">ORACLE unlocks an animal so GHOST can go looking for its DNA. Genome progress is at GHOST.</div>`;
-    h += tabBar("otab", PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!speciesToUnlock().some(s => s.period === id && isUnlocked(s.id))})), oracleTab);
-    const p = PERIOD_BY_ID[oracleTab], list = speciesToUnlock().filter(s => s.period === p.id);
-    h += `<div class="meta" style="margin:8px 0">${p.ago}.</div><ul class="shop">`;
-    for(const s of list) h += projectRow("species", s.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`,
-      `${s.space.toLocaleString()} m² each. ${starsNeed(s) ? `Needs ${starsNeed(s)}★ to clone. ` : ""}${isUnlocked(s.id) ? "GHOST can look for it." : ""}`);
-    h += `</ul>`;
   } else if(oracleMain === "flora"){
     h += `<div class="meta" style="margin-bottom:8px">Plants are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
     h += `<h3>Plants</h3><ul class="shop">${techRows("flora")}</ul>`;
@@ -111,63 +102,158 @@ function oracleHtml(b){
 
 /* ---------- GHOST ---------- */
 
-function ghostBlocker(){
-  const sc = state.science;
-  return deptProblem("ghost") || (!sc.crew.temporal ? "Hire a Temporal Researcher to lead expeditions." : null);
+// The timeline's place (0 the oldest, 1 today), the open site, and the expedition target picked on its card. Not saved.
+let ghostU = null, ghostSite = null, ghostPick = null;
+const GT_EVENT = "#E9C766", GT_LIT = "#D9FF00", GT_MARK = "#454646";
+const tripWhen = siteId => spanText(tripMinutes(siteId));
+// Where the slider opens: on the newest scouted site, else in the Pleistocene
+function ghostStart(){
+  const s = TIME_SITES.filter(x => isScouted(x.id) && Object.keys(x.at).length).pop();
+  return uAt(s ? Math.sqrt(s.from * s.to) : 30000);
 }
-// One genome GHOST can chase: progress, odds, and a button
-function tripRow(id, periodId, label){
-  const sc = state.science, d = sc.dna[id], open = genomeOpen(id), g = genomeInfo(id), out = sc.trips.filter(t => t.sp === id).length;
-  const o = tripOdds(id, periodId), why = open ? tripProblem(id, periodId) : "locked";
-  let h = `<li class="${open ? "" : "locked"}"><span class="nm">${label}</span>`;
-  h += open ? `<button class="buy" data-action="trip" data-p="${periodId}" data-sp="${id}"${why ? ` disabled title="${esc(why)}"` : ""}>Send GHOST ${money(o.cost)}</button>` : `<span class="meta">Locked</span>`;
-  h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}`;
-  if(!open) h += g.animal ? "Unlock it at ORACLE to start collecting its DNA." : g.event ? "Research education programs at ORACLE first." : `Research ${esc(g.name)} at ORACLE first.`;
-  else {
-    const ev = !!g.event, what = ev ? "record" : "DNA";
-    h += d ? (d.genome >= 100 ? (ev ? "Complete, and on offer at Education Centers." : "Complete.") : !ev && d.genome >= CLONE_GENOME.min ? `TAR can clone it now (${cloneQuality(id)}% DNA quality, healthier as it fills in).` : "") : `No ${what} yet.`;
-    if(ev) h += ` Trips take ${spanText(Math.round(g.event.days * DAY_MIN * ghostLevel("speed")))}.`;
-    if(!d || d.genome < 100) h += ` About ${Math.max(1, Math.round(o.trips * (100 - (d ? d.genome : 0)) / 100))} ${d && d.genome ? `more trips to finish the ${ev ? "record" : "genome"}` : `trips for a whole ${ev ? "record" : "genome"}`}, and ${Math.round(o.fail * 100)}% of trips find nothing.`;
-    if(out) h += ` <b>${out} team${out === 1 ? "" : "s"} out ${ev ? "recording" : "looking for"} it.</b>`;
-    if(g.animal && g.animal.stars && !state.sandbox) h += ` Needs ${g.animal.stars}★ to clone.`;
+// "378 to 372 million years ago", "1,000 to 362 years ago"
+const siteWindow = s => s.to >= 1e6 ? `${+(s.from / 1e6).toFixed(1)} to ${+(s.to / 1e6).toFixed(1)} million years ago` : `${fmtYearsAgo(s.from).replace(" ago", "")} to ${fmtYearsAgo(s.to)}`;
+
+function ghostHeadHtml(now){
+  const e = now.epoch;
+  return `<b class="gt-epoch">${esc(e.name)}</b><div class="gt-ago">${fmtYearsAgo(now.years)}</div>` +
+    `<div class="meta gt-period"><span class="dot" style="background:${PERIOD_COLOR[e.period]}"></span>${e.period}</div>`;
+}
+function ghostMapHtml(now){
+  const e = now.epoch, m = epochMap(e), [W, H] = TIMELINE_MAP_SIZE;
+  let h = `<svg class="gt-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Map of the Earth, ${esc(e.name)}"><image href="${spriteUrl(`sprites/timeline/${m}.png`)}" x="0" y="0" width="${W}" height="${H}"/>`;
+  for(const s of sitesIn(e)){
+    const at = s.at[m]; if(!at) continue;
+    const [x, y] = at, c = s.event ? (siteLit(s) ? GT_EVENT : GT_MARK) : isScouted(s.id) ? GT_LIT : GT_MARK;
+    h += `<g class="gt-site${ghostSite === s.id ? " on" : ""}" data-site="${s.id}"><rect class="gt-frame" x="${x - 2}" y="${y - 2}" width="6" height="6"/><rect x="${x}" y="${y}" width="2" height="2" fill="${c}"/></g>`;
   }
-  return h + `</span></li>`;
+  return h + `</svg>`;
+}
+function ghostTrackHtml(){
+  return `<div class="gt-track" role="slider" tabindex="0" aria-label="Time" aria-valuemin="0" aria-valuemax="1000"><div class="gt-bars">${TIMELINE.map(p =>
+    `<div class="gt-bar" title="${p.id}">${p.epochs.map((e, j) => `<i style="background:${j % 2 ? `color-mix(in srgb, ${PERIOD_COLOR[p.id]} 80%, black)` : PERIOD_COLOR[p.id]}"></i>`).join("")}</div>`).join("")}</div><div class="gt-thumb" style="left:${ghostU * 100}%"></div></div>` +
+    `<div class="gt-labels">${TIMELINE.map(p => `<span>${p.id.slice(0, 3)}</span>`).join("")}</div>`;
+}
+const siteLabel = s => siteLit(s) ? s.name : `Unscouted site, ${fmtMa(s.from)} years ago`;
+function ghostChipsHtml(now){
+  return sitesIn(now.epoch).filter(s => Object.keys(s.at).length).map(s =>
+    `<button class="gt-chip" data-action="gsite" data-site="${s.id}" aria-pressed="${ghostSite === s.id}"><i style="background:${s.event ? (siteLit(s) ? GT_EVENT : GT_MARK) : isScouted(s.id) ? GT_LIT : GT_MARK}"></i>${esc(siteLabel(s))}${siteComplete(s) ? ` <span class="gt-done">Site Complete</span>` : ""}</button>`).join("");
+}
+function reportHtml(r){
+  const s = SITE_BY_ID[r.site];
+  return `<div class="gt-report" role="status"><div class="gt-rh">${r.kind === "scout" ? "Scouting" : "Expedition"} report · ${esc(s ? placeName(s.id) : r.site)} · Drone ${r.drone + 1}</div><ul>${r.lines.map(([t, big]) => `<li${big ? ` class="big"` : ""}>${esc(t)}</li>`).join("")}</ul><button class="btn" data-action="greport" data-id="${r.id}" style="padding:3px 10px">Done</button></div>`;
+}
+// One expedition target on a site card: pick it, its genome so far, and its chance of a find
+function targetRow(s, id){
+  const g = genomeInfo(id), d = state.science.dna[id], o = tripOdds(id, s.id);
+  const lock = g.animal && state.rating + 1e-9 < starsNeed(g.animal), done = genomeDone(id);
+  const label = g.animal ? speciesName(g.animal) : g.plant ? `${esc(g.plant.period)} flora <span class="per">plants</span>` : esc(g.name);
+  return `<tr class="${lock || done ? "locked" : ""}"><td><label><input type="radio" name="gpick" data-action="gpick" data-sp="${id}"${ghostPick === id ? " checked" : ""}${lock || done ? " disabled" : ""}> ${label}${lock ? ` <span class="gt-tag">Needs ${starsNeed(g.animal)}★</span>` : ""}</label></td><td>${d ? d.genome : 0}%</td><td>${Math.round((1 - o.fail) * 100)}%</td></tr>`;
+}
+function ghostCardHtml(){
+  const s = SITE_BY_ID[ghostSite];
+  if(!s || !siteShown(s)) return `<div class="meta">Pick a site on the map to see what's there.</div>`;
+  const lit = siteLit(s), rep = state.science.reports.find(r => r.site === s.id), btn = (action, label, why) => `<button class="buy" data-action="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
+  const note = why => why ? `<div class="meta" style="color:var(--bad);margin-top:4px">${esc(why)}</div>` : "";
+  if(s.event){
+    const ev = MUSEUM_BY_ID[s.event], why = lit ? expeditionProblem(s.id, s.event) : "Research education programs at ORACLE first.";
+    return `<b class="gt-name">${esc(ev.name)}</b><div class="meta">${esc(s.name)}, ${esc(s.where)}</div>` +
+      `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${esc(ev.ago)}</dd><dt>Trip</dt><dd>${money(tripOdds(s.event, s.id).cost)} · ${tripWhen(s.id)}</dd></dl>` +
+      `<div class="meta" style="margin:6px 0">A moment from deep time. Each trip records more of it; a finished record becomes an Education Center attraction.</div>` +
+      (lit ? `<table class="gt-targets"><thead><tr><th>Record</th><th>Done</th><th>Survey Success</th></tr></thead><tbody>${targetRow(s, s.event)}</tbody></table>` : "") +
+      (rep ? reportHtml(rep) : "") + `<div class="row" style="margin-top:8px">${btn("gdig", "Send expedition", why)}</div>${note(why)}`;
+  }
+  const trip = `${money(scoutCost(s.id))} · ${tripWhen(s.id)}`, swhy = scoutProblem(s.id);
+  if(!lit) return `<b class="gt-name">Unscouted site</b><div class="meta">Somewhere in the ${esc(epochOf(s.from).name)}</div>` +
+    `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${siteWindow(s)}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>` +
+    (rep ? reportHtml(rep) : "") + `<div class="row" style="margin-top:8px">${btn("gscout", "Send scouting trip", swhy)}</div>${note(swhy)}`;
+  const targets = siteTargets(s), hidden = siteFauna(s).length - siteSeen(s).length;
+  if(ghostPick && !targets.includes(ghostPick)) ghostPick = null;
+  const dwhy = ghostPick ? expeditionProblem(s.id, ghostPick) : "Pick a target first.";
+  return `<b class="gt-name">${esc(s.name)}${!hidden ? ` <span class="gt-badge">Site Complete</span>` : ""}</b><div class="meta">${esc(s.where)}</div>` +
+    `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${siteWindow(s)}</dd><dt>Trip</dt><dd>${trip}</dd></dl>` +
+    `<table class="gt-targets"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${targets.map(id => targetRow(s, id)).join("")}` +
+    `${Array.from({length:hidden}, () => `<tr class="locked"><td>Undiscovered species</td><td>?</td><td>?</td></tr>`).join("")}</tbody></table>` +
+    (rep ? reportHtml(rep) : "") +
+    `<div class="row" style="margin-top:8px">${btn("gdig", ghostPick ? `Send expedition ${money(tripOdds(ghostPick, s.id).cost)}` : "Send expedition", dwhy)}${hidden ? btn("gscout", "Send scouting trip", swhy) : ""}</div>` +
+    note(ghostPick ? dwhy : hidden ? swhy : null);
+}
+function droneCard(i){
+  const sc = state.science, t = sc.trips.find(x => x.bay === i), mk = GHOST_MK[droneMk()].name;
+  if(!t) return `<div class="card bay gt-drone"><div class="bn">Drone ${i + 1} · ${mk}</div><span class="meta">At GHOST, ready.</span></div>`;
+  const s = SITE_BY_ID[t.site], what = t.kind === "scout" ? "Scouting for animals" : MUSEUM_BY_ID[t.sp] ? `Recording the ${esc(genomeInfo(t.sp).name)}` : `Looking for ${esc(genomeInfo(t.sp).name)}`;
+  return `<div class="card bay gt-drone"><div class="bn">Drone ${i + 1} · ${mk}</div><b>${esc(placeName(t.site))}</b>${s && s.from <= EPOCHS[0].from ? ` <span class="meta">${esc(epochOf(s.from).name)}</span>` : ""}<div class="meta">${what}</div>` +
+    `<div style="margin-top:6px" data-dbar="${i}">${meter(doneShare(t), "var(--gold)")}</div><div class="meta" style="margin-top:4px" data-deta="${i}">Back in ${leftText(t.end)}.</div></div>`;
+}
+// Moves the drone bars while the panel stays as it is
+function ghostLive(){
+  for(const el of document.querySelectorAll("[data-dbar]")){
+    const t = state.science.trips.find(x => x.bay === +el.dataset.dbar); if(!t) continue;
+    const i = el.querySelector(".meter i"); if(i) i.style.width = doneShare(t).toFixed(0) + "%";
+    const e = document.querySelector(`[data-deta="${el.dataset.dbar}"]`); if(e) e.textContent = `Back in ${leftText(t.end)}.`;
+  }
 }
 
 function ghostHtml(b){
   const sc = state.science;
+  if(ghostU === null) ghostU = ghostStart();
   let h = deptHead(b);
   h += `<div class="meta">${esc(BUILDINGS.ghost.blurb)}</div>`;
-  h += sciStaffHtml("temporal");
-  h += baysHtml("Expedition bays", "temporal", (t, i) => progressCard(esc(placeName(t.period)), `${MUSEUM_BY_ID[t.sp] ? "recording" : "looking for"} ${esc(genomeInfo(t.sp).name)}`, t, i), "Team is home. Send it from a period below.");
-
-  // one tab per period; animals ORACLE hasn't unlocked are greyed out
-  const inPeriod = id => speciesToUnlock().filter(s => s.period === id), plantsIn = id => Object.values(PLANT_DNA).filter(f => f.period === id);
-  const openIn = id => inPeriod(id).some(s => isUnlocked(s.id)) || plantsIn(id).some(f => genomeOpen(f.id));
-  if(!ghostTab) ghostTab = PERIOD_ORDER.find(openIn) || "Quaternary";
-  const museumOpen = hasTech(MUSEUM.needTech);
-  h += `<section><h3>Genomes by period</h3>${tabBar("gtab", [...PERIOD_ORDER.map(id => ({key:id, label:id, color:PERIOD_COLOR[id], lock:!openIn(id)})), ...(techHidden(MUSEUM.needTech) ? [] : [{key:"events", label:"Events", color:"#8A6D3B", lock:!museumOpen}])], ghostTab)}`;
-  if(ghostTab === "events"){
-    const block = ghostBlocker();
-    h += `<div class="ptab-body"><div class="meta">Moments from deep time. Each trip brings back recordings, scans and samples. A finished record becomes an attraction for an Education Center, and a better record makes a better show.${museumOpen ? "" : " Research education programs at ORACLE first."}</div>`;
-    if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
-    h += `<ul class="shop" style="margin-top:10px">${MUSEUM_EVENTS.map(ev => tripRow(ev.id, ev.id, `<span class="dot" style="background:#8A6D3B"></span>${esc(ev.name)} <span class="per">${esc(ev.ago)}</span>`)).join("")}</ul></div></section>`;
-    if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
-    if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
-    return h;
-  }
-  const p = PERIOD_BY_ID[ghostTab], block = ghostBlocker();
-  h += `<div class="ptab-body"><div class="meta">${p.ago}. Trips here take ${spanText(Math.round(p.days * DAY_MIN * ghostLevel("speed")))}. Each one brings back part of a genome. Bigger animals take more trips.</div>`;
-  h += `<div class="meta" style="margin-top:6px">TAR can clone an animal once its genome is ${CLONE_GENOME.min}% complete. The closer it is to 100%, the healthier the clones and the less likely the clone is to fail (up to ${Math.round(CLONE_GENOME.failMax * 100)}% at ${CLONE_GENOME.min}%): ${CLONE_GENOME.q0}% DNA quality at ${CLONE_GENOME.min}% (frail), 100% when whole.</div>`;
-  if(block) h += `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div>`;
-  h += `<ul class="shop" style="margin-top:10px">`;
-  for(const s of inPeriod(p.id)) h += tripRow(s.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${speciesName(s)}`);
-  for(const f of plantsIn(p.id)) h += tripRow(f.id, p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${esc(f.name)} <span class="per">plants</span>`);
-  h += `</ul></div></section>`;
+  if(deptProblem("ghost")) h += `<div class="meta" style="color:var(--bad)">${esc(deptProblem("ghost"))}</div>`;
+  // the drones: where each one is, what it's after and when it's back
+  const dwhy = droneProblem();
+  h += `<section class="gt-drones"><h3>Drones <span class="meta">${sc.drones} of ${DRONES.max}</span></h3>${Array.from({length:sc.drones}, (_, i) => droneCard(i)).join("")}`;
+  h += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">GHOST's hangar is full.</span>`}</div>`;
+  h += `<div class="meta" style="margin-top:4px">Every drone is GHOST ${GHOST_MK[droneMk()].name}.${droneMk() < GHOST_MK.length - 1 ? ` ORACLE can research better ones under Park management, GHOST.` : ""}</div></section>`;
+  if(sc.reports.length) h += `<section><h3>Reports</h3>${sc.reports.map(reportHtml).join("")}</section>`;
+  // the timeline: slide through deep time, tap a site
+  const now = yearsAt(ghostU);
+  h += `<section class="gt"><h3>Timeline</h3><div id="gtHead">${ghostHeadHtml(now)}</div><div id="gtMap">${ghostMapHtml(now)}</div>${ghostTrackHtml()}`;
+  h += `<div id="gtChips" class="gt-chips">${ghostChipsHtml(now)}</div><div id="gtCard" class="card">${ghostCardHtml()}</div>`;
+  h += `<div class="meta" style="margin-top:6px">Maps from the PALEOMAP PaleoDEMs: Scotese and Wright (2018), CC BY 4.0.</div></section>`;
+  // events older than the slider
+  const deep = TIME_SITES.filter(s => s.event && !Object.keys(s.at).length && siteShown(s));
+  if(deep.length) h += `<section><h3>Deep time</h3><ul class="shop">${deep.map(s => {
+    const ev = MUSEUM_BY_ID[s.event], d = sc.dna[s.event], why = siteLit(s) ? expeditionProblem(s.id, s.event) : "Research education programs at ORACLE first.";
+    return `<li class="${siteLit(s) ? "" : "locked"}"><span class="nm">${esc(ev.name)} <span class="per">${esc(ev.ago)}</span></span><button class="buy" data-action="gdeep" data-site="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Record ${money(tripOdds(s.event, s.id).cost)}</button><span class="need" style="grid-column:1/-1">${dnaBar(d)}${esc(s.name)}, ${esc(s.where)}. Survey Success ${Math.round((1 - tripOdds(s.event, s.id).fail) * 100)}%.</span></li>`; }).join("")}</ul></section>`;
   if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open ORACLE</button></div>`;
-  if(sc.log.length) h += `<section><h3>Recent expeditions</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
+  if(sc.log.length) h += `<section><h3>Recent trips</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
   return h;
 }
+// Redraw the timeline's parts in place (dragging the slider or picking a site), so the slider keeps hold of the pointer
+function ghostRefresh(){
+  const now = yearsAt(ghostU), $el = id => document.getElementById(id);
+  if(ghostSite && !sitesIn(now.epoch).some(s => s.id === ghostSite)){ ghostSite = null; ghostPick = null; }
+  if($el("gtHead")) $el("gtHead").innerHTML = ghostHeadHtml(now);
+  if($el("gtMap")) $el("gtMap").innerHTML = ghostMapHtml(now);
+  if($el("gtChips")) $el("gtChips").innerHTML = ghostChipsHtml(now);
+  if($el("gtCard")) $el("gtCard").innerHTML = ghostCardHtml();
+  const tr = document.querySelector(".gt-track");
+  if(tr){ tr.querySelector(".gt-thumb").style.left = (ghostU * 100) + "%"; tr.setAttribute("aria-valuenow", Math.round(ghostU * 1000)); tr.setAttribute("aria-valuetext", `${now.epoch.name}, ${fmtYearsAgo(now.years)}`); }
+}
+// Dragging the slider, its keys, and taps on the map (the nearest marker within 14 map pixels)
+panelEl.addEventListener("pointerdown", ev => {
+  const tr = ev.target.closest(".gt-track"); if(!tr) return;
+  const go = x => { const r = tr.getBoundingClientRect(); ghostU = clamp((x - r.left) / r.width, 0, 1); ghostRefresh(); };
+  tr.setPointerCapture(ev.pointerId); tr.focus(); go(ev.clientX);
+  const mv = e => go(e.clientX), up = () => { tr.removeEventListener("pointermove", mv); tr.removeEventListener("pointerup", up); tr.removeEventListener("pointercancel", up); };
+  tr.addEventListener("pointermove", mv); tr.addEventListener("pointerup", up); tr.addEventListener("pointercancel", up);
+});
+panelEl.addEventListener("keydown", ev => {
+  const tr = ev.target.closest(".gt-track"); if(!tr) return;
+  const e = yearsAt(ghostU).epoch, i = EPOCHS.indexOf(e), slice = 1 / TIMELINE.length / TIMELINE[e.pi].epochs.length;
+  const jump = k => { const t = EPOCHS[clamp(i + k, 0, EPOCHS.length - 1)]; return (t.pi + (t.ej + .5) / TIMELINE[t.pi].epochs.length) / TIMELINE.length; };
+  const to = {ArrowLeft:ghostU - slice / 20, ArrowDown:ghostU - slice / 20, ArrowRight:ghostU + slice / 20, ArrowUp:ghostU + slice / 20, PageDown:jump(-1), PageUp:jump(1), Home:0, End:1}[ev.key];
+  if(to === undefined) return;
+  ev.preventDefault(); ghostU = clamp(to, 0, 1); ghostRefresh();
+});
+panelEl.addEventListener("click", ev => {
+  const svg = ev.target.closest(".gt-map"); if(!svg) return;
+  const pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  let best = null, bd = 14;
+  for(const g of svg.querySelectorAll(".gt-site")){ const r = g.querySelector(".gt-frame"), d = Math.hypot(+r.getAttribute("x") + 3 - pt.x, +r.getAttribute("y") + 3 - pt.y); if(d < bd){ bd = d; best = g; } }
+  if(best){ if(best.dataset.site !== ghostSite) ghostPick = null; ghostSite = best.dataset.site; ghostRefresh(); }
+});
 
 /* ---------- TAR ---------- */
 
@@ -189,7 +275,7 @@ function tarHtml(b){
       const d = sc.dna[s.id], open = cloneOpen(s.id), why = open ? cloneProblem(s.id) : `Needs ${CLONE_GENOME.min}% genome.`;
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += open ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% chance of failing` : ""}. Takes ${spanText(cloneMinutes(s.id))}.` : ""}${open && state.rating + 1e-9 < starsNeed(s) ? ` Needs ${starsNeed(s)}★.` : ""}</span></li>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% chance of failing` : ""}. Takes ${spanText(cloneMinutes(s.id))}.` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
@@ -224,7 +310,7 @@ function ceresHtml(b){
   const pe = state.exhibits.filter(e => e.animals.some(a => foodType(SPECIES_BY_ID[a.sp]) === "paleoflora"));
   h += `<section><h3>Paleoflora food</h3>`;
   if(!hasTech("paleoflora")) h += `<div class="meta" style="color:var(--bad)">Research Paleoflora cultivation at ORACLE before CERES can grow it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
-  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">CERES needs plant DNA first. Research Mesozoic or Paleozoic flora at ORACLE, then send GHOST to collect it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
+  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">CERES needs plant DNA first. Research Mesozoic or Paleozoic flora at ORACLE, then send GHOST expeditions to a scouted site of that period to collect it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
   else {
     const st = c.stock, cap = ceresCap(), need = state.exhibits.reduce((s, e) => s + (dailyNeed(e).paleoflora || 0), 0);
     h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter(st / cap * 100, FOOD_COLOR.paleoflora)}<span>${Math.floor(st)}/${Math.round(cap)}</span></div>`;
@@ -264,14 +350,18 @@ panelEl.addEventListener("click", ev => {
   const a = b.dataset.action, done = () => { afterChange(); render(); };
   if(a === "omain"){ oracleMain = b.dataset.k; ui.panel(); return; }
   if(a === "omanage"){ oracleManage = b.dataset.k; ui.panel(); return; }
-  if(a === "otab"){ oracleTab = b.dataset.k; ui.panel(); return; }
   if(a === "oera"){ oracleEra = b.dataset.k; ui.panel(); return; }
   if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
-  if(a === "gtab"){ ghostTab = b.dataset.k; ui.panel(); return; }
+  if(a === "gsite"){ if(b.dataset.site !== ghostSite) ghostPick = null; ghostSite = b.dataset.site; ghostRefresh(); return; }
+  if(a === "gpick"){ ghostPick = b.dataset.sp; ghostRefresh(); return; }
+  if(a === "gscout"){ if(sendDrone("scout", ghostSite)) done(); else ui.toast(scoutProblem(ghostSite) || "GHOST can't go there.", "bad"); return; }
+  if(a === "gdig"){ const s = SITE_BY_ID[ghostSite], id = s && s.event ? s.event : ghostPick; if(sendDrone("dig", ghostSite, id)){ ghostPick = null; done(); } else ui.toast(expeditionProblem(ghostSite, id) || "Pick a target first.", "bad"); return; }
+  if(a === "gdeep"){ const s = SITE_BY_ID[b.dataset.site]; if(s && sendDrone("dig", s.id, s.event)) done(); return; }
+  if(a === "gbuy"){ const why = buyDrone(); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "greport"){ dismissReport(+b.dataset.id); done(); return; }
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "stopResearch"){ const p = state.science.projects[+b.dataset.i]; if(p) stopProject(p); done(); return; }
   if(a === "discardClone"){ if(discardClone(b.dataset.id)) done(); return; }
-  if(a === "trip"){ if(launchTrip(b.dataset.sp, b.dataset.p)) done(); return; }
   if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "CERES can't grow that.", "bad"); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }
 });
