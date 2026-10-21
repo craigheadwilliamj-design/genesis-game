@@ -206,7 +206,7 @@ function basicsLow(e, list){
   if(noWater) out.push(["bad", e.viv ? "No pool for the animals that need one." : "No water for the animals that need it."]);
   if(who("thirst")) out.push([lvl("thirst"), `${who("thirst")} thirsty.`]);
   const dirt = e.dirt || 0;
-  if(dirt >= CLEAN.dirtyAt) out.push([dirt >= 60 ? "bad" : "warn", `Sanitation is low (${Math.round(dirt)}% dirty).`]);
+  if(dirt >= CLEAN.dirtyAt) out.push([dirt >= 60 ? "bad" : "warn", `Sanitation is low (${Math.round(100 - dirt)}%).`]);
   return out;
 }
 

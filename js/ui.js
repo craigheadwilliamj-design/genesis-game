@@ -483,12 +483,12 @@ function behaviorHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
-// Exhibit sanitation: the dirt meter
+// Exhibit sanitation: 100 is spotless, and it falls as dirt builds
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
   let h = `<section><h3>Sanitation</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)

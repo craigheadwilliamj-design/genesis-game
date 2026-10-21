@@ -2695,9 +2695,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);
       out.animalHealthBasicsQuiet = !/hungry|thirsty|Sanitation is low/.test(hl());
       ex0.dirt = 50; a1.need.hunger = 80; a1.need.thirst = 55; animalLive(true);
-      out.animalHealthBasics = /It's hungry/.test(hl()) && /It's thirsty/.test(hl()) && /Sanitation is low \(50% dirty\)/.test(hl());
+      out.animalHealthBasics = /It's hungry/.test(hl()) && /It's thirsty/.test(hl()) && /Sanitation is low \(50%\)/.test(hl());
       { const tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex0.id; exTabs.tab = "health"; const hh = exhibitHtml(ex0); exTabs.tab = tk; exTabs.ex = tx;
-        out.exhibitHealthBasics = /1 of \d+ are hungry|It's hungry/.test(hh) && /thirsty/.test(hh) && /Sanitation is low \(50% dirty\)/.test(hh); }
+        out.exhibitHealthBasics = /1 of \d+ are hungry|It's hungry/.test(hh) && /thirsty/.test(hh) && /Sanitation is low \(50%\)/.test(hh); }
       ex0.dirt = dirtKeep; Object.assign(a1.need, needKeep);
       delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
