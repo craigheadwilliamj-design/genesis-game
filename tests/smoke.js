@@ -3661,6 +3661,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // pixel editor (dev mode): strips open as frames, tools draw, the strip saves at full width, and "Try in park" swaps the picture
+  Object.assign(checks, await page.evaluate(async () => {
+    const out = {}, was = SPRITE_PACK["sprites/dime-walk.png"];
+    out.pixelBtnDevOnly = document.querySelector("#pixelBtn").hidden === !devMode();
+    await openPixelEditor("sprites/dime-walk.png");
+    out.pixelStripFrames = px.frames.length === 4 && px.fw === 100 && px.fh === 75 && pxGuess("sprites/human/keeper-walk.png", 64, 32) === 4 && pxGuess("sprites/bld/restroom-front.png", 80, 80) === 1;
+    pxNew("sprites/smoke/test.png", 10, 8, 2); px.mirror = true; px.tool = "pencil"; px.c1 = [10, 20, 30, 255];
+    px.stroke = {a:[1, 1], last:[1, 1], ink:px.c1, base:pxFrame().slice(), done:new Set()}; pxMoveTo(3, 1, {}); px.stroke = null; px.mirror = false;
+    out.pixelPencilMirror = [1, 2, 3, 6, 7, 8].every(x => pxGet(pxFrame(), x, 1)[3] === 255) && pxGet(pxFrame(), 4, 1)[3] === 0;
+    pxPush(); pxFill(pxFrame(), 0, 5, [1, 2, 3, 255], false); const filled = pxGet(pxFrame(), 9, 7)[0] === 1; pxUndo(false);
+    out.pixelFillUndo = filled && pxGet(pxFrame(), 9, 7)[3] === 0;
+    const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
+    const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
+    out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
+    spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
+    document.querySelector("#dlgPixel").close();
+    return out;
+  }));
+
   await page.waitForTimeout(800);
   let ok = true;
   // Quiet by default (only failures and a count); -v prints every check.

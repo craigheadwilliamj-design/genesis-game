@@ -1,0 +1,532 @@
+// Pixel editor (dev mode, HUD "Pixels"): draw and animate any sprite in SPRITE_PACK, try it in the park, send it to the repo.
+// A picture is a strip of same-size frames side by side, as the game draws them. Work is kept as a localStorage draft per path
+// until "Send to repo" writes the PNG to the db collection `pixeled`, where tools/pixeledpull.py picks it up (docs/art.md: Pixel editor).
+
+const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,14],[106,100,77],[227,221,195],[198,188,147],
+  [44,35,19],[66,53,29],[165,125,74],[143,109,64],[110,85,49],[132,101,59],[231,231,231],[189,72,58],[222,182,72],[29,43,34,100]];   // PAL in tools/genesis_style.py
+const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket", "Fill (Shift: every pixel of that color)", "G"], ["line", "Line", "L"],
+  ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select and move", "M"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"]];
+const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",
+  line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h3M9 4h3M14 4h3v3M17 9v3M17 14v3h-3M12 17H9M7 17H4v-3M4 12V9M4 7V4",
+  shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z"};
+const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
+const px = {path:"", fw:16, fh:16, frames:[], cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
+  pal:"image", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
+
+/* ---------- pixels ---------- */
+const pxBlank = (w, h) => new Uint8ClampedArray(w * h * 4);
+const pxAt = (x, y) => (y * px.fw + x) * 4;
+const pxIn = (x, y) => x >= 0 && y >= 0 && x < px.fw && y < px.fh;
+const pxGet = (f, x, y) => { const i = pxAt(x, y); return [f[i], f[i + 1], f[i + 2], f[i + 3]]; };
+const pxSame = (a, b) => a[3] === 0 && b[3] === 0 || a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+function pxPut(f, x, y, c){ if(!pxIn(x, y)) return; const i = pxAt(x, y); f[i] = c[0]; f[i + 1] = c[1]; f[i + 2] = c[2]; f[i + 3] = c[3]; }
+// A drawing tool's dab: the pencil and eraser size, and its mirror image when Mirror is on
+function pxBrush(f, x, y, c){
+  const s = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((s - 1) / 2);
+  for(let dy = 0; dy < s; dy++) for(let dx = 0; dx < s; dx++){ pxPut(f, x - o + dx, y - o + dy, c); if(px.mirror) pxPut(f, px.fw - 1 - (x - o + dx), y - o + dy, c); }
+}
+const pxHex = c => "#" + c.slice(0, 3).map(v => v.toString(16).padStart(2, "0")).join("");
+const pxCss = c => `rgba(${c[0]},${c[1]},${c[2]},${(c[3] / 255).toFixed(3)})`;
+const pxRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+function pxHsl([r, g, b]){
+  r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  if(!d) return [0, 0, l];
+  const h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, d / (1 - Math.abs(2 * l - 1)), l];
+}
+function pxFromHsl(h, s, l){
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2, k = Math.floor(h / 60) % 6;
+  const [r, g, b] = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][k];
+  return [r, g, b].map(v => Math.round((v + m) * 255));
+}
+function pxLine(x0, y0, x1, y1, fn){
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1; let e = dx + dy;
+  for(;;){ fn(x0, y0); if(x0 === x1 && y0 === y1) return; const e2 = 2 * e; if(e2 >= dy){ e += dy; x0 += sx; } if(e2 <= dx){ e += dx; y0 += sy; } }
+}
+// Pixels inside the box's ellipse; the outline is those with a side neighbour outside, so it's always one pixel thick and symmetric
+function pxEllipse(x0, y0, x1, y1, fill, fn){
+  const ax = Math.min(x0, x1), ay = Math.min(y0, y1), bx = Math.max(x0, x1), by = Math.max(y0, y1), cx = (ax + bx + 1) / 2, cy = (ay + by + 1) / 2, rx = (bx - ax + 1) / 2, ry = (by - ay + 1) / 2;
+  const inn = (x, y) => x >= ax && x <= bx && y >= ay && y <= by && ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2 <= 1.0001;
+  for(let y = ay; y <= by; y++) for(let x = ax; x <= bx; x++) if(inn(x, y) && (fill || !inn(x - 1, y) || !inn(x + 1, y) || !inn(x, y - 1) || !inn(x, y + 1))) fn(x, y);
+}
+function pxRect(x0, y0, x1, y1, fill, fn){
+  const ax = Math.min(x0, x1), ay = Math.min(y0, y1), bx = Math.max(x0, x1), by = Math.max(y0, y1);
+  for(let y = ay; y <= by; y++) for(let x = ax; x <= bx; x++) if(fill || x === ax || x === bx || y === ay || y === by) fn(x, y);
+}
+function pxFill(f, x, y, c, all){
+  const t = pxGet(f, x, y); if(pxSame(t, c)) return;
+  if(all){ for(let yy = 0; yy < px.fh; yy++) for(let xx = 0; xx < px.fw; xx++) if(pxSame(pxGet(f, xx, yy), t)) pxPut(f, xx, yy, c); return; }
+  const seen = new Uint8Array(px.fw * px.fh), st = [[x, y]], hit = [];
+  while(st.length){
+    const [a, b] = st.pop(); if(!pxIn(a, b) || seen[b * px.fw + a] || !pxSame(pxGet(f, a, b), t)) continue;
+    seen[b * px.fw + a] = 1; hit.push([a, b]); st.push([a + 1, b], [a - 1, b], [a, b + 1], [a, b - 1]);
+  }
+  hit.forEach(([a, b]) => pxPut(f, a, b, c));
+}
+// Every color the picture uses, by hue then lightness (greys first)
+function pxUsed(){
+  const seen = new Map();
+  for(const f of px.frames) for(let i = 0; i < f.length; i += 4) if(f[i + 3]){ const k = f[i] << 24 | f[i + 1] << 16 | f[i + 2] << 8 | f[i + 3]; if(!seen.has(k)){ seen.set(k, [f[i], f[i + 1], f[i + 2], f[i + 3]]); if(seen.size > 255) break; } }
+  return [...seen.values()].sort((a, b) => { const [ha, sa, la] = pxHsl(a), [hb, sb, lb] = pxHsl(b); return (sa < .08) - (sb < .08) || (sa < .08 ? 0 : Math.round(ha / 20) - Math.round(hb / 20)) || la - lb; });
+}
+const pxSwatches = () => px.pal === "park" ? PX_PARK.map(c => c.length === 4 ? c : [...c, 255]) : px.pal === "dime" ? px.dime || [] : pxUsed();
+// The next lighter or darker color in the palette of the same hue (the art's shade steps); off-palette, step the lightness
+function pxShade(c, up){
+  if(!c[3]) return c;
+  const [h, s, l] = pxHsl(c), pool = [...pxUsed(), ...pxSwatches()].filter(p => p[3] === c[3]);
+  let best = null, bd = 1e9;
+  for(const p of pool){
+    const [ph, ps, pl] = pxHsl(p), dl = (pl - l) * (up ? 1 : -1); if(dl < .015) continue;
+    const dh = s < .08 && ps < .08 ? 0 : Math.min(Math.abs(ph - h), 360 - Math.abs(ph - h)); if(dh > 12 || Math.abs(ps - s) > .5) continue;
+    const d = dh / 12 + dl * 4 + Math.abs(ps - s); if(d < bd){ bd = d; best = p; }
+  }
+  return best ? best.slice() : [...pxFromHsl(h, s, Math.min(1, Math.max(0, l + (up ? .08 : -.08)))), c[3]];
+}
+
+/* ---------- document ---------- */
+const pxSnap = () => ({frames:px.frames.map(f => f.slice()), fw:px.fw, fh:px.fh, cur:px.cur});
+function pxPush(){ pxDrop(); px.undo.push(pxSnap()); if(px.undo.length > PX_UNDO) px.undo.shift(); px.redo = []; }
+function pxRestore(s){ px.frames = s.frames; px.fw = s.fw; px.fh = s.fh; px.cur = Math.min(s.cur, s.frames.length - 1); px.sel = null; pxFit(); }
+function pxUndo(redo){ const [a, b] = redo ? [px.redo, px.undo] : [px.undo, px.redo]; if(!a.length) return; pxDrop(); b.push(pxSnap()); pxRestore(a.pop()); pxChanged(); }
+const pxFrame = () => px.frames[px.cur];
+function pxStrip(){
+  const cv = document.createElement("canvas"); cv.width = px.fw * px.frames.length; cv.height = px.fh; const ctx = cv.getContext("2d");
+  px.frames.forEach((f, i) => ctx.putImageData(new ImageData(f.slice(), px.fw, px.fh), i * px.fw, 0));
+  return cv;
+}
+const pxPng = () => pxStrip().toDataURL("image/png");
+const pxImg = src => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
+function pxSlice(im, n){
+  const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext("2d"); ctx.drawImage(im, 0, 0);
+  const fw = im.width / n; px.fw = fw; px.fh = im.height;
+  px.frames = Array.from({length:n}, (_, i) => new Uint8ClampedArray(ctx.getImageData(i * fw, 0, fw, im.height).data));
+}
+// A strip's frame count: an animal's strips are frames the size of its standing picture, people 16 px wide, the rest one frame
+function pxGuess(path, w, h){
+  const m = path.match(/^(sprites\/(?:[^/]+\/)*)([a-z0-9]+)-[a-z0-9-]+\.png$/i), base = m && SPRITE_PACK[`${m[1]}${m[2]}.png`];
+  if(/^sprites\/human\//.test(path) && w % 16 === 0) return w / 16;
+  if(base){ const bw = pxPngSize(base); if(bw && bw[1] === h && w % bw[0] === 0) return w / bw[0]; }
+  return 1;
+}
+function pxPngSize(uri){ try{ const b = atob(uri.slice(22, 22 + 44)); const n = i => (b.charCodeAt(i) << 24 | b.charCodeAt(i + 1) << 16 | b.charCodeAt(i + 2) << 8 | b.charCodeAt(i + 3)) >>> 0; return [n(16), n(20)]; }catch{ return null; } }
+const pxStore = (k, v) => { try{ v === undefined ? localStorage.removeItem(PX_KEY + k) : localStorage.setItem(PX_KEY + k, JSON.stringify(v)); }catch{} };
+const pxStored = k => { try{ return JSON.parse(localStorage.getItem(PX_KEY + k)); }catch{ return null; } };
+const pxDrafts = () => pxStored("drafts") || {};
+let pxSaveT = 0;
+function pxChanged(){
+  pxDraw(); pxSync();
+  clearTimeout(pxSaveT); pxSaveT = setTimeout(() => {
+    if(!px.path) return;
+    const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
+    pxStore("d:" + px.path, {png:pxPng(), n:px.frames.length, fps:px.fps});
+  }, 600);
+}
+async function pxOpen(path, fresh){
+  pxDrop(); const dr = !fresh && pxStored("d:" + path), src = dr ? dr.png : SPRITE_PACK[path];
+  if(!src) return ui.toast("There's no picture at " + path + ".", "bad");
+  try{
+    const im = await pxImg(src); px.path = path; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
+    pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height)); pxStore("last", path);
+    pxFit(); pxDraw(); pxSync();
+    if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
+  }catch{ ui.toast("That picture didn't load.", "bad"); }
+}
+function pxNew(path, w, h, n){
+  pxDrop(); px.path = path; px.fw = w; px.fh = h; px.frames = Array.from({length:n}, () => pxBlank(w, h)); px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
+  pxFit(); pxChanged();
+}
+
+/* ---------- selection ---------- */
+function pxDrop(){   // stamp a floating selection down where it is
+  const s = px.sel; if(!s || !s.buf || !px.frames.length) return;
+  const f = pxFrame();
+  for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++){ const i = (y * s.w + x) * 4; if(s.buf[i + 3]) pxPut(f, s.x + x, s.y + y, [s.buf[i], s.buf[i + 1], s.buf[i + 2], s.buf[i + 3]]); }
+  s.buf = null;
+}
+function pxCut(s, clear){
+  const f = pxFrame(), b = pxBlank(s.w, s.h);
+  for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++) if(pxIn(s.x + x, s.y + y)){ const i = pxAt(s.x + x, s.y + y), j = (y * s.w + x) * 4; for(let k = 0; k < 4; k++){ b[j + k] = f[i + k]; if(clear) f[i + k] = 0; } }
+  return b;
+}
+function pxCopy(cut){ const s = px.sel; if(!s) return; px.clip = {w:s.w, h:s.h, buf:s.buf ? s.buf.slice() : pxCut(s, false)}; if(cut){ pxPush(); pxCut(px.sel = {...s, buf:null}, true); px.sel = null; pxChanged(); } }
+function pxPaste(){
+  const c = px.clip; if(!c) return; pxPush();
+  px.sel = {x:Math.max(0, Math.min(px.fw - c.w, px.hover ? px.hover[0] : 0)), y:Math.max(0, Math.min(px.fh - c.h, px.hover ? px.hover[1] : 0)), w:c.w, h:c.h, buf:c.buf.slice()};
+  pxTool("select"); pxChanged();
+}
+function pxClear(){ const s = px.sel; if(!s) return; if(s.buf){ s.buf = null; px.sel = null; } else { pxPush(); pxCut(s, true); } pxChanged(); }
+
+/* ---------- canvas ---------- */
+let pxCv, pxCtx, pxStage, pxPrev, pxTmp;
+function pxFit(){
+  if(!pxStage) return;
+  const r = pxStage.getBoundingClientRect(), z = Math.floor(Math.min((r.width - 40) / px.fw, (r.height - 40) / px.fh));
+  px.zoom = Math.max(1, Math.min(48, z || 12)); pxDraw();
+}
+function pxLayer(ctx, f, x, y, z, a){
+  pxTmp.width = px.fw; pxTmp.height = px.fh; pxTmp.getContext("2d").putImageData(new ImageData(f.slice(), px.fw, px.fh), 0, 0);
+  ctx.globalAlpha = a; ctx.drawImage(pxTmp, x, y, px.fw * z, px.fh * z); ctx.globalAlpha = 1;
+}
+function pxDraw(){
+  if(!pxCv || !px.frames.length) return;
+  const z = px.zoom, W = px.fw * z, H = px.fh * z, ctx = pxCtx;
+  pxCv.width = W; pxCv.height = H; ctx.imageSmoothingEnabled = false;
+  const ck = Math.max(4, Math.min(16, z)); for(let y = 0; y < H; y += ck) for(let x = 0; x < W; x += ck){ ctx.fillStyle = (x / ck + y / ck) % 2 ? "#cfd4c8" : "#e8ebe2"; ctx.fillRect(x, y, ck, ck); }
+  if(px.onion && px.frames.length > 1){ pxLayer(ctx, px.frames[(px.cur + px.frames.length - 1) % px.frames.length], 0, 0, z, .28); }
+  pxLayer(ctx, pxFrame(), 0, 0, z, 1);
+  const s = px.sel;
+  if(s && s.buf){ pxTmp.width = s.w; pxTmp.height = s.h; pxTmp.getContext("2d").putImageData(new ImageData(s.buf.slice(), s.w, s.h), 0, 0); ctx.drawImage(pxTmp, s.x * z, s.y * z, s.w * z, s.h * z); }
+  if(px.grid && z >= 6){
+    ctx.fillStyle = "rgba(29,43,34,.13)";
+    for(let x = 1; x < px.fw; x++) ctx.fillRect(x * z, 0, 1, H);
+    for(let y = 1; y < px.fh; y++) ctx.fillRect(0, y * z, W, 1);
+  }
+  if(px.mirror){ ctx.fillStyle = "rgba(184,145,47,.7)"; ctx.fillRect(W / 2 - 1, 0, 2, H); }
+  if(s){ ctx.setLineDash([4, 3]); ctx.strokeStyle = "#1D2B22"; ctx.lineWidth = 1; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.setLineDash([]); }
+  const h = px.hover;
+  if(h && pxIn(h[0], h[1]) && px.tool !== "select"){ ctx.strokeStyle = "rgba(29,43,34,.8)"; ctx.lineWidth = 1; const n = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((n - 1) / 2); ctx.strokeRect((h[0] - o) * z + .5, (h[1] - o) * z + .5, n * z - 1, n * z - 1); }
+  const pos = document.getElementById("pxPos"); if(pos) pos.textContent = h && pxIn(h[0], h[1]) ? `${h[0]}, ${h[1]}` : "";
+}
+function pxPreview(t){
+  if(!document.getElementById("dlgPixel")?.open){ px.anim = 0; return; }
+  px.anim = requestAnimationFrame(pxPreview);
+  if(!pxPrev || !px.frames.length) return;
+  const n = px.frames.length, i = n > 1 ? Math.floor(t / 1000 * px.fps) % n : 0, s = Math.max(1, Math.min(4, Math.floor(120 / Math.max(px.fw, px.fh))));
+  const ctx = pxPrev.getContext("2d"); if(pxPrev.width !== px.fw * s + px.fw + 12 || pxPrev.height !== px.fh * s){ pxPrev.width = px.fw * s + px.fw + 12; pxPrev.height = px.fh * s; }
+  ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, pxPrev.width, pxPrev.height);
+  pxLayer(ctx, px.frames[i], 0, 0, s, 1); pxLayer(ctx, px.frames[i], px.fw * s + 12, px.fh * s - px.fh, 1, 1);
+}
+const pxXY = e => { const r = pxCv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * px.fw), Math.floor((e.clientY - r.top) / r.height * px.fh)]; };
+function pxDown(e){
+  if(e.button === 1 || e.button === 0 && px.space){ px.pan = [e.clientX, e.clientY, pxStage.scrollLeft, pxStage.scrollTop]; pxCv.setPointerCapture(e.pointerId); return; }
+  if(e.button > 2 || !px.frames.length) return;
+  e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
+  const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
+  if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(f, x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }
+  if(px.tool === "select"){
+    const s = px.sel;
+    if(s && x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h){
+      if(!s.buf){ pxPush(); s.buf = pxCut(s, true); }
+      px.stroke = {move:[x - s.x, y - s.y]};
+    } else { pxDrop(); px.sel = null; px.stroke = {a:[x, y]}; }
+    return pxDraw();
+  }
+  pxPush();
+  const ink = px.tool === "eraser" ? [0, 0, 0, 0] : c;
+  px.stroke = {a:[x, y], last:[x, y], ink, base:f.slice(), shift:e.shiftKey, up:!alt, done:new Set()};
+  if(px.tool === "bucket"){ if(pxIn(x, y)) pxFill(f, x, y, ink, e.shiftKey); px.stroke = null; return pxChanged(); }
+  pxMoveTo(x, y, e);
+}
+function pxMoveTo(x, y, e){
+  const st = px.stroke, f = pxFrame(), t = px.tool;
+  if(t === "pencil" || t === "eraser"){ pxLine(st.last[0], st.last[1], x, y, (a, b) => pxBrush(f, a, b, st.ink)); st.last = [x, y]; }
+  else if(t === "shade"){   // each pixel steps once a stroke, however often the stroke crosses it
+    pxLine(st.last[0], st.last[1], x, y, (a, b) => { if(!pxIn(a, b) || st.done.has(a + b * px.fw)) return; st.done.add(a + b * px.fw); pxPut(f, a, b, pxShade(pxGet(f, a, b), st.up)); });
+    st.last = [x, y];
+  } else {
+    f.set(st.base); const fill = e.shiftKey, plot = (a, b) => pxBrush(f, a, b, st.ink);
+    if(t === "line") pxLine(st.a[0], st.a[1], x, y, plot);
+    else if(t === "rect") pxRect(st.a[0], st.a[1], x, y, fill, plot);
+    else if(t === "ellipse") pxEllipse(st.a[0], st.a[1], x, y, fill, plot);
+  }
+  pxDraw();
+}
+function pxMove(e){
+  if(px.pan){ const [cx, cy, sl, stp] = px.pan; pxStage.scrollLeft = sl - (e.clientX - cx); pxStage.scrollTop = stp - (e.clientY - cy); return; }
+  const [x, y] = pxXY(e); px.hover = [x, y];
+  const st = px.stroke;
+  if(!st) return pxDraw();
+  if(px.tool === "select"){
+    const s = px.sel;
+    if(st.move){ s.x = x - st.move[0]; s.y = y - st.move[1]; }
+    else { const ax = Math.max(0, Math.min(st.a[0], x)), ay = Math.max(0, Math.min(st.a[1], y)), bx = Math.min(px.fw - 1, Math.max(st.a[0], x)), by = Math.min(px.fh - 1, Math.max(st.a[1], y)); px.sel = {x:ax, y:ay, w:bx - ax + 1, h:by - ay + 1, buf:null}; }
+    return pxDraw();
+  }
+  pxMoveTo(x, y, e);
+}
+function pxUp(){
+  if(px.pan){ px.pan = null; return; }
+  const st = px.stroke; px.stroke = null; if(!st) return;
+  if(px.tool === "select"){ if(st.move) pxChanged(); return; }
+  pxChanged();
+}
+function pxWheel(e){
+  e.preventDefault();
+  const r = pxCv.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+  const z = Math.max(1, Math.min(64, px.zoom + (e.deltaY < 0 ? 1 : -1) * Math.max(1, Math.round(px.zoom / 6)))); if(z === px.zoom) return;
+  px.zoom = z; pxDraw(); pxSync();
+  const n = pxCv.getBoundingClientRect(); pxStage.scrollLeft += n.left + fx * n.width - e.clientX; pxStage.scrollTop += n.top + fy * n.height - e.clientY;
+}
+
+/* ---------- frames and picture ---------- */
+function pxFrameOp(op, i = px.cur){
+  pxPush(); const n = px.frames.length;
+  if(op === "add"){ px.frames.splice(i + 1, 0, pxBlank(px.fw, px.fh)); px.cur = i + 1; }
+  if(op === "dup"){ px.frames.splice(i + 1, 0, px.frames[i].slice()); px.cur = i + 1; }
+  if(op === "del" && n > 1){ px.frames.splice(i, 1); px.cur = Math.min(i, n - 2); }
+  if((op === "left" && i > 0) || (op === "right" && i < n - 1)){ const j = op === "left" ? i - 1 : i + 1; [px.frames[i], px.frames[j]] = [px.frames[j], px.frames[i]]; px.cur = j; }
+  pxChanged();
+}
+function pxFlip(dir, every){
+  pxPush();
+  for(const f of every ? px.frames : [pxFrame()]){
+    const o = f.slice();
+    for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){ const s = dir === "h" ? pxAt(px.fw - 1 - x, y) : pxAt(x, px.fh - 1 - y), d = pxAt(x, y); for(let k = 0; k < 4; k++) f[d + k] = o[s + k]; }
+  }
+  pxChanged();
+}
+function pxNudge(dx, dy, every){
+  pxPush();
+  for(const f of every ? px.frames : [pxFrame()]){ const o = f.slice(); f.fill(0); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++) if(pxIn(x + dx, y + dy)){ const s = pxAt(x, y), d = pxAt(x + dx, y + dy); for(let k = 0; k < 4; k++) f[d + k] = o[s + k]; } }
+  pxChanged();
+}
+// New canvas size, the old picture held at the anchor (sprites stand on their bottom middle, so that's the default)
+function pxResize(w, h, anchor){
+  if(!(w > 0 && h > 0 && w <= 512 && h <= 512)) return ui.toast("Pick a size from 1 to 512 pixels.", "bad");
+  pxPush(); const ox = anchor[1] === "l" ? 0 : anchor[1] === "r" ? w - px.fw : Math.floor((w - px.fw) / 2), oy = anchor[0] === "t" ? 0 : anchor[0] === "b" ? h - px.fh : Math.floor((h - px.fh) / 2);
+  px.frames = px.frames.map(f => { const n = pxBlank(w, h); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){ const X = x + ox, Y = y + oy; if(X < 0 || Y < 0 || X >= w || Y >= h) continue; const s = pxAt(x, y), d = (Y * w + X) * 4; for(let k = 0; k < 4; k++) n[d + k] = f[s + k]; } return n; });
+  px.fw = w; px.fh = h; pxFit(); pxChanged();
+}
+async function pxReslice(n){
+  const total = px.fw * px.frames.length;
+  if(!(n >= 1) || total % n) return ui.toast(`The strip is ${total} px wide, so it splits into a whole number of frames only for counts that divide ${total}.`, "bad");
+  pxPush(); pxSlice(await pxImg(pxPng()), n); px.cur = 0; pxFit(); pxChanged();
+}
+function pxRecolor(from, to){
+  pxPush(); for(const f of px.frames) for(let i = 0; i < f.length; i += 4) if(pxSame([f[i], f[i + 1], f[i + 2], f[i + 3]], from)){ f[i] = to[0]; f[i + 1] = to[1]; f[i + 2] = to[2]; f[i + 3] = to[3]; }
+  pxChanged();
+}
+
+/* ---------- park and repo ---------- */
+// Show the picture in the running park until reload (spriteUrl.swap, then every drawn copy re-pointed)
+function pxTry(){
+  if(!px.path || !spriteUrl.swap) return;
+  spriteUrl.swap(px.path, pxPng());
+  const u = spriteUrl(px.path);
+  document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
+  if(typeof render === "function" && state) render();
+  ui.toast("It's in the park until you reload. Send it to the repo to keep it.", "good");
+}
+async function pxDb(){
+  if(px.db) return px.db;
+  try{ if(window.claude && typeof window.claude.use === "function") px.db = await window.claude.use("db"); }catch{}
+  return px.db;
+}
+const pxDocId = p => p.replace(/\//g, "~");
+async function pxWatch(){
+  if(px.sub) return; const d = await pxDb(); if(!d || px.sub) return;
+  try{ px.sub = d.collection("pixeled").onSnapshot(s => { px.queue = s.docs.map(x => x.data()).filter(x => x && x.path).sort((a, b) => b.at - a.at); pxSync(); }, () => {}); }catch{}
+}
+async function pxSend(){
+  if(!px.path) return;
+  const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
+  const png = pxPng();
+  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
+  catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
+}
+async function pxUnsend(path){ const d = await pxDb(); try{ if(d) await d.doc("pixeled/" + pxDocId(path)).delete(); }catch{} }
+async function pxDownload(){
+  const name = (px.path.split("/").pop() || "sprite.png"), uri = pxPng();
+  try{
+    const dl = window.claude && await window.claude.use("downloads");
+    if(dl){ const b = atob(uri.split(",")[1]), u = new Uint8Array(b.length); for(let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); await dl.save({filename:name, data:new Blob([u], {type:"image/png"})}); return; }
+  }catch(e){ if(e && e.code !== "unavailable") return; }
+  const a = document.createElement("a"); a.href = uri; a.download = name; a.click();
+}
+async function pxImport(file){
+  try{
+    const im = await pxImg(URL.createObjectURL(file));
+    if(im.width > 2048 || im.height > 512) return ui.toast("That picture is too big for a sprite.", "bad");
+    pxDrop(); px.undo.push(pxSnap()); const n = px.path ? pxGuess(px.path, im.width, im.height) : 1;
+    pxSlice(im, im.width % n ? 1 : n); px.cur = 0; px.sel = null;
+    if(!px.path) px.path = "sprites/" + file.name.replace(/[^a-z0-9._-]/gi, "").toLowerCase();
+    pxFit(); pxChanged(); ui.toast(`Imported ${file.name} into ${px.path}.`);
+  }catch{ ui.toast("That file isn't a picture I can read.", "bad"); }
+}
+
+/* ---------- panel ---------- */
+const pxIcon = k => `<svg viewBox="0 0 21 21" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="${PX_ICONS[k]}"/></svg>`;
+function pxBuild(){
+  const D = document.getElementById("dlgPixel");
+  D.innerHTML = `<div class="pxbar">
+    <b class="pxname" id="pxName"></b>
+    <button class="btn" data-px="open">Open</button><button class="btn" data-px="new">New</button><label class="btn">Import<input type="file" accept="image/png,image/gif,image/webp" id="pxFile" hidden></label>
+    <span class="pxsep"></span><button class="btn" data-px="undo" title="Undo (Ctrl+Z)">Undo</button><button class="btn" data-px="redo" title="Redo (Ctrl+Y)">Redo</button>
+    <span class="pxsep"></span><button class="btn" data-px="zout" title="Zoom out (-)">−</button><span class="num" id="pxZoom"></span><button class="btn" data-px="zin" title="Zoom in (+)">+</button><button class="btn" data-px="fit">Fit</button>
+    <button class="btn" data-px="grid" title="Grid (#)">Grid</button><button class="btn" data-px="mirror" title="Draw mirrored left to right (Shift+M)">Mirror</button>
+    <span class="pxgrow"></span><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button><button class="btn" data-px="close">Close</button></div>
+  <div class="pxmain">
+    <div class="pxtools">${PX_TOOLS.map(([k, n, key]) => `<button data-tool="${k}" title="${n} (${key})" aria-label="${n}">${pxIcon(k)}</button>`).join("")}
+      <div class="pxsize" title="Pencil and eraser size"><small>Size</small>${[1, 2, 3].map(n => `<button data-size="${n}">${n}</button>`).join("")}</div></div>
+    <div class="pxstage" id="pxStage"><canvas id="pxCv"></canvas></div>
+    <div class="pxside">
+      <section><h3>Colors</h3><div class="pxcols"><button class="pxsw big" id="pxC1" title="Left button color"></button><button class="pxsw big" id="pxC2" title="Right button color"></button><button class="btn" data-px="swap" title="Swap (X)">Swap</button>
+        <input type="color" id="pxPick" hidden><input type="color" id="pxRe" hidden></div>
+        <label class="pxrow"><span>Opacity</span><input type="range" min="0" max="255" id="pxAlpha"><span class="num" id="pxAlphaN"></span></label>
+        <div class="pxrow"><select id="pxPal"><option value="image">This picture's colors</option><option value="park">Park style (genesis_style.py)</option><option value="dime">Dimetrodon reference</option></select><span class="meta num" id="pxCount"></span></div>
+        <div class="pxpal" id="pxSw"></div><div class="meta">Left or right click to pick. Double-click a color to change it everywhere.</div></section>
+      <section><h3>Frames</h3><div class="pxframes" id="pxFrames"></div>
+        <div class="pxrow"><button class="btn" data-px="fadd">Add</button><button class="btn" data-px="fdup">Copy</button><button class="btn" data-px="fdel">Delete</button><button class="btn" data-px="fleft" title="Move earlier">◀</button><button class="btn" data-px="fright" title="Move later">▶</button></div>
+        <label class="pxrow"><span>Speed</span><input type="number" min="1" max="30" id="pxFps" class="pxnum"><span>a second</span><label><input type="checkbox" id="pxOnion"> Onion skin</label></label>
+        <canvas id="pxPrev"></canvas><div class="meta">Preview, then at game size (1 pixel a pixel).</div></section>
+      <section><h3>Picture</h3>
+        <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
+        <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
+        <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
+        <div class="meta">Shift+arrows nudge the frame a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
+      <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
+        <div id="pxQueue"></div></section>
+    </div></div>
+  <div class="pxover" id="pxOver" hidden></div>`;
+  pxCv = document.getElementById("pxCv"); pxCtx = pxCv.getContext("2d"); pxStage = document.getElementById("pxStage"); pxPrev = document.getElementById("pxPrev"); pxTmp = document.createElement("canvas");
+  pxCv.addEventListener("pointerdown", pxDown); pxCv.addEventListener("pointermove", pxMove); pxCv.addEventListener("pointerup", pxUp); pxCv.addEventListener("pointercancel", pxUp);
+  pxCv.addEventListener("pointerleave", () => { px.hover = null; pxDraw(); }); pxCv.addEventListener("contextmenu", e => e.preventDefault());
+  pxStage.addEventListener("wheel", pxWheel, {passive:false});
+  pxStage.addEventListener("pointerdown", e => { if(e.target === pxStage && px.tool === "select"){ pxDrop(); px.sel = null; pxChanged(); } });
+  D.addEventListener("click", pxClick); D.addEventListener("dblclick", pxDbl); D.addEventListener("contextmenu", pxRight);
+  D.addEventListener("input", pxInput); D.addEventListener("change", pxInput);
+  document.addEventListener("keydown", e => { if(D.open) pxKey(e); }); document.addEventListener("keyup", e => { if(e.key === " ") px.space = false; });
+  D.addEventListener("cancel", e => { if(px.sel || !document.getElementById("pxOver").hidden){ e.preventDefault(); pxEsc(); } });
+  D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, {png:pxPng(), n:px.frames.length, fps:px.fps}); } });
+  px.built = true;
+}
+function pxSync(){
+  if(!px.built) return; const $p = id => document.getElementById(id);
+  $p("pxName").textContent = px.path ? `${px.path}  ${px.fw}×${px.fh}${px.frames.length > 1 ? `, ${px.frames.length} frames` : ""}` : "No picture open";
+  $p("pxZoom").textContent = px.zoom + "×";
+  document.querySelectorAll("#dlgPixel [data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === px.tool));
+  document.querySelectorAll("#dlgPixel [data-size]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.size === (px.size || 1)));
+  document.querySelector('#dlgPixel [data-px="grid"]').setAttribute("aria-pressed", px.grid);
+  document.querySelector('#dlgPixel [data-px="mirror"]').setAttribute("aria-pressed", px.mirror);
+  $p("pxC1").style.background = px.c1[3] ? pxCss(px.c1) : ""; $p("pxC1").classList.toggle("clear", !px.c1[3]);
+  $p("pxC2").style.background = px.c2[3] ? pxCss(px.c2) : ""; $p("pxC2").classList.toggle("clear", !px.c2[3]);
+  $p("pxAlpha").value = px.c1[3]; $p("pxAlphaN").textContent = px.c1[3];
+  $p("pxPal").value = px.pal;
+  const sw = pxSwatches(), used = px.pal === "image" ? sw.length : pxUsed().length;
+  $p("pxCount").textContent = `${used} color${used === 1 ? "" : "s"} used`; $p("pxCount").classList.toggle("warn", used > 28);
+  $p("pxSw").innerHTML = sw.map(c => `<button class="pxsw" data-c="${c.join(",")}" style="background:${pxCss(c)}" title="${pxHex(c)}${c[3] < 255 ? ` at ${c[3]}` : ""}"></button>`).join("") + `<button class="pxsw clear" data-c="0,0,0,0" title="Clear"></button>`;
+  const fr = $p("pxFrames");
+  if(fr.children.length !== px.frames.length) fr.innerHTML = px.frames.map((_, i) => `<button data-frame="${i}"><canvas></canvas><span>${i + 1}</span></button>`).join("");
+  [...fr.children].forEach((b, i) => {
+    b.setAttribute("aria-pressed", i === px.cur);
+    const cv = b.querySelector("canvas"), s = Math.max(1, Math.floor(44 / Math.max(px.fw, px.fh)));
+    cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[i], 0, 0, s, 1);
+  });
+  $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
+  if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
+  if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
+  if(document.activeElement !== $p("pxN")) $p("pxN").value = px.frames.length;
+  const q = $p("pxQueue");
+  q.innerHTML = !px.db ? `<div class="meta">Sending works when the game is open on claude.ai. Download works anywhere.</div>`
+    : !px.queue.length ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
+    : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
+}
+function pxTool(t){ if(px.tool === "select" && t !== "select"){ pxDrop(); px.sel = null; } px.tool = t; pxSync(); pxDraw(); }
+function pxZoom(d){ px.zoom = Math.max(1, Math.min(64, px.zoom + d * Math.max(1, Math.round(px.zoom / 6)))); pxDraw(); pxSync(); }
+function pxEsc(){ const o = document.getElementById("pxOver"); if(!o.hidden){ o.hidden = true; return; } if(px.sel){ pxDrop(); px.sel = null; pxChanged(); } }
+// Overlays: the picture list and the new-picture form
+function pxOverlay(kind){
+  const o = document.getElementById("pxOver"); o.hidden = false;
+  if(kind === "new"){
+    o.innerHTML = `<div class="pxcard"><h2>New picture</h2>
+      <label class="field"><span>Path in the repo</span><input id="pxNp" value="sprites/new.png"></label>
+      <div class="pxrow"><label class="field"><span>Width</span><input type="number" id="pxNw" value="32" min="1" max="512"></label><label class="field"><span>Height</span><input type="number" id="pxNh" value="32" min="1" max="512"></label><label class="field"><span>Frames</span><input type="number" id="pxNn" value="1" min="1" max="64"></label></div>
+      <div class="pxrow"><button class="btn" data-px="cancel">Cancel</button><button class="btn primary" data-px="create">Create</button></div></div>`;
+    document.getElementById("pxNp").focus(); return;
+  }
+  const drafts = pxDrafts();
+  o.innerHTML = `<div class="pxcard wide"><div class="pxrow"><h2>Open a picture</h2><span class="pxgrow"></span><button class="btn" data-px="cancel">Cancel</button></div>
+    <input id="pxQ" placeholder="Search, like dime or bld/restroom" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
+  const q = document.getElementById("pxQ"); q.value = pxStored("q") || ""; q.focus(); q.select();
+  const list = () => {
+    const t = q.value.trim().toLowerCase(); pxStore("q", t);
+    const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b)).slice(0, 240);
+    document.getElementById("pxList").innerHTML = ps.map(p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">No picture matches that.</p>`;
+  };
+  q.oninput = list; list();
+}
+function pxClick(e){
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.tool) return pxTool(b.dataset.tool);
+  if(b.dataset.size){ px.size = +b.dataset.size; return pxSync(); }
+  if(b.dataset.frame !== undefined){ pxDrop(); px.sel = null; px.cur = +b.dataset.frame; pxDraw(); return pxSync(); }
+  if(b.dataset.c){ if(e.detail < 2){ px.c1 = b.dataset.c.split(",").map(Number); pxSync(); } return; }
+  if(b.dataset.openp){ document.getElementById("pxOver").hidden = true; return pxOpen(b.dataset.openp); }
+  if(b.dataset.unsend) return pxUnsend(b.dataset.unsend);
+  if(b.id === "pxC1"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c1); p.dataset.which = "c1"; return p.click(); }
+  if(b.id === "pxC2"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c2); p.dataset.which = "c2"; return p.click(); }
+  const a = b.dataset.px, all = document.getElementById("pxAll")?.checked;
+  ({open:() => pxOverlay("open"), new:() => pxOverlay("new"), cancel:() => { document.getElementById("pxOver").hidden = true; },
+    create:() => { const p = document.getElementById("pxNp").value.trim(), w = +document.getElementById("pxNw").value, h = +document.getElementById("pxNh").value, n = +document.getElementById("pxNn").value;
+      if(!/^sprites\/[a-z0-9_\/-]+\.png$/i.test(p) || p.includes("..")) return ui.toast("The path should look like sprites/name.png.", "bad");
+      if(!(w >= 1 && h >= 1 && w <= 512 && h <= 512 && n >= 1 && n <= 64)) return ui.toast("Pick a size from 1 to 512 pixels and 1 to 64 frames.", "bad");
+      document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); },
+    undo:() => pxUndo(false), redo:() => pxUndo(true), zin:() => pxZoom(1), zout:() => pxZoom(-1), fit:pxFit,
+    grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
+    revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
+    close:() => document.getElementById("dlgPixel").close(), swap:() => { [px.c1, px.c2] = [px.c2, px.c1]; pxSync(); },
+    fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
+    resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
+    reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
+    try:pxTry, send:pxSend, download:pxDownload}[a] || (() => {}))();
+}
+function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
+function pxRight(e){ const b = e.target.closest("[data-c]"); if(!b) return; e.preventDefault(); px.c2 = b.dataset.c.split(",").map(Number); pxSync(); }
+function pxInput(e){
+  const t = e.target, id = t.id;
+  if(id === "pxPick"){ const c = pxRgb(t.value), w = t.dataset.which; px[w] = [...c, px[w][3] || 255]; pxSync(); }
+  else if(id === "pxRe" && e.type === "change"){ const from = t.dataset.from.split(",").map(Number); pxRecolor(from, [...pxRgb(t.value), from[3]]); }
+  else if(id === "pxAlpha"){ px.c1 = [...px.c1.slice(0, 3), +t.value]; pxSync(); }
+  else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
+  else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
+  else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
+  else if(id === "pxFile" && t.files[0]){ pxImport(t.files[0]); t.value = ""; }
+}
+async function pxDime(){
+  try{
+    const im = await pxImg(SPRITE_PACK["sprites/dime.png"]), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext("2d"); ctx.drawImage(im, 0, 0);
+    const d = ctx.getImageData(0, 0, im.width, im.height).data, seen = new Map();
+    for(let i = 0; i < d.length; i += 4) if(d[i + 3]) seen.set(`${d[i]},${d[i + 1]},${d[i + 2]},${d[i + 3]}`, 1);
+    px.dime = [...seen.keys()].map(k => k.split(",").map(Number)).sort((a, b) => pxHsl(a)[0] - pxHsl(b)[0] || pxHsl(a)[2] - pxHsl(b)[2]); pxSync();
+  }catch{}
+}
+function pxKey(e){
+  if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && e.target.type !== "checkbox") return;
+  if(!document.getElementById("pxOver").hidden) return;
+  const k = e.key, ctl = e.ctrlKey || e.metaKey;
+  if(k === " "){ px.space = true; e.preventDefault(); return; }
+  if(ctl && k.toLowerCase() === "z"){ e.preventDefault(); return pxUndo(e.shiftKey); }
+  if(ctl && k.toLowerCase() === "y"){ e.preventDefault(); return pxUndo(true); }
+  if(ctl && k.toLowerCase() === "c") return pxCopy(false);
+  if(ctl && k.toLowerCase() === "x") return pxCopy(true);
+  if(ctl && k.toLowerCase() === "v") return pxPaste();
+  if(ctl && k.toLowerCase() === "a"){ e.preventDefault(); pxDrop(); px.sel = {x:0, y:0, w:px.fw, h:px.fh, buf:null}; pxTool("select"); return; }
+  if(ctl) return;
+  if(k === "Delete" || k === "Backspace"){ e.preventDefault(); return pxClear(); }
+  if(k === "Enter"){ pxDrop(); px.sel = null; return pxChanged(); }
+  const arrow = {ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1]}[k];
+  if(arrow){
+    e.preventDefault();
+    if(px.sel){ if(!px.sel.buf){ pxPush(); px.sel.buf = pxCut(px.sel, true); } px.sel.x += arrow[0]; px.sel.y += arrow[1]; return pxChanged(); }
+    if(e.shiftKey) return pxNudge(arrow[0], arrow[1], document.getElementById("pxAll")?.checked);
+    if(arrow[1] === 0){ pxDrop(); px.sel = null; px.cur = (px.cur + arrow[0] + px.frames.length) % px.frames.length; pxDraw(); return pxSync(); }
+    return;
+  }
+  if(k === "M" && e.shiftKey){ px.mirror = !px.mirror; pxDraw(); return pxSync(); }
+  const t = PX_TOOLS.find(x => x[2].toLowerCase() === k.toLowerCase()); if(t && !e.shiftKey) return pxTool(t[0]);
+  if(k === "x"){ [px.c1, px.c2] = [px.c2, px.c1]; return pxSync(); }
+  if(k === "+" || k === "=") return pxZoom(1);
+  if(k === "-") return pxZoom(-1);
+  if(k === "#"){ px.grid = !px.grid; pxDraw(); return pxSync(); }
+  if(k === "[" || k === ","){ pxDrop(); px.sel = null; px.cur = (px.cur + px.frames.length - 1) % px.frames.length; pxDraw(); return pxSync(); }
+  if(k === "]" || k === "."){ pxDrop(); px.sel = null; px.cur = (px.cur + 1) % px.frames.length; pxDraw(); return pxSync(); }
+}
+async function openPixelEditor(path){
+  if(!px.built) pxBuild();
+  const D = document.getElementById("dlgPixel"); if(!D.open) D.showModal();
+  pxWatch();
+  if(path) await pxOpen(path);
+  else if(!px.frames.length){ const last = pxStored("last"); if(last && (SPRITE_PACK[last] || pxStored("d:" + last))) await pxOpen(last); else pxOverlay("open"); }
+  pxFit(); pxSync(); if(!px.anim) px.anim = requestAnimationFrame(pxPreview);
+}
+{ const b = document.getElementById("pixelBtn"); if(b){ b.hidden = !devMode(); b.onclick = () => openPixelEditor(); } }

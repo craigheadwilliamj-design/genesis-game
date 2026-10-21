@@ -176,6 +176,61 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .paused-tag{position:absolute;top:12px;right:12px;z-index:5;background:var(--forest);color:var(--on-forest);font:600 13px/1 Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border-radius:7px;display:none}
 .paused-tag.on{display:block}
 
+/* pixel editor (js/pixeled.js) */
+dialog.pixed{width:calc(100vw - 24px);max-width:none;height:calc(100vh - 24px);max-height:none;padding:0;display:none;flex-direction:column;overflow:hidden}
+dialog.pixed[open]{display:flex}
+.pxbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 10px;background:var(--forest);color:var(--on-forest)}
+.pxbar .btn{padding:4px 10px;border-radius:7px;border:1px solid rgba(243,239,217,.3);background:transparent;color:var(--on-forest);cursor:pointer}
+.pxbar .btn[aria-pressed="true"]{background:var(--money);color:#1D2B22;border-color:var(--money)}
+.pxname{font:600 16px/1.1 "Barlow Condensed",sans-serif;margin-right:8px;white-space:pre;overflow:hidden;text-overflow:ellipsis;max-width:40vw}
+.pxsep{width:1px;height:20px;background:rgba(243,239,217,.25);margin:0 2px}
+.pxgrow{flex:1}
+.pxmain{flex:1;min-height:0;display:grid;grid-template-columns:44px 1fr 290px}
+.pxtools{display:flex;flex-direction:column;gap:2px;padding:6px 4px;border-right:1px solid var(--line);background:var(--chrome-2)}
+.pxtools button{width:36px;height:34px;border:0;border-radius:7px;background:none;display:grid;place-items:center;color:var(--ink)}
+.pxtools button:hover{background:var(--chrome)}
+.pxtools button[aria-pressed="true"]{background:var(--forest);color:var(--on-forest)}
+.pxsize{display:flex;flex-direction:column;gap:2px;margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+.pxsize button{height:24px;font-weight:600;font-size:13px}
+.pxsize small{font-size:10px;text-align:center;color:var(--ink-2)}
+.pxstage{overflow:auto;display:grid;place-items:center;padding:20px;background:var(--outside);min-width:0}
+.pxstage canvas{display:block;image-rendering:pixelated;touch-action:none;box-shadow:0 2px 12px rgba(0,0,0,.2);cursor:crosshair}
+.pxside{overflow-y:auto;border-left:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:14px;font-size:14px}
+.pxside h3{margin:0 0 6px;font:600 12px/1.2 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.pxside .btn,.pxcard .btn{padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:var(--chrome-2);cursor:pointer}
+.pxside .btn.primary,.pxcard .btn.primary{background:var(--forest);color:var(--on-forest);border-color:var(--forest);font-weight:600}
+.pxside .meta{font-size:12.5px;margin-top:4px}
+.pxrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}
+.pxrow select{max-width:100%;padding:3px 4px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+.pxnum{width:58px;padding:3px 5px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
+.pxcols{display:flex;align-items:center;gap:8px}
+.pxsw{width:20px;height:20px;padding:0;border:1px solid rgba(0,0,0,.25);border-radius:4px;cursor:pointer}
+.pxsw.big{width:34px;height:34px}
+.pxsw.clear{background:repeating-conic-gradient(#cfd4c8 0 25%,#fff 0 50%) 0 0/10px 10px !important}
+.pxpal{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
+#pxCount.warn{color:var(--warn);font-weight:600}
+.pxframes{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
+.pxframes button{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;border:1px solid var(--line);border-radius:6px;background:var(--chrome-2);font-size:11px;cursor:pointer}
+.pxframes button[aria-pressed="true"]{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold)}
+.pxframes canvas{image-rendering:pixelated;background:repeating-conic-gradient(#e2e6dc 0 25%,#f3f5ef 0 50%) 0 0/8px 8px}
+#pxPrev{display:block;margin-top:8px;image-rendering:pixelated;max-width:100%}
+.pxq{list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:3px}
+.pxq li{display:flex;align-items:center;gap:6px}
+.pxq li .btn{margin-left:auto;padding:0 7px}
+.linkish{border:0;background:none;padding:0;color:var(--gold-ink);font-weight:600;cursor:pointer;text-align:left}
+.pxover{position:absolute;inset:0;background:rgba(14,25,18,.45);display:grid;place-items:center;z-index:2}
+.pxover[hidden]{display:none}
+.pxcard{background:var(--chrome);border-radius:12px;padding:16px;width:min(420px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.pxcard.wide{width:min(900px,94vw);height:min(640px,86vh);display:flex;flex-direction:column}
+.pxcard h2{margin:0}
+.pxcard .field input{width:100%}
+.pxcard #pxQ{margin:10px 0;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
+.pxlist{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;align-content:start}
+.pxlist button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--chrome-2);font-size:12px;word-break:break-all;cursor:pointer}
+.pxlist button:hover{border-color:var(--gold)}
+.pxlist img{height:48px;max-width:100%;object-fit:contain;image-rendering:pixelated}
+.pxlist i{color:var(--gold-ink);font-style:normal;font-weight:600}
+@media (max-width:760px){.pxmain{grid-template-columns:44px 1fr;grid-template-rows:1fr 45%}.pxside{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}}
 /* ----- side panel ----- */
 aside{border-left:1px solid var(--line);background:var(--chrome);overflow:auto;min-height:0}
 .panel{padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -373,6 +428,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
       </div>
       <button class="hbtn" id="focusBtn" aria-pressed="false" title="Hide the menus to see only the map (H)">Hide menus</button>
       <button class="hbtn" id="animalsBtn">Animals</button>
+      <button class="hbtn" id="pixelBtn" title="Pixel editor (dev mode)" hidden>Pixels</button>
       <button class="hbtn" id="mapBtn" title="See the whole park (M)">Park Map</button>
       <button class="hbtn" id="menuBtn">Park</button>
     </div>
@@ -825,6 +881,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <p class="snote">Grey is land you don't own. The white box is what the main view shows. Click the map to look there.</p>
 </dialog>
 
+<dialog id="dlgPixel" class="pixed" aria-label="Pixel editor"></dialog>
+
 <dialog id="dlgMove">
   <h2 id="moveTitle">Move animals</h2>
   <div id="moveBody"></div>
@@ -885,5 +943,6 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/staffui.js"></script>
 <script src="js/animalui.js"></script>
 <script src="js/parkmap.js"></script>
+<script src="js/pixeled.js"></script>
 <script src="js/main.js"></script>
 

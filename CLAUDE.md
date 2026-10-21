@@ -15,12 +15,12 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `docs/paths.md`: path layer drawing, 5 m path chunks, connectivity, the strip compatibility layer, tram.
 - `docs/guests.md`: logistics and goods, guests, personalities, services, museum and Education Center, custodians, security and lamps, hotels, staff and morale.
 - `docs/ui.md`: build menu, park map, map.js rendering and tools, ui.js panels, science/logi/guest UIs, main.js.
-- `docs/art.md`: human and animal sprites, footprints, landscape sprites, flat buildings, fence pictures, full art direction and its status list, sprite pack.
+- `docs/art.md`: the in-game pixel editor (dev mode) and pulling its pictures into the repo, human and animal sprites, footprints, landscape sprites, flat buildings, fence pictures, full art direction and its status list, sprite pack.
 - `docs/rigs.md`: rigged animals (js/rigs.js, per-species notes) and the sprite rigger tool.
 - `tools/BIOME_ART.md`: how to finish a biome's art. `PATHS_PLAN.md`: the paths rework plan.
 
 ## Files (script load order is in index.html)
-`spritepack.js` (generated, loads first), `data.js` (all tuning and content; balance changes go here), `geometry.js`, `sim.js`, `science.js`, `keepers.js`, `escapes.js`, `power.js`, `maintenance.js`, `medicine.js`, `landscape.js`, `fences.js`, `pathcells.js`, `themes.js`, `behavior.js`, `logistics.js`, `guests.js`, `personas.js`, `services.js`, `custodians.js`, `security.js`, `lodging.js`, `staff.js`, `staffui.js`, `animalui.js`, `pathart.js`, `biomepaint.js`, `menu.js`, `rigs.js`, `map.js` (rendering, camera, build tools; also defines `$`, `esc`, `nodeKey`), `propart.js`, `ui.js`, `scienceui.js`, `logiui.js`, `guestui.js`, `parkmap.js`, `main.js` (loop, saving).
+`spritepack.js` (generated, loads first), `data.js` (all tuning and content; balance changes go here), `geometry.js`, `sim.js`, `science.js`, `keepers.js`, `escapes.js`, `power.js`, `maintenance.js`, `medicine.js`, `landscape.js`, `fences.js`, `pathcells.js`, `themes.js`, `behavior.js`, `logistics.js`, `guests.js`, `personas.js`, `services.js`, `custodians.js`, `security.js`, `lodging.js`, `staff.js`, `staffui.js`, `animalui.js`, `pathart.js`, `biomepaint.js`, `menu.js`, `rigs.js`, `map.js` (rendering, camera, build tools; also defines `$`, `esc`, `nodeKey`), `propart.js`, `ui.js`, `scienceui.js`, `logiui.js`, `guestui.js`, `parkmap.js`, `pixeled.js` (dev-mode pixel editor, see docs/art.md), `main.js` (loop, saving).
 
 ## Key globals (details in docs/core.md)
 - `state`: the whole saved game. **Anything that must survive a reload lives in `state`**, with a default in `upgradeSave` (sim.js).
@@ -51,7 +51,7 @@ Buildings, props and paths now follow the **park style**, with the Genesis restr
 The ~480 PNGs are packed into `js/spritepack.js` by `tools/packsprites.py` (the artifact holds at most 511 files). **After adding or changing any PNG, run `python3 tools/packsprites.py`, commit the new `js/spritepack.js`, and publish it.** Code that puts a sprite path in an `<image href>` or `<img src>` must wrap it in `spriteUrl(...)`. Merge conflicts in `js/spritepack.js`: take either side and re-run the tool.
 
 ## Publish
-Artifact: https://claude.ai/artifact/WrtBukrdr1fijyDGdFRbM9 (capabilities `db`, `user`, carried forward automatically).
+Artifact: https://claude.ai/artifact/WrtBukrdr1fijyDGdFRbM9 (capabilities `db`, `user`, `downloads`, carried forward automatically).
 - `index.html` is stored WITHOUT the publish wrapper (it starts with `<title>`, with no `<!doctype>`/`<head>`). Never commit a wrapped copy back, because it would get double-wrapped.
 - Publish with `file_path: index.html`, `url` set to the link above, and `files` listing only the changed `js/*.js` (unchanged files are kept). Sprites ride in `js/spritepack.js`, so never list PNGs in `files` (the file cap is 511).
 - Artifact reads of the live page return the wrapped HTML, so don't save that over `index.html`.
