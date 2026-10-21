@@ -55,7 +55,7 @@ function pathCtx(){
   for(const k of Object.keys(fencePieces())){ const [x, y, d] = k.split(","); if(d === "d" || d === "a") diag.add(x + "," + y); }
   return {
     ex: state.exhibits.map(e => ({...box(e.points), name:e.name})),
-    bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath).map(b => ({...box(b.points), base:cardBase(b.type, b.points)})),
+    bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath).map(b => box(pathSolid(b.type, b.points))),
     water: parkWater().map(w => box(w.points)),
     decor: decorOf().filter(f => LAND[f.type]).flatMap(f => footRects(f, null)),
     lines: (state.fences || []).map(l => l.points),
@@ -69,7 +69,7 @@ function pathChunkProblem(cx, cy, kind, ctx){
   for(const [px, py] of [[x + e, y + e], [x + S - e, y + e], [x + S - e, y + S - e], [x + e, y + S - e]]) if(!inOwned(px, py, 0)) return "Keep it inside the park boundary.";
   const r = chunkRect(cx, cy);
   for(const o of ctx.ex) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through an exhibit.";
-  for(const o of ctx.bl) if(hitsBox(o, x, y) && (o.base ? baseOnPath(o.base, [x, y, x + S, y + S]) : shapesOverlap(r, o.pts))) return "Paths can't go through a building.";
+  for(const o of ctx.bl) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through a building.";
   if(kind !== "b") for(const o of ctx.water) if(hitsBox(o, x, y) && (shapesOverlap(r, o.pts) || shapesOverlap(o.pts, r))) return "Paths can't cross water. Lay a wooden bridge over it.";
   for(const b of ctx.decor) if(boxesHit(b, [x, y, x + S, y + S])) return "It runs into a plant, rock or statue. Bulldoze it first.";
   if(ctx.diag.size) for(let i = 0; i < S; i++) for(let j = 0; j < S; j++) if(ctx.diag.has((x + i) + "," + (y + j))) return "It runs into a fence.";
@@ -282,20 +282,13 @@ function shapeOnChunks(shape){
     if(C[chunkKey(cx, cy)] && shapesOverlap(chunkRect(cx, cy), shape)) return true;
   return false;
 }
-// Is a building on a path? A flat picture card (BLD_PICS card, map.js) stands on its box's south edge with the rest of the box behind the picture, so only that base line counts: it's on a path when there's path on both sides of it, and the back of the box may lie over a path. Anything else counts all of it.
-function cardBase(type, pts){
-  if(typeof BLD_PICS === "undefined" || !BLD_PICS[type] || !BLD_PICS[type].card) return null;
-  const b = bbox(pts); return {x0:b.x0, x1:b.x1, y:b.y1};
+// The part of a building that has to stay off paths: all of it, except that a flat picture card's box (BLD_PICS backOver, map.js) may lie over a path by backOver meters at its back (north) side, so a cart can back a little onto one
+function pathSolid(type, pts){
+  const o = typeof BLD_PICS !== "undefined" && BLD_PICS[type] && BLD_PICS[type].backOver;
+  if(!o) return pts;
+  const b = bbox(pts); return [[b.x0, b.y0 + o], [b.x1, b.y0 + o], [b.x1, b.y1], [b.x0, b.y1]];
 }
-function baseOnPath(L, extra){   // extra: a chunk [x0, y0, x1, y1] about to be laid
-  const at = (x, y) => !!pathAt(x, y) || !!extra && x > extra[0] && x < extra[2] && y > extra[1] && y < extra[3];
-  for(let x = L.x0 + .05; x < L.x1; x += .25) if(at(Math.min(x, L.x1 - .05), L.y - .01) && at(Math.min(x, L.x1 - .05), L.y + .01)) return true;
-  return false;
-}
-function bldOnPath(type, pts){
-  const L = cardBase(type, pts);
-  return L ? baseOnPath(L) : shapeOnChunks(pts) || state.paths.some(q => !q.d && lineEntersShape(q.points, pts));
-}
+function bldOnPath(type, pts){ const S = pathSolid(type, pts); return shapeOnChunks(S) || state.paths.some(q => !q.d && lineEntersShape(q.points, S)); }
 // Is every corner of a shape on a guest or bridge chunk? (corners are pulled a hair inward so one flush with a chunk edge counts as inside) Path props use this.
 function shapeOnGuestPath(shape){
   const [cx, cy] = centroid(shape);
