@@ -3685,6 +3685,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pixelRigger = rig.nodes.length === 2 && rig.cell.w === 10 && Object.keys(rig.assets).length === 2 && px.layers.length === coel.nodes.length && px.fw === coel.cell.w && px.frames.length === 1
       && px.layers[0].name === coel.nodes[0].name && pxCompData(0).some((v, i) => i % 4 === 3 && v);
     pxUndo(false);
+    // the reference: an upload fits inside the canvas whole on the bottom middle, and stays out of the picture
+    const rc = document.createElement("canvas"); rc.width = 400; rc.height = 100; rc.getContext("2d").fillRect(0, 0, 400, 100);
+    const pngNoRef = pxPng(); px.refUrl = rc.toDataURL(); await pxSetRef("upload"); const refB = pxRefBox();
+    out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
+    await pxSetRef(""); px.refUrl = "";
     out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
     const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
     out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;

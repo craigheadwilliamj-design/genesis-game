@@ -19,7 +19,7 @@ const PX_VIEWS = ["front", "back", "left", "right"];
 const PX_SKIP_BLD = ["vivS", "vivM", "vivL", "platform", "tramstop", "campground"];   // drawn with what's inside them or from parts, not one picture
 const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
 const px = {path:"", fw:16, fh:16, frames:[], layers:[], lay:0, cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
-  pal:"image", ref:"", refCv:null, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
+  pal:"image", ref:"", refCv:null, refUrl:"", refAlpha:.3, refShow:true, refFront:false, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
 
 /* ---------- pixels ---------- */
 const pxBlank = (w, h) => new Uint8ClampedArray(w * h * 4);
@@ -141,7 +141,7 @@ function pxChanged(){
   }, 600);
 }
 // A draft keeps every layer as its own strip, so they come back as layers
-const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
   const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
   px.fw = ims[0].width / n; px.fh = ims[0].height;
@@ -156,6 +156,7 @@ async function pxOpen(path, fresh){
     const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
     if(dr && dr.layers) await pxLoadDraft(dr); else pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height));
     pxStore("last", path); px.guide = pxGuideFor(path);
+    if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); }
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
   }catch{ ui.toast("That picture didn't load.", "bad"); }
@@ -201,10 +202,11 @@ function pxDraw(){
   const z = px.zoom, W = px.fw * z, H = px.fh * z, ctx = pxCtx;
   pxCv.width = W; pxCv.height = H; ctx.imageSmoothingEnabled = false;
   const ck = Math.max(4, Math.min(16, z)); for(let y = 0; y < H; y += ck) for(let x = 0; x < W; x += ck){ ctx.fillStyle = (x / ck + y / ck) % 2 ? "#e4e7df" : "#f5f6f2"; ctx.fillRect(x, y, ck, ck); }   // soft, so the pixels and the cursor stand out
-  if(px.refCv){ const r = px.refCv; ctx.globalAlpha = .22; ctx.drawImage(r, Math.floor((px.fw - r.width) / 2) * z, (px.fh - r.height) * z, r.width * z, r.height * z); ctx.globalAlpha = 1; }   // stood on the same bottom middle
+  if(!px.refFront) pxDrawRef(ctx, z);
   if(px.onion && px.frames.length > 1){ ctx.globalAlpha = .28; ctx.drawImage(pxComp((px.cur + px.frames.length - 1) % px.frames.length), 0, 0, W, H); ctx.globalAlpha = 1; }
   const s = px.sel;
   px.layers.forEach((L, l) => { if(L.show) pxLayer(ctx, px.frames[px.cur][l], 0, 0, z, L.alpha); });
+  if(px.refFront) pxDrawRef(ctx, z);
   if(s && s.buf){ pxTmp.width = s.w; pxTmp.height = s.h; pxTmp.getContext("2d").putImageData(new ImageData(s.buf.slice(), s.w, s.h), 0, 0); ctx.drawImage(pxTmp, s.x * z, s.y * z, s.w * z, s.h * z); }
   if(px.grid && z >= 6){
     ctx.fillStyle = "rgba(29,43,34,.13)";
@@ -369,9 +371,9 @@ function pxLayersSync(){
     el.innerHTML = px.layers.map((L, l) => `<div class="pxlrow" data-layer="${l}"><button class="pxeye" data-eye="${l}" title="${L.show ? "Hide" : "Show"} this layer" aria-pressed="${L.show}">${PX_EYE(L.show)}</button><canvas></canvas><input class="pxlname" data-lname="${l}" value="${esc(L.name)}" maxlength="32" aria-label="Layer name"></div>`).reverse().join("");
   }
   el.querySelectorAll(".pxlrow").forEach(r => {
-    const l = +r.dataset.layer, cv = r.querySelector("canvas"), s = Math.max(1, Math.floor(26 / Math.max(px.fw, px.fh)));
+    const l = +r.dataset.layer, cv = r.querySelector("canvas"), s = Math.min(Math.max(1, Math.floor(26 / Math.max(px.fw, px.fh))), 40 / px.fw, 26 / px.fh);   // whole-pixel steps when small, shrunk to fit when big
     r.setAttribute("aria-current", l === px.lay); r.classList.toggle("off", !px.layers[l].show);
-    cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[px.cur][l], 0, 0, s, 1);
+    cv.width = Math.max(1, Math.round(px.fw * s)); cv.height = Math.max(1, Math.round(px.fh * s)); const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[px.cur][l], 0, 0, s, 1);
   });
   const a = Math.round(px.layers[px.lay].alpha * 100); document.getElementById("pxLAlpha").value = a; document.getElementById("pxLAlphaN").textContent = a + "%";
 }
@@ -564,7 +566,10 @@ function pxBuild(){
       <section><h3>Layers</h3><div class="pxlayers" id="pxLayers"></div>
         <div class="pxrow"><button class="btn" data-px="ladd">Add</button><button class="btn" data-px="ldup">Copy</button><button class="btn" data-px="ldel">Delete</button><button class="btn" data-px="lup" title="Move up">▲</button><button class="btn" data-px="ldown" title="Move down">▼</button><button class="btn" data-px="lmerge" title="Paint this layer onto the one under it">Merge down</button></div>
         <label class="pxrow"><span>Layer opacity</span><input type="range" min="0" max="100" id="pxLAlpha"><span class="num" id="pxLAlphaN"></span></label>
-        <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened.</div></section>
+        <div class="pxlrow pxrefrow"><button class="pxeye" data-px="refeye" id="pxRefEye" title="Show or hide the reference"></button><b>Reference</b><select id="pxRef" aria-label="Reference picture"></select><button class="btn" data-px="refup" title="A picture of your own, fitted whole to the canvas">Upload…</button><input type="file" accept="image/*" id="pxRefFile" hidden></div>
+        <div class="pxrow"><span>Reference opacity</span><input type="range" min="5" max="100" id="pxRAlpha"><span class="num" id="pxRAlphaN"></span></div>
+        <label class="pxrow"><input type="checkbox" id="pxRFront"> Draw the reference over the layers, to trace</label>
+        <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened. The reference is only a guide and never goes into the picture: an upload is scaled to fit the canvas whole and stands on the bottom middle.</div></section>
       <section><h3>Frames</h3><div class="pxframes" id="pxFrames"></div>
         <div class="pxrow"><button class="btn" data-px="fadd">Add</button><button class="btn" data-px="fdup">Copy</button><button class="btn" data-px="fdel">Delete</button><button class="btn" data-px="fleft" title="Move earlier">◀</button><button class="btn" data-px="fright" title="Move later">▶</button></div>
         <label class="pxrow"><span>Speed</span><input type="number" min="1" max="30" id="pxFps" class="pxnum"><span>a second</span><label><input type="checkbox" id="pxOnion"> Onion skin</label></label>
@@ -573,7 +578,6 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
-        <label class="pxrow"><span>Underneath</span><select id="pxRef"></select></label>
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
@@ -617,9 +621,10 @@ function pxSync(){
     cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.drawImage(pxComp(i), 0, 0, cv.width, cv.height);
   });
   pxLayersSync();
-  const refs = ["", ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
-  if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
-  $p("pxRef").value = px.ref; $p("pxGuideNote").hidden = px.guide == null;
+  const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
+  if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
+  $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
+  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -692,11 +697,32 @@ function pxNewFill(sized){
   g("pxNp").value = t[4].replace("{id}", g("pxNs").value).replace("{name}", name).replace("{view}", g("pxNv").value);
   if(sized){ g("pxNw").value = t[1]; g("pxNh").value = t[2]; g("pxNn").value = t[3]; }
 }
-// A faint picture under the canvas to match size and feet against (the standing picture of an animal with art)
+// The reference: a guide drawn faintly under the layers (or over them, to trace), never part of the picture. Either a game sprite at
+// its own size (an animal with art, to match size and feet against) or a picture of your own, fitted whole to the canvas.
 async function pxSetRef(path){
   px.ref = path || ""; px.refCv = null;
-  if(path && SPRITE_PACK[path]) try{ const im = await pxImg(SPRITE_PACK[path]), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; cv.getContext("2d").drawImage(im, 0, 0); px.refCv = cv; }catch{}
+  const src = path === "upload" ? px.refUrl : path && SPRITE_PACK[path];
+  if(src) try{ const im = await pxImg(src), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; cv.getContext("2d").drawImage(im, 0, 0); px.refCv = cv; }catch{}
   pxDraw(); pxSync();
+}
+// Where the reference sits, in sprite pixels: an upload scaled to fit inside the canvas with nothing cut off, a sprite at its own size, both on the bottom middle
+function pxRefBox(){
+  const r = px.refCv; if(!r) return null;
+  const k = px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1, w = r.width * k, h = r.height * k;
+  return [(px.fw - w) / 2, px.fh - h, w, h];
+}
+function pxDrawRef(ctx, z){
+  const b = pxRefBox(); if(!b || !px.refShow) return;
+  ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload";   // a photo or sketch reads better smooth; a sprite stays pixel sharp
+  ctx.drawImage(px.refCv, Math.round(b[0] * z), Math.round(b[1] * z), Math.round(b[2] * z), Math.round(b[3] * z)); ctx.restore();
+}
+// An uploaded picture, kept at most 512 px on its long side (plenty to trace from, small enough for the draft)
+async function pxRefUpload(file){
+  try{
+    const im = await pxImg(URL.createObjectURL(file)), k = Math.min(1, 512 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(im.width * k)); cv.height = Math.max(1, Math.round(im.height * k)); const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(im, 0, 0, cv.width, cv.height);
+    px.refUrl = cv.toDataURL("image/png"); px.refShow = true; await pxSetRef("upload"); pxChanged();
+  }catch{ ui.toast("That file isn't a picture I can read.", "bad"); }
 }
 function pxClick(e){
   const b = e.target.closest("button"), row = e.target.closest("[data-layer]");
@@ -719,7 +745,7 @@ function pxClick(e){
       if(!/^sprites\/[a-z0-9_\/-]+\.png$/i.test(p) || p.includes("..")) return ui.toast("The path should look like sprites/name.png.", "bad");
       if(!(w >= 1 && h >= 1 && w <= 512 && h <= 512 && n >= 1 && n <= 64)) return ui.toast("Pick a size from 1 to 512 pixels and 1 to 64 frames.", "bad");
       const ref = !document.getElementById("pxNsF").hidden && document.getElementById("pxNr").checked;
-      document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); pxSetRef(ref && w === 100 && h === 75 ? "sprites/dime.png" : ""); },
+      document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); pxSetRef(ref && w === 100 && h === 75 ? "sprites/dime.png" : "").then(pxChanged); },
     undo:() => pxUndo(false), redo:() => pxUndo(true), zin:() => pxZoom(1), zout:() => pxZoom(-1), fit:pxFit,
     grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
     revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
@@ -728,6 +754,7 @@ function pxClick(e){
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
+    refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); },
     try:pxTry, send:pxSend, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
 function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
@@ -741,7 +768,10 @@ function pxInput(e){
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
   else if(id === "pxNt") pxNewFill(true);
   else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);
-  else if(id === "pxRef") pxSetRef(t.value);
+  else if(id === "pxRef"){ pxSetRef(t.value).then(pxChanged); }
+  else if(id === "pxRefFile" && t.files[0]){ pxRefUpload(t.files[0]); t.value = ""; }
+  else if(id === "pxRAlpha"){ px.refAlpha = +t.value / 100; document.getElementById("pxRAlphaN").textContent = t.value + "%"; pxDraw(); if(e.type === "change") pxChanged(); }
+  else if(id === "pxRFront"){ px.refFront = t.checked; pxChanged(); }
   else if(id === "pxLAlpha"){ px.layers[px.lay].alpha = +t.value / 100; document.getElementById("pxLAlphaN").textContent = t.value + "%"; pxDraw(); if(e.type === "change") pxChanged(); }
   else if(t.dataset.lname && e.type === "change"){ px.layers[+t.dataset.lname].name = t.value.trim().slice(0, 32) || "Layer"; t.blur(); pxChanged(); }
   else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
