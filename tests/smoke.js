@@ -216,19 +216,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
-    // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
+    // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
     state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
-    out.geneNeedsTech = !!geneProblem(ga);
+    out.geneNeedsTech = !!geneProblem();
     state.science.tech.push("genetherapy");
     out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    out.geneOffDoesNothing = !viv.geneTherapy && geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 65;
-    out.geneNoBetterGenome = !!geneProblem(ga);
+    viv.geneTherapy = true; out.geneNoBetterGenome = geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 80;
-    out.geneQueues = !geneProblem(ga); ga.gene = true;
+    out.geneQueues = !geneProblem() && geneTargets(viv).includes(ga) && checkWork(viv) === HEALTH.checkMinutes + GENE.minutes * geneTargets(viv).length; delete viv.vetCheck;
     const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 70 && !ga.gene) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
+    out.geneVetDoesIt = run(600, () => ga.q === 70) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 

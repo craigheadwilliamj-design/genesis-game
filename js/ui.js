@@ -518,12 +518,10 @@ function healthHtml(e){
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  // genome therapy: lift a clone's DNA toward the lab's genome
+  // genome therapy: vets lift sickly clones' DNA at each check-up
   if(e.animals.length && hasTech("genetherapy")){
-    const low = e.animals.filter(a => (a.q ?? 90) < 100);
-    h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
-      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${cloneOpen(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${cloneOpen(a.sp) ? "Lab genome isn't better" : `Needs ${CLONE_GENOME.min}% genome`}</span>`}</li>`; }).join("")}</ul>`;
-    h += `<div class="meta">A vet rewrites the animal's DNA up to what the lab's genome gives a clone today, at most ${GENE.step} points a go. To go further, send GHOST for more of the genome. Healthier DNA means fewer illnesses.</div>`;
+    const sickly = e.animals.filter(a => (a.q ?? 90) < GENE.sickly).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${sickly} sickly clone${sickly === 1 ? "" : "s"}</span></div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){
@@ -857,8 +855,7 @@ panelEl.addEventListener("click", e => {
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
-    const an = it.animals.find(x => x.id === b.dataset.id);
-    if(an){ if(an.gene) delete an.gene; else { const why = geneProblem(an); if(why) ui.toast(why, "bad"); else an.gene = true; } }
+    if(it.geneTherapy) it.geneTherapy = false; else { const why = geneProblem(); if(why) ui.toast(why, "bad"); else it.geneTherapy = true; }
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
