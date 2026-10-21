@@ -171,6 +171,9 @@ function injuryChance(e, a){
 // Everything the exhibit panel says about health
 // Sick animals the player (and the vets) know about. Mild illness stays hidden until a check-up.
 const noticed = a => !!a.sick && !a.sick.hidden;
+// An animal's health as the player sees it, 0 to 100: full unless it's known to be sick or hurt, then less as it gets worse
+const animalHp = a => noticed(a) ? clamp(100 - a.sick.sev, 0, 100) : 100;
+const hpColor = hp => hp >= 100 ? "var(--good)" : hp > 60 ? "var(--warn)" : "var(--bad)";
 const daysSinceCheck = e => e.vetCheck == null ? 99 : state.day - e.vetCheck;
 function healthReport(e){
   const sick = e.animals.filter(noticed), hidden = e.animals.filter(a => a.sick && a.sick.hidden).length;
@@ -198,8 +201,6 @@ function basicsLow(e, list){
   return out;
 }
 
-// What raises illness and injury risk, in words (the keys are the `why` lists from illChance and injuryChance)
-const RISK_WHY = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating plants it isn't evolved for", "no water":"having no water", "no pool":"having no pool", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other", stress:"stress", "the cold":"the cold"};
 
 // Injuries are obvious at once; illness shows only once it's bad
 function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && sev < HEALTH.obviousAt) a.sick.hidden = true; }

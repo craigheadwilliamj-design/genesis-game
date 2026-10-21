@@ -2686,11 +2686,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
       // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
       const hl = () => document.getElementById("anHealth").textContent;
-      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && /chance a day of falling ill/.test(hl());
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && !/chance a day/.test(hl());
       a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
-      out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && !!document.querySelector("#anHealth .meter");
+      out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
+      // the exhibit's Animals and Health tabs show each animal's health too
+      { const ex = animalHome(a1.id), tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex.id; exTabs.tab = "animals"; const at = exhibitHtml(ex); exTabs.tab = "health"; const ht = exhibitHtml(ex); exTabs.tab = tk; exTabs.ex = tx;
+        out.exhibitTabsHealthBar = /Injured, 45% health/.test(at) && /Injured, 45% health/.test(ht) && /Healthy, 100% health/.test(ht) && /width:45%/.test(ht); }
       a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
-      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl());
+      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
       // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low
       const ex0 = animalHome(a1.id), dirtKeep = ex0.dirt, needKeep = {...a1.need};
       ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);

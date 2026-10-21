@@ -517,7 +517,8 @@ function healthHtml(e){
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
-  if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
+  // every animal's health, the worst first; tap one to open it
+  if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
   // genome therapy: vets lift clones' DNA at each check-up
   if(e.animals.length && hasTech("genetherapy")){
     const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
