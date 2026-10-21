@@ -251,22 +251,147 @@ const VIVARIUMS = {
    SCIENCE: ORACLE, GHOST, and TAR
    --------------------------------------------------------------------- */
 
-// Time periods GHOST can travel to.
-//   research   base ORACLE research points to unlock an animal from here (bigger and pricier animals cost more)
-//   trip       what one expedition costs for a mid-size animal
-//   days       how long an expedition takes, in open days
+// Time periods. Every site in a period (TIME_SITES) shares its trip:
+//   trip       what one expedition costs for a mid-size animal (a scouting trip costs the same)
+//   days       how long a trip takes, in open days
 //   risk       extra chance an expedition comes back with nothing. Big animals add more (see TRIP).
 const TIME_PERIODS = [
-  {id:"Quaternary",    ago:"2.6 million years ago to today", research:20,  trip:3000,  days:1.5, risk:.05},
-  {id:"Neogene",       ago:"23–2.6 million years ago", research:30,  trip:3500,  days:1.5, risk:.07},
-  {id:"Paleogene",     ago:"66–23 million years ago",  research:40,  trip:4500,  days:1.5, risk:.10},
-  {id:"Cretaceous",    ago:"145–66 million years ago",  research:60,  trip:7500,  days:2.5, risk:.15},
-  {id:"Jurassic",      ago:"201–145 million years ago", research:70,  trip:7000,  days:2.5, risk:.15},
-  {id:"Triassic",      ago:"252–201 million years ago", research:50,  trip:5000,  days:2.5, risk:.12},
-  {id:"Permian",       ago:"299–252 million years ago", research:40,  trip:4500,  days:1.5, risk:.12},
-  {id:"Carboniferous", ago:"359–299 million years ago", research:30,  trip:4000,  days:1.5, risk:.10},
-  {id:"Devonian",      ago:"419–359 million years ago", research:25,  trip:3500,  days:1.5, risk:.10},
+  {id:"Quaternary",    ago:"2.6 million years ago to today", trip:3000,  days:1.5, risk:.05},
+  {id:"Neogene",       ago:"23–2.6 million years ago", trip:3500,  days:1.5, risk:.07},
+  {id:"Paleogene",     ago:"66–23 million years ago",  trip:4500,  days:1.5, risk:.10},
+  {id:"Cretaceous",    ago:"145–66 million years ago",  trip:7500,  days:2.5, risk:.15},
+  {id:"Jurassic",      ago:"201–145 million years ago", trip:7000,  days:2.5, risk:.15},
+  {id:"Triassic",      ago:"252–201 million years ago", trip:5000,  days:2.5, risk:.12},
+  {id:"Permian",       ago:"299–252 million years ago", trip:4500,  days:1.5, risk:.12},
+  {id:"Carboniferous", ago:"359–299 million years ago", trip:4000,  days:1.5, risk:.10},
+  {id:"Devonian",      ago:"419–359 million years ago", trip:3500,  days:1.5, risk:.10},
 ];
+
+// GHOST's timeline: every period gets one equal bar on the slider, split equally into its epochs. Each epoch is
+// [name, years ago it began]; it ends where the next begins (the Holocene at TIMELINE_FLOOR, as a log scale can't reach 0).
+// Epochs are only for the slider and its labels: `period` stays the unit of every mechanic.
+const TIMELINE = [
+  {id:"Cambrian", epochs:[["Early Cambrian",538.8e6],["Middle Cambrian",506.5e6],["Late Cambrian",497e6]]},
+  {id:"Ordovician", epochs:[["Early Ordovician",485.4e6],["Middle Ordovician",471.3e6],["Late Ordovician",458.2e6]]},
+  {id:"Silurian", epochs:[["Early Silurian",443.1e6],["Late Silurian",426.7e6]]},
+  {id:"Devonian", epochs:[["Early Devonian",419.6e6],["Middle Devonian",393.3e6],["Late Devonian",382.7e6]]},
+  {id:"Carboniferous", epochs:[["Mississippian",358.9e6],["Pennsylvanian",323.4e6]]},
+  {id:"Permian", epochs:[["Cisuralian",298.9e6],["Guadalupian",273.0e6],["Lopingian",259.5e6]]},
+  {id:"Triassic", epochs:[["Early Triassic",251.9e6],["Middle Triassic",246.7e6],["Late Triassic",237e6]]},
+  {id:"Jurassic", epochs:[["Early Jurassic",201.4e6],["Middle Jurassic",174.7e6],["Late Jurassic",161.5e6]]},
+  {id:"Cretaceous", epochs:[["Early Cretaceous",143.1e6],["Late Cretaceous",100.5e6]]},
+  {id:"Paleogene", epochs:[["Paleocene",66.0e6],["Eocene",56.0e6],["Oligocene",33.9e6]]},
+  {id:"Neogene", epochs:[["Miocene",23.03e6],["Pliocene",5.333e6]]},
+  {id:"Quaternary", epochs:[["Pleistocene",2.58e6],["Holocene",11700]]},
+];
+const TIMELINE_FLOOR = 10;
+// The map GHOST shows for an epoch (by its name) or else its period: sprites/timeline/<name>.png, 260 x 130 Mollweide,
+// drafted by tools/timeline/genmaps.py from the PALEOMAP PaleoDEMs (Scotese & Wright 2018, CC BY 4.0).
+const TIMELINE_MAPS = {
+  Cambrian:"cambrian", Ordovician:"ordovician", Silurian:"silurian", Devonian:"devonian", Carboniferous:"carboniferous",
+  Permian:"permian", Triassic:"triassic", Jurassic:"jurassic", "Early Jurassic":"jurassic-early", "Late Jurassic":"jurassic-late",
+  "Early Cretaceous":"cretaceous-early", "Late Cretaceous":"cretaceous-late", Paleogene:"paleogene", Neogene:"neogene",
+  Pleistocene:"pleistocene", Holocene:"holocene",
+};
+const TIMELINE_MAP_SIZE = [260, 130];
+
+// Sites GHOST's drones visit: real fossil localities (or historical ranges for the recently extinct), plus museum events.
+//   from/to   years ago the site's animals lived there; it shows for the whole of any epoch that window touches
+//   at        its marker's pixel on each map it shows on (rotated back by plate reconstruction, nudged so markers never touch)
+//   fauna     species found there (only the ones speciesAvailable shows); event: a MUSEUM_EVENTS id GHOST records there
+// TIME_SITES:BEGIN written by tools/timeline/placesites.py from sites.py; edit those, not this.
+const TIME_SITES = [
+  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:["tikt"]},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:["icht"]},
+  {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:["pulm"]},
+  {id:"joggins", name:"Joggins Fossil Cliffs", where:"Nova Scotia, Canada", from:315e6, to:312e6, at:{carboniferous:[126, 70]}, fauna:["hylo", "arth"]},
+  {id:"nyrany", name:"Nýřany", where:"Bohemia, Czechia", from:308e6, to:306e6, at:{carboniferous:[144, 63]}, fauna:["mibr"]},
+  {id:"commentry", name:"Commentry", where:"Allier, France", from:302e6, to:300e6, at:{carboniferous:[140, 70]}, fauna:["mega"]},
+  {id:"pennredbeds", name:"Late Pennsylvanian red beds", where:"Texas and New Mexico, USA", from:304e6, to:299.5e6, at:{carboniferous:[103, 67]}, fauna:["dcau", "eryo"]},
+  {id:"elcobre", name:"El Cobre Canyon", where:"New Mexico, USA", from:298e6, to:293e6, at:{permian:[104, 54]}, fauna:["plhy"]},
+  {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[106, 61]}, fauna:["dime", "seym"]},
+  {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[114, 60]}, fauna:["coty"]},
+  {id:"pedrafogo", name:"Pedra de Fogo Formation", where:"Maranhão, Brazil", from:280e6, to:272e6, at:{permian:[121, 87]}, fauna:["prio"]},
+  {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[161, 37]}, fauna:["este"]},
+  {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[109, 113]}, fauna:["mosc", "ante"]},
+  {id:"karoolate", name:"Karoo, Daptocephalus Zone", where:"Eastern Cape, South Africa", from:256e6, to:252.2e6, at:{permian:[116, 114]}, fauna:["diic", "lyst"]},
+  {id:"dvina", name:"Sokolki, Northern Dvina", where:"Arkhangelsk, Russia", from:255e6, to:253e6, at:{permian:[153, 37]}, fauna:["scut", "inos"]},
+  {id:"burgersdorp", name:"Burgersdorp Formation", where:"Eastern Cape, South Africa", from:247.5e6, to:247e6, at:{triassic:[128, 108]}, fauna:["eryt"]},
+  {id:"madygen", name:"Madygen Formation", where:"Batken, Kyrgyzstan", from:236e6, to:232e6, at:{triassic:[165, 25]}, fauna:["shar", "long", "gigt"]},
+  {id:"ischigualasto", name:"Ischigualasto Formation", where:"San Juan, Argentina", from:231e6, to:226e6, at:{triassic:[110, 99]}, fauna:["herr"]},
+  {id:"krasiejow", name:"Krasiejów", where:"Opole, Poland", from:230e6, to:225e6, at:{triassic:[136, 33]}, fauna:["sile"]},
+  {id:"chinle", name:"Chinle Formation", where:"Petrified Forest, Arizona, USA", from:225e6, to:208e6, at:{triassic:[89, 55]}, fauna:["post", "desm"]},
+  {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 40]}, fauna:["plat"]},
+  {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[97, 55]}, fauna:["coel"]},
+  {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[143, 32]}, fauna:["liso"]},
+  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:["dimo", "scel"]},
+  {id:"elliot", name:"Elliot Formation", where:"Eastern Cape, South Africa", from:200e6, to:190e6, at:{"jurassic-early":[127, 101]}, fauna:["hete"]},
+  {id:"kayenta", name:"Kayenta Formation", where:"Arizona, USA", from:196e6, to:183e6, at:{"jurassic-early":[92, 46]}, fauna:["dilo"]},
+  {id:"hanson", name:"Hanson Formation", where:"Mount Kirkpatrick, Antarctica", from:194e6, to:188e6, at:{"jurassic-early":[146, 113]}, fauna:["cryo"]},
+  {id:"stonesfield", name:"Stonesfield Slate", where:"Oxfordshire, England", from:168e6, to:166e6, at:{jurassic:[135, 29]}, fauna:["mgal"]},
+  {id:"daohugou", name:"Daohugou and Tiaojishan", where:"Liaoning and Hebei, China", from:165e6, to:158e6, at:{jurassic:[202, 26], "jurassic-late":[203, 28]}, fauna:["anch", "yiqi", "scan"]},
+  {id:"morrison", name:"Morrison Formation", where:"Wyoming, Colorado and Utah, USA", from:156e6, to:147e6, at:{"jurassic-late":[96, 32]}, fauna:["allo", "steg", "cera", "torv", "orni", "dryo", "cama", "apat", "dipl", "brac"]},
+  {id:"tendaguru", name:"Tendaguru", where:"Lindi, Tanzania", from:155e6, to:150e6, at:{"jurassic-late":[141, 91]}, fauna:["kent", "dryo"]},
+  {id:"solnhofen", name:"Solnhofen Limestone", where:"Bavaria, Germany", from:151e6, to:150e6, at:{"jurassic-late":[141, 29]}, fauna:["arch", "comp"]},
+  {id:"cedarmtn", name:"Cedar Mountain Formation", where:"Utah, USA", from:135e6, to:125e6, at:{"cretaceous-early":[90, 30]}, fauna:["utah"]},
+  {id:"wealden", name:"Wealden Group", where:"Isle of Wight, England", from:130e6, to:125e6, at:{"cretaceous-early":[136, 29]}, fauna:["hyps", "igua", "bary"]},
+  {id:"lashoyas", name:"Las Hoyas", where:"Cuenca, Spain", from:127e6, to:125e6, at:{"cretaceous-early":[135, 38]}, fauna:["conc"]},
+  {id:"yixian", name:"Yixian Formation", where:"Liaoning, China", from:125e6, to:120e6, at:{"cretaceous-early":[202, 27]}, fauna:["micr", "yutt", "psit"]},
+  {id:"victoria", name:"Strzelecki and Bungil Formations", where:"Victoria and Queensland, Australia", from:125e6, to:110e6, at:{"cretaceous-early":[154, 126]}, fauna:["kool", "minm"]},
+  {id:"elrhaz", name:"Elrhaz Formation", where:"Gadoufaoua, Niger", from:115e6, to:110e6, at:{"cretaceous-early":[133, 60]}, fauna:["nige"]},
+  {id:"cerrobarcino", name:"Cerro Barcino Formation", where:"Chubut, Argentina", from:102e6, to:101e6, at:{"cretaceous-early":[109, 101]}, fauna:["pata"]},
+  {id:"kemkem", name:"Kem Kem Beds", where:"Morocco", from:100e6, to:94e6, at:{"cretaceous-late":[128, 45]}, fauna:["spin", "carc"]},
+  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:["pter"]},
+  {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[76, 32]}, fauna:["dsuc"]},
+  {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 12]}, fauna:["styr", "para"]},
+  {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[190, 30]}, fauna:["velo", "prot", "ovir", "mcer"]},
+  {id:"lacolonia", name:"La Colonia Formation", where:"Chubut, Argentina", from:72e6, to:69e6, at:{"cretaceous-late":[98, 103]}, fauna:["cnot"]},
+  {id:"nemegt", name:"Nemegt Formation", where:"Gobi Desert, Mongolia", from:70e6, to:68e6, at:{"cretaceous-late":[183, 31]}, fauna:["gall", "ther", "dche", "mono"]},
+  {id:"maevarano", name:"Maevarano Formation", where:"Mahajanga, Madagascar", from:70e6, to:66.1e6, at:{"cretaceous-late":[154, 93]}, fauna:["beel", "simo"]},
+  {id:"javelina", name:"Javelina Formation", where:"Big Bend, Texas, USA", from:69e6, to:66.1e6, at:{"cretaceous-late":[84, 32]}, fauna:["quet"]},
+  {id:"hellcreek", name:"Hell Creek Formation", where:"Montana, USA", from:67e6, to:66.1e6, at:{"cretaceous-late":[92, 19]}, fauna:["trex", "tric", "anky", "pach", "ornm"]},
+  {id:"waipara", name:"Waipara Greensand", where:"Canterbury, New Zealand", from:62e6, to:60e6, at:{paleogene:[43, 108]}, fauna:["waim"]},
+  {id:"fortunion", name:"Fort Union Formation", where:"Montana, USA", from:62e6, to:57e6, at:{paleogene:[84, 19]}, fauna:["ptil", "ples"]},
+  {id:"cerrejon", name:"Cerrejón Formation", where:"La Guajira, Colombia", from:60e6, to:58e6, at:{paleogene:[82, 57]}, fauna:["tita"]},
+  {id:"bighorn", name:"Bighorn Basin", where:"Wyoming, USA", from:56e6, to:54e6, at:{paleogene:[76, 23]}, fauna:["sifr", "miac"]},
+  {id:"kuldana", name:"Kuldana Formation", where:"Kohat, Pakistan", from:50e6, to:47e6, at:{paleogene:[177, 54]}, fauna:["paki", "ambu"]},
+  {id:"bridger", name:"Bridger and Uinta Basins", where:"Wyoming and Utah, USA", from:50e6, to:44e6, at:{paleogene:[69, 25]}, fauna:["uint"]},
+  {id:"messel", name:"Messel Pit", where:"Hesse, Germany", from:48e6, to:47e6, at:{paleogene:[133, 25]}, fauna:["lept", "tmyr"]},
+  {id:"irdinmanha", name:"Irdin Manha Formation", where:"Inner Mongolia, China", from:45e6, to:40e6, at:{paleogene:[190, 26]}, fauna:["andr"]},
+  {id:"venezuela", name:"Parángula Formation", where:"Barinas, Venezuela", from:45e6, to:36e6, at:{paleogene:[90, 59]}, fauna:["bari"]},
+  {id:"fayum", name:"Fayum Depression", where:"Egypt", from:37e6, to:30e6, at:{paleogene:[147, 47]}, fauna:["arsi"]},
+  {id:"whiteriver", name:"White River Badlands", where:"South Dakota, USA", from:34e6, to:30e6, at:{paleogene:[84, 27]}, fauna:["hyae"]},
+  {id:"bugti", name:"Dera Bugti", where:"Balochistan, Pakistan", from:28e6, to:23.1e6, at:{paleogene:[175, 61]}, fauna:["pcer"]},
+  {id:"agate", name:"Nebraska Miocene beds", where:"Agate Fossil Beds, Nebraska, USA", from:22e6, to:15e6, at:{neogene:[70, 28]}, fauna:["daeo", "aepy", "amph"]},
+  {id:"rusinga", name:"Rusinga Island", where:"Lake Victoria, Kenya", from:18e6, to:17e6, at:{neogene:[153, 66]}, fauna:["proc"]},
+  {id:"patagonia", name:"Santa Cruz and Collón Curá Formations", where:"Patagonia, Argentina", from:18e6, to:14e6, at:{neogene:[92, 104]}, fauna:["psil", "kele"]},
+  {id:"tunggur", name:"Tunggur Formation", where:"Inner Mongolia, China", from:13e6, to:11e6, at:{neogene:[196, 28]}, fauna:["plty", "chal"]},
+  {id:"epecuen", name:"Epecuén Formation", where:"La Pampa, Argentina", from:9e6, to:6e6, at:{neogene:[93, 96]}, fauna:["arge"]},
+  {id:"alcoota", name:"Alcoota", where:"Northern Territory, Australia", from:8e6, to:7e6, at:{neogene:[215, 93]}, fauna:["drom"]},
+  {id:"gargano", name:"Gargano", where:"Apulia, Italy", from:7e6, to:5.4e6, at:{neogene:[139, 29]}, fauna:["dgal", "hopl"]},
+  {id:"menorca", name:"Menorca", where:"Balearic Islands, Spain", from:5e6, to:3e6, at:{neogene:[131, 29]}, fauna:["nura"]},
+  {id:"siwaliks", name:"Siwalik Hills", where:"India and Pakistan", from:5e6, to:2.6e6, at:{neogene:[179, 40]}, fauna:["siva", "mchl"]},
+  {id:"cradle", name:"Cradle of Humankind", where:"Gauteng, South Africa", from:3e6, to:2.6e6, at:{neogene:[147, 88]}, fauna:["dino"]},
+  {id:"guangxi", name:"Guangxi caves", where:"Guangxi, China", from:2e6, to:0.3e6, at:{pleistocene:[204, 43]}, fauna:["gpit"]},
+  {id:"pampas", name:"The Pampas", where:"Buenos Aires, Argentina", from:0.5e6, to:12000, at:{pleistocene:[91, 95]}, fauna:["mgth", "doed", "macr", "smil"]},
+  {id:"naracoorte", name:"Naracoorte Caves", where:"South Australia", from:0.5e6, to:40000, at:{pleistocene:[218, 97]}, fauna:["thyl", "mlan"]},
+  {id:"sicily", name:"Sicily", where:"Italy", from:0.5e6, to:0.2e6, at:{pleistocene:[138, 32]}, fauna:["sdel"]},
+  {id:"steppe", name:"Mammoth Steppe", where:"Northern Eurasia", from:0.3e6, to:12000, at:{pleistocene:[160, 18]}, fauna:["mamm", "elas", "mglo"]},
+  {id:"cuba", name:"Cuba", where:"Caribbean", from:0.1e6, to:12000, at:{pleistocene:[75, 45]}, fauna:["ornw"]},
+  {id:"labrea", name:"Rancho La Brea", where:"Los Angeles, California, USA", from:50000, to:12000, at:{pleistocene:[53, 35]}, fauna:["smil", "dire", "arct", "colm", "mast"]},
+  {id:"madagascar", name:"Central Highlands", where:"Madagascar", from:8000, to:2000, at:{holocene:[162, 81]}, fauna:["aind"]},
+  {id:"mauritius", name:"Mauritius", where:"Indian Ocean, 1600s", from:1000, to:362, at:{holocene:[169, 82]}, fauna:["dodo"]},
+  {id:"eastna", name:"Eastern North America", where:"1800s", from:300, to:112, at:{holocene:[81, 30]}, fauna:["ppig"]},
+  {id:"plains", name:"Great Plains", where:"1870s", from:200, to:124, at:{holocene:[69, 29]}, fauna:["rmlo"]},
+  {id:"monteverde", name:"Monteverde Cloud Forest", where:"Costa Rica, 1980s", from:100, to:37, at:{holocene:[69, 55]}, fauna:["gtod"]},
+  {id:"chengjiang", name:"Chengjiang", where:"Yunnan, China", from:520e6, to:515e6, at:{cambrian:[232, 35]}, event:"ev-cambrian"},
+  {id:"miguasha", name:"Miguasha", where:"Quebec, Canada", from:381e6, to:379e6, at:{devonian:[119, 90]}, event:"ev-tetrapods"},
+  {id:"traps", name:"Siberian Traps", where:"Norilsk, Russia", from:252.5e6, to:251.9e6, at:{permian:[153, 23]}, event:"ev-dying"},
+  {id:"chicxulub", name:"Chicxulub", where:"Yucatán, Mexico", from:66.1e6, to:66e6, at:{"cretaceous-late":[86, 41]}, event:"ev-kpg"},
+  {id:"hadean", name:"The young Earth", where:"Everywhere", from:4500e6, to:4400e6, at:{}, event:"ev-hadean"},
+  {id:"hamersley", name:"Hamersley Basin", where:"Western Australia", from:2450e6, to:2300e6, at:{}, event:"ev-oxygen"},
+];
+// TIME_SITES:END
 
 // Science staff, hired at their department's building
 //   dept       the building they work in
@@ -275,8 +400,6 @@ const TIME_PERIODS = [
 const SCIENTISTS = {
   paleo:    {label:"Researcher",         plural:"Researchers",         dept:"oracle", hireCost:3000, wage:250,
              text:"Each one runs one research bay. Left on general research, a researcher earns 4 research points a day. Put them on a project and they stop earning until it is done."},
-  temporal: {label:"Temporal Researcher", plural:"Temporal Researchers", dept:"ghost",  hireCost:4000, wage:400,
-             text:"Each one runs an expedition bay with one team. More researchers means more trips at the same time."},
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
              text:"Each one runs an incubator bay, so TAR can grow that many clones at the same time."},
   botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
@@ -286,10 +409,6 @@ const RESEARCH_PER_PALEO = 4;   // research points each researcher earns per ope
 const RESEARCH_GUEST = .03;     // research points a guest adds on leaving, times how much they learned (0 to 1). Educated crowds fund science.
 // How long research takes, in park minutes per point. A 60-point project is 2 open days.
 const RESEARCH_MIN_PER_POINT = DAY_MIN / 30;
-// What unlocking one animal's genome costs at ORACLE: its period's base plus this much for every $ of its price
-const UNLOCK_PER_PRICE = 1 / 1000;
-// Each animal already unlocked makes the next one this much dearer, so points never pile up late in the game
-const UNLOCK_GROWTH = .04;
 
 // Expeditions. A trip either finds something or comes back empty-handed, and a find fills part of a genome.
 // Bigger animals are harder to find, and a genome takes about 2 trips for the smallest and 8 for the largest.
@@ -297,8 +416,19 @@ const UNLOCK_GROWTH = .04;
 //   trips    trips a genome takes on average: [smallest, largest]
 //   spread   a find is worth between this share less and this share more than average
 //   costMul  trip price multiplier: [smallest, largest]
-//   bonus    chance a trip also turns up traces of another unlocked animal from that period, and what they add
+//   bonus    chance a trip also turns up traces of another discovered animal at the same site, and what they add
 const TRIP = {fail:[.1, .35], trips:[2, 8], spread:.35, costMul:[.35, 1.3], bonus:{chance:.12, gain:[4, 8]}};
+// Scouting trips. The first to a site always lights it (its name and trip). Each animal not yet seen there turns up with its own
+// chance, `find` [smallest animal, largest] (big ones are easier to spot), at most `max` a trip. An animal turning up is
+// what discovers it (state.science.unlocked).
+const SCOUT = {find:[.35, .65], max:2};
+// GHOST's drones replace expedition teams: each flies one trip at a time. GHOST comes with one; the next costs `price`, and each
+// one after that `growth` times the last, up to `max`. They aren't staff (no wage).
+const DRONES = {max:5, price:15000, growth:1.5};
+// Drone marks: every park starts with Mk. I; ORACLE researches the rest in order (TECH ghostmk2-5). `cut` is the share of the
+// chance a trip comes back empty handed that the mark takes away, scouting and expeditions alike.
+const GHOST_MK = [{name:"Mk. I", cut:0}, {name:"Mk. II", tech:"ghostmk2", cut:.15}, {name:"Mk. III", tech:"ghostmk3", cut:.3},
+                  {name:"Mk. IV", tech:"ghostmk4", cut:.4}, {name:"Mk. V", tech:"ghostmk5", cut:.5}];
 // Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
 const TRIP_SIZE = [10, 5000];
 
@@ -350,14 +480,14 @@ const EDU_FOCUS = {
 // Modules added to a center (ORACLE tech `tech`, which needs education programs). Each also teaches on its own.
 //   boost    adds to the strength of those focuses
 //   slots    more guests that can sit through a visit at once
-//   perSpecies  learning grows with the animals ORACLE has unlocked
+//   perSpecies  learning grows with the animals GHOST has discovered
 //   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab", "nursery", "botany", "sim", "biomes" or "touch"
 //   dept     science buildings it needs (any one of them) before it can be installed
 const EDU_MODULES = {
   theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
               text:"A stage for puppet shows and animal talks. Crowds love it."},
   fossils:   {label:"Fossil Displays",  tech:"edfossils",   price:10000, upkeep:80,  learn:6, perSpecies:true, boost:{research:.5, conservation:.25},
-              text:"Real casts and bones. It teaches more as ORACLE unlocks more animals."},
+              text:"Real casts and bones. It teaches more as GHOST discovers more animals."},
   auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
               text:"Tiered seating for lectures. More guests can sit through a talk at once."},
   labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
@@ -415,7 +545,7 @@ CERES_GROW.plant = {
 
 // Period colors, the same ones the planning map uses
 const PERIOD_COLOR = {
-  Devonian:"#C28A4D", Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
+  Cambrian:"#7FA056", Ordovician:"#009270", Silurian:"#B3E1B6", Devonian:"#C28A4D", Carboniferous:"#67A599", Permian:"#F04028", Triassic:"#812B92", Jurassic:"#34B2C9",
   Cretaceous:"#7FC64E", Paleogene:"#FD9A52", Neogene:"#F2D32A", Quaternary:"#E8E27A"
 };
 
@@ -477,7 +607,7 @@ const BUILDINGS = {
              blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and TAR upgrades. Research takes time."},
   ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:15000, upkeep:200, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
-             blurb:"The time travel unit. Sends teams to the periods of animals ORACLE has unlocked, and fills their genomes with DNA."},
+             blurb:"The time travel unit. Its drones scout real fossil sites across deep time to discover animals, then go back for their DNA."},
   tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
              full:"Terrestrial Animal Reconstruction",
              blurb:"The cloning lab. Turns complete genomes into living animals."},
@@ -1018,7 +1148,7 @@ const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full gr
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
-                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once ORACLE has unlocked them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
+                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once ORACLE has researched them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -1178,6 +1308,10 @@ const TECH = [
   {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:80, needs:"ghostcost1", text:"Trips cost about a third less."},
   {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:35, text:"Expeditions take three quarters of the time."},
   {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:80, needs:"ghostspeed1", text:"Expeditions take about half the time."},
+  {id:"ghostmk2", group:"ghost", label:"GHOST Mk. II drones", points:40, text:"Drones come back empty handed 15% less often, scouting and on expeditions."},
+  {id:"ghostmk3", group:"ghost", label:"GHOST Mk. III drones", points:80, needs:"ghostmk2", text:"Drones come back empty handed 30% less often."},
+  {id:"ghostmk4", group:"ghost", label:"GHOST Mk. IV drones", points:140, needs:"ghostmk3", text:"Drones come back empty handed 40% less often."},
+  {id:"ghostmk5", group:"ghost", label:"GHOST Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
   // Genetics
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at CERES
@@ -2674,19 +2808,19 @@ const GOALS = [
   {id:"zone",     text:"Draw a Work Zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  statue:"lyst", check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  statue:"kele", check:g=>g.state.history.some(h=>h.guests>=1000)},
-  {id:"oracle",   text:"Build ORACLE",                       hint:"Every other animal comes from the past. ORACLE researches time periods. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"cenozoic", text:"Unlock a Cenozoic Animal's genome",  hint:"Tap ORACLE and hire a researcher. Idle researchers earn research points as the day goes on. Open the Cenozoic tab (Paleogene, Neogene, Quaternary) and start unlocking an animal.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
-  {id:"mesozoic", text:"Unlock a Mesozoic Animal's genome",  hint:"Open the Mesozoic tab (Triassic, Jurassic, Cretaceous) at ORACLE and start unlocking an animal.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
-  {id:"paleozoic",text:"Unlock a Paleozoic Animal's genome", hint:"Open the Paleozoic tab (Devonian, Carboniferous, Permian) at ORACLE and start unlocking an animal.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
-  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Unlock and complete the genome of a Quaternary animal, then clone it at TAR.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
-  {id:"ghost",    text:"Build GHOST and send an expedition", hint:"GHOST travels to the periods of animals you've unlocked. Hire a Temporal Researcher at GHOST, then pick the animal under its period's tab and send GHOST.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
+  {id:"oracle",   text:"Build ORACLE",                       hint:"ORACLE researches everything from fences to GHOST's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build GHOST, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
+  {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a GHOST drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
+  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Devonian, Carboniferous or Permian site with a GHOST drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
+  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with GHOST's expeditions, then clone it at TAR.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
+  {id:"ghost",    text:"Bring back DNA with GHOST",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at GHOST and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
   {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
   {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once ORACLE has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
   {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},
-  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Unlock the Tyrannosaurus at ORACLE, collect a full T. rex genome with GHOST, and reach 4.5 stars. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Reach 4.5 stars, discover the Tyrannosaurus at Hell Creek with GHOST, collect its genome, and clone it. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at ORACLE. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},

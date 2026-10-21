@@ -90,7 +90,7 @@ function step(now){
   if(sel && sel.kind === "guest") guestLive();
   if(sel && sel.kind === "staff") staffLive();
   if(sel && sel.kind === "animal") animalLive();
-  cloneLive();
+  cloneLive(); ghostLive();
   drawTrams();
   drawKeepers();
   drawGates(now);

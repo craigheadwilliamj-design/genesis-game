@@ -128,8 +128,8 @@ function overviewHtml(){
     const line = (type, text) => { const b = state.buildings.find(x => x.type === type); return b ? `<li><button class="btn" data-action="gotoDept" data-t="${type}" style="padding:3px 9px">${BUILDINGS[type].label}</button><span>${text}</span></li>` : ""; };
     const next = list => list.length ? Math.min(...list.map(j => j.end)) : 0;
     h += `<section><h3>Science</h3><ul class="deptlist">
-      ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} unlocked.`)}
-      ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.crew.temporal} teams out. Next back in ${leftText(next(sc.trips))}.` : `${sc.crew.temporal} team${sc.crew.temporal === 1 ? "" : "s"} home and ready.`)}
+      ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} discovered.`)}
+      ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.drones} drone${sc.drones === 1 ? "" : "s"} out. Next back in ${leftText(next(sc.trips))}.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}` : `${sc.drones} drone${sc.drones === 1 ? "" : "s"} home and ready.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}`)}
       ${line("tar", sc.clones.some(c => c.failed) ? `${sc.clones.filter(c => c.failed).length} failed clone${sc.clones.filter(c => c.failed).length === 1 ? "" : "s"} to discard.` : sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : sc.ready.length ? `${sc.ready.length} clone${sc.ready.length === 1 ? "" : "s"} waiting for an exhibit.` : "Incubators empty.")}
       ${line("ceres", state.ceres.beds.length ? `${state.ceres.beds.length} batch${state.ceres.beds.length === 1 ? "" : "es"} growing. Next ready in ${leftText(next(state.ceres.beds))}.` : "Beds empty.")}
     </ul></section>`;
@@ -298,7 +298,7 @@ function cloneHtml(e, rep){
   if(coming.length) h += `<div style="margin-bottom:8px">${coming.map(c => cloneCard(c)).join("")}</div>`;
   if(!ready.length && !forSale.length){
     h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
-      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
+      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Discover animals by scouting sites with GHOST, then send expeditions until a genome reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
   } else {
     const has = id => ready.some(s => s.period === id) || forSale.some(s => s.period === id);
     if(!has(exTabs.period)) exTabs.period = PERIOD_ORDER.find(has);
@@ -924,11 +924,11 @@ function speciesStatus(s){
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at TAR for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
-  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send GHOST for more.`, lock};
-  if(researching("species", s.id)) return {group:"progress", cls:"wait", how:`ORACLE is unlocking it now. ${leftText(sc.projects.find(p => p.kind === "species" && p.id === s.id).end)} left.`, lock};
-  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Unlocked. Send GHOST to collect its DNA.`, lock};
-  return {group:"locked", cls:"no", how:`Unlock it at ORACLE (${unlockPoints(s)} research points), then send GHOST.`, lock};
+  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A GHOST drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send a GHOST expedition for more.`, lock};
+  const where = sitesOf(s.id).filter(siteShown).map(x => isScouted(x.id) ? x.name : `an unscouted ${sitePeriod(x)} site`);
+  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Discovered. Send a GHOST expedition to ${where[0] || "its site"} to collect its DNA.`, lock};
+  return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
 }
 
 function catalogHtml(){

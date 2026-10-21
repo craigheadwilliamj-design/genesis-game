@@ -99,3 +99,15 @@ SITES = {
     "plains":      ("Great Plains", "1870s", 41.0, -100.0, 0.0002, 0.000124, ["rmlo"]),
     "monteverde":  ("Monteverde Cloud Forest", "Costa Rica, 1980s", 10.3, -84.8, 0.0001, 0.000037, ["gtod"]),
 }
+
+# Museum events (MUSEUM_EVENTS in js/data.js) that sit on the map: id: (event id, name, where, lat, lon, from Ma, to Ma).
+# They need no scouting; an expedition records them. The two older than the slider get no marker: GHOST lists them under
+# Deep Time.
+EVENTS = {
+    "chengjiang": ("ev-cambrian", "Chengjiang", "Yunnan, China", 24.7, 102.9, 520, 515),
+    "miguasha":   ("ev-tetrapods", "Miguasha", "Quebec, Canada", 48.1, -66.4, 381, 379),
+    "traps":      ("ev-dying", "Siberian Traps", "Norilsk, Russia", 69.3, 88.2, 252.5, 251.9),
+    "chicxulub":  ("ev-kpg", "Chicxulub", "Yucatán, Mexico", 21.4, -89.5, 66.1, 66.0),
+    "hadean":     ("ev-hadean", "The young Earth", "Everywhere", 0, 0, 4500, 4400),
+    "hamersley":  ("ev-oxygen", "Hamersley Basin", "Western Australia", -22.5, 118.0, 2450, 2300),
+}

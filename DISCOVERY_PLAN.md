@@ -1,5 +1,7 @@
 # Discovery rework plan: GHOST timeline, sites and drones
 
+Status: built into the game (science.js, scienceui.js, data.js `TIMELINE`/`TIME_SITES`/`DRONES`/`GHOST_MK`, save migration in sim.js). The maps are still drafts that want a tidy in the pixel editor (`sprites/timeline/`, then `tools/packsprites.py`).
+
 Replaces "ORACLE unlocks a species, then GHOST trips to a period fill its genome" with a map of the past: a time slider, real fossil sites, scouting trips that discover animals, and expeditions that collect their DNA, flown by drones bought at GHOST. The working prototype is `tools/timeline/` (published at https://claude.ai/artifact/FdPrbE8fSzhZFmAjVLmbJr; notes in docs/ui.md). Port its behaviour, not its page.
 
 ## Decided
@@ -49,8 +51,8 @@ Replaces "ORACLE unlocks a species, then GHOST trips to a period fill its genome
 - Museum events become map sites with their own marker: Cambrian Explosion (Chengjiang, Yunnan, about 520 Ma), Evolution of Tetrapods (Miguasha, Quebec, about 380 Ma), The Great Dying (Siberian Traps, about 252 Ma), K-Pg Impact (Chicxulub, Yucatán, 66 Ma). They need no scouting: an expedition records them, as trips do now. Hadean Earth and the Great Oxygenation Event are older than the slider, so they sit in a small Deep Time list under it.
 - Bonus finds stay, limited to the same site: an expedition sometimes adds `TRIP.bonus.gain` to another discovered animal there.
 
-## Open
-1. Old saves. Proposed: each hired Temporal Researcher becomes a drone (up to 5), wages stop; every site holding an animal already unlocked is lit with those animals seen; trips out land normally; ORACLE species projects in progress are refunded.
+## Old saves
+Each hired Temporal Researcher became a drone (up to 5) and their wages stopped; every site holding an animal already unlocked starts scouted with those animals seen; trips out land as expeditions to a site; ORACLE species projects in progress were refunded.
 
 ## Build order
 1. Data: `SITES` into data.js via placesites.py, drone and scouting constants, Mk. techs, drop the `temporal` staff kind. Default fields in `upgradeSave`.

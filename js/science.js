@@ -1,8 +1,9 @@
 /* =====================================================================
    SCIENCE
-   ORACLE researches (animals, fences, buildings, plants, medicine, TAR
-   upgrades), GHOST fills genomes, TAR clones animals, and CERES grows
-   plants and medicine. All of it takes time: projects, trips, clones and
+   ORACLE researches (fences, buildings, plants, medicine, TAR and GHOST
+   upgrades), GHOST's drones discover animals at real sites in deep time
+   and fill their genomes, TAR clones animals, and CERES grows plants and
+   medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
    finish at any hour rather than at the daily rollover.
    ===================================================================== */
@@ -30,10 +31,11 @@ const doneShare = j => clamp((nowMin() - j.start) / Math.max(1, j.end - j.start)
 
 /* ---------- bays: one per scientist ---------- */
 
-// Every scientist runs one bay. A bay holds one job (a research project, an expedition, a clone or a growing batch) or nothing.
+// Every scientist runs one bay. A bay holds one job (a research project, a clone or a growing batch) or nothing.
 // Jobs carry the `bay` they run in. The only way to get more bays is to hire more scientists.
+// GHOST works the same way with drones instead of staff: a trip's `bay` is its drone, and buying a drone is the only way to get more.
 const BAY_JOBS = {paleo:() => state.science.projects, temporal:() => state.science.trips, gene:() => state.science.clones, botanist:() => state.ceres.beds};
-const bayCount = kind => state.science.crew[kind] || 0;
+const bayCount = kind => kind === "temporal" ? (dept("ghost") ? state.science.drones : 0) : state.science.crew[kind] || 0;
 const bayJob = (kind, i) => BAY_JOBS[kind]().find(j => j.bay === i) || null;
 // The first empty bay, or -1 when they're all busy
 function freeBay(kind){ for(let i = 0; i < bayCount(kind); i++) if(!bayJob(kind, i)) return i; return -1; }
@@ -41,8 +43,8 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 
 // What a job cost, so cancelling it can give it back: {points} of research or {money}
 function jobRefund(kind, j){
-  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : SPECIES_BY_ID[j.id] ? unlockPoints(SPECIES_BY_ID[j.id]) : 0};
-  if(kind === "temporal") return {money:tripOdds(j.sp, j.period).cost};
+  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : 0};
+  if(kind === "temporal") return {money:j.cost || 0};
   if(kind === "gene") return {money:j.failed ? 0 : SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
 }
@@ -62,18 +64,13 @@ function fireScientist(kind){
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
 const researching = (kind, id) => state.science.projects.some(p => p.kind === kind && p.id === id);
-const speciesToUnlock = () => SPECIES.filter(s => !isStarter(s) && speciesAvailable(s.id));
+// Discovered: GHOST's scouting turned it up (or, in old saves, ORACLE unlocked it)
 const isUnlocked = id => state.science.unlocked.includes(id);
 
-// What unlocking an animal's genome costs in research points: its period's base plus a share of its price,
-// and dearer for every animal already unlocked
-function unlockPoints(s){ return Math.max(4, Math.round((PERIOD_BY_ID[s.period].research * .1 + s.price * UNLOCK_PER_PRICE) * (1 + UNLOCK_GROWTH * state.science.unlocked.length))); }
-
-// A project is {kind, id}: "tech" (anything in TECH), "refine" (an era's medicine, for one period) or "species" (an animal's genome)
+// A project is {kind, id}: "tech" (anything in TECH) or "refine" (an era's medicine, for one period)
 function projectInfo(kind, id){
   if(kind === "tech"){ const t = TECH.find(x => x.id === id); return t ? {label:t.label, points:t.points, needs:t.needs, done:hasTech(id)} : null; }
   if(kind === "refine"){ const era = ERA_OF[id]; return era ? {label:`${id} medicine`, points:REFINE_POINTS[era], needs:MED_TECH[era], done:hasTech("ref-" + id)} : null; }
-  if(kind === "species"){ const s = SPECIES_BY_ID[id]; return s && !isStarter(s) && speciesAvailable(id) ? {label:s.name, points:unlockPoints(s), done:isUnlocked(id)} : null; }
   return null;
 }
 const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);
@@ -81,7 +78,7 @@ const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);
 function projectProblem(kind, id){
   const sc = state.science, info = projectInfo(kind, id);
   if(!info) return "That can't be researched.";
-  if(info.done) return kind === "species" ? "Already unlocked." : "Already researched.";
+  if(info.done) return "Already researched.";
   if(researching(kind, id)) return "Already being researched.";
   const blocker = deptProblem("oracle"); if(blocker) return blocker;
   if(info.needs && !hasTech(info.needs)) return `Research ${TECH.find(x => x.id === info.needs).label} first.`;
@@ -96,7 +93,7 @@ function startProject(kind, id){
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
   sc.projects.push({kind, id, bay:freeBay("paleo"), cost:info.points, start:now, end:now + projectMinutes(info.points)});
-  events.toast(`ORACLE started ${kind === "species" ? `unlocking the ${info.label}` : `researching ${info.label.toLowerCase()}`}. It takes about ${spanText(projectMinutes(info.points))}.`);
+  events.toast(`ORACLE started researching ${info.label.toLowerCase()}. It takes about ${spanText(projectMinutes(info.points))}.`);
   return null;
 }
 // Take a researcher off a project and back to general research. The points come back.
@@ -107,66 +104,141 @@ function stopProject(p){
 }
 function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
-  if(p.kind === "species"){ if(!isUnlocked(p.id)) sc.unlocked.push(p.id); const s = SPECIES_BY_ID[p.id]; events.toast(`ORACLE unlocked the ${s.name}. GHOST can look for its DNA now.`, "good"); return; }
   const tech = p.kind === "refine" ? "ref-" + p.id : p.id;
   if(!hasTech(tech)) sc.tech.push(tech);
   events.toast(`ORACLE finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 
-/* ---------- GHOST: expeditions ---------- */
+/* ---------- GHOST: the timeline, sites and drones ---------- */
 
-// Animals and plants both have genomes: sc.dna[id] = {genome: 0-100}, how complete the lab's record is
+// GHOST's slider runs over TIMELINE: one equal bar a period, split equally into its epochs, a log scale inside each epoch.
+// Epochs flattened oldest first: {name, from, to (years ago), period, pi (period index), ej (epoch index in its period)}.
+const EPOCHS = [];
+TIMELINE.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
+  const to = p.epochs[j + 1] ? p.epochs[j + 1][1] : TIMELINE[i + 1] ? TIMELINE[i + 1].epochs[0][1] : TIMELINE_FLOOR;
+  EPOCHS.push({name, from, to, period:p.id, pi:i, ej:j});
+}));
+const epochOf = years => EPOCHS.find(e => years <= e.from && years > e.to) || EPOCHS[EPOCHS.length - 1];
+// Slider position u (0 the oldest, 1 today) to years ago, and back
+function yearsAt(u){
+  u = clamp(u, 0, 1 - 1e-9);
+  const n = TIMELINE.length, pi = Math.floor(u * n), k = TIMELINE[pi].epochs.length, f = (u * n - pi) * k, ej = Math.floor(f);
+  const e = EPOCHS.find(x => x.pi === pi && x.ej === ej);
+  return {years:e.from * Math.pow(e.to / e.from, f - ej), epoch:e};
+}
+function uAt(years){
+  const e = epochOf(years), t = Math.log(years / e.from) / Math.log(e.to / e.from);
+  return (e.pi + (e.ej + t) / TIMELINE[e.pi].epochs.length) / TIMELINE.length;
+}
+// "375 million years ago", "12,000 years ago": two significant figures under a million years, then millions
+function fmtYearsAgo(y){
+  if(y >= 1e7) return `${Math.round(y / 1e6)} million years ago`;
+  if(y >= 1e6) return `${+(y / 1e6).toFixed(1)} million years ago`;
+  const step = Math.pow(10, Math.max(1, Math.floor(Math.log10(y)) - 1)), r = Math.round(y / step) * step;
+  return r >= 1e6 ? "1 million years ago" : `${r.toLocaleString("en-US")} years ago`;
+}
+const fmtMa = y => y >= 1e6 ? `${+(y / 1e6).toFixed(1)} million` : y.toLocaleString("en-US");
+const epochMap = e => TIMELINE_MAPS[e.name] || TIMELINE_MAPS[e.period];
+
+// Sites. A site belongs to the period it starts in, which sets its trip (TIME_PERIODS); an event site's trip is its event's.
+const SITE_BY_ID = Object.fromEntries(TIME_SITES.map(s => [s.id, s]));
+const sitePeriod = s => epochOf(s.from).period;
+const siteFauna = s => (s.fauna || []).filter(speciesAvailable);
+const siteShown = s => s.event ? !techHidden(MUSEUM.needTech) : siteFauna(s).length > 0;
+const sitesIn = e => TIME_SITES.filter(s => siteShown(s) && s.from > e.to && s.to < e.from);
+const sitesOf = sp => TIME_SITES.filter(s => (s.fauna || []).includes(sp));
+const isScouted = id => !!state.science.seen[id];
+// The animals scouting has turned up at a site
+const siteSeen = s => siteFauna(s).filter(f => (state.science.seen[s.id] || []).includes(f));
+const siteComplete = s => !s.event && isScouted(s.id) && siteSeen(s).length === siteFauna(s).length;
+// A lit site shows its name and can take expeditions: scouted, or an event site once ORACLE has education programs
+const siteLit = s => s.event ? hasTech(MUSEUM.needTech) : isScouted(s.id);
+// What an expedition to a lit site can bring back: its event, or the animals seen there plus its period's plant DNA once
+// ORACLE has that flora
+function siteTargets(s){
+  if(s.event) return [s.event];
+  const f = PLANT_DNA[sitePeriod(s)];
+  return [...siteSeen(s), ...(f && hasTech(FLORA[f.era].tech) ? [f.id] : [])];
+}
+// The site a trip went to can be one from an old save: placeOf takes a site, a period or an event
+const placeOf = id => { const s = SITE_BY_ID[id]; return s ? (s.event ? MUSEUM_BY_ID[s.event] : PERIOD_BY_ID[sitePeriod(s)]) : PERIOD_BY_ID[id] || MUSEUM_BY_ID[id]; };
+const placeName = id => SITE_BY_ID[id] ? (siteLit(SITE_BY_ID[id]) ? SITE_BY_ID[id].name : "an unscouted site") : MUSEUM_BY_ID[id] ? MUSEUM_BY_ID[id].name : `the ${id}`;
+
+// Animals, plants and events all have genomes (an event's is its record): sc.dna[id] = {genome: 0-100}
 function genomeInfo(id){
   const s = SPECIES_BY_ID[id]; if(s) return {id, name:s.name, space:s.space, animal:s};
   const f = PLANT_DNA_BY_ID[id]; if(f) return {id, name:f.name, space:f.space, plant:f};
   const ev = MUSEUM_BY_ID[id]; if(ev) return {id, name:ev.name, space:ev.space, event:ev};
   return null;
 }
-// Where a trip goes: a time period, or one of the museum events
-const placeOf = id => PERIOD_BY_ID[id] || MUSEUM_BY_ID[id];
-const placeName = id => MUSEUM_BY_ID[id] ? MUSEUM_BY_ID[id].name : id;
 const genomeDone = id => { const d = state.science.dna[id]; return !!d && d.genome >= 100; };
 const plantDnaDone = period => !!PLANT_DNA[period] && genomeDone(PLANT_DNA[period].id);
 // Has GHOST finished plant DNA from any period of this era?
 const eraDnaDone = era => Object.values(PLANT_DNA).some(f => f.era === era && genomeDone(f.id));
 const anyPlantDna = () => Object.values(PLANT_DNA).some(f => genomeDone(f.id));
-// Can GHOST go looking for this yet? Animals need ORACLE to have unlocked them, plants need their flora type.
+// Can GHOST go after this yet? Animals need discovering, plants their flora research, events education programs.
 function genomeOpen(id){
   const g = genomeInfo(id); if(!g) return false;
   return g.animal ? isUnlocked(id) : g.event ? hasTech(MUSEUM.needTech) : hasTech(FLORA[g.plant.era].tech);
 }
-// The periods GHOST can look in for a genome
-const genomePeriods = id => { const g = genomeInfo(id); return g.animal ? [g.animal.period] : g.event ? [g.id] : [g.plant.period]; };
 
 // GHOST upgrade multiplier for "cost" or "speed"
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
+// The drones' mark (index into GHOST_MK) and the share of empty-handed trips it takes away
+const droneMk = () => GHOST_MK.reduce((k, m, i) => m.tech && hasTech(m.tech) ? i : k, 0);
+const droneCut = () => GHOST_MK[droneMk()].cut;
 const sizeT = space => clamp(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0, 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
-// What a trip for this genome in this period is like: the chance of coming back empty-handed, the genome % a find adds on average,
-// the trips a whole genome takes on average, and the price
-function tripOdds(id, periodId){
-  const g = genomeInfo(id), p = placeOf(periodId), t = sizeT(g.space);
-  const fail = state.sandbox ? 0 : clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8), trips = lerpT(TRIP.trips, t);
+// What an expedition after this genome at this site is like: the chance of coming back empty-handed, the genome % a find adds
+// on average, the trips a whole genome takes on average, and the price
+function tripOdds(id, siteId){
+  const g = genomeInfo(id), p = placeOf(siteId), t = sizeT(g.space);
+  const fail = state.sandbox ? 0 : clamp(lerpT(TRIP.fail, t) + p.risk, 0, .8) * (1 - droneCut()), trips = lerpT(TRIP.trips, t);
   // a genome ends on a find that overshoots 100% by about half a find's worth, hence the .5
   return {fail, trips, gain:100 / Math.max(.6, trips * (1 - fail) - .5), cost:Math.round(p.trip * lerpT(TRIP.costMul, t) * ghostLevel("cost") / 50) * 50};
 }
+// A scouting trip costs a mid-size expedition there; each unseen animal turns up with this chance
+const scoutCost = siteId => Math.round(placeOf(siteId).trip * ghostLevel("cost") / 50) * 50;
+const scoutChance = sp => state.sandbox ? 1 : 1 - (1 - lerpT(SCOUT.find, sizeT(SPECIES_BY_ID[sp].space))) * (1 - droneCut());
+const tripMinutes = siteId => Math.round(placeOf(siteId).days * DAY_MIN * ghostLevel("speed"));
 
-function tripProblem(id, periodId){
-  const sc = state.science, g = genomeInfo(id);
-  if(!g || !placeOf(periodId) || !genomePeriods(id).includes(periodId)) return "GHOST can't find that there.";
-  return deptProblem("ghost") ||
-    (!genomeOpen(id) ? (g.animal ? `Unlock the ${g.name} at ORACLE first.` : g.event ? `Research education programs at ORACLE first.` : `Research ${g.name} at ORACLE first.`) : null) ||
-    (!sc.crew.temporal ? "Hire a Temporal Researcher at GHOST to lead expeditions." : null) ||
-    (freeBay("temporal") < 0 ? bayFull("temporal", "Temporal Researcher") : null) ||
-    (!canAfford(tripOdds(id, periodId).cost) ? `A trip costs ${money(tripOdds(id, periodId).cost)}. You have ${money(state.money)}.` : null);
+// Drones: GHOST comes with one, and buying more is the only way to fly more trips at once
+const dronePrice = () => Math.round(DRONES.price * Math.pow(DRONES.growth, state.science.drones - 1) / 500) * 500;
+function droneProblem(){
+  return deptProblem("ghost") || (state.science.drones >= DRONES.max ? `GHOST's hangar holds ${DRONES.max} drones.` : null) ||
+    (!canAfford(dronePrice()) ? `A drone costs ${money(dronePrice())}. You have ${money(state.money)}.` : null);
 }
-function launchTrip(id, periodId){
-  if(tripProblem(id, periodId)) return false;
-  const p = placeOf(periodId), now = nowMin();
-  spend(tripOdds(id, periodId).cost, "science");
-  const end = now + Math.round(p.days * DAY_MIN * ghostLevel("speed"));
-  state.science.trips.push({period:periodId, sp:id, bay:freeBay("temporal"), start:now, end});
-  events.toast(`GHOST left for the ${placeName(periodId)} to ${MUSEUM_BY_ID[id] ? "record" : "find"} ${genomeInfo(id).name}. Back in about ${spanText(end - now)}.`);
+function buyDrone(){
+  const why = droneProblem(); if(why) return why;
+  spend(dronePrice(), "science"); state.science.drones++;
+  events.toast(`GHOST has ${state.science.drones} drones now.`, "good");
+  return null;
+}
+const outTo = (siteId, kind, sp) => state.science.trips.some(t => t.site === siteId && t.kind === kind && (sp === undefined || t.sp === sp));
+const ghostProblem = () => deptProblem("ghost") || (freeBay("temporal") < 0 ? `Every drone is out.${state.science.drones < DRONES.max ? " Buy another at GHOST to fly more at once." : ""}` : null);
+
+function scoutProblem(siteId){
+  const s = SITE_BY_ID[siteId];
+  if(!s || !siteShown(s) || s.event) return "There's nothing to scout there.";
+  if(siteComplete(s)) return "Every animal there has been found.";
+  if(outTo(siteId, "scout")) return "A drone is already scouting there.";
+  return ghostProblem() || (!canAfford(scoutCost(siteId)) ? `A scouting trip costs ${money(scoutCost(siteId))}. You have ${money(state.money)}.` : null);
+}
+function expeditionProblem(siteId, id){
+  const s = SITE_BY_ID[siteId], g = genomeInfo(id);
+  if(!s || !g || !siteShown(s) || !siteTargets(s).includes(id)) return s && !s.event && !siteLit(s) ? "Scout the site first." : "GHOST can't find that there.";
+  if(genomeDone(id)) return g.event ? "That record is complete." : "That genome is complete.";
+  if(g.animal && state.rating + 1e-9 < starsNeed(g.animal)) return `Needs a ${starsNeed(g.animal)}-star park. You have ${starTxt(state.rating)}.`;
+  if(outTo(siteId, "dig", id)) return `A drone is already after ${g.name} there.`;
+  return ghostProblem() || (!canAfford(tripOdds(id, siteId).cost) ? `An expedition costs ${money(tripOdds(id, siteId).cost)}. You have ${money(state.money)}.` : null);
+}
+// Send a drone: a scouting trip (kind "scout") or an expedition after one genome (kind "dig", sp the genome)
+function sendDrone(kind, siteId, id){
+  if(kind === "scout" ? scoutProblem(siteId) : expeditionProblem(siteId, id)) return false;
+  const cost = kind === "scout" ? scoutCost(siteId) : tripOdds(id, siteId).cost, now = nowMin(), end = now + tripMinutes(siteId), bay = freeBay("temporal");
+  spend(cost, "science");
+  state.science.trips.push({kind, site:siteId, ...(kind === "dig" ? {sp:id} : {}), bay, cost, start:now, end});
+  events.toast(`Drone ${bay + 1} left for ${placeName(siteId)} to ${kind === "scout" ? "scout for animals" : MUSEUM_BY_ID[id] ? `record the ${genomeInfo(id).name}` : `find ${genomeInfo(id).name}`}. Back in about ${spanText(end - now)}.`);
   return true;
 }
 
@@ -179,30 +251,43 @@ function addSample(sp, gain){
   return {gain:g};
 }
 
+// A drone is back. Its post-mission report waits at GHOST (sc.reports) until dismissed: lines of [text, headline?].
 function tripReturns(t){
-  const sc = state.science, g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.period);
-  if(Math.random() < odds.fail){
-    const msg = `GHOST came back from the ${placeName(t.period)} empty-handed. The ${g.name} trail went cold.`;
-    logScience(msg, false); events.toast(msg, "bad"); return;
+  const sc = state.science, s = SITE_BY_ID[t.site], lines = [];
+  if(t.kind === "scout"){
+    const have = siteSeen(s);
+    const hits = siteFauna(s).filter(f => !have.includes(f) && Math.random() < scoutChance(f)).sort(() => Math.random() - .5).slice(0, SCOUT.max);
+    sc.seen[s.id] = [...(sc.seen[s.id] || []), ...hits];
+    for(const f of hits){
+      const name = SPECIES_BY_ID[f].name;
+      if(isUnlocked(f)) lines.push([`${name} also found here`]);
+      else { sc.unlocked.push(f); lines.push([`${name} Discovered`, true]); }
+    }
+    if(hits.length && siteComplete(s)) lines.push(["Site Complete", true]);
+  } else {
+    const g = genomeInfo(t.sp), odds = tripOdds(t.sp, t.site);
+    if(Math.random() >= odds.fail){
+      const was = (sc.dna[t.sp] || {genome:0}).genome; addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread));
+      const d = sc.dna[t.sp];
+      lines.push([g.event ? `${g.name} Recording Made` : `${g.name} Sample Found`, true]);
+      if(d.genome >= 100 && was < 100) lines.push([g.event ? `${g.name} Record Complete` : `${g.name} Genome Complete`, true]);
+      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push(["TAR can clone it now, though the clones will be frail until the genome is more complete."]);
+      // sometimes the drone also turns up traces of another animal seen at the same site
+      const others = g.event ? [] : siteSeen(s).filter(x => x !== t.sp && !genomeDone(x));
+      if(others.length && Math.random() < TRIP.bonus.chance){
+        const o = others[Math.floor(Math.random() * others.length)], r2 = addSample(o, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]));
+        if(r2.gain) lines.push([`${SPECIES_BY_ID[o].name} traces found (+${Math.round(r2.gain)}%)`]);
+      }
+    }
   }
-  const was = (sc.dna[t.sp] || {genome:0}).genome, r = addSample(t.sp, odds.gain * rand(1 - TRIP.spread, 1 + TRIP.spread));
-  const d = sc.dna[t.sp];
-  if(g.event){
-    const m = r.gain ? `GHOST recorded more of the ${g.name}. ${d.genome >= 100 ? "The record is complete: it's ready for an Education Center." : `Record ${d.genome}% complete.`}`
-                     : `GHOST brought back more of the ${g.name}, but the record was already complete.`;
-    logScience(m, true); events.toast(m, "good"); return;
-  }
-  let msg = r.gain ? `GHOST brought back ${g.name} DNA. Genome ${d.genome}% complete.` : `GHOST brought back more ${g.name} DNA, but the genome was already complete.`;
-  if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) msg += ` TAR can clone it now, though the clones will be frail until the genome is more complete.`;
-  // Sometimes the team turns up traces of another animal ORACLE has unlocked
-  const others = SPECIES.filter(x => x.period === t.period && x.id !== t.sp && isUnlocked(x.id) && !genomeDone(x.id));
-  if(others.length && Math.random() < TRIP.bonus.chance){
-    const o = others[Math.floor(Math.random() * others.length)];
-    const r2 = addSample(o.id, rand(TRIP.bonus.gain[0], TRIP.bonus.gain[1]));
-    if(r2.gain) msg += ` They also found ${o.name} traces (+${Math.round(r2.gain)}%).`;
-  }
-  logScience(msg, true); events.toast(msg, "good");
+  const ok = lines.length > 0;
+  if(!ok) lines.push(["Came back empty handed"]);
+  sc.reports.unshift({id:(sc.reports.reduce((m, r) => Math.max(m, r.id), 0)) + 1, site:t.site, kind:t.kind, drone:t.bay, day:state.day, lines});
+  sc.reports.length = Math.min(sc.reports.length, 12);
+  const msg = `Drone ${t.bay + 1} is back from ${placeName(t.site)}${t.kind === "scout" ? " (scouting)" : ""}: ${lines.map(l => l[0]).join(". ")}.`;
+  logScience(msg, ok); events.toast(msg, ok ? "good" : "bad");
 }
+function dismissReport(id){ const sc = state.science; sc.reports = sc.reports.filter(r => r.id !== id); }
 
 /* ---------- TAR: cloning ---------- */
 
@@ -232,7 +317,6 @@ function cloneProblem(sp){
     (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
     (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
     (!cloneOpen(sp) ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. TAR needs ${CLONE_GENOME.min}% to clone it.` : null) ||
-    (state.rating + 1e-9 < starsNeed(s) ? `Needs a ${starsNeed(s)}-star park. You have ${starTxt(state.rating)}.` : null) ||
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);

@@ -17,7 +17,8 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "maps")
+OUT = os.path.join(HERE, "maps")                                       # the prototype's copy
+GAME = os.path.join(HERE, "..", "..", "sprites", "timeline")           # the game's (run tools/packsprites.py after)
 W, H = 260, 130
 S = W / 130   # distances below are tuned in 130 px map pixels
 PAL = {
@@ -118,6 +119,8 @@ def build(name, age, sea, ice, mask, folder):
                 elif (dist[px, py] or 0) >= (3 + max(0, abs(abs(la) - 25) - 5) / 2.5) * S: k = "desert"
             img.putpixel((px, py), PAL[k] + (255,))
     img.save(os.path.join(OUT, name + ".png"))
+    os.makedirs(GAME, exist_ok=True)
+    img.save(os.path.join(GAME, name + ".png"))
     print(f"{name:18} {age:3} Ma  mountains above {mtn:.0f} m")
 
 def main():
