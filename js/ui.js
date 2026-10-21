@@ -222,7 +222,7 @@ function exhibitHtml(e){
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
@@ -543,21 +543,21 @@ function movesHtml(e){
   return `<div class="meta" style="margin-top:6px">Waiting for keepers: ${ts.map(t => `${esc(SPECIES_BY_ID[t.sp].name)} ${t.from === e.id ? `to ${esc(name(t.to))}` : `from ${esc(name(t.from))}`}${t.keeper ? " (on the way)" : ""}`).join(", ")}. <button class="btn" data-action="cancelMoves" style="padding:2px 8px">Cancel waiting moves</button></div>`;
 }
 
-// The move dialog: where to, and how many
-function openMoveDialog(e, sp){
-  const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length;
+// The move dialog: where to, and how many (with id, just that one animal)
+function openMoveDialog(e, sp, id){
+  const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length, one = id && e.animals.find(a => a.id === id);
   const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
-  $("#moveTitle").textContent = `Move ${s.name}`;
+  $("#moveTitle").textContent = `Move ${one ? one.name || s.name : s.name}`;
   if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
   const fromWhy = keeperMoveProblem(e);
   $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
-    <label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>
+    ${one ? "" : `<label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>`}
     <p style="margin-top:10px">A keeper collects each one through this exhibit's gate and carries it to the new one. Both need a working keeper gate, or be a vivarium.</p>
     ${fromWhy ? `<p style="color:var(--bad)">Keepers can't get into ${esc(e.name)} yet: ${esc(fromWhy)}</p>` : ""}`;
   $("#moveGo").hidden = false;
   $("#moveGo").onclick = () => {
-    const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
-    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n); ui.toast(`${made} ${s.name} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
+    const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = one ? 1 : clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
+    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n, one && one.id); ui.toast(`${one ? one.name || s.name : `${made} ${s.name}`} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
     const mix = mixWarning(s, to);
     if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
     if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
@@ -852,7 +852,7 @@ panelEl.addEventListener("click", e => {
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
-  if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
+  if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
@@ -876,12 +876,6 @@ panelEl.addEventListener("click", e => {
     if(!it.animals.length) it.happy = 70;
     const sex = b.dataset.sex === "male" || b.dataset.sex === "female" ? b.dataset.sex : undefined;
     it.animals.push(nameAnimal({id:uid("a-"), sp:s.id, ...(sex ? {sex} : {})}));
-    afterChange(); render();
-  }
-  if(a === "sell"){
-    const i = it.animals.map(x => x.sp).lastIndexOf(b.dataset.sp); if(i < 0) return;
-    earn(Math.round(SPECIES_BY_ID[b.dataset.sp].price * COST.animalResale), "sold");
-    it.animals.splice(i, 1);
     afterChange(); render();
   }
   if(a === "demolish"){

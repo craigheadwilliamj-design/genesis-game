@@ -3048,15 +3048,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const opened = sel && sel.kind === "animal" && sel.id === target.id;
     const back = panelEl.querySelector(".back"); back.click();
     const backOk = sel && sel.kind === "exhibit" && sel.id === e.id && exTabs.tab === "animals";
+    // each row has its own Move: it queues just that animal and turns into a disabled Moving
+    const other = e.animals.find(a => a !== target), tr0 = state.staff.transfers.length;
+    const made = requestMove(e, other.sp, e, 5, other.id); ui.panel();
+    const mb = id => panelEl.querySelector(`.animal-row[data-id="${id}"] [data-action="moveDlg"]`);
+    const moveOne = made === 1 && state.staff.transfers.length === tr0 + 1 && state.staff.transfers.at(-1).animalId === other.id && mb(other.id).disabled && mb(other.id).textContent === "Moving" && !mb(target.id).disabled && !panelEl.textContent.includes("Species");
+    state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== other.id);
     panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
     const n0 = e.animals.length, m0 = state.money = 1e6, pay = sellValue(target);
     state.staff.transfers.push({id:"tr-smoke", animalId:target.id, sp:target.sp, from:e.id, to:e.id});
     sellAnimal(target.id);
     const sold = e.animals.length === n0 - 1 && !e.animals.some(a => a.id === target.id) && !herd.has(target.id) && state.money - m0 === pay && !state.staff.transfers.some(t => t.animalId === target.id) && !sel;
     exTabs.tab = "main"; select(null); state.exhibits.splice(state.exhibits.indexOf(e), 1); state.money = money0; recompute();
-    return {listed, opened, sold, backOk};
+    return {listed, opened, sold, backOk, moveOne};
   });
-  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
+  if(at){ checks.animalsTabMoveOne = at.moveOne; checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
 
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {

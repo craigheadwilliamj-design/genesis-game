@@ -406,12 +406,13 @@ function callsTidy(){
 /* ---------- moving animals between exhibits ---------- */
 
 // Ask a keeper to move one animal: {id, animalId, sp, from, to}
-function requestMove(from, sp, to, count){
+// Queue up to count of a species to move; with id, just that one animal
+function requestMove(from, sp, to, count, id){
   let n = 0;
   const queued = new Set(state.staff.transfers.map(t => t.animalId));
   for(const a of from.animals){
     if(n >= count) break;
-    if(a.sp !== sp || queued.has(a.id)) continue;
+    if(a.sp !== sp || queued.has(a.id) || (id && a.id !== id)) continue;
     state.staff.transfers.push({id:uid("tr-"), animalId:a.id, sp, from:from.id, to:to.id}); n++;
   }
   return n;
