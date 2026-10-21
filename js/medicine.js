@@ -201,8 +201,6 @@ function basicsLow(e, list){
   return out;
 }
 
-// What raises illness and injury risk, in words (the keys are the `why` lists from illChance and injuryChance)
-const RISK_WHY = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating plants it isn't evolved for", "no water":"having no water", "no pool":"having no pool", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other", stress:"stress", "the cold":"the cold"};
 
 // Injuries are obvious at once; illness shows only once it's bad
 function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && sev < HEALTH.obviousAt) a.sick.hidden = true; }

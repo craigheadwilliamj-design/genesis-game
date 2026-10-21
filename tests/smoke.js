@@ -2686,7 +2686,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
       // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
       const hl = () => document.getElementById("anHealth").textContent;
-      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && /chance a day of falling ill/.test(hl());
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && !/chance a day/.test(hl());
       a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
       out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
       // the exhibit's Animals and Health tabs show each animal's health too
