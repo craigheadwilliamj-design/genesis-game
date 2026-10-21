@@ -50,6 +50,39 @@ def pixel(lat, lon):
     y = math.sqrt(2) * math.sin(t)
     return min(W - 1, int((x / (2 * math.sqrt(2)) + 1) / 2 * W)), min(H - 1, int((1 - y / math.sqrt(2)) / 2 * H))
 
+SEP = 7   # marker frames are 6 px, so centres this far apart (on either axis) leave a 1 px gap
+
+def inside(x, y):
+    """Clear of the 2 px rim, with room for the 6 px frame."""
+    return ((x + 1 - W / 2) / (W / 2 - 6)) ** 2 + ((y + 1 - H / 2) / (H / 2 - 6)) ** 2 <= 1
+
+def spread(spots):
+    """Nudge markers on one map apart until no two frames touch. spots: {site id: [x, y]}, changed in place.
+    Accuracy takes a small hit for legibility; returns the furthest any marker moved, in px."""
+    start = {k: tuple(v) for k, v in spots.items()}
+    ids = sorted(spots)
+    for _ in range(500):
+        moved = False
+        for i, a in enumerate(ids):
+            for b in ids[i + 1:]:
+                (ax, ay), (bx, by) = spots[a], spots[b]
+                dx, dy = bx - ax, by - ay
+                if max(abs(dx), abs(dy)) >= SEP: continue
+                # push apart along the axis they're already further apart on (x on a tie), a pixel each
+                if abs(dx) >= abs(dy):
+                    s = 1 if dx > 0 or (dx == 0 and a < b) else -1
+                    for k, d in ((a, -s), (b, s)):
+                        if inside(spots[k][0] + d, spots[k][1]): spots[k][0] += d
+                else:
+                    s = 1 if dy > 0 else -1
+                    for k, d in ((a, -s), (b, s)):
+                        if inside(spots[k][0], spots[k][1] + d): spots[k][1] += d
+                moved = True
+        if not moved: break
+    else:
+        sys.exit("Couldn't spread the markers apart")
+    return max((math.hypot(spots[k][0] - x, spots[k][1] - y) for k, (x, y) in start.items()), default=0)
+
 def years(ma):
     y = round(ma * 1e6)
     return f"{y / 1e6:g}e6" if y >= 1e5 else str(y)
@@ -65,7 +98,7 @@ def main():
     html = open(PAGE).read()
     epochs, map_of = page_tables(html)
     species, trips = game_tables()
-    problems, used, rows = [], set(), []
+    problems, used, placed = [], set(), []
     for sid, (name, where, lat, lon, frm, to, fauna) in SITES.items():
         touched = [e for e in epochs if frm > e[2] and to < e[1]]
         period = next(e for e in epochs if e[1] >= frm > e[2])[3]
@@ -82,7 +115,15 @@ def main():
             if not m or m in at: continue
             rec = []
             pygplates.reconstruct(feat, rot, rec, MAP_AGES[m][0])
-            at[m] = pixel(*rec[0].get_reconstructed_geometry().to_lat_lon())
+            at[m] = list(pixel(*rec[0].get_reconstructed_geometry().to_lat_lon()))
+        placed.append((sid, name, where, frm, to, fauna, period, at))
+    # sites sharing a map are spread so their markers never touch
+    for m in sorted({m for p in placed for m in p[7]}):
+        spots = {p[0]: p[7][m] for p in placed if m in p[7]}
+        far = spread(spots)
+        if far: print(f"{m:18} {len(spots):2} sites, moved up to {far:.0f} px")
+    rows = []
+    for sid, name, where, frm, to, fauna, period, at in placed:
         trip, days, risk = trips[period]
         animals = ", ".join(f'{{name:"{species[f]["name"]}", space:{num(species[f]["space"])}, stars:{num(species[f]["stars"])}}}' for f in fauna if f in species)
         spots = ", ".join(f'"{k}":[{x}, {y}]' if "-" in k else f"{k}:[{x}, {y}]" for k, (x, y) in at.items())

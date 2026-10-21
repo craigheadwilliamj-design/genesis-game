@@ -31,9 +31,6 @@ figure{margin:0;display:grid;gap:6px}
 #map .site:focus{outline:none}
 #map .frame{fill:var(--marker)}
 #map .site:focus-visible .frame,#map .site.on .frame{fill:#fff}
-#map rect.count{fill:var(--marker)}
-#map .count{pointer-events:none}
-#map text.count{fill:#fff;font:600 7px var(--mono);text-anchor:middle;pointer-events:none}
 .nomap{fill:var(--dim);font:600 10px var(--body);text-anchor:middle}
 /* slider */
 #track{position:relative;height:44px;touch-action:none;cursor:pointer;user-select:none;outline:none}
@@ -179,25 +176,25 @@ const SITES = [
   {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:[{name:"Ichthyostega", space:8, stars:.5}], trip:3500, days:1.5, risk:.1},
   {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:[{name:"Pulmonoscorpius", space:6, stars:0}], trip:4000, days:1.5, risk:.1},
   {id:"joggins", name:"Joggins Fossil Cliffs", where:"Nova Scotia, Canada", from:315e6, to:312e6, at:{carboniferous:[126, 70]}, fauna:[{name:"Hylonomus", space:5, stars:0}, {name:"Arthropleura", space:25, stars:0}], trip:4000, days:1.5, risk:.1},
-  {id:"nyrany", name:"Nýřany", where:"Bohemia, Czechia", from:308e6, to:306e6, at:{carboniferous:[144, 64]}, fauna:[{name:"Microbrachis", space:4, stars:0}], trip:4000, days:1.5, risk:.1},
-  {id:"commentry", name:"Commentry", where:"Allier, France", from:302e6, to:300e6, at:{carboniferous:[140, 69]}, fauna:[{name:"Meganeura", space:20, stars:.5}], trip:4000, days:1.5, risk:.1},
+  {id:"nyrany", name:"Nýřany", where:"Bohemia, Czechia", from:308e6, to:306e6, at:{carboniferous:[144, 63]}, fauna:[{name:"Microbrachis", space:4, stars:0}], trip:4000, days:1.5, risk:.1},
+  {id:"commentry", name:"Commentry", where:"Allier, France", from:302e6, to:300e6, at:{carboniferous:[140, 70]}, fauna:[{name:"Meganeura", space:20, stars:.5}], trip:4000, days:1.5, risk:.1},
   {id:"pennredbeds", name:"Late Pennsylvanian red beds", where:"Texas and New Mexico, USA", from:304e6, to:299.5e6, at:{carboniferous:[103, 67]}, fauna:[{name:"Diplocaulus", space:10, stars:.5}, {name:"Eryops", space:100, stars:.5}], trip:4000, days:1.5, risk:.1},
   {id:"elcobre", name:"El Cobre Canyon", where:"New Mexico, USA", from:298e6, to:293e6, at:{permian:[104, 54]}, fauna:[{name:"Platyhystrix", space:10, stars:.5}], trip:4500, days:1.5, risk:.12},
-  {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[109, 61]}, fauna:[{name:"Dimetrodon", space:400, stars:1}, {name:"Seymouria", space:8, stars:.5}], trip:4500, days:1.5, risk:.12},
-  {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[111, 60]}, fauna:[{name:"Cotylorhynchus", space:900, stars:1.5}], trip:4500, days:1.5, risk:.12},
+  {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[106, 61]}, fauna:[{name:"Dimetrodon", space:400, stars:1}, {name:"Seymouria", space:8, stars:.5}], trip:4500, days:1.5, risk:.12},
+  {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[114, 60]}, fauna:[{name:"Cotylorhynchus", space:900, stars:1.5}], trip:4500, days:1.5, risk:.12},
   {id:"pedrafogo", name:"Pedra de Fogo Formation", where:"Maranhão, Brazil", from:280e6, to:272e6, at:{permian:[121, 87]}, fauna:[{name:"Prionosuchus", space:900, stars:2.5}], trip:4500, days:1.5, risk:.12},
-  {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[159, 37]}, fauna:[{name:"Estemmenosuchus", space:450, stars:1}], trip:4500, days:1.5, risk:.12},
-  {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[112, 113]}, fauna:[{name:"Moschops", space:450, stars:1}, {name:"Anteosaurus", space:800, stars:2}], trip:4500, days:1.5, risk:.12},
-  {id:"karoolate", name:"Karoo, Daptocephalus Zone", where:"Eastern Cape, South Africa", from:256e6, to:252.2e6, at:{permian:[113, 114]}, fauna:[{name:"Diictodon", space:6, stars:0}, {name:"Lystrosaurus", space:120, stars:0}], trip:4500, days:1.5, risk:.12},
-  {id:"dvina", name:"Sokolki, Northern Dvina", where:"Arkhangelsk, Russia", from:255e6, to:253e6, at:{permian:[155, 37]}, fauna:[{name:"Scutosaurus", space:500, stars:1}, {name:"Inostrancevia", space:800, stars:2.5}], trip:4500, days:1.5, risk:.12},
+  {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[161, 37]}, fauna:[{name:"Estemmenosuchus", space:450, stars:1}], trip:4500, days:1.5, risk:.12},
+  {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[109, 113]}, fauna:[{name:"Moschops", space:450, stars:1}, {name:"Anteosaurus", space:800, stars:2}], trip:4500, days:1.5, risk:.12},
+  {id:"karoolate", name:"Karoo, Daptocephalus Zone", where:"Eastern Cape, South Africa", from:256e6, to:252.2e6, at:{permian:[116, 114]}, fauna:[{name:"Diictodon", space:6, stars:0}, {name:"Lystrosaurus", space:120, stars:0}], trip:4500, days:1.5, risk:.12},
+  {id:"dvina", name:"Sokolki, Northern Dvina", where:"Arkhangelsk, Russia", from:255e6, to:253e6, at:{permian:[153, 37]}, fauna:[{name:"Scutosaurus", space:500, stars:1}, {name:"Inostrancevia", space:800, stars:2.5}], trip:4500, days:1.5, risk:.12},
   {id:"burgersdorp", name:"Burgersdorp Formation", where:"Eastern Cape, South Africa", from:247.5e6, to:247e6, at:{triassic:[128, 108]}, fauna:[{name:"Erythrosuchus", space:800, stars:2}], trip:5000, days:2.5, risk:.12},
   {id:"madygen", name:"Madygen Formation", where:"Batken, Kyrgyzstan", from:236e6, to:232e6, at:{triassic:[165, 25]}, fauna:[{name:"Sharovipteryx", space:5, stars:.5}, {name:"Longisquama", space:6, stars:.5}, {name:"Gigatitan", space:14, stars:.5}], trip:5000, days:2.5, risk:.12},
   {id:"ischigualasto", name:"Ischigualasto Formation", where:"San Juan, Argentina", from:231e6, to:226e6, at:{triassic:[110, 99]}, fauna:[{name:"Herrerasaurus", space:300, stars:1}], trip:5000, days:2.5, risk:.12},
-  {id:"krasiejow", name:"Krasiejów", where:"Opole, Poland", from:230e6, to:225e6, at:{triassic:[139, 34]}, fauna:[{name:"Silesaurus", space:100, stars:0}], trip:5000, days:2.5, risk:.12},
-  {id:"chinle", name:"Chinle Formation", where:"Petrified Forest, Arizona, USA", from:225e6, to:208e6, at:{triassic:[92, 55]}, fauna:[{name:"Postosuchus", space:700, stars:2}, {name:"Desmatosuchus", space:500, stars:1}], trip:5000, days:2.5, risk:.12},
-  {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 38]}, fauna:[{name:"Plateosaurus", space:900, stars:1.5}], trip:5000, days:2.5, risk:.12},
-  {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[94, 55]}, fauna:[{name:"Coelophysis", space:200, stars:.5}], trip:5000, days:2.5, risk:.12},
-  {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[140, 33]}, fauna:[{name:"Lisowicia", space:1300, stars:2}], trip:5000, days:2.5, risk:.12},
+  {id:"krasiejow", name:"Krasiejów", where:"Opole, Poland", from:230e6, to:225e6, at:{triassic:[136, 33]}, fauna:[{name:"Silesaurus", space:100, stars:0}], trip:5000, days:2.5, risk:.12},
+  {id:"chinle", name:"Chinle Formation", where:"Petrified Forest, Arizona, USA", from:225e6, to:208e6, at:{triassic:[89, 55]}, fauna:[{name:"Postosuchus", space:700, stars:2}, {name:"Desmatosuchus", space:500, stars:1}], trip:5000, days:2.5, risk:.12},
+  {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 40]}, fauna:[{name:"Plateosaurus", space:900, stars:1.5}], trip:5000, days:2.5, risk:.12},
+  {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[97, 55]}, fauna:[{name:"Coelophysis", space:200, stars:.5}], trip:5000, days:2.5, risk:.12},
+  {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[143, 32]}, fauna:[{name:"Lisowicia", space:1300, stars:2}], trip:5000, days:2.5, risk:.12},
   {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:[{name:"Dimorphodon", space:200, stars:1}, {name:"Scelidosaurus", space:450, stars:1}], trip:7000, days:2.5, risk:.15},
   {id:"elliot", name:"Elliot Formation", where:"Eastern Cape, South Africa", from:200e6, to:190e6, at:{"jurassic-early":[127, 101]}, fauna:[{name:"Heterodontosaurus", space:80, stars:0}], trip:7000, days:2.5, risk:.15},
   {id:"kayenta", name:"Kayenta Formation", where:"Arizona, USA", from:196e6, to:183e6, at:{"jurassic-early":[92, 46]}, fauna:[{name:"Dilophosaurus", space:700, stars:2.5}], trip:7000, days:2.5, risk:.15},
@@ -215,32 +212,32 @@ const SITES = [
   {id:"elrhaz", name:"Elrhaz Formation", where:"Gadoufaoua, Niger", from:115e6, to:110e6, at:{"cretaceous-early":[133, 60]}, fauna:[{name:"Nigersaurus", space:1500, stars:2.5}], trip:7500, days:2.5, risk:.15},
   {id:"cerrobarcino", name:"Cerro Barcino Formation", where:"Chubut, Argentina", from:102e6, to:101e6, at:{"cretaceous-early":[109, 101]}, fauna:[{name:"Patagotitan", space:5500, stars:4.5}], trip:7500, days:2.5, risk:.15},
   {id:"kemkem", name:"Kem Kem Beds", where:"Morocco", from:100e6, to:94e6, at:{"cretaceous-late":[128, 45]}, fauna:[{name:"Spinosaurus", space:3500, stars:4}, {name:"Carcharodontosaurus", space:4000, stars:4.5}], trip:7500, days:2.5, risk:.15},
-  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[89, 25]}, fauna:[{name:"Pteranodon", space:800, stars:2.5}], trip:7500, days:2.5, risk:.15},
-  {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[81, 32]}, fauna:[{name:"Deinosuchus", space:2000, stars:3.5}], trip:7500, days:2.5, risk:.15},
-  {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 15]}, fauna:[{name:"Styracosaurus", space:1800, stars:3}, {name:"Parasaurolophus", space:900, stars:2}], trip:7500, days:2.5, risk:.15},
-  {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[187, 30]}, fauna:[{name:"Velociraptor", space:500, stars:2.5}, {name:"Protoceratops", space:250, stars:1.5}, {name:"Oviraptor", space:250, stars:1}, {name:"Microceratus", space:8, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:[{name:"Pteranodon", space:800, stars:2.5}], trip:7500, days:2.5, risk:.15},
+  {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[76, 32]}, fauna:[{name:"Deinosuchus", space:2000, stars:3.5}], trip:7500, days:2.5, risk:.15},
+  {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 12]}, fauna:[{name:"Styracosaurus", space:1800, stars:3}, {name:"Parasaurolophus", space:900, stars:2}], trip:7500, days:2.5, risk:.15},
+  {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[190, 30]}, fauna:[{name:"Velociraptor", space:500, stars:2.5}, {name:"Protoceratops", space:250, stars:1.5}, {name:"Oviraptor", space:250, stars:1}, {name:"Microceratus", space:8, stars:.5}], trip:7500, days:2.5, risk:.15},
   {id:"lacolonia", name:"La Colonia Formation", where:"Chubut, Argentina", from:72e6, to:69e6, at:{"cretaceous-late":[98, 103]}, fauna:[{name:"Carnotaurus", space:2200, stars:3.5}], trip:7500, days:2.5, risk:.15},
-  {id:"nemegt", name:"Nemegt Formation", where:"Gobi Desert, Mongolia", from:70e6, to:68e6, at:{"cretaceous-late":[186, 31]}, fauna:[{name:"Gallimimus", space:400, stars:1.5}, {name:"Therizinosaurus", space:2000, stars:3.5}, {name:"Deinocheirus", space:2500, stars:3.5}, {name:"Mononykus", space:6, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"nemegt", name:"Nemegt Formation", where:"Gobi Desert, Mongolia", from:70e6, to:68e6, at:{"cretaceous-late":[183, 31]}, fauna:[{name:"Gallimimus", space:400, stars:1.5}, {name:"Therizinosaurus", space:2000, stars:3.5}, {name:"Deinocheirus", space:2500, stars:3.5}, {name:"Mononykus", space:6, stars:.5}], trip:7500, days:2.5, risk:.15},
   {id:"maevarano", name:"Maevarano Formation", where:"Mahajanga, Madagascar", from:70e6, to:66.1e6, at:{"cretaceous-late":[154, 93]}, fauna:[{name:"Beelzebufo", space:8, stars:.5}, {name:"Simosuchus", space:14, stars:.5}], trip:7500, days:2.5, risk:.15},
-  {id:"javelina", name:"Javelina Formation", where:"Big Bend, Texas, USA", from:69e6, to:66.1e6, at:{"cretaceous-late":[81, 32]}, fauna:[{name:"Quetzalcoatlus", space:3000, stars:4}], trip:7500, days:2.5, risk:.15},
-  {id:"hellcreek", name:"Hell Creek Formation", where:"Montana, USA", from:67e6, to:66.1e6, at:{"cretaceous-late":[92, 18]}, fauna:[{name:"Tyrannosaurus rex", space:4000, stars:4.5}, {name:"Triceratops", space:2500, stars:3.5}, {name:"Ankylosaurus", space:2200, stars:3.5}, {name:"Pachycephalosaurus", space:450, stars:1.5}, {name:"Ornithomimus", space:250, stars:1}], trip:7500, days:2.5, risk:.15},
+  {id:"javelina", name:"Javelina Formation", where:"Big Bend, Texas, USA", from:69e6, to:66.1e6, at:{"cretaceous-late":[84, 32]}, fauna:[{name:"Quetzalcoatlus", space:3000, stars:4}], trip:7500, days:2.5, risk:.15},
+  {id:"hellcreek", name:"Hell Creek Formation", where:"Montana, USA", from:67e6, to:66.1e6, at:{"cretaceous-late":[92, 19]}, fauna:[{name:"Tyrannosaurus rex", space:4000, stars:4.5}, {name:"Triceratops", space:2500, stars:3.5}, {name:"Ankylosaurus", space:2200, stars:3.5}, {name:"Pachycephalosaurus", space:450, stars:1.5}, {name:"Ornithomimus", space:250, stars:1}], trip:7500, days:2.5, risk:.15},
   {id:"waipara", name:"Waipara Greensand", where:"Canterbury, New Zealand", from:62e6, to:60e6, at:{paleogene:[43, 108]}, fauna:[{name:"Waimanu", space:22, stars:1}], trip:4500, days:1.5, risk:.1},
-  {id:"fortunion", name:"Fort Union Formation", where:"Montana, USA", from:62e6, to:57e6, at:{paleogene:[81, 22]}, fauna:[{name:"Ptilodus", space:8, stars:.5}, {name:"Plesiadapis", space:6, stars:0}], trip:4500, days:1.5, risk:.1},
-  {id:"cerrejon", name:"Cerrejón Formation", where:"La Guajira, Colombia", from:60e6, to:58e6, at:{paleogene:[85, 57]}, fauna:[{name:"Titanoboa", space:1500, stars:3}], trip:4500, days:1.5, risk:.1},
-  {id:"bighorn", name:"Bighorn Basin", where:"Wyoming, USA", from:56e6, to:54e6, at:{paleogene:[78, 23]}, fauna:[{name:"Sifrhippus", space:9, stars:.5}, {name:"Miacis", space:12, stars:.5}], trip:4500, days:1.5, risk:.1},
-  {id:"kuldana", name:"Kuldana Formation", where:"Kohat, Pakistan", from:50e6, to:47e6, at:{paleogene:[177, 56]}, fauna:[{name:"Pakicetus", space:12, stars:.5}, {name:"Ambulocetus", space:700, stars:2}], trip:4500, days:1.5, risk:.1},
-  {id:"bridger", name:"Bridger and Uinta Basins", where:"Wyoming and Utah, USA", from:50e6, to:44e6, at:{paleogene:[74, 25]}, fauna:[{name:"Uintatherium", space:1100, stars:2}], trip:4500, days:1.5, risk:.1},
+  {id:"fortunion", name:"Fort Union Formation", where:"Montana, USA", from:62e6, to:57e6, at:{paleogene:[84, 19]}, fauna:[{name:"Ptilodus", space:8, stars:.5}, {name:"Plesiadapis", space:6, stars:0}], trip:4500, days:1.5, risk:.1},
+  {id:"cerrejon", name:"Cerrejón Formation", where:"La Guajira, Colombia", from:60e6, to:58e6, at:{paleogene:[82, 57]}, fauna:[{name:"Titanoboa", space:1500, stars:3}], trip:4500, days:1.5, risk:.1},
+  {id:"bighorn", name:"Bighorn Basin", where:"Wyoming, USA", from:56e6, to:54e6, at:{paleogene:[76, 23]}, fauna:[{name:"Sifrhippus", space:9, stars:.5}, {name:"Miacis", space:12, stars:.5}], trip:4500, days:1.5, risk:.1},
+  {id:"kuldana", name:"Kuldana Formation", where:"Kohat, Pakistan", from:50e6, to:47e6, at:{paleogene:[177, 54]}, fauna:[{name:"Pakicetus", space:12, stars:.5}, {name:"Ambulocetus", space:700, stars:2}], trip:4500, days:1.5, risk:.1},
+  {id:"bridger", name:"Bridger and Uinta Basins", where:"Wyoming and Utah, USA", from:50e6, to:44e6, at:{paleogene:[69, 25]}, fauna:[{name:"Uintatherium", space:1100, stars:2}], trip:4500, days:1.5, risk:.1},
   {id:"messel", name:"Messel Pit", where:"Hesse, Germany", from:48e6, to:47e6, at:{paleogene:[133, 25]}, fauna:[{name:"Leptictidium", space:5, stars:0}, {name:"Titanomyrma", space:6, stars:0}], trip:4500, days:1.5, risk:.1},
   {id:"irdinmanha", name:"Irdin Manha Formation", where:"Inner Mongolia, China", from:45e6, to:40e6, at:{paleogene:[190, 26]}, fauna:[{name:"Andrewsarchus", space:1200, stars:2.5}], trip:4500, days:1.5, risk:.1},
-  {id:"venezuela", name:"Parángula Formation", where:"Barinas, Venezuela", from:45e6, to:36e6, at:{paleogene:[87, 59]}, fauna:[{name:"Barinasuchus", space:1100, stars:2.5}], trip:4500, days:1.5, risk:.1},
+  {id:"venezuela", name:"Parángula Formation", where:"Barinas, Venezuela", from:45e6, to:36e6, at:{paleogene:[90, 59]}, fauna:[{name:"Barinasuchus", space:1100, stars:2.5}], trip:4500, days:1.5, risk:.1},
   {id:"fayum", name:"Fayum Depression", where:"Egypt", from:37e6, to:30e6, at:{paleogene:[147, 47]}, fauna:[{name:"Arsinoitherium", space:1800, stars:3}], trip:4500, days:1.5, risk:.1},
-  {id:"whiteriver", name:"White River Badlands", where:"South Dakota, USA", from:34e6, to:30e6, at:{paleogene:[80, 24]}, fauna:[{name:"Hyaenodon", space:500, stars:1.5}], trip:4500, days:1.5, risk:.1},
-  {id:"bugti", name:"Dera Bugti", where:"Balochistan, Pakistan", from:28e6, to:23.1e6, at:{paleogene:[175, 59]}, fauna:[{name:"Paraceratherium", space:4000, stars:3.5}], trip:4500, days:1.5, risk:.1},
+  {id:"whiteriver", name:"White River Badlands", where:"South Dakota, USA", from:34e6, to:30e6, at:{paleogene:[84, 27]}, fauna:[{name:"Hyaenodon", space:500, stars:1.5}], trip:4500, days:1.5, risk:.1},
+  {id:"bugti", name:"Dera Bugti", where:"Balochistan, Pakistan", from:28e6, to:23.1e6, at:{paleogene:[175, 61]}, fauna:[{name:"Paraceratherium", space:4000, stars:3.5}], trip:4500, days:1.5, risk:.1},
   {id:"agate", name:"Nebraska Miocene beds", where:"Agate Fossil Beds, Nebraska, USA", from:22e6, to:15e6, at:{neogene:[70, 28]}, fauna:[{name:"Daeodon", space:700, stars:1.5}, {name:"Aepycamelus", space:800, stars:1.5}, {name:"Amphicyon", space:1100, stars:2.5}], trip:3500, days:1.5, risk:.07},
   {id:"rusinga", name:"Rusinga Island", where:"Lake Victoria, Kenya", from:18e6, to:17e6, at:{neogene:[153, 66]}, fauna:[{name:"Proconsul", space:150, stars:1}], trip:3500, days:1.5, risk:.07},
-  {id:"patagonia", name:"Santa Cruz and Collón Curá Formations", where:"Patagonia, Argentina", from:18e6, to:14e6, at:{neogene:[92, 103]}, fauna:[{name:"Psilopterus", space:26, stars:1}, {name:"Kelenken", space:700, stars:2}], trip:3500, days:1.5, risk:.07},
+  {id:"patagonia", name:"Santa Cruz and Collón Curá Formations", where:"Patagonia, Argentina", from:18e6, to:14e6, at:{neogene:[92, 104]}, fauna:[{name:"Psilopterus", space:26, stars:1}, {name:"Kelenken", space:700, stars:2}], trip:3500, days:1.5, risk:.07},
   {id:"tunggur", name:"Tunggur Formation", where:"Inner Mongolia, China", from:13e6, to:11e6, at:{neogene:[196, 28]}, fauna:[{name:"Platybelodon", space:1500, stars:2.5}, {name:"Chalicotherium", space:1000, stars:2}], trip:3500, days:1.5, risk:.07},
-  {id:"epecuen", name:"Epecuén Formation", where:"La Pampa, Argentina", from:9e6, to:6e6, at:{neogene:[93, 97]}, fauna:[{name:"Argentavis", space:800, stars:3}], trip:3500, days:1.5, risk:.07},
+  {id:"epecuen", name:"Epecuén Formation", where:"La Pampa, Argentina", from:9e6, to:6e6, at:{neogene:[93, 96]}, fauna:[{name:"Argentavis", space:800, stars:3}], trip:3500, days:1.5, risk:.07},
   {id:"alcoota", name:"Alcoota", where:"Northern Territory, Australia", from:8e6, to:7e6, at:{neogene:[215, 93]}, fauna:[{name:"Dromornis", space:1000, stars:2.5}], trip:3500, days:1.5, risk:.07},
   {id:"gargano", name:"Gargano", where:"Apulia, Italy", from:7e6, to:5.4e6, at:{neogene:[139, 29]}, fauna:[{name:"Deinogalerix", space:12, stars:.5}, {name:"Hoplitomeryx", space:26, stars:1}], trip:3500, days:1.5, risk:.07},
   {id:"menorca", name:"Menorca", where:"Balearic Islands, Spain", from:5e6, to:3e6, at:{neogene:[131, 29]}, fauna:[{name:"Nuralagus rex", space:20, stars:1}], trip:3500, days:1.5, risk:.07},
@@ -349,17 +346,6 @@ function buildTrack(){
   $("labels").innerHTML = PERIODS.map(p => `<span title="${p.id}">${p.id.slice(0, 3)}</span>`).join("");
 }
 
-// Sites closer than GROUP_PX on the map share one marker (at the first one's spot); tapping it steps through them.
-const GROUP_PX = 8;
-function groupSites(sites, key){
-  const groups = [];
-  for(const s of sites){
-    const [x, y] = s.at[key], g = groups.find(g => Math.abs(g.at[0] - x) < GROUP_PX && Math.abs(g.at[1] - y) < GROUP_PX);
-    if(g) g.sites.push(s); else groups.push({at:[x, y], sites:[s]});
-  }
-  return groups;
-}
-
 function visibleSites(now){
   return SITES.filter(s => s.at[mapKey(now.epoch)] && s.from > now.epoch.to && s.to < now.epoch.from);
 }
@@ -377,18 +363,13 @@ function render(){
   const map = mapOf(e), sites = visibleSites(now);
   let svg = map ? `<image href="${map}" x="0" y="0" width="260" height="130"/>`
     : `<ellipse cx="130" cy="65" rx="128" ry="63" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="130" y="68">No ${esc(p.id)} map yet</text>`;
-  let badges = "", marks = "";   // badges go under every marker, so one never hides a neighbour's frame
-  if(map) for(const g of groupSites(sites, mapKey(e))){
-    // The selected marker's frame turns white. In a group, the centre shows the picked site and the badge which one it is.
-    const [x, y] = g.at, n = g.sites.length, pi = g.sites.findIndex(s => s.id === sel), shown = pi >= 0 ? [g.sites[pi]] : g.sites;
-    const on = shown.some(s => isLit(s.id)), label = n > 1 ? `${n} sites` : on ? g.sites[0].name : "Unscouted site";
-    const badge = pi >= 0 && n > 1 ? `${pi + 1}/${n}` : `${n}`, bw = badge.length * 4.2 + 4.5;
-    if(n > 1) badges += `<rect class="count" x="${x + 4}" y="${y - 9}" width="${bw}" height="9" rx="2"/><text class="count" x="${x + 4 + bw / 2}" y="${y - 2}">${badge}</text>`;
-    marks += `<g class="site${pi >= 0 ? " on" : ""}" data-ids="${g.sites.map(s => s.id).join(" ")}" tabindex="0" role="button" aria-label="${esc(label)}">
+  // placesites.py keeps markers on a map at least 1 px apart. The selected marker's frame turns white.
+  if(map) for(const s of sites){
+    const [x, y] = s.at[mapKey(e)], on = isLit(s.id);
+    svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unscouted site")}">
       <rect class="frame" x="${x - 2}" y="${y - 2}" width="6" height="6"/>
       <rect x="${x}" y="${y}" width="2" height="2" fill="${on ? "var(--accent)" : "var(--marker)"}"/></g>`;
   }
-  svg += badges + marks;
   $("map").innerHTML = svg;
 
   if(sel && !sites.some(s => s.id === sel)) sel = null;
@@ -418,8 +399,6 @@ function renderCard(){
 }
 
 function pick(id){ if(id !== sel) target = null; sel = id; render(); }
-// A grouped marker picks its next site each tap.
-const pickIn = g => { const ids = g.dataset.ids.split(" "), i = ids.indexOf(sel); pick(ids[(i + 1) % ids.length]); };
 // A tap goes to the nearest marker within HIT_PX map pixels, so neighbouring markers never steal each other's taps.
 const HIT_PX = 14;
 $("map").addEventListener("click", ev => {
@@ -429,9 +408,9 @@ $("map").addEventListener("click", ev => {
     const r = g.querySelector(".frame"), d = Math.hypot(+r.getAttribute("x") + 3 - pt.x, +r.getAttribute("y") + 3 - pt.y);
     if(d < bd){ bd = d; best = g; }
   }
-  if(best) pickIn(best);
+  if(best) pick(best.dataset.id);
 });
-$("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pickIn(g); } });
+$("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
 $("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
 $("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; renderCard(); } });
 $("card").addEventListener("click", ev => {
