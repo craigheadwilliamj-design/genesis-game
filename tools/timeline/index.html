@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GHOST Timeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* One column: readout, map, slider, then the site card. The slider is the instrument; everything else is quiet. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --dim:#5a6878; --line:#cfd6de;
+  --accent:#d9ff00; --marker:#454646; --ocean:#1b60b8; --sel:#18212b;
+  --display:"Pixelify Sans","Courier New",monospace; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;--sel:#ffffff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;--sel:#ffffff;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+main{max-width:640px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+header{display:grid;gap:2px}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+#epoch{font:700 clamp(28px,7vw,40px)/1.05 var(--display);margin:0;text-wrap:balance}
+#ago{font:500 16px/1.3 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+#period{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+#period i{width:10px;height:10px;border-radius:2px;display:inline-block}
+figure{margin:0;display:grid;gap:6px}
+#map{width:100%;max-width:100%;aspect-ratio:2/1;display:block;image-rendering:pixelated;shape-rendering:crispEdges}
+#map image{image-rendering:pixelated}
+#map .hit{fill:transparent;cursor:pointer}
+#map .site:focus{outline:none}
+#map .site:focus-visible .ring,#map .site.on .ring{stroke:var(--sel)}
+.ring{fill:none;stroke:transparent;stroke-width:.6}
+figcaption{font-size:13px;color:var(--dim)}
+.nomap{fill:var(--dim);font:600 5px var(--body);text-anchor:middle}
+/* slider */
+#track{position:relative;height:44px;touch-action:none;cursor:pointer;user-select:none;outline:none}
+#bars{position:absolute;inset:10px 0 10px;display:flex;gap:2px}
+.bar{flex:1;display:flex;border-radius:3px;overflow:hidden;min-width:0}
+.slice{flex:1}
+#thumb{position:absolute;top:0;bottom:0;width:0;pointer-events:none}
+#thumb::before{content:"";position:absolute;left:-1.5px;top:4px;bottom:4px;width:3px;background:var(--ink);border-radius:2px}
+#thumb::after{content:"";position:absolute;left:-7px;top:0;width:14px;height:8px;background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
+#track:focus-visible #thumb::before{box-shadow:0 0 0 3px var(--accent)}
+#labels{display:flex;gap:2px;margin-top:-4px}
+#labels span{flex:1;min-width:0;font:500 10px/1.2 var(--mono);color:var(--dim);text-align:center;overflow:hidden;white-space:nowrap}
+.opts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--dim)}
+.opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
+/* site list + card */
+#list{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+#list button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:6px}
+#list button[aria-pressed="true"]{border-color:var(--ink)}
+#list i{width:8px;height:8px;background:var(--marker);display:inline-block;box-shadow:inset 0 0 0 2px var(--marker)}
+#list i.lit{background:var(--accent)}
+#card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:8px}
+#card h2{font:700 20px/1.15 var(--display);margin:0}
+#card .where{color:var(--dim);font-size:13px}
+#card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
+#card dt{color:var(--dim)}
+#card dd{margin:0;font-variant-numeric:tabular-nums;min-width:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btns button{font:600 14px var(--body);border-radius:6px;padding:7px 12px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+.btns button.ghost{background:transparent;color:var(--ink)}
+.btns button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.empty{color:var(--dim);font-size:14px;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">GHOST · timeline test</span>
+    <h1 id="epoch">Late Devonian</h1>
+    <div id="ago">375 million years ago</div>
+    <div id="period"><i></i><span></span></div>
+  </header>
+
+  <figure>
+    <svg id="map" viewBox="0 0 130 65" role="img" aria-label="Map of the Earth"></svg>
+    <figcaption id="cap"></figcaption>
+  </figure>
+
+  <div>
+    <div id="track" role="slider" tabindex="0" aria-label="Time" aria-valuemin="0" aria-valuemax="1000">
+      <div id="bars"></div>
+      <div id="thumb"></div>
+    </div>
+    <div id="labels"></div>
+  </div>
+
+  <div class="opts">
+    <label><input type="radio" name="show" id="showLive" value="live" checked> Show sites only while their animals lived</label>
+    <label><input type="radio" name="show" id="showEpoch" value="epoch"> Show every site in this epoch</label>
+  </div>
+
+  <ul id="list" aria-label="Sites in view"></ul>
+  <section id="card" aria-live="polite"></section>
+</main>
+
+<script>
+// Periods, oldest first. Each gets one equal bar; its epochs split the bar equally. Years are years ago.
+const PERIODS = [
+  {id:"Cambrian", color:"#7FA056", epochs:[["Early Cambrian",538.8e6],["Middle Cambrian",506.5e6],["Late Cambrian",497e6]]},
+  {id:"Ordovician", color:"#009270", epochs:[["Early Ordovician",485.4e6],["Middle Ordovician",471.3e6],["Late Ordovician",458.2e6]]},
+  {id:"Silurian", color:"#B3E1B6", epochs:[["Early Silurian",443.1e6],["Late Silurian",426.7e6]]},
+  {id:"Devonian", color:"#C28A4D", epochs:[["Early Devonian",419.6e6],["Middle Devonian",393.3e6],["Late Devonian",382.7e6]]},
+  {id:"Carboniferous", color:"#67A599", epochs:[["Mississippian",358.9e6],["Pennsylvanian",323.4e6]]},
+  {id:"Permian", color:"#F04028", epochs:[["Cisuralian",298.9e6],["Guadalupian",273.0e6],["Lopingian",259.5e6]]},
+  {id:"Triassic", color:"#812B92", epochs:[["Early Triassic",251.9e6],["Middle Triassic",246.7e6],["Late Triassic",237e6]]},
+  {id:"Jurassic", color:"#34B2C9", epochs:[["Early Jurassic",201.4e6],["Middle Jurassic",174.7e6],["Late Jurassic",161.5e6]]},
+  {id:"Cretaceous", color:"#7FC64E", epochs:[["Early Cretaceous",143.1e6],["Late Cretaceous",100.5e6]]},
+  {id:"Paleogene", color:"#FD9A52", epochs:[["Paleocene",66.0e6],["Eocene",56.0e6],["Oligocene",33.9e6]]},
+  {id:"Neogene", color:"#F2D32A", epochs:[["Miocene",23.03e6],["Pliocene",5.333e6]]},
+  {id:"Quaternary", color:"#E8E27A", epochs:[["Pleistocene",2.58e6],["Holocene",11700]]},
+];
+const PRESENT = 10;   // the slider's floor: a log scale can't reach 0 years
+// Flatten into epochs with both bounds: from (older) and to (younger).
+const EPOCHS = [];
+PERIODS.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
+  const next = p.epochs[j + 1] ? p.epochs[j + 1][1] : PERIODS[i + 1] ? PERIODS[i + 1].epochs[0][1] : PRESENT;
+  EPOCHS.push({name, from, to:next, period:p, pi:i, ej:j});
+}));
+
+// Maps by period, 130 x 65 px. Sites put their dot on a map by pixel.
+const MAPS = {Devonian:"maps/devonian.png"};
+const SITES = [
+  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:["Tiktaalik"], trip:3500, days:1.5, risk:.10},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:["Ichthyostega"], trip:3500, days:1.5, risk:.10},
+];
+
+// Slider position u (0 = oldest, 1 = today) to years ago and back: equal bars, equal slices, log scale inside a slice.
+function yearsAt(u){
+  u = Math.min(Math.max(u, 0), 1 - 1e-9);
+  const pi = Math.floor(u * PERIODS.length), f = u * PERIODS.length - pi, n = PERIODS[pi].epochs.length;
+  const ej = Math.floor(f * n), t = f * n - ej, e = EPOCHS.find(x => x.pi === pi && x.ej === ej);
+  return {years:e.from * Math.pow(e.to / e.from, t), epoch:e};
+}
+function uAt(years){
+  const e = EPOCHS.find(x => years <= x.from && years > x.to) || EPOCHS[EPOCHS.length - 1];
+  const t = Math.log(years / e.from) / Math.log(e.to / e.from), n = e.period.epochs.length;
+  return (e.pi + (e.ej + t) / n) / PERIODS.length;
+}
+// Bigger steps the further back: two significant figures under a million, then millions.
+function fmtYearsAgo(y){
+  if(y >= 1e7) return `${Math.round(y / 1e6)} million years ago`;
+  if(y >= 1e6) return `${+(y / 1e6).toFixed(1)} million years ago`;
+  const step = Math.pow(10, Math.max(1, Math.floor(Math.log10(y)) - 1)), r = Math.round(y / step) * step;
+  return r >= 1e6 ? "1 million years ago" : `${r.toLocaleString("en-US")} years ago`;
+}
+const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
+
+// Which sites have been surveyed is per viewer, a test convenience only.
+let lit = new Set();
+try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
+const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
+let mode = "live", u = uAt(375e6), sel = null;
+try { const m = localStorage.getItem("ghost-timeline-mode"); if(m === "epoch" || m === "live") mode = m; } catch(e) {}
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
+const shade = (hex, k) => `color-mix(in srgb, ${hex} ${k}%, ${k < 100 ? "black" : "white"})`;
+
+function buildTrack(){
+  $("bars").innerHTML = PERIODS.map(p => `<div class="bar" title="${p.id}">${p.epochs.map((e, j) =>
+    `<div class="slice" style="background:${j % 2 ? shade(p.color, 80) : p.color}"></div>`).join("")}</div>`).join("");
+  $("labels").innerHTML = PERIODS.map(p => `<span title="${p.id}">${p.id.slice(0, 3)}</span>`).join("");
+}
+
+function visibleSites(now){
+  return SITES.filter(s => s.at[now.epoch.period.id] &&
+    (mode === "live" ? now.years <= s.from && now.years >= s.to : s.from > now.epoch.to && s.to < now.epoch.from));
+}
+
+function render(){
+  const now = yearsAt(u), e = now.epoch, p = e.period;
+  $("epoch").textContent = e.name;
+  $("ago").textContent = fmtYearsAgo(now.years);
+  $("period").innerHTML = `<i style="background:${p.color}"></i><span>${esc(p.id)} · epoch ${fmtMa(e.from)} to ${e.to < 1e5 ? "today" : fmtMa(e.to) + " million years ago"}</span>`;
+  $("thumb").style.left = (u * 100) + "%";
+  const tr = $("track");
+  tr.setAttribute("aria-valuenow", Math.round(u * 1000));
+  tr.setAttribute("aria-valuetext", `${e.name}, ${fmtYearsAgo(now.years)}`);
+
+  const map = MAPS[p.id], sites = visibleSites(now);
+  let svg = map ? `<image href="${map}" x="0" y="0" width="130" height="65"/>`
+    : `<ellipse cx="65" cy="32.5" rx="64" ry="31.5" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="65" y="34">No ${esc(p.id)} map yet</text>`;
+  if(map) for(const s of sites){
+    const [x, y] = s.at[p.id], on = lit.has(s.id);
+    svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unsurveyed site")}">
+      <rect class="ring" x="${x - 2.5}" y="${y - 2.5}" width="5" height="5"/>
+      <rect x="${x - 1}" y="${y - 1}" width="3" height="3" fill="var(--marker)"/>
+      <rect x="${x}" y="${y}" width="1" height="1" fill="${on ? "var(--accent)" : "var(--marker)"}"/>
+      <circle class="hit" cx="${x + .5}" cy="${y + .5}" r="6"/></g>`;
+  }
+  $("map").innerHTML = svg;
+  $("cap").textContent = !map ? `Only the Devonian has a map so far.` : sites.length ? `${sites.length} site${sites.length > 1 ? "s" : ""} in view. Tap one.` :
+    mode === "live" ? "No known sites at this moment. Slide a little, or show every site in the epoch." : "No known sites in this epoch.";
+
+  if(sel && !sites.some(s => s.id === sel)) sel = null;
+  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${lit.has(s.id) ? "lit" : ""}"></i>${esc(lit.has(s.id) ? s.name : "Unsurveyed site, " + fmtMa(s.from) + " Ma")}</button></li>`).join("");
+  renderCard();
+}
+
+function renderCard(){
+  const s = SITES.find(x => x.id === sel), c = $("card");
+  if(!s){ c.innerHTML = `<p class="empty">Pick a site on the map to see what's there.</p>`; return; }
+  const on = lit.has(s.id), win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
+  c.innerHTML = on ? `<h2>${esc(s.name)}</h2><div class="where">${esc(s.where)}</div>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>${s.fauna.map(esc).join(", ")}</dd>
+    <dt>Trip</dt><dd>$${s.trip.toLocaleString("en-US")} · ${s.days} days · ${Math.round(s.risk * 100)}% chance it comes back empty</dd></dl>
+    <div class="btns"><button id="go" disabled>Send expedition</button><button class="ghost" id="forget">Forget survey</button></div>`
+  : `<h2>Unsurveyed site</h2><div class="where">Somewhere in the ${esc(s.from > 1e6 ? EPOCHS.find(e => s.from <= e.from && s.from > e.to).name : "past")}</div>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Unknown until ORACLE surveys it</dd></dl>
+    <div class="btns"><button id="survey">Survey (ORACLE)</button></div>`;
+}
+
+function pick(id){ sel = id; render(); }
+$("map").addEventListener("click", ev => { const g = ev.target.closest(".site"); if(g) pick(g.dataset.id); });
+$("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
+$("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
+$("card").addEventListener("click", ev => {
+  if(ev.target.id === "survey"){ lit.add(sel); saveLit(); render(); }
+  if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); render(); }
+});
+document.querySelectorAll('input[name="show"]').forEach(r => {
+  r.checked = r.value === mode;
+  r.addEventListener("change", () => { mode = r.value; try { localStorage.setItem("ghost-timeline-mode", mode); } catch(e) {} render(); });
+});
+
+// Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
+const tr = $("track");
+const setFromX = x => { const r = tr.getBoundingClientRect(); u = Math.min(Math.max((x - r.left) / r.width, 0), 1); render(); };
+tr.addEventListener("pointerdown", ev => { tr.setPointerCapture(ev.pointerId); tr.focus(); setFromX(ev.clientX); });
+tr.addEventListener("pointermove", ev => { if(tr.hasPointerCapture(ev.pointerId)) setFromX(ev.clientX); });
+tr.addEventListener("keydown", ev => {
+  const e = yearsAt(u).epoch, i = EPOCHS.indexOf(e), slice = 1 / PERIODS.length / e.period.epochs.length;
+  const jump = k => { const t = EPOCHS[Math.min(Math.max(i + k, 0), EPOCHS.length - 1)]; return (t.pi + (t.ej + .5) / t.period.epochs.length) / PERIODS.length; };
+  const to = {ArrowLeft:u - slice / 20, ArrowDown:u - slice / 20, ArrowRight:u + slice / 20, ArrowUp:u + slice / 20,
+    PageDown:jump(-1), PageUp:jump(1), Home:0, End:1}[ev.key];
+  if(to === undefined) return;
+  ev.preventDefault(); u = Math.min(Math.max(to, 0), 1); render();
+});
+
+buildTrack(); render();
+</script>
+</body>
+</html>
