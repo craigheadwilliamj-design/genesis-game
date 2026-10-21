@@ -512,6 +512,7 @@ function healthHtml(e){
     const te = trashEaten(e);
     items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}`));
   }
+  if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));

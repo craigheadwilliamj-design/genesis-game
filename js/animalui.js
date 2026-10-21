@@ -31,6 +31,7 @@ function animalHealthItems(a, e, s){
   } else out.push(["ok", "Looks healthy."]);
   const q = a.q ?? 90;
   out.push([q < 50 ? "bad" : q < 70 ? "warn" : "ok", q < 50 ? `Frail clone, ${q}% DNA. It falls ill ${HEALTH.frail.below50} times as often.` : q < 70 ? `Sickly clone, ${q}% DNA. It falls ill ${HEALTH.frail.below70} times as often.` : `${q}% DNA.`]);
+  out.push(...basicsLow(e, [a]));
   if(!a.sick){
     const i = illChance(e, a), j = injuryChance(e, a), why = [...new Set(i.why.concat(j.why))];
     out.push([i.p >= .05 ? "bad" : why.length || i.p >= .015 ? "warn" : "ok", `About a ${pct(i.p)} chance a day of falling ill${j.p ? ` and ${pct(j.p)} of getting hurt` : ""}.${why.length ? ` Raised by ${why.map(w => RISK_WHY[w] || w).join(", ")}.` : ""}`]);

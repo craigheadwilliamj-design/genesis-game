@@ -2690,6 +2690,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && !!document.querySelector("#anHealth .meter");
       a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
       out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl());
+      // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low
+      const ex0 = animalHome(a1.id), dirtKeep = ex0.dirt, needKeep = {...a1.need};
+      ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);
+      out.animalHealthBasicsQuiet = !/hungry|thirsty|Sanitation is low/.test(hl());
+      ex0.dirt = 50; a1.need.hunger = 80; a1.need.thirst = 55; animalLive(true);
+      out.animalHealthBasics = /It's hungry/.test(hl()) && /It's thirsty/.test(hl()) && /Sanitation is low \(50% dirty\)/.test(hl());
+      { const tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex0.id; exTabs.tab = "health"; const hh = exhibitHtml(ex0); exTabs.tab = tk; exTabs.ex = tx;
+        out.exhibitHealthBasics = /1 of \d+ are hungry|It's hungry/.test(hh) && /thirsty/.test(hh) && /Sanitation is low \(50% dirty\)/.test(hh); }
+      ex0.dirt = dirtKeep; Object.assign(a1.need, needKeep);
       delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
       out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");

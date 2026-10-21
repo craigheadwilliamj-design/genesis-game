@@ -192,6 +192,24 @@ function healthReport(e){
   return {sick, hidden, ill:well ? ill / well : 0, hurt:well ? hurt / well : 0, why:[...why]};
 }
 
+// Low hunger, water and sanitation for some of an exhibit's animals, as health list items [level, text]. Only what is low shows.
+function basicsLow(e, list){
+  const out = [], one = list.length === 1, low = k => list.filter(a => a.need && a.need[k] >= 50), who = k => { const n = low(k).length; return n ? (one ? "It's" : `${n} of ${list.length} are`) : ""; };
+  const worst = k => Math.max(0, ...list.map(a => a.need ? a.need[k] : 0)), lvl = k => worst(k) >= 75 ? "bad" : "warn";
+  if(!freeFeeding()){
+    const need = dailyNeed(e), empty = Object.keys(need).filter(t => stockFor(e, t) <= .01), thin = Object.keys(need).filter(t => !empty.includes(t) && stockFor(e, t) < storeMax(e, t) * .25);
+    if(empty.length) out.push(["bad", `Out of ${empty.join(" and ")}.`]);
+    else if(thin.length) out.push(["warn", `Running low on ${thin.join(" and ")}.`]);
+  }
+  if(who("hunger")) out.push([lvl("hunger"), `${who("hunger")} hungry.`]);
+  const noWater = list.some(a => thirsty(e, SPECIES_BY_ID[a.sp]));
+  if(noWater) out.push(["bad", e.viv ? "No pool for the animals that need one." : "No water for the animals that need it."]);
+  if(who("thirst")) out.push([lvl("thirst"), `${who("thirst")} thirsty.`]);
+  const dirt = e.dirt || 0;
+  if(dirt >= CLEAN.dirtyAt) out.push([dirt >= 60 ? "bad" : "warn", `Sanitation is low (${Math.round(dirt)}% dirty).`]);
+  return out;
+}
+
 // What raises illness and injury risk, in words (the keys are the `why` lists from illChance and injuryChance)
 const RISK_WHY = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating plants it isn't evolved for", "no water":"having no water", "no pool":"having no pool", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other", stress:"stress", "the cold":"the cold"};
 
