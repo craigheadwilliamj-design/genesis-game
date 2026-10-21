@@ -51,7 +51,7 @@ function animalHtml(a){
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? sellBtn(a) : ""}</div>`;
   h += `<section><h3>Happiness <span class="num" id="anMoodN"></span></h3><div class="meter"><i id="anMoodBar"></i></div></section>`;
   h += `<section><h3>Needs</h3>${NEED_KEYS.map(k => `<div class="need-row"><span>${NEED_TEXT[k]}</span><span id="anN-${k}"></span></div><div class="meter"><i id="anB-${k}"></i></div>`).join("")}</section>`;
-  h += `<section><h3>Health</h3><div id="anHealth"></div></section>`;
+  h += `<section><h3>Health <span class="num" id="anHpN"></span></h3><div class="meter"><i id="anHpBar"></i></div><div id="anHealth"></div></section>`;
   h += `<section><h3>Wants</h3><ul class="issues" id="anWants"></ul></section>`;
   h += `<section><h3>What's bothering it</h3><ul class="issues" id="anStress"></ul></section>`;
   return h;
@@ -74,8 +74,11 @@ function animalLive(force){
     set("anN-" + k, v >= 75 ? "Desperate" : v >= 50 ? "Needs attention" : v >= 25 ? "Getting there" : "Fine");
     if(b){ b.style.width = Math.round(v) + "%"; b.style.background = v >= 75 ? "#D9483B" : v >= 50 ? "#E3B23C" : "#3E9B4F"; }
   }
-  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items) + (hp.sev == null ? "" : Math.round(hp.sev));
-    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = (hp.sev == null ? "" : meter(hp.sev, hp.sev < 40 ? "var(--warn)" : "var(--bad)")) + `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul>`; } }
+  { const v = Math.round(animalHp(a)), hb = document.getElementById("anHpBar");
+    if(hb){ hb.style.width = v + "%"; hb.style.background = hpColor(v); }
+    set("anHpN", `${v}%`); }
+  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items);
+    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul>`; } }
   const fill = (id, list, none, bad) => {
     const ul = document.getElementById(id), key = list.join("|");
     if(ul && ul.dataset.v !== key){ ul.dataset.v = key; ul.innerHTML = list.length ? list.map(t => `<li class="${bad ? "bad" : ""}"><span>${esc(t)}</span></li>`).join("") : `<li><span class="meta">${none}</span></li>`; }
@@ -146,9 +149,9 @@ const byName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String
 function animalsTabHtml(e){
   if(!e.animals.length) return `<section><h3>Animals</h3><div class="meta">No animals here yet.</div></section>`;
   const rows = [...e.animals].sort(byName).map(a => {
-    const s = SPECIES_BY_ID[a.sp], sk = a.sick, sev = sk ? Math.round(sk.sev) : 0;
-    const hp = sk ? `${sk.kind === "injury" ? "Injured" : "Ill"} ${sev}%` : "Healthy";
-    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(100 - sev, sk ? (sev < 40 ? "var(--warn)" : "var(--bad)") : "var(--ok)")}</span>${sellBtn(a)}</li>`;
+    const s = SPECIES_BY_ID[a.sp], sk = noticed(a) && a.sick, v = Math.round(animalHp(a));
+    const hp = `${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health`;
+    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span>${sellBtn(a)}</li>`;
   });
   return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul></section>`;
 }

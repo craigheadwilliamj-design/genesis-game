@@ -171,6 +171,9 @@ function injuryChance(e, a){
 // Everything the exhibit panel says about health
 // Sick animals the player (and the vets) know about. Mild illness stays hidden until a check-up.
 const noticed = a => !!a.sick && !a.sick.hidden;
+// An animal's health as the player sees it, 0 to 100: full unless it's known to be sick or hurt, then less as it gets worse
+const animalHp = a => noticed(a) ? clamp(100 - a.sick.sev, 0, 100) : 100;
+const hpColor = hp => hp >= 100 ? "var(--good)" : hp > 60 ? "var(--warn)" : "var(--bad)";
 const daysSinceCheck = e => e.vetCheck == null ? 99 : state.day - e.vetCheck;
 function healthReport(e){
   const sick = e.animals.filter(noticed), hidden = e.animals.filter(a => a.sick && a.sick.hidden).length;
