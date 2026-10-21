@@ -69,6 +69,16 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .fauna tr.locked td{color:var(--dim)}
 .rating{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:6px}
 .rating select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
+#oracle{display:grid;gap:8px}
+#oracle h2{font:700 18px/1.15 var(--display);margin:0}
+#oracle p{margin:0;font-size:13px;color:var(--dim)}
+.drones{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.drones li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.drones li.done{border-color:color-mix(in srgb, var(--ink) 35%, var(--line))}
+.drones b{font-weight:600;font-size:14px}
+.drones span{grid-column:1;font-size:13px;color:var(--dim)}
+.drones button{grid-row:1 / span 2;grid-column:2;font:600 13px var(--body);border-radius:6px;padding:5px 10px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+.drones button:disabled{background:transparent;color:var(--dim);border-color:var(--line);cursor:default}
 .tag{white-space:nowrap;font:500 11px var(--mono);color:var(--dim)}
 .report{background:color-mix(in srgb, var(--ink) 6%, var(--panel));border-radius:6px;padding:10px 12px;display:grid;gap:6px}
 .report h3{margin:0;font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
@@ -103,6 +113,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
   <ul id="list" aria-label="Sites in view"></ul>
   <section id="card" aria-live="polite"></section>
+  <section id="oracle" aria-label="ORACLE upgrades"></section>
 </main>
 
 <script>
@@ -140,7 +151,18 @@ const SITES = [
 const TRIP = {fail:[.1, .35], trips:[2, 8], spread:.35}, TRIP_SIZE = [10, 5000];
 const sizeT = space => Math.min(Math.max(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0), 1);
 const lerpT = ([a, b], t) => a + (b - a) * t;
-const success = (s, a) => 1 - Math.min(Math.max(lerpT(TRIP.fail, sizeT(a.space)) + s.risk, 0), .8);
+// ORACLE's survey drones cut the chance a trip comes back empty by a share, so big, hard-to-find animals gain the most.
+const DRONES = [
+  {name:"Survey Drones Mark I", points:30, cut:.1},
+  {name:"Survey Drones Mark II", points:60, cut:.2},
+  {name:"Survey Drones Mark III", points:100, cut:.3},
+  {name:"Survey Drones Mark IV", points:150, cut:.4},
+  {name:"Survey Drones Mark V", points:220, cut:.5},
+];
+let drones = 0;   // Marks researched
+try { const d = parseInt(localStorage.getItem("ghost-timeline-drones")); if(d >= 0 && d <= DRONES.length) drones = d; } catch(e) {}
+const droneCut = () => drones ? DRONES[drones - 1].cut : 0;
+const success = (s, a) => 1 - Math.min(Math.max(lerpT(TRIP.fail, sizeT(a.space)) + s.risk, 0), .8) * (1 - droneCut());
 // Genome % a successful find adds, as tripOdds: a genome takes 2 to 8 trips by size.
 const findGain = (s, a) => 100 / Math.max(.6, lerpT(TRIP.trips, sizeT(a.space)) * success(s, a) - .5) * (1 - TRIP.spread + Math.random() * 2 * TRIP.spread);
 
@@ -281,7 +303,20 @@ tr.addEventListener("keydown", ev => {
 $("rating").innerHTML = Array.from({length:11}, (_, i) => i / 2).map(n => `<option value="${n}"${n === rating ? " selected" : ""}>${stars(n)}</option>`).join("");
 $("rating").addEventListener("change", ev => { rating = parseFloat(ev.target.value); try { localStorage.setItem("ghost-timeline-rating", rating); } catch(e) {}
   const s = SITES.find(x => x.id === sel), a = s && s.fauna.find(x => x.name === target); if(a && rating < a.stars) target = null; renderCard(); });
-buildTrack(); render();
+// ORACLE: survey drone upgrades, each needing the Mark before it. Research is instant here.
+function renderOracle(){
+  $("oracle").innerHTML = `<h2>ORACLE · Survey Drones</h2><p>Each Mark cuts the chance an expedition comes back empty handed. Scouting always succeeds.</p>
+    <ul class="drones">${DRONES.map((d, i) => `<li class="${i < drones ? "done" : ""}"><b>${d.name}</b><span>${Math.round(d.cut * 100)}% fewer empty-handed trips · ${d.points} research points</span>
+      <button data-mark="${i + 1}"${i !== drones ? " disabled" : ""}>${i < drones ? "Researched" : i === drones ? "Research" : `Needs Mark ${["I", "II", "III", "IV"][i - 1]}`}</button></li>`).join("")}</ul>
+    ${drones ? `<div class="btns"><button class="ghost" id="dronesReset">Reset drones (test)</button></div>` : ""}`;
+}
+$("oracle").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if(!b) return;
+  drones = b.id === "dronesReset" ? 0 : +b.dataset.mark;
+  try { localStorage.setItem("ghost-timeline-drones", drones); } catch(e) {}
+  renderOracle(); renderCard();
+});
+buildTrack(); render(); renderOracle();
 </script>
 </body>
 </html>
