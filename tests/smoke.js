@@ -3197,6 +3197,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         // one placed at the new size 0.3 m back from the grid slides onto it
         const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:0, day:0, points:rectPts(150, 151.6, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
         upgradeSave(sv2); out.oldKioskShrinks = out.oldKioskShrinks && Math.abs(bbox(sv2.buildings[0].points).y0 - 150) < 1e-6; }
+      // the back picture stands on the door wall (north edge), the front on the south edge; both have a tappable box over the picture
+      { const at = f => { const a = kv[f], m = a.match(/<image href="[^"]*" x="[^"]+" y="([^"]+)" width="[^"]+" height="([^"]+)"/), r = /<rect [^>]*fill="transparent"/.test(a); return m && r ? +m[1] + +m[2] : NaN; }, P = rectPts(150, 150, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0), px = FLAT34.px;
+        out.kioskBackOnDoorWall = Math.abs(at(0) - (bbox(P).y0 + 4 * px / TILT)) < .2 && Math.abs(at(2) - (bbox(P).y1 + 4 * px / TILT)) < .2; }
       out.kioskSpriteAnimates = ["front", "back", "left", "right"].every(has) && kv.every(a => /visibility:visible;animation:frame1of2 /.test(a) && /visibility:hidden;animation:frame2of2 /.test(a) && !/opacity/.test(a) && !/NaN/.test(a)); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
