@@ -14,7 +14,7 @@ Replaces "ORACLE unlocks a species, then GHOST trips to a period fill its genome
 - 260 x 130 Mollweide maps, one per period plus epoch overrides (Early/Middle/Late Jurassic, Early/Late Cretaceous, Pleistocene/Holocene): 16 in all.
 - Drafted by `tools/timeline/genmaps.py` from the PALEOMAP PaleoDEMs (Scotese & Wright 2018, CC BY 4.0: credit it in the game). Palette: navy rim, deep ocean, shallow sea, land, mountains, desert, ice. The Late Cretaceous is at 75 Ma so the Western Interior Seaway shows.
 - They want a tidy in the pixel editor before shipping. In the game they are sprites: `sprites/timeline/<name>.png`, packed by `tools/packsprites.py`, drawn through `spriteUrl`.
-- No caption under the map. Nearby markers (under 8 px) group into one with a count, and a tap steps through them; a tap goes to the nearest marker.
+- No caption under the map. Every site has its own marker: placesites.py nudges markers on a map apart until no two 6 px frames touch (up to about 5 px off). A tap goes to the nearest marker; the selected one's frame turns white.
 
 ### Sites
 - 83 real localities (historical ranges for the recently extinct) in `tools/timeline/sites.py`, every species at one or more sites of its own period. `placesites.py` rotates them back with the PALEOMAP plate model and checks coverage. For the game it writes a `SITES` table into js/data.js (between marker lines) instead of the prototype page.
