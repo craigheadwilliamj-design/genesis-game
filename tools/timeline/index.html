@@ -10,11 +10,11 @@
 /* One column: readout, map, slider, then the site card. The slider is the instrument; everything else is quiet. */
 :root{
   --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --dim:#5a6878; --line:#cfd6de;
-  --accent:#d9ff00; --marker:#454646; --ocean:#1b60b8; --sel:#18212b;
+  --accent:#d9ff00; --marker:#454646; --ocean:#1b60b8;
   --display:"Pixelify Sans","Courier New",monospace; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;--sel:#ffffff;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;--sel:#ffffff;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;color-scheme:dark}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
 main{max-width:640px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
@@ -29,9 +29,10 @@ figure{margin:0;display:grid;gap:6px}
 #map image{image-rendering:pixelated}
 #map{cursor:pointer}
 #map .site:focus{outline:none}
-#map .site:focus-visible .ring,#map .site.on .ring{stroke:var(--sel)}
-.ring{fill:none;stroke:transparent;stroke-width:1.2}
+#map .frame{fill:var(--marker)}
+#map .site:focus-visible .frame,#map .site.on .frame{fill:#fff}
 #map rect.count{fill:var(--marker)}
+#map .count{pointer-events:none}
 #map text.count{fill:#fff;font:600 7px var(--mono);text-anchor:middle;pointer-events:none}
 .nomap{fill:var(--dim);font:600 10px var(--body);text-anchor:middle}
 /* slider */
@@ -376,16 +377,18 @@ function render(){
   const map = mapOf(e), sites = visibleSites(now);
   let svg = map ? `<image href="${map}" x="0" y="0" width="260" height="130"/>`
     : `<ellipse cx="130" cy="65" rx="128" ry="63" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="130" y="68">No ${esc(p.id)} map yet</text>`;
+  let badges = "", marks = "";   // badges go under every marker, so one never hides a neighbour's frame
   if(map) for(const g of groupSites(sites, mapKey(e))){
-    const [x, y] = g.at, on = g.sites.some(s => isLit(s.id)), picked = g.sites.some(s => s.id === sel), n = g.sites.length;
-    const label = n > 1 ? `${n} sites` : on ? g.sites[0].name : "Unscouted site";
-    svg += `<g class="site${picked ? " on" : ""}" data-ids="${g.sites.map(s => s.id).join(" ")}" tabindex="0" role="button" aria-label="${esc(label)}">
-      <rect class="ring" x="${x - 4}" y="${y - 4}" width="10" height="10"/>
-      <rect x="${x - 2}" y="${y - 2}" width="6" height="6" fill="var(--marker)"/>
-      <rect x="${x}" y="${y}" width="2" height="2" fill="${on ? "var(--accent)" : "var(--marker)"}"/>
-      ${n > 1 ? `<rect class="count" x="${x + 4}" y="${y - 9}" width="${n > 9 ? 13 : 9}" height="9" rx="2"/><text class="count" x="${x + 4 + (n > 9 ? 6.5 : 4.5)}" y="${y - 2}">${n}</text>` : ""}
-</g>`;
+    // The selected marker's frame turns white. In a group, the centre shows the picked site and the badge which one it is.
+    const [x, y] = g.at, n = g.sites.length, pi = g.sites.findIndex(s => s.id === sel), shown = pi >= 0 ? [g.sites[pi]] : g.sites;
+    const on = shown.some(s => isLit(s.id)), label = n > 1 ? `${n} sites` : on ? g.sites[0].name : "Unscouted site";
+    const badge = pi >= 0 && n > 1 ? `${pi + 1}/${n}` : `${n}`, bw = badge.length * 4.2 + 4.5;
+    if(n > 1) badges += `<rect class="count" x="${x + 4}" y="${y - 9}" width="${bw}" height="9" rx="2"/><text class="count" x="${x + 4 + bw / 2}" y="${y - 2}">${badge}</text>`;
+    marks += `<g class="site${pi >= 0 ? " on" : ""}" data-ids="${g.sites.map(s => s.id).join(" ")}" tabindex="0" role="button" aria-label="${esc(label)}">
+      <rect class="frame" x="${x - 2}" y="${y - 2}" width="6" height="6"/>
+      <rect x="${x}" y="${y}" width="2" height="2" fill="${on ? "var(--accent)" : "var(--marker)"}"/></g>`;
   }
+  svg += badges + marks;
   $("map").innerHTML = svg;
 
   if(sel && !sites.some(s => s.id === sel)) sel = null;
@@ -423,7 +426,7 @@ $("map").addEventListener("click", ev => {
   const svg = $("map"), pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
   let best = null, bd = HIT_PX;
   for(const g of svg.querySelectorAll(".site")){
-    const r = g.querySelector("rect:nth-of-type(2)"), d = Math.hypot(+r.getAttribute("x") + 3 - pt.x, +r.getAttribute("y") + 3 - pt.y);
+    const r = g.querySelector(".frame"), d = Math.hypot(+r.getAttribute("x") + 3 - pt.x, +r.getAttribute("y") + 3 - pt.y);
     if(d < bd){ bd = d; best = g; }
   }
   if(best) pickIn(best);
