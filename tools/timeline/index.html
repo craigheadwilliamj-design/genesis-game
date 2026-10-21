@@ -66,7 +66,10 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .fauna th:not(:first-child),.fauna td:not(:first-child){padding-left:12px;text-align:right;font-variant-numeric:tabular-nums}
 .fauna td{padding:6px 0;border-bottom:1px solid var(--line)}
 .fauna label{display:flex;align-items:center;gap:8px;cursor:pointer}
-.tag{font:500 11px var(--mono);color:var(--dim)}
+.fauna tr.locked td{color:var(--dim)}
+.rating{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:6px}
+.rating select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
+.tag{white-space:nowrap;font:500 11px var(--mono);color:var(--dim)}
 .result{margin:0;font-size:14px}
 .empty{color:var(--dim);font-size:14px;margin:0}
 </style>
@@ -78,6 +81,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
     <h1 id="epoch">Late Devonian</h1>
     <div id="ago">375 million years ago</div>
     <div id="period"><i></i><span></span></div>
+    <label class="rating">Park rating (test) <select id="rating"></select></label>
   </header>
 
   <figure>
@@ -124,8 +128,8 @@ PERIODS.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
 // Maps by period, 130 x 65 px. Sites put their dot on a map by pixel.
 const MAPS = {Devonian:"maps/devonian.png"};
 const SITES = [
-  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:[{name:"Tiktaalik", space:10}], trip:3500, days:1.5, risk:.10},
-  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:[{name:"Ichthyostega", space:8}], trip:3500, days:1.5, risk:.10},
+  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:[{name:"Tiktaalik", space:10, stars:.5}], trip:3500, days:1.5, risk:.10},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:[{name:"Ichthyostega", space:8, stars:.5}], trip:3500, days:1.5, risk:.10},
 ];
 
 // Survey Success for one animal at a site, the game's tripOdds: bigger animals are harder to find (TRIP.fail by TRIP_SIZE), plus the site's own risk.
@@ -163,6 +167,9 @@ let lit = new Set();
 try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
 const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
 let u = uAt(375e6), sel = null, target = null, result = "";
+let rating = 1.5;
+try { const r = parseFloat(localStorage.getItem("ghost-timeline-rating")); if(r >= 0 && r <= 5) rating = r; } catch(e) {}
+const stars = n => `${n}★`;
 const genome = {};   // animal name -> % of its genome GHOST has, in memory only
 
 const $ = id => document.getElementById(id);
@@ -216,7 +223,8 @@ function renderCard(){
   c.innerHTML = on ? `<h2>${esc(s.name)}</h2><div class="where">${esc(s.where)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Trip</dt><dd>${trip}</dd></dl>
     <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${s.fauna.map(a => { const g = genome[a.name] || 0;
-      return `<tr><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 ? " disabled" : ""}> ${esc(a.name)}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}</tbody></table>
+      const locked = rating < a.stars;
+      return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}</tbody></table>
     ${result ? `<p class="result">${esc(result)}</p>` : ""}
     <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
   : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
@@ -259,6 +267,9 @@ tr.addEventListener("keydown", ev => {
   ev.preventDefault(); u = Math.min(Math.max(to, 0), 1); render();
 });
 
+$("rating").innerHTML = Array.from({length:11}, (_, i) => i / 2).map(n => `<option value="${n}"${n === rating ? " selected" : ""}>${stars(n)}</option>`).join("");
+$("rating").addEventListener("change", ev => { rating = parseFloat(ev.target.value); try { localStorage.setItem("ghost-timeline-rating", rating); } catch(e) {}
+  const s = SITES.find(x => x.id === sel), a = s && s.fauna.find(x => x.name === target); if(a && rating < a.stars) target = null; renderCard(); });
 buildTrack(); render();
 </script>
 </body>
