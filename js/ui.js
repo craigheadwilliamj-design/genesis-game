@@ -222,7 +222,7 @@ function exhibitHtml(e){
   if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
+  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
   if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
 
@@ -233,8 +233,8 @@ function exhibitHtml(e){
       <div class="meta" style="margin-top:4px">${Math.abs(trend) < 2 ? "Holding steady." : trend > 0 ? `Rising toward ${Math.round(rep.target)}%.` : `Falling toward ${Math.round(rep.target)}%.`}</div>`;
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
-    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
-      ${movesHtml(e)}
+    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
+      <div class="meta" style="margin-top:4px">Move or sell them from the Animals tab.</div>
       <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
       <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
