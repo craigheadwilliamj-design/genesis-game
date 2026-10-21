@@ -3675,6 +3675,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
     const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
     out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
+    const need = pxNeedArt()[0].id; pxNew(`sprites/${need}-walk.png`, 100, 75, 4); pxTry();
+    out.pixelNewSpeciesTry = SPRITES[need].tried === 1 && SPRITES[need].walk === 4 && !!SPRITE_PACK[`sprites/${need}.png`] && pxNeedArt().some(x => x.id === need);
+    delete SPRITES[need]; delete SPRITE_PACK[`sprites/${need}.png`]; delete SPRITE_PACK[`sprites/${need}-walk.png`]; try{ localStorage.removeItem(`genesis-pixel-d:sprites/${need}-walk.png`); localStorage.removeItem("genesis-pixel-drafts"); }catch{}
     spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
     document.querySelector("#dlgPixel").close();
     return out;

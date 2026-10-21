@@ -9,9 +9,13 @@ const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket
 const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",
   line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h3M9 4h3M14 4h3v3M17 9v3M17 14v3h-3M12 17H9M7 17H4v-3M4 12V9M4 7V4",
   shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z"};
+// New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
+const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
+  person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantS:["Plant, small", 44, 40, 1, "sprites/plants/{name}.png"],
+  prop:["Prop view (a bin is 14 x 21)", 14, 21, 1, "sprites/bld/{name}-front.png"], bld:["Building view", 80, 80, 1, "sprites/bld/{name}-front.png"], custom:["Any size", 32, 32, 1, "sprites/{name}.png"]};
 const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
 const px = {path:"", fw:16, fh:16, frames:[], cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
-  pal:"image", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
+  pal:"image", ref:"", refCv:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
 
 /* ---------- pixels ---------- */
 const pxBlank = (w, h) => new Uint8ClampedArray(w * h * 4);
@@ -125,7 +129,7 @@ async function pxOpen(path, fresh){
   pxDrop(); const dr = !fresh && pxStored("d:" + path), src = dr ? dr.png : SPRITE_PACK[path];
   if(!src) return ui.toast("There's no picture at " + path + ".", "bad");
   try{
-    const im = await pxImg(src); px.path = path; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
+    const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
     pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height)); pxStore("last", path);
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
@@ -172,6 +176,7 @@ function pxDraw(){
   const z = px.zoom, W = px.fw * z, H = px.fh * z, ctx = pxCtx;
   pxCv.width = W; pxCv.height = H; ctx.imageSmoothingEnabled = false;
   const ck = Math.max(4, Math.min(16, z)); for(let y = 0; y < H; y += ck) for(let x = 0; x < W; x += ck){ ctx.fillStyle = (x / ck + y / ck) % 2 ? "#cfd4c8" : "#e8ebe2"; ctx.fillRect(x, y, ck, ck); }
+  if(px.refCv){ const r = px.refCv; ctx.globalAlpha = .22; ctx.drawImage(r, Math.floor((px.fw - r.width) / 2) * z, (px.fh - r.height) * z, r.width * z, r.height * z); ctx.globalAlpha = 1; }   // stood on the same bottom middle
   if(px.onion && px.frames.length > 1){ pxLayer(ctx, px.frames[(px.cur + px.frames.length - 1) % px.frames.length], 0, 0, z, .28); }
   pxLayer(ctx, pxFrame(), 0, 0, z, 1);
   const s = px.sel;
@@ -302,6 +307,13 @@ function pxRecolor(from, to){
 function pxTry(){
   if(!px.path || !spriteUrl.swap) return;
   spriteUrl.swap(px.path, pxPng());
+  // a species with no picture yet gets a stand-in SPRITES entry, so its animals draw from this one right away
+  const m = px.path.match(/^sprites\/([a-z0-9]+)(?:-(walk|idle))?\.png$/), id = m && SPECIES_BY_ID[m[1]] && m[1];
+  if(id && (!SPRITES[id] || SPRITES[id].tried)){
+    const S = SPRITES[id] || (SPRITES[id] = {ratio:px.fw / px.fh, tried:1}), base = `sprites/${id}.png`;
+    if(m[2]){ S[m[2]] = px.frames.length; if(m[2] === "idle") S.ms = Math.round(1000 / px.fps); }
+    if(m[2] && !SPRITE_PACK[base]){ pxTmp.width = px.fw; pxTmp.height = px.fh; pxTmp.getContext("2d").putImageData(new ImageData(px.frames[0].slice(), px.fw, px.fh), 0, 0); spriteUrl.swap(base, pxTmp.toDataURL("image/png")); }
+  }
   const u = spriteUrl(px.path);
   document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
   if(typeof render === "function" && state) render();
@@ -373,6 +385,7 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
+        <label class="pxrow"><span>Underneath</span><select id="pxRef"></select></label>
         <div class="meta">Shift+arrows nudge the frame a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
         <div id="pxQueue"></div></section>
@@ -412,6 +425,9 @@ function pxSync(){
     const cv = b.querySelector("canvas"), s = Math.max(1, Math.floor(44 / Math.max(px.fw, px.fh)));
     cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[i], 0, 0, s, 1);
   });
+  const refs = ["", ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
+  if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
+  $p("pxRef").value = px.ref;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -425,25 +441,54 @@ function pxTool(t){ if(px.tool === "select" && t !== "select"){ pxDrop(); px.sel
 function pxZoom(d){ px.zoom = Math.max(1, Math.min(64, px.zoom + d * Math.max(1, Math.round(px.zoom / 6)))); pxDraw(); pxSync(); }
 function pxEsc(){ const o = document.getElementById("pxOver"); if(!o.hidden){ o.hidden = true; return; } if(px.sel){ pxDrop(); px.sel = null; pxChanged(); } }
 // Overlays: the picture list and the new-picture form
-function pxOverlay(kind){
+function pxOverlay(kind, opt){
   const o = document.getElementById("pxOver"); o.hidden = false;
   if(kind === "new"){
+    const tpl = opt && opt.tpl || "animal", sp = opt && opt.sp || pxNeedArt()[0]?.id || SPECIES[0].id;
     o.innerHTML = `<div class="pxcard"><h2>New picture</h2>
-      <label class="field"><span>Path in the repo</span><input id="pxNp" value="sprites/new.png"></label>
-      <div class="pxrow"><label class="field"><span>Width</span><input type="number" id="pxNw" value="32" min="1" max="512"></label><label class="field"><span>Height</span><input type="number" id="pxNh" value="32" min="1" max="512"></label><label class="field"><span>Frames</span><input type="number" id="pxNn" value="1" min="1" max="64"></label></div>
+      <label class="field"><span>What it is</span><select id="pxNt">${Object.entries(PX_TEMPLATES).map(([k, t]) => `<option value="${k}"${k === tpl ? " selected" : ""}>${esc(t[0])}</option>`).join("")}</select></label>
+      <label class="field" id="pxNsF"><span>Species</span><select id="pxNs">${pxSpeciesOrder().map(s => `<option value="${s.id}"${s.id === sp ? " selected" : ""}>${esc(s.name)} (${esc(s.period)})${SPRITES[s.id] && !SPRITES[s.id].tried ? ", has art" : ""}</option>`).join("")}</select></label>
+      <label class="field" id="pxNmF"><span>Name</span><input id="pxNm" value="new" autocomplete="off"></label>
+      <label class="field"><span>Path in the repo</span><input id="pxNp"></label>
+      <div class="pxrow"><label class="field"><span>Width</span><input type="number" id="pxNw" min="1" max="512"></label><label class="field"><span>Height</span><input type="number" id="pxNh" min="1" max="512"></label><label class="field"><span>Frames</span><input type="number" id="pxNn" min="1" max="64"></label></div>
+      <label class="pxrow"><input type="checkbox" id="pxNr" checked> Show another animal faintly underneath, for size</label>
       <div class="pxrow"><button class="btn" data-px="cancel">Cancel</button><button class="btn primary" data-px="create">Create</button></div></div>`;
-    document.getElementById("pxNp").focus(); return;
+    pxNewFill(true); return;
   }
-  const drafts = pxDrafts();
+  const drafts = pxDrafts(), need = pxNeedArt();
   o.innerHTML = `<div class="pxcard wide"><div class="pxrow"><h2>Open a picture</h2><span class="pxgrow"></span><button class="btn" data-px="cancel">Cancel</button></div>
-    <input id="pxQ" placeholder="Search, like dime or bld/restroom" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
+    <div class="pxrow pxtabs"><button class="btn" data-pxtab="all">Pictures</button><button class="btn" data-pxtab="need">Needs art (${need.length} species)</button></div>
+    <input id="pxQ" placeholder="${px.tab === "need" ? "Search, like raptor or Jurassic" : "Search, like dime or bld/restroom"}" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
+  o.querySelectorAll("[data-pxtab]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pxtab === px.tab));
   const q = document.getElementById("pxQ"); q.value = pxStored("q") || ""; q.focus(); q.select();
   const list = () => {
     const t = q.value.trim().toLowerCase(); pxStore("q", t);
+    if(px.tab === "need"){
+      const ss = need.filter(s => !t || s.name.toLowerCase().includes(t) || s.id.includes(t) || s.period.toLowerCase().includes(t));
+      document.getElementById("pxList").innerHTML = ss.map(s => `<button data-newsp="${s.id}"><b>${esc(s.name)}</b><span>${esc(s.period)}${s.viv ? ", vivarium" : ""}</span><span>${LAUNCH_ROSTER.includes(s.id) ? "In the launch roster" : ""}${drafts[`sprites/${s.id}.png`] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">Every species matching that has a picture.</p>`;
+      return;
+    }
     const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b)).slice(0, 240);
     document.getElementById("pxList").innerHTML = ps.map(p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">No picture matches that.</p>`;
   };
   q.oninput = list; list();
+}
+// Species still drawn as dots: the launch roster first, then by period
+const pxNeedArt = () => pxSpeciesOrder().filter(s => !SPRITES[s.id] || SPRITES[s.id].tried);
+const pxSpeciesOrder = () => SPECIES.slice().sort((a, b) => (!!SPRITES[a.id] && !SPRITES[a.id].tried) - (!!SPRITES[b.id] && !SPRITES[b.id].tried) || !LAUNCH_ROSTER.includes(a.id) - !LAUNCH_ROSTER.includes(b.id));
+// The new-picture form: a template sets the size, frames and path; the size and path can still be typed over
+function pxNewFill(sized){
+  const g = id => document.getElementById(id), t = PX_TEMPLATES[g("pxNt").value], animal = t[4].includes("{id}");
+  g("pxNsF").hidden = !animal; g("pxNmF").hidden = animal; g("pxNr").parentElement.hidden = !animal;
+  const name = g("pxNm").value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "new";
+  g("pxNp").value = t[4].replace("{id}", g("pxNs").value).replace("{name}", name);
+  if(sized){ g("pxNw").value = t[1]; g("pxNh").value = t[2]; g("pxNn").value = t[3]; }
+}
+// A faint picture under the canvas to match size and feet against (the standing picture of an animal with art)
+async function pxSetRef(path){
+  px.ref = path || ""; px.refCv = null;
+  if(path && SPRITE_PACK[path]) try{ const im = await pxImg(SPRITE_PACK[path]), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; cv.getContext("2d").drawImage(im, 0, 0); px.refCv = cv; }catch{}
+  pxDraw(); pxSync();
 }
 function pxClick(e){
   const b = e.target.closest("button"); if(!b) return;
@@ -453,6 +498,8 @@ function pxClick(e){
   if(b.dataset.c){ if(e.detail < 2){ px.c1 = b.dataset.c.split(",").map(Number); pxSync(); } return; }
   if(b.dataset.openp){ document.getElementById("pxOver").hidden = true; return pxOpen(b.dataset.openp); }
   if(b.dataset.unsend) return pxUnsend(b.dataset.unsend);
+  if(b.dataset.pxtab){ px.tab = b.dataset.pxtab; return pxOverlay("open"); }
+  if(b.dataset.newsp){ const p = `sprites/${b.dataset.newsp}.png`; if(pxStored("d:" + p)){ document.getElementById("pxOver").hidden = true; return pxOpen(p); } return pxOverlay("new", {tpl:"animal", sp:b.dataset.newsp}); }
   if(b.id === "pxC1"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c1); p.dataset.which = "c1"; return p.click(); }
   if(b.id === "pxC2"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c2); p.dataset.which = "c2"; return p.click(); }
   const a = b.dataset.px, all = document.getElementById("pxAll")?.checked;
@@ -460,7 +507,8 @@ function pxClick(e){
     create:() => { const p = document.getElementById("pxNp").value.trim(), w = +document.getElementById("pxNw").value, h = +document.getElementById("pxNh").value, n = +document.getElementById("pxNn").value;
       if(!/^sprites\/[a-z0-9_\/-]+\.png$/i.test(p) || p.includes("..")) return ui.toast("The path should look like sprites/name.png.", "bad");
       if(!(w >= 1 && h >= 1 && w <= 512 && h <= 512 && n >= 1 && n <= 64)) return ui.toast("Pick a size from 1 to 512 pixels and 1 to 64 frames.", "bad");
-      document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); },
+      const ref = !document.getElementById("pxNsF").hidden && document.getElementById("pxNr").checked;
+      document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); pxSetRef(ref && w === 100 && h === 75 ? "sprites/dime.png" : ""); },
     undo:() => pxUndo(false), redo:() => pxUndo(true), zin:() => pxZoom(1), zout:() => pxZoom(-1), fit:pxFit,
     grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
     revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
@@ -479,6 +527,9 @@ function pxInput(e){
   else if(id === "pxAlpha"){ px.c1 = [...px.c1.slice(0, 3), +t.value]; pxSync(); }
   else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
+  else if(id === "pxNt") pxNewFill(true);
+  else if(id === "pxNs" || id === "pxNm") pxNewFill(false);
+  else if(id === "pxRef") pxSetRef(t.value);
   else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
   else if(id === "pxFile" && t.files[0]){ pxImport(t.files[0]); t.value = ""; }
 }
