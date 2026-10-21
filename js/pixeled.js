@@ -5,10 +5,11 @@
 const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,14],[106,100,77],[227,221,195],[198,188,147],
   [44,35,19],[66,53,29],[165,125,74],[143,109,64],[110,85,49],[132,101,59],[231,231,231],[189,72,58],[222,182,72],[29,43,34,100]];   // PAL in tools/genesis_style.py
 const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket", "Fill (Shift: every pixel of that color)", "G"], ["line", "Line", "L"],
-  ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select and move", "M"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"]];
+  ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select and move", "M"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"], ["pan", "Pan: drag to move the view (or hold Space)", "H"]];
 const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",
   line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h13v13H4z",
-  shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z"};
+  shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z",
+  pan:"M7 11V5.5a1.5 1.5 0 013 0V10M10 9.5V4a1.5 1.5 0 013 0v6M13 9.5V5.5a1.5 1.5 0 013 0V12c0 3.6-2.2 6-5.5 6C7.3 18 6 16.4 4.9 14.4L3 11a1.4 1.4 0 012.4-1.4L7 12"};
 // New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
 const PX_DASH = {select:' stroke-dasharray="3.2 2.6" stroke-linecap="butt"'};   // icons drawn dashed (a marquee)
 const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
@@ -239,7 +240,7 @@ function pxPreview(t){
 }
 const pxXY = e => { const r = pxCv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * px.fw), Math.floor((e.clientY - r.top) / r.height * px.fh)]; };
 function pxDown(e){
-  if(e.button === 1 || e.button === 0 && px.space){ px.pan = [e.clientX, e.clientY, pxStage.scrollLeft, pxStage.scrollTop]; pxCv.setPointerCapture(e.pointerId); return; }
+  if(pxPans(e)) return;   // the stage pans (pxPanStart)
   if(e.button > 2 || !px.frames.length) return;
   e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
@@ -274,7 +275,7 @@ function pxMoveTo(x, y, e){
   pxDraw();
 }
 function pxMove(e){
-  if(px.pan){ const [cx, cy, sl, stp] = px.pan; pxStage.scrollLeft = sl - (e.clientX - cx); pxStage.scrollTop = stp - (e.clientY - cy); return; }
+  if(px.pan) return;
   const [x, y] = pxXY(e); px.hover = [x, y];
   const st = px.stroke;
   if(!st) return pxDraw();
@@ -287,7 +288,7 @@ function pxMove(e){
   pxMoveTo(x, y, e);
 }
 function pxUp(){
-  if(px.pan){ px.pan = null; return; }
+  if(px.pan) return;
   const st = px.stroke; px.stroke = null; if(!st) return;
   if(px.tool === "select"){ if(st.move) pxChanged(); return; }
   pxChanged();
@@ -378,7 +379,16 @@ function pxLayersSync(){
   const a = Math.round(px.layers[px.lay].alpha * 100); document.getElementById("pxLAlpha").value = a; document.getElementById("pxLAlphaN").textContent = a + "%";
 }
 // The canvas cursor: a crosshair with a white halo (its hot spot is the pixel drawn on) and the tool's icon beside it, readable on any color
+// Panning: the Pan tool, a held Space or the middle button drags the view, from anywhere on the stage
+const pxPans = e => e.button === 1 || e.button === 0 && (px.tool === "pan" || px.space);
+function pxPanStart(e){
+  if(!pxPans(e)) return;
+  e.preventDefault(); px.pan = [e.clientX, e.clientY, pxStage.scrollLeft, pxStage.scrollTop]; pxStage.setPointerCapture(e.pointerId); pxStage.classList.add("panning");
+}
+function pxPanMove(e){ if(!px.pan) return; const [cx, cy, sl, st] = px.pan; pxStage.scrollLeft = sl - (e.clientX - cx); pxStage.scrollTop = st - (e.clientY - cy); }
+function pxPanEnd(){ if(!px.pan) return; px.pan = null; pxStage.classList.remove("panning"); }
 function pxCursor(t){
+  if(t === "pan") return "grab";
   const ch = "M8 0v6M8 10v6M0 8h6M10 8h6", ico = PX_ICONS[t] ? `<g transform="translate(12 12) scale(.9)" fill="none" stroke-linejoin="round" stroke-linecap="round"><path d="${PX_ICONS[t]}" stroke="#fff" stroke-width="5"/><path d="${PX_ICONS[t]}" stroke="#111" stroke-width="2.2"${PX_DASH[t] || ""}/></g>` : "";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="${ch}" stroke="#fff" stroke-width="4.5"/><path d="${ch}" stroke="#111" stroke-width="2"/>${ico}</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 8 8, crosshair`;
@@ -590,10 +600,11 @@ function pxBuild(){
   pxCv.style.cursor = pxCursor(px.tool);
   pxCv.addEventListener("pointerleave", () => { px.hover = null; pxDraw(); }); pxCv.addEventListener("contextmenu", e => e.preventDefault());
   pxStage.addEventListener("wheel", pxWheel, {passive:false});
-  pxStage.addEventListener("pointerdown", e => { if(e.target === pxStage && px.tool === "select"){ pxDrop(); px.sel = null; pxChanged(); } });
+  pxStage.addEventListener("pointerdown", e => { pxPanStart(e); if(!px.pan && e.target === pxStage && px.tool === "select"){ pxDrop(); px.sel = null; pxChanged(); } });
+  pxStage.addEventListener("pointermove", pxPanMove); pxStage.addEventListener("pointerup", pxPanEnd); pxStage.addEventListener("pointercancel", pxPanEnd);
   D.addEventListener("click", pxClick); D.addEventListener("dblclick", pxDbl); D.addEventListener("contextmenu", pxRight);
   D.addEventListener("input", pxInput); D.addEventListener("change", pxInput);
-  document.addEventListener("keydown", e => { if(D.open) pxKey(e); }); document.addEventListener("keyup", e => { if(e.key === " ") px.space = false; });
+  document.addEventListener("keydown", e => { if(D.open) pxKey(e); }); document.addEventListener("keyup", e => { if(e.key === " "){ px.space = false; pxStage.classList.remove("grab"); } });
   D.addEventListener("cancel", e => { if(px.sel || !document.getElementById("pxOver").hidden){ e.preventDefault(); pxEsc(); } });
   D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, pxDraft()); } });
   px.built = true;
@@ -789,7 +800,7 @@ function pxKey(e){
   if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && e.target.type !== "checkbox") return;
   if(!document.getElementById("pxOver").hidden) return;
   const k = e.key, ctl = e.ctrlKey || e.metaKey;
-  if(k === " "){ px.space = true; e.preventDefault(); return; }
+  if(k === " "){ px.space = true; pxStage.classList.add("grab"); e.preventDefault(); return; }
   if(ctl && k.toLowerCase() === "z"){ e.preventDefault(); return pxUndo(e.shiftKey); }
   if(ctl && k.toLowerCase() === "y"){ e.preventDefault(); return pxUndo(true); }
   if(ctl && k.toLowerCase() === "c") return pxCopy(false);

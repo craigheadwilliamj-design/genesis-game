@@ -193,8 +193,10 @@ dialog.pixed[open]{display:flex}
 .pxsize{display:flex;flex-direction:column;gap:2px;margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
 .pxsize button{height:28px;font-weight:700;font-size:14px}
 .pxsize small{font-size:10px;text-align:center;color:var(--ink-2)}
-.pxstage{overflow:auto;display:grid;place-items:center;padding:20px;background:var(--outside);min-width:0}
-.pxstage canvas{display:block;image-rendering:pixelated;touch-action:none;box-shadow:0 2px 12px rgba(0,0,0,.2);cursor:crosshair}
+.pxstage{overflow:auto;display:flex;padding:20px;background:var(--outside);min-width:0}
+.pxstage.grab,.pxstage.grab canvas{cursor:grab !important}
+.pxstage.panning,.pxstage.panning canvas{cursor:grabbing !important}
+.pxstage canvas{flex:none;margin:auto;display:block;image-rendering:pixelated;touch-action:none;box-shadow:0 2px 12px rgba(0,0,0,.2);cursor:crosshair}
 .pxside{overflow-y:auto;border-left:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:14px;font-size:14px}
 .pxside h3{margin:0 0 6px;font:600 12px/1.2 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
 .pxside .btn,.pxcard .btn{padding:4px 9px;border-radius:7px;border:1px solid var(--line);background:var(--chrome-2);cursor:pointer}
