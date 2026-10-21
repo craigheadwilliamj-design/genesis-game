@@ -248,6 +248,7 @@ function exhibitHtml(e){
     else if(isBreached(e)) notes.push(["bad", "Broken. Animals can walk out until a mechanic repairs it."]);
     notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
     h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
+    h += `<div class="meta" style="margin-top:6px">Guest visibility: ${Math.round(viewFactor(e, derived.reach) * 100)}%</div>`;
     h += `<div class="row" style="margin-top:8px">`;
     h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
     h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at ORACLE</span>`;
