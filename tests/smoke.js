@@ -3662,7 +3662,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   }));
 
   // pixel editor (dev mode): strips open as frames, tools draw, the strip saves at full width, and "Try in park" swaps the picture
-  Object.assign(checks, await page.evaluate(async () => {
+  const coelRig = require("fs").readFileSync(path.resolve(__dirname, "../tools/rigger/coelophysis/coelophysis-clips.json"), "utf8");
+  Object.assign(checks, await page.evaluate(async require_coel => {
     const out = {}, was = SPRITE_PACK["sprites/dime-walk.png"];
     out.pixelBtnDevOnly = document.querySelector("#pixelBtn").hidden === !devMode();
     await openPixelEditor("sprites/dime-walk.png");
@@ -3678,6 +3679,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const stacked = px.frames.every(f => f.length === 2) && pxGet(pxCompData(0), 1, 1)[0] === 200;
     px.layers[1].show = false; const hid = pxGet(pxCompData(0), 1, 1).join() === "10,20,30,255"; px.layers[1].show = true;
     px.layers[1].alpha = .5; pxLayerOp("merge"); const merged = px.layers.length === 1 && pxGet(px.frames[0][0], 1, 1)[0] === 105; pxUndo(false);
+    // the rigger: layers out as full-cell parts (empty ones skipped), and a rigger project back in as layers at their rest-pose places
+    const rig = pxRigFile(), coel = JSON.parse(require_coel);
+    await pxFromRigger(coel, "coel.json");
+    out.pixelRigger = rig.nodes.length === 2 && rig.cell.w === 10 && Object.keys(rig.assets).length === 2 && px.layers.length === coel.nodes.length && px.fw === coel.cell.w && px.frames.length === 1
+      && px.layers[0].name === coel.nodes[0].name && pxCompData(0).some((v, i) => i % 4 === 3 && v);
+    pxUndo(false);
     out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
     const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
     out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
@@ -3701,7 +3708,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
     devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
     return out;
-  }));
+  }, coelRig));
 
   await page.waitForTimeout(800);
   let ok = true;

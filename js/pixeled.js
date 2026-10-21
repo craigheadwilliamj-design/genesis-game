@@ -464,15 +464,66 @@ async function pxSend(){
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
 }
 async function pxUnsend(path){ const d = await pxDb(); try{ if(d) await d.doc("pixeled/" + pxDocId(path)).delete(); }catch{} }
-async function pxDownload(){
-  const name = (px.path.split("/").pop() || "sprite.png"), uri = pxPng();
+async function pxSaveFile(blob, name){
   try{
     const dl = window.claude && await window.claude.use("downloads");
-    if(dl){ const b = atob(uri.split(",")[1]), u = new Uint8Array(b.length); for(let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); await dl.save({filename:name, data:new Blob([u], {type:"image/png"})}); return; }
+    if(dl){ await dl.save({filename:name, data:blob}); return; }
   }catch(e){ if(e && e.code !== "unavailable") return; }
-  const a = document.createElement("a"); a.href = uri; a.download = name; a.click();
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function pxDownload(){
+  const uri = pxPng(), b = atob(uri.split(",")[1]), u = new Uint8Array(b.length); for(let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
+  pxSaveFile(new Blob([u], {type:"image/png"}), px.path.split("/").pop() || "sprite.png");
+}
+/* ---------- the sprite rigger (tools/rigger) ---------- */
+// This frame's layers as a rigger project: a layer a part (the rigger's draw order is bottom first, like layers), each a full-cell
+// picture with the part where it is drawn, its joint in the middle of its pixels. In the rigger: Load project for a new rig, or
+// Update parts to give an existing rig's parts (matched by name) their new pictures and keep the animation.
+function pxRigFile(){
+  const name = (px.path.split("/").pop() || "critter").replace(/\.png$/, "").replace(/-(walk|idle|rest|swim)$/, ""), o = {name, cell:{w:px.fw, h:px.fh}, ground:px.fh - 1, seq:1, assets:{}, nodes:[], ref:null, clips:[{name:"walk", fps:8, frames:[{}]}], from:"pixel editor " + px.path};
+  let low = -1;
+  px.layers.forEach((L, l) => {
+    const f = px.frames[px.cur][l]; let x0 = px.fw, y0 = px.fh, x1 = -1, y1 = -1;
+    for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++) if(f[pxAt(x, y) + 3]){ x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if(x1 < 0) return;   // an empty layer isn't a part
+    low = Math.max(low, y1);
+    const cv = document.createElement("canvas"); cv.width = px.fw; cv.height = px.fh; cv.getContext("2d").putImageData(new ImageData(f.slice(), px.fw, px.fh), 0, 0);
+    const a = "a" + o.seq++, id = "n" + o.seq++, jx = Math.round((x0 + x1 + 1) / 2), jy = Math.round((y0 + y1 + 1) / 2);
+    o.assets[a] = cv.toDataURL("image/png");
+    o.nodes.push({id, name:L.name, asset:a, px:jx, py:jy, parent:null, lx:jx, ly:jy, flip:false, hidden:!L.show});
+  });
+  if(low >= 0) o.ground = low + 1;   // the ground line under the lowest pixel, where the feet stand
+  return o;
+}
+function pxToRigger(){
+  if(!px.frames.length) return;
+  const o = pxRigFile(); if(!o.nodes.length) return ui.toast("Every layer is empty, so there are no parts to send.", "bad");
+  pxSaveFile(new Blob([JSON.stringify(o)], {type:"application/json"}), o.name + "-parts.json");
+  ui.toast(`Saved ${o.nodes.length} part${o.nodes.length === 1 ? "" : "s"}, a layer each. In the rigger: Load project to start a rig, or Update parts to swap them into a rig you have.`, "good");
+}
+// A rigger project in, its parts as layers: each drawn where it stands in the rest pose, so a rig's parts can be touched up here and sent back
+async function pxFromRigger(o, file){
+  if(!o || !o.cell || !Array.isArray(o.nodes) || !o.assets) throw new Error("not a rigger project");
+  const w = o.cell.w, h = o.cell.h; if(!(w > 0 && h > 0 && w <= 512 && h <= 512)) throw new Error("its cell size won't fit");
+  const by = Object.fromEntries(o.nodes.map(n => [n.id, n])), rest = n => { let x = 0, y = 0, g = 0; while(n && g++ < 60){ x += n.lx; y += n.ly; n = n.parent ? by[n.parent] : null; } return [x, y]; };
+  pxDrop(); px.undo.push(pxSnap()); px.redo = [];
+  px.fw = w; px.fh = h; px.frames = [[]]; px.layers = []; px.cur = 0; px.sel = null;
+  for(const n of o.nodes){
+    if(!o.assets[n.asset]) continue;
+    const im = await pxImg(o.assets[n.asset]), cv = document.createElement("canvas"); cv.width = w; cv.height = h; const ctx = cv.getContext("2d"), [jx, jy] = rest(n);
+    ctx.setTransform(n.flip ? -1 : 1, 0, 0, 1, jx, jy); ctx.drawImage(im, -n.px, -n.py);   // the rigger's rest pose: at its joint, mirrored about it if flipped
+    px.frames[0].push(new Uint8ClampedArray(ctx.getImageData(0, 0, w, h).data));
+    px.layers.push({name:String(n.name || "part").slice(0, 32), show:!n.hidden && !n.off, alpha:1});
+  }
+  if(!px.layers.length){ px.frames = [[pxBlank(w, h)]]; px.layers = [pxLayerNew(1)]; }
+  px.lay = px.layers.length - 1;
+  if(!px.path) px.path = "sprites/" + String(o.name || "critter").replace(/[^a-z0-9_-]/gi, "").toLowerCase() + ".png";
+  pxFit(); pxChanged(); ui.toast(`Opened ${file}: ${px.layers.length} parts as layers. Send to rigger gives them back; Update parts there keeps the animation.`);
 }
 async function pxImport(file){
+  if(/\.json$/i.test(file.name) || file.type === "application/json"){
+    try{ return await pxFromRigger(JSON.parse(await file.text()), file.name); }catch(e){ return ui.toast("That isn't a rigger project I can read (" + e.message + ").", "bad"); }
+  }
   try{
     const im = await pxImg(URL.createObjectURL(file));
     if(im.width > 2048 || im.height > 512) return ui.toast("That picture is too big for a sprite.", "bad");
@@ -495,7 +546,7 @@ function pxBuild(){
   const D = document.getElementById("dlgPixel");
   D.innerHTML = `<div class="pxbar">
     <b class="pxname" id="pxName"></b>
-    <button class="btn" data-px="open">Open</button><button class="btn" data-px="new">New</button><label class="btn">Import<input type="file" accept="image/png,image/gif,image/webp" id="pxFile" hidden></label>
+    <button class="btn" data-px="open">Open</button><button class="btn" data-px="new">New</button><label class="btn">Import<input type="file" accept="image/png,image/gif,image/webp,.json,application/json" id="pxFile" hidden></label>
     <span class="pxsep"></span><button class="btn" data-px="undo" title="Undo (Ctrl+Z)">Undo</button><button class="btn" data-px="redo" title="Redo (Ctrl+Y)">Redo</button>
     <span class="pxsep"></span><button class="btn" data-px="zout" title="Zoom out (-)">−</button><span class="num" id="pxZoom"></span><button class="btn" data-px="zin" title="Zoom in (+)">+</button><button class="btn" data-px="fit">Fit</button>
     <button class="btn" data-px="grid" title="Grid (#)">Grid</button><button class="btn" data-px="mirror" title="Draw mirrored left to right (Shift+M)">Mirror</button>
@@ -526,6 +577,7 @@ function pxBuild(){
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
+        <div class="pxrow"><button class="btn" data-px="rigger" title="Save this frame's layers as parts for the sprite rigger">Send to rigger</button><span class="meta">A layer a part. Import a rigger project to get its parts back as layers.</span></div>
         <div id="pxQueue"></div></section>
     </div></div>
   <div class="pxover" id="pxOver" hidden></div>`;
@@ -676,7 +728,7 @@ function pxClick(e){
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
-    try:pxTry, send:pxSend, download:pxDownload}[a] || (() => {}))();
+    try:pxTry, send:pxSend, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
 function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
 function pxRight(e){ const b = e.target.closest("[data-c]"); if(!b) return; e.preventDefault(); px.c2 = b.dataset.c.split(",").map(Number); pxSync(); }
