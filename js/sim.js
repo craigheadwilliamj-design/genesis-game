@@ -307,23 +307,23 @@ function upgradeSave(s){
     }
     b.face = best;
   }
-  // food carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in. Ones placed at the new size before the door wall snapped to the grid slide onto it (doorOnGrid, map.js), up to half a meter.
-  for(const b of s.buildings) if(b.type === "kiosk" && b.points && b.points.length === 4){
-    const t = BUILDINGS.kiosk, P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % 4], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+  // food and gift carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in. Ones placed at the new size before the door wall snapped to the grid slide onto it (doorOnGrid, map.js), up to half a meter.
+  for(const b of s.buildings) if((b.type === "kiosk" || b.type === "cart") && b.points && b.points.length === 4){
+    const t = BUILDINGS[b.type], P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % 4], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
     if(Math.abs(L - t.w) < 1e-3 && Math.abs(Math.hypot(P[(i + 2) % 4][0] - c[0], P[(i + 2) % 4][1] - c[1]) - t.d) < 1e-3){ b.points = doorOnGrid(P, b.face === undefined ? 2 : b.face, b.type); continue; }
     const ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L, [cx, cy] = centroid(P), mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2, out = -uy * (mx - cx) + ux * (my - cy) < 0 ? -1 : 1;
     b.points = rectPts(mx + uy * out * t.d / 2, my - ux * out * t.d / 2, t.w, t.d, Math.atan2(uy, ux)).map(p => [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]);
   }
-  // a north-facing food cart backing onto a path sits with backOver (map.js) of its box over the path: ones saved further on or off it slide there, once
-  if(!s.cardBack2){
-    const over = BLD_PICS.kiosk.backOver;
-    for(const b of s.buildings) if(b.type === "kiosk" && b.face === 0 && b.points){
+  // a north-facing food or gift cart backing onto a path sits with backOver (map.js) of its box over the path: ones saved further on or off it slide there, once (gift carts got their picture after food carts, so their own flag)
+  for(const [flag, type] of [["cardBack2", "kiosk"], ["cartBack", "cart"]]) if(!s[flag]){
+    const over = BLD_PICS[type].backOver;
+    for(const b of s.buildings) if(b.type === type && b.face === 0 && b.points){
       const bb = bbox(b.points), Y = Math.round((bb.y0 + over) / CHUNK) * CHUNK, cx = Math.floor((bb.x0 + bb.x1) / 2 / CHUNK), k = s.pathChunks[`${cx},${Y / CHUNK - 1}`];
       if(Math.abs(bb.y0 + over - Y) > 2.5 || Math.abs(bb.y0 + over - Y) < 1e-6 || !(k === "g" || k === "b") || s.pathChunks[`${cx},${Y / CHUNK}`]) continue;
       const P = b.points.map(([x, y]) => [x, Math.round((y + Y - bb.y0 - over) * 1e6) / 1e6]);
       if(!s.buildings.some(o => o !== b && shapesOverlap(P, o.points)) && !s.exhibits.some(e => shapesOverlap(P, e.points))) b.points = P;
     }
-    s.cardBack2 = true;
+    s[flag] = true;
   }
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
   if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
