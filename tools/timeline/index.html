@@ -70,7 +70,11 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .rating{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:6px}
 .rating select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
 .tag{white-space:nowrap;font:500 11px var(--mono);color:var(--dim)}
-.result{margin:0;font-size:14px}
+.report{background:color-mix(in srgb, var(--ink) 6%, var(--panel));border-radius:6px;padding:10px 12px;display:grid;gap:6px}
+.report h3{margin:0;font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.report ul{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-size:14px}
+.report b{font:700 16px/1.2 var(--display)}
+.report button{justify-self:start;font:600 13px var(--body);background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
 .empty{color:var(--dim);font-size:14px;margin:0}
 </style>
 </head>
@@ -166,7 +170,7 @@ const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
 let lit = new Set();
 try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
 const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
-let u = uAt(375e6), sel = null, target = null, result = "";
+let u = uAt(375e6), sel = null, target = null, report = null;   // report: the post-mission overview, {title, lines:[[html]]}
 let rating = 1.5;
 try { const r = parseFloat(localStorage.getItem("ghost-timeline-rating")); if(r >= 0 && r <= 5) rating = r; } catch(e) {}
 const stars = n => `${n}★`;
@@ -225,32 +229,39 @@ function renderCard(){
     <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${s.fauna.map(a => { const g = genome[a.name] || 0;
       const locked = rating < a.stars;
       return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}</tbody></table>
-    ${result ? `<p class="result">${esc(result)}</p>` : ""}
+    ${report ? `<div class="report" role="status"><h3>${esc(report.title)}</h3><ul>${report.lines.map(l => `<li>${l}</li>`).join("")}</ul><button id="done">Done</button></div>` : ""}
     <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
   : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>
     <div class="btns"><button id="survey">Send scouting trip</button></div>`;
 }
 
-function pick(id){ if(id !== sel){ target = null; result = ""; } sel = id; render(); }
+function pick(id){ if(id !== sel){ target = null; report = null; } sel = id; render(); }
 $("map").addEventListener("click", ev => { const g = ev.target.closest(".site"); if(g) pick(g.dataset.id); });
 $("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
 $("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
-$("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; result = ""; renderCard(); } });
+$("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; renderCard(); } });
 $("card").addEventListener("click", ev => {
-  if(ev.target.id === "survey"){ lit.add(sel); saveLit(); render(); }
+  // Scouting always succeeds. An animal no other scouted site has is discovered here.
+  if(ev.target.id === "survey"){
+    const s = SITES.find(x => x.id === sel), known = new Set(SITES.filter(x => lit.has(x.id)).flatMap(x => x.fauna.map(a => a.name)));
+    lit.add(sel); saveLit();
+    report = {title:`Scouting report · ${s.name}`, lines:s.fauna.map(a => known.has(a.name) ? `${esc(a.name)}, already known from another site` : `<b>${esc(a.name)} Discovered</b>`)};
+    render();
+  }
+  if(ev.target.id === "done"){ report = null; renderCard(); }
   if(ev.target.id === "go"){
     const s = SITES.find(x => x.id === sel), a = s.fauna.find(x => x.name === target);
     if(Math.random() < success(s, a)){
       const was = genome[a.name] || 0, now = Math.min(100, Math.round(was + findGain(s, a)));
       genome[a.name] = now;
-      result = !was ? `${a.name} Discovered.` : now >= 100 ? `${a.name} genome complete.` : `GHOST brought back more ${a.name} DNA.`;
+      report = {title:`Expedition report · ${s.name}`, lines:[now >= 100 ? `<b>${esc(a.name)} genome complete</b>` : `Brought back ${esc(a.name)} DNA. Genome ${was}% → ${now}%.`]};
       if(now >= 100) target = null;
     }
-    else result = `GHOST came back from the ${s.name} empty-handed.`;
+    else report = {title:`Expedition report · ${s.name}`, lines:[`Came back empty-handed. No ${esc(a.name)} DNA this time.`]};
     renderCard();
   }
-  if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); render(); }
+  if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); report = null; render(); }
 });
 
 // Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
