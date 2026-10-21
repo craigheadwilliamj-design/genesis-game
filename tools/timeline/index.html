@@ -133,6 +133,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
   <section id="card" aria-live="polite"></section>
   <section id="fleet" aria-label="GHOST drones"></section>
   <section id="oracle" aria-label="ORACLE upgrades"></section>
+  <p class="note">Maps drafted from the PALEOMAP PaleoDEMs: Scotese, C.R. and Wright, N. (2018), CC BY 4.0.</p>
 </main>
 
 <script>
@@ -159,8 +160,15 @@ PERIODS.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
   EPOCHS.push({name, from, to:next, period:p, pi:i, ej:j});
 }));
 
-// Maps by period, 130 x 65 px. Sites put their dot on a map by pixel.
-const MAPS = {Devonian:"maps/devonian.png"};
+// Maps, 130 x 65 px: one a period, with epoch overrides where the world changes a lot within it. Drafted by
+// genmaps.py from the PALEOMAP PaleoDEMs; the Devonian is hand-drawn. Sites put their dot on a map by pixel.
+const MAPS = {
+  Cambrian:"cambrian", Ordovician:"ordovician", Silurian:"silurian", Devonian:"devonian-hand", Carboniferous:"carboniferous",
+  Permian:"permian", Triassic:"triassic", Jurassic:"jurassic", "Early Jurassic":"jurassic-early", "Late Jurassic":"jurassic-late",
+  "Early Cretaceous":"cretaceous-early", "Late Cretaceous":"cretaceous-late", Paleogene:"paleogene", Neogene:"neogene",
+  Pleistocene:"pleistocene", Holocene:"holocene",
+};
+const mapOf = e => { const m = MAPS[e.name] || MAPS[e.period.id]; return m && `maps/${m}.png`; };
 const SITES = [
   {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{Devonian:[57, 39]}, fauna:[{name:"Tiktaalik", space:10, stars:.5}], trip:3500, days:1.5, risk:.10},
   {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{Devonian:[63, 43]}, fauna:[{name:"Ichthyostega", space:8, stars:.5}], trip:3500, days:1.5, risk:.10},
@@ -268,7 +276,7 @@ function render(){
   tr.setAttribute("aria-valuenow", Math.round(u * 1000));
   tr.setAttribute("aria-valuetext", `${e.name}, ${fmtYearsAgo(now.years)}`);
 
-  const map = MAPS[p.id], sites = visibleSites(now);
+  const map = mapOf(e), sites = visibleSites(now);
   let svg = map ? `<image href="${map}" x="0" y="0" width="130" height="65"/>`
     : `<ellipse cx="65" cy="32.5" rx="64" ry="31.5" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="65" y="34">No ${esc(p.id)} map yet</text>`;
   if(map) for(const s of sites){
