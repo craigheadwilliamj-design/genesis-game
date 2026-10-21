@@ -41,7 +41,7 @@ MAPS = {
     "cambrian": (510, 0, None),
     "ordovician": (450, 0, south(-65)),
     "silurian": (430, 0, None),
-    "devonian-draft": (375, 0, None),
+    "devonian": (375, 0, None),
     "carboniferous": (310, 0, south(-50)),
     "permian": (270, 0, south(-75)),
     "triassic": (220, 0, None),
@@ -49,7 +49,7 @@ MAPS = {
     "jurassic": (170, 0, None),
     "jurassic-late": (150, 0, None),
     "cretaceous-early": (125, 0, None),
-    "cretaceous-late": (70, 0, None),
+    "cretaceous-late": (75, 0, None),
     "paleogene": (50, 0, None),
     "neogene": (15, 0, south(-65)),
     "pleistocene": (0, -120, lgm),
@@ -93,7 +93,8 @@ def build(name, age, sea, ice, mask, folder):
             zs = np.array(zs)
             nl, ns = (zs > sea).sum(), ((zs > sea - 200) & (zs <= sea)).sum()
             nd = len(zs) - nl - ns
-            kind[px, py] = "land" if nl >= max(ns, nd) else "shallow" if ns >= nd else "deep"
+            # land needs a majority of the samples, so narrow seaways (the Western Interior Seaway) stay open
+            kind[px, py] = "land" if nl > len(zs) / 2 else "shallow" if ns >= nd or ns + nl > len(zs) / 2 else "deep"
             elev[px, py] = float(zs[zs > sea].mean()) if nl else 0
             where[px, py] = (float(np.mean([a for a, b in ll])), ll[len(ll) // 2][1])
     # distance from the sea, in pixels, for deserts
