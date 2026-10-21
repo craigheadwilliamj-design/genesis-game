@@ -315,11 +315,11 @@ function finishBatch(b){
   const c = state.ceres;
   if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
   else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); events.toast("CERES finished a batch of Paleoflora food.", "good"); }
-  else { const g = MED_GOOD[b.era]; cerMeds()[g] = (cerMeds()[g] || 0) + growInfo("med", b.era).doses; if(cerMedTotal() > medCap()) cerMeds()[g] -= cerMedTotal() - medCap(); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
+  else { const g = MED_GOOD[b.era]; cerMeds()[g] = Math.min(medCap(), (cerMeds()[g] || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingFood = () => growing("food") * CERES_GROW.food.amount;
-const pendingDoses = () => state.ceres.beds.filter(b => b.kind === "med").reduce((s, b) => s + growInfo("med", b.era).doses, 0);
+const pendingDoses = era => state.ceres.beds.filter(b => b.kind === "med" && b.era === era).reduce((s, b) => s + growInfo("med", b.era).doses, 0);
 
 /* ---------- time passing ---------- */
 
@@ -379,8 +379,10 @@ function scienceTick(dtMin){
   // CERES keeps medicine stocked for the types set to "keep stocked"
   if(beds() && freeBay("botanist") >= 0){
     if(c.auto.food && c.stock + pendingFood() + CERES_GROW.food.amount <= ceresCap() && growBatch("food")) return;
-    for(const era of Object.keys(c.auto)){
-      if(era === "food" || !c.auto[era] || cerMedTotal() + pendingDoses() + growInfo("med", era).doses > medCap()) continue;
+    // each era's medicine has its own room, and the one running lowest goes first
+    const low = era => (cerMeds()[MED_GOOD[era]] || 0) + pmcStock(MED_GOOD[era]) + pendingDoses(era);
+    for(const era of Object.keys(c.auto).filter(k => k !== "food" && c.auto[k]).sort((x, y) => low(x) - low(y))){
+      if((cerMeds()[MED_GOOD[era]] || 0) + pendingDoses(era) + growInfo("med", era).doses > medCap()) continue;
       if(growBatch("med", era)) break;
     }
   }

@@ -1250,7 +1250,7 @@ const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "di
                      "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
 // CERES grows medicine in batches (see CERES_GROW) once ORACLE has unlocked its type
 const MEDICINE = {
-  capacity:60,         // doses CERES holds
+  capacity:60,         // doses CERES holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
   feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
