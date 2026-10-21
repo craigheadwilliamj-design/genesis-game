@@ -527,7 +527,8 @@ function healthHtml(e){
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
-    h += `<div class="meta">${e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : ""}Medicated feed cuts illness by ${Math.round((1 - MEDICINE.feedCut) * 100)}% and clears up mild cases without a vet${treatable < e.animals.length ? `, but only for animals whose era's medicine ORACLE has researched (${treatable} of ${e.animals.length} here)` : ""}.</div>`;
+    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at ORACLE.` : "");
+    if(note) h += `<div class="meta">${note.trim()}</div>`;
   }
   return h + `</section>`;
 }
