@@ -162,6 +162,10 @@ const DRONES = [
 let drones = 0;   // Marks researched
 try { const d = parseInt(localStorage.getItem("ghost-timeline-drones")); if(d >= 0 && d <= DRONES.length) drones = d; } catch(e) {}
 const droneCut = () => drones ? DRONES[drones - 1].cut : 0;
+// Scouting can fail: each animal not yet seen at the site has its own chance to turn up (big animals are easier to spot),
+// drones cut the miss chance like they do for expeditions, and one trip turns up at most SCOUT.max of them.
+const SCOUT = {find:[.35, .65], max:2};
+const scoutChance = a => 1 - (1 - lerpT(SCOUT.find, sizeT(a.space))) * (1 - droneCut());
 const success = (s, a) => 1 - Math.min(Math.max(lerpT(TRIP.fail, sizeT(a.space)) + s.risk, 0), .8) * (1 - droneCut());
 // Genome % a successful find adds, as tripOdds: a genome takes 2 to 8 trips by size.
 const findGain = (s, a) => 100 / Math.max(.6, lerpT(TRIP.trips, sizeT(a.space)) * success(s, a) - .5) * (1 - TRIP.spread + Math.random() * 2 * TRIP.spread);
@@ -189,9 +193,13 @@ const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
 
 // A site shows for the whole of any epoch its window touches.
 // Which sites GHOST has scouted is per viewer, a test convenience only.
-let lit = new Set();
-try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
-const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
+// seen: site id -> the animals scouting has turned up there. A site is lit once it has been scouted at all.
+let seen = {};
+try { seen = JSON.parse(localStorage.getItem("ghost-timeline-seen") || "{}") || {}; } catch(e) {}
+const saveSeen = () => { try { localStorage.setItem("ghost-timeline-seen", JSON.stringify(seen)); } catch(e) {} };
+const isLit = id => !!seen[id];
+const seenAt = s => s.fauna.filter(a => seen[s.id] && seen[s.id].includes(a.name));
+const known = name => Object.values(seen).some(l => l.includes(name));
 let u = uAt(375e6), sel = null, target = null, report = null;   // report: the post-mission overview, {title, lines:[[html]]}
 let rating = 1.5;
 try { const r = parseFloat(localStorage.getItem("ghost-timeline-rating")); if(r >= 0 && r <= 5) rating = r; } catch(e) {}
@@ -226,7 +234,7 @@ function render(){
   let svg = map ? `<image href="${map}" x="0" y="0" width="130" height="65"/>`
     : `<ellipse cx="65" cy="32.5" rx="64" ry="31.5" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="65" y="34">No ${esc(p.id)} map yet</text>`;
   if(map) for(const s of sites){
-    const [x, y] = s.at[p.id], on = lit.has(s.id);
+    const [x, y] = s.at[p.id], on = isLit(s.id);
     svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unscouted site")}">
       <rect class="ring" x="${x - 2.5}" y="${y - 2.5}" width="5" height="5"/>
       <rect x="${x - 1}" y="${y - 1}" width="3" height="3" fill="var(--marker)"/>
@@ -237,22 +245,22 @@ function render(){
   $("cap").textContent = !map ? `Only the Devonian has a map so far.` : sites.length ? `${sites.length} site${sites.length > 1 ? "s" : ""} in this epoch. Tap one.` : "No known sites in this epoch.";
 
   if(sel && !sites.some(s => s.id === sel)) sel = null;
-  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${lit.has(s.id) ? "lit" : ""}"></i>${esc(lit.has(s.id) ? s.name : "Unscouted site, " + fmtMa(s.from) + " Ma")}</button></li>`).join("");
+  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${isLit(s.id) ? "lit" : ""}"></i>${esc(isLit(s.id) ? s.name : "Unscouted site, " + fmtMa(s.from) + " Ma")}</button></li>`).join("");
   renderCard();
 }
 
 function renderCard(){
   const s = SITES.find(x => x.id === sel), c = $("card");
   if(!s){ c.innerHTML = `<p class="empty">Pick a site on the map to see what's there.</p>`; return; }
-  const on = lit.has(s.id), win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
+  const on = isLit(s.id), found = on ? seenAt(s) : [], hidden = s.fauna.length - found.length, win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
   const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`;
   c.innerHTML = on ? `<h2>${esc(s.name)}</h2><div class="where">${esc(s.where)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Trip</dt><dd>${trip}</dd></dl>
-    <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${s.fauna.map(a => { const g = genome[a.name] || 0;
+    <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${found.map(a => { const g = genome[a.name] || 0;
       const locked = rating < a.stars;
-      return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}</tbody></table>
+      return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}${Array.from({length:hidden}, () => `<tr class="locked"><td>Undiscovered species</td><td>?</td><td>?</td></tr>`).join("")}</tbody></table>
     ${report ? `<div class="report" role="status"><h3>${esc(report.title)}</h3><ul>${report.lines.map(l => `<li>${l}</li>`).join("")}</ul><button id="done">Done</button></div>` : ""}
-    <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
+    <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button>${hidden ? `<button class="ghost" id="survey">Send scouting trip</button>` : ""}<button class="ghost" id="forget">Forget scouting</button></div>`
   : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>
     <div class="btns"><button id="survey">Send scouting trip</button></div>`;
@@ -264,11 +272,13 @@ $("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"
 $("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
 $("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; renderCard(); } });
 $("card").addEventListener("click", ev => {
-  // Scouting always succeeds. An animal no other scouted site has is discovered here.
+  // A scouting trip turns up some of the animals still unseen here; one no scouted site had before is discovered.
   if(ev.target.id === "survey"){
-    const s = SITES.find(x => x.id === sel), known = new Set(SITES.filter(x => lit.has(x.id)).flatMap(x => x.fauna.map(a => a.name)));
-    lit.add(sel); saveLit();
-    report = {title:`Scouting report · ${s.name}`, lines:s.fauna.map(a => known.has(a.name) ? `${esc(a.name)}, already known from another site` : `<b>${esc(a.name)} Discovered</b>`)};
+    const s = SITES.find(x => x.id === sel), have = seenAt(s);
+    const hits = s.fauna.filter(a => !have.includes(a) && Math.random() < scoutChance(a)).sort(() => Math.random() - .5).slice(0, SCOUT.max);
+    const lines = hits.map(a => known(a.name) ? `${esc(a.name)} also found here` : `<b>${esc(a.name)} Discovered</b>`);
+    seen[s.id] = [...(seen[s.id] || []), ...hits.map(a => a.name)]; saveSeen();
+    report = {title:`Scouting report · ${s.name}`, lines:lines.length ? lines : ["Came back empty handed"]};
     render();
   }
   if(ev.target.id === "done"){ report = null; renderCard(); }
@@ -283,7 +293,7 @@ $("card").addEventListener("click", ev => {
     else report = {title:`Expedition report · ${s.name}`, lines:["Came back empty handed"]};
     renderCard();
   }
-  if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); report = null; render(); }
+  if(ev.target.id === "forget"){ delete seen[sel]; target = null; saveSeen(); report = null; render(); }
 });
 
 // Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
@@ -305,7 +315,7 @@ $("rating").addEventListener("change", ev => { rating = parseFloat(ev.target.val
   const s = SITES.find(x => x.id === sel), a = s && s.fauna.find(x => x.name === target); if(a && rating < a.stars) target = null; renderCard(); });
 // ORACLE: survey drone upgrades, each needing the Mark before it. Research is instant here.
 function renderOracle(){
-  $("oracle").innerHTML = `<h2>ORACLE · Survey Drones</h2><p>Each Mark cuts the chance an expedition comes back empty handed. Scouting always succeeds.</p>
+  $("oracle").innerHTML = `<h2>ORACLE · Survey Drones</h2><p>Each Mark cuts the chance a scouting trip or an expedition comes back empty handed.</p>
     <ul class="drones">${DRONES.map((d, i) => `<li class="${i < drones ? "done" : ""}"><b>${d.name}</b><span>${Math.round(d.cut * 100)}% fewer empty-handed trips · ${d.points} research points</span>
       <button data-mark="${i + 1}"${i !== drones ? " disabled" : ""}>${i < drones ? "Researched" : i === drones ? "Research" : `Needs Mark ${["I", "II", "III", "IV"][i - 1]}`}</button></li>`).join("")}</ul>
     ${drones ? `<div class="btns"><button class="ghost" id="dronesReset">Reset drones (test)</button></div>` : ""}`;
