@@ -87,6 +87,24 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .report b{font:700 16px/1.2 var(--display)}
 .report button{justify-self:start;font:600 13px var(--body);background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
 .empty{color:var(--dim);font-size:14px;margin:0}
+#fleet{display:grid;gap:8px}
+#fleet .head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px}
+#fleet h2{font:700 18px/1.15 var(--display);margin:0}
+#fleet h2 .count{font:500 14px var(--mono);color:var(--dim);margin-left:6px;font-variant-numeric:tabular-nums}
+#fleet .clock{display:flex;align-items:center;gap:8px;font:500 13px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+#fleet select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
+.ships{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.ships li{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:grid;gap:3px;font-size:13px;min-width:0}
+.ships .top{display:flex;justify-content:space-between;gap:8px}
+.ships b{font-size:14px;font-weight:600}
+.ships .mk{font:500 11px var(--mono);color:var(--dim)}
+.ships .st{color:var(--dim)}
+.ships .bar2{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.ships .bar2 i{display:block;height:100%;background:var(--accent)}
+.ships .eta{font:500 12px var(--mono);font-variant-numeric:tabular-nums}
+.ships li.free .st{color:var(--ink)}
+#reports{display:grid;gap:6px}
+.note{color:var(--dim);font-size:13px;margin:0}
 </style>
 </head>
 <body>
@@ -113,6 +131,7 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 
   <ul id="list" aria-label="Sites in view"></ul>
   <section id="card" aria-live="polite"></section>
+  <section id="fleet" aria-label="GHOST drones"></section>
   <section id="oracle" aria-label="ORACLE upgrades"></section>
 </main>
 
@@ -202,11 +221,24 @@ const isLit = id => !!seen[id];
 const seenAt = s => s.fauna.filter(a => seen[s.id] && seen[s.id].includes(a.name));
 const complete = s => isLit(s.id) && seenAt(s).length === s.fauna.length;
 const known = name => Object.values(seen).some(l => l.includes(name));
-let u = uAt(375e6), sel = null, target = null, report = null;   // report: the post-mission overview, {title, lines:[[html]]}
+let u = uAt(375e6), sel = null, target = null;
+
+// The drone fleet. GHOST owns 1 to MAX_DRONES drones, all of the park's current Mk.; each flies one mission at a time.
+// Missions run on a park clock in days (a game day is 240 s at 1x). A mission resolves when it gets back, and its
+// post-mission overview waits in reports until it's dismissed.
+const MAX_DRONES = 5, DAY_SECONDS = 240;
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch(e) { return d; } };
+const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
+let fleet = Math.min(Math.max(load("ghost-timeline-fleet", 1), 1), MAX_DRONES);
+let day = load("ghost-timeline-day", 1), speed = load("ghost-timeline-speed", 10);
+let missions = load("ghost-timeline-missions", []), reports = load("ghost-timeline-reports", []);
+const saveFleet = () => { keep("ghost-timeline-fleet", fleet); keep("ghost-timeline-missions", missions); keep("ghost-timeline-reports", reports); keep("ghost-timeline-day", day); };
+const freeDrone = () => { for(let i = 0; i < fleet; i++) if(!missions.some(m => m.drone === i)) return i; return -1; };
+const siteEpoch = s => EPOCHS.find(e => s.from <= e.from && s.from > e.to);
 let rating = 1.5;
 try { const r = parseFloat(localStorage.getItem("ghost-timeline-rating")); if(r >= 0 && r <= 5) rating = r; } catch(e) {}
 const stars = n => `${n}★`;
-const genome = {};   // animal name -> % of its genome GHOST has, in memory only
+const genome = load("ghost-timeline-genome", {});   // animal name -> % of its genome GHOST has
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
@@ -254,49 +286,70 @@ function renderCard(){
   const s = SITES.find(x => x.id === sel), c = $("card");
   if(!s){ c.innerHTML = `<p class="empty">Pick a site on the map to see what's there.</p>`; return; }
   const on = isLit(s.id), found = on ? seenAt(s) : [], hidden = s.fauna.length - found.length, win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
-  const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`;
+  const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`, free = freeDrone(), rep = reports.find(r => r.site === s.id);
+  const scouting = missions.some(m => m.site === s.id && m.kind === "scout"), hunting = target && missions.some(m => m.site === s.id && m.target === target);
   c.innerHTML = on ? `<h2>${esc(s.name)}${!hidden ? ' <span class="badge">Site Complete</span>' : ""}</h2><div class="where">${esc(s.where)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Trip</dt><dd>${trip}</dd></dl>
     <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${found.map(a => { const g = genome[a.name] || 0;
       const locked = rating < a.stars;
       return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}${Array.from({length:hidden}, () => `<tr class="locked"><td>Undiscovered species</td><td>?</td><td>?</td></tr>`).join("")}</tbody></table>
-    ${report ? `<div class="report" role="status"><h3>${esc(report.title)}</h3><ul>${report.lines.map(l => `<li>${l}</li>`).join("")}</ul><button id="done">Done</button></div>` : ""}
-    <div class="btns"><button id="go"${target ? "" : " disabled"}>Send expedition</button>${hidden ? `<button class="ghost" id="survey">Send scouting trip</button>` : ""}<button class="ghost" id="forget">Forget scouting</button></div>`
+    ${rep ? reportHtml(rep) : ""}
+    <div class="btns"><button id="go"${target && free >= 0 && !hunting ? "" : " disabled"}>${hunting ? "Already looking" : "Send expedition"}</button>${hidden ? `<button class="ghost" id="survey"${free >= 0 && !scouting ? "" : " disabled"}>${scouting ? "Scouting…" : "Send scouting trip"}</button>` : ""}<button class="ghost" id="forget">Forget scouting</button></div>
+    ${free < 0 ? `<p class="note">All drones are out. One will be back in ${eta(Math.min(...missions.map(m => m.end)))}.</p>` : ""}`
   : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>
-    <div class="btns"><button id="survey">Send scouting trip</button></div>`;
+    ${rep ? reportHtml(rep) : ""}
+    <div class="btns"><button id="survey"${free >= 0 && !scouting ? "" : " disabled"}>${scouting ? "Scouting…" : "Send scouting trip"}</button></div>
+    ${free < 0 ? `<p class="note">All drones are out. One will be back in ${eta(Math.min(...missions.map(m => m.end)))}.</p>` : ""}`;
 }
 
-function pick(id){ if(id !== sel){ target = null; report = null; } sel = id; render(); }
+function pick(id){ if(id !== sel) target = null; sel = id; render(); }
 $("map").addEventListener("click", ev => { const g = ev.target.closest(".site"); if(g) pick(g.dataset.id); });
 $("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
 $("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
 $("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; renderCard(); } });
 $("card").addEventListener("click", ev => {
+  if(ev.target.id === "survey") send("scout", null);
+  if(ev.target.id === "go") send("expedition", target);
+  if(ev.target.classList.contains("dismiss")) dismiss(+ev.target.dataset.r);
+  if(ev.target.id === "forget"){ delete seen[sel]; target = null; saveSeen(); render(); }
+});
+
+function send(kind, tgt){
+  const s = SITES.find(x => x.id === sel), d = freeDrone();
+  if(d < 0) return;
+  missions.push({drone:d, site:s.id, kind, target:tgt, start:day, end:day + s.days});
+  saveFleet(); render(); renderFleet();
+}
+function dismiss(id){ reports = reports.filter(r => r.id !== id); saveFleet(); renderCard(); renderFleet(); }
+function reportHtml(r){
+  return `<div class="report" role="status"><h3>${esc(r.title)}</h3><ul>${r.lines.map(l => `<li>${l}</li>`).join("")}</ul><button class="dismiss" data-r="${r.id}">Done</button></div>`;
+}
+
+// A mission resolves when its drone gets back.
+function land(m){
+  const s = SITES.find(x => x.id === m.site), who = `Drone ${m.drone + 1}`;
+  let title, lines;
   // A scouting trip turns up some of the animals still unseen here; one no scouted site had before is discovered.
-  if(ev.target.id === "survey"){
-    const s = SITES.find(x => x.id === sel), have = seenAt(s);
+  if(m.kind === "scout"){
+    const have = seenAt(s);
     const hits = s.fauna.filter(a => !have.includes(a) && Math.random() < scoutChance(a)).sort(() => Math.random() - .5).slice(0, SCOUT.max);
-    const lines = hits.map(a => known(a.name) ? `${esc(a.name)} also found here` : `<b>${esc(a.name)} Discovered</b>`);
+    lines = hits.map(a => known(a.name) ? `${esc(a.name)} also found here` : `<b>${esc(a.name)} Discovered</b>`);
     seen[s.id] = [...(seen[s.id] || []), ...hits.map(a => a.name)]; saveSeen();
     if(hits.length && complete(s)) lines.push("<b>Site Complete</b>");
-    report = {title:`Scouting report · ${s.name}`, lines:lines.length ? lines : ["Came back empty handed"]};
-    render();
-  }
-  if(ev.target.id === "done"){ report = null; renderCard(); }
-  if(ev.target.id === "go"){
-    const s = SITES.find(x => x.id === sel), a = s.fauna.find(x => x.name === target);
+    title = `Scouting report · ${s.name} · ${who}`;
+  } else {
+    const a = s.fauna.find(x => x.name === m.target);
+    title = `Expedition report · ${s.name} · ${who}`;
     if(Math.random() < success(s, a)){
       const was = genome[a.name] || 0, now = Math.min(100, Math.round(was + findGain(s, a)));
-      genome[a.name] = now;
-      report = {title:`Expedition report · ${s.name}`, lines:[`<b>${esc(a.name)} Sample Found</b>`, ...(now >= 100 ? [`<b>${esc(a.name)} Genome Complete</b>`] : [])]};
-      if(now >= 100) target = null;
+      genome[a.name] = now; keep("ghost-timeline-genome", genome);
+      lines = [`<b>${esc(a.name)} Sample Found</b>`, ...(now >= 100 ? [`<b>${esc(a.name)} Genome Complete</b>`] : [])];
+      if(now >= 100 && target === a.name) target = null;
     }
-    else report = {title:`Expedition report · ${s.name}`, lines:["Came back empty handed"]};
-    renderCard();
   }
-  if(ev.target.id === "forget"){ delete seen[sel]; target = null; saveSeen(); report = null; render(); }
-});
+  reports.unshift({id:Math.max(0, ...reports.map(r => r.id)) + 1, site:s.id, title, lines:lines && lines.length ? lines : ["Came back empty handed"]});
+}
 
 // Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
 const tr = $("track");
@@ -328,7 +381,49 @@ $("oracle").addEventListener("click", ev => {
   try { localStorage.setItem("ghost-timeline-mk", drones); } catch(e) {}
   renderOracle(); renderCard();
 });
-buildTrack(); render(); renderOracle();
+// Time left on the park clock: days, or clock hours under a day (a park day is 17 clock hours, 6 AM to 11 PM).
+function eta(end){
+  const d = Math.max(0, end - day);
+  if(d >= 1) return `${+d.toFixed(1)} days`;
+  const h = d * 17;
+  return h >= 1 ? `${Math.round(h)} h` : `${Math.max(1, Math.round(h * 60))} min`;
+}
+function renderFleet(){
+  const mk = DRONES[drones - 1].name.replace("GHOST ", "");
+  const rows = Array.from({length:fleet}, (_, i) => {
+    const m = missions.find(x => x.drone === i);
+    if(!m) return `<li class="free"><div class="top"><b>Drone ${i + 1}</b><span class="mk">${mk}</span></div><div class="st">At GHOST, ready</div></li>`;
+    const s = SITES.find(x => x.id === m.site), pct = Math.min(100, (day - m.start) / (m.end - m.start) * 100);
+    return `<li><div class="top"><b>Drone ${i + 1}</b><span class="mk">${mk}</span></div>
+      <div>${esc(isLit(s.id) ? s.name : "Unscouted site")} · ${esc(siteEpoch(s).name)}</div>
+      <div class="st">${m.kind === "scout" ? "Scouting for animals" : `Looking for ${esc(m.target)}`}</div>
+      <div class="bar2"><i style="width:${pct}%"></i></div><div class="eta">Back in ${eta(m.end)}</div></li>`;
+  }).join("");
+  $("fleet").innerHTML = `<div class="head"><h2>GHOST Drones <span class="count">${fleet} of ${MAX_DRONES}</span></h2>
+      <label class="clock">Day ${Math.floor(day)} · Speed <select id="speed">${[[0, "Paused"], [1, "1×"], [10, "10×"], [60, "60×"]].map(([v, l]) => `<option value="${v}"${v === speed ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
+    <ul class="ships">${rows}</ul>
+    ${fleet < MAX_DRONES ? `<div class="btns"><button class="ghost" id="addDrone">Add a drone (test)</button></div>` : ""}
+    ${reports.length ? `<div id="reports">${reports.map(reportHtml).join("")}</div>` : ""}`;
+}
+$("fleet").addEventListener("change", ev => { if(ev.target.id === "speed"){ speed = +ev.target.value; keep("ghost-timeline-speed", speed); } });
+$("fleet").addEventListener("click", ev => {
+  if(ev.target.id === "addDrone" && fleet < MAX_DRONES){ fleet++; saveFleet(); renderFleet(); renderCard(); }
+  if(ev.target.classList.contains("dismiss")) dismiss(+ev.target.dataset.r);
+});
+
+// The clock. Missions land as their end passes; the drone list redraws a few times a second while anything is out.
+let last = performance.now(), drawn = 0;
+function tick(t){
+  const dt = Math.min(1, (t - last) / 1000); last = t;
+  if(speed){
+    day += dt * speed / DAY_SECONDS;
+    const back = missions.filter(m => m.end <= day).sort((a, b) => a.end - b.end);
+    if(back.length){ missions = missions.filter(m => m.end > day); back.forEach(land); saveFleet(); render(); renderFleet(); }
+    else if(t - drawn > 250 && missions.length){ drawn = t; renderFleet(); keep("ghost-timeline-day", day); }
+  }
+  requestAnimationFrame(tick);
+}
+buildTrack(); render(); renderOracle(); renderFleet(); requestAnimationFrame(tick);
 </script>
 </body>
 </html>
