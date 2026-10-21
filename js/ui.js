@@ -234,8 +234,7 @@ function exhibitHtml(e){
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
-      <div class="meta" style="margin-top:4px">Move or sell them from the Animals tab.</div>
-      <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
+      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
       <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
 
