@@ -11,11 +11,14 @@ const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M
   shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z"};
 // New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
 const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
-  person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantS:["Plant, small", 44, 40, 1, "sprites/plants/{name}.png"],
-  prop:["Prop view (a bin is 14 x 21)", 14, 21, 1, "sprites/bld/{name}-front.png"], bld:["Building view", 80, 80, 1, "sprites/bld/{name}-front.png"], custom:["Any size", 32, 32, 1, "sprites/{name}.png"]};
+  person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantM:["Plant, medium", 64, 58, 1, "sprites/plants/{name}.png"],
+  plantS:["Plant, small", 44, 40, 1, "sprites/plants/{name}.png"], rock:["Rock or boulder shape", 24, 18, 1, "sprites/rocks/{name}.png"],
+  prop:["Prop, one view (a bin is 14 x 21)", 14, 21, 1, "sprites/bld/{name}-{view}.png"], bld:["Building, one view", 80, 80, 1, "sprites/bld/{name}-{view}.png"], custom:["Any size", 32, 32, 1, "sprites/{name}.png"]};
+const PX_VIEWS = ["front", "back", "left", "right"];
+const PX_SKIP_BLD = ["vivS", "vivM", "vivL", "platform", "tramstop", "campground"];   // drawn with what's inside them or from parts, not one picture
 const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
 const px = {path:"", fw:16, fh:16, frames:[], cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
-  pal:"image", ref:"", refCv:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
+  pal:"image", ref:"", refCv:null, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
 
 /* ---------- pixels ---------- */
 const pxBlank = (w, h) => new Uint8ClampedArray(w * h * 4);
@@ -130,13 +133,13 @@ async function pxOpen(path, fresh){
   if(!src) return ui.toast("There's no picture at " + path + ".", "bad");
   try{
     const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
-    pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height)); pxStore("last", path);
+    pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height)); pxStore("last", path); px.guide = pxGuideFor(path);
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
   }catch{ ui.toast("That picture didn't load.", "bad"); }
 }
 function pxNew(path, w, h, n){
-  pxDrop(); px.path = path; px.fw = w; px.fh = h; px.frames = Array.from({length:n}, () => pxBlank(w, h)); px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
+  pxDrop(); px.path = path; px.fw = w; px.fh = h; px.guide = pxGuideFor(path); px.frames = Array.from({length:n}, () => pxBlank(w, h)); px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
   pxFit(); pxChanged();
 }
 
@@ -187,6 +190,11 @@ function pxDraw(){
     for(let y = 1; y < px.fh; y++) ctx.fillRect(0, y * z, W, 1);
   }
   if(px.mirror){ ctx.fillStyle = "rgba(184,145,47,.7)"; ctx.fillRect(W / 2 - 1, 0, 2, H); }
+  if(px.guide != null){   // over the footprint's width for this view, centered, with ticks at its ends
+    const gw = Math.min(px.fw, px.guideW || px.fw), x0 = Math.round((px.fw - gw) / 2) * z, x1 = x0 + Math.round(gw) * z;
+    ctx.fillStyle = "rgba(184,145,47,.9)"; for(let x = x0; x < x1; x += 8) ctx.fillRect(x, px.guide * z - 1, Math.min(5, x1 - x), 2);
+    if(px.guideW){ ctx.fillRect(x0, px.guide * z - 3 * z, 2, 3 * z); ctx.fillRect(x1 - 2, px.guide * z - 3 * z, 2, 3 * z); }
+  }   // the base row: its bottom stands on the footprint's front edge
   if(s){ ctx.setLineDash([4, 3]); ctx.strokeStyle = "#1D2B22"; ctx.lineWidth = 1; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.setLineDash([]); }
   const h = px.hover;
   if(h && pxIn(h[0], h[1]) && px.tool !== "select"){ ctx.strokeStyle = "rgba(29,43,34,.8)"; ctx.lineWidth = 1; const n = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((n - 1) / 2); ctx.strokeRect((h[0] - o) * z + .5, (h[1] - o) * z + .5, n * z - 1, n * z - 1); }
@@ -312,12 +320,59 @@ function pxTry(){
   if(id && (!SPRITES[id] || SPRITES[id].tried)){
     const S = SPRITES[id] || (SPRITES[id] = {ratio:px.fw / px.fh, tried:1}), base = `sprites/${id}.png`;
     if(m[2]){ S[m[2]] = px.frames.length; if(m[2] === "idle") S.ms = Math.round(1000 / px.fps); }
-    if(m[2] && !SPRITE_PACK[base]){ pxTmp.width = px.fw; pxTmp.height = px.fh; pxTmp.getContext("2d").putImageData(new ImageData(px.frames[0].slice(), px.fw, px.fh), 0, 0); spriteUrl.swap(base, pxTmp.toDataURL("image/png")); }
+    if(m[2] && !SPRITE_PACK[base]) spriteUrl.swap(base, pxFirst());
   }
+  pxTryLand(); pxTryBld();
   const u = spriteUrl(px.path);
   document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
   if(typeof render === "function" && state) render();
   ui.toast("It's in the park until you reload. Send it to the repo to keep it.", "good");
+}
+const pxFirst = () => { pxTmp.width = px.fw; pxTmp.height = px.fh; pxTmp.getContext("2d").putImageData(new ImageData(px.frames[0].slice(), px.fw, px.fh), 0, 0); return pxTmp.toDataURL("image/png"); };
+// A plant's picture sets its ratio (a new one gets a stand-in PLANT_SPRITES entry); a rock shape is that biome's nth picture for its type
+function pxTryLand(){
+  const pl = px.path.match(/^sprites\/plants\/([a-z0-9-]+)\.png$/), rk = px.path.match(/^sprites\/rocks\/([a-z]+)-([a-z]+)-(\d+)\.png$/);
+  if(pl || rk){ const n = px.path.slice(px.path.lastIndexOf("/") + 1, -4), hit = pxHit(); if(hit){ SPRITE_HIT[n] = hit; hitBands.delete(n); } }   // the tap shape, until spritehit.py measures it for good
+  if(pl && LAND[pl[1]] && LAND[pl[1]].flora){ const S = PLANT_SPRITES[pl[1]] || (PLANT_SPRITES[pl[1]] = {size:1, tried:1}); S.ratio = px.fw / px.fh; }
+  if(rk && LAND[rk[1]] && BIOMES[rk[2]]){ const B = ROCK_SPRITES[rk[2]] || (ROCK_SPRITES[rk[2]] = {}), l = B[rk[1]] || (B[rk[1]] = []), i = +rk[3] - 1; if(i >= 0 && i <= l.length) l[i] = [px.fw, px.fh]; }
+}
+// The picture's SPRITE_HIT entry, measured like tools/spritehit.py: [width, height, base half-width, whole half-width, 4 px silhouette bands]
+function pxHit(){
+  const f = px.frames[0], w = px.fw, h = px.fh, rows = [];
+  for(let y = 0; y < h; y++){ const r = []; for(let x = 0; x < w; x++) if(f[pxAt(x, y) + 3] > 20) r.push(x); rows.push(r); }
+  const ys = rows.map((r, y) => r.length ? y : -1).filter(y => y >= 0); if(!ys.length) return null;
+  const y0 = ys[0], y1 = ys[ys.length - 1] + 1, xs = rows.flat(), base = rows.slice(Math.max(y0, y1 - Math.max(2, Math.floor((y1 - y0) / 4))), y1).flat(), bands = [];
+  for(let by = 0; by < h; by += 4){ const bx = rows.slice(by, by + 4).flat(); bands.push(bx.length ? `${Math.min(...bx)}-${Math.max(...bx)}` : ""); }
+  while(bands.length && !bands[bands.length - 1]) bands.pop();
+  return [w, h, (Math.max(...base) - Math.min(...base) + 1) / 2, (Math.max(...xs) - Math.min(...xs) + 1) / 2, bands.join(",")];
+}
+// A building's view: a stand-in BLD_PICS entry for a type with no pictures, growing a view list as views are tried; a prop
+// borrows this view for the ones not drawn yet (and its broken state), since its drawing has no fallback. Genesis theme only, like the real ones.
+function pxTryBld(){
+  const m = px.path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)(?:-(\d+|broken))?\.png$/), t = m && BUILDINGS[m[1]]; if(!t || PX_SKIP_BLD.includes(m[1])) return;
+  const k = m[1], v = m[2];
+  if(m[3] === "broken"){ if(PROP_PICS[k] && PROP_PICS[k].fake) PROP_PICS[k].fake = PROP_PICS[k].fake.filter(x => x !== px.path); return; }   // a drawn broken picture stops being stood in for
+  if(t.prop){
+    if(PROP_PICS[k] && !PROP_PICS[k].tried) return;
+    const P = PROP_PICS[k] || (PROP_PICS[k] = {tried:1}), png = pxFirst(); P[v] = [px.fw, px.fh, .5]; (P.drawn = P.drawn || []).includes(v) || P.drawn.push(v);
+    P.fake = P.fake || [];
+    for(const w of PX_VIEWS){
+      if(!P.drawn.includes(w)){ P[w] = [px.fw, px.fh, .5]; spriteUrl.swap(`sprites/bld/${k}-${w}.png`, png); }
+      const br = `sprites/bld/${k}-${w}-broken.png`; if(!SPRITE_PACK[br] || P.fake.includes(br)){ spriteUrl.swap(br, SPRITE_PACK[`sprites/bld/${k}-${w}.png`]); if(!P.fake.includes(br)) P.fake.push(br); }
+    }
+    return;
+  }
+  if(BLD_PICS[k] && !BLD_PICS[k].tried) return;
+  const B = BLD_PICS[k] || (BLD_PICS[k] = {w:px.fw, h:px.fh, base:px.guide != null ? px.guide : px.fh - 9, views:[], tried:1});
+  B.w = px.fw; B.h = px.fh; if(px.guide != null) B.base = px.guide; if(!B.views.includes(v)) B.views.push(v); if(m[3]) B.frames = Math.max(B.frames || 1, +m[3]);
+  if(!SPRITE_PACK[`sprites/bld/${k}-front.png`]) spriteUrl.swap(`sprites/bld/${k}-front.png`, pxFirst());   // views not drawn yet fall back to the front
+}
+// Where a picture's base stands: a building's base row, a prop's third row from the bottom (two shadow rows under it)
+function pxGuideFor(p){
+  const m = p.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)/), t = m && BUILDINGS[m[1]]; px.guideW = 0; if(!t) return null;
+  px.guideW = (/left|right/.test(m[2]) ? t.d : t.w) / ROCK_MPP;   // sides show the turned footprint
+  if(t.prop) return px.fh - 2;
+  const B = BLD_PICS[m[1]]; return B && !B.tried ? (/left|right/.test(m[2]) ? B.sideBase || B.base : B.base) : B ? B.base : px.fh - 9;
 }
 async function pxDb(){
   if(px.db) return px.db;
@@ -386,6 +441,7 @@ function pxBuild(){
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
         <label class="pxrow"><span>Underneath</span><select id="pxRef"></select></label>
+        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the frame a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
         <div id="pxQueue"></div></section>
@@ -427,7 +483,7 @@ function pxSync(){
   });
   const refs = ["", ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
-  $p("pxRef").value = px.ref;
+  $p("pxRef").value = px.ref; $p("pxGuideNote").hidden = px.guide == null;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -448,24 +504,26 @@ function pxOverlay(kind, opt){
     o.innerHTML = `<div class="pxcard"><h2>New picture</h2>
       <label class="field"><span>What it is</span><select id="pxNt">${Object.entries(PX_TEMPLATES).map(([k, t]) => `<option value="${k}"${k === tpl ? " selected" : ""}>${esc(t[0])}</option>`).join("")}</select></label>
       <label class="field" id="pxNsF"><span>Species</span><select id="pxNs">${pxSpeciesOrder().map(s => `<option value="${s.id}"${s.id === sp ? " selected" : ""}>${esc(s.name)} (${esc(s.period)})${SPRITES[s.id] && !SPRITES[s.id].tried ? ", has art" : ""}</option>`).join("")}</select></label>
-      <label class="field" id="pxNmF"><span>Name</span><input id="pxNm" value="new" autocomplete="off"></label>
+      <label class="field" id="pxNmF"><span>Name</span><input id="pxNm" value="${esc(opt && opt.name || "new")}" autocomplete="off"></label>
+      <label class="field" id="pxNvF"><span>View</span><select id="pxNv">${PX_VIEWS.map(v => `<option${opt && opt.view === v ? " selected" : ""}>${v}</option>`).join("")}</select></label>
       <label class="field"><span>Path in the repo</span><input id="pxNp"></label>
       <div class="pxrow"><label class="field"><span>Width</span><input type="number" id="pxNw" min="1" max="512"></label><label class="field"><span>Height</span><input type="number" id="pxNh" min="1" max="512"></label><label class="field"><span>Frames</span><input type="number" id="pxNn" min="1" max="64"></label></div>
       <label class="pxrow"><input type="checkbox" id="pxNr" checked> Show another animal faintly underneath, for size</label>
       <div class="pxrow"><button class="btn" data-px="cancel">Cancel</button><button class="btn primary" data-px="create">Create</button></div></div>`;
-    pxNewFill(true); return;
+    pxNewFill(true); if(opt && opt.w){ document.getElementById("pxNw").value = opt.w; document.getElementById("pxNh").value = opt.h; } return;
   }
-  const drafts = pxDrafts(), need = pxNeedArt();
+  const drafts = pxDrafts(), cats = {animal:"Animals", plant:"Plants", bld:"Buildings", rock:"Rocks"};
+  if(px.tab === "need") px.tab = "animal";
   o.innerHTML = `<div class="pxcard wide"><div class="pxrow"><h2>Open a picture</h2><span class="pxgrow"></span><button class="btn" data-px="cancel">Cancel</button></div>
-    <div class="pxrow pxtabs"><button class="btn" data-pxtab="all">Pictures</button><button class="btn" data-pxtab="need">Needs art (${need.length} species)</button></div>
-    <input id="pxQ" placeholder="${px.tab === "need" ? "Search, like raptor or Jurassic" : "Search, like dime or bld/restroom"}" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
+    <div class="pxrow pxtabs"><button class="btn" data-pxtab="all">Pictures</button><span class="meta">Needs art:</span>${Object.entries(cats).map(([k, l]) => `<button class="btn" data-pxtab="${k}">${l}${k === "rock" ? "" : ` (${pxNeeds(k).length})`}</button>`).join("")}</div>
+    <input id="pxQ" placeholder="${px.tab === "all" ? "Search, like dime or bld/restroom" : "Search"}" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
   o.querySelectorAll("[data-pxtab]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pxtab === px.tab));
   const q = document.getElementById("pxQ"); q.value = pxStored("q") || ""; q.focus(); q.select();
   const list = () => {
     const t = q.value.trim().toLowerCase(); pxStore("q", t);
-    if(px.tab === "need"){
-      const ss = need.filter(s => !t || s.name.toLowerCase().includes(t) || s.id.includes(t) || s.period.toLowerCase().includes(t));
-      document.getElementById("pxList").innerHTML = ss.map(s => `<button data-newsp="${s.id}"><b>${esc(s.name)}</b><span>${esc(s.period)}${s.viv ? ", vivarium" : ""}</span><span>${LAUNCH_ROSTER.includes(s.id) ? "In the launch roster" : ""}${drafts[`sprites/${s.id}.png`] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">Every species matching that has a picture.</p>`;
+    if(px.tab !== "all"){
+      px.needList = pxNeeds(px.tab).filter(x => !t || (x.label + " " + x.sub).toLowerCase().includes(t));
+      document.getElementById("pxList").innerHTML = px.needList.map((x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">Everything here has a picture.</p>`;
       return;
     }
     const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b)).slice(0, 240);
@@ -473,15 +531,29 @@ function pxOverlay(kind, opt){
   };
   q.oninput = list; list();
 }
+// What still has no picture, as entries for the new-picture form: species (dots), plants, buildings and props (drawn boxes), and one more shape for each biome's rocks
+function pxNeeds(cat){
+  if(cat === "animal") return pxNeedArt().map(s => ({label:s.name, sub:s.period + (s.viv ? ", vivarium" : ""), note:LAUNCH_ROSTER.includes(s.id) ? "In the launch roster" : "", path:`sprites/${s.id}.png`, opt:{tpl:"animal", sp:s.id}}));
+  if(cat === "plant") return Object.keys(LAND).filter(k => LAND[k].flora && (!PLANT_SPRITES[k] || PLANT_SPRITES[k].tried))
+    .map(k => ({label:LAND[k].label, sub:k, note:"", path:`sprites/plants/${k}.png`, opt:{tpl:/small$/.test(k) ? "plantS" : /medium$/.test(k) ? "plantM" : "plant", name:k}}));
+  if(cat === "bld") return Object.entries(BUILDINGS).filter(([k, t]) => !PX_SKIP_BLD.includes(k) && (t.prop ? !PROP_PICS[k] || PROP_PICS[k].tried : !BLD_PICS[k] || BLD_PICS[k].tried)).map(([k, t]) => {
+    const c = Math.ceil(Math.max(t.w, t.d) / ROCK_MPP), w = t.prop ? c + 2 : c + 18 + c % 2, h = t.prop ? Math.round(w * 1.5) : w;
+    return {label:t.label, sub:`${t.w} × ${t.d} m${t.prop ? ", a prop" : ""}`, note:"Four views: front, back, left, right", path:`sprites/bld/${k}-front.png`, opt:{tpl:t.prop ? "prop" : "bld", name:k, view:"front", w, h}};
+  });
+  return Object.keys(BIOMES).flatMap(b => ROCK_TYPES.filter(ty => LAND[ty]).map(ty => {
+    const l = (ROCK_SPRITES[b] || {})[ty] || [], avg = i => l.length ? Math.round(l.reduce((a, d) => a + d[i], 0) / l.length) : ty === "boulder" ? [40, 30][i] : [24, 18][i], n = l.length + 1;
+    return {label:`${LAND[ty].label}, ${BIOMES[b].label}`, sub:`${l.length} shape${l.length === 1 ? "" : "s"} now`, note:"Add another shape", path:`sprites/rocks/${ty}-${b}-${n}.png`, opt:{tpl:"rock", name:`${ty}-${b}-${n}`, w:avg(0), h:avg(1)}};
+  }));
+}
 // Species still drawn as dots: the launch roster first, then by period
 const pxNeedArt = () => pxSpeciesOrder().filter(s => !SPRITES[s.id] || SPRITES[s.id].tried);
 const pxSpeciesOrder = () => SPECIES.slice().sort((a, b) => (!!SPRITES[a.id] && !SPRITES[a.id].tried) - (!!SPRITES[b.id] && !SPRITES[b.id].tried) || !LAUNCH_ROSTER.includes(a.id) - !LAUNCH_ROSTER.includes(b.id));
 // The new-picture form: a template sets the size, frames and path; the size and path can still be typed over
 function pxNewFill(sized){
   const g = id => document.getElementById(id), t = PX_TEMPLATES[g("pxNt").value], animal = t[4].includes("{id}");
-  g("pxNsF").hidden = !animal; g("pxNmF").hidden = animal; g("pxNr").parentElement.hidden = !animal;
-  const name = g("pxNm").value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "new";
-  g("pxNp").value = t[4].replace("{id}", g("pxNs").value).replace("{name}", name);
+  g("pxNsF").hidden = !animal; g("pxNmF").hidden = animal; g("pxNr").parentElement.hidden = !animal; g("pxNvF").hidden = !t[4].includes("{view}");
+  const name = g("pxNm").value.trim().replace(/[^a-zA-Z0-9_-]+/g, "-") || "new";
+  g("pxNp").value = t[4].replace("{id}", g("pxNs").value).replace("{name}", name).replace("{view}", g("pxNv").value);
   if(sized){ g("pxNw").value = t[1]; g("pxNh").value = t[2]; g("pxNn").value = t[3]; }
 }
 // A faint picture under the canvas to match size and feet against (the standing picture of an animal with art)
@@ -499,7 +571,7 @@ function pxClick(e){
   if(b.dataset.openp){ document.getElementById("pxOver").hidden = true; return pxOpen(b.dataset.openp); }
   if(b.dataset.unsend) return pxUnsend(b.dataset.unsend);
   if(b.dataset.pxtab){ px.tab = b.dataset.pxtab; return pxOverlay("open"); }
-  if(b.dataset.newsp){ const p = `sprites/${b.dataset.newsp}.png`; if(pxStored("d:" + p)){ document.getElementById("pxOver").hidden = true; return pxOpen(p); } return pxOverlay("new", {tpl:"animal", sp:b.dataset.newsp}); }
+  if(b.dataset.need){ const x = px.needList[+b.dataset.need]; if(pxStored("d:" + x.path)){ document.getElementById("pxOver").hidden = true; return pxOpen(x.path); } return pxOverlay("new", x.opt); }
   if(b.id === "pxC1"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c1); p.dataset.which = "c1"; return p.click(); }
   if(b.id === "pxC2"){ const p = document.getElementById("pxPick"); p.value = pxHex(px.c2); p.dataset.which = "c2"; return p.click(); }
   const a = b.dataset.px, all = document.getElementById("pxAll")?.checked;
@@ -528,7 +600,7 @@ function pxInput(e){
   else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
   else if(id === "pxNt") pxNewFill(true);
-  else if(id === "pxNs" || id === "pxNm") pxNewFill(false);
+  else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);
   else if(id === "pxRef") pxSetRef(t.value);
   else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
   else if(id === "pxFile" && t.files[0]){ pxImport(t.files[0]); t.value = ""; }

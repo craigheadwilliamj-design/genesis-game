@@ -3678,6 +3678,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const need = pxNeedArt()[0].id; pxNew(`sprites/${need}-walk.png`, 100, 75, 4); pxTry();
     out.pixelNewSpeciesTry = SPRITES[need].tried === 1 && SPRITES[need].walk === 4 && !!SPRITE_PACK[`sprites/${need}.png`] && pxNeedArt().some(x => x.id === need);
     delete SPRITES[need]; delete SPRITE_PACK[`sprites/${need}.png`]; delete SPRITE_PACK[`sprites/${need}-walk.png`]; try{ localStorage.removeItem(`genesis-pixel-d:sprites/${need}-walk.png`); localStorage.removeItem("genesis-pixel-drafts"); }catch{}
+    // plants, buildings, props and rocks: each kind still missing a picture is listed, and Try gives it a stand-in entry with its own picture
+    const nd = ["plant", "bld", "rock"].map(c => pxNeeds(c)), pk = nd[0][0], bk = nd[1].find(x => !BUILDINGS[x.opt.name].prop), rkk = nd[2][0], keep = JSON.stringify([PLANT_SPRITES[pk.opt.name], BLD_PICS[bk.opt.name], ROCK_SPRITES]);
+    const tryOne = x => { pxNew(x.path, x.opt.w || PX_TEMPLATES[x.opt.tpl][1], x.opt.h || PX_TEMPLATES[x.opt.tpl][2], 1); pxPut(pxFrame(), 2, px.fh - 2, [9, 9, 9, 255]); pxTry(); };
+    [pk, bk, rkk].forEach(tryOne);
+    const [rt, rb] = rkk.opt.name.split("-");
+    out.pixelNewLandAndBuildings = nd.every(l => l.length) && PLANT_SPRITES[pk.opt.name].tried === 1 && !!SPRITE_HIT[pk.opt.name] && BLD_PICS[bk.opt.name].tried === 1 && BLD_PICS[bk.opt.name].base === bk.opt.h - 9
+      && ROCK_SPRITES[rb][rt].length === +rkk.opt.name.split("-")[2] && pxGuideFor("sprites/bld/restroom-left.png") === BLD_PICS.restroom.base;
+    delete PLANT_SPRITES[pk.opt.name]; delete BLD_PICS[bk.opt.name]; ROCK_SPRITES[rb][rt].pop(); void keep;
+    [pk, bk, rkk].forEach(x => { try{ localStorage.removeItem("genesis-pixel-d:" + x.path); }catch{} });
     spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
     document.querySelector("#dlgPixel").close();
     return out;
