@@ -1727,7 +1727,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
       out.waterTooMuchHurts = waterFit(wp, wp) === 1 && waterFit(0, wp) === 0 && waterFit(wp * 5, wp) < 1 && waterFit(wp * 5, wp) < waterFit(wp * 1.1, wp); }
     try { const h = landHtml(bx); out.landPanelRenders = /Plant Cover: ?<\/b>|Plant Cover/.test(h) && /Rock Coverage/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
-    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Dirtiness/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
+    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Sanitation/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
     out.fernPrairie = !!BIOMES.fern && ["Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene"].every(p => PLANTS_OF[p].fern && PLANTS_OF[p].fern.length === 3) && ["Devonian", "Carboniferous", "Neogene", "Quaternary"].every(p => !PLANTS_OF[p].fern) && !!document.querySelector('#b-fern') && !!document.querySelector('#p-fern') && !!document.querySelector('#w-fern') && !!WATER_TEX.fern && !!ROCK_SPRITES.fern;
     state.exhibits = keepEx; state.money = keepMoney; render();
@@ -2683,6 +2683,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       select("animal", a1.id); animalLive(true);
       const inp = document.getElementById("aName");
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
+      // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
+      const hl = () => document.getElementById("anHealth").textContent;
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && /chance a day of falling ill/.test(hl());
+      a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
+      out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && !!document.querySelector("#anHealth .meter");
+      a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
+      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl());
+      delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
       out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");
       inp.value = "x".repeat(60); inp.dispatchEvent(new Event("change", {bubbles:true}));

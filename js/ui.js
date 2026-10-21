@@ -483,13 +483,12 @@ function behaviorHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
-// Exhibit dirtiness: the meter and what it means
+// Exhibit sanitation: the dirt meter
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
-  let h = `<section><h3>Dirtiness</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
-    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
+  let h = `<section><h3>Sanitation</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
@@ -514,8 +513,7 @@ function healthHtml(e){
     items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
   }
   if(e.animals.length > hr.sick.length){
-    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating plants it isn't evolved for", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
-    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => why[w]).join(", ")}.` : ""}`));
+    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => RISK_WHY[w] || w).join(", ")}.` : ""}`));
   }
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
