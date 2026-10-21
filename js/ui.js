@@ -518,10 +518,10 @@ function healthHtml(e){
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  // genome therapy: vets lift sickly clones' DNA at each check-up
+  // genome therapy: vets lift clones' DNA at each check-up
   if(e.animals.length && hasTech("genetherapy")){
-    const sickly = e.animals.filter(a => (a.q ?? 90) < GENE.sickly).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${sickly} sickly clone${sickly === 1 ? "" : "s"}</span></div>`;
+    const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} below the lab's quality</span></div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){

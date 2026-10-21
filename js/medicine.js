@@ -98,11 +98,11 @@ function trashNight(out){
 }
 
 /* ---------- genome therapy ---------- */
-// An exhibit with e.geneTherapy on has each vet check-up lift its sickly clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
+// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
 const labQuality = sp => cloneQuality(sp);
 const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
-const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => (a.q ?? 90) < GENE.sickly && !a.darted && geneGain(a) >= GENE.minGain) : [];
+const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && geneGain(a) >= GENE.minGain) : [];
 // Why it can't be switched on, or null
 function geneProblem(){
   if(!hasTech("genetherapy")) return "Research Genome therapy at ORACLE first.";
@@ -112,7 +112,7 @@ function geneProblem(){
 }
 // How long a vet's check-up of an exhibit takes, with the genome therapy it will do
 const checkWork = e => HEALTH.checkMinutes + GENE.minutes * geneTargets(e).length;
-// Done in the check-up: each sickly clone gets a procedure while the money lasts
+// Done in the check-up: each clone the lab can improve gets a procedure while the money lasts
 function geneTherapy(e, who){
   let n = 0, short = false;
   for(const a of geneTargets(e)){
@@ -120,8 +120,8 @@ function geneTherapy(e, who){
     if(!canAfford(cost)){ short = true; break; }
     spend(cost, "medicine"); a.q = (a.q ?? 90) + gain; n++;
   }
-  if(n) events.toast(`${who} gave genome therapy to ${n} sickly clone${n === 1 ? "" : "s"} in ${e.name}.`, "good");
-  if(short) events.toast(`${who} couldn't afford genome therapy for every sickly clone in ${e.name}.`, "bad");
+  if(n) events.toast(`${who} gave genome therapy to ${n} clone${n === 1 ? "" : "s"} in ${e.name}.`, "good");
+  if(short) events.toast(`${who} couldn't afford genome therapy for every clone in ${e.name}.`, "bad");
   return n;
 }
 

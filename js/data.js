@@ -1237,12 +1237,11 @@ const HEALTH = {
   healPerNight:45,     // severity a treated patient recovers each night
   dose:2,              // medicine doses one patient's treatment uses
 };
-// Genome therapy (ORACLE tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each sickly clone's DNA quality toward the lab's genome for its species
+// Genome therapy (ORACLE tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
 const GENE = {
   minutes:10,          // extra time a check-up takes for each animal treated
   step:20,             // most DNA quality points one procedure adds
   minGain:5,           // the lab's genome has to beat the animal by this much to be worth it
-  sickly:70,           // clones under this DNA quality are sickly enough to treat
   base:500,            // fixed price of a procedure
   perPoint:60,         // plus this for each quality point gained
 };
