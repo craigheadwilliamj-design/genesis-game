@@ -1913,6 +1913,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       rot = 2; at(211, 270); placeBuilding({clientX:lastPtr.x, clientY:lastPtr.y});
       const placed = state.buildings[state.buildings.length - 1];
       out.facePlacedSaved = !!placed && placed.type === "restroom" && placed.face === 3 && !state.buildings.some(b => BUILDINGS[b.type].prop && b.face !== undefined);
+      // the door wall lands on the grid, so a cart of any depth stands flush against a path, placed or turned
+      { const onGrid = (pts, f) => { const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][f]; return Math.abs(e - Math.round(e)) < 1e-6; };
+        setTool("kiosk"); const r0 = rot, okPlace = [0, 2, 4, 6].every(r => { rot = r; const g = at(231.4, 270.3); return onGrid(g.pts, g.face); }); rot = r0;
+        const kb = {id:"b-kgrid", type:"kiosk", face:2, day:0, points:rectPts(240, 250, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}; kb.points = doorOnGrid(kb.points, 2); state.buildings.push(kb);
+        setTool("move"); mvSel = kb.id; rotateMoved(); mvSel = null; setTool("select");
+        out.cartDoorOnGrid = okPlace && kb.face === 3 && onGrid(kb.points, kb.face); state.buildings.splice(state.buildings.indexOf(kb), 1); }
       // the door point is the middle of the wall that faces that way
       const sq = rectPts(211, 270, 8, 6, 0), dp = f => doorPoint({points:sq, face:f}).map(v => Math.round(v * 1e6) / 1e6).join();
       out.faceDoorPoint = dp(0) === "211,267" && dp(1) === "215,270" && dp(2) === "211,273" && dp(3) === "207,270";
@@ -3187,7 +3193,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       { const sv = JSON.parse(JSON.stringify(state)), old = rectPts(150, 150, 4, 5, 0); sv.buildings = [{id:"pko", type:"kiosk", face:1, day:0, points:old}];
         upgradeSave(sv); const P = sv.buildings[0].points, b = bbox(P), b0 = bbox(old);
         out.oldKioskShrinks = Math.abs(b.x1 - b0.x1) < 1e-6 && Math.abs((b.x1 - b.x0) - BUILDINGS.kiosk.d) < 1e-6 && Math.abs((b.y1 - b.y0) - BUILDINGS.kiosk.w) < 1e-6 && Math.abs((b.y0 + b.y1) - (b0.y0 + b0.y1)) < 1e-6
-          && JSON.stringify(upgradeSave(JSON.parse(JSON.stringify(sv))).buildings[0].points) === JSON.stringify(P); }
+          && JSON.stringify(upgradeSave(JSON.parse(JSON.stringify(sv))).buildings[0].points) === JSON.stringify(P);
+        // one placed at the new size 0.3 m back from the grid slides onto it
+        const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:0, day:0, points:rectPts(150, 151.6, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
+        upgradeSave(sv2); out.oldKioskShrinks = out.oldKioskShrinks && Math.abs(bbox(sv2.buildings[0].points).y0 - 150) < 1e-6; }
       out.kioskSpriteAnimates = ["front", "back", "left", "right"].every(has) && kv.every(a => /visibility:visible;animation:frame1of2 /.test(a) && /visibility:hidden;animation:frame2of2 /.test(a) && !/opacity/.test(a) && !/NaN/.test(a)); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
