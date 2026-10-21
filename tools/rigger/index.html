@@ -70,8 +70,8 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
  <div id="top">
   <div class="grp"><button id="bRig" class="on">Rig</button><button id="bPose">Pose</button></div>
   <div class="sep"></div>
-  <div class="grp"><button id="bAdd">Add parts…</button><button id="bRef">Reference…</button>
-   <input id="fileParts" type="file" accept="image/*" multiple hidden><input id="fileRef" type="file" accept="image/*" hidden><input id="fileProj" type="file" accept=".json,application/json" hidden><input id="fileSwap" type="file" accept="image/*" hidden></div>
+  <div class="grp"><button id="bAdd">Add parts…</button><button id="bUpd" title="Take the parts from a pixel editor file (Send to rigger): parts with the same name get the new picture and keep their joints and animation; new names are added">Update parts…</button><button id="bRef">Reference…</button>
+   <input id="fileParts" type="file" accept="image/*" multiple hidden><input id="fileRef" type="file" accept="image/*" hidden><input id="fileProj" type="file" accept=".json,application/json" hidden><input id="fileSwap" type="file" accept="image/*" hidden><input id="fileUpd" type="file" accept=".json,application/json" hidden></div>
   <div class="sep"></div>
   <div class="grp"><button id="bUndo">Undo</button><button id="bRedo">Redo</button></div>
   <div class="sep"></div>
@@ -241,6 +241,34 @@ async function swapPicture(n, file){
   if(old && (old.width !== im.width || old.height !== im.height))
     ask('The new picture is ' + im.width + '×' + im.height + ' and the old one was ' + old.width + '×' + old.height + '. The joint stays at the same pixel (' + n.px + ', ' + n.py + '), so check it still sits where the part turns.', {info:true});
 }
+// Parts from a project file, matched by name (the game's pixel editor writes one, a layer a part, every picture a full cell with the part
+// drawn in place). A part with the same name gets the new picture and keeps its joint, parent, place and poses; a full-cell picture is
+// re-anchored so its joint stays at the same spot (no flip: the picture is already as it shows). Other names come in as new parts.
+async function updateParts(o){
+  if(!o || !o.nodes || !o.assets) throw new Error('not a parts file');
+  const key = s => String(s || '').trim().toLowerCase(), m = nodeMap(), byName = {}, done = [], added = [];
+  P.nodes.forEach(n => { if(!byName[key(n.name)]) byName[key(n.name)] = n; });
+  for(const inc of o.nodes){
+    const url = o.assets[inc.asset]; if(!url) continue;
+    const aid = 'a' + (P.seq++), im = await loadAsset(aid, url), n = byName[key(inc.name)];
+    if(n){
+      const full = im.width === P.cell.w && im.height === P.cell.h;
+      if(full){ const [jx, jy] = restPos(n, m); n.px = jx; n.py = jy; n.flip = false; }
+      n.asset = aid; done.push(n.name);
+    } else {
+      const id = 'n' + (P.seq++);
+      P.nodes.push({id, name:inc.name || 'part', asset:aid, px:inc.px ?? Math.round(im.width/2), py:inc.py ?? Math.round(im.height/2), parent:null,
+        lx:inc.lx ?? Math.round(P.cell.w/2), ly:inc.ly ?? Math.round(P.cell.h/2), flip:false, hidden:!!inc.hidden});
+      added.push(inc.name || 'part');
+    }
+  }
+  const left = P.nodes.filter(n => !done.includes(n.name) && !added.includes(n.name)).map(n => n.name);
+  save(true);
+  const cellNote = o.cell && (o.cell.w !== P.cell.w || o.cell.h !== P.cell.h) ? ' The file\'s cell is ' + o.cell.w + '×' + o.cell.h + ' and this project\'s is ' + P.cell.w + '×' + P.cell.h + ', so check the parts line up.' : '';
+  ask((done.length ? 'Updated ' + done.length + ' part' + (done.length === 1 ? '' : 's') + ': ' + done.join(', ') + '.' : 'No part names matched.')
+    + (added.length ? ' Added ' + added.length + ' new: ' + added.join(', ') + '.' : '')
+    + (left.length ? ' Kept as they were: ' + left.join(', ') + '.' : '') + cellNote + ' Undo puts it all back.', {info:true});
+}
 async function setRef(file){
   const aid = 'a' + (P.seq++);
   await loadAsset(aid, await readURL(file));
@@ -294,8 +322,9 @@ function pickAt(wx, wy){
 
 // ---------- view ----------
 const cv = $('#cv'), ctx = cv.getContext('2d');
-const toWorld = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left - view.x)/view.z, (e.clientY - r.top - view.y)/view.z]; };
-function resize(){ const r = cv.getBoundingClientRect(); cv.width = Math.max(1, r.width|0); cv.height = Math.max(1, r.height|0); draw(); }
+// pointer to world: scaled by the canvas's drawn size over its box, so a click lands on what it shows even before a resize catches up
+const toWorld = e => { const r = cv.getBoundingClientRect(), sx = cv.width/(r.width || 1), sy = cv.height/(r.height || 1); return [((e.clientX - r.left)*sx - view.x)/view.z, ((e.clientY - r.top)*sy - view.y)/view.z]; };
+function resize(){ const r = cv.getBoundingClientRect(), w = Math.max(1, r.width|0), h = Math.max(1, r.height|0); if(w === cv.width && h === cv.height) return; cv.width = w; cv.height = h; draw(); }
 function fit(){
   const r = cv.getBoundingClientRect();
   view.z = clamp(Math.floor(Math.min((r.width - 110)/P.cell.w, (r.height - 40)/P.cell.h)), 1, 16) || 1;
@@ -732,6 +761,8 @@ on('#bResetPart', 'click', withSel(n => { delete frames()[cur][n.id]; save(); })
 // ---------- top bar ----------
 on('#bRig', 'click', () => setMode('rig')); on('#bPose', 'click', () => setMode('pose'));
 on('#bAdd', 'click', () => $('#fileParts').click()); on('#fileParts', 'change', e => { addFiles([...e.target.files]); e.target.value = ''; });
+on('#bUpd', 'click', () => $('#fileUpd').click());
+on('#fileUpd', 'change', async e => { const f = e.target.files[0]; e.target.value = ''; if(!f) return; try{ await updateParts(JSON.parse(await f.text())); }catch(err){ ask('Could not read those parts: ' + err.message, {info:true}); } });
 on('#bRef', 'click', () => $('#fileRef').click()); on('#fileRef', 'change', e => { if(e.target.files[0]) setRef(e.target.files[0]); e.target.value = ''; });
 on('#bUndo', 'click', doUndo); on('#bRedo', 'click', doRedo);
 on('#pjName', 'change', () => { P.name = $('#pjName').value.trim().replace(/[^\w-]+/g, '-') || 'critter'; save(); });
@@ -927,6 +958,7 @@ document.addEventListener('keydown', e => {
 document.addEventListener('keyup', e => { if(e.code === 'Space') spaceDown = false; });
 ['dragover', 'drop'].forEach(ev => $('#stage').addEventListener(ev, e => { e.preventDefault(); if(ev === 'drop') addFiles([...e.dataTransfer.files]); }));
 window.addEventListener('resize', resize);
+if(window.ResizeObserver) new ResizeObserver(resize).observe($('#stage'));   // the stage also changes size when the timeline or side panel grows, with no window resize
 
 // ---------- start ----------
 (async function start(){

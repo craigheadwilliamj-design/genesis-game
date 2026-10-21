@@ -10,7 +10,10 @@ const spriteUrl = (() => {
     im.onload = () => { blobs = true; cache.clear(); }; im.src = u;
   } catch(e){}
   // the path rides along as a #fragment (ignored when loading) so the markup still says which picture it is
-  return p => { const d = SPRITE_PACK[p]; if(!d) return p; if(!blobs) return d + "#" + p; let u = cache.get(p); if(!u){ try { u = toBlob(d) + "#" + p; } catch(e){ u = d + "#" + p; } cache.set(p, u); } return u; };
+  const url = p => { const d = SPRITE_PACK[p]; if(!d) return p; if(!blobs) return d + "#" + p; let u = cache.get(p); if(!u){ try { u = toBlob(d) + "#" + p; } catch(e){ u = d + "#" + p; } cache.set(p, u); } return u; };
+  // the pixel editor's "Try in park": a new picture for a path until reload
+  url.swap = (p, d) => { SPRITE_PACK[p] = d; cache.delete(p); };
+  return url;
 })();
 // Flat tiles in index.html (<pattern><image data-sp="sprites/...">) are swapped once the page has loaded
 document.querySelectorAll("image[data-sp]").forEach(el => el.setAttribute("href", spriteUrl(el.dataset.sp)));

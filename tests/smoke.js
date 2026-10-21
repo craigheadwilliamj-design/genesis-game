@@ -3661,6 +3661,61 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     return out;
   }));
 
+  // pixel editor (dev mode): strips open as frames, tools draw, the strip saves at full width, and "Try in park" swaps the picture
+  const coelRig = require("fs").readFileSync(path.resolve(__dirname, "../tools/rigger/coelophysis/coelophysis-clips.json"), "utf8");
+  Object.assign(checks, await page.evaluate(async require_coel => {
+    const out = {}, was = SPRITE_PACK["sprites/dime-walk.png"];
+    out.pixelBtnDevOnly = document.querySelector("#pixelBtn").hidden === !devMode();
+    await openPixelEditor("sprites/dime-walk.png");
+    out.pixelStripFrames = px.frames.length === 4 && px.fw === 100 && px.fh === 75 && pxGuess("sprites/human/keeper-walk.png", 64, 32) === 4 && pxGuess("sprites/bld/restroom-front.png", 80, 80) === 1;
+    pxNew("sprites/smoke/test.png", 10, 8, 2); px.mirror = true; px.tool = "pencil"; px.c1 = [10, 20, 30, 255];
+    px.stroke = {a:[1, 1], last:[1, 1], ink:px.c1, base:pxFrame().slice(), done:new Set()}; pxMoveTo(3, 1, {}); px.stroke = null; px.mirror = false;
+    out.pixelPencilMirror = [1, 2, 3, 6, 7, 8].every(x => pxGet(pxFrame(), x, 1)[3] === 255) && pxGet(pxFrame(), 4, 1)[3] === 0;
+    pxPush(); pxFill(pxFrame(), 0, 5, [1, 2, 3, 255], false); const filled = pxGet(pxFrame(), 9, 7)[0] === 1; pxUndo(false);
+    out.pixelFillUndo = filled && pxGet(pxFrame(), 9, 7)[3] === 0;
+    const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
+    // layers: every frame gets the new layer, the strip shows them stacked, a hidden one drops out, merge down and undo
+    pxLayerOp("add"); pxPut(pxFrame(), 1, 1, [200, 0, 0, 255]);
+    const stacked = px.frames.every(f => f.length === 2) && pxGet(pxCompData(0), 1, 1)[0] === 200;
+    px.layers[1].show = false; const hid = pxGet(pxCompData(0), 1, 1).join() === "10,20,30,255"; px.layers[1].show = true;
+    px.layers[1].alpha = .5; pxLayerOp("merge"); const merged = px.layers.length === 1 && pxGet(px.frames[0][0], 1, 1)[0] === 105; pxUndo(false);
+    // the rigger: layers out as full-cell parts (empty ones skipped), and a rigger project back in as layers at their rest-pose places
+    const rig = pxRigFile(), coel = JSON.parse(require_coel);
+    await pxFromRigger(coel, "coel.json");
+    out.pixelRigger = rig.nodes.length === 2 && rig.cell.w === 10 && Object.keys(rig.assets).length === 2 && px.layers.length === coel.nodes.length && px.fw === coel.cell.w && px.frames.length === 1
+      && px.layers[0].name === coel.nodes[0].name && pxCompData(0).some((v, i) => i % 4 === 3 && v);
+    pxUndo(false);
+    // the reference: an upload fits inside the canvas whole on the bottom middle, and stays out of the picture
+    const rc = document.createElement("canvas"); rc.width = 400; rc.height = 100; rc.getContext("2d").fillRect(0, 0, 400, 100);
+    const pngNoRef = pxPng(); px.refUrl = rc.toDataURL(); await pxSetRef("upload"); const refB = pxRefBox();
+    out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
+    await pxSetRef(""); px.refUrl = "";
+    pxTool("pan"); out.pixelPanTool = pxPans({button:0}) && pxPans({button:1}) && pxCv.style.cursor === "grab" && !!document.querySelector('#dlgPixel [data-tool="pan"]'); pxTool("pencil");
+    out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
+    const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
+    out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
+    const need = pxNeedArt()[0].id; pxNew(`sprites/${need}-walk.png`, 100, 75, 4); pxTry();
+    out.pixelNewSpeciesTry = SPRITES[need].tried === 1 && SPRITES[need].walk === 4 && !!SPRITE_PACK[`sprites/${need}.png`] && pxNeedArt().some(x => x.id === need);
+    delete SPRITES[need]; delete SPRITE_PACK[`sprites/${need}.png`]; delete SPRITE_PACK[`sprites/${need}-walk.png`]; try{ localStorage.removeItem(`genesis-pixel-d:sprites/${need}-walk.png`); localStorage.removeItem("genesis-pixel-drafts"); }catch{}
+    // plants, buildings, props and rocks: each kind still missing a picture is listed, and Try gives it a stand-in entry with its own picture
+    const nd = ["plant", "bld", "rock"].map(c => pxNeeds(c)), pk = nd[0][0], bk = nd[1].find(x => !BUILDINGS[x.opt.name].prop), rkk = nd[2][0], keep = JSON.stringify([PLANT_SPRITES[pk.opt.name], BLD_PICS[bk.opt.name], ROCK_SPRITES]);
+    const tryOne = x => { pxNew(x.path, x.opt.w || PX_TEMPLATES[x.opt.tpl][1], x.opt.h || PX_TEMPLATES[x.opt.tpl][2], 1); pxPut(pxFrame(), 2, px.fh - 2, [9, 9, 9, 255]); pxTry(); };
+    [pk, bk, rkk].forEach(tryOne);
+    const [rt, rb] = rkk.opt.name.split("-");
+    out.pixelNewLandAndBuildings = nd.every(l => l.length) && PLANT_SPRITES[pk.opt.name].tried === 1 && !!SPRITE_HIT[pk.opt.name] && BLD_PICS[bk.opt.name].tried === 1 && BLD_PICS[bk.opt.name].base === bk.opt.h - 9
+      && ROCK_SPRITES[rb][rt].length === +rkk.opt.name.split("-")[2] && pxGuideFor("sprites/bld/restroom-left.png") === BLD_PICS.restroom.base;
+    delete PLANT_SPRITES[pk.opt.name]; delete BLD_PICS[bk.opt.name]; ROCK_SPRITES[rb][rt].pop(); void keep;
+    [pk, bk, rkk].forEach(x => { try{ localStorage.removeItem("genesis-pixel-d:" + x.path); }catch{} });
+    spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
+    document.querySelector("#dlgPixel").close();
+    // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked
+    const wasDev = devMode(), tap = () => { for(let i = 0; i < 5; i++) document.querySelector("#verLabel").click(); };
+    if(wasDev) tap(); tap(); const shown = !document.querySelector("#pixelBtn").hidden && devMode(); tap();
+    out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
+    devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
+    return out;
+  }, coelRig));
+
   await page.waitForTimeout(800);
   let ok = true;
   // Quiet by default (only failures and a count); -v prints every check.

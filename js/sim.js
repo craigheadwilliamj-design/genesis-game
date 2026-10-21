@@ -897,7 +897,9 @@ function checkGoals(){
 /* ---------- formatting shared by the screen ---------- */
 
 // Hidden dev-mode switch. Lives in localStorage only, never in `state`, so a shared save can't carry it.
-function devMode(){ try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
+// devFlag holds it for this visit when the page can't keep storage (it is still never saved in `state`).
+let devFlag = null;
+function devMode(){ if(devFlag !== null) return devFlag; try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
 function money(n){ const s = "$" + Math.abs(Math.round(n)).toLocaleString(); return n < 0 ? "−" + s : s; }
 function fmtArea(m2){ return `${Math.round(m2).toLocaleString()} m²`; }
 // state.day to a calendar date: {d, m (1 based), y}, and "3 Mar Y2" for the HUD and logs. Days before 1 count as day 1.
