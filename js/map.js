@@ -1116,13 +1116,13 @@ function faceMark34(P, i, wall, m, text){
 }
 // Genesis buildings drawn as one picture per view (sprites/bld/<name>-<front|back|left|right>.png at ROCK_MPP), picked by where the door looks: down the screen front, up back, left or right the side with the door at that end. w x h is the picture in px, base the row under its base slab (the shadow rows below it hang past the footprint's front edge; sideBase for the left and right pictures, when it differs). A pixel is square on screen after the squash. views lists the pictures drawn so far when some are missing; the rest fall back to the front. frames: an animation, <name>-<view>-2.png etc., cycling at 3 a second, one shown at a time.
 // Restroom: the front and back walls are 61 px (the 8 m door wall), the side pictures' 46 px (the turned 6 m front), the roof overhangs. Food cart: the vendor shifting behind the counter; its side pictures sit two rows lower in the frame (sideBase), the right one the left mirrored.
-// card: the pictures are flat, with no roof depth drawn, so the back view stands on the door wall (the footprint's north edge) to meet the path it faces, not on the south edge. hit: the picture's opaque box per view [x0, y0, x1, y1] in px, tappable on top of the footprint.
+// card: the pictures are flat, with no roof depth drawn, so the box behind the picture's base line may lie over a path (bldOnPath, pathcells.js) and a cart can back right onto one; facing north it snaps that base line, not its door wall, to the grid (doorOnGrid). hit: the picture's opaque box per view [x0, y0, x1, y1] in px, tappable on top of the footprint.
 const BLD_PICS = {restroom:{w:80, h:80, base:71}, kiosk:{w:40, h:40, base:36, sideBase:38, frames:2, card:true,
   hit:{front:[2, 1, 37, 36], back:[2, 1, 37, 36], left:[6, 0, 33, 38], right:[7, 0, 34, 38]}}};
 function bldSprite34(bl, P, on, dead, reach, line){
   const B = BLD_PICS[bl.type], px = FLAT34.px, [cx] = centroid(P);
   const [nx, ny] = norm34(P, faceEdge(P, bl.face === undefined ? 2 : bl.face)), v = Math.abs(ny) >= Math.abs(nx) ? (ny < 0 ? "back" : "front") : nx < 0 ? "left" : "right", view = !B.views || B.views.includes(v) ? v : "front";
-  const by = (B.card && view === "back" ? Math.min : Math.max)(...P.map(p => p[1])), base = view === "left" || view === "right" ? B.sideBase || B.base : B.base, [x, y] = flatSnap34([cx - B.w / 2 * px, by - base * px / TILT]);
+  const by = Math.max(...P.map(p => p[1])), base = view === "left" || view === "right" ? B.sideBase || B.base : B.base, [x, y] = flatSnap34([cx - B.w / 2 * px, by - base * px / TILT]);
   const img = (f, a) => `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${f > 1 ? "-" + f : ""}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(B.w * px).toFixed(2)}" height="${(B.h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated${a}" pointer-events="none"/>`;
   const n = B.frames || 1, dur = n / 3, ph = (performance.now() / 1000 + [...String(bl.id)].reduce((a, c) => a + c.charCodeAt(0), 0) / 3) % dur;   // one frame shown at a time (the pictures have see-through bits, so stacking them ghosts), kept in step across redraws, each building a beat apart
   const h = B.hit && B.hit[view];
@@ -2549,8 +2549,9 @@ function propFacing(x, y, type){
   const k = best && (!edge || best.d <= edge.d) ? o : edge ? edge.k : 2;
   return [Math.round(Math.cos(k * Math.PI/4) * 1e6) / 1e6, Math.round(Math.sin(k * Math.PI/4) * 1e6) / 1e6];
 }
-// Slide a building so the wall with its door lies on the grid, so it can stand flush against a path (whose edges are on whole meters) whatever its depth. 0-3 = N/E/S/W.
-function doorOnGrid(pts, face){
+// Slide a building so the wall with its door lies on the grid, so it can stand flush against a path (whose edges are on whole meters) whatever its depth. 0-3 = N/E/S/W. A picture card facing north snaps its base line (south edge) instead, the line that meets the path it backs onto.
+function doorOnGrid(pts, face, type){
+  if(face === 0 && BLD_PICS[type] && BLD_PICS[type].card) face = 2;
   const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][face], d = Math.round(e / GRID_STEP) * GRID_STEP - e, ax = face % 2;
   return pts.map(([x, y]) => [Math.round((x + (ax ? d : 0)) * 1e6) / 1e6, Math.round((y + (ax ? 0 : d)) * 1e6) / 1e6]);
 }
@@ -2580,12 +2581,12 @@ function placeGhost(clientX, clientY){
   }
   const face = t.prop ? undefined : (2 + rot / 2) % 4;   // a fresh building looks south; each quarter turn swings its door with it
   let pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
-  if(!t.prop && !t.viv) pts = doorOnGrid(pts, face);
+  if(!t.prop && !t.viv) pts = doorOnGrid(pts, face, tool);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
   if(!why && t.onPath && !shapeOnGuestPath(pts)) why = "Keep it on a path.";
-  if(!why && !t.onPath && (shapeOnChunks(pts) || state.paths.some(q => !q.d && lineEntersShape(q.points, pts)))) why = "It sits on a path.";
+  if(!why && !t.onPath && bldOnPath(tool, pts)) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why, face};
@@ -2609,7 +2610,7 @@ function rotateMoved(){
   const orig = it.points, [cx, cy] = centroid(orig), a = Math.PI/2, c = Math.cos(a), s = Math.sin(a);
   const prop = BUILDINGS[it.type].prop, face0 = it.face, face = prop ? face0 : ((face0 === undefined ? 2 : face0) + 1) % 4;   // the door turns with the walls
   it.points = orig.map(([x, y]) => [Math.round((cx + (x - cx)*c - (y - cy)*s) * 1e6) / 1e6, Math.round((cy + (x - cx)*s + (y - cy)*c) * 1e6) / 1e6]);
-  if(!prop){ it.points = doorOnGrid(it.points, face); it.face = face; }
+  if(!prop){ it.points = doorOnGrid(it.points, face, it.type); it.face = face; }
   const why = moveProblem("building", it);
   if(why){ it.points = orig; it.face = face0; setStat(`Can't turn it here. ${why}`, true); return; }
   if(prop) it.rot = ((it.rot || 0) + 2) % 8;
@@ -3029,7 +3030,7 @@ function moveProblem(kind, it){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!shapeOnGuestPath(pts)) return "Keep it on a path."; }
-    else if(shapeOnChunks(pts) || state.paths.some(p => !p.d && lineEntersShape(p.points, pts))) return "It sits on a path.";
+    else if(bldOnPath(it.type, pts)) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
     const keep = state.fences; state.fences = keep.filter(l => l !== it);

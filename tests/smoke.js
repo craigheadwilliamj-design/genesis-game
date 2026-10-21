@@ -1914,11 +1914,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const placed = state.buildings[state.buildings.length - 1];
       out.facePlacedSaved = !!placed && placed.type === "restroom" && placed.face === 3 && !state.buildings.some(b => BUILDINGS[b.type].prop && b.face !== undefined);
       // the door wall lands on the grid, so a cart of any depth stands flush against a path, placed or turned
-      { const onGrid = (pts, f) => { const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][f]; return Math.abs(e - Math.round(e)) < 1e-6; };
+      { const onGrid = (pts, f) => { const b = bbox(pts), e = [b.y1, b.x1, b.y1, b.x0][f]; return Math.abs(e - Math.round(e)) < 1e-6; };   // a cart facing north snaps its base line (south edge), the one that meets the path behind it
         setTool("kiosk"); const r0 = rot, okPlace = [0, 2, 4, 6].every(r => { rot = r; const g = at(231.4, 270.3); return onGrid(g.pts, g.face); }); rot = r0;
         const kb = {id:"b-kgrid", type:"kiosk", face:2, day:0, points:rectPts(240, 250, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}; kb.points = doorOnGrid(kb.points, 2); state.buildings.push(kb);
         setTool("move"); mvSel = kb.id; rotateMoved(); mvSel = null; setTool("select");
         out.cartDoorOnGrid = okPlace && kb.face === 3 && onGrid(kb.points, kb.face); state.buildings.splice(state.buildings.indexOf(kb), 1); }
+      // a cart's box may lie over a path behind its picture's base line, but the base line itself can't be on the path; a saved north-facing cart backing onto a path slides up to meet it, once
+      { const key = Object.keys(state.pathChunks).find(k => { const [x, y] = k.split(",").map(Number); return guestCell(state.pathChunks[k]) && !state.pathChunks[`${x},${y + 1}`]; }), [qx, qy] = key.split(",").map(Number), Y = (qy + 1) * CHUNK, t = BUILDINGS.kiosk;
+        const kc = y1 => ({id:"b-kback", type:"kiosk", face:0, day:0, points:rectPts(qx * CHUNK + 2.5, y1 - t.d / 2, t.w, t.d, 0)}), msg = y1 => moveProblem("building", kc(y1));
+        const sv = JSON.parse(JSON.stringify(state)); delete sv.cardBack; sv.buildings = [kc(Y + t.d)]; upgradeSave(sv);
+        out.cartBacksOntoPath = msg(Y) !== "It sits on a path." && msg(Y - .5) === "It sits on a path." && msg(Y + t.d) !== "It sits on a path." && !bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + 3, 8, 6, 0)) && bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + 2.9, 8, 6, 0))
+          && Math.abs(bbox(sv.buildings[0].points).y1 - Y) < 1e-6 && sv.cardBack === true; }
       // the door point is the middle of the wall that faces that way
       const sq = rectPts(211, 270, 8, 6, 0), dp = f => doorPoint({points:sq, face:f}).map(v => Math.round(v * 1e6) / 1e6).join();
       out.faceDoorPoint = dp(0) === "211,267" && dp(1) === "215,270" && dp(2) === "211,273" && dp(3) === "207,270";
@@ -3195,11 +3201,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.oldKioskShrinks = Math.abs(b.x1 - b0.x1) < 1e-6 && Math.abs((b.x1 - b.x0) - BUILDINGS.kiosk.d) < 1e-6 && Math.abs((b.y1 - b.y0) - BUILDINGS.kiosk.w) < 1e-6 && Math.abs((b.y0 + b.y1) - (b0.y0 + b0.y1)) < 1e-6
           && JSON.stringify(upgradeSave(JSON.parse(JSON.stringify(sv))).buildings[0].points) === JSON.stringify(P);
         // one placed at the new size 0.3 m back from the grid slides onto it
-        const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:0, day:0, points:rectPts(150, 151.6, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
-        upgradeSave(sv2); out.oldKioskShrinks = out.oldKioskShrinks && Math.abs(bbox(sv2.buildings[0].points).y0 - 150) < 1e-6; }
-      // the back picture stands on the door wall (north edge), the front on the south edge; both have a tappable box over the picture
+        const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:2, day:0, points:rectPts(150, 151.6, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
+        upgradeSave(sv2); out.oldKioskShrinks = out.oldKioskShrinks && Math.abs(bbox(sv2.buildings[0].points).y1 - 153) < 1e-6; }
+      // every view stands on the box's south edge, with a tappable box over the picture
       { const at = f => { const a = kv[f], m = a.match(/<image href="[^"]*" x="[^"]+" y="([^"]+)" width="[^"]+" height="([^"]+)"/), r = /<rect [^>]*fill="transparent"/.test(a); return m && r ? +m[1] + +m[2] : NaN; }, P = rectPts(150, 150, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0), px = FLAT34.px;
-        out.kioskBackOnDoorWall = Math.abs(at(0) - (bbox(P).y0 + 4 * px / TILT)) < .2 && Math.abs(at(2) - (bbox(P).y1 + 4 * px / TILT)) < .2; }
+        out.kioskOnBaseLine = [0, 2].every(f => Math.abs(at(f) - (bbox(P).y1 + 4 * px / TILT)) < .2); }
       out.kioskSpriteAnimates = ["front", "back", "left", "right"].every(has) && kv.every(a => /visibility:visible;animation:frame1of2 /.test(a) && /visibility:hidden;animation:frame2of2 /.test(a) && !/opacity/.test(a) && !/NaN/.test(a)); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
