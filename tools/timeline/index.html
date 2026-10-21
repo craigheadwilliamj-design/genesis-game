@@ -255,10 +255,10 @@ $("card").addEventListener("click", ev => {
     if(Math.random() < success(s, a)){
       const was = genome[a.name] || 0, now = Math.min(100, Math.round(was + findGain(s, a)));
       genome[a.name] = now;
-      report = {title:`Expedition report · ${s.name}`, lines:[`<b>${esc(a.name)} Sample Found</b>`]};
+      report = {title:`Expedition report · ${s.name}`, lines:[`<b>${esc(a.name)} Sample Found</b>`, ...(now >= 100 ? [`<b>${esc(a.name)} Genome Complete</b>`] : [])]};
       if(now >= 100) target = null;
     }
-    else report = {title:`Expedition report · ${s.name}`, lines:[`Came back empty-handed. No ${esc(a.name)} DNA this time.`]};
+    else report = {title:`Expedition report · ${s.name}`, lines:["Came back empty handed"]};
     renderCard();
   }
   if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); report = null; render(); }
