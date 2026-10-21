@@ -3689,6 +3689,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     [pk, bk, rkk].forEach(x => { try{ localStorage.removeItem("genesis-pixel-d:" + x.path); }catch{} });
     spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
     document.querySelector("#dlgPixel").close();
+    // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked
+    const wasDev = devMode(), tap = () => { for(let i = 0; i < 5; i++) document.querySelector("#verLabel").click(); };
+    if(wasDev) tap(); tap(); const shown = !document.querySelector("#pixelBtn").hidden && devMode(); tap();
+    out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
+    devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
     return out;
   }));
 

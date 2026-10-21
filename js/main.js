@@ -160,9 +160,10 @@ function showStart(){
     const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
     if(n < 5) return;
     n = 0;
-    const on = !devMode();
+    const on = !devMode(); devFlag = on;
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
-    ui.toast(on ? "Dev mode on. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
+    const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
+    ui.toast(on ? "Dev mode on. Pixels is in the top bar. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
