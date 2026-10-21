@@ -3673,6 +3673,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     pxPush(); pxFill(pxFrame(), 0, 5, [1, 2, 3, 255], false); const filled = pxGet(pxFrame(), 9, 7)[0] === 1; pxUndo(false);
     out.pixelFillUndo = filled && pxGet(pxFrame(), 9, 7)[3] === 0;
     const im = await pxImg(pxPng()); out.pixelPngIsStrip = im.width === 20 && im.height === 8;
+    // layers: every frame gets the new layer, the strip shows them stacked, a hidden one drops out, merge down and undo
+    pxLayerOp("add"); pxPut(pxFrame(), 1, 1, [200, 0, 0, 255]);
+    const stacked = px.frames.every(f => f.length === 2) && pxGet(pxCompData(0), 1, 1)[0] === 200;
+    px.layers[1].show = false; const hid = pxGet(pxCompData(0), 1, 1).join() === "10,20,30,255"; px.layers[1].show = true;
+    px.layers[1].alpha = .5; pxLayerOp("merge"); const merged = px.layers.length === 1 && pxGet(px.frames[0][0], 1, 1)[0] === 105; pxUndo(false);
+    out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
     const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
     out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
     const need = pxNeedArt()[0].id; pxNew(`sprites/${need}-walk.png`, 100, 75, 4); pxTry();

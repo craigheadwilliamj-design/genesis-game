@@ -1,5 +1,5 @@
 // Pixel editor (dev mode, HUD "Pixels"): draw and animate any sprite in SPRITE_PACK, try it in the park, send it to the repo.
-// A picture is a strip of same-size frames side by side, as the game draws them. Work is kept as a localStorage draft per path
+// A picture is a strip of same-size frames side by side, as the game draws them, made of layers shared by every frame (px.frames[frame][layer]). Work is kept as a localStorage draft per path
 // until "Send to repo" writes the PNG to the db collection `pixeled`, where tools/pixeledpull.py picks it up (docs/art.md: Pixel editor).
 
 const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,14],[106,100,77],[227,221,195],[198,188,147],
@@ -7,9 +7,10 @@ const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,
 const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket", "Fill (Shift: every pixel of that color)", "G"], ["line", "Line", "L"],
   ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select and move", "M"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"]];
 const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",
-  line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h3M9 4h3M14 4h3v3M17 9v3M17 14v3h-3M12 17H9M7 17H4v-3M4 12V9M4 7V4",
+  line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h13v13H4z",
   shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z"};
 // New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
+const PX_DASH = {select:' stroke-dasharray="3.2 2.6" stroke-linecap="butt"'};   // icons drawn dashed (a marquee)
 const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
   person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantM:["Plant, medium", 64, 58, 1, "sprites/plants/{name}.png"],
   plantS:["Plant, small", 44, 40, 1, "sprites/plants/{name}.png"], rock:["Rock or boulder shape", 24, 18, 1, "sprites/rocks/{name}.png"],
@@ -17,7 +18,7 @@ const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"
 const PX_VIEWS = ["front", "back", "left", "right"];
 const PX_SKIP_BLD = ["vivS", "vivM", "vivL", "platform", "tramstop", "campground"];   // drawn with what's inside them or from parts, not one picture
 const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
-const px = {path:"", fw:16, fh:16, frames:[], cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
+const px = {path:"", fw:16, fh:16, frames:[], layers:[], lay:0, cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
   pal:"image", ref:"", refCv:null, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
 
 /* ---------- pixels ---------- */
@@ -73,7 +74,7 @@ function pxFill(f, x, y, c, all){
 // Every color the picture uses, by hue then lightness (greys first)
 function pxUsed(){
   const seen = new Map();
-  for(const f of px.frames) for(let i = 0; i < f.length; i += 4) if(f[i + 3]){ const k = f[i] << 24 | f[i + 1] << 16 | f[i + 2] << 8 | f[i + 3]; if(!seen.has(k)){ seen.set(k, [f[i], f[i + 1], f[i + 2], f[i + 3]]); if(seen.size > 255) break; } }
+  for(const f of px.frames.flat()) for(let i = 0; i < f.length; i += 4) if(f[i + 3]){ const k = f[i] << 24 | f[i + 1] << 16 | f[i + 2] << 8 | f[i + 3]; if(!seen.has(k)){ seen.set(k, [f[i], f[i + 1], f[i + 2], f[i + 3]]); if(seen.size > 255) break; } }
   return [...seen.values()].sort((a, b) => { const [ha, sa, la] = pxHsl(a), [hb, sb, lb] = pxHsl(b); return (sa < .08) - (sb < .08) || (sa < .08 ? 0 : Math.round(ha / 20) - Math.round(hb / 20)) || la - lb; });
 }
 const pxSwatches = () => px.pal === "park" ? PX_PARK.map(c => c.length === 4 ? c : [...c, 255]) : px.pal === "dime" ? px.dime || [] : pxUsed();
@@ -91,22 +92,33 @@ function pxShade(c, up){
 }
 
 /* ---------- document ---------- */
-const pxSnap = () => ({frames:px.frames.map(f => f.slice()), fw:px.fw, fh:px.fh, cur:px.cur});
+const pxSnap = () => ({frames:px.frames.map(f => f.map(l => l.slice())), layers:px.layers.map(l => ({...l})), lay:px.lay, fw:px.fw, fh:px.fh, cur:px.cur});
 function pxPush(){ pxDrop(); px.undo.push(pxSnap()); if(px.undo.length > PX_UNDO) px.undo.shift(); px.redo = []; }
-function pxRestore(s){ px.frames = s.frames; px.fw = s.fw; px.fh = s.fh; px.cur = Math.min(s.cur, s.frames.length - 1); px.sel = null; pxFit(); }
+function pxRestore(s){ px.frames = s.frames; px.layers = s.layers; px.lay = Math.min(s.lay, s.layers.length - 1); px.fw = s.fw; px.fh = s.fh; px.cur = Math.min(s.cur, s.frames.length - 1); px.sel = null; pxFit(); }
 function pxUndo(redo){ const [a, b] = redo ? [px.redo, px.undo] : [px.undo, px.redo]; if(!a.length) return; pxDrop(); b.push(pxSnap()); pxRestore(a.pop()); pxChanged(); }
-const pxFrame = () => px.frames[px.cur];
-function pxStrip(){
+const pxFrame = () => px.frames[px.cur][px.lay];   // what the tools draw on: this frame's current layer
+const pxLayerNew = n => ({name:"Layer " + n, show:true, alpha:1});
+// A frame as it shows: its visible layers bottom to top, each at its own opacity
+function pxComp(i){
+  const cv = document.createElement("canvas"); cv.width = px.fw; cv.height = px.fh; const ctx = cv.getContext("2d");
+  px.layers.forEach((L, l) => { if(L.show) pxLayer(ctx, px.frames[i][l], 0, 0, 1, L.alpha); });
+  return cv;
+}
+const pxCompData = i => pxComp(i).getContext("2d").getImageData(0, 0, px.fw, px.fh).data;
+function pxStrip(l){   // the whole strip, or one layer's strip (for drafts)
   const cv = document.createElement("canvas"); cv.width = px.fw * px.frames.length; cv.height = px.fh; const ctx = cv.getContext("2d");
-  px.frames.forEach((f, i) => ctx.putImageData(new ImageData(f.slice(), px.fw, px.fh), i * px.fw, 0));
+  px.frames.forEach((f, i) => l == null ? ctx.drawImage(pxComp(i), i * px.fw, 0) : ctx.putImageData(new ImageData(f[l].slice(), px.fw, px.fh), i * px.fw, 0));
   return cv;
 }
 const pxPng = () => pxStrip().toDataURL("image/png");
 const pxImg = src => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = src; });
-function pxSlice(im, n){
+// A strip cut into n frames' pixels (an image or a canvas)
+function pxCuts(im, n){
   const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext("2d"); ctx.drawImage(im, 0, 0);
-  const fw = im.width / n; px.fw = fw; px.fh = im.height;
-  px.frames = Array.from({length:n}, (_, i) => new Uint8ClampedArray(ctx.getImageData(i * fw, 0, fw, im.height).data));
+  const fw = im.width / n; return Array.from({length:n}, (_, i) => new Uint8ClampedArray(ctx.getImageData(i * fw, 0, fw, im.height).data));
+}
+function pxSlice(im, n){   // a flat picture: one layer
+  px.fw = im.width / n; px.fh = im.height; px.frames = pxCuts(im, n).map(b => [b]); px.layers = [pxLayerNew(1)]; px.lay = 0;
 }
 // A strip's frame count: an animal's strips are frames the size of its standing picture, people 16 px wide, the rest one frame
 function pxGuess(path, w, h){
@@ -125,21 +137,31 @@ function pxChanged(){
   clearTimeout(pxSaveT); pxSaveT = setTimeout(() => {
     if(!px.path) return;
     const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
-    pxStore("d:" + px.path, {png:pxPng(), n:px.frames.length, fps:px.fps});
+    pxStore("d:" + px.path, pxDraft());
   }, 600);
 }
+// A draft keeps every layer as its own strip, so they come back as layers
+const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+async function pxLoadDraft(dr){
+  const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
+  px.fw = ims[0].width / n; px.fh = ims[0].height;
+  const cuts = ims.map(im => pxCuts(im, n));
+  px.frames = Array.from({length:n}, (_, i) => cuts.map(c => c[i]));
+  px.layers = dr.layers.map(({name, show, alpha}) => ({name, show, alpha})); px.lay = Math.min(dr.lay || 0, px.layers.length - 1);
+}
 async function pxOpen(path, fresh){
-  pxDrop(); const dr = !fresh && pxStored("d:" + path), src = dr ? dr.png : SPRITE_PACK[path];
+  pxDrop(); const dr = !fresh && pxStored("d:" + path), src = dr ? dr.png || dr.layers && dr.layers[0].png : SPRITE_PACK[path];
   if(!src) return ui.toast("There's no picture at " + path + ".", "bad");
   try{
     const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
-    pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height)); pxStore("last", path); px.guide = pxGuideFor(path);
+    if(dr && dr.layers) await pxLoadDraft(dr); else pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height));
+    pxStore("last", path); px.guide = pxGuideFor(path);
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
   }catch{ ui.toast("That picture didn't load.", "bad"); }
 }
 function pxNew(path, w, h, n){
-  pxDrop(); px.path = path; px.fw = w; px.fh = h; px.guide = pxGuideFor(path); px.frames = Array.from({length:n}, () => pxBlank(w, h)); px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
+  pxDrop(); px.path = path; px.fw = w; px.fh = h; px.guide = pxGuideFor(path); px.frames = Array.from({length:n}, () => [pxBlank(w, h)]); px.layers = [pxLayerNew(1)]; px.lay = 0; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
   pxFit(); pxChanged();
 }
 
@@ -178,11 +200,11 @@ function pxDraw(){
   if(!pxCv || !px.frames.length) return;
   const z = px.zoom, W = px.fw * z, H = px.fh * z, ctx = pxCtx;
   pxCv.width = W; pxCv.height = H; ctx.imageSmoothingEnabled = false;
-  const ck = Math.max(4, Math.min(16, z)); for(let y = 0; y < H; y += ck) for(let x = 0; x < W; x += ck){ ctx.fillStyle = (x / ck + y / ck) % 2 ? "#cfd4c8" : "#e8ebe2"; ctx.fillRect(x, y, ck, ck); }
+  const ck = Math.max(4, Math.min(16, z)); for(let y = 0; y < H; y += ck) for(let x = 0; x < W; x += ck){ ctx.fillStyle = (x / ck + y / ck) % 2 ? "#e4e7df" : "#f5f6f2"; ctx.fillRect(x, y, ck, ck); }   // soft, so the pixels and the cursor stand out
   if(px.refCv){ const r = px.refCv; ctx.globalAlpha = .22; ctx.drawImage(r, Math.floor((px.fw - r.width) / 2) * z, (px.fh - r.height) * z, r.width * z, r.height * z); ctx.globalAlpha = 1; }   // stood on the same bottom middle
-  if(px.onion && px.frames.length > 1){ pxLayer(ctx, px.frames[(px.cur + px.frames.length - 1) % px.frames.length], 0, 0, z, .28); }
-  pxLayer(ctx, pxFrame(), 0, 0, z, 1);
+  if(px.onion && px.frames.length > 1){ ctx.globalAlpha = .28; ctx.drawImage(pxComp((px.cur + px.frames.length - 1) % px.frames.length), 0, 0, W, H); ctx.globalAlpha = 1; }
   const s = px.sel;
+  px.layers.forEach((L, l) => { if(L.show) pxLayer(ctx, px.frames[px.cur][l], 0, 0, z, L.alpha); });
   if(s && s.buf){ pxTmp.width = s.w; pxTmp.height = s.h; pxTmp.getContext("2d").putImageData(new ImageData(s.buf.slice(), s.w, s.h), 0, 0); ctx.drawImage(pxTmp, s.x * z, s.y * z, s.w * z, s.h * z); }
   if(px.grid && z >= 6){
     ctx.fillStyle = "rgba(29,43,34,.13)";
@@ -197,7 +219,11 @@ function pxDraw(){
   }   // the base row: its bottom stands on the footprint's front edge
   if(s){ ctx.setLineDash([4, 3]); ctx.strokeStyle = "#1D2B22"; ctx.lineWidth = 1; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.setLineDash([]); }
   const h = px.hover;
-  if(h && pxIn(h[0], h[1]) && px.tool !== "select"){ ctx.strokeStyle = "rgba(29,43,34,.8)"; ctx.lineWidth = 1; const n = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((n - 1) / 2); ctx.strokeRect((h[0] - o) * z + .5, (h[1] - o) * z + .5, n * z - 1, n * z - 1); }
+  if(h && pxIn(h[0], h[1]) && px.tool !== "select"){   // the pixel under the cursor: a white ring inside a dark one, readable on any color
+    const n = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((n - 1) / 2), x = (h[0] - o) * z, y = (h[1] - o) * z, w = n * z;
+    ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeRect(x - 1.5, y - 1.5, w + 3, w + 3);   // drawn just outside the pixel, so the pixel's own color stays in view
+    ctx.lineWidth = 1.5; ctx.strokeStyle = "#111"; ctx.strokeRect(x - .75, y - .75, w + 1.5, w + 1.5);
+  }
   const pos = document.getElementById("pxPos"); if(pos) pos.textContent = h && pxIn(h[0], h[1]) ? `${h[0]}, ${h[1]}` : "";
 }
 function pxPreview(t){
@@ -207,7 +233,7 @@ function pxPreview(t){
   const n = px.frames.length, i = n > 1 ? Math.floor(t / 1000 * px.fps) % n : 0, s = Math.max(1, Math.min(4, Math.floor(120 / Math.max(px.fw, px.fh))));
   const ctx = pxPrev.getContext("2d"); if(pxPrev.width !== px.fw * s + px.fw + 12 || pxPrev.height !== px.fh * s){ pxPrev.width = px.fw * s + px.fw + 12; pxPrev.height = px.fh * s; }
   ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, pxPrev.width, pxPrev.height);
-  pxLayer(ctx, px.frames[i], 0, 0, s, 1); pxLayer(ctx, px.frames[i], px.fw * s + 12, px.fh * s - px.fh, 1, 1);
+  const c = pxComp(i); ctx.drawImage(c, 0, 0, px.fw * s, px.fh * s); ctx.drawImage(c, px.fw * s + 12, px.fh * s - px.fh);
 }
 const pxXY = e => { const r = pxCv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * px.fw), Math.floor((e.clientY - r.top) / r.height * px.fh)]; };
 function pxDown(e){
@@ -215,7 +241,8 @@ function pxDown(e){
   if(e.button > 2 || !px.frames.length) return;
   e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
-  if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(f, x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }
+  if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(pxCompData(px.cur), x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }   // the color as it shows, whatever layer it's on
+  if(!px.layers[px.lay].show) return ui.toast("This layer is hidden. Show it to draw on it.");
   if(px.tool === "select"){
     const s = px.sel;
     if(s && x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h){
@@ -274,40 +301,85 @@ function pxWheel(e){
 /* ---------- frames and picture ---------- */
 function pxFrameOp(op, i = px.cur){
   pxPush(); const n = px.frames.length;
-  if(op === "add"){ px.frames.splice(i + 1, 0, pxBlank(px.fw, px.fh)); px.cur = i + 1; }
-  if(op === "dup"){ px.frames.splice(i + 1, 0, px.frames[i].slice()); px.cur = i + 1; }
+  if(op === "add"){ px.frames.splice(i + 1, 0, px.layers.map(() => pxBlank(px.fw, px.fh))); px.cur = i + 1; }
+  if(op === "dup"){ px.frames.splice(i + 1, 0, px.frames[i].map(l => l.slice())); px.cur = i + 1; }
   if(op === "del" && n > 1){ px.frames.splice(i, 1); px.cur = Math.min(i, n - 2); }
   if((op === "left" && i > 0) || (op === "right" && i < n - 1)){ const j = op === "left" ? i - 1 : i + 1; [px.frames[i], px.frames[j]] = [px.frames[j], px.frames[i]]; px.cur = j; }
   pxChanged();
 }
-function pxFlip(dir, every){
+function pxFlip(dir, every){   // the whole picture: every layer
   pxPush();
-  for(const f of every ? px.frames : [pxFrame()]){
+  for(const f of (every ? px.frames : [px.frames[px.cur]]).flat()){
     const o = f.slice();
     for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){ const s = dir === "h" ? pxAt(px.fw - 1 - x, y) : pxAt(x, px.fh - 1 - y), d = pxAt(x, y); for(let k = 0; k < 4; k++) f[d + k] = o[s + k]; }
   }
   pxChanged();
 }
-function pxNudge(dx, dy, every){
+function pxNudge(dx, dy, every){   // the current layer only, so a layer can be lined up against the rest
   pxPush();
-  for(const f of every ? px.frames : [pxFrame()]){ const o = f.slice(); f.fill(0); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++) if(pxIn(x + dx, y + dy)){ const s = pxAt(x, y), d = pxAt(x + dx, y + dy); for(let k = 0; k < 4; k++) f[d + k] = o[s + k]; } }
+  for(const f of every ? px.frames.map(fr => fr[px.lay]) : [pxFrame()]){ const o = f.slice(); f.fill(0); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++) if(pxIn(x + dx, y + dy)){ const s = pxAt(x, y), d = pxAt(x + dx, y + dy); for(let k = 0; k < 4; k++) f[d + k] = o[s + k]; } }
   pxChanged();
 }
 // New canvas size, the old picture held at the anchor (sprites stand on their bottom middle, so that's the default)
 function pxResize(w, h, anchor){
   if(!(w > 0 && h > 0 && w <= 512 && h <= 512)) return ui.toast("Pick a size from 1 to 512 pixels.", "bad");
   pxPush(); const ox = anchor[1] === "l" ? 0 : anchor[1] === "r" ? w - px.fw : Math.floor((w - px.fw) / 2), oy = anchor[0] === "t" ? 0 : anchor[0] === "b" ? h - px.fh : Math.floor((h - px.fh) / 2);
-  px.frames = px.frames.map(f => { const n = pxBlank(w, h); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){ const X = x + ox, Y = y + oy; if(X < 0 || Y < 0 || X >= w || Y >= h) continue; const s = pxAt(x, y), d = (Y * w + X) * 4; for(let k = 0; k < 4; k++) n[d + k] = f[s + k]; } return n; });
+  px.frames = px.frames.map(fr => fr.map(f => { const n = pxBlank(w, h); for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){ const X = x + ox, Y = y + oy; if(X < 0 || Y < 0 || X >= w || Y >= h) continue; const s = pxAt(x, y), d = (Y * w + X) * 4; for(let k = 0; k < 4; k++) n[d + k] = f[s + k]; } return n; }));
   px.fw = w; px.fh = h; pxFit(); pxChanged();
 }
 async function pxReslice(n){
   const total = px.fw * px.frames.length;
   if(!(n >= 1) || total % n) return ui.toast(`The strip is ${total} px wide, so it splits into a whole number of frames only for counts that divide ${total}.`, "bad");
-  pxPush(); pxSlice(await pxImg(pxPng()), n); px.cur = 0; pxFit(); pxChanged();
+  pxPush(); const cuts = px.layers.map((_, l) => pxCuts(pxStrip(l), n));   // each layer's strip, cut again
+  px.fw = total / n; px.frames = Array.from({length:n}, (_, i) => cuts.map(c => c[i])); px.cur = 0; pxFit(); pxChanged();
 }
 function pxRecolor(from, to){
-  pxPush(); for(const f of px.frames) for(let i = 0; i < f.length; i += 4) if(pxSame([f[i], f[i + 1], f[i + 2], f[i + 3]], from)){ f[i] = to[0]; f[i + 1] = to[1]; f[i + 2] = to[2]; f[i + 3] = to[3]; }
+  pxPush(); for(const f of px.frames.flat()) for(let i = 0; i < f.length; i += 4) if(pxSame([f[i], f[i + 1], f[i + 2], f[i + 3]], from)){ f[i] = to[0]; f[i + 1] = to[1]; f[i + 2] = to[2]; f[i + 3] = to[3]; }
   pxChanged();
+}
+
+/* ---------- layers ---------- */
+// Layers run through every frame. Add and Copy go above the current one; Merge down paints it onto the one under it at its opacity.
+function pxLayerOp(op){
+  const n = px.layers.length, l = px.lay;
+  if(op === "del" && n < 2 || op === "up" && l >= n - 1 || (op === "down" || op === "merge") && l < 1) return;
+  pxPush();
+  if(op === "add"){ px.frames.forEach(f => f.splice(l + 1, 0, pxBlank(px.fw, px.fh))); px.layers.splice(l + 1, 0, pxLayerNew(n + 1)); px.lay = l + 1; }
+  if(op === "dup"){ px.frames.forEach(f => f.splice(l + 1, 0, f[l].slice())); px.layers.splice(l + 1, 0, {...px.layers[l], name:(px.layers[l].name + " copy").slice(0, 32)}); px.lay = l + 1; }
+  if(op === "del"){ px.frames.forEach(f => f.splice(l, 1)); px.layers.splice(l, 1); px.lay = Math.max(0, l - 1); }
+  if(op === "up" || op === "down"){ const j = op === "up" ? l + 1 : l - 1; for(const a of [...px.frames, px.layers]) [a[l], a[j]] = [a[j], a[l]]; px.lay = j; }
+  if(op === "merge"){
+    const L = px.layers[l];
+    px.frames.forEach(f => {
+      const cv = document.createElement("canvas"); cv.width = px.fw; cv.height = px.fh; const ctx = cv.getContext("2d");
+      ctx.putImageData(new ImageData(f[l - 1].slice(), px.fw, px.fh), 0, 0); if(L.show) pxLayer(ctx, f[l], 0, 0, 1, L.alpha);
+      f[l - 1] = new Uint8ClampedArray(ctx.getImageData(0, 0, px.fw, px.fh).data); f.splice(l, 1);
+    });
+    px.layers.splice(l, 1); px.lay = l - 1;
+  }
+  pxChanged();
+}
+const PX_EYE = on => `<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z"/>${on ? `<circle cx="10" cy="10" r="2.6" fill="currentColor"/>` : `<path d="M3 17L17 3"/>`}</svg>`;
+// The layer list, top layer first; rebuilt only when the layers change, so a name being typed keeps its focus
+function pxLayersSync(){
+  const el = document.getElementById("pxLayers"); if(!px.layers.length){ el.innerHTML = ""; el.dataset.key = ""; return; }
+  const key = px.layers.map(L => L.name + L.show).join("|") + px.layers.length;
+  if(el.dataset.key !== key && !el.contains(document.activeElement)){
+    el.dataset.key = key;
+    el.innerHTML = px.layers.map((L, l) => `<div class="pxlrow" data-layer="${l}"><button class="pxeye" data-eye="${l}" title="${L.show ? "Hide" : "Show"} this layer" aria-pressed="${L.show}">${PX_EYE(L.show)}</button><canvas></canvas><input class="pxlname" data-lname="${l}" value="${esc(L.name)}" maxlength="32" aria-label="Layer name"></div>`).reverse().join("");
+  }
+  el.querySelectorAll(".pxlrow").forEach(r => {
+    const l = +r.dataset.layer, cv = r.querySelector("canvas"), s = Math.max(1, Math.floor(26 / Math.max(px.fw, px.fh)));
+    r.setAttribute("aria-current", l === px.lay); r.classList.toggle("off", !px.layers[l].show);
+    cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[px.cur][l], 0, 0, s, 1);
+  });
+  const a = Math.round(px.layers[px.lay].alpha * 100); document.getElementById("pxLAlpha").value = a; document.getElementById("pxLAlphaN").textContent = a + "%";
+}
+// The canvas cursor: a crosshair with a white halo (its hot spot is the pixel drawn on) and the tool's icon beside it, readable on any color
+function pxCursor(t){
+  const ch = "M8 0v6M8 10v6M0 8h6M10 8h6", ico = PX_ICONS[t] ? `<g transform="translate(12 12) scale(.9)" fill="none" stroke-linejoin="round" stroke-linecap="round"><path d="${PX_ICONS[t]}" stroke="#fff" stroke-width="5"/><path d="${PX_ICONS[t]}" stroke="#111" stroke-width="2.2"${PX_DASH[t] || ""}/></g>` : "";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><path d="${ch}" stroke="#fff" stroke-width="4.5"/><path d="${ch}" stroke="#111" stroke-width="2"/>${ico}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") 8 8, crosshair`;
 }
 
 /* ---------- park and repo ---------- */
@@ -328,7 +400,7 @@ function pxTry(){
   if(typeof render === "function" && state) render();
   ui.toast("It's in the park until you reload. Send it to the repo to keep it.", "good");
 }
-const pxFirst = () => { pxTmp.width = px.fw; pxTmp.height = px.fh; pxTmp.getContext("2d").putImageData(new ImageData(px.frames[0].slice(), px.fw, px.fh), 0, 0); return pxTmp.toDataURL("image/png"); };
+const pxFirst = () => pxComp(0).toDataURL("image/png");
 // A plant's picture sets its ratio (a new one gets a stand-in PLANT_SPRITES entry); a rock shape is that biome's nth picture for its type
 function pxTryLand(){
   const pl = px.path.match(/^sprites\/plants\/([a-z0-9-]+)\.png$/), rk = px.path.match(/^sprites\/rocks\/([a-z]+)-([a-z]+)-(\d+)\.png$/);
@@ -338,7 +410,7 @@ function pxTryLand(){
 }
 // The picture's SPRITE_HIT entry, measured like tools/spritehit.py: [width, height, base half-width, whole half-width, 4 px silhouette bands]
 function pxHit(){
-  const f = px.frames[0], w = px.fw, h = px.fh, rows = [];
+  const f = pxCompData(0), w = px.fw, h = px.fh, rows = [];
   for(let y = 0; y < h; y++){ const r = []; for(let x = 0; x < w; x++) if(f[pxAt(x, y) + 3] > 20) r.push(x); rows.push(r); }
   const ys = rows.map((r, y) => r.length ? y : -1).filter(y => y >= 0); if(!ys.length) return null;
   const y0 = ys[0], y1 = ys[ys.length - 1] + 1, xs = rows.flat(), base = rows.slice(Math.max(y0, y1 - Math.max(2, Math.floor((y1 - y0) / 4))), y1).flat(), bands = [];
@@ -404,15 +476,21 @@ async function pxImport(file){
   try{
     const im = await pxImg(URL.createObjectURL(file));
     if(im.width > 2048 || im.height > 512) return ui.toast("That picture is too big for a sprite.", "bad");
-    pxDrop(); px.undo.push(pxSnap()); const n = px.path ? pxGuess(px.path, im.width, im.height) : 1;
+    pxDrop(); px.undo.push(pxSnap()); px.redo = [];
+    if(px.frames.length && im.width === px.fw * px.frames.length && im.height === px.fh){   // the same size as the strip: a new layer on top, to trace or combine
+      const cuts = pxCuts(im, px.frames.length); px.frames.forEach((f, i) => f.push(cuts[i]));
+      px.layers.push({...pxLayerNew(px.layers.length + 1), name:file.name.replace(/\.[a-z]+$/i, "").slice(0, 24)}); px.lay = px.layers.length - 1;
+      pxChanged(); return ui.toast(`Imported ${file.name} as a new layer.`);
+    }
+    const n = px.path ? pxGuess(px.path, im.width, im.height) : 1;
     pxSlice(im, im.width % n ? 1 : n); px.cur = 0; px.sel = null;
     if(!px.path) px.path = "sprites/" + file.name.replace(/[^a-z0-9._-]/gi, "").toLowerCase();
-    pxFit(); pxChanged(); ui.toast(`Imported ${file.name} into ${px.path}.`);
+    pxFit(); pxChanged(); ui.toast(`Imported ${file.name} into ${px.path}. A picture the size of the open strip comes in as a new layer instead.`);
   }catch{ ui.toast("That file isn't a picture I can read.", "bad"); }
 }
 
 /* ---------- panel ---------- */
-const pxIcon = k => `<svg viewBox="0 0 21 21" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="${PX_ICONS[k]}"/></svg>`;
+const pxIcon = k => `<svg viewBox="0 0 21 21" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round" stroke-linecap="round"><path d="${PX_ICONS[k]}"${PX_DASH[k] || ""}/></svg>`;
 function pxBuild(){
   const D = document.getElementById("dlgPixel");
   D.innerHTML = `<div class="pxbar">
@@ -432,6 +510,10 @@ function pxBuild(){
         <label class="pxrow"><span>Opacity</span><input type="range" min="0" max="255" id="pxAlpha"><span class="num" id="pxAlphaN"></span></label>
         <div class="pxrow"><select id="pxPal"><option value="image">This picture's colors</option><option value="park">Park style (genesis_style.py)</option><option value="dime">Dimetrodon reference</option></select><span class="meta num" id="pxCount"></span></div>
         <div class="pxpal" id="pxSw"></div><div class="meta">Left or right click to pick. Double-click a color to change it everywhere.</div></section>
+      <section><h3>Layers</h3><div class="pxlayers" id="pxLayers"></div>
+        <div class="pxrow"><button class="btn" data-px="ladd">Add</button><button class="btn" data-px="ldup">Copy</button><button class="btn" data-px="ldel">Delete</button><button class="btn" data-px="lup" title="Move up">▲</button><button class="btn" data-px="ldown" title="Move down">▼</button><button class="btn" data-px="lmerge" title="Paint this layer onto the one under it">Merge down</button></div>
+        <label class="pxrow"><span>Layer opacity</span><input type="range" min="0" max="100" id="pxLAlpha"><span class="num" id="pxLAlphaN"></span></label>
+        <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened.</div></section>
       <section><h3>Frames</h3><div class="pxframes" id="pxFrames"></div>
         <div class="pxrow"><button class="btn" data-px="fadd">Add</button><button class="btn" data-px="fdup">Copy</button><button class="btn" data-px="fdel">Delete</button><button class="btn" data-px="fleft" title="Move earlier">◀</button><button class="btn" data-px="fright" title="Move later">▶</button></div>
         <label class="pxrow"><span>Speed</span><input type="number" min="1" max="30" id="pxFps" class="pxnum"><span>a second</span><label><input type="checkbox" id="pxOnion"> Onion skin</label></label>
@@ -442,13 +524,14 @@ function pxBuild(){
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
         <label class="pxrow"><span>Underneath</span><select id="pxRef"></select></label>
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
-        <div class="meta">Shift+arrows nudge the frame a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
+        <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
         <div id="pxQueue"></div></section>
     </div></div>
   <div class="pxover" id="pxOver" hidden></div>`;
   pxCv = document.getElementById("pxCv"); pxCtx = pxCv.getContext("2d"); pxStage = document.getElementById("pxStage"); pxPrev = document.getElementById("pxPrev"); pxTmp = document.createElement("canvas");
   pxCv.addEventListener("pointerdown", pxDown); pxCv.addEventListener("pointermove", pxMove); pxCv.addEventListener("pointerup", pxUp); pxCv.addEventListener("pointercancel", pxUp);
+  pxCv.style.cursor = pxCursor(px.tool);
   pxCv.addEventListener("pointerleave", () => { px.hover = null; pxDraw(); }); pxCv.addEventListener("contextmenu", e => e.preventDefault());
   pxStage.addEventListener("wheel", pxWheel, {passive:false});
   pxStage.addEventListener("pointerdown", e => { if(e.target === pxStage && px.tool === "select"){ pxDrop(); px.sel = null; pxChanged(); } });
@@ -456,7 +539,7 @@ function pxBuild(){
   D.addEventListener("input", pxInput); D.addEventListener("change", pxInput);
   document.addEventListener("keydown", e => { if(D.open) pxKey(e); }); document.addEventListener("keyup", e => { if(e.key === " ") px.space = false; });
   D.addEventListener("cancel", e => { if(px.sel || !document.getElementById("pxOver").hidden){ e.preventDefault(); pxEsc(); } });
-  D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, {png:pxPng(), n:px.frames.length, fps:px.fps}); } });
+  D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, pxDraft()); } });
   px.built = true;
 }
 function pxSync(){
@@ -479,8 +562,9 @@ function pxSync(){
   [...fr.children].forEach((b, i) => {
     b.setAttribute("aria-pressed", i === px.cur);
     const cv = b.querySelector("canvas"), s = Math.max(1, Math.floor(44 / Math.max(px.fw, px.fh)));
-    cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; pxLayer(ctx, px.frames[i], 0, 0, s, 1);
+    cv.width = px.fw * s; cv.height = px.fh * s; const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.drawImage(pxComp(i), 0, 0, cv.width, cv.height);
   });
+  pxLayersSync();
   const refs = ["", ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxGuideNote").hidden = px.guide == null;
@@ -493,7 +577,7 @@ function pxSync(){
     : !px.queue.length ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
     : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
 }
-function pxTool(t){ if(px.tool === "select" && t !== "select"){ pxDrop(); px.sel = null; } px.tool = t; pxSync(); pxDraw(); }
+function pxTool(t){ if(px.tool === "select" && t !== "select"){ pxDrop(); px.sel = null; } px.tool = t; if(pxCv) pxCv.style.cursor = pxCursor(t); pxSync(); pxDraw(); }
 function pxZoom(d){ px.zoom = Math.max(1, Math.min(64, px.zoom + d * Math.max(1, Math.round(px.zoom / 6)))); pxDraw(); pxSync(); }
 function pxEsc(){ const o = document.getElementById("pxOver"); if(!o.hidden){ o.hidden = true; return; } if(px.sel){ pxDrop(); px.sel = null; pxChanged(); } }
 // Overlays: the picture list and the new-picture form
@@ -563,7 +647,10 @@ async function pxSetRef(path){
   pxDraw(); pxSync();
 }
 function pxClick(e){
-  const b = e.target.closest("button"); if(!b) return;
+  const b = e.target.closest("button"), row = e.target.closest("[data-layer]");
+  if(b && b.dataset.eye){ const L = px.layers[+b.dataset.eye]; L.show = !L.show; return pxChanged(); }
+  if(row && +row.dataset.layer !== px.lay){ pxDrop(); px.sel = null; px.lay = +row.dataset.layer; pxDraw(); pxSync(); }
+  if(!b) return;
   if(b.dataset.tool) return pxTool(b.dataset.tool);
   if(b.dataset.size){ px.size = +b.dataset.size; return pxSync(); }
   if(b.dataset.frame !== undefined){ pxDrop(); px.sel = null; px.cur = +b.dataset.frame; pxDraw(); return pxSync(); }
@@ -585,6 +672,7 @@ function pxClick(e){
     grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
     revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
     close:() => document.getElementById("dlgPixel").close(), swap:() => { [px.c1, px.c2] = [px.c2, px.c1]; pxSync(); },
+    ladd:() => pxLayerOp("add"), ldup:() => pxLayerOp("dup"), ldel:() => pxLayerOp("del"), lup:() => pxLayerOp("up"), ldown:() => pxLayerOp("down"), lmerge:() => pxLayerOp("merge"),
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
@@ -602,6 +690,8 @@ function pxInput(e){
   else if(id === "pxNt") pxNewFill(true);
   else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);
   else if(id === "pxRef") pxSetRef(t.value);
+  else if(id === "pxLAlpha"){ px.layers[px.lay].alpha = +t.value / 100; document.getElementById("pxLAlphaN").textContent = t.value + "%"; pxDraw(); if(e.type === "change") pxChanged(); }
+  else if(t.dataset.lname && e.type === "change"){ px.layers[+t.dataset.lname].name = t.value.trim().slice(0, 32) || "Layer"; t.blur(); pxChanged(); }
   else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
   else if(id === "pxFile" && t.files[0]){ pxImport(t.files[0]); t.value = ""; }
 }
