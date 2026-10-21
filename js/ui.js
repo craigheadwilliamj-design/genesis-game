@@ -255,7 +255,7 @@ function exhibitHtml(e){
     h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at ORACLE</span>`;
     h += `</div>`;
     const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
-    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}Guests see in at ${Math.round(viewFactor(e, derived.reach) * 100)}%.${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
     h += `</section>`;
   }
 
