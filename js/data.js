@@ -444,11 +444,11 @@ const STARTER_POOLS = {
 //   minRating  stars the park needs before you can build it
 const BUILDINGS = {
   // Dining and retail come in the same three tiers and sizes: cart (1 item), stand (3 items), and a large restaurant or shop (5 items)
-  // the food cart's footprint is its picture's base (sprites/bld/kiosk-*.png: 29 px across the front, 20 px across the side)
+  // the food and gift carts' footprint is their picture's base (sprites/bld/kiosk-*.png and cart-*.png: 29 px across the front, 20 px across the side)
   kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:3.8, d:2.6, kind:"food",  menuSlots:1, slots:2,  serveMin:3},
   food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:8,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
   restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:18, d:14, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
-  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5,  d:4,  kind:"merch", menuSlots:1, slots:2,  serveMin:3},
+  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:3.8, d:2.6, kind:"merch", menuSlots:1, slots:2,  serveMin:3},
   shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:8,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
   megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:18, d:14, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
   restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:8,  d:6,  serves:["bladder"], slots:4, serveMin:3},
@@ -1250,7 +1250,7 @@ const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "di
                      "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
 // CERES grows medicine in batches (see CERES_GROW) once ORACLE has unlocked its type
 const MEDICINE = {
-  capacity:60,         // doses CERES holds
+  capacity:60,         // doses CERES holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
   feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit

@@ -1191,6 +1191,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
     state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
     out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
+    // a pile of one era's medicine doesn't stop CERES regrowing another's
+    state.ceres.meds = {medpal:0, medmes:0, medcen:medCap()};
+    out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
 
     // medicine only cures a period's animals once refined for it
