@@ -44,8 +44,6 @@ figcaption{font-size:13px;color:var(--dim)}
 #track:focus-visible #thumb::before{box-shadow:0 0 0 3px var(--accent)}
 #labels{display:flex;gap:2px;margin-top:-4px}
 #labels span{flex:1;min-width:0;font:500 10px/1.2 var(--mono);color:var(--dim);text-align:center;overflow:hidden;white-space:nowrap}
-.opts{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--dim)}
-.opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
 /* site list + card */
 #list{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
 #list button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:6px}
@@ -86,11 +84,6 @@ button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
       <div id="thumb"></div>
     </div>
     <div id="labels"></div>
-  </div>
-
-  <div class="opts">
-    <label><input type="radio" name="show" id="showLive" value="live" checked> Show sites only while their animals lived</label>
-    <label><input type="radio" name="show" id="showEpoch" value="epoch"> Show every site in this epoch</label>
   </div>
 
   <ul id="list" aria-label="Sites in view"></ul>
@@ -149,12 +142,12 @@ function fmtYearsAgo(y){
 }
 const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
 
-// Which sites have been surveyed is per viewer, a test convenience only.
+// A site shows for the whole of any epoch its window touches.
+// Which sites GHOST has scouted is per viewer, a test convenience only.
 let lit = new Set();
 try { lit = new Set(JSON.parse(localStorage.getItem("ghost-timeline-lit") || "[]")); } catch(e) {}
 const saveLit = () => { try { localStorage.setItem("ghost-timeline-lit", JSON.stringify([...lit])); } catch(e) {} };
-let mode = "live", u = uAt(375e6), sel = null;
-try { const m = localStorage.getItem("ghost-timeline-mode"); if(m === "epoch" || m === "live") mode = m; } catch(e) {}
+let u = uAt(375e6), sel = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
@@ -167,8 +160,7 @@ function buildTrack(){
 }
 
 function visibleSites(now){
-  return SITES.filter(s => s.at[now.epoch.period.id] &&
-    (mode === "live" ? now.years <= s.from && now.years >= s.to : s.from > now.epoch.to && s.to < now.epoch.from));
+  return SITES.filter(s => s.at[now.epoch.period.id] && s.from > now.epoch.to && s.to < now.epoch.from);
 }
 
 function render(){
@@ -186,18 +178,17 @@ function render(){
     : `<ellipse cx="65" cy="32.5" rx="64" ry="31.5" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="65" y="34">No ${esc(p.id)} map yet</text>`;
   if(map) for(const s of sites){
     const [x, y] = s.at[p.id], on = lit.has(s.id);
-    svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unsurveyed site")}">
+    svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unscouted site")}">
       <rect class="ring" x="${x - 2.5}" y="${y - 2.5}" width="5" height="5"/>
       <rect x="${x - 1}" y="${y - 1}" width="3" height="3" fill="var(--marker)"/>
       <rect x="${x}" y="${y}" width="1" height="1" fill="${on ? "var(--accent)" : "var(--marker)"}"/>
       <circle class="hit" cx="${x + .5}" cy="${y + .5}" r="6"/></g>`;
   }
   $("map").innerHTML = svg;
-  $("cap").textContent = !map ? `Only the Devonian has a map so far.` : sites.length ? `${sites.length} site${sites.length > 1 ? "s" : ""} in view. Tap one.` :
-    mode === "live" ? "No known sites at this moment. Slide a little, or show every site in the epoch." : "No known sites in this epoch.";
+  $("cap").textContent = !map ? `Only the Devonian has a map so far.` : sites.length ? `${sites.length} site${sites.length > 1 ? "s" : ""} in this epoch. Tap one.` : "No known sites in this epoch.";
 
   if(sel && !sites.some(s => s.id === sel)) sel = null;
-  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${lit.has(s.id) ? "lit" : ""}"></i>${esc(lit.has(s.id) ? s.name : "Unsurveyed site, " + fmtMa(s.from) + " Ma")}</button></li>`).join("");
+  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${lit.has(s.id) ? "lit" : ""}"></i>${esc(lit.has(s.id) ? s.name : "Unscouted site, " + fmtMa(s.from) + " Ma")}</button></li>`).join("");
   renderCard();
 }
 
@@ -205,13 +196,14 @@ function renderCard(){
   const s = SITES.find(x => x.id === sel), c = $("card");
   if(!s){ c.innerHTML = `<p class="empty">Pick a site on the map to see what's there.</p>`; return; }
   const on = lit.has(s.id), win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
+  const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`;
   c.innerHTML = on ? `<h2>${esc(s.name)}</h2><div class="where">${esc(s.where)}</div>
     <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>${s.fauna.map(esc).join(", ")}</dd>
-    <dt>Trip</dt><dd>$${s.trip.toLocaleString("en-US")} · ${s.days} days · ${Math.round(s.risk * 100)}% chance it comes back empty</dd></dl>
-    <div class="btns"><button id="go" disabled>Send expedition</button><button class="ghost" id="forget">Forget survey</button></div>`
-  : `<h2>Unsurveyed site</h2><div class="where">Somewhere in the ${esc(s.from > 1e6 ? EPOCHS.find(e => s.from <= e.from && s.from > e.to).name : "past")}</div>
-    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Unknown until ORACLE surveys it</dd></dl>
-    <div class="btns"><button id="survey">Survey (ORACLE)</button></div>`;
+    <dt>Trip</dt><dd>${trip}</dd><dt>Survey Success</dt><dd>${Math.round((1 - s.risk) * 100)}%</dd></dl>
+    <div class="btns"><button id="go" disabled>Send expedition</button><button class="ghost" id="forget">Forget scouting</button></div>`
+  : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Unknown until GHOST scouts it</dd><dt>Trip</dt><dd>${trip}</dd></dl>
+    <div class="btns"><button id="survey">Send scouting trip</button></div>`;
 }
 
 function pick(id){ sel = id; render(); }
@@ -221,10 +213,6 @@ $("list").addEventListener("click", ev => { const b = ev.target.closest("button"
 $("card").addEventListener("click", ev => {
   if(ev.target.id === "survey"){ lit.add(sel); saveLit(); render(); }
   if(ev.target.id === "forget"){ lit.delete(sel); saveLit(); render(); }
-});
-document.querySelectorAll('input[name="show"]').forEach(r => {
-  r.checked = r.value === mode;
-  r.addEventListener("change", () => { mode = r.value; try { localStorage.setItem("ghost-timeline-mode", mode); } catch(e) {} render(); });
 });
 
 // Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
