@@ -496,7 +496,7 @@ const hli = (level, text) => `<li class="hl ${level}">${text}</li>`;
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
   if(!e.animals.length && !away.length) return "";
-  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
+  const hr = healthReport(e), items = [];
   let h = `<section><h3>Health</h3>`;
   if(!healthActive()) items.push(hli("ok", `Animals start falling ill on ${fmtDate(state.health.from)}.`));
   if(hr.sick.length){
@@ -505,15 +505,12 @@ function healthHtml(e){
   } else if(e.animals.length) items.push(hli("ok", "Everyone looks healthy."));
   if(e.animals.length){
     const d = daysSinceCheck(e), late = d >= HEALTH.checkEvery;
-    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.`));
+    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`}`));
   }
   if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
-    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
-  }
-  if(e.animals.length > hr.sick.length){
-    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => RISK_WHY[w] || w).join(", ")}.` : ""}`));
+    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}`));
   }
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
