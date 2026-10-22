@@ -3691,6 +3691,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
     await pxSetRef(""); px.refUrl = "";
     pxTool("pan"); out.pixelPanTool = pxPans({button:0}) && pxPans({button:1}) && pxCv.style.cursor === "grab" && !!document.querySelector('#dlgPixel [data-tool="pan"]'); pxTool("pencil");
+    // the lasso snaps to pixels: a triangle's ring and inside, and copy and paste keep its shape
+    const tri = pxLassoSel([[0, 0], [6, 0], [0, 6]]); let triN = 0; tri.mask.forEach(v => triN += v);
+    px.sel = tri; pxCopy(false); const pasteBefore = px.undo.length; pxPaste();
+    out.pixelLasso = tri.w === 7 && tri.h === 7 && triN === 28 && tri.mask[6] === 1 && tri.mask[7 * 6 + 6] === 0 && pxInSel(tri, 1, 1) && !pxInSel(tri, 6, 6) && !pxLassoSel([[2, 2]])
+      && !!px.sel.mask && px.sel.buf.length === 7 * 7 * 4 && px.undo.length === pasteBefore + 1 && pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 0, 0, 0, 0])) === pxSig(2, 1, new Uint8ClampedArray([1, 2, 3, 255, 9, 9, 9, 0]));
+    px.sel = null; pxUndo(false);
     out.pixelLayers = stacked && hid && merged && px.layers.length === 2 && pxDraft().layers.length === 2;
     const before = spriteUrl("sprites/dime-walk.png"); px.path = "sprites/dime-walk.png"; pxTry();
     out.pixelTryInPark = SPRITE_PACK["sprites/dime-walk.png"] !== was && spriteUrl("sprites/dime-walk.png") !== before;
