@@ -774,22 +774,32 @@ function pxOverlay(kind, opt){
   }
   const drafts = pxDrafts(), cats = {animal:"Animals", plant:"Plants", bld:"Buildings", rock:"Rocks"};
   if(px.tab === "need") px.tab = "animal";
+  const undr = !!pxStored("undrawn"), needsOf = c => c === "all" ? ["animal", "plant", "bld"].flatMap(pxNeeds) : pxNeeds(c);
   o.innerHTML = `<div class="pxcard wide"><div class="pxrow"><h2>Open a picture</h2><span class="pxgrow"></span><button class="btn" data-px="cancel">Cancel</button></div>
-    <div class="pxrow pxtabs"><button class="btn" data-pxtab="all">Pictures</button><span class="meta">Needs art:</span>${Object.entries(cats).map(([k, l]) => `<button class="btn" data-pxtab="${k}">${l}${k === "rock" ? "" : ` (${pxNeeds(k).length})`}</button>`).join("")}</div>
+    <div class="pxrow pxtabs"><button class="btn" data-pxtab="all">Pictures</button>${Object.entries(cats).map(([k, l]) => `<button class="btn" data-pxtab="${k}">${l} (${pxDrawn(k).length}${k === "rock" ? "" : `, ${pxNeeds(k).length} undrawn`})</button>`).join("")}<span class="pxgrow"></span><label class="pxrow"><input type="checkbox" id="pxUndr"${undr ? " checked" : ""}> Undrawn only</label></div>
     <input id="pxQ" placeholder="${px.tab === "all" ? "Search, like dime or bld/restroom" : "Search"}" autocomplete="off"><div class="pxlist" id="pxList"></div></div>`;
   o.querySelectorAll("[data-pxtab]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pxtab === px.tab));
-  const q = document.getElementById("pxQ"); q.value = pxStored("q") || ""; q.focus(); q.select();
+  const q = document.getElementById("pxQ"), u = document.getElementById("pxUndr"); q.value = pxStored("q") || ""; q.focus(); q.select();
   const list = () => {
-    const t = q.value.trim().toLowerCase(); pxStore("q", t);
-    if(px.tab !== "all"){
-      px.needList = pxNeeds(px.tab).filter(x => !t || (x.label + " " + x.sub).toLowerCase().includes(t));
-      document.getElementById("pxList").innerHTML = px.needList.map((x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">Everything here has a picture.</p>`;
-      return;
-    }
-    const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b));
-    document.getElementById("pxList").innerHTML = (t ? `<p class="meta" style="grid-column:1/-1">${ps.length} of ${Object.keys(SPRITE_PACK).length} pictures match.</p>` : `<p class="meta" style="grid-column:1/-1">All ${ps.length} pictures. Search to narrow.</p>`) + ps.map(p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">No picture matches that.</p>`;
+    const t = q.value.trim().toLowerCase(), only = u.checked; pxStore("q", t); pxStore("undrawn", only ? 1 : 0);
+    const note = s => `<p class="meta" style="grid-column:1/-1">${s}</p>`, hit = x => !t || (x.label + " " + x.sub).toLowerCase().includes(t);
+    px.needList = needsOf(px.tab).filter(hit);
+    const needBtn = (x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`;
+    const drawnBtn = p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`;
+    const ps = only ? [] : pxDrawn(px.tab).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b));
+    const html = px.needList.map(needBtn).join("") + ps.map(drawnBtn).join("");
+    document.getElementById("pxList").innerHTML = note(`${ps.length + px.needList.length} shown${only ? ", undrawn only" : ""}.`) + (html || note("Nothing matches that."));
   };
-  q.oninput = list; list();
+  q.oninput = list; u.onchange = list; list();
+}
+// Every picture in the pack that belongs to a category (animal pictures and rig parts are named by species id)
+function pxDrawn(cat){
+  const ps = Object.keys(SPRITE_PACK);
+  if(cat === "all") return ps;
+  if(cat === "plant") return ps.filter(p => p.startsWith("sprites/plants/"));
+  if(cat === "bld") return ps.filter(p => p.startsWith("sprites/bld/"));
+  if(cat === "rock") return ps.filter(p => p.startsWith("sprites/rocks/"));
+  return ps.filter(p => SPECIES_BY_ID[p.slice(8).split(/[\/.-]/)[0]]);
 }
 // What still has no picture, as entries for the new-picture form: species (dots), plants, buildings and props (drawn boxes), and one more shape for each biome's rocks
 function pxNeeds(cat){
