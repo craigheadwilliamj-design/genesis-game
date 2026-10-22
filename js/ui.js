@@ -903,8 +903,7 @@ function askConfirm(title, text, yes, onYes, no = "Cancel"){
   d.showModal();
 }
 
-/* ---------- animal catalog ---------- */
-let catFilter = "all";
+/* ---------- Paleopedia ---------- */
 
 // Where a species stands: can you get it now, is it on its way, or not started yet?
 function speciesStatus(s){
@@ -919,36 +918,75 @@ function speciesStatus(s){
   return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
 }
 
-function catalogHtml(){
-  const owned = new Map();
-  for(const e of state.exhibits) for(const a of e.animals) owned.set(a.sp, (owned.get(a.sp) || 0) + 1);
-  const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-  let h = "", shown = 0;
-  for(const per of order){
-    const list = SPECIES.filter(s => s.period === per && speciesAvailable(s.id)).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
-    if(!list.length) continue;
-    shown += list.length;
-    const p = PERIOD_BY_ID[per];
-    h += `<section class="cat-period"><h3><span class="dot" style="background:${PERIOD_COLOR[per]}"></span>${per} <span class="meta">${p.ago}</span></h3><div class="cat-grid">`;
-    for(const {s, st} of list){
-      const n = owned.get(s.id) || 0;
-      h += `<div class="cat-card"><span class="nm">${speciesName(s)}</span>
-        <span class="stats">${dietText(s)}. ${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}. ${money(s.food)}/day food. Appeal ${s.appeal}.</span>
-        <span class="how ${st.cls}">${esc(st.how)}</span>
-        ${st.lock ? `<span class="lock">${esc(st.lock)}</span>` : ""}
-        ${n ? `<span class="have">${n} in your park</span>` : ""}</div>`;
-    }
-    h += `</div></section>`;
+// Known to the Paleopedia: a starter, a discovered species, or one with DNA already collected
+const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
+let ppPick = null;   // species id open on the card
+let ppPeriod = null; // period tab open, or null for none
+// A species' sprite box: a patch of its first biome's ground, laid from the same 1 m tiles as the map (biomepaint.js)
+const ppGround = {};   // biome -> data URL of the patch (null while its tiles load)
+const PP_SCALE = 2, PP_CELLS = [24, 14];
+function ppGroundUrl(biome){
+  const T = GROUND_TILES[biome];
+  if(!T) return spriteUrl(`sprites/ground/${biome}.png`);
+  if(biome in ppGround) return ppGround[biome];
+  ppGround[biome] = null;
+  const n = T.plain + T.detail, tiles = [], pick = groundPicks(T.plain, T.detail, T.share); let left = n;
+  for(let i = 0; i < n; i++){
+    const t = new Image(); tiles.push(t);
+    t.onload = () => {
+      if(--left) return;
+      const [W, H] = PP_CELLS, px = GROUND_TILE_PX, c = document.createElement("canvas"); c.width = W * px; c.height = H * px;
+      const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+      for(let x = 0; x < W; x++) for(let y = 0; y < H; y++){
+        const k = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(k + 1) ? 0 : cellHash(x + 7919, y + 104729) % (T.turn === false ? 2 : 8), h = px / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+        g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * px + h, y * px + h);
+        g.drawImage(tiles[k], -h, -h);
+      }
+      try { ppGround[biome] = c.toDataURL(); } catch(e){ return; }
+      document.querySelectorAll(`.pp-pic[data-biome="${biome}"]`).forEach(el => el.style.background = ppBg({id:"", biome}));
+    };
+    t.src = spriteUrl(`sprites/ground/${biome}-${i + 1}.png`);
   }
-  if(!shown) h = `<div class="meta">Nothing here yet.</div>`;
-  return h;
+  return null;
+}
+const ppBiome = s => s.biome || (biomesOf(s) || [])[0];
+const ppBg = s => { const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); return u ? `${BIOMES[b].color} url('${u}') 0 0/${PP_CELLS[0] * GROUND_TILE_PX * PP_SCALE}px ${PP_CELLS[1] * GROUND_TILE_PX * PP_SCALE}px` : BIOMES[b].color; };
+const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
+
+function ppCard(s){
+  const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
+  let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
+  const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
+    + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
+    + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
+    + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
+    + `</dl></div><div class="pp-right"><h3>${esc(s.name)}</h3><i class="pp-sci">${esc(I.sci || "")}</i>`
+    + `<p class="pp-desc">${I.desc ? esc(I.desc) : "No notes on this animal yet."}</p></div>`
+    + `<div class="pp-acq"><span class="how ${st.cls}">${esc(st.how)}</span>${st.lock ? ` <span class="lock">${esc(st.lock)}</span>` : ""}${n ? ` <span class="have">${n} in your park.</span>` : ""}</div></div>`;
+}
+
+function catalogHtml(){
+  const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
+  const all = SPECIES.filter(s => speciesAvailable(s.id)), pers = order.filter(per => all.some(s => s.period === per));
+  if(!pers.includes(ppPeriod)) ppPeriod = null;
+  const tabs = pers.map(per => `<button class="pp-tab" data-per="${per}" aria-pressed="${per === ppPeriod}">${per}</button>`).join("");
+  if(!ppPeriod) return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="meta">Pick a period.</div></div>`;
+  const here = all.filter(s => s.period === ppPeriod), got = here.filter(ppKnown), p = PERIOD_BY_ID[ppPeriod];
+  if(!got.some(s => s.id === ppPick)) ppPick = got.length ? got[0].id : null;
+  const list = `<h3 class="pp-ph"><span class="dot" style="background:${PERIOD_COLOR[ppPeriod]}"></span>${ppPeriod} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
+    + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${esc(s.name)}</button>`).join("")
+    + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div>`;
+  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered in this period yet.</div>`;
+  return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div></div>`;
 }
 
 function openCatalog(){ $("#catalogBody").innerHTML = catalogHtml(); if(!$("#dlgAnimals").open) $("#dlgAnimals").showModal(); }
 $("#animalsBtn").onclick = openCatalog;
 $("#closeAnimals").onclick = () => $("#dlgAnimals").close();
-document.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => {
-  catFilter = b.dataset.filter;
-  document.querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b));
-  $("#catalogBody").innerHTML = catalogHtml();
-});
+$("#catalogBody").onclick = e => {
+  const t = e.target.closest("[data-per]"), b = e.target.closest("[data-sp]");
+  if(t){ ppPeriod = ppPeriod === t.dataset.per ? null : t.dataset.per; $("#catalogBody").innerHTML = catalogHtml(); }
+  else if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
+};
