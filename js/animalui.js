@@ -26,7 +26,7 @@ function animalHealthItems(a, e, s){
   const out = [], sk = noticed(a) ? a.sick : null, hit = sk && sk.hit;
   if(sk){
     const what = sk.kind === "injury" ? "Injured" : "Ill", cause = sk.cause === "trash" ? " from eating trash" : hit ? (hit.how === "fight" ? `, wounded in a fight with a ${hit.by}` : `, bitten by a ${hit.by}`) : "";
-    out.push([sk.sev >= 40 ? "bad" : "warn", `${what}${cause}, ${Math.round(sk.sev)}% severe${sk.chronic ? " (chronic)" : ""}.`]);
+    out.push([sk.sev >= 40 ? "bad" : "warn", `${what}${cause}${sk.chronic ? " (chronic)" : ""}.`]);
     out.push(["warn", sickStatus(e, a)]);
   } else out.push(["ok", "Looks healthy."]);
   const q = a.q ?? 90;
