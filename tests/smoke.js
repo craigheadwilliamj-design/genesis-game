@@ -3273,7 +3273,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // the front turns: the front vector follows the angle, and the picture changes with it
     const mk = r => ({id:"pf", type:"bench", points:rectPts(150, 150, 3, 1.4, r * Math.PI / 4)});
     out.propFrontTurns = [0, 1, 2, 3].every(r => { const f = propFront(mk(r)), a = r * Math.PI / 4; return Math.abs(f[0] + Math.sin(a)) < 1e-6 && Math.abs(f[1] - Math.cos(a)) < 1e-6; }) && propArt(mk(0), .1, false, false) !== propArt(mk(2), .1, false, false) && propArt(mk(0), .1, false, false) !== propArt(mk(4), .1, false, false);
-    out.propFrontsDiffer = names.every(ty => { const t = BUILDINGS[ty], at = r => propArt({id:"pd", type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}, .1, false, false); return at(0) !== at(4); });
+    // a pictured prop with no back picture (the lamp) shows its front both ways
+    out.propFrontsDiffer = names.filter(ty => !PROP_PICS[ty] || SPRITE_PACK[`sprites/bld/${ty}-back.png`]).every(ty => { const t = BUILDINGS[ty], at = r => propArt({id:"pd", type:ty, points:rectPts(150, 150, t.w, t.d, r * Math.PI / 4)}, .1, false, false); return at(0) !== at(4); });
     // placing with a rotation stores it
     state.sandbox = true; state.over = false; state.money = 1e7;
     let placed = null;
