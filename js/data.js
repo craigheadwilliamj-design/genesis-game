@@ -931,6 +931,7 @@ const LAMP = {
   litAt:.25,           // a path corner this lit counts as lit (0 to 1)
   visRadius:8,         // meters of pool drawn round a lamp (the gameplay radius above is wider)
   steps:[[1, .62], [.66, .36], [.33, .16]],   // [share of visRadius, share of night left] per step, outer to inner
+  px:.26,              // meters a pixel of the light pools and head glow (two art pixels), so their edges stair-step
   glow:"#FFC96B",      // warm light
   tint:.07,            // opacity of the warm tint over the pool
   headH:3.0,           // meters up the glow hangs: just under the lamp head, so the head itself stays visible
