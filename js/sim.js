@@ -523,7 +523,7 @@ const vivRank = size => ({S:1, M:2, L:3})[size] || 0;
 // A diet can be written as one word or a list; treat it as a list everywhere
 for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
 const eats = (s, d) => s.diet.includes(d);
-const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.bug ? ", bug" : "");
+const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.bug ? ", bug" : "");
 
 // Does species x go after species y? Returns how, or null if it leaves it alone.
 // The rules are explained next to SPECIES in data.js.

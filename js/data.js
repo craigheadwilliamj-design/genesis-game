@@ -75,6 +75,7 @@ const UPKEEP = {
 //   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore
 //   predator true means it attacks any other species, so it can only live with its own kind
 //   bug      true for insects, arachnids, and other arthropods
+//   semi     true for the semi-aquatic tag, shown after the diet (display only for now; piscivores already want water)
 //
 //   Who can share an exhibit (size means how much room each animal needs):
 //     predators share with no other species
@@ -109,7 +110,7 @@ const SPECIES = [
   {id:"coty", name:"Cotylorhynchus", period:"Permian", diet:["herbivore"], price:13000, food:180, space:900, group:[2,5], appeal:8, stars:1.5},
   {id:"ante", name:"Anteosaurus",    period:"Permian", diet:["carnivore"], predator:true, price:15000, food:150, space:800, group:[1,3], appeal:9, stars:2},
   {id:"inos", name:"Inostrancevia",  period:"Permian", diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
-  {id:"prio", name:"Prionosuchus",   period:"Permian", diet:["piscivore"], price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
+  {id:"prio", name:"Prionosuchus",   period:"Permian", diet:["piscivore"], semi:true, price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
   // Triassic
   {id:"sile", name:"Silesaurus",     period:"Triassic", diet:["omnivore"], price:3500, food:25, space:100, group:[3,10], appeal:3, stars:0},
   {id:"shar", name:"Sharovipteryx",  period:"Triassic", diet:["insectivore"], price:3800, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
@@ -177,7 +178,7 @@ const SPECIES = [
   {id:"cnot", name:"Carnotaurus",    period:"Cretaceous", diet:["carnivore"], predator:true, price:36000, food:380, space:2200, group:[1,2],  appeal:16, stars:3.5},
   {id:"dche", name:"Deinocheirus",   period:"Cretaceous", diet:["omnivore","piscivore"], price:38000, food:420, space:2500, group:[1,3],  appeal:16, stars:3.5},
   {id:"quet", name:"Quetzalcoatlus", period:"Cretaceous", diet:["carnivore"], price:45000, food:400, space:3000, group:[1,4],  appeal:19, stars:4},
-  {id:"spin", name:"Spinosaurus",    period:"Cretaceous", diet:["piscivore","carnivore"], price:55000, food:600, space:3500, group:[1,2],  appeal:20, stars:4},
+  {id:"spin", name:"Spinosaurus",    period:"Cretaceous", diet:["piscivore","carnivore"], semi:true, price:55000, food:600, space:3500, group:[1,2],  appeal:20, stars:4},
   {id:"pata", name:"Patagotitan",    period:"Cretaceous", diet:["herbivore"], price:60000, food:800, space:5500, group:[2,5], appeal:21, stars:4.5},
   {id:"carc", name:"Carcharodontosaurus", period:"Cretaceous", diet:["carnivore"], predator:true, price:70000, food:750, space:4000, group:[1,2],  appeal:22, stars:4.5},
   {id:"trex", name:"Tyrannosaurus rex", period:"Cretaceous", diet:["carnivore"], predator:true, price:80000, food:800, space:4000, group:[1,2],  appeal:25, stars:4.5},
