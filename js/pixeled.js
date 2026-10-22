@@ -80,17 +80,12 @@ function pxUsed(){
   return [...seen.values()].sort((a, b) => { const [ha, sa, la] = pxHsl(a), [hb, sb, lb] = pxHsl(b); return (sa < .08) - (sb < .08) || (sa < .08 ? 0 : Math.round(ha / 20) - Math.round(hb / 20)) || la - lb; });
 }
 const pxSwatches = () => px.pal === "park" ? PX_PARK.map(c => c.length === 4 ? c : [...c, 255]) : px.pal === "dime" ? px.dime || [] : pxUsed();
-// The next lighter or darker color in the palette of the same hue (the art's shade steps); off-palette, step the lightness
+// A small lightness nudge, so repeated strokes lighten or darken gently
+const PX_SHADE_STEP = .03;
 function pxShade(c, up){
   if(!c[3]) return c;
-  const [h, s, l] = pxHsl(c), pool = [...pxUsed(), ...pxSwatches()].filter(p => p[3] === c[3]);
-  let best = null, bd = 1e9;
-  for(const p of pool){
-    const [ph, ps, pl] = pxHsl(p), dl = (pl - l) * (up ? 1 : -1); if(dl < .015) continue;
-    const dh = s < .08 && ps < .08 ? 0 : Math.min(Math.abs(ph - h), 360 - Math.abs(ph - h)); if(dh > 12 || Math.abs(ps - s) > .5) continue;
-    const d = dh / 12 + dl * 4 + Math.abs(ps - s); if(d < bd){ bd = d; best = p; }
-  }
-  return best ? best.slice() : [...pxFromHsl(h, s, Math.min(1, Math.max(0, l + (up ? .08 : -.08)))), c[3]];
+  const [h, s, l] = pxHsl(c);
+  return [...pxFromHsl(h, s, Math.min(1, Math.max(0, l + (up ? PX_SHADE_STEP : -PX_SHADE_STEP)))), c[3]];
 }
 
 /* ---------- document ---------- */
