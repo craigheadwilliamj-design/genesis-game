@@ -612,14 +612,37 @@ async function pxDraftPng(dr){
   return cv.toDataURL("image/png");
 }
 // Drafts changed since they were last sent (a queue row newer than the draft means it went)
+// and not just like the game's picture: opening a picture and showing a layer saves a draft too. pxGameEq caches that check per draft save (path -> [time, same]).
+const pxGameEq = {};
+async function pxSameNow(path, t){
+  const c = pxGameEq[path]; if(c && c[0] === t) return c[1] instanceof Promise ? await c[1] : c[1];
+  const job = (async () => {
+    const dr = pxStored("d:" + path), game = SPRITE_PACK[path]; if(!dr || !game) return false;
+    try{
+      const [a, b] = await Promise.all([pxImg(await pxDraftPng(dr)), pxImg(game)]); if(a.width !== b.width || a.height !== b.height) return false;
+      const rgba = im => { const cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const c = cv.getContext("2d"); c.drawImage(im, 0, 0); return c.getImageData(0, 0, im.width, im.height).data; };
+      const da = rgba(a), db = rgba(b); for(let i = 0; i < da.length; i += 4) if(da[i + 3] !== db[i + 3] || da[i + 3] && (da[i] !== db[i] || da[i + 1] !== db[i + 1] || da[i + 2] !== db[i + 2])) return false;
+      return true;
+    }catch{ return false; }
+  })();
+  pxGameEq[path] = [t, job]; const same = await job; if(pxGameEq[path] && pxGameEq[path][1] === job) pxGameEq[path] = [t, same]; return same;
+}
 function pxUnsent(){
-  const sent = new Map(px.queue.map(x => [x.path, x.at]));
-  return Object.entries(pxDrafts()).filter(([path, t]) => !(sent.get(path) >= t)).map(([path]) => path);
+  const sent = new Map(px.queue.map(x => [x.path, x.at])), out = [];
+  for(const [path, t] of Object.entries(pxDrafts())){
+    if(sent.get(path) >= t) continue;
+    const c = pxGameEq[path];
+    if(!c || c[0] !== t) pxSameNow(path, t).then(same => { if(same) pxSync(); });   // the count drops once it's known
+    if(c && c[0] === t && c[1] === true) continue;
+    out.push(path);
+  }
+  return out;
 }
 async function pxSendAll(){
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   pxSaveDraft();
-  const todo = pxUnsent(); if(!todo.length) return ui.toast("Nothing new to send.");
+  const drafts = pxDrafts(), maybe = pxUnsent(), same = await Promise.all(maybe.map(p => pxSameNow(p, drafts[p]))), todo = maybe.filter((p, i) => !same[i]);
+  if(!todo.length) return ui.toast("Nothing new to send: your drafts match the game's pictures.");
   let ok = 0; const blank = [];
   for(const path of todo){
     const dr = pxStored("d:" + path); if(!dr) continue;
