@@ -1253,7 +1253,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
     const lx = {id:"e-land", name:"Land test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     state.exhibits = [lx];
-    const fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
+    const fish = SPECIES.find(s => s.semi);
     lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
     out.landMenu = !!document.querySelector('[data-tool="water"]') && !!document.querySelector('[data-tool="land-rock"]');
     setTool("water"); out.landTool = tool === "water" && $("#drawbar").classList.contains("on"); setTool("select");
@@ -1747,7 +1747,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     { const vb = {viv:"S", biome:"wetland", points:bx.points, animals:[], vivScene:null}; const before = biomeOf(vb); vb.vivScene = {era:"mesozoic", biome:"desert"};
       out.vivBiomeIsScene = before === "wetland" && biomeOf(vb) === "desert" && typeof regradeProblem === "undefined"; }
     { const sp = SPECIES.find(s => !s.viv && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
-      const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => !s.viv && s.diet.includes("piscivore"));
+      const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => s.semi);
       out.wantsBySize = wantsOf({points:pts.map(([x,y]) => [x*2,y*2]), biome:"tropical"}, sp).plants > tW.plants;
       out.wantsByBiome = dW.rock > tW.rock && tW.plants > dW.plants && wantsOf(mk("desert"), fish).water > wantsOf(mk("desert"), sp).water;
       const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
@@ -3690,6 +3690,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.vivLampDrawn = landSvg(ev, null, () => false).includes("sprites/viv/vlamp-pool.png") && landSvg(ev, null, () => false).includes("sprites/viv/vlamp.png");
 
       // pool: water for water lovers (thirst, water share, happiness), animals sit in it partly submerged; distinct from the misters
+      wantHeat.semi = true;   // no vivarium species is semi-aquatic yet, so borrow one as the water lover
       const pv = mk("e-pp", 4, 200 + 30); state.exhibits.push(pv); recompute();
       const dryNo = thirsty(pv, wantHeat), tDry = exhibitReport(pv).target, wat0 = haveOf(pv, wantHeat).water, ill1 = illChance(pv, pv.animals[0]);
       addVivToy(pv, "vpool"); const pool = landOf(pv).find(f => f.type === "vpool");
@@ -3698,6 +3699,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && vivPoolM2(pv) === LAND.vpool.poolM2 && arthLike && !thirsty(pv, SPECIES_BY_ID.arth) && LAND.vpool.pool && !LAND.vmist.pool;
       let sunk = 0; for(let t = 0; t < 8 && sunk < 1; t++){ regatherViv(pv); render(); sunk = [...herd.values()].filter(h => h.exhibitId === pv.id && h.sub && /clip-path/.test(h.el.innerHTML)).length; }
       out.vivPoolSubmerged = sunk >= 1 && !!vivPoolAt(pv, pool.x, pool.y) && !vivPoolAt(pv, pool.x + 5, pool.y);
+      delete wantHeat.semi;
       const poolSvg = landSvg(pv, null, () => false);
       out.vivPoolDrawn = poolSvg.includes("sprites/viv/vpool.png") && poolSvg.includes(`data-y="${pool.y - 1000}"`);
       state.exhibits = state.exhibits.filter(x => x !== pv);
