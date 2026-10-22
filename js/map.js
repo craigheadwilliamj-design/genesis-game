@@ -1366,16 +1366,27 @@ function applyTransform(){ const t = `translate(${view.tx} ${view.ty}) scale(${v
 // Lamp light: the night wash gets stepped holes cut in it round each working lamp (the ground shows at its day color), a faint warm tint
 // over the pool, and a small glow at the lamp head. Each step is one group at a single opacity, so overlapping pools never add up. Redrawn only when the lamp set changes.
 let lightKey = "";
+// A disc as stair-stepped pixels on the world pixel grid (one path of row runs, so overlapping discs in a group union cleanly)
+function pixDisc(cx, cy, r, px){
+  let d = "";
+  const j0 = Math.floor((cy - r) / px), j1 = Math.ceil((cy + r) / px);
+  for(let j = j0; j < j1; j++){
+    const dy = (j + .5) * px - cy, w2 = r * r - dy * dy; if(w2 <= 0) continue;
+    const w = Math.sqrt(w2), i0 = Math.ceil((cx - w) / px - .5), i1 = Math.floor((cx + w) / px - .5);
+    if(i1 >= i0) d += `M${+(i0 * px).toFixed(3)} ${+(j * px).toFixed(3)}h${+((i1 - i0 + 1) * px).toFixed(3)}v${px}h${-+((i1 - i0 + 1) * px).toFixed(3)}z`;
+  }
+  return d;
+}
 function drawLights(){
   const g = $("#lightPools"), h = $("#washHoles"); if(!g || !h) return;
   const spots = lampSpots(), key = spots.map(s => `${s.id}:${s.x.toFixed(1)},${s.y.toFixed(1)}`).join("|");
   if(key !== lightKey){
     lightKey = key;
-    const R = LAMP.visRadius, c = (s, r, fill) => `<circle cx="${s.x.toFixed(2)}" cy="${s.y.toFixed(2)}" r="${r.toFixed(2)}" fill="${fill}"/>`;
+    const R = LAMP.visRadius, px = LAMP.px, c = (s, r, fill) => `<path d="${pixDisc(s.x, s.y, r, px)}" fill="${fill}" shape-rendering="crispEdges"/>`;
     let left = 1, holes = "";   // the share of night left in each step; a step's group opacity cuts it from what the step before left
     LAMP.steps.forEach(([share, wash]) => { holes += `<g opacity="${(1 - wash / left).toFixed(3)}">${spots.map(s => c(s, R * share, "#000")).join("")}</g>`; left = wash; });
     h.innerHTML = holes;
-    const head = s => `<circle cx="${s.hx.toFixed(2)}" cy="${(s.hy - LAMP.headH / TILT).toFixed(2)}" r="${LAMP.headR}" fill="${LAMP.glow}"/>`;
+    const head = s => `<path d="${pixDisc(s.hx, s.hy - LAMP.headH / TILT, LAMP.headR, px)}" fill="${LAMP.glow}" shape-rendering="crispEdges"/>`;
     g.innerHTML = `<g opacity="${LAMP.tint}">${spots.map(s => c(s, R, LAMP.glow)).join("")}</g><g opacity=".4">${spots.map(head).join("")}</g>`;
   }
   const o = darkLevel().toFixed(2); if(g.getAttribute("opacity") !== o) g.setAttribute("opacity", o);
