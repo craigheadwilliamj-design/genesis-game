@@ -127,6 +127,11 @@ function pxGuess(path, w, h){
 function pxPngSize(uri){ try{ const b = atob(uri.slice(22, 22 + 44)); const n = i => (b.charCodeAt(i) << 24 | b.charCodeAt(i + 1) << 16 | b.charCodeAt(i + 2) << 8 | b.charCodeAt(i + 3)) >>> 0; return [n(16), n(20)]; }catch{ return null; } }
 const pxStore = (k, v) => { try{ v === undefined ? localStorage.removeItem(PX_KEY + k) : localStorage.setItem(PX_KEY + k, JSON.stringify(v)); }catch{} };
 const pxStored = k => { try{ return JSON.parse(localStorage.getItem(PX_KEY + k)); }catch{ return null; } };
+// The open picture's building or prop type: its footprint (BUILDINGS w x d, meters) can be changed here. pxFootOrig keeps each type's footprint as the game had it.
+const pxFootOrig = {};
+const pxFootType = () => { const m = px.path && px.path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(?:front|back|left|right)/); return m && BUILDINGS[m[1]] ? m[1] : null; };
+function pxSetFoot(k, w, d){ const t = BUILDINGS[k]; pxFootOrig[k] = pxFootOrig[k] || {w:t.w, d:t.d}; t.w = w; t.d = d; }
+function pxFootDiff(){ const k = pxFootType(), o = k && pxFootOrig[k], t = k && BUILDINGS[k]; return o && (o.w !== t.w || o.d !== t.d) ? {k, w:t.w, d:t.d} : null; }
 const pxDrafts = () => pxStored("drafts") || {};
 let pxSaveT = 0;
 function pxChanged(){
@@ -139,7 +144,7 @@ function pxSaveDraft(){
   pxStore("d:" + px.path, pxDraft());
 }
 // A draft keeps every layer as its own strip, so they come back as layers
-const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+const pxDraft = () => ({foot:pxFootDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
   const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
   px.fw = ims[0].width / n; px.fh = ims[0].height;
@@ -153,7 +158,9 @@ async function pxOpen(path, fresh){
   try{
     const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
     if(dr && dr.layers) await pxLoadDraft(dr); else pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height));
-    pxStore("last", path); px.guide = pxGuideFor(path);
+    pxStore("last", path);
+    { const k = pxFootType(), o = k && pxFootOrig[k]; if(dr && dr.foot) pxSetFoot(dr.foot.k, dr.foot.w, dr.foot.d); else if(o) pxSetFoot(k, o.w, o.d); }   // a draft brings its footprint; Revert goes back to the game's
+    px.guide = pxGuideFor(path);
     if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); }
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
@@ -548,7 +555,7 @@ async function pxSend(){
   if(!px.path) return;
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   const png = pxPng();
-  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
+  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
 }
 // A draft as the strip the game reads: its visible layers stacked
@@ -570,7 +577,7 @@ async function pxSendAll(){
   let ok = 0;
   for(const path of todo){
     const dr = pxStored("d:" + path); if(!dr) continue;
-    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, at:Date.now()}); ok++; }catch{}
+    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), at:Date.now()}); ok++; }catch{}
   }
   ui.toast(ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${ok < todo.length ? ` ${todo.length - ok} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.", ok ? "good" : "bad"); pxWatch();
 }
@@ -688,6 +695,7 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
+        <div class="pxrow" id="pxFootRow" hidden><span>Footprint</span><input type="number" id="pxFW" class="pxnum" min="0.5" max="40" step="0.1"><span>×</span><input type="number" id="pxFD" class="pxnum" min="0.5" max="40" step="0.1"><span>m, across × deep</span></div>
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
@@ -742,6 +750,7 @@ function pxSync(){
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
   $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null;
+  { const k = pxFootType(); $p("pxFootRow").hidden = !k; if(k){ if(document.activeElement !== $p("pxFW")) $p("pxFW").value = BUILDINGS[k].w; if(document.activeElement !== $p("pxFD")) $p("pxFD").value = BUILDINGS[k].d; } }
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -896,6 +905,10 @@ function pxInput(e){
   else if(id === "pxRe" && e.type === "change"){ const from = t.dataset.from.split(",").map(Number); pxRecolor(from, [...pxRgb(t.value), from[3]]); }
   else if(id === "pxAlpha"){ px.c1 = [...px.c1.slice(0, 3), +t.value]; pxSync(); }
   else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
+  else if((id === "pxFW" || id === "pxFD") && e.type === "change"){   // the footprint, live in the park for new placements; the gold guide follows
+    const k = pxFootType(), g = i => document.getElementById(i).value, n = v => Math.max(.5, Math.min(40, Math.round((+v || 0) * 10) / 10));
+    if(k){ pxSetFoot(k, n(g("pxFW")), n(g("pxFD"))); px.guide = pxGuideFor(px.path); pxChanged(); }
+  }
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
   else if(id === "pxNt") pxNewFill(true);
   else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);
