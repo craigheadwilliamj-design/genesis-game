@@ -786,8 +786,8 @@ function pxOverlay(kind, opt){
       document.getElementById("pxList").innerHTML = px.needList.map((x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">Everything here has a picture.</p>`;
       return;
     }
-    const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b)).slice(0, 240);
-    document.getElementById("pxList").innerHTML = ps.map(p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">No picture matches that.</p>`;
+    const ps = Object.keys(SPRITE_PACK).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b));
+    document.getElementById("pxList").innerHTML = (t ? `<p class="meta" style="grid-column:1/-1">${ps.length} of ${Object.keys(SPRITE_PACK).length} pictures match.</p>` : `<p class="meta" style="grid-column:1/-1">All ${ps.length} pictures. Search to narrow.</p>`) + ps.map(p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`).join("") || `<p class="meta">No picture matches that.</p>`;
   };
   q.oninput = list; list();
 }
