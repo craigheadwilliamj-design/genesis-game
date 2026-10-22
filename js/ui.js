@@ -418,11 +418,11 @@ function propsHtml(e){
   let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
     const list = HABITAT_PROPS.filter(k => isToy(k) && !toyHidden(k)), counts = devMode() ? speciesCounts(e) : [];
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Something to chase, chew, rub on and dig through keeps animals busy. Bored animals with nothing to do pace. Some toys only interest some diets, and frozen treats and hay bales get used up.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Toys keep animals busy so they don't pace. Hover a button for what it does.</div>`;
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
-    h += `<div class="meta" style="margin-top:6px">${list.map(k => { const t = LAND[k]; return `<b>${esc(t.label)}</b>: ${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; }).join(" ")} Rocks, plants and room count too.</div>`;
-    return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
+    const tip = k => { const t = LAND[k]; return `${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `Everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; };
+    return h + `<div class="row" style="margin-top:6px">${list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ` title="${esc(tip(k))}"`}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("")}</div></section>`;
   }
   if(sub === "shelters"){
     const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
@@ -433,13 +433,13 @@ function propsHtml(e){
     return h + `<div class="row" style="margin-top:6px">${list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ` title="${esc(tip(k))}"`}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("")}</div></section>`;
   }
   const list = HABITAT_PROPS.filter(isTray), tr = trays(e), eaten = Object.keys(dailyNeed(e)), foods = eaten.length ? eaten : TRAY_FOODS;
-  h += `<div class="meta" style="margin-top:6px">${haveText(list)} Animals eat from trays first. Keepers walk in through the gate to fill them${e.gate ? "" : ", so this exhibit needs a gate"}. Each tray holds one kind of food.</div>`;
+  h += `<div class="meta" style="margin-top:6px">${haveText(list)} Keepers fill trays through the gate${e.gate ? "" : ", so this exhibit needs a gate"}.</div>`;
   if(tr.length){
     const cap = tr.reduce((n, f) => n + trayCap(f), 0), has = tr.reduce((n, f) => n + trayHas(f), 0);
     h += `<div class="meta" style="margin-top:6px">Trays hold ${Math.round(has)} of ${cap} units.</div>`;
     h += tr.map((f, i) => { const k = trayKind(f), opts = [...new Set([...foods, ...(f.set ? [f.set] : [])])];
       return `<label class="field" style="margin-top:6px"><span>${esc(LAND[f.type].label)} ${i + 1}: ${Math.round(trayHas(f))}/${trayCap(f)}${k ? " " + esc(k) : ""}</span><select data-tray="${esc(f.id)}"><option value=""${f.set ? "" : " selected"}>Any food</option>${opts.map(t => `<option value="${t}"${f.set === t ? " selected" : ""}>${esc(t)} only</option>`).join("")}</select></label>`; }).join("");
-    h += `<div class="meta" style="margin-top:4px">Pick what a tray gets. Changing it empties the tray. "Any food" takes whatever keepers bring first.</div>`;
+    h += `<div class="meta" style="margin-top:4px">Changing a tray's food empties it.</div>`;
   }
   return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
 }
