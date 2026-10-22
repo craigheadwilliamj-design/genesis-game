@@ -121,8 +121,8 @@ function propArt(bl, inv, on, dead){
 const PROP_PICS = {
   bin:{front:[14, 21, .45], back:[14, 21, .45], left:[14, 21, .45], right:[14, 21, .45]},
   bench:{front:[26, 16, .5], back:[26, 12, .5], left:[12, 15, .5], right:[12, 15, .5]},
+  lamp:{front:[13, 32, .6, 31]},
 };
-if(SPRITE_PACK["sprites/bld/lamp-front.png"]) PROP_PICS.lamp = {front:[13, 32, .6, 31]};   // drawn pictures only once the working lamp's front is in; until then lamps keep their boxes
 for(const v of ["front", "back", "left", "right"]) PROP_PICS.bin[v + "-broken"] = [21, 21, .45];
 function propSprite34(bl, k, st, on, dead){
   const [fx, fy] = propFront(bl), face = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right", Q = PROP_PICS[bl.type];

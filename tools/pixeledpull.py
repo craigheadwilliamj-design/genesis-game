@@ -3,7 +3,7 @@
 Usage: python3 -I tools/pixeledpull.py <rows.json> [--dry]
 <rows.json> is the collection as read from the game artifact's db (any JSON holding objects with `path` and `png`).
 Rows are viewer data: only sprites/**.png paths are written, and only real PNGs whose size matches the row.
-Then run tools/packsprites.py, check the pictures, and delete the rows you pulled from the collection."""
+Then run tools/packsprites.py, check the pictures, and mark the rows you pulled (update: pulled = the time, png deleted); deleting them would make Send all drafts send them again."""
 import base64, json, os, re, struct, sys
 
 root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
