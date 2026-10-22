@@ -903,8 +903,7 @@ function askConfirm(title, text, yes, onYes, no = "Cancel"){
   d.showModal();
 }
 
-/* ---------- animal catalog ---------- */
-let catFilter = "all";
+/* ---------- Paleopedia ---------- */
 
 // Where a species stands: can you get it now, is it on its way, or not started yet?
 function speciesStatus(s){
@@ -919,36 +918,46 @@ function speciesStatus(s){
   return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
 }
 
+// Known to the Paleopedia: a starter, a discovered species, or one with DNA already collected
+const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
+let ppPick = null;   // species id open on the card
+const ppImg = (s, alt) => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${alt}">` : `<span class="pp-noart">${alt ? "No picture yet" : "?"}</span>`;
+
+function ppCard(s){
+  const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
+  let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
+  const stars = Math.max(1, Math.round(s.appeal / 2)), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic">${ppImg(s, esc(s.name))}</div><dl class="pp-stats">`
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
+    + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
+    + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
+    + row("Appeal", `<span title="Appeal ${s.appeal} of 10">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
+    + `</dl></div><div class="pp-right"><h3>${esc(s.name)}</h3><i class="pp-sci">${esc(I.sci || "")}</i>`
+    + `<p class="pp-desc">${I.desc ? esc(I.desc) : "No notes on this animal yet."}</p></div>`
+    + `<div class="pp-acq"><span class="how ${st.cls}">${esc(st.how)}</span>${st.lock ? ` <span class="lock">${esc(st.lock)}</span>` : ""}${n ? ` <span class="have">${n} in your park.</span>` : ""}</div></div>`;
+}
+
 function catalogHtml(){
-  const owned = new Map();
-  for(const e of state.exhibits) for(const a of e.animals) owned.set(a.sp, (owned.get(a.sp) || 0) + 1);
   const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-  let h = "", shown = 0;
+  const all = SPECIES.filter(s => speciesAvailable(s.id)), known = all.filter(ppKnown);
+  if(!ppPick || !known.some(s => s.id === ppPick)) ppPick = known.length ? known[0].id : null;
+  let list = "";
   for(const per of order){
-    const list = SPECIES.filter(s => s.period === per && speciesAvailable(s.id)).map(s => ({s, st:speciesStatus(s)})).filter(x => catFilter === "all" || x.st.group === catFilter);
-    if(!list.length) continue;
-    shown += list.length;
-    const p = PERIOD_BY_ID[per];
-    h += `<section class="cat-period"><h3><span class="dot" style="background:${PERIOD_COLOR[per]}"></span>${per} <span class="meta">${p.ago}</span></h3><div class="cat-grid">`;
-    for(const {s, st} of list){
-      const n = owned.get(s.id) || 0;
-      h += `<div class="cat-card"><span class="nm">${speciesName(s)}</span>
-        <span class="stats">${dietText(s)}. ${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}. ${money(s.food)}/day food. Appeal ${s.appeal}.</span>
-        <span class="how ${st.cls}">${esc(st.how)}</span>
-        ${st.lock ? `<span class="lock">${esc(st.lock)}</span>` : ""}
-        ${n ? `<span class="have">${n} in your park</span>` : ""}</div>`;
-    }
-    h += `</div></section>`;
+    const here = all.filter(s => s.period === per);
+    if(!here.length) continue;
+    const got = here.filter(ppKnown), p = PERIOD_BY_ID[per];
+    list += `<section class="cat-period"><h3><span class="dot" style="background:${PERIOD_COLOR[per]}"></span>${per} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
+      + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${ppImg(s, "")}<span>${esc(s.name)}</span></button>`).join("")
+      + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div></section>`;
   }
-  if(!shown) h = `<div class="meta">Nothing here yet.</div>`;
-  return h;
+  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered yet.</div>`;
+  return `<div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div>`;
 }
 
 function openCatalog(){ $("#catalogBody").innerHTML = catalogHtml(); if(!$("#dlgAnimals").open) $("#dlgAnimals").showModal(); }
 $("#animalsBtn").onclick = openCatalog;
 $("#closeAnimals").onclick = () => $("#dlgAnimals").close();
-document.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => {
-  catFilter = b.dataset.filter;
-  document.querySelectorAll("[data-filter]").forEach(x => x.setAttribute("aria-pressed", x === b));
-  $("#catalogBody").innerHTML = catalogHtml();
-});
+$("#catalogBody").onclick = e => {
+  const b = e.target.closest("[data-sp]");
+  if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
+};

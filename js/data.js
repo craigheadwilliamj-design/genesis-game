@@ -2444,6 +2444,14 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
 }).map(([id, b]) => [id, b.split(" ")]));
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join(" or ");   // "fern prairie or scrubland"
+
+// Paleopedia write-ups, by species id: sci = scientific name, ft = body length in feet, desc = the text on its card. A species with no entry shows blanks.
+const SPECIES_INFO = {
+  icht:{sci:"Ichthyostega stensioei", ft:5, desc:"One of the first animals with four limbs. It lived in the swamps of Late Devonian Greenland, and it had seven toes on each hind foot. It probably dragged itself over mud banks more than it walked, and still breathed through gills in the water. It sits near the line between fish and land animals."},
+  dime:{sci:"Dimetrodon grandis", ft:11, desc:"Not a dinosaur, and older than the first dinosaurs by about 40 million years. Dimetrodon was a synapsid, so it is a closer relative of mammals than of any reptile. Its tall sail may have helped it warm up in the morning sun or show off to mates. It was the top predator of Early Permian Texas."},
+  coel:{sci:"Coelophysis bauri", ft:10, desc:"A light, fast hunter of Late Triassic North America. A New Mexico quarry holds hundreds of them, probably caught together by a flash flood. It ran on two legs, had a long neck and tail, and ate small animals and fish. It was among the earliest dinosaurs."},
+  plat:{sci:"Plateosaurus engelhardti", ft:26, desc:"A big plant-eater of Late Triassic Europe, and one of the first dinosaurs to grow so large. Its long neck reached high leaves, and it could probably rear up on its hind legs to get at more. Over a hundred skeletons are known, many from the German site of Trossingen."}
+};
 // Share of an exhibit's floor a species wants under water: fish eaters most, animals whose two biomes are both scrubland or desert least
 const waterWant = s => s.semi ? HAB.waterSemi : (biomesOf(s) || []).length && biomesOf(s).every(b => ["scrubland", "desert"].includes(b)) ? HAB.waterDry : HAB.waterBase;
 
