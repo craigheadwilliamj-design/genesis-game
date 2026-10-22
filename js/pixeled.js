@@ -131,11 +131,12 @@ const pxDrafts = () => pxStored("drafts") || {};
 let pxSaveT = 0;
 function pxChanged(){
   pxDraw(); pxSync();
-  clearTimeout(pxSaveT); pxSaveT = setTimeout(() => {
-    if(!px.path) return;
-    const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
-    pxStore("d:" + px.path, pxDraft());
-  }, 600);
+  clearTimeout(pxSaveT); pxSaveT = setTimeout(pxSaveDraft, 600);
+}
+function pxSaveDraft(){
+  clearTimeout(pxSaveT); if(!px.path) return;
+  const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
+  pxStore("d:" + px.path, pxDraft());
 }
 // A draft keeps every layer as its own strip, so they come back as layers
 const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
@@ -550,6 +551,29 @@ async function pxSend(){
   try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
 }
+// A draft as the strip the game reads: its visible layers stacked
+async function pxDraftPng(dr){
+  if(!dr.layers) return dr.png;
+  const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), cv = document.createElement("canvas"), ctx = cv.getContext("2d"); cv.width = ims[0].width; cv.height = ims[0].height;
+  dr.layers.forEach((L, l) => { if(L.show !== false){ ctx.globalAlpha = L.alpha ?? 1; ctx.drawImage(ims[l], 0, 0); } });
+  return cv.toDataURL("image/png");
+}
+// Drafts changed since they were last sent (a queue row newer than the draft means it went)
+function pxUnsent(){
+  const sent = new Map(px.queue.map(x => [x.path, x.at]));
+  return Object.entries(pxDrafts()).filter(([path, t]) => !(sent.get(path) >= t)).map(([path]) => path);
+}
+async function pxSendAll(){
+  const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
+  pxSaveDraft();
+  const todo = pxUnsent(); if(!todo.length) return ui.toast("Nothing new to send.");
+  let ok = 0;
+  for(const path of todo){
+    const dr = pxStored("d:" + path); if(!dr) continue;
+    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, at:Date.now()}); ok++; }catch{}
+  }
+  ui.toast(ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${ok < todo.length ? ` ${todo.length - ok} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.", ok ? "good" : "bad"); pxWatch();
+}
 async function pxUnsend(path){ const d = await pxDb(); try{ if(d) await d.doc("pixeled/" + pxDocId(path)).delete(); }catch{} }
 async function pxSaveFile(blob, name){
   try{
@@ -666,7 +690,7 @@ function pxBuild(){
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
-      <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
+      <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
         <div class="meta" id="pxTryNote" hidden></div>
         <div class="pxrow"><button class="btn" data-px="rigger" title="Save this frame's layers as parts for the sprite rigger">Send to rigger</button><span class="meta">A layer a part. Import a rigger project to get its parts back as layers.</span></div>
         <div id="pxQueue"></div></section>
@@ -722,6 +746,7 @@ function pxSync(){
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
   if(document.activeElement !== $p("pxN")) $p("pxN").value = px.frames.length;
+  const un = pxUnsent().length; $p("pxSendAll").textContent = un > 1 ? `Send all drafts (${un})` : "Send all drafts";
   const q = $p("pxQueue");
   q.innerHTML = !px.db ? `<div class="meta">Sending works when the game is open on claude.ai. Download works anywhere.</div>`
     : !px.queue.length ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
@@ -851,7 +876,7 @@ function pxClick(e){
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
     refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); },
     copy:() => pxCopy(false), cut:() => pxCopy(true), paste:pxPasteButton, selall:pxSelectAll,
-    try:pxTry, send:pxSend, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
+    try:pxTry, send:pxSend, sendall:pxSendAll, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
 function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
 function pxRight(e){ const b = e.target.closest("[data-c]"); if(!b) return; e.preventDefault(); px.c2 = b.dataset.c.split(",").map(Number); pxSync(); }
