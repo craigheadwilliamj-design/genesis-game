@@ -127,6 +127,36 @@ function pxGuess(path, w, h){
 function pxPngSize(uri){ try{ const b = atob(uri.slice(22, 22 + 44)); const n = i => (b.charCodeAt(i) << 24 | b.charCodeAt(i + 1) << 16 | b.charCodeAt(i + 2) << 8 | b.charCodeAt(i + 3)) >>> 0; return [n(16), n(20)]; }catch{ return null; } }
 const pxStore = (k, v) => { try{ v === undefined ? localStorage.removeItem(PX_KEY + k) : localStorage.setItem(PX_KEY + k, JSON.stringify(v)); }catch{} };
 const pxStored = k => { try{ return JSON.parse(localStorage.getItem(PX_KEY + k)); }catch{ return null; } };
+// The open picture's building or prop type: its footprint (BUILDINGS w x d, meters) can be changed here. pxFootOrig keeps each type's footprint as the game had it.
+const pxFootOrig = {};
+const pxFootType = () => { const m = px.path && px.path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(?:front|back|left|right)/); return m && BUILDINGS[m[1]] ? m[1] : null; };
+function pxSetFoot(k, w, d){ const t = BUILDINGS[k]; pxFootOrig[k] = pxFootOrig[k] || {w:t.w, d:t.d}; t.w = w; t.d = d; }
+// The guide's end ticks are handles: dragging one sets the footprint's width in this view (the depth on a side view), kept centered
+// The base row (where the footprint's front edge meets the picture): a building's BLD_PICS base (sideBase on the sides), a prop view's 4th PROP_PICS number. pxBaseOrig keeps each path's row as the game had it.
+const pxBaseOrig = {};
+function pxSetBase(row){
+  const k = pxFootType(); if(!k) return; const v = px.path.match(/-(front|back|left|right)/)[1], side = v === "left" || v === "right";
+  if(!(px.path in pxBaseOrig)) pxBaseOrig[px.path] = px.guide; px.guide = row;
+  const B = BLD_PICS[k], P = PROP_PICS[k];
+  if(BUILDINGS[k].prop){ if(P && P[v]) P[v][3] = row; }
+  else if(B){ if(side && !B.tried) B.sideBase = row; else B.base = row; }
+}
+const pxBaseDiff = () => px.path in pxBaseOrig && px.guide !== pxBaseOrig[px.path] ? px.guide : null;
+function pxFootEnds(){ const gw = Math.round(Math.min(px.fw, px.guideW || px.fw)), x0 = Math.round((px.fw - gw) / 2); return [x0, x0 + gw]; }
+function pxFootHit(e){   // "w" on an end handle, "row" on the line between them; only with Adjust footprint on
+  if(!px.footEdit || px.guide == null || !px.guideW || !pxFootType()) return false;
+  const r = pxCv.getBoundingClientRect(), z = r.width / px.fw, mx = e.clientX - r.left, my = e.clientY - r.top, gy = px.guide * z, [x0, x1] = pxFootEnds();
+  if(my > gy - 4 * z - 6 && my < gy + 6 && [x0, x1].some(x => Math.abs(mx - x * z) < Math.max(6, z))) return "w";
+  return Math.abs(my - gy) < Math.max(6, z / 2) && mx > x0 * z && mx < x1 * z ? "row" : false;
+}
+function pxFootDrag(e, how){
+  if(how === "row"){ const r = pxCv.getBoundingClientRect(), row = Math.max(1, Math.min(px.fh, Math.round((e.clientY - r.top) / r.height * px.fh))); if(row !== px.guide) pxSetBase(row); return pxDraw(); }
+  const r = pxCv.getBoundingClientRect(), half = Math.abs((e.clientX - r.left) / r.width * px.fw - px.fw / 2), k = pxFootType(), t = BUILDINGS[k];
+  const m = Math.max(.5, Math.round(Math.min(px.fw, Math.round(half * 2)) * ROCK_MPP * 10) / 10), side = /-(left|right)/.test(px.path);
+  if(m !== (side ? t.d : t.w)){ pxSetFoot(k, side ? t.w : m, side ? m : t.d); px.guide = pxGuideFor(px.path); }
+  pxDraw();
+}
+function pxFootDiff(){ const k = pxFootType(), o = k && pxFootOrig[k], t = k && BUILDINGS[k]; return o && (o.w !== t.w || o.d !== t.d) ? {k, w:t.w, d:t.d} : null; }
 const pxDrafts = () => pxStored("drafts") || {};
 let pxSaveT = 0;
 function pxChanged(){
@@ -139,7 +169,7 @@ function pxSaveDraft(){
   pxStore("d:" + px.path, pxDraft());
 }
 // A draft keeps every layer as its own strip, so they come back as layers
-const pxDraft = () => ({n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
   const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
   px.fw = ims[0].width / n; px.fh = ims[0].height;
@@ -153,7 +183,11 @@ async function pxOpen(path, fresh){
   try{
     const im = await pxImg(src); px.path = path; px.ref = ""; px.refCv = null; px.fps = dr && dr.fps || 6; px.cur = 0; px.undo = []; px.redo = []; px.sel = null;
     if(dr && dr.layers) await pxLoadDraft(dr); else pxSlice(im, dr ? dr.n : pxGuess(path, im.width, im.height));
-    pxStore("last", path); px.guide = pxGuideFor(path);
+    pxStore("last", path);
+    { const k = pxFootType(), o = k && pxFootOrig[k]; if(dr && dr.foot) pxSetFoot(dr.foot.k, dr.foot.w, dr.foot.d); else if(o) pxSetFoot(k, o.w, o.d); }   // a draft brings its footprint; Revert goes back to the game's
+    px.guide = pxGuideFor(path);
+    if(path in pxBaseOrig) pxSetBase(pxBaseOrig[path]);   // back to the game's row, then the draft's
+    if(dr && dr.base != null) pxSetBase(dr.base);
     if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); }
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
@@ -273,7 +307,9 @@ function pxDraw(){
   if(px.guide != null){   // over the footprint's width for this view, centered, with ticks at its ends
     const gw = Math.min(px.fw, px.guideW || px.fw), x0 = Math.round((px.fw - gw) / 2) * z, x1 = x0 + Math.round(gw) * z;
     ctx.fillStyle = "rgba(184,145,47,.9)"; for(let x = x0; x < x1; x += 8) ctx.fillRect(x, px.guide * z - 1, Math.min(5, x1 - x), 2);
-    if(px.guideW){ ctx.fillRect(x0, px.guide * z - 3 * z, 2, 3 * z); ctx.fillRect(x1 - 2, px.guide * z - 3 * z, 2, 3 * z); }
+    if(px.guideW){
+      const hw = Math.max(4, Math.min(8, z)); ctx.fillRect(x0 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2); ctx.fillRect(x1 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2);   // the handles
+    }
   }   // the base row: its bottom stands on the footprint's front edge
   if(s){
     const box = c => s.mask ? ctx.stroke(pxMaskPath(s, z)) : ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1);
@@ -308,6 +344,7 @@ function pxDown(e){
   if(pxPans(e)) return;   // the stage pans (pxPanStart)
   if(e.button > 2 || !px.frames.length) return;
   e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
+  { const h = !e.button && pxFootHit(e); if(h){ px.stroke = {foot:h}; return; } }
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
   if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(pxCompData(px.cur), x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }   // the color as it shows, whatever layer it's on
   if(!px.layers[px.lay].show) return ui.toast("This layer is hidden. Show it to draw on it.");
@@ -343,6 +380,8 @@ function pxMove(e){
   if(px.pan) return;
   const [x, y] = pxXY(e); px.hover = [x, y];
   const st = px.stroke;
+  if(st && st.foot) return pxFootDrag(e, st.foot);
+  const fh = !st && pxFootHit(e); if(fh !== (px.footHover || false)){ px.footHover = fh; pxCv.style.cursor = fh === "w" ? "ew-resize" : fh === "row" ? "ns-resize" : pxCursor(px.tool); }
   if(!st) return pxDraw();
   if(pxSelTool(px.tool)){
     const s = px.sel;
@@ -356,6 +395,7 @@ function pxMove(e){
 function pxUp(){
   if(px.pan) return;
   const st = px.stroke; px.stroke = null; if(!st) return;
+  if(st.foot) return pxChanged();   // saves the footprint with the draft
   if(st.lasso){ px.sel = pxLassoSel(st.lasso); return pxDraw(); }
   if(pxSelTool(px.tool)){ if(st.move) pxChanged(); return; }
   pxChanged();
@@ -514,10 +554,10 @@ function pxTryBld(){
   if(m[3] === "broken"){ if(PROP_PICS[k] && PROP_PICS[k].fake) PROP_PICS[k].fake = PROP_PICS[k].fake.filter(x => x !== px.path); return; }   // a drawn broken picture stops being stood in for
   if(t.prop){
     if(PROP_PICS[k] && !PROP_PICS[k].tried) return;
-    const P = PROP_PICS[k] || (PROP_PICS[k] = {tried:1}), png = pxFirst(); P[v] = [px.fw, px.fh, .5]; (P.drawn = P.drawn || []).includes(v) || P.drawn.push(v);
+    const P = PROP_PICS[k] || (PROP_PICS[k] = {tried:1}), png = pxFirst(); P[v] = [px.fw, px.fh, .5, px.guide != null ? px.guide : px.fh - 2]; (P.drawn = P.drawn || []).includes(v) || P.drawn.push(v);
     P.fake = P.fake || [];
     for(const w of PX_VIEWS){
-      if(!P.drawn.includes(w)){ P[w] = [px.fw, px.fh, .5]; spriteUrl.swap(`sprites/bld/${k}-${w}.png`, png); }
+      if(!P.drawn.includes(w)){ P[w] = [px.fw, px.fh, .5, P[v][3]]; spriteUrl.swap(`sprites/bld/${k}-${w}.png`, png); }
       const br = `sprites/bld/${k}-${w}-broken.png`; if(!SPRITE_PACK[br] || P.fake.includes(br)){ spriteUrl.swap(br, SPRITE_PACK[`sprites/bld/${k}-${w}.png`]); if(!P.fake.includes(br)) P.fake.push(br); }
     }
     return;
@@ -531,7 +571,7 @@ function pxTryBld(){
 function pxGuideFor(p){
   const m = p.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)/), t = m && BUILDINGS[m[1]]; px.guideW = 0; if(!t) return null;
   px.guideW = (/left|right/.test(m[2]) ? t.d : t.w) / ROCK_MPP;   // sides show the turned footprint
-  if(t.prop) return px.fh - 2;
+  if(t.prop){ const P = PROP_PICS[m[1]]; return P && P[m[2]] && P[m[2]][3] != null ? P[m[2]][3] : px.fh - 2; }
   const B = BLD_PICS[m[1]]; return B && !B.tried ? (/left|right/.test(m[2]) ? B.sideBase || B.base : B.base) : B ? B.base : px.fh - 9;
 }
 async function pxDb(){
@@ -548,7 +588,7 @@ async function pxSend(){
   if(!px.path) return;
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   const png = pxPng();
-  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
+  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), ...(pxBaseDiff() != null ? {base:pxBaseDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
 }
 // A draft as the strip the game reads: its visible layers stacked
@@ -570,7 +610,7 @@ async function pxSendAll(){
   let ok = 0;
   for(const path of todo){
     const dr = pxStored("d:" + path); if(!dr) continue;
-    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, at:Date.now()}); ok++; }catch{}
+    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), ...(dr.base != null ? {base:dr.base} : {}), at:Date.now()}); ok++; }catch{}
   }
   ui.toast(ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${ok < todo.length ? ` ${todo.length - ok} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.", ok ? "good" : "bad"); pxWatch();
 }
@@ -688,7 +728,8 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
-        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
+        <label class="pxrow" id="pxFootTog" hidden><input type="checkbox" id="pxFootEdit"> Adjust footprint: drag the gold line's ends for its size, the line itself for its row</label>
+        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view. With Adjust footprint on, drag its end handles to change the footprint (the depth on a side view) or the line to move its row; the park uses them at once, and they go with the picture when you send it.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
         <div class="meta" id="pxTryNote" hidden></div>
@@ -741,7 +782,7 @@ function pxSync(){
   const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
-  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null;
+  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null; $p("pxFootTog").hidden = px.guide == null || !pxFootType(); $p("pxFootEdit").checked = !!px.footEdit;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -896,6 +937,7 @@ function pxInput(e){
   else if(id === "pxRe" && e.type === "change"){ const from = t.dataset.from.split(",").map(Number); pxRecolor(from, [...pxRgb(t.value), from[3]]); }
   else if(id === "pxAlpha"){ px.c1 = [...px.c1.slice(0, 3), +t.value]; pxSync(); }
   else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
+  else if(id === "pxFootEdit"){ px.footEdit = t.checked; px.footHover = false; pxCv.style.cursor = pxCursor(px.tool); pxDraw(); }
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
   else if(id === "pxNt") pxNewFill(true);
   else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);

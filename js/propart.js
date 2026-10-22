@@ -115,7 +115,7 @@ function propArt(bl, inv, on, dead){
   return s;
 }
 // Genesis path objects drawn as pictures in the restroom's style (sprites/bld/<type>-<front|back|left|right>[-full|-broken].png, made by tools/pixelbin.py and tools/pixelbench.py), picked by where the item's front looks.
-// Each view is [width, height, front]: the picture is centered across, and the bottom of its base (the third row from the bottom, above the 2 shadow rows) sits `front` m in front of the middle, scaled by k like the drawn props.
+// Each view is [width, height, front, row]: the picture is centered across, and the bottom of its base (`row`, else the third row from the bottom, above the 2 shadow rows) sits `front` m in front of the middle, scaled by k like the drawn props.
 // A bench's end-on views cheat the projection (its end profile with a short top, not two tall strips running back), standing in the middle of the footprint.
 const PROP_PICS = {
   bin:{front:[14, 21, .45], back:[14, 21, .45], left:[14, 21, .45], right:[14, 21, .45]},
@@ -123,7 +123,7 @@ const PROP_PICS = {
 };
 function propSprite34(bl, k, st, on, dead){
   const [fx, fy] = propFront(bl), view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
-  const [w, h, e] = PROP_PICS[bl.type][view], px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [x, y] = flatSnap34([cx - w / 2 * px, cy + e * k - (h - 2) * px / TILT]);
+  const [w, h, e, r = h - 2] = PROP_PICS[bl.type][view], px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [x, y] = flatSnap34([cx - w / 2 * px, cy + e * k - r * px / TILT]);
   return `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${st}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(w * px).toFixed(2)}" height="${(h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`
     + (on || dead ? `<polygon points="${polyStr(bl.points)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "");
 }
