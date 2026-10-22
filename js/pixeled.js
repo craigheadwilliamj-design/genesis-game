@@ -5,13 +5,14 @@
 const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,14],[106,100,77],[227,221,195],[198,188,147],
   [44,35,19],[66,53,29],[165,125,74],[143,109,64],[110,85,49],[132,101,59],[231,231,231],[189,72,58],[222,182,72],[29,43,34,100]];   // PAL in tools/genesis_style.py
 const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket", "Fill (Shift: every pixel of that color)", "G"], ["line", "Line", "L"],
-  ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select and move", "M"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"], ["pan", "Pan: drag to move the view (or hold Space)", "H"]];
+  ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select a box and move it", "M"], ["lasso", "Lasso: draw around pixels to select them (the line snaps to pixels)", "Q"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"], ["pan", "Pan: drag to move the view (or hold Space)", "H"]];
 const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",
   line:"M4 17L17 4", rect:"M4 5h13v11H4z", ellipse:"M10.5 4.5c4 0 6.5 2.7 6.5 6s-2.5 6-6.5 6S4 13.8 4 10.5s2.5-6 6.5-6z", select:"M4 4h13v13H4z",
   shade:"M10.5 3a7.5 7.5 0 000 15zM10.5 3a7.5 7.5 0 010 15", picker:"M14 3l4 4-2 2-1-1-7 7H6v-2l7-7-1-1z",
+  lasso:"M10.5 3.5c4.4 0 7.5 2.2 7.5 5s-3.1 5-7.5 5S3 11.3 3 8.5s3.1-5 7.5-5zM5.5 12.5c-1.2 1.6-.6 3.6 1.4 4.1 1.3.3 1.8 1.5 1.2 2.6",
   pan:"M7 11V5.5a1.5 1.5 0 013 0V10M10 9.5V4a1.5 1.5 0 013 0v6M13 9.5V5.5a1.5 1.5 0 013 0V12c0 3.6-2.2 6-5.5 6C7.3 18 6 16.4 4.9 14.4L3 11a1.4 1.4 0 012.4-1.4L7 12"};
 // New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
-const PX_DASH = {select:' stroke-dasharray="3.2 2.6" stroke-linecap="butt"'};   // icons drawn dashed (a marquee)
+const PX_DASH = {select:' stroke-dasharray="3.2 2.6" stroke-linecap="butt"', lasso:' stroke-dasharray="3.2 2.2" stroke-linecap="butt"'};   // icons drawn dashed (a marquee)
 const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
   person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantM:["Plant, medium", 64, 58, 1, "sprites/plants/{name}.png"],
   plantS:["Plant, small", 44, 40, 1, "sprites/plants/{name}.png"], rock:["Rock or boulder shape", 24, 18, 1, "sprites/rocks/{name}.png"],
@@ -174,16 +175,74 @@ function pxDrop(){   // stamp a floating selection down where it is
   for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++){ const i = (y * s.w + x) * 4; if(s.buf[i + 3]) pxPut(f, s.x + x, s.y + y, [s.buf[i], s.buf[i + 1], s.buf[i + 2], s.buf[i + 3]]); }
   s.buf = null;
 }
+// A selection is a box {x, y, w, h}, with a mask (1 a pixel) when the lasso drew it, and buf once its pixels are lifted to move
+const pxSelTool = t => t === "select" || t === "lasso";
+const pxInSel = (s, x, y) => x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h && (!s.mask || !!s.mask[(y - s.y) * s.w + x - s.x]);
 function pxCut(s, clear){
   const f = pxFrame(), b = pxBlank(s.w, s.h);
-  for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++) if(pxIn(s.x + x, s.y + y)){ const i = pxAt(s.x + x, s.y + y), j = (y * s.w + x) * 4; for(let k = 0; k < 4; k++){ b[j + k] = f[i + k]; if(clear) f[i + k] = 0; } }
+  for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++) if(pxIn(s.x + x, s.y + y) && (!s.mask || s.mask[y * s.w + x])){ const i = pxAt(s.x + x, s.y + y), j = (y * s.w + x) * 4; for(let k = 0; k < 4; k++){ b[j + k] = f[i + k]; if(clear) f[i + k] = 0; } }
   return b;
 }
-function pxCopy(cut){ const s = px.sel; if(!s) return; px.clip = {w:s.w, h:s.h, buf:s.buf ? s.buf.slice() : pxCut(s, false)}; if(cut){ pxPush(); pxCut(px.sel = {...s, buf:null}, true); px.sel = null; pxChanged(); } }
-function pxPaste(){
-  const c = px.clip; if(!c) return; pxPush();
-  px.sel = {x:Math.max(0, Math.min(px.fw - c.w, px.hover ? px.hover[0] : 0)), y:Math.max(0, Math.min(px.fh - c.h, px.hover ? px.hover[1] : 0)), w:c.w, h:c.h, buf:c.buf.slice()};
-  pxTool("select"); pxChanged();
+// A picture's fingerprint: its size and which pixels show in roughly what color (PNG round trips can nudge see-through pixels)
+function pxSig(w, h, buf){ let a = 0x811c9dc5; for(let i = 0; i < buf.length; i += 4){ const v = buf[i + 3] ? 1 + (buf[i] >> 3 << 10 | buf[i + 1] >> 3 << 5 | buf[i + 2] >> 3) : 0; a = Math.imul(a ^ v, 16777619); } return w + "x" + h + ":" + (a >>> 0); }
+// Copy keeps the pixels for pasting anywhere (another frame, layer or picture), and puts a PNG on the system clipboard where the page may
+function pxCopy(cut){
+  const s = px.sel; if(!s) return ui.toast("Select something first: the box (M) or the lasso (Q).");
+  px.clip = {w:s.w, h:s.h, buf:s.buf ? s.buf.slice() : pxCut(s, false), mask:s.mask ? s.mask.slice() : null};
+  (px.mine = px.mine || []).push(pxSig(s.w, s.h, px.clip.buf)); if(px.mine.length > 30) px.mine.shift();   // what this editor put on the system clipboard
+  try{ const cv = document.createElement("canvas"); cv.width = s.w; cv.height = s.h; cv.getContext("2d").putImageData(new ImageData(px.clip.buf.slice(), s.w, s.h), 0, 0);
+    cv.toBlob(b => { try{ navigator.clipboard.write([new ClipboardItem({"image/png":b})]).catch(() => {}); }catch{} }); }catch{}
+  if(cut){ pxPush(); if(s.buf){ s.buf = null; } else pxCut(s, true); px.sel = null; pxChanged(); }
+  else ui.toast(`Copied ${s.w}×${s.h}. Paste with Ctrl+V or Paste, here or in another frame, layer or picture.`);
+}
+// Paste floats the pixels at the cursor (or the top left) to be moved, nudged or dropped with Enter or a click outside
+function pxPaste(c = px.clip){
+  if(!c) return ui.toast("Nothing copied yet. Select something and Copy, or copy a picture in another app.");
+  pxPush();
+  px.sel = {x:Math.max(0, Math.min(px.fw - c.w, px.hover ? px.hover[0] : 0)), y:Math.max(0, Math.min(px.fh - c.h, px.hover ? px.hover[1] : 0)), w:c.w, h:c.h, buf:c.buf.slice(), mask:c.mask ? c.mask.slice() : null};
+  if(!pxSelTool(px.tool)) pxTool("select"); pxChanged();
+}
+// A picture from the system clipboard (copied in another app) becomes what pastes
+async function pxPasteImage(blob){
+  try{
+    const im = await pxImg(URL.createObjectURL(blob)), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const ctx = cv.getContext("2d"); ctx.drawImage(im, 0, 0);
+    const buf = new Uint8ClampedArray(ctx.getImageData(0, 0, im.width, im.height).data), c = px.clip;
+    if(c && (px.mine || []).includes(pxSig(im.width, im.height, buf))) return pxPaste();   // one of our own copies coming back: the newest copy made here wins, with its lasso shape
+    px.clip = {w:im.width, h:im.height, buf, mask:null}; pxPaste();
+    if(im.width > px.fw || im.height > px.fh) ui.toast(`The pasted picture is ${im.width}×${im.height}, bigger than the canvas; what's outside is cut off when you drop it.`);
+  }catch{ ui.toast("That clipboard picture didn't load.", "bad"); }
+}
+async function pxPasteButton(){
+  if(px.clip) return pxPaste();
+  try{ for(const it of await navigator.clipboard.read()){ const t = it.types.find(t => t.startsWith("image/")); if(t) return pxPasteImage(await it.getType(t)); } }catch{}
+  pxPaste(null);
+}
+// The lasso: the drawn path is pixels from the start (each move joined by a pixel line), closed back to its first pixel; the selection
+// is that ring and every pixel whose middle is inside it, so its edge always runs along pixel edges
+function pxLassoSel(pts){
+  const ring = [], all = pts.concat([pts[0]]);
+  for(let i = 0; i < all.length - 1; i++) pxLine(all[i][0], all[i][1], all[i + 1][0], all[i + 1][1], (a, b) => ring.push([a, b]));
+  const xs = ring.map(p => p[0]), ys = ring.map(p => p[1]), x0 = Math.min(...xs), y0 = Math.min(...ys), w = Math.max(...xs) - x0 + 1, h = Math.max(...ys) - y0 + 1;
+  if(new Set(ring.map(p => p + "")).size < 2) return null;   // a click, not a lasso
+  const mask = new Uint8Array(w * h); ring.forEach(([a, b]) => { mask[(b - y0) * w + a - x0] = 1; });
+  for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+    const cx = x0 + x + .5, cy = y0 + y + .5; let inside = false;
+    for(let i = 0, j = pts.length - 1; i < pts.length; j = i++){ const [xi, yi] = [pts[i][0] + .5, pts[i][1] + .5], [xj, yj] = [pts[j][0] + .5, pts[j][1] + .5]; if((yi > cy) !== (yj > cy) && cx < (xj - xi) * (cy - yi) / (yj - yi) + xi) inside = !inside; }
+    if(inside) mask[y * w + x] = 1;
+  }
+  return {x:x0, y:y0, w, h, mask, buf:null};
+}
+// The outline of a lasso selection, along its pixels' outer edges
+function pxMaskPath(s, z){
+  const p = new Path2D(), on = (x, y) => x >= 0 && y >= 0 && x < s.w && y < s.h && s.mask[y * s.w + x];
+  for(let y = 0; y < s.h; y++) for(let x = 0; x < s.w; x++) if(on(x, y)){
+    const X = (s.x + x) * z, Y = (s.y + y) * z;
+    if(!on(x, y - 1)){ p.moveTo(X, Y + .5); p.lineTo(X + z, Y + .5); }
+    if(!on(x, y + 1)){ p.moveTo(X, Y + z - .5); p.lineTo(X + z, Y + z - .5); }
+    if(!on(x - 1, y)){ p.moveTo(X + .5, Y); p.lineTo(X + .5, Y + z); }
+    if(!on(x + 1, y)){ p.moveTo(X + z - .5, Y); p.lineTo(X + z - .5, Y + z); }
+  }
+  return p;
 }
 function pxClear(){ const s = px.sel; if(!s) return; if(s.buf){ s.buf = null; px.sel = null; } else { pxPush(); pxCut(s, true); } pxChanged(); }
 
@@ -220,9 +279,19 @@ function pxDraw(){
     ctx.fillStyle = "rgba(184,145,47,.9)"; for(let x = x0; x < x1; x += 8) ctx.fillRect(x, px.guide * z - 1, Math.min(5, x1 - x), 2);
     if(px.guideW){ ctx.fillRect(x0, px.guide * z - 3 * z, 2, 3 * z); ctx.fillRect(x1 - 2, px.guide * z - 3 * z, 2, 3 * z); }
   }   // the base row: its bottom stands on the footprint's front edge
-  if(s){ ctx.setLineDash([4, 3]); ctx.strokeStyle = "#1D2B22"; ctx.lineWidth = 1; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1); ctx.setLineDash([]); }
+  if(s){
+    const box = c => s.mask ? ctx.stroke(pxMaskPath(s, z)) : ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1);
+    ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeStyle = "#111"; box(); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; box(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
+  }
+  const ls = px.stroke && px.stroke.lasso;
+  if(ls){   // the lasso so far, as the pixels it will select along; the dashes close it back to the start
+    const pix = []; for(let i = 0; i < ls.length - 1 || i === 0 && ls.length === 1; i++){ const a = ls[i], b = ls[i + 1] || a; pxLine(a[0], a[1], b[0], b[1], (x, y) => pix.push([x, y])); }
+    ctx.fillStyle = "rgba(255,255,255,.6)"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1;
+    pix.forEach(([x, y]) => { ctx.fillRect(x * z, y * z, z, z); if(z >= 4) ctx.strokeRect(x * z + .5, y * z + .5, z - 1, z - 1); });
+    const a = ls[ls.length - 1], b = ls[0]; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo((a[0] + .5) * z, (a[1] + .5) * z); ctx.lineTo((b[0] + .5) * z, (b[1] + .5) * z); ctx.stroke(); ctx.setLineDash([]);
+  }
   const h = px.hover;
-  if(h && pxIn(h[0], h[1]) && px.tool !== "select"){   // the pixel under the cursor: a white ring inside a dark one, readable on any color
+  if(h && pxIn(h[0], h[1]) && !pxSelTool(px.tool)){   // the pixel under the cursor: a white ring inside a dark one, readable on any color
     const n = px.tool === "pencil" || px.tool === "eraser" ? px.size || 1 : 1, o = Math.floor((n - 1) / 2), x = (h[0] - o) * z, y = (h[1] - o) * z, w = n * z;
     ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeRect(x - 1.5, y - 1.5, w + 3, w + 3);   // drawn just outside the pixel, so the pixel's own color stays in view
     ctx.lineWidth = 1.5; ctx.strokeStyle = "#111"; ctx.strokeRect(x - .75, y - .75, w + 1.5, w + 1.5);
@@ -246,12 +315,12 @@ function pxDown(e){
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
   if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(pxCompData(px.cur), x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }   // the color as it shows, whatever layer it's on
   if(!px.layers[px.lay].show) return ui.toast("This layer is hidden. Show it to draw on it.");
-  if(px.tool === "select"){
+  if(pxSelTool(px.tool)){   // inside the selection a drag moves it; outside, a new box or lasso starts
     const s = px.sel;
-    if(s && x >= s.x && y >= s.y && x < s.x + s.w && y < s.y + s.h){
+    if(s && pxInSel(s, x, y)){
       if(!s.buf){ pxPush(); s.buf = pxCut(s, true); }
       px.stroke = {move:[x - s.x, y - s.y]};
-    } else { pxDrop(); px.sel = null; px.stroke = {a:[x, y]}; }
+    } else { pxDrop(); px.sel = null; px.stroke = px.tool === "lasso" ? {lasso:[[Math.max(0, Math.min(px.fw - 1, x)), Math.max(0, Math.min(px.fh - 1, y))]]} : {a:[x, y]}; }
     return pxDraw();
   }
   pxPush();
@@ -279,9 +348,10 @@ function pxMove(e){
   const [x, y] = pxXY(e); px.hover = [x, y];
   const st = px.stroke;
   if(!st) return pxDraw();
-  if(px.tool === "select"){
+  if(pxSelTool(px.tool)){
     const s = px.sel;
-    if(st.move){ s.x = x - st.move[0]; s.y = y - st.move[1]; }
+    if(st.lasso){ const p = [Math.max(0, Math.min(px.fw - 1, x)), Math.max(0, Math.min(px.fh - 1, y))], l = st.lasso[st.lasso.length - 1]; if(p[0] !== l[0] || p[1] !== l[1]) st.lasso.push(p); }
+    else if(st.move){ s.x = x - st.move[0]; s.y = y - st.move[1]; }
     else { const ax = Math.max(0, Math.min(st.a[0], x)), ay = Math.max(0, Math.min(st.a[1], y)), bx = Math.min(px.fw - 1, Math.max(st.a[0], x)), by = Math.min(px.fh - 1, Math.max(st.a[1], y)); px.sel = {x:ax, y:ay, w:bx - ax + 1, h:by - ay + 1, buf:null}; }
     return pxDraw();
   }
@@ -290,7 +360,8 @@ function pxMove(e){
 function pxUp(){
   if(px.pan) return;
   const st = px.stroke; px.stroke = null; if(!st) return;
-  if(px.tool === "select"){ if(st.move) pxChanged(); return; }
+  if(st.lasso){ px.sel = pxLassoSel(st.lasso); return pxDraw(); }
+  if(pxSelTool(px.tool)){ if(st.move) pxChanged(); return; }
   pxChanged();
 }
 function pxWheel(e){
@@ -560,6 +631,7 @@ function pxBuild(){
     <b class="pxname" id="pxName"></b>
     <button class="btn" data-px="open">Open</button><button class="btn" data-px="new">New</button><label class="btn">Import<input type="file" accept="image/png,image/gif,image/webp,.json,application/json" id="pxFile" hidden></label>
     <span class="pxsep"></span><button class="btn" data-px="undo" title="Undo (Ctrl+Z)">Undo</button><button class="btn" data-px="redo" title="Redo (Ctrl+Y)">Redo</button>
+    <span class="pxsep"></span><button class="btn" data-px="copy" title="Copy the selection (Ctrl+C)">Copy</button><button class="btn" data-px="cut" title="Cut the selection (Ctrl+X)">Cut</button><button class="btn" data-px="paste" title="Paste (Ctrl+V): what you copied here, or a picture copied in another app">Paste</button><button class="btn" data-px="selall" title="Select the whole frame (Ctrl+A)">Select all</button>
     <span class="pxsep"></span><button class="btn" data-px="zout" title="Zoom out (-)">−</button><span class="num" id="pxZoom"></span><button class="btn" data-px="zin" title="Zoom in (+)">+</button><button class="btn" data-px="fit">Fit</button>
     <button class="btn" data-px="grid" title="Grid (#)">Grid</button><button class="btn" data-px="mirror" title="Draw mirrored left to right (Shift+M)">Mirror</button>
     <span class="pxgrow"></span><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button><button class="btn" data-px="close">Close</button></div>
@@ -600,11 +672,16 @@ function pxBuild(){
   pxCv.style.cursor = pxCursor(px.tool);
   pxCv.addEventListener("pointerleave", () => { px.hover = null; pxDraw(); }); pxCv.addEventListener("contextmenu", e => e.preventDefault());
   pxStage.addEventListener("wheel", pxWheel, {passive:false});
-  pxStage.addEventListener("pointerdown", e => { pxPanStart(e); if(!px.pan && e.target === pxStage && px.tool === "select"){ pxDrop(); px.sel = null; pxChanged(); } });
+  pxStage.addEventListener("pointerdown", e => { pxPanStart(e); if(!px.pan && e.target === pxStage && pxSelTool(px.tool)){ pxDrop(); px.sel = null; pxChanged(); } });
   pxStage.addEventListener("pointermove", pxPanMove); pxStage.addEventListener("pointerup", pxPanEnd); pxStage.addEventListener("pointercancel", pxPanEnd);
   D.addEventListener("click", pxClick); D.addEventListener("dblclick", pxDbl); D.addEventListener("contextmenu", pxRight);
   D.addEventListener("input", pxInput); D.addEventListener("change", pxInput);
-  document.addEventListener("keydown", e => { if(D.open) pxKey(e); }); document.addEventListener("keyup", e => { if(e.key === " "){ px.space = false; pxStage.classList.remove("grab"); } });
+  document.addEventListener("keydown", e => { if(D.open) pxKey(e); });
+  document.addEventListener("paste", e => {
+    if(!D.open || /INPUT|TEXTAREA/.test(document.activeElement?.tagName || "")) return;
+    const f = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
+    if(f){ clearTimeout(px.pasteT); e.preventDefault(); pxPasteImage(f.getAsFile()); }
+  }); document.addEventListener("keyup", e => { if(e.key === " "){ px.space = false; pxStage.classList.remove("grab"); } });
   D.addEventListener("cancel", e => { if(px.sel || !document.getElementById("pxOver").hidden){ e.preventDefault(); pxEsc(); } });
   D.addEventListener("close", () => { pxDrop(); clearTimeout(pxSaveT); if(px.path && px.frames.length){ pxStore("d:" + px.path, pxDraft()); } });
   px.built = true;
@@ -645,7 +722,8 @@ function pxSync(){
     : !px.queue.length ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
     : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
 }
-function pxTool(t){ if(px.tool === "select" && t !== "select"){ pxDrop(); px.sel = null; } px.tool = t; if(pxCv) pxCv.style.cursor = pxCursor(t); pxSync(); pxDraw(); }
+function pxSelectAll(){ pxDrop(); px.sel = {x:0, y:0, w:px.fw, h:px.fh, buf:null, mask:null}; if(!pxSelTool(px.tool)) pxTool("select"); else pxDraw(); }
+function pxTool(t){ if(pxSelTool(px.tool) && !pxSelTool(t)){ pxDrop(); px.sel = null; } px.tool = t; if(pxCv) pxCv.style.cursor = pxCursor(t); pxSync(); pxDraw(); }
 function pxZoom(d){ px.zoom = Math.max(1, Math.min(64, px.zoom + d * Math.max(1, Math.round(px.zoom / 6)))); pxDraw(); pxSync(); }
 function pxEsc(){ const o = document.getElementById("pxOver"); if(!o.hidden){ o.hidden = true; return; } if(px.sel){ pxDrop(); px.sel = null; pxChanged(); } }
 // Overlays: the picture list and the new-picture form
@@ -737,6 +815,7 @@ async function pxRefUpload(file){
 }
 function pxClick(e){
   const b = e.target.closest("button"), row = e.target.closest("[data-layer]");
+  if(b && e.detail) b.blur();   // a mouse-clicked button lets go of focus, so Enter, Delete and the arrows go to the canvas, not the button again
   if(b && b.dataset.eye){ const L = px.layers[+b.dataset.eye]; L.show = !L.show; return pxChanged(); }
   if(row && +row.dataset.layer !== px.lay){ pxDrop(); px.sel = null; px.lay = +row.dataset.layer; pxDraw(); pxSync(); }
   if(!b) return;
@@ -766,6 +845,7 @@ function pxClick(e){
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
     refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); },
+    copy:() => pxCopy(false), cut:() => pxCopy(true), paste:pxPasteButton, selall:pxSelectAll,
     try:pxTry, send:pxSend, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
 function pxDbl(e){ const b = e.target.closest("[data-c]"); if(!b || b.dataset.c === "0,0,0,0") return; const r = document.getElementById("pxRe"); r.dataset.from = b.dataset.c; r.value = pxHex(b.dataset.c.split(",").map(Number)); r.click(); }
@@ -805,8 +885,8 @@ function pxKey(e){
   if(ctl && k.toLowerCase() === "y"){ e.preventDefault(); return pxUndo(true); }
   if(ctl && k.toLowerCase() === "c") return pxCopy(false);
   if(ctl && k.toLowerCase() === "x") return pxCopy(true);
-  if(ctl && k.toLowerCase() === "v") return pxPaste();
-  if(ctl && k.toLowerCase() === "a"){ e.preventDefault(); pxDrop(); px.sel = {x:0, y:0, w:px.fw, h:px.fh, buf:null}; pxTool("select"); return; }
+  if(ctl && k.toLowerCase() === "v"){ px.pasteT = setTimeout(() => pxPaste(), 80); return; }   // the paste event below cancels this when the clipboard holds a picture
+  if(ctl && k.toLowerCase() === "a"){ e.preventDefault(); pxSelectAll(); return; }
   if(ctl) return;
   if(k === "Delete" || k === "Backspace"){ e.preventDefault(); return pxClear(); }
   if(k === "Enter"){ pxDrop(); px.sel = null; return pxChanged(); }
