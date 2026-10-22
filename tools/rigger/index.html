@@ -136,7 +136,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <button id="fDel">Delete</button>
    <label>Tween <input id="twN" type="number" min="1" max="30" value="2"></label><button id="bTween">Fill to next</button><button id="bTweenLoop">Fill to first</button>
    <span class="sep"></span>
-   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button><button id="bHalf" title="Animate the partner of the selected part (or of every pair, from the part drawn in front) as the same motion half a cycle later">Half-cycle partner</button><button id="bAuto" title="Make a walk for the whole rig: finds the legs from the mirrored pairs, plants each foot, and moves the body, tail, neck and arms with it">Auto walk</button>
+   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button><button id="bHalf" title="Animate the partner of the selected part (or of every pair, from the part drawn in front) as the same motion half a cycle later">Half-cycle partner</button><button id="bAuto" title="Make a walk for the whole rig: finds the legs from the mirrored pairs, plants each foot, and moves the body, tail, neck and arms with it">Auto walk</button><button id="bAutoIdle" title="Make an idle (breathing, head nod, tail sway; plus a jaw gape if there is a jaw part) and a rest (lying down) from the same mirrored limb pairs">Auto idle + rest</button>
    <span class="sep"></span>
    <button id="bExport">Export strip</button><button id="bExportStand">Export standing</button>
    <span class="sep"></span>
@@ -676,64 +676,126 @@ function lowestPoint(n, W0){
   const lx = cnt ? sx/cnt : 0;
   return {y:best, local:[lx, (best - M[5] - M[1]*lx)/(M[3] || 1)]};
 }
-function autoWalk(N, sOpt, lOpt){
+// what the generators need to know about the rig: its limbs, which way it faces, the root parts that carry the body, and the tail, neck, head and jaw parts
+function analyzeRig(){
   const pairs = limbChains(); if(!pairs.length) return {error:'No limbs found. Legs are mirrored pairs: pair the near and far thigh, shin and foot (Make far twin does it), with the shin under the thigh and the foot under the shin.'};
-  const W0 = worlds({}), D = 180/Math.PI, rd = x => Math.round(x*10)/10;
+  // a limb with no parent would stay put when the body moves, so it is attached to the body: the biggest part that is not a limb and has no parent (rest positions stay as they are)
+  let attached = 0;
+  const limbIds0 = new Set(); pairs.forEach(p => [...p.near, ...p.far].forEach(n => limbIds0.add(n.id)));
+  const area = n => { const d = hits[n.asset]; let c = 0; if(d) for(let i = 3; i < d.length; i += 4) if(d[i] > 16) c++; return c; };
+  const bodies = P.nodes.filter(n => !n.parent && !limbIds0.has(n.id)).sort((a, b) => area(b) - area(a));
+  if(bodies.length) for(const p of pairs) for(const ch of [p.near, p.far]) if(!ch[0].parent){ setParent(ch[0], bodies[0].id); attached++; }
+  const W0 = worlds({}), by = nodeMap();
   pairs.forEach(p => { p.bottom = Math.max(...p.near.map(n => lowestPoint(n, W0).y)); });
   const low = Math.max(...pairs.map(p => p.bottom)), legs = pairs.filter(p => low - p.bottom <= .12*P.cell.h), arms = pairs.filter(p => !legs.includes(p));
   const head = P.nodes.find(n => /head|skull/i.test(n.name)), tail = P.nodes.find(n => /tail/i.test(n.name));
   const dir = head && tail ? (Math.sign(W0[head.id][4] - W0[tail.id][4]) || 1) : 1;
   legs.sort((a, b) => (W0[a.near[0].id][4] - W0[b.near[0].id][4])*dir);
-  const nl = legs.length, duty = nl === 1 ? .62 : nl === 2 ? .75 : .55;
-  const phases = legs.map((_, i) => nl === 2 ? i*.25 : nl === 1 ? 0 : (i%2)*.5);
   // each leg's rest geometry: the two bone vectors, and the foot spot (the third part's joint, or the lowest point of a two-part leg)
+  const cr = (a, c) => a[0]*c[1] - a[1]*c[0];
   for(const lg of legs){
     const [n1, n2, n3] = lg.near, v1 = [n2.lx, n2.ly];
     let v2, E0;
     if(n3){ v2 = [n3.lx, n3.ly]; E0 = [W0[n3.id][4], W0[n3.id][5]]; }
     else{ const lp = lowestPoint(n2, W0); v2 = lp.local; E0 = apply(drawM(n2, W0[n2.id]), v2[0], v2[1]); }
     lg.v1 = v1; lg.v2 = v2; lg.E0 = E0; lg.L1 = Math.hypot(...v1); lg.L2 = Math.hypot(...v2);
-    const cr = (a, c) => a[0]*c[1] - a[1]*c[0];
     lg.sRest = Math.sign(cr([v1[0] + v2[0], v1[1] + v2[1]], v1));
     lg.len = lg.L1 + lg.L2;
   }
-  const L = legs.reduce((s, g) => s + g.len, 0)/nl, S = sOpt > 0 ? sOpt : Math.round((nl === 1 ? .5 : nl === 2 ? .42 : .35)*L*2)/2, lift = lOpt >= 0 ? lOpt : Math.round((nl === 1 ? .22 : .18)*L*2)/2, B = .03*L;
-  const roots = new Set(); const rootOf = n => { const m = nodeMap(); let g = 0; while(n.parent && m[n.parent] && g++ < 60) n = m[n.parent]; return n; };
-  legs.forEach(g => roots.add(rootOf(g.near[0]).id));
+  const rootOf = n => { let g = 0; while(n.parent && by[n.parent] && g++ < 60) n = by[n.parent]; return n; };
+  const roots = new Set(legs.map(g => rootOf(g.near[0]).id));
   const limbIds = new Set(); pairs.forEach(p => [...p.near, ...p.far].forEach(n => limbIds.add(n.id)));
   const spine = P.nodes.filter(n => !limbIds.has(n.id)), grab = re => spine.filter(n => re.test(n.name));
-  const tails = grab(/tail/i), necks = grab(/neck/i), heads = grab(/head|skull/i);
-  const frames = [];
+  const tails = grab(/tail/i); tails.sort((a, b) => depth(a) - depth(b));
+  return {attached, bodyName:bodies[0] && bodies[0].name, pairs, legs, arms, dir, roots, tails, necks:grab(/neck/i), heads:grab(/head|skull/i), jaws:grab(/jaw|mandible/i), L:legs.reduce((s, g) => s + g.len, 0)/legs.length};
+}
+// 2-bone IK for one side of a leg: the poses of its parts that put the foot spot at (ax, ay) in the world, given the poses already set for the parts above it (in W)
+function solveLeg(lg, ch, W, ax, ay, dir, pose){
+  const [n1, n2, n3] = ch, D = 180/Math.PI, rd = x => Math.round(x*10)/10, cr = (a, c) => a[0]*c[1] - a[1]*c[0];
+  const PM = n1.parent && W[n1.parent] ? W[n1.parent] : I, [hx, hy] = apply(PM, n1.lx, n1.ly), pr = Math.atan2(PM[1], PM[0]);
+  const dx = ax - hx, dy = ay - hy; let d = Math.hypot(dx, dy);
+  d = Math.min(Math.max(d, Math.abs(lg.L1 - lg.L2) + .3), lg.L1 + lg.L2 - .05);
+  const ph = Math.atan2(dy, dx), al = Math.acos(clamp((lg.L1*lg.L1 + d*d - lg.L2*lg.L2)/(2*lg.L1*d), -1, 1)), cands = [ph + al, ph - al]; let best = null;
+  if(lg.sRest) for(const t1 of cands){ if(Math.sign(cr([dx, dy], [lg.L1*Math.cos(t1), lg.L1*Math.sin(t1)])) === lg.sRest) best = t1; }
+  if(best === null) best = Math.cos(cands[0])*dir >= Math.cos(cands[1])*dir ? cands[0] : cands[1];   // a straight limb at rest: the joint points the way the animal faces
+  const kx = hx + lg.L1*Math.cos(best), ky = hy + lg.L1*Math.sin(best), t2 = Math.atan2(ay - ky, ax - kx);
+  const t1r = Math.atan2(lg.v1[1], lg.v1[0]), t2r = Math.atan2(lg.v2[1], lg.v2[0]), r1 = best - t1r - pr, tot2 = t2 - t2r, r2 = tot2 - (best - t1r);
+  pose[n1.id] = {r:rd(r1*D), dx:0, dy:0}; pose[n2.id] = {r:rd(r2*D), dx:0, dy:0};
+  if(n3) pose[n3.id] = {r:rd(-tot2*D), dx:0, dy:0};   // the foot turns back so it stays as flat as at rest
+}
+const poseR = (pose, n, r) => { pose[n.id] = {r:Math.round(r*10)/10, dx:0, dy:0}; };
+function autoWalk(N, sOpt, lOpt){
+  const A = analyzeRig(); if(A.error) return A;
+  const {legs, arms, dir, roots, tails, necks, heads, L} = A, rd = x => Math.round(x*10)/10, nl = legs.length, duty = nl === 1 ? .62 : nl === 2 ? .75 : .55;
+  const phases = legs.map((_, i) => nl === 2 ? i*.25 : nl === 1 ? 0 : (i%2)*.5);
+  const S = sOpt > 0 ? sOpt : Math.round((nl === 1 ? .5 : nl === 2 ? .42 : .35)*L*2)/2, lift = lOpt >= 0 ? lOpt : Math.round((nl === 1 ? .22 : .18)*L*2)/2, B = .03*L, frames = [];
   for(let i = 0; i < N; i++){
     const f0 = (i + .5)/N, pose = {}, bob = -B*Math.cos(4*Math.PI*(f0 - duty/2)), bn = bob/B;
     roots.forEach(id => { pose[id] = {r:0, dx:0, dy:rd(bob)}; });
-    tails.forEach(n => { pose[n.id] = {r:rd(2.2*bn), dx:0, dy:0}; });
-    necks.forEach(n => { pose[n.id] = {r:rd(-1.5*bn), dx:0, dy:0}; });
-    heads.forEach(n => { pose[n.id] = {r:rd(1.5*bn), dx:0, dy:0}; });
+    tails.forEach(n => poseR(pose, n, 2.2*bn)); necks.forEach(n => poseR(pose, n, -1.5*bn)); heads.forEach(n => poseR(pose, n, 1.5*bn));
     const W = worlds(pose);
     legs.forEach((lg, li) => {
       for(const side of ['near', 'far']){
-        const ch = side === 'near' ? lg.near : lg.far, fl = (f0 + phases[li] + (side === 'far' ? .5 : 0)) % 1, [n1, n2, n3] = ch;
-        let ax, ay;
+        const fl = (f0 + phases[li] + (side === 'far' ? .5 : 0)) % 1; let ax, ay;
         if(fl < duty){ const t = fl/duty; ax = lg.E0[0] + dir*(S/2 - S*t); ay = lg.E0[1]; }
         else{ const t = (fl - duty)/(1 - duty); ax = lg.E0[0] + dir*(-S/2 + S*t); ay = lg.E0[1] - lift*Math.sin(Math.PI*t); }
-        const PM = n1.parent && W[n1.parent] ? W[n1.parent] : I, [hx, hy] = apply(PM, n1.lx, n1.ly), pr = Math.atan2(PM[1], PM[0]);
-        const dx = ax - hx, dy = ay - hy; let d = Math.hypot(dx, dy);
-        d = Math.min(Math.max(d, Math.abs(lg.L1 - lg.L2) + .3), lg.L1 + lg.L2 - .05);
-        const ph = Math.atan2(dy, dx), al = Math.acos(clamp((lg.L1*lg.L1 + d*d - lg.L2*lg.L2)/(2*lg.L1*d), -1, 1)), cr = (a, c) => a[0]*c[1] - a[1]*c[0];
-        const cands = [ph + al, ph - al]; let best = null;
-        if(lg.sRest) for(const t1 of cands){ if(Math.sign(cr([dx, dy], [lg.L1*Math.cos(t1), lg.L1*Math.sin(t1)])) === lg.sRest) best = t1; }
-        if(best === null) best = Math.cos(cands[0])*dir >= Math.cos(cands[1])*dir ? cands[0] : cands[1];   // a straight limb at rest: the joint points the way the animal faces
-        const kx = hx + lg.L1*Math.cos(best), ky = hy + lg.L1*Math.sin(best), t2 = Math.atan2(ay - ky, ax - kx);
-        const t1r = Math.atan2(lg.v1[1], lg.v1[0]), t2r = Math.atan2(lg.v2[1], lg.v2[0]), r1 = best - t1r - pr, tot2 = t2 - t2r, r2 = tot2 - (best - t1r);
-        pose[n1.id] = {r:rd(r1*D), dx:0, dy:0}; pose[n2.id] = {r:rd(r2*D), dx:0, dy:0};
-        if(n3) pose[n3.id] = {r:rd(-tot2*D), dx:0, dy:0};   // the foot turns back so it stays as flat as at rest
+        solveLeg(lg, lg[side], W, ax, ay, dir, pose);
       }
     });
-    arms.forEach(ar => { ['near', 'far'].forEach(side => { const ph0 = side === 'near' ? .5 : 0, a = Math.cos(2*Math.PI*(f0 - ph0)); ar[side].forEach((n, j) => { if(j < 2) pose[n.id] = {r:rd((j ? 4 : 6)*a), dx:0, dy:0}; }); }); });
+    arms.forEach(ar => { ['near', 'far'].forEach(side => { const ph0 = side === 'near' ? .5 : 0, a = Math.cos(2*Math.PI*(f0 - ph0)); ar[side].forEach((n, j) => { if(j < 2) poseR(pose, n, (j ? 4 : 6)*a); }); }); });
     frames.push(pose);
   }
-  return {frames, info:{legs:nl, arms:arms.length, S, lift, duty, cycle:Math.round(S/duty*10)/10, dir, found:pairs.length}};
+  return {frames, info:{legs:nl, arms:arms.length, S, lift, duty, cycle:Math.round(S/duty*10)/10, dir, found:A.pairs.length, attached:A.attached, body:A.bodyName}};
+}
+// A standing idle that starts and ends on the exact standing pose (the game holds the first frame between idles): a slow breath with the feet kept planted, the head nodding, the neck and tail following; idle2, if there is a jaw, is a gape with the head lifted
+function autoIdle(N){
+  const A = analyzeRig(); if(A.error) return A;
+  const {legs, dir, roots, tails, necks, heads, jaws} = A, out = {};
+  const base = (f, t, pose) => {
+    const s = Math.sin(2*Math.PI*t), br = (1 - Math.cos(2*Math.PI*t))/2;
+    roots.forEach(id => { pose[id] = {r:0, dx:0, dy:Math.round(-.8*br*10)/10}; });
+    return {s, br};
+  };
+  const plant = pose => { const W = worlds(pose); legs.forEach(lg => ['near', 'far'].forEach(side => solveLeg(lg, lg[side], W, lg.E0[0], lg.E0[1], dir, pose))); };
+  const a = [], b = [];
+  for(let i = 0; i <= N; i++){
+    const t = i/N, pose = {};
+    if(i > 0 && i < N){
+      const {s} = base(null, t, pose);
+      heads.forEach(n => poseR(pose, n, dir*3*s)); necks.forEach(n => poseR(pose, n, -dir*1.5*s));
+      tails.forEach((n, j) => poseR(pose, n, 3*Math.sin(2*Math.PI*t - .7*j)));
+      plant(pose);
+    }
+    a.push(pose);
+  }
+  out.idle = a;
+  if(jaws.length){
+    for(let i = 0; i <= N; i++){
+      const t = i/N, pose = {}, g = Math.pow(Math.sin(Math.PI*t), 2);
+      if(i > 0 && i < N){
+        jaws.forEach(n => poseR(pose, n, dir*14*g)); heads.forEach(n => poseR(pose, n, -dir*5*g)); necks.forEach(n => poseR(pose, n, -dir*2*g));
+        tails.forEach((n, j) => poseR(pose, n, 2*g*(j + 1)*.5));
+      }
+      b.push(pose);
+    }
+    out.idle2 = b;
+  }
+  return {clips:out, info:{legs:legs.length, jaw:jaws.length > 0, attached:A.attached, body:A.bodyName}};
+}
+// Lying down: the hips settle with the feet staying put, so the legs fold; the head and neck lower and the tail droops. It ends lying down and the game holds the last frame
+function autoRest(N){
+  const A = analyzeRig(); if(A.error) return A;
+  const {legs, dir, roots, tails, necks, heads, L} = A, drop = .45*L, frames = [];
+  for(let i = 0; i <= N; i++){
+    const t = i/N, e = t*t*(3 - 2*t), pose = {};
+    if(i > 0){
+      roots.forEach(id => { pose[id] = {r:0, dx:0, dy:Math.round(drop*e*10)/10}; });
+      heads.forEach(n => poseR(pose, n, dir*12*e)); necks.forEach(n => poseR(pose, n, dir*5*e)); tails.forEach(n => poseR(pose, n, -dir*3*e));
+      const W = worlds(pose); legs.forEach(lg => ['near', 'far'].forEach(side => solveLeg(lg, lg[side], W, lg.E0[0], lg.E0[1], dir, pose)));
+    }
+    frames.push(pose);
+  }
+  return {frames, info:{legs:legs.length, drop:Math.round(drop*10)/10, attached:A.attached, body:A.bodyName}};
 }
 function lerpPose(a, b, t){
   const out = {};
@@ -939,7 +1001,21 @@ on('#bAuto', 'click', async () => {
   if(k < 0){ P.clips.push({name:'walk', fps:8, frames:[]}); k = P.clips.length - 1; }
   P.clips[k].frames = r.frames; ci = k; cur = 0; setMode('pose'); save(true);
   const i = r.info;
-  ask(i.legs + ' leg pair' + (i.legs > 1 ? 's' : '') + (i.arms ? ' and ' + i.arms + ' arm pair' + (i.arms > 1 ? 's' : '') : '') + ' found, facing ' + (i.dir > 0 ? 'right' : 'left') + '. Stride ' + i.S + ' px, lift ' + i.lift + ' px, feet down ' + Math.round(i.duty*100) + '% of the cycle. The ground moves ' + i.cycle + ' px a cycle (' + Math.round(i.cycle/P.cell.w*1000)/1000 + ' of the cell), so in data.js step is about ' + Math.round(i.cycle/P.cell.w/N*1000)/1000 + '. Check it frame by frame and fix what looks off.', {info:true});
+  ask(i.legs + ' leg pair' + (i.legs > 1 ? 's' : '') + (i.arms ? ' and ' + i.arms + ' arm pair' + (i.arms > 1 ? 's' : '') : '') + ' found, facing ' + (i.dir > 0 ? 'right' : 'left') + '. Stride ' + i.S + ' px, lift ' + i.lift + ' px, feet down ' + Math.round(i.duty*100) + '% of the cycle. The ground moves ' + i.cycle + ' px a cycle (' + Math.round(i.cycle/P.cell.w*1000)/1000 + ' of the cell), so in data.js step is about ' + Math.round(i.cycle/P.cell.w/N*1000)/1000 + '. Check it frame by frame and fix what looks off.' + (i.attached ? ' ' + i.attached + ' limb' + (i.attached > 1 ? 's were' : ' was') + ' not attached to anything, so they now hang off ' + i.body + '.' : ''), {info:true});
+});
+on('#bAutoIdle', 'click', async () => {
+  if(!P.nodes.length) return;
+  const txt = await ask('Auto idle and rest. How many frames for the idle, then for the rest? Like "12, 10". The idle starts and ends on the standing pose; the rest lowers the animal and its last frame is held. Legs are found from mirrored pairs (Make far twin makes them).', {value:'12, 10', ok:'Make them'});
+  if(txt === null) return;
+  const nums = String(txt).split(/[\s,]+/).filter(Boolean).map(Number), NI = clamp(Math.round(nums[0]) || 12, 4, 40), NR = clamp(Math.round(nums[1]) || 10, 3, 40);
+  const idle = autoIdle(NI); if(idle.error){ ask(idle.error, {info:true}); return; }
+  const rest = autoRest(NR), made = [['idle', idle.clips.idle, 6], ['rest', rest.frames, 4]]; if(idle.clips.idle2) made.splice(1, 0, ['idle2', idle.clips.idle2, 6]);
+  const had = made.filter(m => P.clips.some(c => c.name === m[0] && c.frames.length > 1)).map(m => m[0]);
+  if(had.length && !(await ask('Replace the ' + had.join(', ') + ' animation' + (had.length > 1 ? 's' : '') + ' you already have?', {ok:'Replace'}))) return;
+  let k = ci;
+  for(const [name, fr, fps] of made){ k = P.clips.findIndex(c => c.name === name); if(k < 0){ P.clips.push({name, fps, frames:[]}); k = P.clips.length - 1; } P.clips[k].frames = fr; }
+  ci = P.clips.findIndex(c => c.name === 'idle'); cur = 0; setMode('pose'); save(true);
+  ask('Made ' + made.map(m => m[0] + ' (' + m[1].length + ' frames)').join(', ') + (idle.clips.idle2 ? '' : ' (no part named jaw, so no gape)') + '. Export with rigtogame: --idle idle' + (idle.clips.idle2 ? ' idle2' : '') + ' --rest rest. Check them frame by frame; the rest folds the legs by keeping the feet put while the hips drop ' + rest.info.drop + ' px.' + (idle.info.attached ? ' ' + idle.info.attached + ' limb' + (idle.info.attached > 1 ? 's were' : ' was') + ' not attached to anything, so they now hang off ' + idle.info.body + '.' : ''), {info:true});
 });
 on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else ask('This is the last frame. Use "Fill to first" to close the loop.', {info:true}); });
 on('#bTweenLoop', 'click', () => { if(frames().length > 1 || cur > 0) tween(0); });
