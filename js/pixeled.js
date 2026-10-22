@@ -131,6 +131,19 @@ const pxStored = k => { try{ return JSON.parse(localStorage.getItem(PX_KEY + k))
 const pxFootOrig = {};
 const pxFootType = () => { const m = px.path && px.path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(?:front|back|left|right)/); return m && BUILDINGS[m[1]] ? m[1] : null; };
 function pxSetFoot(k, w, d){ const t = BUILDINGS[k]; pxFootOrig[k] = pxFootOrig[k] || {w:t.w, d:t.d}; t.w = w; t.d = d; }
+// The guide's end ticks are handles: dragging one sets the footprint's width in this view (the depth on a side view), kept centered
+function pxFootEnds(){ const gw = Math.round(Math.min(px.fw, px.guideW || px.fw)), x0 = Math.round((px.fw - gw) / 2); return [x0, x0 + gw]; }
+function pxFootHit(e){
+  if(px.guide == null || !px.guideW || !pxFootType()) return false;
+  const r = pxCv.getBoundingClientRect(), z = r.width / px.fw, mx = e.clientX - r.left, my = e.clientY - r.top, gy = px.guide * z;
+  return my > gy - 4 * z - 6 && my < gy + 6 && pxFootEnds().some(x => Math.abs(mx - x * z) < Math.max(6, z));
+}
+function pxFootDrag(e){
+  const r = pxCv.getBoundingClientRect(), half = Math.abs((e.clientX - r.left) / r.width * px.fw - px.fw / 2), k = pxFootType(), t = BUILDINGS[k];
+  const m = Math.max(.5, Math.round(Math.min(px.fw, Math.round(half * 2)) * ROCK_MPP * 10) / 10), side = /-(left|right)/.test(px.path);
+  if(m !== (side ? t.d : t.w)){ pxSetFoot(k, side ? t.w : m, side ? m : t.d); px.guide = pxGuideFor(px.path); }
+  pxDraw();
+}
 function pxFootDiff(){ const k = pxFootType(), o = k && pxFootOrig[k], t = k && BUILDINGS[k]; return o && (o.w !== t.w || o.d !== t.d) ? {k, w:t.w, d:t.d} : null; }
 const pxDrafts = () => pxStored("drafts") || {};
 let pxSaveT = 0;
@@ -280,7 +293,11 @@ function pxDraw(){
   if(px.guide != null){   // over the footprint's width for this view, centered, with ticks at its ends
     const gw = Math.min(px.fw, px.guideW || px.fw), x0 = Math.round((px.fw - gw) / 2) * z, x1 = x0 + Math.round(gw) * z;
     ctx.fillStyle = "rgba(184,145,47,.9)"; for(let x = x0; x < x1; x += 8) ctx.fillRect(x, px.guide * z - 1, Math.min(5, x1 - x), 2);
-    if(px.guideW){ ctx.fillRect(x0, px.guide * z - 3 * z, 2, 3 * z); ctx.fillRect(x1 - 2, px.guide * z - 3 * z, 2, 3 * z); }
+    if(px.guideW){
+      const hw = Math.max(4, Math.min(8, z)); ctx.fillRect(x0 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2); ctx.fillRect(x1 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2);   // the handles
+      const k = pxFootType(), t = k && BUILDINGS[k];
+      if(t){ const lb = `${/-(left|right)/.test(px.path) ? t.d + " m deep" : t.w + " m across"} · drag the ends`; ctx.font = "bold 12px system-ui, sans-serif"; ctx.textAlign = "center"; const tw = ctx.measureText(lb).width + 12, cx = (x0 + x1) / 2, ty = px.guide * z + 6; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillRect(cx - tw / 2, ty, tw, 18); ctx.fillStyle = "#6b5212"; ctx.fillText(lb, cx, ty + 13); ctx.textAlign = "start"; }
+    }
   }   // the base row: its bottom stands on the footprint's front edge
   if(s){
     const box = c => s.mask ? ctx.stroke(pxMaskPath(s, z)) : ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1);
@@ -315,6 +332,7 @@ function pxDown(e){
   if(pxPans(e)) return;   // the stage pans (pxPanStart)
   if(e.button > 2 || !px.frames.length) return;
   e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
+  if(!e.button && pxFootHit(e)){ px.stroke = {foot:1}; return; }
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
   if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(pxCompData(px.cur), x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }   // the color as it shows, whatever layer it's on
   if(!px.layers[px.lay].show) return ui.toast("This layer is hidden. Show it to draw on it.");
@@ -350,6 +368,8 @@ function pxMove(e){
   if(px.pan) return;
   const [x, y] = pxXY(e); px.hover = [x, y];
   const st = px.stroke;
+  if(st && st.foot) return pxFootDrag(e);
+  const fh = !st && pxFootHit(e); if(fh !== !!px.footHover){ px.footHover = fh; pxCv.style.cursor = fh ? "ew-resize" : pxCursor(px.tool); }
   if(!st) return pxDraw();
   if(pxSelTool(px.tool)){
     const s = px.sel;
@@ -363,6 +383,7 @@ function pxMove(e){
 function pxUp(){
   if(px.pan) return;
   const st = px.stroke; px.stroke = null; if(!st) return;
+  if(st.foot) return pxChanged();   // saves the footprint with the draft
   if(st.lasso){ px.sel = pxLassoSel(st.lasso); return pxDraw(); }
   if(pxSelTool(px.tool)){ if(st.move) pxChanged(); return; }
   pxChanged();
@@ -695,8 +716,7 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
-        <div class="pxrow" id="pxFootRow" hidden><span>Footprint</span><input type="number" id="pxFW" class="pxnum" min="0.5" max="40" step="0.1"><span>×</span><input type="number" id="pxFD" class="pxnum" min="0.5" max="40" step="0.1"><span>m, across × deep</span></div>
-        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
+        <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view. Drag its end handles to change the footprint (the depth on a side view); the park uses it at once for new ones, and it goes with the picture when you send it.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
         <div class="meta" id="pxTryNote" hidden></div>
@@ -750,7 +770,6 @@ function pxSync(){
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
   $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null;
-  { const k = pxFootType(); $p("pxFootRow").hidden = !k; if(k){ if(document.activeElement !== $p("pxFW")) $p("pxFW").value = BUILDINGS[k].w; if(document.activeElement !== $p("pxFD")) $p("pxFD").value = BUILDINGS[k].d; } }
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -905,10 +924,6 @@ function pxInput(e){
   else if(id === "pxRe" && e.type === "change"){ const from = t.dataset.from.split(",").map(Number); pxRecolor(from, [...pxRgb(t.value), from[3]]); }
   else if(id === "pxAlpha"){ px.c1 = [...px.c1.slice(0, 3), +t.value]; pxSync(); }
   else if(id === "pxPal"){ px.pal = t.value; if(px.pal === "dime" && !px.dime) pxDime(); pxSync(); }
-  else if((id === "pxFW" || id === "pxFD") && e.type === "change"){   // the footprint, live in the park for new placements; the gold guide follows
-    const k = pxFootType(), g = i => document.getElementById(i).value, n = v => Math.max(.5, Math.min(40, Math.round((+v || 0) * 10) / 10));
-    if(k){ pxSetFoot(k, n(g("pxFW")), n(g("pxFD"))); px.guide = pxGuideFor(px.path); pxChanged(); }
-  }
   else if(id === "pxFps"){ px.fps = Math.max(1, Math.min(30, +t.value || 6)); }
   else if(id === "pxNt") pxNewFill(true);
   else if(id === "pxNs" || id === "pxNm" || id === "pxNv") pxNewFill(false);

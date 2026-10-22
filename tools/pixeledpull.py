@@ -38,4 +38,12 @@ for r in rows(json.load(open(args[0]))):
         os.makedirs(os.path.dirname(os.path.join(root, p)), exist_ok=True)
         open(os.path.join(root, p), "wb").write(b)
     ok += 1
+    f = r.get("foot")   # a footprint dragged in the editor: written into that type's BUILDINGS entry in data.js
+    if isinstance(f, dict) and isinstance(f.get("k"), str) and re.fullmatch(r"[A-Za-z0-9]+", f["k"]) and all(isinstance(f.get(x), (int, float)) and .5 <= f[x] <= 40 for x in "wd"):
+        dp = os.path.join(root, "js", "data.js"); src = open(dp).read(); n = lambda v: ("%g" % round(v, 1))
+        rx = re.compile(r"(^\s*" + f["k"] + r":\s*\{label:[^\n]*?\bw:\s*)[\d.]+(,\s*d:\s*)[\d.]+", re.M)
+        if rx.search(src):
+            print(f"{'would set' if dry else 'set'} {f['k']} footprint to {n(f['w'])} x {n(f['d'])} m in js/data.js")
+            if not dry: open(dp, "w").write(rx.sub(lambda m: m.group(1) + n(f["w"]) + m.group(2) + n(f["d"]), src, 1))
+        else: print("skip footprint, no BUILDINGS entry for", f["k"])
 print(ok, "picture" + ("" if ok == 1 else "s"), "pulled." + ("" if dry or not ok else " Now run python3 tools/packsprites.py."))
