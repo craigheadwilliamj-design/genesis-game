@@ -476,7 +476,16 @@ function pxTry(){
   const u = spriteUrl(px.path);
   document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
   if(typeof render === "function" && state) render();
-  ui.toast("It's in the park until you reload. Send it to the repo to keep it.", "good");
+  const el = document.getElementById("pxTryNote");
+  if(el){ el.textContent = "In the park until you reload." + pxTryWhere(px.path); el.hidden = false; }
+  ui.toast("It's in the park.", "good");
+}
+// Which in-game state shows a building or prop picture, so a Try that seems to do nothing says why
+function pxTryWhere(path){
+  const m = path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)(?:-(\d+|broken|full))?\.png$/), t = m && BUILDINGS[m[1]]; if(!t) return "";
+  const face = {front:"facing the bottom of the screen", back:"facing the top", left:"facing left", right:"facing right"}[m[2]];
+  const when = m[3] === "broken" ? "broken" : m[3] === "full" ? "full" : t.prop ? (m[1] === "bin" ? "working and not full" : "working") : "";
+  return ` This one shows on ${t.one || t.label}${t.prop ? ` ${face}` : ` seen from the ${m[2]}`}${when ? `, when it is ${when}` : ""}, in the Genesis theme. Place one and turn it to match.`;
 }
 const pxFirst = () => pxComp(0).toDataURL("image/png");
 // A plant's picture sets its ratio (a new one gets a stand-in PLANT_SPRITES entry); a rock shape is that biome's nth picture for its type
@@ -658,6 +667,7 @@ function pxBuild(){
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="download">Download</button></div>
+        <div class="meta" id="pxTryNote" hidden></div>
         <div class="pxrow"><button class="btn" data-px="rigger" title="Save this frame's layers as parts for the sprite rigger">Send to rigger</button><span class="meta">A layer a part. Import a rigger project to get its parts back as layers.</span></div>
         <div id="pxQueue"></div></section>
     </div></div>
