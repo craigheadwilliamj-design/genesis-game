@@ -136,7 +136,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <button id="fDel">Delete</button>
    <label>Tween <input id="twN" type="number" min="1" max="30" value="2"></label><button id="bTween">Fill to next</button><button id="bTweenLoop">Fill to first</button>
    <span class="sep"></span>
-   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button><button id="bHalf" title="Animate the partner of the selected part (or of every pair, from the part drawn in front) as the same motion half a cycle later">Half-cycle partner</button>
+   <button id="bMirror" title="Swap the pose of each mirrored pair (near and far legs) in this frame">Mirror pose</button><button id="bMirrorAll" title="Swap every mirrored pair in every frame of this animation">Mirror clip</button><button id="bHalf" title="Animate the partner of the selected part (or of every pair, from the part drawn in front) as the same motion half a cycle later">Half-cycle partner</button><button id="bAuto" title="Make a walk for the whole rig: finds the legs from the mirrored pairs, plants each foot, and moves the body, tail, neck and arms with it">Auto walk</button>
    <span class="sep"></span>
    <button id="bExport">Export strip</button><button id="bExportStand">Export standing</button>
    <span class="sep"></span>
@@ -650,6 +650,91 @@ function halfCycle(){
   }
   return count;
 }
+// ---------- auto walk ----------
+// Legs and arms come from mirrored pairs: a pair whose top part hangs off a part with no mirror, then the mirrored children below it (Make far twin makes these).
+// The part drawn later is the near side. Only the first three parts of a limb are used; the rest follow along.
+function limbChains(){
+  const by = nodeMap(), idx = n => P.nodes.indexOf(n), pairs = [], seen = new Set();
+  const chainOf = top => { const c = [top]; for(let g = 0; g < 8; g++){ const k = P.nodes.find(x => x.parent === c[c.length - 1].id && x.mirror && by[x.mirror]); if(!k) break; c.push(k); } return c; };
+  for(const a of P.nodes){
+    const b = a.mirror && by[a.mirror]; if(!b || seen.has(a.id) || seen.has(b.id)) continue;
+    const pa = a.parent && by[a.parent]; if(pa && pa.mirror) continue;
+    seen.add(a.id); seen.add(b.id);
+    const near = idx(a) > idx(b) ? a : b, far = near === a ? b : a, nc = chainOf(near), fc = chainOf(far), k = Math.min(nc.length, fc.length, 3);
+    if(k >= 2) pairs.push({near:nc.slice(0, k), far:fc.slice(0, k), k});
+  }
+  return pairs;
+}
+// the lowest opaque pixel of a part at rest: its world y and the point (in the part's own frame) that touches down
+function lowestPoint(n, W0){
+  const im = imgs[n.asset], d = hits[n.asset], M = drawM(n, W0[n.id]); let best = -Infinity, sx = 0, cnt = 0;
+  for(let pass = 0; pass < 2; pass++) for(let v = 0; v < im.height; v++) for(let u = 0; u < im.width; u++){
+    if(d[(v*im.width + u)*4 + 3] <= 16) continue;
+    const lx = u + .5 - n.px, ly = v + 1 - n.py, y = M[1]*lx + M[3]*ly + M[5];
+    if(!pass) best = Math.max(best, y); else if(y > best - .5){ sx += lx; cnt++; }
+  }
+  const lx = cnt ? sx/cnt : 0;
+  return {y:best, local:[lx, (best - M[5] - M[1]*lx)/(M[3] || 1)]};
+}
+function autoWalk(N, sOpt, lOpt){
+  const pairs = limbChains(); if(!pairs.length) return {error:'No limbs found. Legs are mirrored pairs: pair the near and far thigh, shin and foot (Make far twin does it), with the shin under the thigh and the foot under the shin.'};
+  const W0 = worlds({}), D = 180/Math.PI, rd = x => Math.round(x*10)/10;
+  pairs.forEach(p => { p.bottom = Math.max(...p.near.map(n => lowestPoint(n, W0).y)); });
+  const low = Math.max(...pairs.map(p => p.bottom)), legs = pairs.filter(p => low - p.bottom <= .12*P.cell.h), arms = pairs.filter(p => !legs.includes(p));
+  const head = P.nodes.find(n => /head|skull/i.test(n.name)), tail = P.nodes.find(n => /tail/i.test(n.name));
+  const dir = head && tail ? (Math.sign(W0[head.id][4] - W0[tail.id][4]) || 1) : 1;
+  legs.sort((a, b) => (W0[a.near[0].id][4] - W0[b.near[0].id][4])*dir);
+  const nl = legs.length, duty = nl === 1 ? .62 : nl === 2 ? .75 : .55;
+  const phases = legs.map((_, i) => nl === 2 ? i*.25 : nl === 1 ? 0 : (i%2)*.5);
+  // each leg's rest geometry: the two bone vectors, and the foot spot (the third part's joint, or the lowest point of a two-part leg)
+  for(const lg of legs){
+    const [n1, n2, n3] = lg.near, v1 = [n2.lx, n2.ly];
+    let v2, E0;
+    if(n3){ v2 = [n3.lx, n3.ly]; E0 = [W0[n3.id][4], W0[n3.id][5]]; }
+    else{ const lp = lowestPoint(n2, W0); v2 = lp.local; E0 = apply(drawM(n2, W0[n2.id]), v2[0], v2[1]); }
+    lg.v1 = v1; lg.v2 = v2; lg.E0 = E0; lg.L1 = Math.hypot(...v1); lg.L2 = Math.hypot(...v2);
+    const cr = (a, c) => a[0]*c[1] - a[1]*c[0];
+    lg.sRest = Math.sign(cr([v1[0] + v2[0], v1[1] + v2[1]], v1));
+    lg.len = lg.L1 + lg.L2;
+  }
+  const L = legs.reduce((s, g) => s + g.len, 0)/nl, S = sOpt > 0 ? sOpt : Math.round((nl === 1 ? .5 : nl === 2 ? .42 : .35)*L*2)/2, lift = lOpt >= 0 ? lOpt : Math.round((nl === 1 ? .22 : .18)*L*2)/2, B = .03*L;
+  const roots = new Set(); const rootOf = n => { const m = nodeMap(); let g = 0; while(n.parent && m[n.parent] && g++ < 60) n = m[n.parent]; return n; };
+  legs.forEach(g => roots.add(rootOf(g.near[0]).id));
+  const limbIds = new Set(); pairs.forEach(p => [...p.near, ...p.far].forEach(n => limbIds.add(n.id)));
+  const spine = P.nodes.filter(n => !limbIds.has(n.id)), grab = re => spine.filter(n => re.test(n.name));
+  const tails = grab(/tail/i), necks = grab(/neck/i), heads = grab(/head|skull/i);
+  const frames = [];
+  for(let i = 0; i < N; i++){
+    const f0 = (i + .5)/N, pose = {}, bob = -B*Math.cos(4*Math.PI*(f0 - duty/2)), bn = bob/B;
+    roots.forEach(id => { pose[id] = {r:0, dx:0, dy:rd(bob)}; });
+    tails.forEach(n => { pose[n.id] = {r:rd(2.2*bn), dx:0, dy:0}; });
+    necks.forEach(n => { pose[n.id] = {r:rd(-1.5*bn), dx:0, dy:0}; });
+    heads.forEach(n => { pose[n.id] = {r:rd(1.5*bn), dx:0, dy:0}; });
+    const W = worlds(pose);
+    legs.forEach((lg, li) => {
+      for(const side of ['near', 'far']){
+        const ch = side === 'near' ? lg.near : lg.far, fl = (f0 + phases[li] + (side === 'far' ? .5 : 0)) % 1, [n1, n2, n3] = ch;
+        let ax, ay;
+        if(fl < duty){ const t = fl/duty; ax = lg.E0[0] + dir*(S/2 - S*t); ay = lg.E0[1]; }
+        else{ const t = (fl - duty)/(1 - duty); ax = lg.E0[0] + dir*(-S/2 + S*t); ay = lg.E0[1] - lift*Math.sin(Math.PI*t); }
+        const PM = n1.parent && W[n1.parent] ? W[n1.parent] : I, [hx, hy] = apply(PM, n1.lx, n1.ly), pr = Math.atan2(PM[1], PM[0]);
+        const dx = ax - hx, dy = ay - hy; let d = Math.hypot(dx, dy);
+        d = Math.min(Math.max(d, Math.abs(lg.L1 - lg.L2) + .3), lg.L1 + lg.L2 - .05);
+        const ph = Math.atan2(dy, dx), al = Math.acos(clamp((lg.L1*lg.L1 + d*d - lg.L2*lg.L2)/(2*lg.L1*d), -1, 1)), cr = (a, c) => a[0]*c[1] - a[1]*c[0];
+        const cands = [ph + al, ph - al]; let best = null;
+        if(lg.sRest) for(const t1 of cands){ if(Math.sign(cr([dx, dy], [lg.L1*Math.cos(t1), lg.L1*Math.sin(t1)])) === lg.sRest) best = t1; }
+        if(best === null) best = Math.cos(cands[0])*dir >= Math.cos(cands[1])*dir ? cands[0] : cands[1];   // a straight limb at rest: the joint points the way the animal faces
+        const kx = hx + lg.L1*Math.cos(best), ky = hy + lg.L1*Math.sin(best), t2 = Math.atan2(ay - ky, ax - kx);
+        const t1r = Math.atan2(lg.v1[1], lg.v1[0]), t2r = Math.atan2(lg.v2[1], lg.v2[0]), r1 = best - t1r - pr, tot2 = t2 - t2r, r2 = tot2 - (best - t1r);
+        pose[n1.id] = {r:rd(r1*D), dx:0, dy:0}; pose[n2.id] = {r:rd(r2*D), dx:0, dy:0};
+        if(n3) pose[n3.id] = {r:rd(-tot2*D), dx:0, dy:0};   // the foot turns back so it stays as flat as at rest
+      }
+    });
+    arms.forEach(ar => { ['near', 'far'].forEach(side => { const ph0 = side === 'near' ? .5 : 0, a = Math.cos(2*Math.PI*(f0 - ph0)); ar[side].forEach((n, j) => { if(j < 2) pose[n.id] = {r:rd((j ? 4 : 6)*a), dx:0, dy:0}; }); }); });
+    frames.push(pose);
+  }
+  return {frames, info:{legs:nl, arms:arms.length, S, lift, duty, cycle:Math.round(S/duty*10)/10, dir, found:pairs.length}};
+}
 function lerpPose(a, b, t){
   const out = {};
   P.nodes.forEach(n => {
@@ -841,6 +926,20 @@ on('#bHalf', 'click', () => {
   if(frames().length < 2){ ask('Pose at least two frames first. The partner copies the motion half a cycle later.', {info:true}); return; }
   if(mode === 'rig') setMode('pose');
   if(halfCycle()) save(true);
+});
+on('#bAuto', 'click', async () => {
+  if(!P.nodes.length) return;
+  const txt = await ask('Auto walk. How many frames? You can add the stride and the foot lift in pixels after it, like "8, 12, 5"; leave them out and they come from the leg length. Legs are found from mirrored pairs (Make far twin makes them).', {value:'8', ok:'Make walk'});
+  if(txt === null) return;
+  const nums = String(txt).split(/[\s,]+/).filter(Boolean).map(Number), N = clamp(Math.round(nums[0]) || 8, 3, 16);
+  const r = autoWalk(N, nums[1], nums.length > 2 ? nums[2] : undefined);
+  if(r.error){ ask(r.error, {info:true}); return; }
+  let k = P.clips.findIndex(c => c.name === 'walk');
+  if(k >= 0 && P.clips[k].frames.length > 1 && !(await ask('Replace the walk animation you already have?', {ok:'Replace'}))) return;
+  if(k < 0){ P.clips.push({name:'walk', fps:8, frames:[]}); k = P.clips.length - 1; }
+  P.clips[k].frames = r.frames; ci = k; cur = 0; setMode('pose'); save(true);
+  const i = r.info;
+  ask(i.legs + ' leg pair' + (i.legs > 1 ? 's' : '') + (i.arms ? ' and ' + i.arms + ' arm pair' + (i.arms > 1 ? 's' : '') : '') + ' found, facing ' + (i.dir > 0 ? 'right' : 'left') + '. Stride ' + i.S + ' px, lift ' + i.lift + ' px, feet down ' + Math.round(i.duty*100) + '% of the cycle. The ground moves ' + i.cycle + ' px a cycle (' + Math.round(i.cycle/P.cell.w*1000)/1000 + ' of the cell), so in data.js step is about ' + Math.round(i.cycle/P.cell.w/N*1000)/1000 + '. Check it frame by frame and fix what looks off.', {info:true});
 });
 on('#bTween', 'click', () => { const fs = frames(); if(cur < fs.length - 1) tween(cur + 1); else ask('This is the last frame. Use "Fill to first" to close the loop.', {info:true}); });
 on('#bTweenLoop', 'click', () => { if(frames().length > 1 || cur > 0) tween(0); });
