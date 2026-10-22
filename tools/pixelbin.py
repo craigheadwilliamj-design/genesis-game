@@ -1,6 +1,6 @@
 """Trash bin sprites in the Genesis restroom's style (sprites/bld/restroom-*.png): a green tiled lid with a dark green edge, cream plaster
 with tan shading and dark brown edges, a dark band under the lid, a brown tiled base and the same see-through shadow, at 0.13 m a pixel (palette in tools/genesis_style.py).
-Writes sprites/bld/bin-<front|back|left|right>[-full|-broken].png (14 x 21 px): the base slab's bottom is row 18 (propSprite34 in propart.js stands it on the bin's front edge), the shadow rows 19-20.
+Writes sprites/bld/bin-<front|back|left|right>.png (14 x 21 px; the -full and -broken pictures are hand-drawn in the pixel editor now, so it leaves them alone): the base slab's bottom is row 18 (propSprite34 in propart.js stands it on the bin's front edge), the shadow rows 19-20.
 The side views are the same both ways (the flap is edge-on); the full one has a heap of litter, the broken one its lid knocked off to the back.
 Run: python3 tools/pixelbin.py [--sheet out.png]"""
 import sys, os
@@ -62,7 +62,7 @@ def main():
   root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
   out, ims = os.path.join(root, "sprites", "bld"), []
   for view in ("front", "back", "left", "right"):
-    for state in ("", "full", "broken"):
+    for state in ("",):   # full and broken are hand-drawn now
       g = grid(view)
       if state == "full": full(g, view)
       if state == "broken": broken(g, view)

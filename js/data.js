@@ -587,7 +587,7 @@ const BUILDINGS = {
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true, onPath:true},
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, onPath:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
   picnic:    {label:"Picnic area", one:"a picnic area", glyph:"",  color:"#9C7A48", price:1500,  upkeep:6,   w:6,  d:5,  prop:true, serves:["energy"], seats:true, slots:5, serveMin:15, patience:3},
-  lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:1.2, d:1.2, prop:true, onPath:true},
+  lamp:      {label:"Lamp post",   one:"a lamp post",   glyph:"",  color:"#E3C04A", price:300,   upkeep:3,   w:0.7, d:1.2, prop:true, onPath:true},
   camera:    {label:"Security camera", one:"a security camera", glyph:"", color:"#2B3F6B", price:900, upkeep:4, tech:"cameras", w:1.2, d:1.2, prop:true, onPath:true},
   donate:    {label:"Donation box", one:"a donation box", glyph:"", color:"#2F6B4A", price:350, upkeep:2, w:1.4, d:1.4, prop:true, onPath:true},
   sign:      {label:"Info sign",   one:"an info sign",  glyph:"",  color:"#3B6FB6", price:250,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
