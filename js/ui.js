@@ -956,12 +956,12 @@ const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)
 function ppCard(s){
   const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
-  const stars = Math.max(1, Math.round(s.appeal / 2)), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
+  const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
     + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
-    + row("Appeal", `<span title="Appeal ${s.appeal} of 10">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
+    + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
     + `</dl></div><div class="pp-right"><h3>${esc(s.name)}</h3><i class="pp-sci">${esc(I.sci || "")}</i>`
     + `<p class="pp-desc">${I.desc ? esc(I.desc) : "No notes on this animal yet."}</p></div>`
     + `<div class="pp-acq"><span class="how ${st.cls}">${esc(st.how)}</span>${st.lock ? ` <span class="lock">${esc(st.lock)}</span>` : ""}${n ? ` <span class="have">${n} in your park.</span>` : ""}</div></div>`;

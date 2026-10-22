@@ -1901,6 +1901,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       at(dx, 264); const depotStaff = !stat().includes("No path nearby");
       state.pathChunks = Object.assign({}, W.C); pathVer++; recompute();
       state.science.tech = techKeep; out.placeServiceRules = depotGuest && depotStaff;
+      // the Paleopedia card renders for every species, discovered or not, in every period
+      { const un = state.science.unlocked.slice(); let bad = ""; ppPick = null;
+        for(const s of SPECIES){ if(!speciesAvailable(s.id)) continue; for(const known of [true, false]){ state.science.unlocked = known ? [s.id] : []; ppPeriod = s.period; ppPick = s.id; try { catalogHtml(); } catch(x){ bad = s.id + ": " + x.message; } } }
+        state.science.unlocked = un; ppPeriod = null; ppPick = null; out.paleopediaCards = bad === ""; }
       // the guest walking graph still finds a building placed at the reach limit, in both turns
       setTool("restroom");
       for(const r of [0, 2]){
