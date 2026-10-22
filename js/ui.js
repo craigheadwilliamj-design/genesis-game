@@ -922,15 +922,42 @@ function speciesStatus(s){
 const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
 let ppPick = null;   // species id open on the card
 let ppPeriod = null; // period tab open, or null for none
-// A species' sprite box: its first biome's ground texture
-const ppBg = s => { const b = biomesOf(s); return b ? `${BIOMES[b[0]].color} url('${spriteUrl(`sprites/ground/${b[0]}.png`)}') 0 0/288px 288px` : "var(--chrome-2)"; };
+// A species' sprite box: a patch of its first biome's ground, laid from the same 1 m tiles as the map (biomepaint.js)
+const ppGround = {};   // biome -> data URL of the patch (null while its tiles load)
+const PP_SCALE = 2, PP_CELLS = [24, 14];
+function ppGroundUrl(biome){
+  const T = GROUND_TILES[biome];
+  if(!T) return spriteUrl(`sprites/ground/${biome}.png`);
+  if(biome in ppGround) return ppGround[biome];
+  ppGround[biome] = null;
+  const n = T.plain + T.detail, tiles = [], pick = groundPicks(T.plain, T.detail, T.share); let left = n;
+  for(let i = 0; i < n; i++){
+    const t = new Image(); tiles.push(t);
+    t.onload = () => {
+      if(--left) return;
+      const [W, H] = PP_CELLS, px = GROUND_TILE_PX, c = document.createElement("canvas"); c.width = W * px; c.height = H * px;
+      const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+      for(let x = 0; x < W; x++) for(let y = 0; y < H; y++){
+        const k = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(k + 1) ? 0 : cellHash(x + 7919, y + 104729) % (T.turn === false ? 2 : 8), h = px / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+        g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * px + h, y * px + h);
+        g.drawImage(tiles[k], -h, -h);
+      }
+      try { ppGround[biome] = c.toDataURL(); } catch(e){ return; }
+      document.querySelectorAll(`.pp-pic[data-biome="${biome}"]`).forEach(el => el.style.background = ppBg({id:"", biome}));
+    };
+    t.src = spriteUrl(`sprites/ground/${biome}-${i + 1}.png`);
+  }
+  return null;
+}
+const ppBiome = s => s.biome || (biomesOf(s) || [])[0];
+const ppBg = s => { const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); return u ? `${BIOMES[b].color} url('${u}') 0 0/${PP_CELLS[0] * GROUND_TILE_PX * PP_SCALE}px ${PP_CELLS[1] * GROUND_TILE_PX * PP_SCALE}px` : BIOMES[b].color; };
 const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
 
 function ppCard(s){
   const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.max(1, Math.round(s.appeal / 2)), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
+  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
     + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
