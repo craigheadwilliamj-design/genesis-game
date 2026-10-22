@@ -476,9 +476,9 @@ function pxTry(){
   const u = spriteUrl(px.path);
   document.querySelectorAll("image, img").forEach(el => { const h = el.getAttribute("href") || el.getAttribute("src") || ""; if(h.endsWith("#" + px.path)) el.setAttribute(el.tagName === "IMG" ? "src" : "href", u); });
   if(typeof render === "function" && state) render();
-  const note = "It's in the park until you reload. Send it to the repo to keep it." + pxTryWhere(px.path), el = document.getElementById("pxTryNote");
-  if(el){ el.textContent = note; el.hidden = false; }
-  ui.toast(note, "good");
+  const el = document.getElementById("pxTryNote");
+  if(el){ el.textContent = "In the park until you reload." + pxTryWhere(px.path); el.hidden = false; }
+  ui.toast("It's in the park.", "good");
 }
 // Which in-game state shows a building or prop picture, so a Try that seems to do nothing says why
 function pxTryWhere(path){
