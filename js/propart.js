@@ -123,7 +123,7 @@ const PROP_PICS = {
 };
 function propSprite34(bl, k, st, on, dead){
   const [fx, fy] = propFront(bl), view = Math.abs(fy) >= Math.abs(fx) ? (fy > 0 ? "front" : "back") : fx < 0 ? "left" : "right";
-  const [w, h, e] = PROP_PICS[bl.type][view], px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [x, y] = flatSnap34([cx - w / 2 * px, cy + e * k - (h - 2) * px / TILT]);
+  const [w, h, e, r = h - 2] = PROP_PICS[bl.type][view], px = FLAT34.px * k, [cx, cy] = centroid(bl.points), [x, y] = flatSnap34([cx - w / 2 * px, cy + e * k - r * px / TILT]);
   return `<image href="${spriteUrl(`sprites/bld/${bl.type}-${view}${st}.png`)}" x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${(w * px).toFixed(2)}" height="${(h * px / TILT).toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`
     + (on || dead ? `<polygon points="${polyStr(bl.points)}" fill="none" stroke="${dead ? "var(--bad)" : "var(--sel)"}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "");
 }

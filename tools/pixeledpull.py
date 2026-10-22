@@ -46,4 +46,19 @@ for r in rows(json.load(open(args[0]))):
             print(f"{'would set' if dry else 'set'} {f['k']} footprint to {n(f['w'])} x {n(f['d'])} m in js/data.js")
             if not dry: open(dp, "w").write(rx.sub(lambda m: m.group(1) + n(f["w"]) + m.group(2) + n(f["d"]), src, 1))
         else: print("skip footprint, no BUILDINGS entry for", f["k"])
+    v = re.fullmatch(r"sprites/bld/([A-Za-z0-9]+)-(front|back|left|right)\.png", p); row = r.get("base")
+    if v and isinstance(row, int) and 1 <= row <= h:   # a base row dragged in the editor: a building's BLD_PICS base (sideBase on the sides) or a prop view's 4th PROP_PICS number
+        k, view = v.groups(); side = view in ("left", "right"); n = 0
+        mp = os.path.join(root, "js", "map.js"); src = open(mp).read()
+        bx = re.compile(r"(\b" + k + r":\{w:\d+, h:\d+, base:)(\d+)(, sideBase:\d+)?")
+        if bx.search(src):
+            src = bx.sub(lambda m: m.group(1) + (m.group(2) + f", sideBase:{row}" if side else str(row) + (m.group(3) or "")), src, 1); n = 1
+        else:
+            mp = os.path.join(root, "js", "propart.js"); src = open(mp).read()
+            px_ = re.compile(r"(\b" + k + r":\{[^\n]*?\b" + view + r":\[)(\d+), (\d+), ([\d.]+)(?:, \d+)?\]")
+            if px_.search(src): src = px_.sub(lambda m: m.group(1) + f"{m.group(2)}, {m.group(3)}, {m.group(4)}" + ("" if row == int(m.group(3)) - 2 else f", {row}") + "]", src, 1); n = 1
+        if n:
+            print(f"{'would set' if dry else 'set'} {k} {view} base row to {row} in js/{os.path.basename(mp)}")
+            if not dry: open(mp, "w").write(src)
+        else: print(f"skip base row, no BLD_PICS or PROP_PICS entry for {k}: add one with row {row}")
 print(ok, "picture" + ("" if ok == 1 else "s"), "pulled." + ("" if dry or not ok else " Now run python3 tools/packsprites.py."))
