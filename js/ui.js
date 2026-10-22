@@ -922,15 +922,15 @@ function speciesStatus(s){
 const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
 let ppPick = null;   // species id open on the card
 let ppPeriod = null; // period tab open, or null for none
-// A species' sprite box: its first biome's ground under a pale sky
-const ppBg = s => { const b = biomesOf(s); if(!b) return "var(--chrome-2)"; const c = BIOMES[b[0]].color; return `linear-gradient(#DCE8EC 58%, ${c} 58%)`; };
+// A species' sprite box: its first biome's ground texture
+const ppBg = s => { const b = biomesOf(s); return b ? `${BIOMES[b[0]].color} url('${spriteUrl(`sprites/ground/${b[0]}.png`)}') 0 0/288px 288px` : "var(--chrome-2)"; };
 const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
 
 function ppCard(s){
   const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.max(1, Math.round(s.appeal / 2)), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" style="background:${ppBg(s)}">${ppImg(s)}</div><dl class="pp-stats">`
+  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
     + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
