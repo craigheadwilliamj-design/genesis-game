@@ -106,6 +106,7 @@ code{background:var(--bg);padding:2px 5px;border-radius:4px}
    <div class="row rigonly"><span></span><label><input id="pFlip" type="checkbox"> Flip left/right</label></div>
    <div class="row rigonly"><span></span><label title="For extras like a shut eye or a bubble: hidden in every frame unless that frame shows it"><input id="pOff" type="checkbox"> Hidden unless a frame shows it</label></div>
    <div class="row rigonly"><span></span><button id="bDup">Duplicate</button><button id="bDel">Delete</button></div>
+   <div class="row rigonly"><span></span><button id="bFar" title="Copy this part and everything under it as the far side of the limb: darker, behind the body, paired with the originals and moving half a cycle later">Make far twin</button></div>
    <div class="row"><span></span><button id="bSwap" title="Swap this part's PNG for a fixed one. The joint, parent, place and every pose stay as they are">Replace picture…</button></div>
    <div class="row poseonly"><span>Rotate</span><input id="pR" type="range" min="-180" max="180" step="1" style="flex:1"><input id="pRn" type="number" step="0.5"></div>
    <div class="row poseonly"><span>Shift</span>x<input id="pDx" type="number" step="1">y<input id="pDy" type="number" step="1"></div>
@@ -577,6 +578,32 @@ function dupNode(n){
   if(!n.mirror) setMirror(n, c.id);
   sel = c.id;
 }
+// the far side of a limb: copies the selected part and everything under it with darker pictures, behind the rest, paired with the originals and moving half a cycle later
+const FAR_TINT = .72;
+function tintAsset(aid){
+  const im = imgs[aid], src = hits[aid]; if(!im || !src) return aid;
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const x = c.getContext('2d'), d = x.createImageData(im.width, im.height);
+  for(let i = 0; i < src.length; i += 4){ d.data[i] = Math.round(src[i]*FAR_TINT); d.data[i+1] = Math.round(src[i+1]*FAR_TINT); d.data[i+2] = Math.round(src[i+2]*Math.min(1, FAR_TINT + .06)); d.data[i+3] = src[i+3]; }
+  x.putImageData(d, 0, 0);
+  const id = 'a' + (P.seq++); P.assets[id] = c.toDataURL('image/png'); imgs[id] = c; hits[id] = d.data;
+  return id;
+}
+function farTwin(n){
+  const chain = P.nodes.filter(x => x === n || isDesc(x.id, n.id));
+  if(chain.some(x => x.mirror)) return 'Part of that limb already has a mirror partner. Clear its Mirror box first, or pick the limb\'s top part (the one nearest the body).';
+  const map = {}, tinted = {};
+  chain.forEach(x => {
+    const c = JSON.parse(JSON.stringify(x)); c.id = 'n' + (P.seq++); c.name = x.name + ' far'; c.mirror = x.id; x.mirror = c.id;
+    c.asset = tinted[x.asset] || (tinted[x.asset] = tintAsset(x.asset)); map[x.id] = c;
+  });
+  chain.forEach(x => { const c = map[x.id]; if(x !== n && map[x.parent]) c.parent = map[x.parent].id; });
+  P.nodes.unshift(...chain.map(x => map[x.id]));
+  P.clips.forEach(cl => cl.frames.forEach(f => chain.forEach(x => { if(f[x.id]) f[map[x.id].id] = Object.assign({}, f[x.id]); })));
+  if(frames().length > 1) chain.forEach(x => shiftPartner(x, map[x.id]));
+  sel = map[n.id].id;
+  return '';
+}
 function setPivotAt(wx, wy){
   const n = sel && nodeOf(sel); if(!n) return;
   const W = worlds({}), [x, y] = apply(inv(drawM(n, W[n.id])), wx, wy);
@@ -599,6 +626,16 @@ function mirrorFrame(f){
     if(pa) f[b.id] = Object.assign({}, Z, pa); else delete f[b.id];
   }
 }
+// dst moves as src does, half a cycle later
+function shiftPartner(src, dst){
+  const fs = frames(), N = fs.length, Z = {r:0, dx:0, dy:0}, from = fs.map(f => Object.assign({}, Z, f[src.id]));
+  fs.forEach((f, i) => {
+    const t = (i + N/2) % N, i0 = Math.floor(t) % N, i1 = (i0 + 1) % N, u = t - Math.floor(t), A = from[i0], B = from[i1], o = {};
+    for(const k of ['r', 'dx', 'dy']) o[k] = Math.round((A[k] + (B[k] - A[k])*u)*10)/10;
+    if(A.v !== undefined) o.v = A.v;
+    f[dst.id] = o;
+  });
+}
 function halfCycle(){
   const fs = frames(), N = fs.length, by = nodeMap(), done = new Set(), selN = sel && by[sel];
   let count = 0;
@@ -608,13 +645,7 @@ function halfCycle(){
     if(selN && selN.mirror && !hit) continue;
     const src = hit ? selN : (P.nodes.indexOf(a) > P.nodes.indexOf(b) ? a : b), dst = src === a ? b : a;
     done.add(a.id); done.add(b.id);
-    const Z = {r:0, dx:0, dy:0}, from = fs.map(f => Object.assign({}, Z, f[src.id]));
-    fs.forEach((f, i) => {
-      const t = (i + N/2) % N, i0 = Math.floor(t) % N, i1 = (i0 + 1) % N, u = t - Math.floor(t), A = from[i0], B = from[i1], o = {};
-      for(const k of ['r', 'dx', 'dy']) o[k] = Math.round((A[k] + (B[k] - A[k])*u)*10)/10;
-      if(A.v !== undefined) o.v = A.v;
-      f[dst.id] = o;
-    });
+    shiftPartner(src, dst);
     count++;
   }
   return count;
@@ -748,6 +779,7 @@ on('#pFlip', 'change', withSel(n => { n.flip = $('#pFlip').checked; save(); }));
 on('#pOff', 'change', withSel(n => { n.off = $('#pOff').checked; save(); }));
 on('#pShow', 'change', withSel(n => { showPart(n, $('#pShow').checked); save(); }));
 on('#bDup', 'click', withSel(n => { dupNode(n); save(); }));
+on('#bFar', 'click', withSel(n => { const e = farTwin(n); if(e) ask(e, {info:true}); else save(true); }));
 on('#bSwap', 'click', withSel(() => $('#fileSwap').click()));
 on('#fileSwap', 'change', withSel(async n => { const f = $('#fileSwap').files[0]; $('#fileSwap').value = ''; if(!f) return; try{ await swapPicture(n, f); }catch(err){ ask('Could not open that picture: ' + err.message, {info:true}); } }));
 on('#bDel', 'click', withSel(async n => { if(await ask('Delete "' + n.name + '"? Parts attached to it move up to its parent.', {ok:'Delete'})){ delNode(n); save(); } }));
