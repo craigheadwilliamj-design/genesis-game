@@ -75,7 +75,7 @@ const UPKEEP = {
 //   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore
 //   predator true means it attacks any other species, so it can only live with its own kind
 //   bug      true for insects, arachnids, and other arthropods
-//   semi     true for the semi-aquatic tag, shown after the diet (display only for now; piscivores already want water)
+//   semi     true for the semi-aquatic tag, shown after the diet; they want more water in the exhibit and wade and swim in it
 //
 //   Who can share an exhibit (size means how much room each animal needs):
 //     predators share with no other species
@@ -1514,7 +1514,7 @@ const HAB = {
   groveBonus:6,    // happiness for animals with plenty of groves from their era
   waterDry:.05,    // share of the floor under water that animals from scrubland or desert want
   waterBase:.08,   // ...that everyone else wants
-  waterSemi:.25,   // ...that semi-aquatic species (fish eaters) want
+  waterSemi:.25,   // ...that semi-aquatic species want
   waterBand:.2,    // no penalty within this share either side of what an animal wants
   rockBase:1,      // rocks a 500 m² exhibit of grassland wants for an animal with middling taste (likes .4); scaled by biome and by how much it likes rocks
   offEra:1/3,      // other periods' plants of the right biome can fill this share of the plant cover an animal wants
@@ -1549,7 +1549,7 @@ const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 // How much each species likes water and rocks (0 to 1). Fish eaters want water. Anything not listed likes both a little.
 const LIKES_ROCK = {water:.2, rock:.9};
 const HABITAT_LIKES = {diic:LIKES_ROCK, lyst:LIKES_ROCK, seym:LIKES_ROCK, dime:LIKES_ROCK, plhy:LIKES_ROCK, mlan:LIKES_ROCK, mono:LIKES_ROCK, beel:{water:.6, rock:.6}};
-const likesOf = s => HABITAT_LIKES[s.id] || (s.diet.includes("piscivore") ? {water:.9, rock:.1} : {water:.4, rock:.4});
+const likesOf = s => HABITAT_LIKES[s.id] || (s.semi ? {water:.9, rock:.1} : {water:.4, rock:.4});
 
 // Animal behavior (behavior.js). Each animal has six needs, from 0 (met) to 100 (desperate):
 //   hunger, thirst, discomfort (habitat, weather, dirt), lonely, bored, stress
@@ -2445,7 +2445,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
 const biomesOf = s => SPECIES_BIOMES[s.id] || null;
 const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join(" or ");   // "fern prairie or scrubland"
 // Share of an exhibit's floor a species wants under water: fish eaters most, animals whose two biomes are both scrubland or desert least
-const waterWant = s => s.diet.includes("piscivore") ? HAB.waterSemi : (biomesOf(s) || []).length && biomesOf(s).every(b => ["scrubland", "desert"].includes(b)) ? HAB.waterDry : HAB.waterBase;
+const waterWant = s => s.semi ? HAB.waterSemi : (biomesOf(s) || []).length && biomesOf(s).every(b => ["scrubland", "desert"].includes(b)) ? HAB.waterDry : HAB.waterBase;
 
 // Themes: the look of paths, buildings and exhibits. Each item has an optional `theme` (none means Genesis).
 //   path     live and dead surface colors, the edge line, `kerb`: a dashed second color along the edge ({c, dash} in px), and `ruts`: two worn wheel tracks down the path ({c, o: opacity}), and `center`: a thin painted dashed center line ({c, w, dash, o})

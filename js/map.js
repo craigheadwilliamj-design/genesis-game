@@ -1598,7 +1598,7 @@ function walkArea(h, e){
   const sp = SPECIES_BY_ID[h.sp], wat = sp && !swims(sp) && !isFlyer(sp) ? waterOf(e).map(w => w.points) : [];
   return {pts, obs, m, wat};
 }
-// Semi-aquatic animals (fish eaters and the like) wade in and swim; the rest stay on the bank
+// Semi-aquatic animals wade in and swim; the rest stay on the bank
 const swims = s => !isFlyer(s) && likesOf(s).water >= .6;
 const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w));
 const obsDist = (o, x, y) => Math.hypot(Math.max(Math.abs(x - o.x) - o.hx, 0), Math.max(Math.abs(y - o.y) - o.hy, 0));
