@@ -804,8 +804,8 @@ function pxSync(){
   const un = pxUnsent().length; $p("pxSendAll").textContent = un > 1 ? `Send all drafts (${un})` : "Send all drafts";
   const q = $p("pxQueue");
   q.innerHTML = !px.db ? `<div class="meta">Sending works when the game is open on claude.ai. Download works anywhere.</div>`
-    : !px.queue.length ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
-    : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
+    : !px.queue.some(x => !x.pulled) ? `<div class="meta">Nothing waiting. Sent pictures wait here until Claude pulls them into the repo.</div>`
+    : `<div class="meta">Waiting for the repo:</div><ul class="pxq">${px.queue.filter(x => !x.pulled).map(x => `<li><button class="linkish" data-openp="${esc(x.path)}">${esc(x.path)}</button><span class="meta"> ${new Date(x.at).toLocaleString([], {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})}</span><button class="btn" data-unsend="${esc(x.path)}" title="Take it off the list">×</button></li>`).join("")}</ul>`;
 }
 function pxSelectAll(){ pxDrop(); px.sel = {x:0, y:0, w:px.fw, h:px.fh, buf:null, mask:null}; if(!pxSelTool(px.tool)) pxTool("select"); else pxDraw(); }
 function pxTool(t){ if(pxSelTool(px.tool) && !pxSelTool(t)){ pxDrop(); px.sel = null; } px.tool = t; if(pxCv) pxCv.style.cursor = pxCursor(t); pxSync(); pxDraw(); }
@@ -840,7 +840,8 @@ function pxOverlay(kind, opt){
     const note = s => `<p class="meta" style="grid-column:1/-1">${s}</p>`, hit = x => !t || (x.label + " " + x.sub).toLowerCase().includes(t);
     px.needList = needsOf(px.tab).filter(hit);
     const needBtn = (x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`;
-    const drawnBtn = p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${spriteUrl(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`;
+    const thumb = p => SPRITE_PACK[p] ? spriteUrl(p) : (pxStored("d:" + p)?.layers || []).find(L => L.show !== false)?.png || "";
+    const drawnBtn = p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${thumb(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`;
     const ps = only ? [] : pxDrawn(px.tab).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b));
     const html = px.needList.map(needBtn).join("") + ps.map(drawnBtn).join("");
     document.getElementById("pxList").innerHTML = note(`${ps.length + px.needList.length} shown${only ? ", undrawn only" : ""}.`) + (html || note("Nothing matches that."));
@@ -849,7 +850,7 @@ function pxOverlay(kind, opt){
 }
 // Every picture in the pack that belongs to a category (animal pictures and rig parts are named by species id)
 function pxDrawn(cat){
-  const ps = Object.keys(SPRITE_PACK);
+  const ps = [...new Set([...Object.keys(SPRITE_PACK), ...Object.keys(pxDrafts())])];   // a draft of a picture the game doesn't have yet is listed too, or it could only be found by retyping its path
   if(cat === "all") return ps;
   if(cat === "plant") return ps.filter(p => p.startsWith("sprites/plants/"));
   if(cat === "bld") return ps.filter(p => p.startsWith("sprites/bld/"));
