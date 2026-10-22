@@ -413,7 +413,9 @@ const propsTabs = {sub:"shelters"};
 const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects"];
 function propsHtml(e){
   const sub = ["trays", "toys"].includes(propsTabs.sub) ? propsTabs.sub : "shelters", isTray = k => !!LAND[k].tray, isToy = k => !LAND[k].vivToy && !!(LAND[k].toy || LAND[k].toyFor);
-  const btnsFor = list => list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ""}>${esc(t.label)}, ${money(t.price)}${t.tray ? ` (${t.tray} units)` : ""}</button>`; }).join("");
+  const thumb = k => SHELTER_SPRITES[k] ? `sprites/shelter/${k}.png` : TRAY_SPRITES[k] ? `sprites/tray/${k}.png` : "";
+  const btnsFor = (list, tip, extra) => list.map(k => { const t = LAND[k], why = landLock(t), img = thumb(k), more = extra ? extra(t) : t.tray ? `${t.tray} units` : "", title = why || (tip ? tip(k) : "");
+    return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:4px 9px;display:inline-flex;align-items:center;gap:6px"${title ? ` title="${esc(title)}"` : ""}${why ? " disabled" : ""}>${img ? `<img src="${spriteUrl(img)}" alt="" style="height:30px;max-width:64px;object-fit:contain;image-rendering:pixelated">` : ""}<span>${esc(t.label)}<br><small>${money(t.price)}${more ? ` · ${more}` : ""}</small></span></button>`; }).join("");
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
   let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
@@ -422,15 +424,15 @@ function propsHtml(e){
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
     const tip = k => { const t = LAND[k]; return `${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `Everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; };
-    return h + `<div class="row" style="margin-top:6px">${list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ` title="${esc(tip(k))}"`}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("")}</div></section>`;
+    return h + `<div class="row" style="margin-top:8px">${btnsFor(list, tip, () => "")}</div></section>`;
   }
   if(sub === "shelters"){
     const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
-    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Shelters keep animals out of heat, cold and storms, and out of sight while they're inside. Canopies only help in heat and rain. Hover a button for details.</div>`;
-    if(e.animals.length){ const c = coverOf(e), w = weatherNow(), x = exposure(e);
-      h += `<div class="meta" style="margin-top:6px">Cover: ${c.shelter} of ${c.need} slots${c.idle ? `, ${c.idle} spare slots can't be used by these animals` : ""}${c.shade ? `, +${Math.round(c.shade)} from groves` : ""}. Today ${esc(w.label.toLowerCase())}${w.happy ? (x > 0 ? `, ${Math.round(x * 100)}% uncovered` : ", all covered") : ""}, tomorrow ${esc(weatherNext().label.toLowerCase())}.</div>`; }
-    const tip = k => k === "screen" ? `Hides ${SCREEN.holds} animals from the path, within ${SCREEN.fenceReach} m of the fence. Shy animals stress less and hooligans bang on the glass far less, and the animals stay in sight.` : `Bigger animals take more room, and a shelter only takes animals up to its size.${/burrow/i.test(LAND[k].label) ? " Burrows only take burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf." : ""}`;
-    return h + `<div class="row" style="margin-top:6px">${list.map(k => { const t = LAND[k], why = landLock(t); return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:3px 9px"${why ? ` disabled title="${esc(why)}"` : ` title="${esc(tip(k))}"`}>${esc(t.label)}, ${money(t.price)}</button>`; }).join("")}</div></section>`;
+    h += `<div class="meta" style="margin-top:6px">${haveText(list)} Shelters keep animals out of heat, cold and storms, and out of sight while they're inside. Hover a button for details.</div>`;
+    if(e.animals.length){ const c = coverOf(e), have = Math.round(c.shelter + (c.shade || 0)), r = c.need ? have / c.need : 1, lv = r >= 1 ? "ok" : r >= .5 ? "mid" : "no";
+      h += `<div class="need-row ${lv}" style="margin-top:6px" title="Animals' shelter slots covered, in today's weather (${esc(weatherNow().label.toLowerCase())}).${c.idle ? ` ${c.idle} slots of room can't be used by these animals.` : ""}"><b>Shelter cover</b><span>${have}/${c.need}</span></div>`; }
+    const tip = k => k === "screen" ? `Hides ${SCREEN.holds} animals from the path, within ${SCREEN.fenceReach} m of the fence. Shy animals stress less and hooligans bang on the glass far less, and the animals stay in sight.` : `Bigger animals take more room, and a shelter only takes animals up to its size.${LAND[k].only ? " Burrows only take burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf." : ""}${LAND[k].noCold ? " Doesn't help in the cold." : ""}`;
+    return h + `<div class="row" style="margin-top:8px">${btnsFor(list, tip, t => t.slots ? `${t.slots} slots` : "")}</div></section>`;
   }
   const list = HABITAT_PROPS.filter(isTray), tr = trays(e), eaten = Object.keys(dailyNeed(e)), foods = eaten.length ? eaten : TRAY_FOODS;
   h += `<div class="meta" style="margin-top:6px">${haveText(list)} Keepers fill trays through the gate${e.gate ? "" : ", so this exhibit needs a gate"}.</div>`;
@@ -441,7 +443,7 @@ function propsHtml(e){
       return `<label class="field" style="margin-top:6px"><span>${esc(LAND[f.type].label)} ${i + 1}: ${Math.round(trayHas(f))}/${trayCap(f)}${k ? " " + esc(k) : ""}</span><select data-tray="${esc(f.id)}"><option value=""${f.set ? "" : " selected"}>Any food</option>${opts.map(t => `<option value="${t}"${f.set === t ? " selected" : ""}>${esc(t)} only</option>`).join("")}</select></label>`; }).join("");
     h += `<div class="meta" style="margin-top:4px">Changing a tray's food empties it.</div>`;
   }
-  return h + `<div class="row" style="margin-top:6px">${btnsFor(list)}</div></section>`;
+  return h + `<div class="row" style="margin-top:8px">${btnsFor(list)}</div></section>`;
 }
 
 // Behavior tab: what the animals are doing, how each species' needs stand, and what's stressing them
