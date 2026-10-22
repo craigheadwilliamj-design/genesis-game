@@ -216,19 +216,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
-    // genome therapy: a vet lifts a sickly clone toward the lab's DNA quality, never past it, and it costs money
+    // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
     state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
-    out.geneNeedsTech = !!geneProblem(ga);
+    out.geneNeedsTech = !!geneProblem();
     state.science.tech.push("genetherapy");
     out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    out.geneOffDoesNothing = !viv.geneTherapy && geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 65;
-    out.geneNoBetterGenome = !!geneProblem(ga);
+    viv.geneTherapy = true; out.geneNoBetterGenome = geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 80;
-    out.geneQueues = !geneProblem(ga); ga.gene = true;
+    out.geneQueues = !geneProblem() && geneTargets(viv).includes(ga) && checkWork(viv) === HEALTH.checkMinutes + GENE.minutes * geneTargets(viv).length; delete viv.vetCheck;
     const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 70 && !ga.gene) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
+    out.geneVetDoesIt = run(600, () => ga.q === 70) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -263,9 +264,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
     { const was = localStorage.getItem("genesis-dev"); localStorage.removeItem("genesis-dev");
-      out.rosterHidesHerr = !speciesAvailable("herr") && speciesAvailable("trex") && !speciesToUnlock().some(s => s.id === "herr");
+      out.rosterHidesHerr = !speciesAvailable("herr") && speciesAvailable("trex") && !siteShown(SITE_BY_ID.ischigualasto) && siteShown(SITE_BY_ID.hellcreek);
       out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-prot"]'));
-      localStorage.setItem("genesis-dev", "1"); out.devShowsHerr = speciesAvailable("herr") && speciesToUnlock().some(s => s.id === "herr");
+      localStorage.setItem("genesis-dev", "1"); out.devShowsHerr = speciesAvailable("herr") && siteShown(SITE_BY_ID.ischigualasto);
       if(was === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", was); }
     { const was = localStorage.getItem("genesis-dev"), th = {theme:"volcanic"}, themed = THEMES.volcanic ? "volcanic" : Object.keys(THEMES).find(k => k !== "genesis");
       const pen = state.exhibits[0] || {id:"e-t", name:"T", points:[[0,0],[30,0],[30,30],[0,30]], animals:[{id:"t1", sp:"trex"}]};
@@ -1098,33 +1099,53 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const pts2 = sc.points; parties = [{n:4, edu:50, mood:50, needs:{}, thought:new Set(), pers:[]}]; partyLeaves(parties[0]); parties = [];
     out.guestsFundResearch = Math.abs(sc.points - pts2 - 4 * RESEARCH_GUEST * .5) < 1e-6;
 
-    // animals are unlocked one by one under their period
-    const small = SPECIES.filter(x => !x.viv).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
-    out.tripLockedFirst = !!tripProblem(small.id, small.period);
-    sc.points = 500; state.minute = DAWN_MIN + 60;
-    out.unlockAnimal = startProject("species", small.id) === null && !isUnlocked(small.id);
-    out.unlockCostScales = unlockPoints(big) > unlockPoints(small);
-    adv(projectMinutes(unlockPoints(small)) + 5, () => isUnlocked(small.id));
-    out.animalUnlocked = isUnlocked(small.id) && !sc.unlocked.includes(small.period);
+    // the timeline: equal period bars, a log scale inside each epoch, and labels that round coarser further back
+    out.timelineRoundTrips = [0.05, .37, .5, .91, .999].every(u => Math.abs(uAt(yearsAt(u).years) - u) < 1e-9);
+    out.timelineLabels = fmtYearsAgo(352) === "350 years ago" && fmtYearsAgo(126000) === "130,000 years ago" && fmtYearsAgo(2.58e6) === "2.6 million years ago" && fmtYearsAgo(251.9e6) === "252 million years ago";
+    out.everySpeciesHasASite = SPECIES.every(x => TIME_SITES.some(t => (t.fauna || []).includes(x.id) && epochOf(t.from).period === x.period));
+    out.sitesHaveMaps = TIME_SITES.every(t => t.from > EPOCHS[0].from || Object.keys(t.at).length > 0) && Object.values(TIMELINE_MAPS).every(m => SPRITE_PACK[`sprites/timeline/${m}.png`]);
 
-    // trips: need a team, take minutes, and come back mid-day
-    out.needsTeam = !!tripProblem(small.id, small.period);
-    hireScientist("temporal");
-    out.tripOk = !tripProblem(small.id, small.period);
+    // animals are discovered by GHOST's drones scouting real sites; GHOST comes with one drone
+    const small = SPECIES.filter(x => !x.viv && speciesAvailable(x.id) && sitesOf(x.id).length).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
+    const site = sitesOf(small.id).find(siteShown), other = TIME_SITES.find(t => siteShown(t) && !t.event && t.id !== site.id);
+    out.digNeedsScout = expeditionProblem(site.id, small.id) === "Scout the site first.";
+    out.oneDrone = sc.drones === 1 && bayCount("temporal") === 1 && sc.crew.temporal === undefined;
     const mny = state.money; state.minute = DAWN_MIN + 60;
-    out.launch = launchTrip(small.id, small.period) && state.money === mny - tripOdds(small.id, small.period).cost && sc.trips.length === 1;
-    out.oneTeamOneTrip = !!tripProblem(small.id, small.period);
+    out.scoutSent = sendDrone("scout", site.id) && state.money === mny - scoutCost(site.id) && sc.trips.length === 1 && sc.trips[0].bay === 0 && sc.trips[0].kind === "scout";
+    out.oneDroneOneTrip = /Every drone is out/.test(scoutProblem(other.id) || "") && /already scouting/.test(scoutProblem(site.id) || "");
     const trip = sc.trips[0];
-    out.tripLength = trip.end - trip.start === Math.round(PERIOD_BY_ID[small.period].days * DAY_MIN);
+    out.tripLength = trip.end - trip.start === Math.round(PERIOD_BY_ID[sitePeriod(site)].days * DAY_MIN);
     const realRandom = Math.random;
-    Math.random = () => .99;   // never empty-handed bonus-free good find
-    out.tripReturns = adv(trip.end - nowMin() + 2, () => !sc.trips.length) && !!sc.dna[small.id];
+    Math.random = () => .01;   // every unseen animal turns up
+    out.scoutDiscovers = adv(trip.end - nowMin() + 2, () => !sc.trips.length) && isUnlocked(small.id) && isScouted(site.id) && sc.reports[0].lines[0][0] === `${small.name} Discovered` && sc.reports[0].kind === "scout";
+    Math.random = () => .99;   // nothing turns up
+    sendDrone("scout", other.id); adv(sc.trips[0].end - nowMin() + 2, () => !sc.trips.length);
+    out.scoutCanFail = siteLit(other) && siteSeen(other).length === 0 && sc.reports[0].lines[0][0] === "Came back empty handed" && !siteComplete(other);
+    // a big site gives up at most two animals a trip, then reads Site Complete
+    const morrison = SITE_BY_ID.morrison, devWas = localStorage.getItem("genesis-dev"); localStorage.setItem("genesis-dev", "1");
+    Math.random = () => .01; tripReturns({kind:"scout", site:"morrison", bay:0});
+    const two = siteSeen(morrison).length; let k = 0; while(!siteComplete(morrison) && k++ < 20) tripReturns({kind:"scout", site:"morrison", bay:0});
+    out.scoutCapsAndCompletes = two === SCOUT.max && siteComplete(morrison) && sc.reports[0].lines.some(l => l[0] === "Site Complete") && /every animal/i.test(scoutProblem("morrison"));
+    if(devWas === null) localStorage.removeItem("genesis-dev"); else localStorage.setItem("genesis-dev", devWas);
+    // expeditions: locked behind the park's stars, and a find fills the genome
+    const starred = siteSeen(morrison).map(id => SPECIES_BY_ID[id]).find(x => x.stars > 0);
+    state.rating = 0; out.starLock = /star park/.test(expeditionProblem("morrison", starred.id) || "");
+    state.rating = 5; Math.random = () => .99;   // a find, and no bonus
+    out.expedition = sendDrone("dig", site.id, small.id) && adv(sc.trips[0].end - nowMin() + 2, () => !sc.trips.length) && sc.dna[small.id].genome > 0 && sc.reports[0].lines[0][0] === `${small.name} Sample Found`;
     Math.random = realRandom;
+    // more drones fly more trips; each costs more than the last
+    const p1 = dronePrice(), m1 = state.money;
+    out.buyDrone = buyDrone() === null && sc.drones === 2 && state.money === m1 - p1 && dronePrice() > p1 && bayCount("temporal") === 2;
+    // better drone marks cut empty-handed trips
+    const fail0 = tripOdds(big.id, sitesOf(big.id)[0].id).fail; sc.tech.push("ghostmk2", "ghostmk3", "ghostmk4", "ghostmk5");
+    out.droneMarks = droneMk() === 4 && Math.abs(tripOdds(big.id, sitesOf(big.id)[0].id).fail - fail0 * .5) < 1e-9;
+    sc.tech = sc.tech.filter(t => !/^ghostmk/.test(t)); sc.drones = 1;
 
     // a genome takes about 3 trips for the smallest animal and 8 for the largest
+    const dig = id => tripReturns({kind:"dig", site:sitesOf(id)[0].id, sp:id, bay:0});
     const avgTrips = id => {
-      const p = SPECIES_BY_ID[id].period; let total = 0; const N = 600;
-      for(let n = 0; n < N; n++){ delete sc.dna[id]; let k = 0; while(!genomeDone(id) && k < 60){ tripReturns({sp:id, period:p}); k++; } total += k; }
+      let total = 0; const N = 600;
+      for(let n = 0; n < N; n++){ delete sc.dna[id]; let k = 0; while(!genomeDone(id) && k < 60){ dig(id); k++; } total += k; }
       return total / N;
     };
     const tiny = SPECIES.slice().sort((a, c) => a.space - c.space)[0];
@@ -1132,8 +1153,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const aSmall = avgTrips(tiny.id), aBig = avgTrips(big.id);
     out.smallGenome3 = aSmall > 1.6 && aSmall < 3.2;
     out.bigGenome8 = aBig > 6.8 && aBig < 9.2;
-    out.bigTakesMoreTrips = aBig > aSmall + 3 && tripOdds(big.id, big.period).trips > tripOdds(tiny.id, tiny.period).trips + 4;
-    out.genomeVaries = (() => { const ns = []; for(let n = 0; n < 40; n++){ delete sc.dna[big.id]; let k = 0; while(!genomeDone(big.id) && k < 60){ tripReturns({sp:big.id, period:big.period}); k++; } ns.push(k); } return Math.min(...ns) < Math.max(...ns); })();
+    out.bigTakesMoreTrips = aBig > aSmall + 3 && tripOdds(big.id, sitesOf(big.id)[0].id).trips > tripOdds(tiny.id, sitesOf(tiny.id)[0].id).trips + 4;
+    out.genomeVaries = (() => { const ns = []; for(let n = 0; n < 40; n++){ delete sc.dna[big.id]; let k = 0; while(!genomeDone(big.id) && k < 60){ dig(big.id); k++; } ns.push(k); } return Math.min(...ns) < Math.max(...ns); })();
+    sc.reports = [];
 
     // cloning: time depends on size and the upgrades, and runs on minutes
     sc.dna[small.id] = {genome:100, quality:90}; hireScientist("gene");
@@ -1173,7 +1195,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.floraLocked = /ORACLE/.test(growProblem("plant", "Jurassic", "small"));
     sc.tech.push("paleoflora", "mesoplant", "medmeso");
     out.floraNeedsDna = /plant DNA/.test(growProblem("plant", "Jurassic", "small")) && !ceresRate();
-    out.dnaPerPeriod = PLANT_DNA.Jurassic.id === "flora-Jurassic" && genomePeriods(PLANT_DNA.Jurassic.id).join() === "Jurassic" && genomeOpen(PLANT_DNA.Jurassic.id) && !genomeOpen(PLANT_DNA.Devonian.id);
+    out.dnaPerPeriod = PLANT_DNA.Jurassic.id === "flora-Jurassic" && siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Jurassic.id) && !siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Triassic.id) && genomeOpen(PLANT_DNA.Jurassic.id) && !genomeOpen(PLANT_DNA.Devonian.id);
     out.noPlantingStock = !CERES_GROW.flora && typeof replantProblem === "undefined" && !("plants" in state.ceres);
     sc.dna[PLANT_DNA.Jurassic.id] = {genome:50, quality:80};
     out.halfDnaNotEnough = !!growProblem("plant", "Jurassic", "small");
@@ -1191,6 +1213,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
     state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
     out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
+    // a pile of one era's medicine doesn't stop CERES regrowing another's
+    state.ceres.meds = {medpal:0, medmes:0, medcen:medCap()};
+    out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
 
     // medicine only cures a period's animals once refined for it
@@ -1204,7 +1229,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.refineOk = projectProblem("refine", "Cretaceous") === null;
 
     // saves from before timed science keep their unlocked periods, trips, and clones
-    const oldS = JSON.parse(JSON.stringify(newPark()));
+    const oldS = JSON.parse(JSON.stringify(newPark())); delete oldS.discoV; delete oldS.science.drones; delete oldS.science.seen; delete oldS.science.reports;
     oldS.day = 6; oldS.starters = ["arth"]; oldS.science.unlocked = ["Cretaceous"]; delete oldS.science.projects;
     oldS.science.trips = [{period:"Jurassic", sp:"dryo", back:7}]; oldS.science.clones = [{id:"c1", sp:"lyst", exhibitId:null, q:90, lane:0, done:8}];
     oldS.science.crew.temporal = 1; oldS.science.crew.gene = 1;
@@ -1214,6 +1239,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const money0 = oldS.money, up = upgradeSave(oldS);
     out.oldJobsGetBays = up.science.trips[0].bay === 0 && up.science.clones.length === 1 && up.science.clones[0].bay === 0 && up.science.clones[0].lane === undefined;
     out.oldExtraJobRefunded = up.money === money0 + SPECIES_BY_ID.lyst.price;
+    // discovery moved to GHOST: the Temporal Researcher became a drone, the trip still out became an expedition to a site,
+    // and the sites of animals already unlocked are scouted
+    out.oldDiscovery = up.discoV === 1 && up.science.drones === 1 && up.science.crew.temporal === undefined && up.science.trips[0].kind === "dig"
+      && sitesOf("dryo").some(t => t.id === up.science.trips[0].site) && (up.science.seen.hellcreek || []).includes("trex") && Array.isArray(up.science.reports);
     out.oldUnlocksAnimals = up.science.unlocked.includes("trex") && up.science.unlocked.every(id => SPECIES_BY_ID[id]) && !up.science.unlocked.includes("arth");
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
@@ -1724,7 +1753,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const wp = wantsOf(mk("desert"), sp).water, ex = {water:wp * 5, rock:0, plants:0};
       out.waterTooMuchHurts = waterFit(wp, wp) === 1 && waterFit(0, wp) === 0 && waterFit(wp * 5, wp) < 1 && waterFit(wp * 5, wp) < waterFit(wp * 1.1, wp); }
     try { const h = landHtml(bx); out.landPanelRenders = /Plant Cover: ?<\/b>|Plant Cover/.test(h) && /Rock Coverage/.test(h) && /Landscaping/.test(h); } catch(x){ out.landPanelRenders = false; }
-    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Dirtiness/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
+    try { const sp2 = SPECIES.find(s => !s.viv); bx.animals = [{id:"hb1", sp:sp2.id, q:90}]; exTabs.ex = bx.id; exTabs.tab = "health"; const h = exhibitHtml(bx); out.healthTabRenders = /Sanitation/.test(h) && /class="hl (ok|warn|bad)"/.test(h) && /aria-selected="true"[^>]*>[^<]*Health/.test(h); exTabs.tab = "land"; const lh = exhibitHtml(bx); out.landTabRenders = /Landscape needs/.test(lh) && /Water<\/b><span>[\d.]+%\/[\d.]+%/.test(lh) && /data-action="lsub"/.test(lh); landTabs.sub = "water"; out.waterSubTab = /data-action="waterTool"/.test(exhibitHtml(bx)); landTabs.sub = "plants"; out.landNoShelter = !/data-key="barn"/.test(exhibitHtml(bx)); exTabs.tab = "props"; const ph = exhibitHtml(bx); out.propsTabRenders = /Habitat props/.test(ph) && /data-key="shelter"/.test(ph) && /data-key="barn"/.test(ph) && !/data-key="traysm"/.test(ph) && /Shelters cover/.test(ph); exTabs.tab = "clone"; out.cloneTabRenders = /Add animals/.test(exhibitHtml(bx)); exTabs.tab = "main"; bx.animals = []; } catch(x){ out.healthTabRenders = String(x); }
     render(); out.biomeDrawn = !!document.querySelector('#world [fill="url(#b-wetland)"]') && !!document.querySelector('#b-boreal');
     out.fernPrairie = !!BIOMES.fern && ["Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene"].every(p => PLANTS_OF[p].fern && PLANTS_OF[p].fern.length === 3) && ["Devonian", "Carboniferous", "Neogene", "Quaternary"].every(p => !PLANTS_OF[p].fern) && !!document.querySelector('#b-fern') && !!document.querySelector('#p-fern') && !!document.querySelector('#w-fern') && !!WATER_TEX.fern && !!ROCK_SPRITES.fern;
     state.exhibits = keepEx; state.money = keepMoney; render();
@@ -2418,13 +2447,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const sc = state.science, m1 = state.money; state.money = 1e6;
         const ec = {id:"ec1", type:"edcenter", points:sq(0, 0, 16), day:0, shows:[]};
         state.buildings.push(ec);
-        const ev = MUSEUM_BY_ID["ev-dying"], tp0 = tripProblem(ev.id, ev.id);
+        const ev = MUSEUM_BY_ID["ev-dying"], tp0 = expeditionProblem("traps", ev.id);
         sc.tech.push("education"); sc.dna[ev.id] = {genome:100, quality:80};
         const l0 = showsLearn(ec), u0 = showsUpkeep(ec);
         const why = addShow(ec, ev.id);
         out.museum = !!tp0 && !why && showsOf(ec).length === 1 && showsLearn(ec) > l0 && showsUpkeep(ec) === ev.upkeep + u0 && !!addShow(ec, ev.id)
           && !showsReady(ec).includes(ev) && museumHtml(ec).includes("Take it down") && eduCenterHtml(ec).includes("Museum attractions")
-          && genomeInfo(ev.id).event === ev && genomePeriods(ev.id)[0] === ev.id && tripOdds("ev-hadean", "ev-hadean").cost > 0
+          && genomeInfo(ev.id).event === ev && SITE_BY_ID.traps.event === ev.id && tripOdds("ev-hadean", "hadean").cost > 0
           && Array.isArray(upgradeSave(JSON.parse(JSON.stringify({...state, buildings:[{id:"x", type:"edcenter", points:[]}]}))).buildings[0].shows);
         // focus and modules: a focus works at strength 1, modules that suit it make it stronger, and the auditorium seats more
         sc.tech.push("edtheater", "edfossils", "edauditorium");
@@ -2680,6 +2709,26 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       select("animal", a1.id); animalLive(true);
       const inp = document.getElementById("aName");
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
+      // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
+      const hl = () => document.getElementById("anHealth").textContent;
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && !/chance a day/.test(hl());
+      a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
+      out.animalHealthInjured = /Injured, bitten by a Dimetrodon, 55% severe/.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
+      // the exhibit's Animals and Health tabs show each animal's health too
+      { const ex = animalHome(a1.id), tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex.id; exTabs.tab = "animals"; const at = exhibitHtml(ex); exTabs.tab = "health"; const ht = exhibitHtml(ex); exTabs.tab = tk; exTabs.ex = tx;
+        out.exhibitTabsHealthBar = /Injured, 45% health/.test(at) && /Injured, 45% health/.test(ht) && /Healthy, 100% health/.test(ht) && /width:45%/.test(ht); }
+      a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
+      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
+      // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low
+      const ex0 = animalHome(a1.id), dirtKeep = ex0.dirt, needKeep = {...a1.need};
+      ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);
+      out.animalHealthBasicsQuiet = !/hungry|thirsty|Sanitation is low/.test(hl());
+      ex0.dirt = 50; a1.need.hunger = 80; a1.need.thirst = 55; animalLive(true);
+      out.animalHealthBasics = /It's hungry/.test(hl()) && /It's thirsty/.test(hl()) && /Sanitation is low \(50%\)/.test(hl());
+      { const tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex0.id; exTabs.tab = "health"; const hh = exhibitHtml(ex0); exTabs.tab = tk; exTabs.ex = tx;
+        out.exhibitHealthBasics = /1 of \d+ are hungry|It's hungry/.test(hh) && /thirsty/.test(hh) && /Sanitation is low \(50%\)/.test(hh); }
+      ex0.dirt = dirtKeep; Object.assign(a1.need, needKeep);
+      delete a1.sick; animalLive(true);
       inp.value = "Rex <b>"; inp.dispatchEvent(new Event("input", {bubbles:true})); inp.dispatchEvent(new Event("change", {bubbles:true}));
       out.animalRename = a1.name === "Rex <b>" && document.getElementById("aName") === inp && !panelEl.querySelector("h2 b, section b");
       inp.value = "x".repeat(60); inp.dispatchEvent(new Event("change", {bubbles:true}));
@@ -3024,15 +3073,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const opened = sel && sel.kind === "animal" && sel.id === target.id;
     const back = panelEl.querySelector(".back"); back.click();
     const backOk = sel && sel.kind === "exhibit" && sel.id === e.id && exTabs.tab === "animals";
+    // each row has its own Move: it queues just that animal and turns into a disabled Moving
+    const other = e.animals.find(a => a !== target), tr0 = state.staff.transfers.length;
+    const made = requestMove(e, other.sp, e, 5, other.id); ui.panel();
+    const mb = id => panelEl.querySelector(`.animal-row[data-id="${id}"] [data-action="moveDlg"]`);
+    const moveOne = made === 1 && state.staff.transfers.length === tr0 + 1 && state.staff.transfers.at(-1).animalId === other.id && mb(other.id).disabled && mb(other.id).textContent === "Moving" && !mb(target.id).disabled && !panelEl.textContent.includes("Species");
+    state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== other.id);
     panelEl.querySelector(`.animal-row[data-id="${target.id}"]`).click();
     const n0 = e.animals.length, m0 = state.money = 1e6, pay = sellValue(target);
     state.staff.transfers.push({id:"tr-smoke", animalId:target.id, sp:target.sp, from:e.id, to:e.id});
     sellAnimal(target.id);
     const sold = e.animals.length === n0 - 1 && !e.animals.some(a => a.id === target.id) && !herd.has(target.id) && state.money - m0 === pay && !state.staff.transfers.some(t => t.animalId === target.id) && !sel;
     exTabs.tab = "main"; select(null); state.exhibits.splice(state.exhibits.indexOf(e), 1); state.money = money0; recompute();
-    return {listed, opened, sold, backOk};
+    return {listed, opened, sold, backOk, moveOne};
   });
-  if(at){ checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
+  if(at){ checks.animalsTabMoveOne = at.moveOne; checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
 
   // focus mode: H hides the build menu and side panel, the button/H brings them back
   const fm = await page.evaluate(() => {
@@ -3073,8 +3128,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.paths.push({id:"s12-p0", name:"s", points:[[state.gate[0],state.gate[1]],[207.5,290],[207.5,262]]}, {id:"s12-p1", name:"s", points:[[207.5,262],[222,262]]}, {id:"s12-p2", name:"s", points:[[207.5,262],[193,262]]}, {id:"s12-p3", name:"s", points:[[207.5,290],[217,290]]}, {id:"s12-p4", name:"s", points:[[207.5,290],[193,290]]});
     recompute(); buildKeeperGraph(); state.sandbox = false; state.over = false; state.money = 1e9;
     const sc = () => state.science;
-    for(const k of ["paleo", "temporal", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
+    for(const k of ["paleo", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
     const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
+    // a GHOST expedition goes after another animal, seen at its site
+    const tsp = SPECIES.find(s => s.id !== sp.id && speciesAvailable(s.id) && sitesOf(s.id).length), tsite = sitesOf(tsp.id).find(siteShown);
+    sc().seen[tsite.id] = [tsp.id]; if(!isUnlocked(tsp.id)) sc().unlocked.push(tsp.id);
     // log the park minute each job actually finishes
     const seen = {}, real = {fp:finishProject, tr:tripReturns, fc:finishClone, fb:finishBatch};
     finishProject = p => { seen.proj = nowMin(); real.fp(p); }; tripReturns = t => { seen.trip = nowMin(); real.tr(t); };
@@ -3084,7 +3142,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; s.ready = [];
       for(const k of Object.keys(seen)) delete seen[k];
       state.day = startDay; state.minute = startMinute; s.points = 1e6; s.tech = s.tech.filter(t => t !== "moat"); s.tech.push("medpaleo");
-      state.rating = 5; startProject("tech", "moat"); launchTrip(sp.id, sp.period); orderClone(sp.id, null); growBatch("med", era);
+      state.rating = 5; startProject("tech", "moat"); delete s.dna[tsp.id]; sendDrone("dig", tsite.id, tsp.id); orderClone(sp.id, null); growBatch("med", era);
       const jobs = {proj:sc().projects[0], trip:sc().trips[0], clone:sc().clones[0], bed:state.ceres.beds[0]};
       if(Object.values(jobs).some(j => !j)) return null;
       const ends = Object.fromEntries(Object.entries(jobs).map(([k, j]) => [k, j.end]));

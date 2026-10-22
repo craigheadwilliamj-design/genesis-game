@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GHOST Timeline</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* One column: readout, map, slider, then the site card. The slider is the instrument; everything else is quiet. */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --dim:#5a6878; --line:#cfd6de;
+  --accent:#d9ff00; --marker:#454646; --ocean:#1b60b8;
+  --display:"Pixelify Sans","Courier New",monospace; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--dim:#93a1b0;--line:#2c3744;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--body)}
+main{max-width:640px;margin:0 auto;padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:18px}
+header{display:grid;gap:2px}
+.eyebrow{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+#epoch{font:700 clamp(28px,7vw,40px)/1.05 var(--display);margin:0;text-wrap:balance}
+#ago{font:500 16px/1.3 var(--mono);font-variant-numeric:tabular-nums;color:var(--ink)}
+#period{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--dim)}
+#period i{width:10px;height:10px;border-radius:2px;display:inline-block}
+figure{margin:0;display:grid;gap:6px}
+#map{width:100%;max-width:100%;aspect-ratio:2/1;display:block;image-rendering:pixelated;shape-rendering:crispEdges}
+#map image{image-rendering:pixelated}
+#map{cursor:pointer}
+#map .site:focus{outline:none}
+#map .frame{fill:var(--marker)}
+#map .site:focus-visible .frame,#map .site.on .frame{fill:#fff}
+.nomap{fill:var(--dim);font:600 10px var(--body);text-anchor:middle}
+/* slider */
+#track{position:relative;height:44px;touch-action:none;cursor:pointer;user-select:none;outline:none}
+#bars{position:absolute;inset:10px 0 10px;display:flex;gap:2px}
+.bar{flex:1;display:flex;border-radius:3px;overflow:hidden;min-width:0}
+.slice{flex:1}
+#thumb{position:absolute;top:0;bottom:0;width:0;pointer-events:none}
+#thumb::before{content:"";position:absolute;left:-1.5px;top:4px;bottom:4px;width:3px;background:var(--ink);border-radius:2px}
+#thumb::after{content:"";position:absolute;left:-7px;top:0;width:14px;height:8px;background:var(--ink);clip-path:polygon(0 0,100% 0,50% 100%)}
+#track:focus-visible #thumb::before{box-shadow:0 0 0 3px var(--accent)}
+#labels{display:flex;gap:2px;margin-top:-4px}
+#labels span{flex:1;min-width:0;font:500 10px/1.2 var(--mono);color:var(--dim);text-align:center;overflow:hidden;white-space:nowrap}
+/* site list + card */
+#list{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+#list button{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:6px}
+#list button[aria-pressed="true"]{border-color:var(--ink)}
+#list i{width:8px;height:8px;background:var(--marker);display:inline-block;box-shadow:inset 0 0 0 2px var(--marker)}
+#list i.lit{background:var(--accent)}
+#card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:8px}
+#card h2{font:700 20px/1.15 var(--display);margin:0}
+#card .where{color:var(--dim);font-size:13px}
+#card dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px}
+#card dt{color:var(--dim)}
+#card dd{margin:0;font-variant-numeric:tabular-nums;min-width:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btns button{font:600 14px var(--body);border-radius:6px;padding:7px 12px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+.btns button.ghost{background:transparent;color:var(--ink)}
+.btns button:disabled{opacity:.45;cursor:default}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.fauna{width:100%;border-collapse:collapse;font-size:14px}
+.fauna th{text-align:left;font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:6px 0;border-bottom:1px solid var(--line)}
+.fauna th:not(:first-child),.fauna td:not(:first-child){padding-left:12px;text-align:right;font-variant-numeric:tabular-nums}
+.fauna td{padding:6px 0;border-bottom:1px solid var(--line)}
+.fauna label{display:flex;align-items:center;gap:8px;cursor:pointer}
+.fauna tr.locked td{color:var(--dim)}
+.rating{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin-top:6px}
+.rating select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
+#oracle{display:grid;gap:8px}
+#oracle h2{font:700 18px/1.15 var(--display);margin:0}
+#oracle p{margin:0;font-size:13px;color:var(--dim)}
+.drones{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.drones li{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px}
+.drones li.done{border-color:color-mix(in srgb, var(--ink) 35%, var(--line))}
+.drones b{font-weight:600;font-size:14px}
+.drones span{grid-column:1;font-size:13px;color:var(--dim)}
+.drones button{grid-row:1 / span 2;grid-column:2;font:600 13px var(--body);border-radius:6px;padding:5px 10px;cursor:pointer;border:1px solid var(--ink);background:var(--ink);color:var(--bg)}
+.drones button:disabled{background:transparent;color:var(--dim);border-color:var(--line);cursor:default}
+#card h2 .badge{display:inline-block;vertical-align:middle;margin-left:6px;font:500 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;padding:4px 6px;border-radius:4px;background:var(--accent);color:#18212b}
+#list .done{font:500 10px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.tag{white-space:nowrap;font:500 11px var(--mono);color:var(--dim)}
+.report{background:color-mix(in srgb, var(--ink) 6%, var(--panel));border-radius:6px;padding:10px 12px;display:grid;gap:6px}
+.report h3{margin:0;font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.report ul{margin:0;padding:0;list-style:none;display:grid;gap:3px;font-size:14px}
+.report b{font:700 16px/1.2 var(--display)}
+.report button{justify-self:start;font:600 13px var(--body);background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer}
+.empty{color:var(--dim);font-size:14px;margin:0}
+#fleet{display:grid;gap:8px}
+#fleet .head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px}
+#fleet h2{font:700 18px/1.15 var(--display);margin:0}
+#fleet h2 .count{font:500 14px var(--mono);color:var(--dim);margin-left:6px;font-variant-numeric:tabular-nums}
+#fleet .clock{display:flex;align-items:center;gap:8px;font:500 13px var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+#fleet select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:2px 4px}
+.ships{margin:0;padding:0;list-style:none;display:grid;gap:6px}
+.ships li{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;display:grid;gap:3px;font-size:13px;min-width:0}
+.ships .top{display:flex;justify-content:space-between;gap:8px}
+.ships b{font-size:14px;font-weight:600}
+.ships .mk{font:500 11px var(--mono);color:var(--dim)}
+.ships .st{color:var(--dim)}
+.ships .bar2{height:4px;border-radius:2px;background:var(--line);overflow:hidden}
+.ships .bar2 i{display:block;height:100%;background:var(--accent)}
+.ships .eta{font:500 12px var(--mono);font-variant-numeric:tabular-nums}
+.ships li.free .st{color:var(--ink)}
+#reports{display:grid;gap:6px}
+.note{color:var(--dim);font-size:13px;margin:0}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="eyebrow">GHOST · timeline test</span>
+    <h1 id="epoch">Late Devonian</h1>
+    <div id="ago">375 million years ago</div>
+    <div id="period"><i></i><span></span></div>
+    <label class="rating">Park rating (test) <select id="rating"></select></label>
+  </header>
+
+  <figure>
+    <svg id="map" viewBox="0 0 260 130" role="img" aria-label="Map of the Earth"></svg>
+  </figure>
+
+  <div>
+    <div id="track" role="slider" tabindex="0" aria-label="Time" aria-valuemin="0" aria-valuemax="1000">
+      <div id="bars"></div>
+      <div id="thumb"></div>
+    </div>
+    <div id="labels"></div>
+  </div>
+
+  <ul id="list" aria-label="Sites in view"></ul>
+  <section id="card" aria-live="polite"></section>
+  <section id="fleet" aria-label="GHOST drones"></section>
+  <section id="oracle" aria-label="ORACLE upgrades"></section>
+  <p class="note">Maps drafted from the PALEOMAP PaleoDEMs: Scotese, C.R. and Wright, N. (2018), CC BY 4.0.</p>
+</main>
+
+<script>
+// Periods, oldest first. Each gets one equal bar; its epochs split the bar equally. Years are years ago.
+const PERIODS = [
+  {id:"Cambrian", color:"#7FA056", epochs:[["Early Cambrian",538.8e6],["Middle Cambrian",506.5e6],["Late Cambrian",497e6]]},
+  {id:"Ordovician", color:"#009270", epochs:[["Early Ordovician",485.4e6],["Middle Ordovician",471.3e6],["Late Ordovician",458.2e6]]},
+  {id:"Silurian", color:"#B3E1B6", epochs:[["Early Silurian",443.1e6],["Late Silurian",426.7e6]]},
+  {id:"Devonian", color:"#C28A4D", epochs:[["Early Devonian",419.6e6],["Middle Devonian",393.3e6],["Late Devonian",382.7e6]]},
+  {id:"Carboniferous", color:"#67A599", epochs:[["Mississippian",358.9e6],["Pennsylvanian",323.4e6]]},
+  {id:"Permian", color:"#F04028", epochs:[["Cisuralian",298.9e6],["Guadalupian",273.0e6],["Lopingian",259.5e6]]},
+  {id:"Triassic", color:"#812B92", epochs:[["Early Triassic",251.9e6],["Middle Triassic",246.7e6],["Late Triassic",237e6]]},
+  {id:"Jurassic", color:"#34B2C9", epochs:[["Early Jurassic",201.4e6],["Middle Jurassic",174.7e6],["Late Jurassic",161.5e6]]},
+  {id:"Cretaceous", color:"#7FC64E", epochs:[["Early Cretaceous",143.1e6],["Late Cretaceous",100.5e6]]},
+  {id:"Paleogene", color:"#FD9A52", epochs:[["Paleocene",66.0e6],["Eocene",56.0e6],["Oligocene",33.9e6]]},
+  {id:"Neogene", color:"#F2D32A", epochs:[["Miocene",23.03e6],["Pliocene",5.333e6]]},
+  {id:"Quaternary", color:"#E8E27A", epochs:[["Pleistocene",2.58e6],["Holocene",11700]]},
+];
+const PRESENT = 10;   // the slider's floor: a log scale can't reach 0 years
+// Flatten into epochs with both bounds: from (older) and to (younger).
+const EPOCHS = [];
+PERIODS.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
+  const next = p.epochs[j + 1] ? p.epochs[j + 1][1] : PERIODS[i + 1] ? PERIODS[i + 1].epochs[0][1] : PRESENT;
+  EPOCHS.push({name, from, to:next, period:p, pi:i, ej:j});
+}));
+
+// Maps, 260 x 130 px: one a period, with epoch overrides where the world changes a lot within it. Drafted by
+// genmaps.py from the PALEOMAP PaleoDEMs. A site puts its dot on each map by pixel (`at`, keyed by map; placesites.py
+// works them out by plate reconstruction).
+const MAPS = {
+  Cambrian:"cambrian", Ordovician:"ordovician", Silurian:"silurian", Devonian:"devonian", Carboniferous:"carboniferous",
+  Permian:"permian", Triassic:"triassic", Jurassic:"jurassic", "Early Jurassic":"jurassic-early", "Late Jurassic":"jurassic-late",
+  "Early Cretaceous":"cretaceous-early", "Late Cretaceous":"cretaceous-late", Paleogene:"paleogene", Neogene:"neogene",
+  Pleistocene:"pleistocene", Holocene:"holocene",
+};
+const mapKey = e => MAPS[e.name] || MAPS[e.period.id], mapOf = e => mapKey(e) && `maps/${mapKey(e)}.png`;
+// SITES:BEGIN written by placesites.py from sites.py; edit those, not this.
+const SITES = [
+  {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:[{name:"Tiktaalik", space:10, stars:.5}], trip:3500, days:1.5, risk:.1},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:[{name:"Ichthyostega", space:8, stars:.5}], trip:3500, days:1.5, risk:.1},
+  {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:[{name:"Pulmonoscorpius", space:6, stars:0}], trip:4000, days:1.5, risk:.1},
+  {id:"joggins", name:"Joggins Fossil Cliffs", where:"Nova Scotia, Canada", from:315e6, to:312e6, at:{carboniferous:[126, 70]}, fauna:[{name:"Hylonomus", space:5, stars:0}, {name:"Arthropleura", space:25, stars:0}], trip:4000, days:1.5, risk:.1},
+  {id:"nyrany", name:"Nýřany", where:"Bohemia, Czechia", from:308e6, to:306e6, at:{carboniferous:[144, 63]}, fauna:[{name:"Microbrachis", space:4, stars:0}], trip:4000, days:1.5, risk:.1},
+  {id:"commentry", name:"Commentry", where:"Allier, France", from:302e6, to:300e6, at:{carboniferous:[140, 70]}, fauna:[{name:"Meganeura", space:20, stars:.5}], trip:4000, days:1.5, risk:.1},
+  {id:"pennredbeds", name:"Late Pennsylvanian red beds", where:"Texas and New Mexico, USA", from:304e6, to:299.5e6, at:{carboniferous:[103, 67]}, fauna:[{name:"Diplocaulus", space:10, stars:.5}, {name:"Eryops", space:100, stars:.5}], trip:4000, days:1.5, risk:.1},
+  {id:"elcobre", name:"El Cobre Canyon", where:"New Mexico, USA", from:298e6, to:293e6, at:{permian:[104, 54]}, fauna:[{name:"Platyhystrix", space:10, stars:.5}], trip:4500, days:1.5, risk:.12},
+  {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[106, 61]}, fauna:[{name:"Dimetrodon", space:400, stars:1}, {name:"Seymouria", space:8, stars:.5}], trip:4500, days:1.5, risk:.12},
+  {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[114, 60]}, fauna:[{name:"Cotylorhynchus", space:900, stars:1.5}], trip:4500, days:1.5, risk:.12},
+  {id:"pedrafogo", name:"Pedra de Fogo Formation", where:"Maranhão, Brazil", from:280e6, to:272e6, at:{permian:[121, 87]}, fauna:[{name:"Prionosuchus", space:900, stars:2.5}], trip:4500, days:1.5, risk:.12},
+  {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[161, 37]}, fauna:[{name:"Estemmenosuchus", space:450, stars:1}], trip:4500, days:1.5, risk:.12},
+  {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[109, 113]}, fauna:[{name:"Moschops", space:450, stars:1}, {name:"Anteosaurus", space:800, stars:2}], trip:4500, days:1.5, risk:.12},
+  {id:"karoolate", name:"Karoo, Daptocephalus Zone", where:"Eastern Cape, South Africa", from:256e6, to:252.2e6, at:{permian:[116, 114]}, fauna:[{name:"Diictodon", space:6, stars:0}, {name:"Lystrosaurus", space:120, stars:0}], trip:4500, days:1.5, risk:.12},
+  {id:"dvina", name:"Sokolki, Northern Dvina", where:"Arkhangelsk, Russia", from:255e6, to:253e6, at:{permian:[153, 37]}, fauna:[{name:"Scutosaurus", space:500, stars:1}, {name:"Inostrancevia", space:800, stars:2.5}], trip:4500, days:1.5, risk:.12},
+  {id:"burgersdorp", name:"Burgersdorp Formation", where:"Eastern Cape, South Africa", from:247.5e6, to:247e6, at:{triassic:[128, 108]}, fauna:[{name:"Erythrosuchus", space:800, stars:2}], trip:5000, days:2.5, risk:.12},
+  {id:"madygen", name:"Madygen Formation", where:"Batken, Kyrgyzstan", from:236e6, to:232e6, at:{triassic:[165, 25]}, fauna:[{name:"Sharovipteryx", space:5, stars:.5}, {name:"Longisquama", space:6, stars:.5}, {name:"Gigatitan", space:14, stars:.5}], trip:5000, days:2.5, risk:.12},
+  {id:"ischigualasto", name:"Ischigualasto Formation", where:"San Juan, Argentina", from:231e6, to:226e6, at:{triassic:[110, 99]}, fauna:[{name:"Herrerasaurus", space:300, stars:1}], trip:5000, days:2.5, risk:.12},
+  {id:"krasiejow", name:"Krasiejów", where:"Opole, Poland", from:230e6, to:225e6, at:{triassic:[136, 33]}, fauna:[{name:"Silesaurus", space:100, stars:0}], trip:5000, days:2.5, risk:.12},
+  {id:"chinle", name:"Chinle Formation", where:"Petrified Forest, Arizona, USA", from:225e6, to:208e6, at:{triassic:[89, 55]}, fauna:[{name:"Postosuchus", space:700, stars:2}, {name:"Desmatosuchus", space:500, stars:1}], trip:5000, days:2.5, risk:.12},
+  {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 40]}, fauna:[{name:"Plateosaurus", space:900, stars:1.5}], trip:5000, days:2.5, risk:.12},
+  {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[97, 55]}, fauna:[{name:"Coelophysis", space:200, stars:.5}], trip:5000, days:2.5, risk:.12},
+  {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[143, 32]}, fauna:[{name:"Lisowicia", space:1300, stars:2}], trip:5000, days:2.5, risk:.12},
+  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:[{name:"Dimorphodon", space:200, stars:1}, {name:"Scelidosaurus", space:450, stars:1}], trip:7000, days:2.5, risk:.15},
+  {id:"elliot", name:"Elliot Formation", where:"Eastern Cape, South Africa", from:200e6, to:190e6, at:{"jurassic-early":[127, 101]}, fauna:[{name:"Heterodontosaurus", space:80, stars:0}], trip:7000, days:2.5, risk:.15},
+  {id:"kayenta", name:"Kayenta Formation", where:"Arizona, USA", from:196e6, to:183e6, at:{"jurassic-early":[92, 46]}, fauna:[{name:"Dilophosaurus", space:700, stars:2.5}], trip:7000, days:2.5, risk:.15},
+  {id:"hanson", name:"Hanson Formation", where:"Mount Kirkpatrick, Antarctica", from:194e6, to:188e6, at:{"jurassic-early":[146, 113]}, fauna:[{name:"Cryolophosaurus", space:1300, stars:3}], trip:7000, days:2.5, risk:.15},
+  {id:"stonesfield", name:"Stonesfield Slate", where:"Oxfordshire, England", from:168e6, to:166e6, at:{jurassic:[135, 29]}, fauna:[{name:"Megalosaurus", space:2500, stars:3.5}], trip:7000, days:2.5, risk:.15},
+  {id:"daohugou", name:"Daohugou and Tiaojishan", where:"Liaoning and Hebei, China", from:165e6, to:158e6, at:{jurassic:[202, 26], "jurassic-late":[203, 28]}, fauna:[{name:"Anchiornis", space:6, stars:.5}, {name:"Yi qi", space:10, stars:1}, {name:"Scansoriopteryx", space:5, stars:.5}], trip:7000, days:2.5, risk:.15},
+  {id:"morrison", name:"Morrison Formation", where:"Wyoming, Colorado and Utah, USA", from:156e6, to:147e6, at:{"jurassic-late":[96, 32]}, fauna:[{name:"Allosaurus", space:3000, stars:3.5}, {name:"Stegosaurus", space:1500, stars:2.5}, {name:"Ceratosaurus", space:2000, stars:3}, {name:"Torvosaurus", space:3000, stars:4}, {name:"Ornitholestes", space:100, stars:0}, {name:"Dryosaurus", space:400, stars:1}, {name:"Camarasaurus", space:4500, stars:3.5}, {name:"Apatosaurus", space:4700, stars:4}, {name:"Diplodocus", space:5000, stars:4}, {name:"Brachiosaurus", space:5200, stars:4}], trip:7000, days:2.5, risk:.15},
+  {id:"tendaguru", name:"Tendaguru", where:"Lindi, Tanzania", from:155e6, to:150e6, at:{"jurassic-late":[141, 91]}, fauna:[{name:"Kentrosaurus", space:1000, stars:2}, {name:"Dryosaurus", space:400, stars:1}], trip:7000, days:2.5, risk:.15},
+  {id:"solnhofen", name:"Solnhofen Limestone", where:"Bavaria, Germany", from:151e6, to:150e6, at:{"jurassic-late":[141, 29]}, fauna:[{name:"Archaeopteryx", space:12, stars:1}, {name:"Compsognathus", space:12, stars:.5}], trip:7000, days:2.5, risk:.15},
+  {id:"cedarmtn", name:"Cedar Mountain Formation", where:"Utah, USA", from:135e6, to:125e6, at:{"cretaceous-early":[90, 30]}, fauna:[{name:"Utahraptor", space:1200, stars:3}], trip:7500, days:2.5, risk:.15},
+  {id:"wealden", name:"Wealden Group", where:"Isle of Wight, England", from:130e6, to:125e6, at:{"cretaceous-early":[136, 29]}, fauna:[{name:"Hypsilophodon", space:150, stars:0}, {name:"Iguanodon", space:1200, stars:2}, {name:"Baryonyx", space:1800, stars:3}], trip:7500, days:2.5, risk:.15},
+  {id:"lashoyas", name:"Las Hoyas", where:"Cuenca, Spain", from:127e6, to:125e6, at:{"cretaceous-early":[135, 38]}, fauna:[{name:"Concavenator", space:900, stars:2.5}], trip:7500, days:2.5, risk:.15},
+  {id:"yixian", name:"Yixian Formation", where:"Liaoning, China", from:125e6, to:120e6, at:{"cretaceous-early":[202, 27]}, fauna:[{name:"Microraptor", space:12, stars:1}, {name:"Yutyrannus", space:2200, stars:3.5}, {name:"Psittacosaurus", space:200, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"victoria", name:"Strzelecki and Bungil Formations", where:"Victoria and Queensland, Australia", from:125e6, to:110e6, at:{"cretaceous-early":[154, 126]}, fauna:[{name:"Koolasuchus", space:30, stars:1}, {name:"Minmi", space:300, stars:1}], trip:7500, days:2.5, risk:.15},
+  {id:"elrhaz", name:"Elrhaz Formation", where:"Gadoufaoua, Niger", from:115e6, to:110e6, at:{"cretaceous-early":[133, 60]}, fauna:[{name:"Nigersaurus", space:1500, stars:2.5}], trip:7500, days:2.5, risk:.15},
+  {id:"cerrobarcino", name:"Cerro Barcino Formation", where:"Chubut, Argentina", from:102e6, to:101e6, at:{"cretaceous-early":[109, 101]}, fauna:[{name:"Patagotitan", space:5500, stars:4.5}], trip:7500, days:2.5, risk:.15},
+  {id:"kemkem", name:"Kem Kem Beds", where:"Morocco", from:100e6, to:94e6, at:{"cretaceous-late":[128, 45]}, fauna:[{name:"Spinosaurus", space:3500, stars:4}, {name:"Carcharodontosaurus", space:4000, stars:4.5}], trip:7500, days:2.5, risk:.15},
+  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:[{name:"Pteranodon", space:800, stars:2.5}], trip:7500, days:2.5, risk:.15},
+  {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[76, 32]}, fauna:[{name:"Deinosuchus", space:2000, stars:3.5}], trip:7500, days:2.5, risk:.15},
+  {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 12]}, fauna:[{name:"Styracosaurus", space:1800, stars:3}, {name:"Parasaurolophus", space:900, stars:2}], trip:7500, days:2.5, risk:.15},
+  {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[190, 30]}, fauna:[{name:"Velociraptor", space:500, stars:2.5}, {name:"Protoceratops", space:250, stars:1.5}, {name:"Oviraptor", space:250, stars:1}, {name:"Microceratus", space:8, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"lacolonia", name:"La Colonia Formation", where:"Chubut, Argentina", from:72e6, to:69e6, at:{"cretaceous-late":[98, 103]}, fauna:[{name:"Carnotaurus", space:2200, stars:3.5}], trip:7500, days:2.5, risk:.15},
+  {id:"nemegt", name:"Nemegt Formation", where:"Gobi Desert, Mongolia", from:70e6, to:68e6, at:{"cretaceous-late":[183, 31]}, fauna:[{name:"Gallimimus", space:400, stars:1.5}, {name:"Therizinosaurus", space:2000, stars:3.5}, {name:"Deinocheirus", space:2500, stars:3.5}, {name:"Mononykus", space:6, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"maevarano", name:"Maevarano Formation", where:"Mahajanga, Madagascar", from:70e6, to:66.1e6, at:{"cretaceous-late":[154, 93]}, fauna:[{name:"Beelzebufo", space:8, stars:.5}, {name:"Simosuchus", space:14, stars:.5}], trip:7500, days:2.5, risk:.15},
+  {id:"javelina", name:"Javelina Formation", where:"Big Bend, Texas, USA", from:69e6, to:66.1e6, at:{"cretaceous-late":[84, 32]}, fauna:[{name:"Quetzalcoatlus", space:3000, stars:4}], trip:7500, days:2.5, risk:.15},
+  {id:"hellcreek", name:"Hell Creek Formation", where:"Montana, USA", from:67e6, to:66.1e6, at:{"cretaceous-late":[92, 19]}, fauna:[{name:"Tyrannosaurus rex", space:4000, stars:4.5}, {name:"Triceratops", space:2500, stars:3.5}, {name:"Ankylosaurus", space:2200, stars:3.5}, {name:"Pachycephalosaurus", space:450, stars:1.5}, {name:"Ornithomimus", space:250, stars:1}], trip:7500, days:2.5, risk:.15},
+  {id:"waipara", name:"Waipara Greensand", where:"Canterbury, New Zealand", from:62e6, to:60e6, at:{paleogene:[43, 108]}, fauna:[{name:"Waimanu", space:22, stars:1}], trip:4500, days:1.5, risk:.1},
+  {id:"fortunion", name:"Fort Union Formation", where:"Montana, USA", from:62e6, to:57e6, at:{paleogene:[84, 19]}, fauna:[{name:"Ptilodus", space:8, stars:.5}, {name:"Plesiadapis", space:6, stars:0}], trip:4500, days:1.5, risk:.1},
+  {id:"cerrejon", name:"Cerrejón Formation", where:"La Guajira, Colombia", from:60e6, to:58e6, at:{paleogene:[82, 57]}, fauna:[{name:"Titanoboa", space:1500, stars:3}], trip:4500, days:1.5, risk:.1},
+  {id:"bighorn", name:"Bighorn Basin", where:"Wyoming, USA", from:56e6, to:54e6, at:{paleogene:[76, 23]}, fauna:[{name:"Sifrhippus", space:9, stars:.5}, {name:"Miacis", space:12, stars:.5}], trip:4500, days:1.5, risk:.1},
+  {id:"kuldana", name:"Kuldana Formation", where:"Kohat, Pakistan", from:50e6, to:47e6, at:{paleogene:[177, 54]}, fauna:[{name:"Pakicetus", space:12, stars:.5}, {name:"Ambulocetus", space:700, stars:2}], trip:4500, days:1.5, risk:.1},
+  {id:"bridger", name:"Bridger and Uinta Basins", where:"Wyoming and Utah, USA", from:50e6, to:44e6, at:{paleogene:[69, 25]}, fauna:[{name:"Uintatherium", space:1100, stars:2}], trip:4500, days:1.5, risk:.1},
+  {id:"messel", name:"Messel Pit", where:"Hesse, Germany", from:48e6, to:47e6, at:{paleogene:[133, 25]}, fauna:[{name:"Leptictidium", space:5, stars:0}, {name:"Titanomyrma", space:6, stars:0}], trip:4500, days:1.5, risk:.1},
+  {id:"irdinmanha", name:"Irdin Manha Formation", where:"Inner Mongolia, China", from:45e6, to:40e6, at:{paleogene:[190, 26]}, fauna:[{name:"Andrewsarchus", space:1200, stars:2.5}], trip:4500, days:1.5, risk:.1},
+  {id:"venezuela", name:"Parángula Formation", where:"Barinas, Venezuela", from:45e6, to:36e6, at:{paleogene:[90, 59]}, fauna:[{name:"Barinasuchus", space:1100, stars:2.5}], trip:4500, days:1.5, risk:.1},
+  {id:"fayum", name:"Fayum Depression", where:"Egypt", from:37e6, to:30e6, at:{paleogene:[147, 47]}, fauna:[{name:"Arsinoitherium", space:1800, stars:3}], trip:4500, days:1.5, risk:.1},
+  {id:"whiteriver", name:"White River Badlands", where:"South Dakota, USA", from:34e6, to:30e6, at:{paleogene:[84, 27]}, fauna:[{name:"Hyaenodon", space:500, stars:1.5}], trip:4500, days:1.5, risk:.1},
+  {id:"bugti", name:"Dera Bugti", where:"Balochistan, Pakistan", from:28e6, to:23.1e6, at:{paleogene:[175, 61]}, fauna:[{name:"Paraceratherium", space:4000, stars:3.5}], trip:4500, days:1.5, risk:.1},
+  {id:"agate", name:"Nebraska Miocene beds", where:"Agate Fossil Beds, Nebraska, USA", from:22e6, to:15e6, at:{neogene:[70, 28]}, fauna:[{name:"Daeodon", space:700, stars:1.5}, {name:"Aepycamelus", space:800, stars:1.5}, {name:"Amphicyon", space:1100, stars:2.5}], trip:3500, days:1.5, risk:.07},
+  {id:"rusinga", name:"Rusinga Island", where:"Lake Victoria, Kenya", from:18e6, to:17e6, at:{neogene:[153, 66]}, fauna:[{name:"Proconsul", space:150, stars:1}], trip:3500, days:1.5, risk:.07},
+  {id:"patagonia", name:"Santa Cruz and Collón Curá Formations", where:"Patagonia, Argentina", from:18e6, to:14e6, at:{neogene:[92, 104]}, fauna:[{name:"Psilopterus", space:26, stars:1}, {name:"Kelenken", space:700, stars:2}], trip:3500, days:1.5, risk:.07},
+  {id:"tunggur", name:"Tunggur Formation", where:"Inner Mongolia, China", from:13e6, to:11e6, at:{neogene:[196, 28]}, fauna:[{name:"Platybelodon", space:1500, stars:2.5}, {name:"Chalicotherium", space:1000, stars:2}], trip:3500, days:1.5, risk:.07},
+  {id:"epecuen", name:"Epecuén Formation", where:"La Pampa, Argentina", from:9e6, to:6e6, at:{neogene:[93, 96]}, fauna:[{name:"Argentavis", space:800, stars:3}], trip:3500, days:1.5, risk:.07},
+  {id:"alcoota", name:"Alcoota", where:"Northern Territory, Australia", from:8e6, to:7e6, at:{neogene:[215, 93]}, fauna:[{name:"Dromornis", space:1000, stars:2.5}], trip:3500, days:1.5, risk:.07},
+  {id:"gargano", name:"Gargano", where:"Apulia, Italy", from:7e6, to:5.4e6, at:{neogene:[139, 29]}, fauna:[{name:"Deinogalerix", space:12, stars:.5}, {name:"Hoplitomeryx", space:26, stars:1}], trip:3500, days:1.5, risk:.07},
+  {id:"menorca", name:"Menorca", where:"Balearic Islands, Spain", from:5e6, to:3e6, at:{neogene:[131, 29]}, fauna:[{name:"Nuralagus rex", space:20, stars:1}], trip:3500, days:1.5, risk:.07},
+  {id:"siwaliks", name:"Siwalik Hills", where:"India and Pakistan", from:5e6, to:2.6e6, at:{neogene:[179, 40]}, fauna:[{name:"Sivatherium", space:2000, stars:3}, {name:"Megalochelys", space:900, stars:2}], trip:3500, days:1.5, risk:.07},
+  {id:"cradle", name:"Cradle of Humankind", where:"Gauteng, South Africa", from:3e6, to:2.6e6, at:{neogene:[147, 88]}, fauna:[{name:"Dinopithecus", space:250, stars:1}], trip:3500, days:1.5, risk:.07},
+  {id:"guangxi", name:"Guangxi caves", where:"Guangxi, China", from:2e6, to:0.3e6, at:{pleistocene:[204, 43]}, fauna:[{name:"Gigantopithecus", space:1400, stars:2.5}], trip:3000, days:1.5, risk:.05},
+  {id:"pampas", name:"The Pampas", where:"Buenos Aires, Argentina", from:0.5e6, to:12000, at:{pleistocene:[91, 95]}, fauna:[{name:"Megatherium", space:1500, stars:2.5}, {name:"Doedicurus", space:1100, stars:2.5}, {name:"Macrauchenia", space:900, stars:2}, {name:"Smilodon", space:900, stars:3}], trip:3000, days:1.5, risk:.05},
+  {id:"naracoorte", name:"Naracoorte Caves", where:"South Australia", from:0.5e6, to:40000, at:{pleistocene:[218, 97]}, fauna:[{name:"Thylacoleo", space:500, stars:2}, {name:"Megalania", space:1200, stars:2.5}], trip:3000, days:1.5, risk:.05},
+  {id:"sicily", name:"Sicily", where:"Italy", from:0.5e6, to:0.2e6, at:{pleistocene:[138, 32]}, fauna:[{name:"Sicilian Dwarf Elephant", space:40, stars:1.5}], trip:3000, days:1.5, risk:.05},
+  {id:"steppe", name:"Mammoth Steppe", where:"Northern Eurasia", from:0.3e6, to:12000, at:{pleistocene:[160, 18]}, fauna:[{name:"Woolly mammoth", space:2000, stars:3}, {name:"Elasmotherium", space:1800, stars:3}, {name:"Megaloceros", space:850, stars:2}], trip:3000, days:1.5, risk:.05},
+  {id:"cuba", name:"Cuba", where:"Caribbean", from:0.1e6, to:12000, at:{pleistocene:[75, 45]}, fauna:[{name:"Ornimegalonyx", space:14, stars:1}], trip:3000, days:1.5, risk:.05},
+  {id:"labrea", name:"Rancho La Brea", where:"Los Angeles, California, USA", from:50000, to:12000, at:{pleistocene:[53, 35]}, fauna:[{name:"Smilodon", space:900, stars:3}, {name:"Dire wolf", space:500, stars:2}, {name:"Arctodus", space:1000, stars:2.5}, {name:"Columbian mammoth", space:2400, stars:3.5}, {name:"American mastodon", space:1900, stars:3}], trip:3000, days:1.5, risk:.05},
+  {id:"madagascar", name:"Central Highlands", where:"Madagascar", from:8000, to:2000, at:{holocene:[162, 81]}, fauna:[{name:"Archaeoindris", space:900, stars:2}], trip:3000, days:1.5, risk:.05},
+  {id:"mauritius", name:"Mauritius", where:"Indian Ocean, 1600s", from:1000, to:362, at:{holocene:[169, 82]}, fauna:[{name:"Dodo", space:30, stars:1.5}], trip:3000, days:1.5, risk:.05},
+  {id:"eastna", name:"Eastern North America", where:"1800s", from:300, to:112, at:{holocene:[81, 30]}, fauna:[{name:"Passenger Pigeon", space:4, stars:0}], trip:3000, days:1.5, risk:.05},
+  {id:"plains", name:"Great Plains", where:"1870s", from:200, to:124, at:{holocene:[69, 29]}, fauna:[{name:"Rocky Mountain Locust", space:4, stars:0}], trip:3000, days:1.5, risk:.05},
+  {id:"monteverde", name:"Monteverde Cloud Forest", where:"Costa Rica, 1980s", from:100, to:37, at:{holocene:[69, 55]}, fauna:[{name:"Golden Toad", space:4, stars:0}], trip:3000, days:1.5, risk:.05},
+];
+// SITES:END
+
+// Survey Success for one animal at a site, the game's tripOdds: bigger animals are harder to find (TRIP.fail by TRIP_SIZE), plus the site's own risk.
+const TRIP = {fail:[.1, .35], trips:[2, 8], spread:.35}, TRIP_SIZE = [10, 5000];
+const sizeT = space => Math.min(Math.max(Math.log(space / TRIP_SIZE[0]) / Math.log(TRIP_SIZE[1] / TRIP_SIZE[0]), 0), 1);
+const lerpT = ([a, b], t) => a + (b - a) * t;
+// GHOST's survey drones: every park starts with Mk. I, and ORACLE researches Mk. II to V. Each cuts the chance a trip
+// comes back empty by a share, so big, hard-to-find animals gain the most.
+const DRONES = [
+  {name:"GHOST Mk. I", points:0, cut:0},
+  {name:"GHOST Mk. II", points:40, cut:.15},
+  {name:"GHOST Mk. III", points:80, cut:.3},
+  {name:"GHOST Mk. IV", points:140, cut:.4},
+  {name:"GHOST Mk. V", points:220, cut:.5},
+];
+let drones = 1;   // the Mk. the park has
+try { const d = parseInt(localStorage.getItem("ghost-timeline-mk")); if(d >= 1 && d <= DRONES.length) drones = d; } catch(e) {}
+const droneCut = () => DRONES[drones - 1].cut;
+// Scouting can fail: each animal not yet seen at the site has its own chance to turn up (big animals are easier to spot),
+// drones cut the miss chance like they do for expeditions, and one trip turns up at most SCOUT.max of them.
+const SCOUT = {find:[.35, .65], max:2};
+const scoutChance = a => 1 - (1 - lerpT(SCOUT.find, sizeT(a.space))) * (1 - droneCut());
+const success = (s, a) => 1 - Math.min(Math.max(lerpT(TRIP.fail, sizeT(a.space)) + s.risk, 0), .8) * (1 - droneCut());
+// Genome % a successful find adds, as tripOdds: a genome takes 2 to 8 trips by size.
+const findGain = (s, a) => 100 / Math.max(.6, lerpT(TRIP.trips, sizeT(a.space)) * success(s, a) - .5) * (1 - TRIP.spread + Math.random() * 2 * TRIP.spread);
+
+// Slider position u (0 = oldest, 1 = today) to years ago and back: equal bars, equal slices, log scale inside a slice.
+function yearsAt(u){
+  u = Math.min(Math.max(u, 0), 1 - 1e-9);
+  const pi = Math.floor(u * PERIODS.length), f = u * PERIODS.length - pi, n = PERIODS[pi].epochs.length;
+  const ej = Math.floor(f * n), t = f * n - ej, e = EPOCHS.find(x => x.pi === pi && x.ej === ej);
+  return {years:e.from * Math.pow(e.to / e.from, t), epoch:e};
+}
+function uAt(years){
+  const e = EPOCHS.find(x => years <= x.from && years > x.to) || EPOCHS[EPOCHS.length - 1];
+  const t = Math.log(years / e.from) / Math.log(e.to / e.from), n = e.period.epochs.length;
+  return (e.pi + (e.ej + t) / n) / PERIODS.length;
+}
+// Bigger steps the further back: two significant figures under a million, then millions.
+function fmtYearsAgo(y){
+  if(y >= 1e7) return `${Math.round(y / 1e6)} million years ago`;
+  if(y >= 1e6) return `${+(y / 1e6).toFixed(1)} million years ago`;
+  const step = Math.pow(10, Math.max(1, Math.floor(Math.log10(y)) - 1)), r = Math.round(y / step) * step;
+  return r >= 1e6 ? "1 million years ago" : `${r.toLocaleString("en-US")} years ago`;
+}
+const fmtMa = y => `${+(y / 1e6).toFixed(1)}`;
+
+// A site shows for the whole of any epoch its window touches.
+// Which sites GHOST has scouted is per viewer, a test convenience only.
+// seen: site id -> the animals scouting has turned up there. A site is lit once it has been scouted at all.
+let seen = {};
+try { seen = JSON.parse(localStorage.getItem("ghost-timeline-seen") || "{}") || {}; } catch(e) {}
+const saveSeen = () => { try { localStorage.setItem("ghost-timeline-seen", JSON.stringify(seen)); } catch(e) {} };
+const isLit = id => !!seen[id];
+const seenAt = s => s.fauna.filter(a => seen[s.id] && seen[s.id].includes(a.name));
+const complete = s => isLit(s.id) && seenAt(s).length === s.fauna.length;
+const known = name => Object.values(seen).some(l => l.includes(name));
+let u = uAt(375e6), sel = null, target = null;
+
+// The drone fleet. GHOST owns 1 to MAX_DRONES drones, all of the park's current Mk.; each flies one mission at a time.
+// Missions run on a park clock in days (a game day is 240 s at 1x). A mission resolves when it gets back, and its
+// post-mission overview waits in reports until it's dismissed.
+const MAX_DRONES = 5, DAY_SECONDS = 240;
+// Drones are bought with money at GHOST (they replace Temporal Researchers and aren't staff: no wage). The first comes
+// with GHOST; each one after costs DRONE_PRICE.growth times the last.
+const DRONE_PRICE = {base:15000, growth:1.5};
+const dronePrice = () => Math.round(DRONE_PRICE.base * Math.pow(DRONE_PRICE.growth, fleet - 1) / 500) * 500;
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch(e) { return d; } };
+const keep = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} };
+let fleet = Math.min(Math.max(load("ghost-timeline-fleet", 1), 1), MAX_DRONES);
+let day = load("ghost-timeline-day", 1), speed = load("ghost-timeline-speed", 10);
+let missions = load("ghost-timeline-missions", []), reports = load("ghost-timeline-reports", []);
+const saveFleet = () => { keep("ghost-timeline-fleet", fleet); keep("ghost-timeline-missions", missions); keep("ghost-timeline-reports", reports); keep("ghost-timeline-day", day); };
+const freeDrone = () => { for(let i = 0; i < fleet; i++) if(!missions.some(m => m.drone === i)) return i; return -1; };
+const siteEpoch = s => EPOCHS.find(e => s.from <= e.from && s.from > e.to);
+let rating = 1.5;
+try { const r = parseFloat(localStorage.getItem("ghost-timeline-rating")); if(r >= 0 && r <= 5) rating = r; } catch(e) {}
+const stars = n => `${n}★`;
+const genome = load("ghost-timeline-genome", {});   // animal name -> % of its genome GHOST has
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;"}[c]));
+const shade = (hex, k) => `color-mix(in srgb, ${hex} ${k}%, ${k < 100 ? "black" : "white"})`;
+
+function buildTrack(){
+  $("bars").innerHTML = PERIODS.map(p => `<div class="bar" title="${p.id}">${p.epochs.map((e, j) =>
+    `<div class="slice" style="background:${j % 2 ? shade(p.color, 80) : p.color}"></div>`).join("")}</div>`).join("");
+  $("labels").innerHTML = PERIODS.map(p => `<span title="${p.id}">${p.id.slice(0, 3)}</span>`).join("");
+}
+
+function visibleSites(now){
+  return SITES.filter(s => s.at[mapKey(now.epoch)] && s.from > now.epoch.to && s.to < now.epoch.from);
+}
+
+function render(){
+  const now = yearsAt(u), e = now.epoch, p = e.period;
+  $("epoch").textContent = e.name;
+  $("ago").textContent = fmtYearsAgo(now.years);
+  $("period").innerHTML = `<i style="background:${p.color}"></i><span>${esc(p.id)} · epoch ${fmtMa(e.from)} to ${e.to < 1e5 ? "today" : fmtMa(e.to) + " million years ago"}</span>`;
+  $("thumb").style.left = (u * 100) + "%";
+  const tr = $("track");
+  tr.setAttribute("aria-valuenow", Math.round(u * 1000));
+  tr.setAttribute("aria-valuetext", `${e.name}, ${fmtYearsAgo(now.years)}`);
+
+  const map = mapOf(e), sites = visibleSites(now);
+  let svg = map ? `<image href="${map}" x="0" y="0" width="260" height="130"/>`
+    : `<ellipse cx="130" cy="65" rx="128" ry="63" fill="color-mix(in srgb, var(--dim) 18%, transparent)"/><text class="nomap" x="130" y="68">No ${esc(p.id)} map yet</text>`;
+  // placesites.py keeps markers on a map at least 1 px apart. The selected marker's frame turns white.
+  if(map) for(const s of sites){
+    const [x, y] = s.at[mapKey(e)], on = isLit(s.id);
+    svg += `<g class="site${sel === s.id ? " on" : ""}" data-id="${s.id}" tabindex="0" role="button" aria-label="${esc(on ? s.name : "Unscouted site")}">
+      <rect class="frame" x="${x - 2}" y="${y - 2}" width="6" height="6"/>
+      <rect x="${x}" y="${y}" width="2" height="2" fill="${on ? "var(--accent)" : "var(--marker)"}"/></g>`;
+  }
+  $("map").innerHTML = svg;
+
+  if(sel && !sites.some(s => s.id === sel)) sel = null;
+  $("list").innerHTML = sites.map(s => `<li><button data-id="${s.id}" aria-pressed="${sel === s.id}"><i class="${isLit(s.id) ? "lit" : ""}"></i>${esc(isLit(s.id) ? s.name : "Unscouted site, " + fmtMa(s.from) + " Ma")}${complete(s) ? ' <span class="done">Site Complete</span>' : ""}</button></li>`).join("");
+  renderCard();
+}
+
+function renderCard(){
+  const s = SITES.find(x => x.id === sel), c = $("card");
+  if(!s){ c.innerHTML = `<p class="empty">Pick a site on the map to see what's there.</p>`; return; }
+  const on = isLit(s.id), found = on ? seenAt(s) : [], hidden = s.fauna.length - found.length, win = `${fmtMa(s.from)} to ${fmtMa(s.to)} million years ago`;
+  const trip = `$${s.trip.toLocaleString("en-US")} · ${s.days} days`, free = freeDrone(), rep = reports.find(r => r.site === s.id);
+  const scouting = missions.some(m => m.site === s.id && m.kind === "scout"), hunting = target && missions.some(m => m.site === s.id && m.target === target);
+  c.innerHTML = on ? `<h2>${esc(s.name)}${!hidden ? ' <span class="badge">Site Complete</span>' : ""}</h2><div class="where">${esc(s.where)}</div>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Trip</dt><dd>${trip}</dd></dl>
+    <table class="fauna"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${found.map(a => { const g = genome[a.name] || 0;
+      const locked = rating < a.stars;
+      return `<tr${locked ? ' class="locked"' : ""}><td><label><input type="radio" name="target" value="${esc(a.name)}"${target === a.name ? " checked" : ""}${g >= 100 || locked ? " disabled" : ""}> ${esc(a.name)}${locked ? ` <span class="tag">Needs ${stars(a.stars)}</span>` : ""}</label></td><td>${g}%</td><td>${Math.round(success(s, a) * 100)}%</td></tr>`; }).join("")}${Array.from({length:hidden}, () => `<tr class="locked"><td>Undiscovered species</td><td>?</td><td>?</td></tr>`).join("")}</tbody></table>
+    ${rep ? reportHtml(rep) : ""}
+    <div class="btns"><button id="go"${target && free >= 0 && !hunting ? "" : " disabled"}>${hunting ? "Already looking" : "Send expedition"}</button>${hidden ? `<button class="ghost" id="survey"${free >= 0 && !scouting ? "" : " disabled"}>${scouting ? "Scouting…" : "Send scouting trip"}</button>` : ""}<button class="ghost" id="forget">Forget scouting</button></div>
+    ${free < 0 ? `<p class="note">All drones are out. One will be back in ${eta(Math.min(...missions.map(m => m.end)))}.</p>` : ""}`
+  : `<h2>Unscouted site</h2><div class="where">Somewhere in the ${esc(EPOCHS.find(e => s.from <= e.from && s.from > e.to).name)}</div>
+    <dl><dt>When</dt><dd>${win}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>
+    ${rep ? reportHtml(rep) : ""}
+    <div class="btns"><button id="survey"${free >= 0 && !scouting ? "" : " disabled"}>${scouting ? "Scouting…" : "Send scouting trip"}</button></div>
+    ${free < 0 ? `<p class="note">All drones are out. One will be back in ${eta(Math.min(...missions.map(m => m.end)))}.</p>` : ""}`;
+}
+
+function pick(id){ if(id !== sel) target = null; sel = id; render(); }
+// A tap goes to the nearest marker within HIT_PX map pixels, so neighbouring markers never steal each other's taps.
+const HIT_PX = 14;
+$("map").addEventListener("click", ev => {
+  const svg = $("map"), pt = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
+  let best = null, bd = HIT_PX;
+  for(const g of svg.querySelectorAll(".site")){
+    const r = g.querySelector(".frame"), d = Math.hypot(+r.getAttribute("x") + 3 - pt.x, +r.getAttribute("y") + 3 - pt.y);
+    if(d < bd){ bd = d; best = g; }
+  }
+  if(best) pick(best.dataset.id);
+});
+$("map").addEventListener("keydown", ev => { const g = ev.target.closest(".site"); if(g && (ev.key === "Enter" || ev.key === " ")){ ev.preventDefault(); pick(g.dataset.id); } });
+$("list").addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(b.dataset.id); });
+$("card").addEventListener("change", ev => { if(ev.target.name === "target"){ target = ev.target.value; renderCard(); } });
+$("card").addEventListener("click", ev => {
+  if(ev.target.id === "survey") send("scout", null);
+  if(ev.target.id === "go") send("expedition", target);
+  if(ev.target.classList.contains("dismiss")) dismiss(+ev.target.dataset.r);
+  if(ev.target.id === "forget"){ delete seen[sel]; target = null; saveSeen(); render(); }
+});
+
+function send(kind, tgt){
+  const s = SITES.find(x => x.id === sel), d = freeDrone();
+  if(d < 0) return;
+  missions.push({drone:d, site:s.id, kind, target:tgt, start:day, end:day + s.days});
+  saveFleet(); render(); renderFleet();
+}
+function dismiss(id){ reports = reports.filter(r => r.id !== id); saveFleet(); renderCard(); renderFleet(); }
+function reportHtml(r){
+  return `<div class="report" role="status"><h3>${esc(r.title)}</h3><ul>${r.lines.map(l => `<li>${l}</li>`).join("")}</ul><button class="dismiss" data-r="${r.id}">Done</button></div>`;
+}
+
+// A mission resolves when its drone gets back.
+function land(m){
+  const s = SITES.find(x => x.id === m.site), who = `Drone ${m.drone + 1}`;
+  let title, lines;
+  // A scouting trip turns up some of the animals still unseen here; one no scouted site had before is discovered.
+  if(m.kind === "scout"){
+    const have = seenAt(s);
+    const hits = s.fauna.filter(a => !have.includes(a) && Math.random() < scoutChance(a)).sort(() => Math.random() - .5).slice(0, SCOUT.max);
+    lines = hits.map(a => known(a.name) ? `${esc(a.name)} also found here` : `<b>${esc(a.name)} Discovered</b>`);
+    seen[s.id] = [...(seen[s.id] || []), ...hits.map(a => a.name)]; saveSeen();
+    if(hits.length && complete(s)) lines.push("<b>Site Complete</b>");
+    title = `Scouting report · ${s.name} · ${who}`;
+  } else {
+    const a = s.fauna.find(x => x.name === m.target);
+    title = `Expedition report · ${s.name} · ${who}`;
+    if(Math.random() < success(s, a)){
+      const was = genome[a.name] || 0, now = Math.min(100, Math.round(was + findGain(s, a)));
+      genome[a.name] = now; keep("ghost-timeline-genome", genome);
+      lines = [`<b>${esc(a.name)} Sample Found</b>`, ...(now >= 100 ? [`<b>${esc(a.name)} Genome Complete</b>`] : [])];
+      if(now >= 100 && target === a.name) target = null;
+    }
+  }
+  reports.unshift({id:Math.max(0, ...reports.map(r => r.id)) + 1, site:s.id, title, lines:lines && lines.length ? lines : ["Came back empty handed"]});
+}
+
+// Dragging and keys. Arrows nudge, Page keys jump an epoch, Home and End go to the ends.
+const tr = $("track");
+const setFromX = x => { const r = tr.getBoundingClientRect(); u = Math.min(Math.max((x - r.left) / r.width, 0), 1); render(); };
+tr.addEventListener("pointerdown", ev => { tr.setPointerCapture(ev.pointerId); tr.focus(); setFromX(ev.clientX); });
+tr.addEventListener("pointermove", ev => { if(tr.hasPointerCapture(ev.pointerId)) setFromX(ev.clientX); });
+tr.addEventListener("keydown", ev => {
+  const e = yearsAt(u).epoch, i = EPOCHS.indexOf(e), slice = 1 / PERIODS.length / e.period.epochs.length;
+  const jump = k => { const t = EPOCHS[Math.min(Math.max(i + k, 0), EPOCHS.length - 1)]; return (t.pi + (t.ej + .5) / t.period.epochs.length) / PERIODS.length; };
+  const to = {ArrowLeft:u - slice / 20, ArrowDown:u - slice / 20, ArrowRight:u + slice / 20, ArrowUp:u + slice / 20,
+    PageDown:jump(-1), PageUp:jump(1), Home:0, End:1}[ev.key];
+  if(to === undefined) return;
+  ev.preventDefault(); u = Math.min(Math.max(to, 0), 1); render();
+});
+
+$("rating").innerHTML = Array.from({length:11}, (_, i) => i / 2).map(n => `<option value="${n}"${n === rating ? " selected" : ""}>${stars(n)}</option>`).join("");
+$("rating").addEventListener("change", ev => { rating = parseFloat(ev.target.value); try { localStorage.setItem("ghost-timeline-rating", rating); } catch(e) {}
+  const s = SITES.find(x => x.id === sel), a = s && s.fauna.find(x => x.name === target); if(a && rating < a.stars) target = null; renderCard(); });
+// ORACLE: drone upgrades, each needing the Mk. before it. Research is instant here.
+function renderOracle(){
+  $("oracle").innerHTML = `<h2>ORACLE · GHOST Drones</h2><p>Every park starts with GHOST Mk. I. Each upgrade cuts the chance a scouting trip or an expedition comes back empty handed.</p>
+    <ul class="drones">${DRONES.map((d, i) => `<li class="${i < drones ? "done" : ""}"><b>${d.name}</b><span>${i ? `${Math.round(d.cut * 100)}% fewer empty-handed trips · ${d.points} research points` : "Standard drones"}</span>
+      <button data-mark="${i + 1}"${i !== drones ? " disabled" : ""}>${!i ? "Standard" : i < drones ? "Researched" : i === drones ? "Research" : `Needs ${DRONES[i - 1].name.replace("GHOST ", "")}`}</button></li>`).join("")}</ul>
+    ${drones > 1 ? `<div class="btns"><button class="ghost" id="dronesReset">Reset drones (test)</button></div>` : ""}`;
+}
+$("oracle").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if(!b) return;
+  drones = b.id === "dronesReset" ? 1 : +b.dataset.mark;
+  try { localStorage.setItem("ghost-timeline-mk", drones); } catch(e) {}
+  renderOracle(); renderCard();
+});
+// Time left on the park clock: days, or clock hours under a day (a park day is 17 clock hours, 6 AM to 11 PM).
+function eta(end){
+  const d = Math.max(0, end - day);
+  if(d >= 1) return `${+d.toFixed(1)} days`;
+  const h = d * 17;
+  return h >= 1 ? `${Math.round(h)} h` : `${Math.max(1, Math.round(h * 60))} min`;
+}
+function renderFleet(){
+  const mk = DRONES[drones - 1].name.replace("GHOST ", "");
+  const rows = Array.from({length:fleet}, (_, i) => {
+    const m = missions.find(x => x.drone === i);
+    if(!m) return `<li class="free"><div class="top"><b>Drone ${i + 1}</b><span class="mk">${mk}</span></div><div class="st">At GHOST, ready</div></li>`;
+    const s = SITES.find(x => x.id === m.site), pct = Math.min(100, (day - m.start) / (m.end - m.start) * 100);
+    return `<li><div class="top"><b>Drone ${i + 1}</b><span class="mk">${mk}</span></div>
+      <div>${esc(isLit(s.id) ? s.name : "Unscouted site")} · ${esc(siteEpoch(s).name)}</div>
+      <div class="st">${m.kind === "scout" ? "Scouting for animals" : `Looking for ${esc(m.target)}`}</div>
+      <div class="bar2"><i style="width:${pct}%"></i></div><div class="eta">Back in ${eta(m.end)}</div></li>`;
+  }).join("");
+  $("fleet").innerHTML = `<div class="head"><h2>GHOST Drones <span class="count">${fleet} of ${MAX_DRONES}</span></h2>
+      <label class="clock">Day ${Math.floor(day)} · Speed <select id="speed">${[[0, "Paused"], [1, "1×"], [10, "10×"], [60, "60×"]].map(([v, l]) => `<option value="${v}"${v === speed ? " selected" : ""}>${l}</option>`).join("")}</select></label></div>
+    <ul class="ships">${rows}</ul>
+    <div class="btns">${fleet < MAX_DRONES ? `<button id="addDrone">Buy a drone · $${dronePrice().toLocaleString("en-US")}</button>` : `<span class="note">GHOST's hangar is full.</span>`}${fleet > 1 ? `<button class="ghost" id="resetFleet">Reset drones (test)</button>` : ""}</div>
+    ${reports.length ? `<div id="reports">${reports.map(reportHtml).join("")}</div>` : ""}`;
+}
+$("fleet").addEventListener("change", ev => { if(ev.target.id === "speed"){ speed = +ev.target.value; keep("ghost-timeline-speed", speed); } });
+$("fleet").addEventListener("click", ev => {
+  if(ev.target.id === "addDrone" && fleet < MAX_DRONES){ fleet++; saveFleet(); renderFleet(); renderCard(); }
+  if(ev.target.id === "resetFleet"){ fleet = 1; missions = missions.filter(m => m.drone === 0); saveFleet(); renderFleet(); renderCard(); }
+  if(ev.target.classList.contains("dismiss")) dismiss(+ev.target.dataset.r);
+});
+
+// The clock. Missions land as their end passes; the drone list redraws a few times a second while anything is out.
+let last = performance.now(), drawn = 0;
+function tick(t){
+  const dt = Math.min(1, (t - last) / 1000); last = t;
+  if(speed){
+    day += dt * speed / DAY_SECONDS;
+    const back = missions.filter(m => m.end <= day).sort((a, b) => a.end - b.end);
+    if(back.length){ missions = missions.filter(m => m.end > day); back.forEach(land); saveFleet(); render(); renderFleet(); }
+    else if(t - drawn > 250 && missions.length){ drawn = t; renderFleet(); keep("ghost-timeline-day", day); }
+  }
+  requestAnimationFrame(tick);
+}
+buildTrack(); render(); renderOracle(); renderFleet(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>

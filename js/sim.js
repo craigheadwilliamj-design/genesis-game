@@ -130,12 +130,15 @@ function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wag
 function freshScience(){
   return {
     points:0,          // unspent ORACLE research points
-    crew:{paleo:0, temporal:0, gene:0, botanist:0},  // science staff hired at each department
+    crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
     tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
     projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
-    unlocked:[],       // animals ORACLE has unlocked, so GHOST can look for their DNA
-    dna:{},            // species id (or plant DNA id) -> {genome: 0-100}
-    trips:[],          // expeditions in the field: {period, sp, start, end}
+    unlocked:[],       // animals discovered (GHOST's scouting turned them up), so drones can go back for their DNA
+    dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
+    drones:1,          // GHOST's drones, one trip each at a time (GHOST comes with one; buy more there)
+    seen:{},           // site id (TIME_SITES) -> the animals scouting has turned up there; a site in here has been scouted
+    trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
+    reports:[],        // post-mission reports waiting at GHOST, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
     clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
@@ -153,7 +156,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, parkClosed:false,
+    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, discoV:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{},
@@ -307,23 +310,23 @@ function upgradeSave(s){
     }
     b.face = best;
   }
-  // food carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in. Ones placed at the new size before the door wall snapped to the grid slide onto it (doorOnGrid, map.js), up to half a meter.
-  for(const b of s.buildings) if(b.type === "kiosk" && b.points && b.points.length === 4){
-    const t = BUILDINGS.kiosk, P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % 4], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+  // food and gift carts shrank to fit their picture: keep the door wall where it is (so the path still reaches it) and pull the sides and back in. Ones placed at the new size before the door wall snapped to the grid slide onto it (doorOnGrid, map.js), up to half a meter.
+  for(const b of s.buildings) if((b.type === "kiosk" || b.type === "cart") && b.points && b.points.length === 4){
+    const t = BUILDINGS[b.type], P = b.points, i = faceEdge(P, b.face === undefined ? 2 : b.face), a = P[i], c = P[(i + 1) % 4], L = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
     if(Math.abs(L - t.w) < 1e-3 && Math.abs(Math.hypot(P[(i + 2) % 4][0] - c[0], P[(i + 2) % 4][1] - c[1]) - t.d) < 1e-3){ b.points = doorOnGrid(P, b.face === undefined ? 2 : b.face, b.type); continue; }
     const ux = (c[0] - a[0]) / L, uy = (c[1] - a[1]) / L, [cx, cy] = centroid(P), mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2, out = -uy * (mx - cx) + ux * (my - cy) < 0 ? -1 : 1;
     b.points = rectPts(mx + uy * out * t.d / 2, my - ux * out * t.d / 2, t.w, t.d, Math.atan2(uy, ux)).map(p => [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]);
   }
-  // a north-facing food cart backing onto a path sits with backOver (map.js) of its box over the path: ones saved further on or off it slide there, once
-  if(!s.cardBack2){
-    const over = BLD_PICS.kiosk.backOver;
-    for(const b of s.buildings) if(b.type === "kiosk" && b.face === 0 && b.points){
+  // a north-facing food or gift cart backing onto a path sits with backOver (map.js) of its box over the path: ones saved further on or off it slide there, once (gift carts got their picture after food carts, so their own flag)
+  for(const [flag, type] of [["cardBack2", "kiosk"], ["cartBack", "cart"]]) if(!s[flag]){
+    const over = BLD_PICS[type].backOver;
+    for(const b of s.buildings) if(b.type === type && b.face === 0 && b.points){
       const bb = bbox(b.points), Y = Math.round((bb.y0 + over) / CHUNK) * CHUNK, cx = Math.floor((bb.x0 + bb.x1) / 2 / CHUNK), k = s.pathChunks[`${cx},${Y / CHUNK - 1}`];
       if(Math.abs(bb.y0 + over - Y) > 2.5 || Math.abs(bb.y0 + over - Y) < 1e-6 || !(k === "g" || k === "b") || s.pathChunks[`${cx},${Y / CHUNK}`]) continue;
       const P = b.points.map(([x, y]) => [x, Math.round((y + Y - bb.y0 - over) * 1e6) / 1e6]);
       if(!s.buildings.some(o => o !== b && shapesOverlap(P, o.points)) && !s.exhibits.some(e => shapesOverlap(P, e.points))) b.points = P;
     }
-    s.cardBack2 = true;
+    s[flag] = true;
   }
   for(const b of s.buildings) if(b.type === "edcenter" && !b.shows) b.shows = [];
   if(s.science && s.science.hatchDay === undefined) s.science.hatchDay = -1;
@@ -456,11 +459,34 @@ function upgradeSave(s){
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
+  // discovery moved to GHOST's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
+  // animal already unlocked starts scouted with those animals seen, ORACLE species projects are paid back, and trips still out
+  // are given a site so they land as expeditions.
+  if(s.discoV !== 1){
+    sc.drones = clamp(Math.max(sc.crew.temporal || 0, sc.trips.length, 1), 1, DRONES.max);
+    delete sc.crew.temporal;
+    sc.seen = sc.seen || {}; sc.reports = sc.reports || [];
+    for(const site of TIME_SITES){ const got = (site.fauna || []).filter(f => sc.unlocked.includes(f)); if(got.length) sc.seen[site.id] = got; }
+    for(const p of sc.projects.filter(p => p.kind === "species")){ sc.points += p.cost || 0; sc.projects.splice(sc.projects.indexOf(p), 1); }
+    const used = new Set();
+    for(const t of sc.trips){
+      if(t.kind) continue;
+      const inPeriod = TIME_SITES.filter(x => !x.event && epochOf(x.from).period === t.period);
+      const site = MUSEUM_BY_ID[t.sp] ? TIME_SITES.find(x => x.event === t.sp)
+        : PLANT_DNA_BY_ID[t.sp] ? inPeriod.find(x => sc.seen[x.id]) || inPeriod[0]
+        : sitesOf(t.sp).find(x => sc.seen[x.id]) || sitesOf(t.sp)[0];
+      if(site && !MUSEUM_BY_ID[t.sp] && !sc.seen[site.id]) sc.seen[site.id] = [];
+      Object.assign(t, {kind:"dig", site:site ? site.id : t.period, cost:0}); delete t.period;
+      if(t.bay === undefined || t.bay >= sc.drones || used.has(t.bay)){ let k = 0; while(used.has(k)) k++; t.bay = k; }
+      used.add(t.bay);
+    }
+    s.discoV = 1;
+  }
   if(!s.science.tech.includes("bars")) s.science.tech.push("bars");   // metal bars are free in every park
   for(const k of Object.keys(freshScience())) if(s.science[k] === undefined) s.science[k] = freshScience()[k];
   for(const k of Object.keys(freshLedger())) if(s.today[k] === undefined) s.today[k] = 0;
   // animals from before behavior get a fresh set of needs (behavior.js)
-  for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; }   // who is indoors isn't saved: the shelters fill up again as the day goes
+  for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; delete a.gene; }   // who is indoors isn't saved: the shelters fill up again as the day goes
   // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
   if(!s.animalSeq) s.animalSeq = {};
   { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];

@@ -128,8 +128,8 @@ function overviewHtml(){
     const line = (type, text) => { const b = state.buildings.find(x => x.type === type); return b ? `<li><button class="btn" data-action="gotoDept" data-t="${type}" style="padding:3px 9px">${BUILDINGS[type].label}</button><span>${text}</span></li>` : ""; };
     const next = list => list.length ? Math.min(...list.map(j => j.end)) : 0;
     h += `<section><h3>Science</h3><ul class="deptlist">
-      ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} unlocked.`)}
-      ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.crew.temporal} teams out. Next back in ${leftText(next(sc.trips))}.` : `${sc.crew.temporal} team${sc.crew.temporal === 1 ? "" : "s"} home and ready.`)}
+      ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} discovered.`)}
+      ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.drones} drone${sc.drones === 1 ? "" : "s"} out. Next back in ${leftText(next(sc.trips))}.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}` : `${sc.drones} drone${sc.drones === 1 ? "" : "s"} home and ready.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}`)}
       ${line("tar", sc.clones.some(c => c.failed) ? `${sc.clones.filter(c => c.failed).length} failed clone${sc.clones.filter(c => c.failed).length === 1 ? "" : "s"} to discard.` : sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : sc.ready.length ? `${sc.ready.length} clone${sc.ready.length === 1 ? "" : "s"} waiting for an exhibit.` : "Incubators empty.")}
       ${line("ceres", state.ceres.beds.length ? `${state.ceres.beds.length} batch${state.ceres.beds.length === 1 ? "" : "es"} growing. Next ready in ${leftText(next(state.ceres.beds))}.` : "Beds empty.")}
     </ul></section>`;
@@ -233,31 +233,29 @@ function exhibitHtml(e){
       <div class="meta" style="margin-top:4px">${Math.abs(trend) < 2 ? "Holding steady." : trend > 0 ? `Rising toward ${Math.round(rep.target)}%.` : `Falling toward ${Math.round(rep.target)}%.`}</div>`;
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
-    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${sp}">Move</button><button class="btn sell" data-action="sell" data-sp="${sp}">Sell +${money(s.price * COST.animalResale)}</button></span></li>`; }).join("")}</ul>
-      ${movesHtml(e)}
-      <div class="meta" style="margin-top:6px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
+    h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
+      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
       <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
   }
 
   // barriers, moats, and aviary netting
   if(!e.viv){
-    const cur = e.barrier || "wood";
-    h += `<section><h3>Barrier</h3><label class="field"><span>Wall type</span><select id="barrierSel" data-action-change="barrier">${Object.entries(BARRIERS).map(([key, b]) => {
-      const locked = b.tech && !hasTech(b.tech), cost = key === cur ? 0 : upgradeCost(e, key);
-      return `<option value="${key}"${key === cur ? " selected" : ""}${locked ? " disabled" : ""}>${b.label}, strength ${b.strength}${locked ? " (research at ORACLE)" : key === cur ? " (current)" : cost ? `, ${money(cost)}` : ", free"}</option>`;
-    }).join("")}</select></label>`;
-    if(cur === "electric") h += `<div class="row" style="margin-top:6px"><span class="status ${e.powered === false ? "no" : "ok"}">${e.powered === false ? "No power" : "Powered"}</span><span class="meta">Draws ${Math.round(fenceDraw(e))} kW. Park supply ${Math.round(powerSupply())} of ${Math.round(powerDemand())} kW needed.${generators().length ? "" : " Build a generator."}</span></div>`;
+    h += `<section><h3>Barrier</h3>`;
     const kc = knownCond(e), since = daysSinceInspect(e);
     h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(kc, kc >= 60 ? "var(--good)" : kc >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(kc)}%</span></div>`;
-    h += `<div class="meta">${e.open ? "<b style='color:var(--bad)'>There's a gap in the fence.</b> Animals can walk out until you close it. " : isBreached(e) ? "<b style='color:var(--bad)'>Broken.</b> Animals can walk out until a mechanic repairs it. " : ""}${since >= 99 ? "Never inspected." : since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago${since >= MAINT.inspectEvery ? ", overdue" : ""}.`} Wears about ${wearPerDay(e).toFixed(1)}% a day${wearPerDay(e) > barrierOf(e).wear + .01 ? ", partly from animals attacking it" : ""}.</div>`;
-    h += `<div class="meta" style="margin-top:4px">${cur === "concrete" ? "Concrete hides the animals, so guests enjoy this exhibit much less. A viewing platform fixes that." : cur === "acrylic" ? "Guests love seeing through acrylic." : cur === "brick" || cur === "stone" ? "Tough and only moderately tall, so guests can still see over it." : cur === "bamboo" ? "Cheap and weak, and it wears out fast. Only for animals that won't test it." : cur === "palisade" ? "Solid logs: strong for wood, but guests see little of the animals." : cur === "iron" ? "Strong, and guests see right through it." : cur === "drystone" ? "A low wall that holds small, calm animals and looks lovely." : cur === "adobe" ? "Thick, sun-baked walls. Guests see little, and the rain wears them down." : cur === "stake" ? "Crossed stakes, the old Scandinavian way. Light and cheap." : cur === "bone" ? "Mammoth ribs lashed to bone posts. Strong for something that looks this old." : ""} Changing walls has no refund.</div>`;
+    const notes = [];
+    if(e.open) notes.push(["bad", "There's a gap in the fence. Animals can walk out until you close it."]);
+    else if(isBreached(e)) notes.push(["bad", "Broken. Animals can walk out until a mechanic repairs it."]);
+    notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
+    h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
+    h += `<div class="meta" style="margin-top:6px">Guest appeal: ${Math.round(viewFactor(e, derived.reach) * 100)}%</div>`;
     h += `<div class="row" style="margin-top:8px">`;
     h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
     h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at ORACLE</span>`;
     h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at ORACLE</span>`;
     h += `</div>`;
     const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
-    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}Guests see in at ${Math.round(viewFactor(e, derived.reach) * 100)}%.${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
     h += `</section>`;
   }
 
@@ -299,7 +297,7 @@ function cloneHtml(e, rep){
   if(coming.length) h += `<div style="margin-bottom:8px">${coming.map(c => cloneCard(c)).join("")}</div>`;
   if(!ready.length && !forSale.length){
     h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
-      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Unlock animals at ORACLE, then send GHOST on expeditions until a species reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
+      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Discover animals by scouting sites with GHOST, then send expeditions until a genome reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
   } else {
     const has = id => ready.some(s => s.period === id) || forSale.some(s => s.period === id);
     if(!has(exTabs.period)) exTabs.period = PERIOD_ORDER.find(has);
@@ -483,13 +481,12 @@ function behaviorHtml(e){
 }
 
 // Sick animals, illness risk, and medicated feed for one exhibit
-// Exhibit dirtiness: the meter and what it means
+// Exhibit sanitation: 100 is spotless, and it falls as dirt builds
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
-  let h = `<section><h3>Dirtiness</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Dirt</span>${meter(dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(dirt)}%</span></div>`;
-    h += `<div class="meta">Gets about ${dirtPerDay(e).toFixed(0)}% dirtier a day. Keepers head over at ${CLEAN.dirtyAt}%, and tidy it any time they're free. Cleaning takes about ${Math.round(60 / cleanRate(e))} minutes per 60% of dirt${hasUpgrade("hoses") ? " with hoses" : hasUpgrade("shovels") ? " with shovels" : " by hand"}.${hasUpgrade("shovels") ? "" : " <b>Shovels from the Tool Shed would speed that up.</b>"}</div>`;
+  let h = `<section><h3>Sanitation</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
@@ -497,7 +494,7 @@ const hli = (level, text) => `<li class="hl ${level}">${text}</li>`;
 function healthHtml(e){
   const away = state.health.ward.filter(p => p.home === e.id);
   if(!e.animals.length && !away.length) return "";
-  const hr = healthReport(e), pct = p => p >= .1 ? `${Math.round(p * 100)}%` : `${(p * 100).toFixed(1)}%`, items = [];
+  const hr = healthReport(e), items = [];
   let h = `<section><h3>Health</h3>`;
   if(!healthActive()) items.push(hli("ok", `Animals start falling ill on ${fmtDate(state.health.from)}.`));
   if(hr.sick.length){
@@ -506,34 +503,31 @@ function healthHtml(e){
   } else if(e.animals.length) items.push(hli("ok", "Everyone looks healthy."));
   if(e.animals.length){
     const d = daysSinceCheck(e), late = d >= HEALTH.checkEvery;
-    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`} Check-ups catch illness early, while a vet can still treat it on the spot.`));
+    items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "No vet check-up yet." : d === 0 ? "Vet checked them today." : `Last vet check-up ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`}`));
   }
   if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
-    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}${hasNoFeed(e) ? "A Do Not Feed sign by the fence helps." : `A Do Not Feed sign within ${THROWN.signReach} m of the fence would cut it down.`}`));
+    items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}`));
   }
-  if(e.animals.length > hr.sick.length){
-    const why = {hunger:"going hungry", dirt:"a dirty exhibit", "frail clones":"frail clones", "sickly clones":"sickly clones", "eating grass":"eating plants it isn't evolved for", "no water":"having no water", weather:"bad weather with no cover", rivals:"territorial rivals", attacks:"species that attack each other"};
-    items.push(hli(hr.ill >= .05 ? "bad" : hr.why.length || hr.ill >= .015 ? "warn" : "ok", `Each healthy animal has about a ${pct(hr.ill)} chance a day of falling ill${hr.hurt ? ` and ${pct(hr.hurt)} of getting hurt` : ""}.${hr.why.length ? ` Raised by ${hr.why.map(w => why[w]).join(", ")}.` : ""}`));
-  }
+  if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
   if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
-  if(hr.sick.length) h += `<ul class="herd" style="margin-top:8px">${hr.sick.map(a => { const s = SPECIES_BY_ID[a.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">${a.sick.kind === "injury" ? "Injured" : "Ill"}</span>${meter(a.sick.sev, a.sick.sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(sickStatus(e, a))}</span></span></li>`; }).join("")}</ul>`;
-  // genome therapy: lift a clone's DNA toward the lab's genome
+  // every animal's health, the worst first; tap one to open it
+  if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
+  // genome therapy: vets lift clones' DNA at each check-up
   if(e.animals.length && hasTech("genetherapy")){
-    const low = e.animals.filter(a => (a.q ?? 90) < 100);
-    h += `<div style="margin-top:8px"><b>Genome therapy</b></div><ul class="herd">${low.map(a => { const s = SPECIES_BY_ID[a.sp], lab = labQuality(a.sp), gain = geneGain(a), ok = gain >= GENE.minGain;
-      return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${a.q ?? 90}% DNA${cloneOpen(a.sp) ? `, lab ${lab}%` : ""}</span></span>${a.gene ? `<button class="btn" data-action="gene" data-id="${a.id}">Queued. Cancel</button>` : ok ? `<button class="btn" data-action="gene" data-id="${a.id}">+${gain}% for ${money(geneCost(gain))}</button>` : `<span class="meta">${cloneOpen(a.sp) ? "Lab genome isn't better" : `Needs ${CLONE_GENOME.min}% genome`}</span>`}</li>`; }).join("")}</ul>`;
-    h += `<div class="meta">A vet rewrites the animal's DNA up to what the lab's genome gives a clone today, at most ${GENE.step} points a go. To go further, send GHOST for more of the genome. Healthier DNA means fewer illnesses.</div>`;
+    const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} below the lab's quality</span></div>`;
   }
   // medicated feed from CERES
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
-    h += `<div class="meta">${e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : ""}Medicated feed cuts illness by ${Math.round((1 - MEDICINE.feedCut) * 100)}% and clears up mild cases without a vet${treatable < e.animals.length ? `, but only for animals whose era's medicine ORACLE has researched (${treatable} of ${e.animals.length} here)` : ""}.</div>`;
+    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at ORACLE.` : "");
+    if(note) h += `<div class="meta">${note.trim()}</div>`;
   }
   return h + `</section>`;
 }
@@ -547,21 +541,21 @@ function movesHtml(e){
   return `<div class="meta" style="margin-top:6px">Waiting for keepers: ${ts.map(t => `${esc(SPECIES_BY_ID[t.sp].name)} ${t.from === e.id ? `to ${esc(name(t.to))}` : `from ${esc(name(t.from))}`}${t.keeper ? " (on the way)" : ""}`).join(", ")}. <button class="btn" data-action="cancelMoves" style="padding:2px 8px">Cancel waiting moves</button></div>`;
 }
 
-// The move dialog: where to, and how many
-function openMoveDialog(e, sp){
-  const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length;
+// The move dialog: where to, and how many (with id, just that one animal)
+function openMoveDialog(e, sp, id){
+  const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length, one = id && e.animals.find(a => a.id === id);
   const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
-  $("#moveTitle").textContent = `Move ${s.name}`;
+  $("#moveTitle").textContent = `Move ${one ? one.name || s.name : s.name}`;
   if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
   const fromWhy = keeperMoveProblem(e);
   $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
-    <label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>
+    ${one ? "" : `<label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>`}
     <p style="margin-top:10px">A keeper collects each one through this exhibit's gate and carries it to the new one. Both need a working keeper gate, or be a vivarium.</p>
     ${fromWhy ? `<p style="color:var(--bad)">Keepers can't get into ${esc(e.name)} yet: ${esc(fromWhy)}</p>` : ""}`;
   $("#moveGo").hidden = false;
   $("#moveGo").onclick = () => {
-    const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
-    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n); ui.toast(`${made} ${s.name} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
+    const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = one ? 1 : clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
+    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n, one && one.id); ui.toast(`${one ? one.name || s.name : `${made} ${s.name}`} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
     const mix = mixWarning(s, to);
     if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
     if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
@@ -680,7 +674,7 @@ function pmcHtml(b){
   h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
   h += `<div class="meta" style="margin-top:4px">Order it at a Delivery Dock, ${money(MODERN.cost)} a dose, and custodians carry it here. It eases any illness but never cures it fully: animals go home with a chronic case. It works best on Cenozoic animals and worst on Paleozoic ones.</div>`;
   h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "fully curable once ORACLE refines the medicine for their period" : `contemporary medicine gets them to ${100 - MODERN.floor[era]}% at best. Research ${ERA_LABEL[era]} medicine at ORACLE, and refine it for each period, for a full cure`}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())} of ${medCap()}. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())}, up to ${medCap()} of each era's. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
@@ -856,13 +850,12 @@ panelEl.addEventListener("click", e => {
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
   if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
-  if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp); return; }
+  if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
-    const an = it.animals.find(x => x.id === b.dataset.id);
-    if(an){ if(an.gene) delete an.gene; else { const why = geneProblem(an); if(why) ui.toast(why, "bad"); else an.gene = true; } }
+    if(it.geneTherapy) it.geneTherapy = false; else { const why = geneProblem(); if(why) ui.toast(why, "bad"); else it.geneTherapy = true; }
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
@@ -883,12 +876,6 @@ panelEl.addEventListener("click", e => {
     it.animals.push(nameAnimal({id:uid("a-"), sp:s.id, ...(sex ? {sex} : {})}));
     afterChange(); render();
   }
-  if(a === "sell"){
-    const i = it.animals.map(x => x.sp).lastIndexOf(b.dataset.sp); if(i < 0) return;
-    earn(Math.round(SPECIES_BY_ID[b.dataset.sp].price * COST.animalResale), "sold");
-    it.animals.splice(i, 1);
-    afterChange(); render();
-  }
   if(a === "demolish"){
     bulldozeItem(sel.kind, it);
   }
@@ -905,17 +892,6 @@ panelEl.addEventListener("change", ev => {
   const e = selItem(), f = e && landOf(e).find(x => x.id === id); if(!f) return;
   f.set = ev.target.value || null; f.food = {};
   ui.panel();
-});
-
-// Changing an exhibit's wall type
-panelEl.addEventListener("change", ev => {
-  if(ev.target.id !== "barrierSel") return;
-  const e = selItem(), key = ev.target.value; if(!e) return;
-  const b = BARRIERS[key], cost = upgradeCost(e, key);
-  if((b.tech && !hasTech(b.tech)) || !canAfford(cost)){ ui.toast(!canAfford(cost) ? `That costs ${money(cost)}.` : "Research it at ORACLE first.", "bad"); ui.panel(); return; }
-  spend(cost, "built"); if(e.grid) refenceExhibit(e, key); else e.barrier = key;
-  ui.toast(`${e.name} now has ${b.label.toLowerCase()}${cost ? ` (${money(cost)})` : ""}.`);
-  afterChange(); render();
 });
 
 // A yes/no question inside the page
@@ -936,11 +912,11 @@ function speciesStatus(s){
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at TAR for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
-  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`GHOST is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send GHOST for more.`, lock};
-  if(researching("species", s.id)) return {group:"progress", cls:"wait", how:`ORACLE is unlocking it now. ${leftText(sc.projects.find(p => p.kind === "species" && p.id === s.id).end)} left.`, lock};
-  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Unlocked. Send GHOST to collect its DNA.`, lock};
-  return {group:"locked", cls:"no", how:`Unlock it at ORACLE (${unlockPoints(s)} research points), then send GHOST.`, lock};
+  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A GHOST drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send a GHOST expedition for more.`, lock};
+  const where = sitesOf(s.id).filter(siteShown).map(x => isScouted(x.id) ? x.name : `an unscouted ${sitePeriod(x)} site`);
+  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Discovered. Send a GHOST expedition to ${where[0] || "its site"} to collect its DNA.`, lock};
+  return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
 }
 
 function catalogHtml(){

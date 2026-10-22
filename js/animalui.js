@@ -21,6 +21,22 @@ function animalStressors(a, e, s){
   if(rep) for(const i of rep.issues) if(i.bad) out.push(i.text.replace(/\.$/, ""));
   return [...new Set(out)];
 }
+// One animal's health as bulleted checks: [level, text]. Mild illness nobody has spotted yet doesn't show.
+function animalHealthItems(a, e, s){
+  const out = [], sk = noticed(a) ? a.sick : null, hit = sk && sk.hit;
+  if(sk){
+    const what = sk.kind === "injury" ? "Injured" : "Ill", cause = sk.cause === "trash" ? " from eating trash" : hit ? (hit.how === "fight" ? `, wounded in a fight with a ${hit.by}` : `, bitten by a ${hit.by}`) : "";
+    out.push([sk.sev >= 40 ? "bad" : "warn", `${what}${cause}, ${Math.round(sk.sev)}% severe${sk.chronic ? " (chronic)" : ""}.`]);
+    out.push(["warn", sickStatus(e, a)]);
+  } else out.push(["ok", "Looks healthy."]);
+  const q = a.q ?? 90;
+  out.push([q < 50 ? "bad" : q < 70 ? "warn" : "ok", q < 50 ? `Frail clone, ${q}% DNA. It falls ill ${HEALTH.frail.below50} times as often.` : q < 70 ? `Sickly clone, ${q}% DNA. It falls ill ${HEALTH.frail.below70} times as often.` : `${q}% DNA.`]);
+  out.push(...basicsLow(e, [a]));
+  if(anyMedTech() && e.medFeed) out.push(e.medFedOk ? ["ok", "Medicated today."] : ["bad", "Not medicated today."]);
+  const d = daysSinceCheck(e);
+  out.push([d === 0 ? "ok" : d >= HEALTH.checkEvery ? "bad" : "warn", d >= 99 ? "No vet check-up on this exhibit yet." : d === 0 ? "A vet checked the exhibit today." : `The exhibit's last vet check-up was ${d} day${d === 1 ? "" : "s"} ago.`]);
+  return {items:out, sev:sk ? sk.sev : null};
+}
 function animalHtml(a){
   const e = animalHome(a.id), s = SPECIES_BY_ID[a.sp];
   let h = `<button class="back" data-action="${e ? "animalBack" : "deselect"}" data-id="${e ? esc(e.id) : ""}">‹ ${esc(e ? e.name : "Park office")}</button>`;
@@ -31,6 +47,7 @@ function animalHtml(a){
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? sellBtn(a) : ""}</div>`;
   h += `<section><h3>Happiness <span class="num" id="anMoodN"></span></h3><div class="meter"><i id="anMoodBar"></i></div></section>`;
   h += `<section><h3>Needs</h3>${NEED_KEYS.map(k => `<div class="need-row"><span>${NEED_TEXT[k]}</span><span id="anN-${k}"></span></div><div class="meter"><i id="anB-${k}"></i></div>`).join("")}</section>`;
+  h += `<section><h3>Health <span class="num" id="anHpN"></span></h3><div class="meter"><i id="anHpBar"></i></div><div id="anHealth"></div></section>`;
   h += `<section><h3>Wants</h3><ul class="issues" id="anWants"></ul></section>`;
   h += `<section><h3>What's bothering it</h3><ul class="issues" id="anStress"></ul></section>`;
   return h;
@@ -53,6 +70,11 @@ function animalLive(force){
     set("anN-" + k, v >= 75 ? "Desperate" : v >= 50 ? "Needs attention" : v >= 25 ? "Getting there" : "Fine");
     if(b){ b.style.width = Math.round(v) + "%"; b.style.background = v >= 75 ? "#D9483B" : v >= 50 ? "#E3B23C" : "#3E9B4F"; }
   }
+  { const v = Math.round(animalHp(a)), hb = document.getElementById("anHpBar");
+    if(hb){ hb.style.width = v + "%"; hb.style.background = hpColor(v); }
+    set("anHpN", `${v}%`); }
+  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items);
+    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul>`; } }
   const fill = (id, list, none, bad) => {
     const ul = document.getElementById(id), key = list.join("|");
     if(ul && ul.dataset.v !== key){ ul.dataset.v = key; ul.innerHTML = list.length ? list.map(t => `<li class="${bad ? "bad" : ""}"><span>${esc(t)}</span></li>`).join("") : `<li><span class="meta">${none}</span></li>`; }
@@ -116,18 +138,19 @@ panelEl.addEventListener("change", ev => {
   ev.target.value = animalSelName = renameAnimal(a, ev.target.value); saveSoon();
 });
 
-// The Animals tab: every animal in the exhibit by name, with sex, health and a Sell button
+// The Animals tab: every animal by name with sex, health and its own Move and Sell buttons, then moves waiting on keepers
 const sellValue = a => Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale);
 const sellBtn = a => `<button class="btn sell" data-action="animalSell" data-id="${esc(a.id)}">Sell +${money(sellValue(a))}</button>`;
 const byName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase()) || String(a.id).localeCompare(String(b.id));
 function animalsTabHtml(e){
-  if(!e.animals.length) return `<section><h3>Animals</h3><div class="meta">No animals here yet.</div></section>`;
+  if(!e.animals.length) return `<section><h3>Animals</h3><div class="meta">No animals here yet.</div>${movesHtml(e)}</section>`;
+  const queued = new Set(state.staff.transfers.filter(t => !t.med).map(t => t.animalId));
   const rows = [...e.animals].sort(byName).map(a => {
-    const s = SPECIES_BY_ID[a.sp], sk = a.sick, sev = sk ? Math.round(sk.sev) : 0;
-    const hp = sk ? `${sk.kind === "injury" ? "Injured" : "Ill"} ${sev}%` : "Healthy";
-    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(100 - sev, sk ? (sev < 40 ? "var(--warn)" : "var(--bad)") : "var(--ok)")}</span>${sellBtn(a)}</li>`;
+    const s = SPECIES_BY_ID[a.sp], sk = noticed(a) && a.sick, v = Math.round(animalHp(a));
+    const hp = `${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health`;
+    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${esc(a.sp)}" data-id="${esc(a.id)}"${queued.has(a.id) ? " disabled" : ""}>${queued.has(a.id) ? "Moving" : "Move"}</button>${sellBtn(a)}</span></li>`;
   });
-  return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul></section>`;
+  return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul>${movesHtml(e)}</section>`;
 }
 function sellAnimalAsk(id){
   const a = animalById(id), e = a && animalHome(id); if(!a || !e) return;
