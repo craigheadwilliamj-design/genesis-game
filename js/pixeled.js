@@ -309,8 +309,6 @@ function pxDraw(){
     ctx.fillStyle = "rgba(184,145,47,.9)"; for(let x = x0; x < x1; x += 8) ctx.fillRect(x, px.guide * z - 1, Math.min(5, x1 - x), 2);
     if(px.guideW){
       const hw = Math.max(4, Math.min(8, z)); ctx.fillRect(x0 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2); ctx.fillRect(x1 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2);   // the handles
-      const k = pxFootType(), t = k && BUILDINGS[k];
-      if(t){ const lb = `${/-(left|right)/.test(px.path) ? t.d + " m deep" : t.w + " m across"} · row ${px.guide}${px.footEdit ? " · drag the ends or the line" : ""}`; ctx.font = "bold 12px system-ui, sans-serif"; ctx.textAlign = "center"; const tw = ctx.measureText(lb).width + 12, cx = (x0 + x1) / 2, ty = px.guide * z + 6; ctx.fillStyle = "rgba(255,255,255,.92)"; ctx.fillRect(cx - tw / 2, ty, tw, 18); ctx.fillStyle = "#6b5212"; ctx.fillText(lb, cx, ty + 13); ctx.textAlign = "start"; }
     }
   }   // the base row: its bottom stands on the footprint's front edge
   if(s){
