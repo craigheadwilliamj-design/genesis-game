@@ -102,6 +102,14 @@ function pxComp(i){
   return cv;
 }
 const pxCompData = i => pxComp(i).getContext("2d").getImageData(0, 0, px.fw, px.fh).data;
+const pxInked = d => d.some((v, j) => j % 4 === 3 && v);   // any pixel not fully see-through
+// Why the open picture would go out blank ("" if it wouldn't): nothing shows in any frame, naming hidden layers that hold pixels, the usual cause
+function pxEmptyWhy(){
+  if(px.frames.some((_, i) => pxInked(pxCompData(i)))) return "";
+  const hid = px.layers.filter((L, l) => !L.show && px.frames.some(f => pxInked(f[l]))).map(L => L.name);
+  return hid.length ? `${px.path} is blank: everything is on hidden layers (${hid.join(", ")}). Show them first.` : `${px.path} is blank.`;
+}
+async function pxPngInked(url){ const im = await pxImg(url), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; const c = cv.getContext("2d"); c.drawImage(im, 0, 0); return pxInked(c.getImageData(0, 0, im.width, im.height).data); }
 function pxStrip(l){   // the whole strip, or one layer's strip (for drafts)
   const cv = document.createElement("canvas"); cv.width = px.fw * px.frames.length; cv.height = px.fh; const ctx = cv.getContext("2d");
   px.frames.forEach((f, i) => l == null ? ctx.drawImage(pxComp(i), i * px.fw, 0) : ctx.putImageData(new ImageData(f[l].slice(), px.fw, px.fh), i * px.fw, 0));
@@ -162,6 +170,10 @@ let pxSaveT = 0;
 function pxChanged(){
   pxDraw(); pxSync();
   clearTimeout(pxSaveT); pxSaveT = setTimeout(pxSaveDraft, 600);
+}
+function pxSaveNow(){   // the Save button: the draft saves itself anyway, this does it now and says so
+  if(!px.path) return; pxSaveDraft(); pxSync();
+  const why = pxEmptyWhy(); ui.toast(why ? "Saved, but " + why[0].toLowerCase() + why.slice(1) : `Saved ${px.path}.`, why ? "bad" : "good");
 }
 function pxSaveDraft(){
   clearTimeout(pxSaveT); if(!px.path) return;
@@ -586,6 +598,7 @@ async function pxWatch(){
 }
 async function pxSend(){
   if(!px.path) return;
+  const why = pxEmptyWhy(); if(why) return ui.toast(why + " Nothing was sent.", "bad");
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   const png = pxPng();
   try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), ...(pxBaseDiff() != null ? {base:pxBaseDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
@@ -607,12 +620,13 @@ async function pxSendAll(){
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   pxSaveDraft();
   const todo = pxUnsent(); if(!todo.length) return ui.toast("Nothing new to send.");
-  let ok = 0;
+  let ok = 0; const blank = [];
   for(const path of todo){
     const dr = pxStored("d:" + path); if(!dr) continue;
-    try{ const png = await pxDraftPng(dr), im = await pxImg(png); await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), ...(dr.base != null ? {base:dr.base} : {}), at:Date.now()}); ok++; }catch{}
+    try{ const png = await pxDraftPng(dr), im = await pxImg(png); if(!await pxPngInked(png)){ blank.push(path); continue; } await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), ...(dr.base != null ? {base:dr.base} : {}), at:Date.now()}); ok++; }catch{}
   }
-  ui.toast(ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${ok < todo.length ? ` ${todo.length - ok} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.", ok ? "good" : "bad"); pxWatch();
+  const fail = todo.length - ok - blank.length, skip = blank.length ? ` Not sent, blank (a hidden layer?): ${blank.join(", ")}.` : "";
+  ui.toast((ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${fail ? ` ${fail} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.") + skip, ok && !skip ? "good" : "bad"); pxWatch();
 }
 async function pxUnsend(path){ const d = await pxDb(); try{ if(d) await d.doc("pixeled/" + pxDocId(path)).delete(); }catch{} }
 async function pxSaveFile(blob, name){
@@ -702,7 +716,7 @@ function pxBuild(){
     <span class="pxsep"></span><button class="btn" data-px="copy" title="Copy the selection (Ctrl+C)">Copy</button><button class="btn" data-px="cut" title="Cut the selection (Ctrl+X)">Cut</button><button class="btn" data-px="paste" title="Paste (Ctrl+V): what you copied here, or a picture copied in another app">Paste</button><button class="btn" data-px="selall" title="Select the whole frame (Ctrl+A)">Select all</button>
     <span class="pxsep"></span><button class="btn" data-px="zout" title="Zoom out (-)">−</button><span class="num" id="pxZoom"></span><button class="btn" data-px="zin" title="Zoom in (+)">+</button><button class="btn" data-px="fit">Fit</button>
     <button class="btn" data-px="grid" title="Grid (#)">Grid</button><button class="btn" data-px="mirror" title="Draw mirrored left to right (Shift+M)">Mirror</button>
-    <span class="pxgrow"></span><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button><button class="btn" data-px="close">Close</button></div>
+    <span class="pxgrow"></span><button class="btn primary" data-px="save" title="Save the draft now (Ctrl+S)">Save</button><button class="btn" data-px="revert" title="Drop the draft and reload the game's copy">Revert</button><button class="btn" data-px="close">Close</button></div>
   <div class="pxmain">
     <div class="pxtools">${PX_TOOLS.map(([k, n, key]) => `<button data-tool="${k}" title="${n} (${key})" aria-label="${n}">${pxIcon(k)}</button>`).join("")}
       <div class="pxsize" title="Pencil and eraser size"><small>Size</small>${[1, 2, 3].map(n => `<button data-size="${n}">${n}</button>`).join("")}</div></div>
@@ -919,6 +933,7 @@ function pxClick(e){
       document.getElementById("pxOver").hidden = true; pxNew(p, w, h, n); pxSetRef(ref && w === 100 && h === 75 ? "sprites/dime.png" : "").then(pxChanged); },
     undo:() => pxUndo(false), redo:() => pxUndo(true), zin:() => pxZoom(1), zout:() => pxZoom(-1), fit:pxFit,
     grid:() => { px.grid = !px.grid; pxDraw(); pxSync(); }, mirror:() => { px.mirror = !px.mirror; pxDraw(); pxSync(); },
+    save:() => pxSaveNow(),
     revert:() => { if(!px.path || !SPRITE_PACK[px.path]) return ui.toast("This picture isn't in the game yet, so there's nothing to revert to."); const d = pxDrafts(); delete d[px.path]; pxStore("drafts", d); pxStore("d:" + px.path); pxOpen(px.path, true); },
     close:() => document.getElementById("dlgPixel").close(), swap:() => { [px.c1, px.c2] = [px.c2, px.c1]; pxSync(); },
     ladd:() => pxLayerOp("add"), ldup:() => pxLayerOp("dup"), ldel:() => pxLayerOp("del"), lup:() => pxLayerOp("up"), ldown:() => pxLayerOp("down"), lmerge:() => pxLayerOp("merge"),
@@ -968,6 +983,7 @@ function pxKey(e){
   if(ctl && k.toLowerCase() === "c") return pxCopy(false);
   if(ctl && k.toLowerCase() === "x") return pxCopy(true);
   if(ctl && k.toLowerCase() === "v"){ px.pasteT = setTimeout(() => pxPaste(), 80); return; }   // the paste event below cancels this when the clipboard holds a picture
+  if(ctl && k.toLowerCase() === "s"){ e.preventDefault(); return pxSaveNow(); }
   if(ctl && k.toLowerCase() === "a"){ e.preventDefault(); pxSelectAll(); return; }
   if(ctl) return;
   if(k === "Delete" || k === "Backspace"){ e.preventDefault(); return pxClear(); }
