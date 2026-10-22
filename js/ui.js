@@ -921,13 +921,14 @@ function speciesStatus(s){
 // Known to the Paleopedia: a starter, a discovered species, or one with DNA already collected
 const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
 let ppPick = null;   // species id open on the card
-const ppImg = (s, alt) => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${alt}">` : `<span class="pp-noart">${alt ? "No picture yet" : "?"}</span>`;
+let ppPeriod = null; // period tab open, or null for none
+const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
 
 function ppCard(s){
   const I = SPECIES_INFO[s.id] || {}, t = traitsOf(s), st = speciesStatus(s), per = PERIOD_BY_ID[s.period];
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.max(1, Math.round(s.appeal / 2)), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
-  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic">${ppImg(s, esc(s.name))}</div><dl class="pp-stats">`
+  return `<div class="pp-card"><div class="pp-left"><div class="pp-pic">${ppImg(s)}</div><dl class="pp-stats">`
     + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
@@ -939,25 +940,24 @@ function ppCard(s){
 
 function catalogHtml(){
   const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-  const all = SPECIES.filter(s => speciesAvailable(s.id)), known = all.filter(ppKnown);
-  if(!ppPick || !known.some(s => s.id === ppPick)) ppPick = known.length ? known[0].id : null;
-  let list = "";
-  for(const per of order){
-    const here = all.filter(s => s.period === per);
-    if(!here.length) continue;
-    const got = here.filter(ppKnown), p = PERIOD_BY_ID[per];
-    list += `<section class="cat-period"><h3><span class="dot" style="background:${PERIOD_COLOR[per]}"></span>${per} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
-      + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${ppImg(s, "")}<span>${esc(s.name)}</span></button>`).join("")
-      + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div></section>`;
-  }
-  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered yet.</div>`;
-  return `<div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div>`;
+  const all = SPECIES.filter(s => speciesAvailable(s.id)), pers = order.filter(per => all.some(s => s.period === per));
+  if(!pers.includes(ppPeriod)) ppPeriod = null;
+  const tabs = pers.map(per => `<button class="pp-tab" data-per="${per}" aria-pressed="${per === ppPeriod}">${per}</button>`).join("");
+  if(!ppPeriod) return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="meta">Pick a period.</div></div>`;
+  const here = all.filter(s => s.period === ppPeriod), got = here.filter(ppKnown), p = PERIOD_BY_ID[ppPeriod];
+  if(!got.some(s => s.id === ppPick)) ppPick = got.length ? got[0].id : null;
+  const list = `<h3 class="pp-ph"><span class="dot" style="background:${PERIOD_COLOR[ppPeriod]}"></span>${ppPeriod} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
+    + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${esc(s.name)}</button>`).join("")
+    + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div>`;
+  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered in this period yet.</div>`;
+  return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div></div>`;
 }
 
 function openCatalog(){ $("#catalogBody").innerHTML = catalogHtml(); if(!$("#dlgAnimals").open) $("#dlgAnimals").showModal(); }
 $("#animalsBtn").onclick = openCatalog;
 $("#closeAnimals").onclick = () => $("#dlgAnimals").close();
 $("#catalogBody").onclick = e => {
-  const b = e.target.closest("[data-sp]");
-  if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
+  const t = e.target.closest("[data-per]"), b = e.target.closest("[data-sp]");
+  if(t){ ppPeriod = ppPeriod === t.dataset.per ? null : t.dataset.per; $("#catalogBody").innerHTML = catalogHtml(); }
+  else if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
 };
