@@ -1596,11 +1596,18 @@ function walkArea(h, e){
   }
   // land animals keep out of the exhibit's water; swimmers and flyers ignore it
   const sp = SPECIES_BY_ID[h.sp], wat = sp && !swims(sp) && !isFlyer(sp) ? waterOf(e).map(w => w.points) : [];
-  return {pts, obs, m, wat};
+  return {pts, obs, m, wat, wm:body};
 }
 // Semi-aquatic animals wade in and swim; the rest stay on the bank
-const swims = s => !isFlyer(s) && likesOf(s).water >= .6;
-const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w));
+const swims = s => !isFlyer(s) && (!!s.semi || likesOf(s).water >= .6);
+// Would a land animal standing at (x, y) be in the exhibit's water, or hanging over its edge?
+function landWet(h, e, x, y){
+  const sp = SPECIES_BY_ID[h.sp]; if(!sp || swims(sp) || isFlyer(sp)) return false;
+  const m = (h.r || 1) * .5;
+  return waterOf(e).some(w => inPoly(x, y, w.points) || distToEdge(x, y, w.points) < m);
+}
+// in the water, or with its body hanging over the edge (wm is half a body)
+const inWater = (p, A) => A.wat.some(w => inPoly(p[0], p[1], w) || distToEdge(p[0], p[1], w) < A.wm);
 const obsDist = (o, x, y) => Math.hypot(Math.max(Math.abs(x - o.x) - o.hx, 0), Math.max(Math.abs(y - o.y) - o.hy, 0));
 const inObstacle = (p, A) => A.obs.some(o => obsDist(o, p[0], p[1]) < o.c) || inWater(p, A);
 // Is p somewhere an animal can stand: inside, off the fence, out of the rocks and trees?
@@ -1627,7 +1634,7 @@ function walkClear(a, b, A){
   }
   // not into or across a pond (one it's standing in doesn't count, so it can wade out)
   if(A.wat.length && !inWater(a, A) && inWater(b, A)) return false;
-  if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length])) return false;
+  if(A.wat.length && !inWater(a, A) && !inWater(b, A)) for(const w of A.wat) for(let i = 0; i < w.length; i++) if(segCross(a, b, w[i], w[(i + 1) % w.length]) || segSegDist(a, b, w[i], w[(i + 1) % w.length]) < A.wm) return false;
   for(const t of [.25, .5, .75]) if(!inPoly(a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t, pts)) return false;
   return true;
 }
@@ -1702,7 +1709,8 @@ function wadeOut(h, e){
   let best = null, bd = Infinity;
   for(let i = 0; i < 80; i++){ const p = randomInside(e.points); if(!standable(p, A)) continue; const d = Math.hypot(p[0] - h.x, p[1] - h.y); if(d < bd){ bd = d; best = p; } }
   if(!best) return false;
-  h.path = walkRoute([h.x, h.y], best, A) || [best];
+  const r = walkRoute([h.x, h.y], best, A);
+  if(r) h.path = r; else { h.x = best[0]; h.y = best[1]; h.path = []; }   // no way out on foot: it's put on the bank, never walked across the pond
   return true;
 }
 
@@ -1911,7 +1919,10 @@ function animateAnimals(dt){
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
     if(d < .3){ h.wp = h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
     const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * dt);
+    const px = h.x, py = h.y;
     h.x += dx/d * step; h.y += dy/d * step;
+    // last line of defence: a land animal never takes a step into the water (one already in it may keep wading out)
+    if(landWet(h, e, h.x, h.y) && !landWet(h, e, px, py)){ h.x = px; h.y = py; h.path = null; h.wait = .5; continue; }
     swimCheck(h, e);
     // pictures face the way they walk, and step a frame every half a body's width, so the feet keep pace with the ground
     if(swimmingPic(h)){ h.stride = (h.stride || 0) + step; setPose(h, Math.floor(h.stride / (h.r * (S.step || .5))) % S.swim); }
