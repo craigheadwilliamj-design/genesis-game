@@ -57,6 +57,9 @@ const ui = {
     el.className = "toast " + (kind || "");
     if(html) el.innerHTML = html; else el.textContent = text;
     const box = $("#toasts");
+    // a modal dialog sits above the page, so show toasts inside it while one is open
+    const dlg = document.querySelector("dialog:modal"), home = ui.toastHome || (ui.toastHome = box.parentNode);
+    (dlg || home).appendChild(box);
     box.appendChild(el);
     while(box.children.length > 4) box.firstChild.remove();
     setTimeout(() => el.remove(), kind === "day" ? 9000 : 6000);
