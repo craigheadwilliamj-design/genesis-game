@@ -49,7 +49,7 @@ function pbits(Q, px, rows, cx, g0, on){
 function propArt(bl, inv, on, dead){
   const t = BUILDINGS[bl.type], T = themeOf(bl), P = bl.points, c = centroid(P), px0 = FLAT34.px;
   const uu = [P[1][0] - P[0][0], P[1][1] - P[0][1]], ul = Math.hypot(uu[0], uu[1]) || 1, fv = propFront(bl);
-  const k = Math.max(1, 4.5*inv / (Math.max(t.w, t.d) / 2));   // never smaller than a tappable size when far out
+  const k = Math.min(1.5, Math.max(1, 4.5*inv / (Math.max(t.w, t.d) / 2)));   // a little bigger than true size when far out, never giant (the tap area in map.js stays generous)
   const F = {c, u:[uu[0] / ul, uu[1] / ul], v:fv, k, px:px0 / k};
   const broken = isBroken(bl), full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
   if(PROP_PICS[bl.type] && T === THEMES.genesis) return propSprite34(bl, k, broken ? "-broken" : full ? "-full" : "", on, dead);
