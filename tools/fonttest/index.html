@@ -99,12 +99,12 @@ function build() {
       <div style="--base:${$("fit").checked ? f.base : 16}px;font-family:${f.css},monospace">${sampleHtml(f)}</div>
     </section>`).join("");
   // the .sample rule reads --base from its parent, set above per card
-  document.fonts.ready.then(() => FONTS.forEach((f, i) => {
-    const ok = [...document.fonts].some(ff => ff.family.replace(/"/g, "") === f.name && ff.status === "loaded");
+  // fonts.load() starts the download and resolves with the faces it got; none means the font isn't there
+  FONTS.forEach((f, i) => {
     const t = $("tag" + i);
-    t.textContent = ok ? "loaded" : "not loaded (fallback shown)";
-    t.className = "tag " + (ok ? "ok" : "miss");
-  }));
+    const done = ok => { t.textContent = ok ? "loaded" : "not loaded (fallback shown)"; t.className = "tag " + (ok ? "ok" : "miss"); };
+    document.fonts.load(`${f.base}px ${f.css}`, "Aa").then(faces => done(faces.length > 0), () => done(false));
+  });
 }
 
 $("scale").innerHTML = SCALES.map(s => `<button data-s="${s}" class="${s === scale ? "on" : ""}">${s}x</button>`).join("");
