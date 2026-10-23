@@ -57,13 +57,12 @@ button:disabled{cursor:default}
 #roWeather{margin-left:auto}
 .wxicon{display:flex;width:24px;height:24px}
 .wxicon svg{width:100%;height:100%}
-.clockbox{gap:12px;padding:3px 6px 3px 14px}
-.clockbox .when{display:flex;flex-direction:column;gap:2px;min-width:112px;text-align:center}
+.clockbox{flex-direction:column;align-items:stretch;gap:2px;padding:3px 14px;min-width:140px;text-align:center}
 .clockbox b{font-size:14px;letter-spacing:.06em;text-transform:uppercase}
 .clockbox #clock{font-size:17px;font-variant-numeric:tabular-nums}
 .clockbox .closed{color:#FF9C8F;font-size:12px;letter-spacing:.1em}
-.speed{display:flex;border:1px solid #3D6450;border-radius:5px;overflow:hidden;background:#1F3A2B}
-.speed button{border:0;background:transparent;color:var(--on-forest);padding:4px 8px;font:600 14px/1 Barlow,sans-serif;min-width:32px;min-height:32px}
+.speed{display:flex;border:1px solid #3D6450;border-radius:6px;overflow:hidden;background:#2A4A37}
+.speed button{border:0;background:transparent;color:var(--on-forest);padding:6px 10px;font-weight:600;min-width:36px;min-height:38px}
 .speed button+button{border-left:1px solid #3D6450}
 .speed button[aria-pressed="true"]{background:var(--money);color:#1D2B22}
 .hmenu{flex-direction:column;justify-content:center;gap:4px;width:52px;padding:0 13px;cursor:pointer}
@@ -475,9 +474,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   #roGuests{min-width:0;font-size:14px}
   #roWeather{margin-left:0}
   #wxLabel{display:none}
-  .clockbox{gap:8px;padding:3px 5px 3px 9px}
-  .clockbox .when{min-width:84px}
-  .speed button{min-height:30px;min-width:28px;padding:3px 5px}
+  .clockbox{min-width:110px}
+  .speed button{min-height:32px;min-width:32px;padding:4px 7px}
   .hmenu{width:42px;padding:0 10px}
   aside{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:55%;border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.2);z-index:10}
   .tools{top:8px;left:8px}
@@ -506,14 +504,12 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     <div class="hstars" id="rating" title="Park rating"></div>
     <div class="hbox" id="roGuests">Guests: <span id="inpark" class="num">0</span></div>
     <div class="hbox wx" id="roWeather"><span id="wxLabel">Fair</span><i id="wxIcon" class="wxicon" data-kind="fair" aria-hidden="true"></i></div>
-    <div class="hbox clockbox">
-      <div class="when"><b id="dayLabel">1 Jan Y1</b><div class="daybar"><i id="dayFill"></i></div><span id="clock" class="num">8:00 AM</span><b id="closedTag" class="closed" hidden>Closed</b></div>
-      <div class="speed" role="group" aria-label="Game speed">
-        <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
-        <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
-        <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
-        <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
-      </div>
+    <div class="hbox clockbox"><b id="dayLabel">1 Jan Y1</b><div class="daybar"><i id="dayFill"></i></div><span id="clock" class="num">8:00 AM</span><b id="closedTag" class="closed" hidden>Closed</b></div>
+    <div class="speed" role="group" aria-label="Game speed">
+      <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
+      <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
+      <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
+      <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
     </div>
     <button class="hbox hmenu" id="menuBtn" title="Main menu (pauses the game)" aria-label="Main menu"><i></i><i></i><i></i></button>
   </header>
