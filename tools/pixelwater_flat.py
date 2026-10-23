@@ -70,5 +70,5 @@ def tile(size, seed, pal):
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/water"
 os.makedirs(out, exist_ok=True)
-for name, seed in (("scrubland", 11), ("tundra", 31), ("boreal", 37)):
+for name, seed in (("scrubland", 11), ("tundra", 31)):
     im = tile(144, seed, PAL[name]); im.save(f"{out}/{name}.png"); print(name, im.size, len({p[:3] for p in im.get_flattened_data()}), "colors")

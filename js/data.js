@@ -1954,6 +1954,7 @@ const WATER_TILES = {
   desert:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
   grassland:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
   tropical:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
+  boreal:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]},
   temperate:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, waves:[[12, 10], [24, 25]]}};
 const ROCK_SPRITES = {
   desert:{
