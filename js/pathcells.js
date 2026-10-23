@@ -72,23 +72,14 @@ function pathChunkProblem(cx, cy, kind, ctx){
   for(const o of ctx.bl) if(hitsBox(o, x, y) && shapesOverlap(r, o.pts)) return "Paths can't go through a building.";
   if(kind !== "b") for(const o of ctx.water) if(hitsBox(o, x, y) && (shapesOverlap(r, o.pts) || shapesOverlap(o.pts, r))) return "Paths can't cross water. Lay a wooden bridge over it.";
   for(const b of ctx.decor) if(boxesHit(b, [x, y, x + S, y + S])) return "It runs into a plant, rock or statue. Bulldoze it first.";
-  if(ctx.diag.size) for(let i = 0; i < S; i++) for(let j = 0; j < S; j++) if(ctx.diag.has((x + i) + "," + (y + j))) return "It runs into a fence.";
+  if(ctx.diag.has(x + "," + y)) return "It runs into a fence.";   // a diagonal fence piece across the chunk
   for(const l of ctx.lines) if(lineEntersShape(l, r)) return "It runs into a fence.";
   return null;
 }
-// Is there a straight fence piece across the chunk, or on the edge it shares with the chunk next to it (at cx+dx, cy+dy)?
-function fenceInChunk(cx, cy){
-  const P = fencePieces(), x = cx * CHUNK, y = cy * CHUNK;
-  for(let i = 0; i < CHUNK; i++) for(let j = 1; j < CHUNK; j++) if(P[pieceKey(x + j, y + i, "v")] || P[pieceKey(x + i, y + j, "h")]) return true;
-  return false;
-}
+// Is there a fence piece on the edge the chunk shares with the chunk next to it (at nx, ny)? Fence pieces are a chunk long and lie on chunk edges.
 function fenceOnChunkEdge(cx, cy, nx, ny){
   const P = fencePieces();
-  for(let i = 0; i < CHUNK; i++){
-    if(nx !== cx){ if(P[pieceKey(Math.max(cx, nx) * CHUNK, cy * CHUNK + i, "v")]) return true; }
-    else if(P[pieceKey(cx * CHUNK + i, Math.max(cy, ny) * CHUNK, "h")]) return true;
-  }
-  return false;
+  return !!(nx !== cx ? P[pieceKey(Math.max(cx, nx) * CHUNK, cy * CHUNK, "v")] : P[pieceKey(cx * CHUNK, Math.max(cy, ny) * CHUNK, "h")]);
 }
 // What laying a run from chunk a to chunk b would do: {chunks (keys of the whole run), todo (the ones that change), bad (key to reason), cost, why, end, kind}
 function planPath(a, b, kind){
@@ -99,7 +90,6 @@ function planPath(a, b, kind){
   for(const k of out.todo){
     const [cx, cy] = chunkXY(k);
     let why = pathChunkProblem(cx, cy, kind, ctx);
-    if(!why && fenceInChunk(cx, cy)) why = "It runs into a fence.";
     if(!why) for(const [dx, dy] of CHUNK_DIRS){
       const n = chunkKey(cx + dx, cy + dy);
       if((inRun.has(n) || C[n]) && fenceOnChunkEdge(cx, cy, cx + dx, cy + dy)){ why = "It runs into a fence."; break; }

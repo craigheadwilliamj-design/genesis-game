@@ -159,7 +159,7 @@ function newPark(){
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, discoV:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
-    exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{},
+    exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{}, fenceGrid5:true,
     paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
     buildings:[],
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
@@ -244,6 +244,7 @@ function upgradeSave(s){
   if(s.over === "shutdown") s.over = false;   // the deaths shutdown is gone
   if(s.debtWarned === undefined) s.debtWarned = false;
   if(!s.fenceGrid) s.fenceGrid = {};
+  if(!s.fenceGrid5){ snapFencesToGrid5(s); s.fenceGrid5 = true; }   // fence pieces are 5 m now (older fence went down a meter a piece)
   if(s.tramFare === undefined) s.tramFare = TRAM.fare;
   // parks from before keepers existed get 3 days of free feeding to build backstage
   if(!s.staff){ s.staff = freshStaff(); s.staff.feedFrom = Math.max(5, s.day + 3); }

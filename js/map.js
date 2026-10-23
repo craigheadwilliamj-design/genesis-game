@@ -2411,12 +2411,12 @@ function endWaterDrag(){
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
-const gridAt = ev => { const w = toWorld(ev.clientX, ev.clientY); return [Math.round(w.x / GRID_STEP) * GRID_STEP, Math.round(w.y / GRID_STEP) * GRID_STEP]; };
+const gridAt = ev => { const w = toWorld(ev.clientX, ev.clientY); return [fenceSnap(w.x), fenceSnap(w.y)]; };   // the fence grid point under the pointer
 function fenceBar(stat){
   const B = BARRIERS[fenceSel];
-  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
+  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece every 5 m, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
   $("#dUndo").disabled = false;
-  setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.` : stat || `${money(fenceRate(fenceSel))} a meter.`, !!(B.tech && !hasTech(B.tech)));
+  setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.` : stat || `${money(fenceRate(fenceSel) * FENCE_GRID.step)} a piece.`, !!(B.tech && !hasTech(B.tech)));
 }
 // The pieces the current drag covers
 function fenceDragKeys(){
