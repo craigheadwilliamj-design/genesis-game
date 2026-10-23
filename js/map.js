@@ -1332,7 +1332,7 @@ function renderOverlay(){
       else s += doorArrowSvg(ghost.pts, ghost.face, col, inv);
     }
   }
-  if(gateGhost && !gateGhost.loose) s += gateGhostSvg(gateGhost, inv);
+  if(gateGhost) s += gateGhostSvg(gateGhost, inv);   // red on fence that isn't closed yet, too
   if(tool === "zoneedit" && zedit){
     const z = zoneById(zedit.id);
     if(z){
@@ -2682,7 +2682,9 @@ function findGateSpot(clientX, clientY){
   if(!best){
     // loose fence that doesn't close a loop: say so
     const k = pieceNear(p.x, p.y, Math.max(.6, 10 / view.k));
-    return k && !claimedPieces().has(k) ? {loose:true, ok:false, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."} : null;
+    if(!k || claimedPieces().has(k)) return null;
+    const [a, b] = pieceEnds(k), r = segProj(p.x, p.y, a, b);
+    return {loose:true, ok:false, x:r.x, y:r.y, a, b, why:"This fence isn't closed yet. Close the loop to make a pen, then put a gate on it."};
   }
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
