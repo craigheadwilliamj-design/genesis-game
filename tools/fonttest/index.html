@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Font Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Pixelify+Sans:wght@400;700&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=Tiny5&family=VT323&display=block" rel="stylesheet">
+<style>
+/* Local fonts: drop m5x7.woff2 and DepartureMono.woff2 into tools/fonttest/fonts/ */
+@font-face { font-family: "m5x7"; src: url("fonts/m5x7.woff2") format("woff2"), url("fonts/m5x7.ttf") format("truetype"); font-display: block; }
+@font-face { font-family: "Departure Mono"; src: url("fonts/DepartureMono-Regular.woff2") format("woff2"); font-display: block; }
+
+:root {
+  --bg: #1d2a24; --panel: #2b3d34; --edge: #12191a; --ink: #e8f0dc; --dim: #9db3a0; --accent: #f2c14e; --bad: #e07a5f;
+  --scale: 2;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--edge); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+header h1 { margin: 0; font-size: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--dim); border-radius: 4px; overflow: hidden; }
+.seg button { background: transparent; color: var(--ink); border: 0; padding: 4px 10px; cursor: pointer; font: inherit; }
+.seg button.on { background: var(--accent); color: var(--edge); }
+label { color: var(--dim); }
+main { padding: 16px; display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--edge); border-radius: 4px; padding: 12px; min-width: 0; }
+.card h2 { margin: 0 0 2px; font: 600 15px system-ui, sans-serif; display: flex; justify-content: space-between; gap: 8px; }
+.meta { color: var(--dim); font: 12px system-ui, sans-serif; margin-bottom: 10px; }
+.tag { font: 11px system-ui, sans-serif; padding: 1px 6px; border-radius: 3px; background: var(--edge); }
+.tag.ok { color: #8fd694; } .tag.miss { color: var(--bad); }
+.sample { font-size: calc(var(--base) * var(--scale)); line-height: 1.3; -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed; overflow-wrap: anywhere; }
+.sample + .sample { margin-top: .6em; }
+.sample .t { color: var(--accent); }
+.sample .d { color: var(--dim); }
+.sample table { border-collapse: collapse; width: 100%; font: inherit; }
+.sample td { padding: 0 .4em 0 0; }
+.sample td:last-child { text-align: right; padding: 0; }
+.neg { color: var(--bad); }
+.tip { display: inline-block; background: #0e1514; border: 1px solid var(--dim); padding: .3em .6em; }
+.btn { display: inline-block; background: var(--accent); color: var(--edge); padding: .25em .8em; margin-right: .4em; }
+.bar { display: inline-block; width: 8em; height: .8em; background: var(--edge); vertical-align: middle; }
+.bar i { display: block; height: 100%; width: 63%; background: #8fd694; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pixel Font Test</h1>
+  <span class="seg" id="scale"></span>
+  <label><input type="checkbox" id="fit" checked> Use each font's native pixel size (crisp)</label>
+  <label>Park name: <input id="park" value="Isla Nublar Zoological Park" size="26"></label>
+</header>
+<main id="grid"></main>
+
+<script>
+// base = the size at which one font pixel is one screen pixel at 1x (the crisp size).
+// If the real size differs, the page flags it. Sizes are multiplied by the scale picker.
+const FONTS = [
+  { name: "m5x7",           css: '"m5x7"',           base: 16, lic: "CC0 (itch.io listing)",     note: "5x7 grid, real lowercase. Local file needed." },
+  { name: "Pixelify Sans",  css: '"Pixelify Sans"',  base: 16, lic: "OFL (Google Fonts)",        note: "Four weights, rounder, scales a bit freely." },
+  { name: "Press Start 2P", css: '"Press Start 2P"', base: 8,  lic: "OFL 1.1",                   note: "8 px grid, wide. Titles and numbers." },
+  { name: "Departure Mono", css: '"Departure Mono"', base: 11, lic: "OFL (verify)",              note: "Monospace, good for ledgers. Local file needed." },
+  { name: "Silkscreen",     css: '"Silkscreen"',     base: 8,  lic: "OFL (verify)",              note: "Tiny, caps-leaning labels." },
+  { name: "Tiny5",          css: '"Tiny5"',          base: 8,  lic: "OFL (verify)",              note: "Compact 5px-tall style." },
+  { name: "Jersey 10",      css: '"Jersey 10"',      base: 16, lic: "OFL (verify)",              note: "Sporty, condensed." },
+  { name: "VT323",          css: '"VT323"',          base: 16, lic: "OFL (verify)",              note: "Terminal look." },
+];
+const SCALES = [1, 2, 3, 4];
+let scale = 2;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function sampleHtml(f) {
+  const park = esc($("park").value || "Paleo Park");
+  return `
+  <div class="sample"><span class="t">${park}</span><br><span class="d">Rating 4.5 stars · Day 37 · Tuesday 9:40 AM</span></div>
+  <div class="sample"><span class="btn">Build</span><span class="btn">Paleopedia</span><span class="btn">Park Map</span></div>
+  <div class="sample">
+    <table>
+      <tr><td>Ticket sales</td><td>$12,480</td></tr>
+      <tr><td>Staff wages</td><td class="neg">-$3,215</td></tr>
+      <tr><td>Food and gifts</td><td>$4,902</td></tr>
+      <tr><td class="t">Balance</td><td class="t">$18,642</td></tr>
+    </table>
+  </div>
+  <div class="sample">Dimetrodon grandis. A sail-backed predator that lived before the dinosaurs. Needs a warm, dry exhibit with at least 40 m² of space.</div>
+  <div class="sample"><span class="tip">Keeper is feeding the Triceratops.</span> <span class="bar"><i></i></span></div>
+  <div class="sample d">ABCDEFGHIJKLMNOPQRSTUVWXYZ<br>abcdefghijklmnopqrstuvwxyz<br>0123456789 .,:;!?'"()[]+-×/%$&amp;<br>áéíóúñü ÅØ ß</div>`;
+}
+
+function build() {
+  document.documentElement.style.setProperty("--scale", scale);
+  $("grid").innerHTML = FONTS.map((f, i) => `
+    <section class="card">
+      <h2>${f.name} <span class="tag" id="tag${i}">checking…</span></h2>
+      <div class="meta">${f.lic}. ${f.note} Native size ${f.base}px, shown at ${f.base * scale}px.</div>
+      <div style="--base:${$("fit").checked ? f.base : 16}px;font-family:${f.css},monospace">${sampleHtml(f)}</div>
+    </section>`).join("");
+  // the .sample rule reads --base from its parent, set above per card
+  document.fonts.ready.then(() => FONTS.forEach((f, i) => {
+    const ok = [...document.fonts].some(ff => ff.family.replace(/"/g, "") === f.name && ff.status === "loaded");
+    const t = $("tag" + i);
+    t.textContent = ok ? "loaded" : "not loaded (fallback shown)";
+    t.className = "tag " + (ok ? "ok" : "miss");
+  }));
+}
+
+$("scale").innerHTML = SCALES.map(s => `<button data-s="${s}" class="${s === scale ? "on" : ""}">${s}x</button>`).join("");
+$("scale").onclick = e => {
+  const s = +e.target.dataset.s; if (!s) return;
+  scale = s; [...$("scale").children].forEach(b => b.classList.toggle("on", +b.dataset.s === s)); build();
+};
+$("fit").onchange = build;
+$("park").oninput = build;
+build();
+</script>
+</body>
+</html>
