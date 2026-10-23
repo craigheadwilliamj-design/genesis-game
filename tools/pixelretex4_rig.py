@@ -1,9 +1,9 @@
-# New hide texture for four rigged animals: the Allosaurus, Dryosaurus, Compsognathus and Platyhystrix (part pictures inside their rigger projects, tools/rigger/<species>/).
+# New hide texture for five rigged animals: the Allosaurus, Dryosaurus, Compsognathus, Platyhystrix and Tyrannosaurus (part pictures inside their rigger projects, tools/rigger/<species>/).
 # Their parts already carry an older shading pass, so this reads each pixel back to a role (base hide, belly, markings, sail...) from the colors the part holds now, then paints the roles again in the flat style:
 # a lit top-left edge, shade under the flank and the right side, rows of short scale dashes, belly scutes, a lit line where belly meets flank, markings with a lighter top and darker underside.
 # Every pixel keeps its place (asserted), eyes, claws and anything it doesn't know stay exactly as they are, and it is safe to run twice (it reads its own colors back).
 # Far limbs and feet stay flat. Parts turn with the animal, so each part is shaded in its own frame.
-# Usage: python3 -I tools/pixelretex4_rig.py [allo|dryo|comp|plhy ...]   (no argument = all four; rewrites the rig and clips JSONs in place, then run rigtogame.py as in docs/rigs.md)
+# Usage: python3 -I tools/pixelretex4_rig.py [allo|dryo|comp|plhy|trex ...]   (no argument = all five; rewrites the rig and clips JSONs in place, then run rigtogame.py as in docs/rigs.md)
 import sys, os, io, json, base64
 from PIL import Image
 
@@ -47,6 +47,14 @@ SPECIES = {
                 "sailA": "#94bd10", "sailAhi": "#b4d83a", "sailAlo": "#6b9206",
                 "sailB": "#eab80e", "sailBhi": "#f7d44c", "sailBlo": "#bc8d08"},
         "scale": True, "ribs": True,
+    },
+    "trex": {
+        "dir": "tyrannosaurus", "files": ["trex-rig.json"],
+        "map": {"#c06e21": "base", "#af8155": "belly", "#3e250c": "dark", "#8a4f1a": "far", "#2d1b09": "far"},
+        "new": {"base": "#c06e21", "hi": "#da7f25", "hi2": "#cc7523", "lo": "#99591b", "scale": "#a65f1d", "far": "#8a4f1a",
+                "belly": "#af8155", "bellyhi": "#c9a074", "bellylo": "#8c6642", "rib": "#a07548",
+                "dark": "#3e250c", "darkhi": "#5a3716", "darklo": "#2a1808"},
+        "scale": True, "ribs": True, "soft": True, "flatthigh": True, "deep": True,
     },
 }
 
