@@ -3458,44 +3458,41 @@ function setFocus(on, keep){
 }
 try{ if(localStorage.getItem("genesis-focus") === "1") setFocus(true, true); }catch{}
 buildMenu();
-// Open one category's flyout (a BUILD_CATS id), or close it with false. A category with one group opens that group too.
-let sideCat = null;
+// Open one category's tray along the bottom (a BUILD_CATS id, kept in sideCat from menu.js), or close it with false
 const sideOpen = cat => {
   sideCat = cat || null;
   document.querySelectorAll("#sideMenu .tbtn[data-cat]").forEach(b => b.setAttribute("aria-expanded", b.dataset.cat === sideCat));
-  const mine = [...document.querySelectorAll("#sideMenu .sgroup")].filter(g => g.dataset.cat === sideCat);
-  document.querySelectorAll("#sideMenu .sgroup").forEach(g => g.classList.toggle("other", g.dataset.cat !== sideCat));
-  if(mine.filter(g => !g.classList.contains("flat")).length === 1){ const g = mine.find(g => !g.classList.contains("flat")); g.classList.add("open"); g.firstElementChild.setAttribute("aria-expanded", true); }
-  $("#sideBody").hidden = !sideCat; mapwrap.classList.toggle("side-open", !!sideCat);
-  if(typeof render === "function" && state) render();   // the fence end rings follow the menu
+  document.querySelectorAll("#sideMenu .tray").forEach(t => t.classList.toggle("on", t.dataset.cat === sideCat));
+  $("#sideBody").hidden = !sideCat;
+  if(typeof render === "function" && state) render();   // the fence end rings show while the Exhibits tray is open
 };
-// Tapping a tool picks it and tucks the menu away so the map is clear. Tapping it again goes back to Select.
-document.querySelectorAll("[data-tool]").forEach(b => b.addEventListener("click", () => {
-  const t = b.dataset.tool, active = t === tool || (familyOf(tool) && familyOf(tool) === familyOf(t));
-  const off = active && tool !== "select" && !familyOf(t);
-  setTool(off ? "select" : t);
-  if(!off && t !== "select") sideOpen(false);
-}));
-document.querySelectorAll("[data-fence]").forEach(b => b.addEventListener("click", () => {
-  fenceSel = b.dataset.fence; setTool("exhibit"); sideOpen(false);
-}));
-// One group open at a time; dropdowns inside a group open on their own
-document.querySelectorAll("#sideMenu .tbtn[data-cat]").forEach(b => b.addEventListener("click", () => sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat)));
-document.querySelectorAll(".shead").forEach(h => h.addEventListener("click", () => {
-  const g = h.parentElement, was = g.classList.contains("open");
-  document.querySelectorAll(".sgroup.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
-  g.classList.toggle("open", !was); h.setAttribute("aria-expanded", !was);
-}));
-document.querySelectorAll(".srow.head").forEach(h => h.addEventListener("click", () => {
-  const it = h.parentElement, was = it.classList.contains("open");
-  it.classList.toggle("open", !was); h.setAttribute("aria-expanded", !was);
-}));
+// One handler for the whole menu, so it keeps working when buildMenu redraws it. The trays stay open while you build;
+// tapping the active tool again goes back to Select. In menu A, a button that holds a list opens it as menu B (one at a time).
+// A mouse wheel over a bar scrolls it sideways
+$("#sideMenu").addEventListener("wheel", e => {
+  const bar = e.target.closest(".trayA, .ssub"); if(!bar || bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  e.preventDefault(); bar.scrollLeft += e.deltaY;
+}, {passive:false});
+$("#sideMenu").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  if(b.matches(".tbtn[data-cat]")){ sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat); return; }
+  if(b.id === "supplyBtn"){ supplyOn = !supplyOn; b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On" : "Off"; render(); return; }
+  if(b.dataset.fence){ fenceSel = b.dataset.fence; setTool("exhibit"); return; }
+  if(b.dataset.tool){
+    const t = b.dataset.tool, active = t === tool || (familyOf(tool) && familyOf(tool) === familyOf(t));
+    setTool(active && tool !== "select" && !familyOf(t) ? "select" : t); return;
+  }
+  if(b.matches(".srow.head")){
+    const it = b.parentElement, was = it.classList.contains("open");
+    it.closest(".trayA").querySelectorAll(".sitem.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
+    it.classList.toggle("open", !was); b.setAttribute("aria-expanded", !was);
+  }
+});
 $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick); });
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
 svg.classList.add("tilt");
-$("#supplyBtn").onclick = () => { supplyOn = !supplyOn; const b = $("#supplyBtn"); b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On. Green farms, blue stores, gold exhibits" : "Off"; render(); };
 $("#dUndo").onclick = undoDrawPoint;
 $("#dFinish").onclick = finishDraw;
 $("#dCancel").onclick = cancelTool;

@@ -122,6 +122,8 @@ const ICON_LINES = {
 function menuIcon(tool, color, glyph){
   let inner = ICON_LINES[tool];
   const b = BUILDINGS[tool];
+  // a building the map draws from pictures (BLD_PICS, map.js) shows its front picture
+  if(!inner && b && BLD_PICS[tool]) inner = `<image href="${spriteUrl(`sprites/bld/${tool}-front.png`)}" x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMax meet" style="image-rendering:pixelated"/>`;
   if(!inner && b) inner = b.viv ? ICON_LINES.viv : `<rect x="3" y="6" width="18" height="13" rx="2" fill="${b.color}"/>${b.glyph ? `<text x="12" y="13" class="glyph" font-size="10">${esc(b.glyph)}</text>` : ""}`;
   if(!inner && color) inner = `<path d="M3 16h18" stroke="${color}" stroke-width="5" stroke-linecap="round"/><path d="M3 16h18" stroke="#fff" stroke-width="1" stroke-dasharray="1 4" opacity=".6"/>`;
   return `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true">${inner || ""}</svg>`;
@@ -196,24 +198,44 @@ const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in wat
 
 // Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
 const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
-// The left column's big buttons, each opening a flyout of the build groups it holds
+// The left column's big buttons. Each opens a tray along the bottom (menu A): Buildings lists its groups, the others list their tools,
+// and anything that holds a list opens that list in a second bar above it (menu B).
 const BUILD_CATS = [
-  {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi", "toggles"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
+  {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
   {id:"land", label:"Landscaping", groups:["land", "land-buy"], icon:'<g transform="translate(12 12) rotate(40) scale(1.2) translate(-12 -12)"><path d="M9 1.5h6v3.5H9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M11 5h2v9h-2z" fill="currentColor"/><path d="M7.5 13.5h9v4.5c0 2.5-2 4-4.5 5-2.5-1-4.5-2.5-4.5-5z" fill="currentColor"/><path d="M12 15.5v4.5" stroke="#1F3A2B" stroke-opacity=".6" stroke-width="1.2"/></g>'},
   {id:"exhibits", label:"Exhibits", groups:["exhibits"], icon:'<path d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2"/>'},
   {id:"paths", label:"Paths", groups:["paths"], icon:'<path d="M8 21c0-5 6-5 6-9s-5-5-5-9M15 21c0-5 6-5 6-9s-5-5-5-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'},
 ];
+// Placeholder pictures for the Buildings groups until their pixel art is drawn
+const GROUP_ICONS = {
+  guest:'<circle cx="12" cy="6" r="3.2" fill="#F0C9A0"/><path d="M7 21v-7a5 5 0 0 1 10 0v7z" fill="#D9558C"/><path d="M9 6.5c0-3 6-3 6 0-1-1.5-5-1.5-6 0z" fill="#E8C34A"/>',
+  staff:'<circle cx="12" cy="7" r="3.2" fill="#F0C9A0"/><path d="M7 5.5h10l-1-2.5H8z" fill="#8A7A4A"/><path d="M7 21v-7a5 5 0 0 1 10 0v7z" fill="#6E7B3E"/>',
+  mgmt:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="#DDEFE6" fill-opacity=".25" stroke="#DDEFE6" stroke-width="1.8" stroke-linejoin="round"/><path d="M6.5 15.5h11l1.5 3a1.5 1.5 0 0 1-1.3 2H6.3a1.5 1.5 0 0 1-1.3-2z" fill="#5FD36E"/>',
+  logi:'<rect x="2" y="7" width="12" height="9" fill="#8C939A"/><path d="M14 10h4l3 3v3h-7z" fill="#6E757C"/><circle cx="6.5" cy="17.5" r="2" fill="#3A3F44"/><circle cx="17" cy="17.5" r="2" fill="#3A3F44"/>',
+};
+let sideCat = null;   // the open tray's category, or null
 const catOf = gid => (BUILD_CATS.find(c => c.groups.includes(gid)) || {}).id;
+// A group's tools as one flat list: dropdowns inside it (Dining, Retail, Hotels) are spread out
+const flatRows = it => it.sub ? it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("") : menuRow(it);
 function buildMenu(){
-  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}" data-cat="${catOf(g.id)}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
-  const rest = `<section class="sgroup flat" data-cat="build"><div class="stitle">Toggles</div>
-    <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
+  const shown = g => g.items.filter(it => !menuHidden(it));
+  const on = typeof supplyOn !== "undefined" && !!supplyOn, supply = `<button class="srow" id="supplyBtn" aria-pressed="${on}" title="Show where keepers haul goods: green farms, blue stores, gold exhibits">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">${on ? "On" : "Off"}</span></span></button>`;
+  const groupEntry = g => `<div class="sitem sgroup" data-group="${g.id}" data-open="grp-${g.id}"><button class="srow head" aria-expanded="false"><svg class="ticon" viewBox="0 0 24 24" aria-hidden="true">${GROUP_ICONS[g.id] || ""}</svg><span class="tl"><b>${esc(g.label.replace(/ Buildings$/, ""))}</b></span></button><div class="ssub">${shown(g).map(flatRows).join("")}${g.id === "logi" ? supply : ""}</div></div>`;
+  const trays = BUILD_CATS.map(c => { const gs = c.groups.map(id => BUILD_MENU.find(g => g.id === id)).filter(Boolean);
+    const entries = c.id === "build" ? gs.map(groupEntry).join("") : gs.map(g => `<div class="sgroup" data-group="${g.id}">${shown(g).map(menuRow).join("")}</div>`).join("");
+    return `<section class="tray" data-cat="${c.id}"><div class="tray-tab">${esc(c.label)}</div><div class="trayA">${entries}</div></section>`; }).join("");
   const big = BUILD_CATS.map(c => `<button class="tbtn big" id="cat-${c.id}" data-cat="${c.id}" aria-expanded="false" aria-controls="sideBody" title="${c.label}" aria-label="${c.label}"><svg viewBox="0 0 24 24" aria-hidden="true">${c.icon}</svg></button>`).join("");
   $("#sideMenu").innerHTML = `<div class="lefttools"><div class="smallrow">
     <button class="tbtn sm" data-tool="bulldoze" aria-pressed="false" title="Bulldoze: remove things (${Math.round(COST.refundShare * 100)}% back)" aria-label="Bulldoze">${menuIcon("bulldoze")}</button>
     <button class="tbtn sm" data-tool="move" aria-pressed="false" title="Move: drag a building, exhibit or path to a new spot" aria-label="Move">${menuIcon("move")}</button></div>
     ${big}</div>
-    <div class="sidebody" id="sideBody" hidden>${groups}${rest}</div>`;
+    <div class="sidebody" id="sideBody" hidden>${trays}</div>`;
+  // The bars have no room for the notes, so each note becomes its button's tooltip (a list's opening note goes on the button that opens it)
+  document.querySelectorAll("#sideBody .snote:not([data-pbiome]):not([data-pnone])").forEach(p => {
+    const prev = p.previousElementSibling, b = prev && prev.matches("button") ? prev : p.parentNode.matches(".ssub") ? p.parentNode.previousElementSibling : p.nextElementSibling && p.nextElementSibling.querySelector(".srow.head");
+    if(b && !b.title) b.title = p.textContent;
+  });
+  if(sideCat) sideOpen(sideCat);
 }
 
 // Grey out what isn't researched yet. Called after anything changes.
