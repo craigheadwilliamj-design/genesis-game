@@ -154,7 +154,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 function newPark(){
   return {
     animalSeq:{},
-    version:1, name:"Genesis Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
+    version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, discoV:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],

@@ -173,7 +173,7 @@ $("#dlgStart").addEventListener("cancel", e => e.preventDefault());
 $("#startContinue").onclick = () => { $("#dlgStart").close(); startWith(savedGame, false); };
 $("#startNew").onclick = () => { startBiome = DEFAULT_PARK_BIOME; biomeCards($("#startBiomes"), startBiome); $("#startName").value = ""; $("#startSetup").hidden = false; $("#startNew").hidden = true; };
 $("#startGo").onclick = () => {
-  const s = newPark(); s.name = $("#startName").value.trim().slice(0, 40) || "Genesis Park"; s.biome = startBiome;
+  const s = newPark(); s.name = $("#startName").value.trim().slice(0, 40) || "New Park"; s.biome = startBiome;
   $("#dlgStart").close(); startWith(s, true); saveNow();
 };
 
@@ -200,7 +200,7 @@ document.querySelectorAll("#rtools [data-dept]").forEach(b => b.onclick = () => 
 });
 panelEl.addEventListener("input", e => {
   if(e.target.id !== "officeName") return;
-  state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true);
+  state.name = e.target.value.slice(0, 40) || "New Park"; ui.hud(true);
   const t = $("#officeTitle"); if(t) t.textContent = state.name;
   saveSoon();
 });
