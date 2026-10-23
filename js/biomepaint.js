@@ -204,7 +204,8 @@ function buildTiles(biome, T, water){
       if(--left) return;
       const px = GROUND_SPAN * GROUND_TILE_PX, pick = groundPicks(T.plain, T.detail, T.share, salt), urls = [];
       // glint tiles (after the detail ones) play as the first `glint` of `frames` frames on every plain cell, each cell starting at its own frame, or by its diagonal (x + y) when `wave` is set, which makes a band of glints sweep down and right; the other frames show its plain tile
-      const lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0]), 1) : T.frames;
+      // `sub` splits every frame into that many steps (fps and periods times `sub`, each glint tile held `sub` steps), so a band moves in smaller steps at the same speed
+      const S = T.sub || 1, lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0] * S), 1) : T.frames * S;
       let done = 0, dead = false;
       const show = u => imgs.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
       const frame = f => {
@@ -214,8 +215,8 @@ function buildTiles(biome, T, water){
         for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
           let t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8);
           if(gl && t < T.plain){ let k = gl;
-            if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const q = (f + P - Math.floor((x + y) % W * P / W) + j) % P; if(q < gl){ k = q; break; } } }
-            else k = (f + cellHash(x + 9001 + salt, y + 31337)) % T.frames;
+            if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const PS = P * S, q = (f + PS - Math.floor((x + y) % W * PS / W) + j * S) % PS; if(q < gl * S){ k = Math.floor(q / S); break; } } }
+            else k = Math.floor((f + cellHash(x + 9001 + salt, y + 31337) * S) % (T.frames * S) / S);
             if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
           const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
           g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
@@ -225,7 +226,7 @@ function buildTiles(biome, T, water){
           if(!b){ dead = true; return; }
           urls[f] = URL.createObjectURL(b);
           if(f === 0) show(urls[0]);
-          if(++done === F && F > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % F]), 1000 / T.fps); }
+          if(++done === F && F > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % F]), 1000 / (T.fps * S)); }
         }); } catch(e){ dead = true; }   // a tainted canvas: keep the single tile
       };
       for(let f = 0; f < F; f++) tileQueueAdd(() => frame(f), f === 0);
