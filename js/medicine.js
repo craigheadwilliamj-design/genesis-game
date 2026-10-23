@@ -4,7 +4,7 @@
    animals hurt each other. Mild illness is hidden until a vet's routine
    check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
    treat minor illnesses on the spot, and dart serious cases; keepers carry
-   those in, and the PMC treats them with CERES medicine once ORACLE has
+   those in, and the PMC treats them with CERES medicine once the Research Lab has
    researched it for their era.
    Vets also dart escaped animals, and keepers carry those home.
    ===================================================================== */
@@ -105,7 +105,7 @@ const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
 const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && geneGain(a) >= GENE.minGain) : [];
 // Why it can't be switched on, or null
 function geneProblem(){
-  if(!hasTech("genetherapy")) return "Research Genome therapy at ORACLE first.";
+  if(!hasTech("genetherapy")) return "Research Genome therapy at the Research Lab first.";
   if(!dept("pmc")) return "Genome therapy needs a connected Paleo-Medicine Center.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
   return null;

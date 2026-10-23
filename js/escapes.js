@@ -143,7 +143,7 @@ function fearFactor(){
   return l.some(x => isDangerous(SPECIES_BY_ID[x.sp])) ? .3 : .7;
 }
 
-// Put a recovered animal back: into its exhibit if keepers can still reach it, otherwise to TAR's holding pens
+// Put a recovered animal back: into its exhibit if keepers can still reach it, otherwise to the Genetics Lab's holding pens
 function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];

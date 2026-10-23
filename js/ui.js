@@ -278,9 +278,9 @@ function exhibitHtml(e){
     h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
     h += `<div class="meta" style="margin-top:6px">Guest appeal: ${Math.round(viewFactor(e, derived.reach) * 100)}%</div>`;
     h += `<div class="row" style="margin-top:8px">`;
-    h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at ORACLE</span>`;
-    h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at ORACLE</span>`;
-    h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at ORACLE</span>`;
+    h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at the Research Lab</span>`;
+    h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at the Research Lab</span>`;
+    h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at the Research Lab</span>`;
     h += `</div>`;
     const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
     h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
@@ -316,7 +316,7 @@ function cloneHtml(e, rep){
   const sc = state.science;
   let h = "";
   if(sc.ready.length){
-    h += `<section><h3>Waiting at TAR</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${sexMark(r)} ${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
+    h += `<section><h3>Waiting at the Genetics Lab</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${sexMark(r)} ${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
   }
   const ready = SPECIES.filter(s => speciesAvailable(s.id) && cloneOpen(s.id) && fitsHabitat(s, e));
   const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
@@ -324,7 +324,7 @@ function cloneHtml(e, rep){
   h += `<section><h3>Add animals</h3>`;
   if(coming.length) h += `<div style="margin-bottom:8px">${coming.map(c => cloneCard(c)).join("")}</div>`;
   if(!ready.length && !forSale.length){
-    h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build ORACLE to research time periods, GHOST to collect DNA, and TAR to clone."
+    h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build the Research Lab to research time periods, GHOST to collect DNA, and the Genetics Lab to clone."
       : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Discover animals by scouting sites with GHOST, then send expeditions until a genome reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
   } else {
     const has = id => ready.some(s => s.period === id) || forSale.some(s => s.period === id);
@@ -411,7 +411,7 @@ function needsHtml(e){
 
 // Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Props tab)
 const ROCKS = ["rock", "boulder"];
-const landLock = t => t.tech && !hasTech(t.tech) ? "Research at ORACLE first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from CERES.` : "";
+const landLock = t => t.tech && !hasTech(t.tech) ? "Research at the Research Lab first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from CERES.` : "";
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
   const here = biomeOf(e), biomes = Object.keys(BIOMES).filter(b => Object.values(PLANTS_OF).some(p => p[b]));
@@ -542,8 +542,8 @@ function healthHtml(e){
     items.push(hli(!e.trash ? "ok" : te >= .25 ? "bad" : "warn", `${e.trash ? `Guests have thrown ${e.trash} piece${e.trash === 1 ? "" : "s"} of trash in today. Tonight each animal has a ${Math.round(te * 100)}% chance of eating some, and ${Math.round(THROWN.deadly * 100)}% of those die.` : "No trash thrown in today."} ${e.net || e.aviary ? `Netting catches ${Math.round(netCatch(e) * 100)}% of it, less as the fence wears. ` : ""}`));
   }
   if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
-  if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at ORACLE to improve them."));
-  if(!anyMedTech()) items.push(hli("warn", "Research medicine at ORACLE so the PMC can treat animals and CERES can make medicated feed."));
+  if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at the Research Lab to improve them."));
+  if(!anyMedTech()) items.push(hli("warn", "Research medicine at the Research Lab so the PMC can treat animals and CERES can make medicated feed."));
   else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   // every animal's health, the worst first; tap one to open it
@@ -557,7 +557,7 @@ function healthHtml(e){
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
-    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at ORACLE.` : "");
+    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at the Research Lab.` : "");
     if(note) h += `<div class="meta">${note.trim()}</div>`;
   }
   return h + `</section>`;
@@ -619,8 +619,8 @@ function animalCard(s, rep, mode){
   h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
   if(mode === "clone") h += ` Genome ${state.science.dna[s.id].genome}% complete, clones ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% failure risk` : ""}. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
   h += `</span>`;
-  if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build TAR to clone it.</span>`;
-  else if(mode === "clone" && !dept("tar")) h += `<span class="warn">TAR isn't connected to a path or service road.</span>`;
+  if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build the Genetics Lab to clone it.</span>`;
+  else if(mode === "clone" && !dept("tar")) h += `<span class="warn">The Genetics Lab isn't connected to a path or service road.</span>`;
   else if(!locked) h += fitLine;
   if(!locked && rep.exhibit && !rep.exhibit.viv){ const risk = escapeRisk(rep.exhibit, s); if(risk) h += `<span class="warn">${esc(risk)}</span>`; }
   return h + `</li>`;
@@ -628,7 +628,7 @@ function animalCard(s, rep, mode){
 
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><div><h2>${t.label}</h2><div class="meta">${esc(t.full)}</div></div>`;
+  let h = `<button class="back" data-action="deselect">‹ Park office</button><div><h2>${t.label}</h2>${t.full ? `<div class="meta">${esc(t.full)}</div>` : ""}</div>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Staffed and running" : "Not connected"}</span><span class="meta">${money(t.upkeep)} a day to run</span></div>`;
   if(!ok) h += `<div class="meta" style="color:var(--bad)">Staff can't get here. Run a path or service road from the entrance to it. Until then it does nothing.</div>`;
   return h;
@@ -704,8 +704,8 @@ function pmcHtml(b){
   const cm = Math.floor(pmcStock(CMED));
   h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
   h += `<div class="meta" style="margin-top:4px">Order it at a Delivery Dock, ${money(MODERN.cost)} a dose, and custodians carry it here. It eases any illness but never cures it fully: animals go home with a chronic case. It works best on Cenozoic animals and worst on Paleozoic ones.</div>`;
-  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "fully curable once ORACLE refines the medicine for their period" : `contemporary medicine gets them to ${100 - MODERN.floor[era]}% at best. Research ${ERA_LABEL[era]} medicine at ORACLE, and refine it for each period, for a full cure`}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once ORACLE researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())}, up to ${medCap()} of each era's. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
+  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "fully curable once the Research Lab refines the medicine for their period" : `contemporary medicine gets them to ${100 - MODERN.floor[era]}% at best. Research ${ERA_LABEL[era]} medicine at the Research Lab, and refine it for each period, for a full cure`}</li>`).join("")}</ul>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once the Research Lab researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())}, up to ${medCap()} of each era's. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
@@ -804,7 +804,7 @@ function pathHtml(p){
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
-  if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like ORACLE, GHOST, and TAR can use it.</div>`;
+  if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like the Research Lab, GHOST, and the Genetics Lab can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
   if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
@@ -941,9 +941,9 @@ function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
-  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at TAR for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
+  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at the Genetics Lab for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A GHOST drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. TAR needs ${CLONE_GENOME.min}% to clone it. Send a GHOST expedition for more.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. The Genetics Lab needs ${CLONE_GENOME.min}% to clone it. Send a GHOST expedition for more.`, lock};
   const where = sitesOf(s.id).filter(siteShown).map(x => isScouted(x.id) ? x.name : `an unscouted ${sitePeriod(x)} site`);
   if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Discovered. Send a GHOST expedition to ${where[0] || "its site"} to collect its DNA.`, lock};
   return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};

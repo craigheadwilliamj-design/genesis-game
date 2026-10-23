@@ -639,7 +639,7 @@ function fenceProblem(pts, barrier, free){
   const B = BARRIERS[barrier] || BARRIERS.wood;
   if(pts.length < 2) return "Needs at least 2 corners.";
   if(lineLength(pts) < 2) return "Too short.";
-  if(!free && B.tech && !hasTech(B.tech)) return `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.`;
+  if(!free && B.tech && !hasTech(B.tech)) return `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.`;
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "It runs into an exhibit.";
   if(state.buildings.some(b => lineEntersShape(pts, b.points) || lineShapeDist(pts, b.points) < .3)) return "It runs into a building.";
@@ -774,7 +774,7 @@ function landProblem(e, key, x, y, pic, biome){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at ORACLE first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at ORACLE first.`;
+  if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at the Research Lab first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at the Research Lab first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   if(t.ceres && state.ceres.stock < t.ceres) return `Takes ${t.ceres} Paleoflora from CERES, which has ${Math.floor(state.ceres.stock)}.`;
   const why = landFit(e, key, x, y, pic, biome);
@@ -814,8 +814,8 @@ function decorProblem(key, x, y, pic, biome){
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return statuesOn() ? `${t.label} is locked. ${statueHint(key)}` : "Statues aren't available yet.";
-  if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
-  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
+  if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at the Research Lab to plant this one out here.";
+  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at the Research Lab first.`;
   if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
   const why = decorFit(key, x, y, pic, biome);
   if(why) return why;

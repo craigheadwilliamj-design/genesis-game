@@ -224,7 +224,7 @@ function newGround(faces){
 // o.dir and o.side: which way the run goes, and which side of it the pointer is on (1 / -1 / 0 near the line). On a wall two pens share, the fence goes on the pointer's side only; with the pointer on the wall (0), both sides change.
 function planPieces(keys, barrier, o = {}){
   const B = BARRIERS[barrier], P = fencePieces(), out = {todo:[], next:{}, cost:0, why:null, note:""};
-  if(B.tech && !hasTech(B.tech)) return {...out, why:`Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.`};
+  if(B.tech && !hasTech(B.tech)) return {...out, why:`Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.`};
   const dirs = o.dir && o.side && !o.meet ? faceDirs(P) : null;
   let kept = 0, swapped = 0, sided = 0;
   for(const k of keys){

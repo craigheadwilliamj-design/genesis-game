@@ -291,8 +291,8 @@ const eduUpkeep = b => showsUpkeep(b) + (b.type === "edcenter" ? modsOf(b).reduc
 const modsReady = b => Object.keys(EDU_MODULES).filter(id => hasTech(EDU_MODULES[id].tech) && !modsOf(b).includes(id));
 function modProblem(b, id){
   const m = EDU_MODULES[id];
-  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at ORACLE first."
-    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "TAR"} first.`
+  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at the Research Lab first."
+    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "the Genetics Lab"} first.`
     : modsOf(b).includes(id) ? "It's already installed."
     : modsOf(b).length >= EDU_CENTER.moduleSlots ? `An Education Center has room for ${EDU_CENTER.moduleSlots} modules. Remove one first.`
     : !canAfford(m.price) ? `Installing it costs ${money(m.price)}. You have ${money(state.money)}.` : null;

@@ -58,7 +58,7 @@ const cerMedTotal = () => MED_GOODS.reduce((s, t) => s + (cerMeds()[t] || 0), 0)
 const pmcStock = g => { const p = pmcBuilding(); return p ? (g ? stockOf(p, g) : MED_GOODS.reduce((s, t) => s + stockOf(p, t), 0)) : 0; };   // no good named: the era medicines together
 const medOnHand = pmcStock;
 function useMeds(n, g){ const p = pmcBuilding(); if(p) takeGood(p, g, n); }
-// the eras whose medicine ORACLE has researched, so the PMC only reserves room for those
+// the eras whose medicine the Research Lab has researched, so the PMC only reserves room for those
 const medGoodsWanted = () => MED_GOODS.filter(g => hasTech(MED_TECH[Object.keys(MED_GOOD).find(k => MED_GOOD[k] === g)]));
 
 /* ---------- zones ---------- */

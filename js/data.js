@@ -66,7 +66,7 @@ const UPKEEP = {
 };
 
 // Animals.
-//   price    what one costs to buy, or to clone at TAR
+//   price    what one costs to buy, or to clone at the Genetics Lab
 //   food     feed cost per animal per day
 //   space    square meters each animal needs
 //   group    [fewest, most] of this species that are happy living together
@@ -249,7 +249,7 @@ const VIVARIUMS = {
 };
 
 /* ---------------------------------------------------------------------
-   SCIENCE: ORACLE, GHOST, and TAR
+   SCIENCE: The Research Lab, GHOST, and the Genetics Lab
    --------------------------------------------------------------------- */
 
 // Time periods. Every site in a period (TIME_SITES) shares its trip:
@@ -402,7 +402,7 @@ const SCIENTISTS = {
   paleo:    {label:"Researcher",         plural:"Researchers",         dept:"oracle", hireCost:3000, wage:250,
              text:"Each one runs one research bay. Left on general research, a researcher earns 4 research points a day. Put them on a project and they stop earning until it is done."},
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
-             text:"Each one runs an incubator bay, so TAR can grow that many clones at the same time."},
+             text:"Each one runs an incubator bay, so the Genetics Lab can grow that many clones at the same time."},
   botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
              text:"Each one tends a growing bed, so CERES can grow that many batches at the same time."},
 };
@@ -426,14 +426,14 @@ const SCOUT = {find:[.35, .65], max:2};
 // GHOST's drones replace expedition teams: each flies one trip at a time. GHOST comes with one; the next costs `price`, and each
 // one after that `growth` times the last, up to `max`. They aren't staff (no wage).
 const DRONES = {max:5, price:15000, growth:1.5};
-// Drone marks: every park starts with Mk. I; ORACLE researches the rest in order (TECH ghostmk2-5). `cut` is the share of the
+// Drone marks: every park starts with Mk. I; the Research Lab researches the rest in order (TECH ghostmk2-5). `cut` is the share of the
 // chance a trip comes back empty handed that the mark takes away, scouting and expeditions alike.
 const GHOST_MK = [{name:"Mk. I", cut:0}, {name:"Mk. II", tech:"ghostmk2", cut:.15}, {name:"Mk. III", tech:"ghostmk3", cut:.3},
                   {name:"Mk. IV", tech:"ghostmk4", cut:.4}, {name:"Mk. V", tech:"ghostmk5", cut:.5}];
 // Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
 const TRIP_SIZE = [10, 5000];
 
-// Plant genomes, one per Mesozoic or Paleozoic period. GHOST collects each from its own period, once ORACLE has researched that era's flora.
+// Plant genomes, one per Mesozoic or Paleozoic period. GHOST collects each from its own period, once the Research Lab has researched that era's flora.
 // CERES needs a period's genome complete before it grows that period's plants (and any complete one lets it grow Paleoflora food).
 //   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
 const PLANT_DNA = {};
@@ -465,20 +465,20 @@ const MUSEUM_EVENTS = [
 const MUSEUM_BY_ID = Object.fromEntries(MUSEUM_EVENTS.map(e => [e.id, e]));
 const MUSEUM = {
   slots:3,             // attractions one Education Center can show at once
-  needTech:"education",// GHOST can start recording events once ORACLE has researched this
+  needTech:"education",// GHOST can start recording events once the Research Lab has researched this
 };
 
 // What an Education Center is for. A center with a focus gets its effect every visit, times its strength:
 // 1 plus the boost each installed module gives that focus. Pick it in the center's panel.
 //   donate   dollars a guest drops in the box per visit. appeal: keenness to visit. joy/learn: mood and learning per visit.
-//   science  ORACLE research points a guest's visit adds
+//   science  research points a guest's visit adds
 const EDU_FOCUS = {
   conservation:{label:"Conservation", donate:2.5, text:"Guests give to the cause. Donations on every visit."},
   spectacle:   {label:"Spectacle",    appeal:12,  text:"A show worth walking across the park for. Guests are keener to come."},
   family:      {label:"Family",       joy:5, learn:4, text:"Made for kids and parents. Guests leave happier and know more."},
-  research:    {label:"Research",     science:.06, text:"Visitors help real science. Every visit earns ORACLE research points."},
+  research:    {label:"Research",     science:.06, text:"Visitors help real science. Every visit earns research points."},
 };
-// Modules added to a center (ORACLE tech `tech`, which needs education programs). Each also teaches on its own.
+// Modules added to a center (Research Lab tech `tech`, which needs education programs). Each also teaches on its own.
 //   boost    adds to the strength of those focuses
 //   slots    more guests that can sit through a visit at once
 //   perSpecies  learning grows with the animals GHOST has discovered
@@ -492,9 +492,9 @@ const EDU_MODULES = {
   auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
               text:"Tiered seating for lectures. More guests can sit through a talk at once."},
   labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
-              text:"A gallery over the working labs. It's only as good as what's going on: ORACLE, GHOST, TAR and CERES all busy makes the best show."},
+              text:"A gallery over the working labs. It's only as good as what's going on: the Research Lab, GHOST, the Genetics Lab and CERES all busy makes the best show."},
   nursery:   {label:"Nursery Window",   tech:"ednursery",   price:11000, upkeep:100, learn:3, joy:4, appeal:6, live:"nursery", dept:["tar"], boost:{family:.7, conservation:.3, spectacle:.2},
-              text:"Watch clones in the incubators, and the day one hatches. Needs TAR, and the best shows are while clones are growing."},
+              text:"Watch clones in the incubators, and the day one hatches. Needs the Genetics Lab, and the best shows are while clones are growing."},
   botanical: {label:"Botanical Hall",   tech:"edbotanical", price:13000, upkeep:110, learn:5, joy:3, appeal:3, live:"botany", dept:["ceres"], boost:{conservation:.6, family:.4, research:.2},
               text:"A glasshouse of living prehistoric plants from CERES. It grows richer as more plant DNA is finished and while beds are growing."},
   simroom:   {label:"Simulation Room",  tech:"edsimroom",   price:18000, upkeep:150, learn:7, joy:3, appeal:8, live:"sim", dept:["ghost"], boost:{spectacle:.5, research:.5, family:.2},
@@ -507,13 +507,13 @@ const EDU_MODULES = {
 const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5, simIdle:.2, simPlaces:4, biomes:4, genomes:8};   // a live module with nothing going on still works at this share
 const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 
-// What one animal clone takes at TAR, in open days: 1 plus 1 more for every this many m² the species needs
+// What one animal clone takes at the Genetics Lab, in open days: 1 plus 1 more for every this many m² the species needs
 const CLONE_DAYS_PER_SPACE = 1000;
-// TAR upgrades, researched at ORACLE: each level of speed cuts clone time
+// Genetics Lab upgrades, researched at the Research Lab: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
-// GHOST upgrades, researched at ORACLE: trip price and time multipliers per level
+// GHOST upgrades, researched at the Research Lab: trip price and time multipliers per level
 const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
-// Cloning from a partial genome: TAR clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
+// Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
 // runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
 const CLONE_GENOME = {min:60, q0:40, failMax:.35};
 // Clones from a partial genome can die in the incubator: `failMax` chance at the minimum, none once the genome is whole. A failed clone stops
@@ -528,7 +528,7 @@ const CLONE_FAIL = {from:.2, to:.9, causes:[
   "Organ-field patterning arrested",
 ]};
 
-// What CERES grows in its beds. Works like TAR's incubators, but with plants.
+// What CERES grows in its beds. Works like the Genetics Lab's incubators, but with plants.
 //   days    how long one batch takes, in open days
 //   cost    what one batch costs
 //   doses   (medicine) doses one batch makes
@@ -603,14 +603,12 @@ const BUILDINGS = {
   tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
-  oracle:   {label:"ORACLE", one:"ORACLE", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
-             full:"Operational Requests for Ancestral & Chronological Life Evidence",
-             blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and TAR upgrades. Research takes time."},
+  oracle:   {label:"Research Lab", one:"the Research Lab", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
+             blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and Genetics Lab upgrades. Research takes time."},
   ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:15000, upkeep:200, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
              blurb:"The time travel unit. Its drones scout real fossil sites across deep time to discover animals, then go back for their DNA."},
-  tar:      {label:"TAR",    one:"TAR",    glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
-             full:"Terrestrial Animal Reconstruction",
+  tar:      {label:"Genetics Lab", one:"the Genetics Lab", glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
              blurb:"The cloning lab. Turns complete genomes into living animals."},
 };
 
@@ -1047,7 +1045,7 @@ const CLEAN = {
 // Exhibit barriers. An animal escapes if its strength is more than the barrier's.
 //   perMeter   cost to upgrade, per meter of fence
 //   view       how well guests can see in (concrete hides the animals)
-//   tech       what ORACLE has to research first
+//   tech       what the Research Lab has to research first
 //   deco       decoration (hedge, rope): guests like it, and it holds animals like any other wall
 const BARRIERS = {
   wood:     {label:"Wooden fence",      strength:25,  perMeter:0,   view:1.0,  tech:null,       color:"#3B3226"},
@@ -1131,7 +1129,7 @@ const ERA_OF = {Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleoz
                 Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
 
 // What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
-//   tech     what ORACLE has to research first
+//   tech     what the Research Lab has to research first
 const FLORA = {
   cenozoic:  {label:"Cenozoic",  plants:"grasses and flowering plants",              tech:null},
   mesozoic:  {label:"Mesozoic",  plants:"cycads, conifers, ginkgos, and ferns",      tech:"mesoplant"},
@@ -1150,7 +1148,7 @@ const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full gr
 
 BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
                    full:"Cultivated Ecosystem Rations & Environmental Synthesis",
-                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once ORACLE has researched them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
+                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once the Research Lab has researched them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -1268,8 +1266,8 @@ BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:
 const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
 const ZONE_MIN_AREA = 200;
 
-// Things ORACLE can research besides animals. Each one takes time (see RESEARCH_MIN_PER_POINT).
-//   group   which ORACLE tab it sits on: "barrier" and "build" under Park Management, "tar" for TAR upgrades,
+// Things the Research Lab can research besides animals. Each one takes time (see RESEARCH_MIN_PER_POINT).
+//   group   which Research Lab tab it sits on: "barrier" and "build" under Park Management, "tar" for Genetics Lab upgrades,
 //           "flora" and "med" under Paleo-Flora
 //   needs   another project that has to finish first
 //   era     (flora, med) the era it belongs to
@@ -1288,7 +1286,7 @@ const TECH = [
   {id:"edfossils", group:"build", label:"Fossil displays", points:40, needs:"education", text:"Add Fossil Displays to an Education Center. They teach more as you unlock more animals."},
   {id:"edauditorium", group:"build", label:"Education auditorium", points:55, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
   {id:"edlabwindow", group:"build", label:"Live lab window", points:50, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
-  {id:"ednursery", group:"build", label:"Nursery window", points:50, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch TAR's clones grow, and love a hatching."},
+  {id:"ednursery", group:"build", label:"Nursery window", points:50, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch the Genetics Lab's clones grow, and love a hatching."},
   {id:"edbotanical", group:"build", label:"Botanical hall", points:50, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
   {id:"edsimroom", group:"build", label:"Simulation room", points:65, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
   {id:"ediorama", group:"build", label:"Ecosystem diorama", points:50, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
@@ -1302,7 +1300,7 @@ const TECH = [
   {id:"vehicles",   group:"build", label:"Staff vehicles",   points:70, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"transit",   group:"build", label:"Guest tram",       points:60, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
   {id:"foodprod",  group:"build", label:"Food production",  points:18, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
-  // TAR upgrades
+  // Genetics Lab upgrades
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:35, text:"Clones finish in three quarters of the time."},
   {id:"fast2",    group:"tar", label:"Much faster incubators", points:80, needs:"fast1", text:"Clones finish in about half the time."},
   // GHOST upgrades
@@ -1373,7 +1371,7 @@ const HEALTH = {
   healPerNight:45,     // severity a treated patient recovers each night
   dose:2,              // medicine doses one patient's treatment uses
 };
-// Genome therapy (ORACLE tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
+// Genome therapy (Research Lab tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
 const GENE = {
   minutes:10,          // extra time a check-up takes for each animal treated
   step:20,             // most DNA quality points one procedure adds
@@ -1384,7 +1382,7 @@ const GENE = {
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
                      "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
-// CERES grows medicine in batches (see CERES_GROW) once ORACLE has unlocked its type
+// CERES grows medicine in batches (see CERES_GROW) once the Research Lab has unlocked its type
 const MEDICINE = {
   capacity:60,         // doses CERES holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
@@ -2800,7 +2798,7 @@ const THEMES = {
         base:{c:"#9A9EA0", w:14, c2:"#6C7276", dash2:"2 7"},
         more:[{c:"#A9D8D3", w:5.4}, {c:"#F2FFFD", w:1.2, dash:"11 7 3 9"}, {c:"#4B3121", w:1.8},
           {c:"#1E2226", w:11, dash:"0 30", cap:"square"}, {c:"#8E979D", w:5, dash:"0 30", cap:"square"}, {c:"#B5552D", w:2, dash:"0 120", cap:"square"}]}},
-    unlock:{hint:"Research Modern design at ORACLE.", check:() => hasTech("modern")}},
+    unlock:{hint:"Research Modern design at the Research Lab.", check:() => hasTech("modern")}},
   japanese: {label:"Japanese Garden", ground:"#7FA68F", tex:"japanese", gtex:"japanese-moss", ptex:"japanese-plank", btex:"japanese-tile", blurb:"Calm and precise: curved tile roofs, golden thatch, dark timber walkways with pebble edges, bamboo lattice and plaster walls, clipped moss and raked gravel. Red is kept for lanterns.",
     path:{live:"#6A5240", dead:"#54402F", edge:"#2E2118", kerb:{c:"#CFCBBE", dash:"2.4 1.6"}}, bld:"#3C4146", mix:.85, edge:"#1F1A16", accent:"#C8442E", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
@@ -2955,27 +2953,27 @@ const GOALS = [
   {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.length>0},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, custodians stock a station from it, and keepers carry the food out to the exhibits. Partner parks cover the first deliveries.", reward:5500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a Custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3500, check:g=>(g.state.staff.custodians || []).length>0},
-  {id:"guard",    text:"Hire a Security Guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at ORACLE, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:4000, check:g=>(g.state.staff.guards || []).length>0},
+  {id:"guard",    text:"Hire a Security Guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at the Research Lab, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:4000, check:g=>(g.state.staff.guards || []).length>0},
   {id:"gate",     text:"Give an exhibit a Keeper Gate",      hint:"Run a path or service road to an exhibit's fence, then use Gates under Exhibit Tools on that fence.", reward:3000, check:g=>g.state.exhibits.some(e=>!e.viv && e.gate && gateCheck(e).ok)},
   {id:"mechanic", text:"Hire a Mechanic",                    hint:"Fences wear down, and predators attack them. Build a Workshop beside a path or service road and hire a mechanic to inspect and repair them.", reward:4500, check:g=>(g.state.staff.mechanics || []).length>0},
   {id:"vet",      text:"Hire a Vet",                         hint:"Animals get sick, and some get hurt fighting. Build a Paleo-Medicine Center beside a path or service road and hire a vet. Vets also dart escaped animals.", reward:14000, check:g=>(g.state.staff.vets || []).length>0},
   {id:"zone",     text:"Draw a Work Zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  statue:"lyst", check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  statue:"kele", check:g=>g.state.history.some(h=>h.guests>=1000)},
-  {id:"oracle",   text:"Build ORACLE",                       hint:"ORACLE researches everything from fences to GHOST's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"oracle",   text:"Build the Research Lab",                       hint:"The Research Lab researches everything from fences to GHOST's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build GHOST, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
   {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a GHOST drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
   {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Devonian, Carboniferous or Permian site with a GHOST drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
-  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with GHOST's expeditions, then clone it at TAR.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
+  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with GHOST's expeditions, then clone it at the Genetics Lab.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
   {id:"ghost",    text:"Bring back DNA with GHOST",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at GHOST and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
-  {id:"clone",    text:"Build TAR and clone an animal",      hint:"TAR turns a complete genome into an animal. Hire a Geneticist at TAR, then order clones from TAR or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
-  {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once ORACLE has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
+  {id:"clone",    text:"Build the Genetics Lab and clone an animal",      hint:"The Genetics Lab turns a complete genome into an animal. Hire a Geneticist at the Genetics Lab, then order clones from the Genetics Lab or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
+  {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once the Research Lab has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
   {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},
   {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Reach 4.5 stars, discover the Tyrannosaurus at Hell Creek with GHOST, collect its genome, and clone it. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
-  {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at ORACLE. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
+  {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at the Research Lab. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},
 ];

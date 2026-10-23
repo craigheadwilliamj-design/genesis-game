@@ -1,8 +1,8 @@
 /* =====================================================================
    SCIENCE
-   ORACLE researches (fences, buildings, plants, medicine, TAR and GHOST
+   The Research Lab researches (fences, buildings, plants, medicine, the Genetics Lab and GHOST
    upgrades), GHOST's drones discover animals at real sites in deep time
-   and fill their genomes, TAR clones animals, and CERES grows plants and
+   and fill their genomes, the Genetics Lab clones animals, and CERES grows plants and
    medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
    finish at any hour rather than at the daily rollover.
@@ -60,11 +60,11 @@ function fireScientist(kind){
   }
 }
 
-/* ---------- ORACLE: research ---------- */
+/* ---------- Research Lab: research ---------- */
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
 const researching = (kind, id) => state.science.projects.some(p => p.kind === kind && p.id === id);
-// Discovered: GHOST's scouting turned it up (or, in old saves, ORACLE unlocked it)
+// Discovered: GHOST's scouting turned it up (or, in old saves, the Research Lab unlocked it)
 const isUnlocked = id => state.science.unlocked.includes(id);
 
 // A project is {kind, id}: "tech" (anything in TECH) or "refine" (an era's medicine, for one period)
@@ -93,7 +93,7 @@ function startProject(kind, id){
   const sc = state.science, info = projectInfo(kind, id), now = nowMin();
   sc.points -= info.points;
   sc.projects.push({kind, id, bay:freeBay("paleo"), cost:info.points, start:now, end:now + projectMinutes(info.points)});
-  events.toast(`ORACLE started researching ${info.label.toLowerCase()}. It takes about ${spanText(projectMinutes(info.points))}.`);
+  events.toast(`The Research Lab started researching ${info.label.toLowerCase()}. It takes about ${spanText(projectMinutes(info.points))}.`);
   return null;
 }
 // Take a researcher off a project and back to general research. The points come back.
@@ -106,7 +106,7 @@ function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
   const tech = p.kind === "refine" ? "ref-" + p.id : p.id;
   if(!hasTech(tech)) sc.tech.push(tech);
-  events.toast(`ORACLE finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
+  events.toast(`The Research Lab finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 
 /* ---------- GHOST: the timeline, sites and drones ---------- */
@@ -151,10 +151,10 @@ const isScouted = id => !!state.science.seen[id];
 // The animals scouting has turned up at a site
 const siteSeen = s => siteFauna(s).filter(f => (state.science.seen[s.id] || []).includes(f));
 const siteComplete = s => !s.event && isScouted(s.id) && siteSeen(s).length === siteFauna(s).length;
-// A lit site shows its name and can take expeditions: scouted, or an event site once ORACLE has education programs
+// A lit site shows its name and can take expeditions: scouted, or an event site once the Research Lab has education programs
 const siteLit = s => s.event ? hasTech(MUSEUM.needTech) : isScouted(s.id);
 // What an expedition to a lit site can bring back: its event, or the animals seen there plus its period's plant DNA once
-// ORACLE has that flora
+// The Research Lab has that flora
 function siteTargets(s){
   if(s.event) return [s.event];
   const f = PLANT_DNA[sitePeriod(s)];
@@ -271,7 +271,7 @@ function tripReturns(t){
       const d = sc.dna[t.sp];
       lines.push([g.event ? `${g.name} Recording Made` : `${g.name} Sample Found`, true]);
       if(d.genome >= 100 && was < 100) lines.push([g.event ? `${g.name} Record Complete` : `${g.name} Genome Complete`, true]);
-      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push(["TAR can clone it now, though the clones will be frail until the genome is more complete."]);
+      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push(["The Genetics Lab can clone it now, though the clones will be frail until the genome is more complete."]);
       // sometimes the drone also turns up traces of another animal seen at the same site
       const others = g.event ? [] : siteSeen(s).filter(x => x !== t.sp && !genomeDone(x));
       if(others.length && Math.random() < TRIP.bonus.chance){
@@ -289,21 +289,21 @@ function tripReturns(t){
 }
 function dismissReport(id){ const sc = state.science; sc.reports = sc.reports.filter(r => r.id !== id); }
 
-/* ---------- TAR: cloning ---------- */
+/* ---------- Genetics Lab: cloning ---------- */
 
 const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fast1") ? TAR_UPGRADE.speed : 1;
 // How long a clone takes: 1 open day plus 1 more for every CLONE_DAYS_PER_SPACE m², less with faster incubators
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
-// TAR can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
+// The Genetics Lab can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
 const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
 const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
 // The chance a clone dies in the incubator: CLONE_GENOME.failMax at the minimum genome, nothing at 100%
 const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
 function failClone(j){
   j.failed = true; j.stop = clamp((j.fail - j.start) / Math.max(1, j.end - j.start) * 100, 0, 100);
-  events.toast(`TAR: the ${SPECIES_BY_ID[j.sp].name} clone failed at ${Math.round(j.stop)}%. ${j.why}. Discard the specimen to free the incubator.`, "bad");
+  events.toast(`The ${SPECIES_BY_ID[j.sp].name} clone at the Genetics Lab failed at ${Math.round(j.stop)}%. ${j.why}. Discard the specimen to free the incubator.`, "bad");
   events.changed();
 }
 function discardClone(id){
@@ -314,9 +314,9 @@ function discardClone(id){
 function cloneProblem(sp){
   const s = SPECIES_BY_ID[sp], d = state.science.dna[sp];
   return deptProblem("tar") ||
-    (!state.science.crew.gene ? "Hire a Geneticist at TAR to run the incubators." : null) ||
+    (!state.science.crew.gene ? "Hire a Geneticist at the Genetics Lab to run the incubators." : null) ||
     (freeBay("gene") < 0 ? bayFull("gene", "Geneticist") : null) ||
-    (!cloneOpen(sp) ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. TAR needs ${CLONE_GENOME.min}% to clone it.` : null) ||
+    (!cloneOpen(sp) ? `${s.name}'s genome is ${d ? d.genome : 0}% complete. The Genetics Lab needs ${CLONE_GENOME.min}% to clone it.` : null) ||
     (!canAfford(s.price) ? `Cloning costs ${money(s.price)}. You have ${money(state.money)}.` : null);
 }
 const cloneReadyMin = sp => nowMin() + cloneMinutes(sp);
@@ -330,7 +330,7 @@ function orderClone(sp, exhibitId, sex){
   // a partial genome can fail partway (never in sandbox)
   if(!state.sandbox && Math.random() < cloneFailChance(sp)){ job.fail = start + rand(CLONE_FAIL.from, CLONE_FAIL.to) * (end - start); job.why = CLONE_FAIL.causes[Math.floor(Math.random() * CLONE_FAIL.causes.length)]; }
   state.science.clones.push(job);
-  events.toast(`TAR started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
+  events.toast(`The Genetics Lab started a ${sex} ${s.name} clone. Ready ${whenText(end)}.`);
   return true;
 }
 function putAnimal(e, a){
@@ -353,8 +353,8 @@ function placeReady(id, exhibitId){
 function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
-  if(e){ putAnimal(e, c); events.toast(`TAR finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`TAR finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
+  if(e){ putAnimal(e, c); events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
+  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`The Genetics Lab finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
 }
 
 /* ---------- CERES: growing plants and medicine ---------- */
@@ -374,13 +374,13 @@ function growProblem(kind, era, size){
   if(!sc.crew.botanist) return "Hire a botanist at CERES to tend a growing bed.";
   if(kind === "plant"){
     const f = FLORA[ERA_OF[era]];
-    if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at ORACLE first.`;
+    if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at the Research Lab first.`;
     if(PLANT_DNA[era] && !plantDnaDone(era)) return `GHOST has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
   } else if(kind === "food"){
-    if(!hasTech("paleoflora")) return "Research Paleoflora cultivation at ORACLE first.";
+    if(!hasTech("paleoflora")) return "Research Paleoflora cultivation at the Research Lab first.";
     if(!anyPlantDna()) return "CERES needs plant DNA first.";
   } else {
-    if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at ORACLE first.`;
+    if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at the Research Lab first.`;
     if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
   }
   if(freeBay("botanist") < 0) return bayFull("botanist", "botanist");
@@ -438,7 +438,7 @@ function scienceTick(dtMin){
     sc.trips = sc.trips.filter(t => t.end > now);
     back.forEach(tripReturns);
   }
-  // with TAR closed or nobody to run it, every clone waits
+  // with the Genetics Lab closed or nobody to run it, every clone waits
   if(sc.clones.length){
     if(!tarWorking()) for(const j of sc.clones){ if(j.failed) continue; j.start += dtMin; j.end += dtMin; if(j.fail !== undefined) j.fail += dtMin; }
     else {

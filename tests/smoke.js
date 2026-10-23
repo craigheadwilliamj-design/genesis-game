@@ -1192,7 +1192,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
     out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at CERES to tend a growing bed.";
     hireScientist("botanist");
-    out.floraLocked = /ORACLE/.test(growProblem("plant", "Jurassic", "small"));
+    out.floraLocked = /Research Lab/.test(growProblem("plant", "Jurassic", "small"));
     sc.tech.push("paleoflora", "mesoplant", "medmeso");
     out.floraNeedsDna = /plant DNA/.test(growProblem("plant", "Jurassic", "small")) && !ceresRate();
     out.dnaPerPeriod = PLANT_DNA.Jurassic.id === "flora-Jurassic" && siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Jurassic.id) && !siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Triassic.id) && genomeOpen(PLANT_DNA.Jurassic.id) && !genomeOpen(PLANT_DNA.Devonian.id);
@@ -3174,7 +3174,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = DAWN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
     const a = rate(1), b = rate(8), c = rate(240);
     out.pointsIgnoreStepSize = Math.abs(a - b) < 1e-6 && Math.abs(a - c) < 1e-6 && a > 0;
-    // a clone waits (its clock held) while TAR has no geneticist, then finishes on schedule after one is hired
+    // a clone waits (its clock held) while the Genetics Lab has no geneticist, then finishes on schedule after one is hired
     sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = DAWN_MIN + 20;
     state.rating = 5; const why0 = cloneProblem(sp.id); orderClone(sp.id, null); if(!sc().clones[0]) return {why:"clone: " + why0 + " crew " + JSON.stringify(sc().crew) + " tar " + !!dept("tar")}; const cl = sc().clones[0], len = cl.end - cl.start, g = sc().crew.gene; sc().crew.gene = 0;
     for(const k of Object.keys(seen)) delete seen[k];
@@ -3346,7 +3346,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   Object.assign(checks, decks);
 
-  // Genome quality is completeness: TAR clones from 60%, and the closer to 100% the healthier the clone
+  // Genome quality is completeness: The Genetics Lab clones from 60%, and the closer to 100% the healthier the clone
   const gq = await page.evaluate(() => {
     const out = {}, sc = state.science, keep = {dna:sc.dna, sb:state.sandbox, clones:sc.clones.slice(), money:state.money, rating:state.rating, tech:sc.tech.slice()};
     const sp = SPECIES.find(s => !s.viv && !s.stars) || SPECIES.find(s => !s.viv);

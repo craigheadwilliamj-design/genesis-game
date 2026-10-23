@@ -129,17 +129,17 @@ function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wag
 
 function freshScience(){
   return {
-    points:0,          // unspent ORACLE research points
+    points:0,          // unspent points
     crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
-    tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
-    projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
+    tech:["bars"],           // everything the Research Lab has researched (TECH ids, plus "ref-<Period>" for refined medicine)
+    projects:[],       // The Research Lab's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals discovered (GHOST's scouting turned them up), so drones can go back for their DNA
     dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
     drones:1,          // GHOST's drones, one trip each at a time (GHOST comes with one; buy more there)
     seen:{},           // site id (TIME_SITES) -> the animals scouting has turned up there; a site in here has been scouted
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
     reports:[],        // post-mission reports waiting at GHOST, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
-    clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
+    clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
   };
@@ -443,7 +443,7 @@ function upgradeSave(s){
   }
   // contemporary medicine used to be a counter the suppliers refilled; now it is stock in the PMC
   if(s.health.cmeds !== undefined){ const pmc = s.buildings.find(b => b.type === "pmc"); if(pmc && s.health.cmeds > 0){ pmc.store = pmc.store || {}; pmc.store[CMED] = (pmc.store[CMED] || 0) + s.health.cmeds; } delete s.health.cmeds; }
-  // medicine used to be one good. Split what's on hand across the eras ORACLE has researched (else Cenozoic), so nothing is lost.
+  // medicine used to be one good. Split what's on hand across the eras the Research Lab has researched (else Cenozoic), so nothing is lost.
   {
     const eras = Object.keys(MED_TECH).filter(e => s.science.tech.includes(MED_TECH[e])), into = (eras.length ? eras : ["cenozoic"]).map(e => MED_GOOD[e]);
     const split = (n, put) => { const each = Math.floor(n / into.length); into.forEach((g, i) => put(g, i === 0 ? n - each * (into.length - 1) : each)); };
@@ -460,7 +460,7 @@ function upgradeSave(s){
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
   // discovery moved to GHOST's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
-  // animal already unlocked starts scouted with those animals seen, ORACLE species projects are paid back, and trips still out
+  // animal already unlocked starts scouted with those animals seen, Research Lab species projects are paid back, and trips still out
   // are given a site so they land as expeditions.
   if(s.discoV !== 1){
     sc.drones = clamp(Math.max(sc.crew.temporal || 0, sc.trips.length, 1), 1, DRONES.max);
@@ -835,7 +835,7 @@ function dailyCosts(){
   return {feed:Math.round(feed), wages:Math.round(wages), upkeep:Math.round(upkeep), research};
 }
 
-/* ---------- science: ORACLE, GHOST, TAR, and CERES (the rest is in science.js) ---------- */
+/* ---------- science: Research Lab, GHOST, the Genetics Lab, and CERES (the rest is in science.js) ---------- */
 
 const PERIOD_BY_ID = Object.fromEntries(TIME_PERIODS.map(p => [p.id, p]));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -844,8 +844,8 @@ const rand = (a, b) => a + Math.random() * (b - a);
 function dept(type){ const b = state.buildings.find(x => x.type === type); return b && isReachable(b) ? b : null; }
 function hasDept(type){ return state.buildings.some(x => x.type === type); }
 function deptProblem(type){
-  if(!hasDept(type)) return `Build ${BUILDINGS[type].label} first.`;
-  if(!dept(type)) return `${BUILDINGS[type].label} isn't connected. Run a path or service road from the entrance to it.`;
+  if(!hasDept(type)) return `Build ${BUILDINGS[type].one} first.`;
+  if(!dept(type)) return `${BUILDINGS[type].one.replace(/^the/, "The")} isn't connected. Run a path or service road from the entrance to it.`;
   return null;
 }
 function logScience(text, ok){ state.science.log.unshift({day:state.day, text, ok}); state.science.log.length = Math.min(state.science.log.length, 8); }
