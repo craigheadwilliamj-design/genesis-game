@@ -129,23 +129,23 @@ function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wag
 
 function freshScience(){
   return {
-    points:0,          // unspent ORACLE research points
+    points:0,          // unspent points
     crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
-    tech:["bars"],           // everything ORACLE has researched (TECH ids, plus "ref-<Period>" for refined medicine)
-    projects:[],       // ORACLE's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
-    unlocked:[],       // animals discovered (GHOST's scouting turned them up), so drones can go back for their DNA
+    tech:["bars"],           // everything the Research Lab has researched (TECH ids, plus "ref-<Period>" for refined medicine)
+    projects:[],       // The Research Lab's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
+    unlocked:[],       // animals discovered (the Time Travel Lab's scouting turned them up), so drones can go back for their DNA
     dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
-    drones:1,          // GHOST's drones, one trip each at a time (GHOST comes with one; buy more there)
+    drones:1,          // The Time Travel Lab's drones, one trip each at a time (the Time Travel Lab comes with one; buy more there)
     seen:{},           // site id (TIME_SITES) -> the animals scouting has turned up there; a site in here has been scouted
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
-    reports:[],        // post-mission reports waiting at GHOST, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
-    clones:[],         // TAR's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
+    reports:[],        // post-mission reports waiting at the Time Travel Lab, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
+    clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and Botany Lab beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
   };
 }
 
-// CERES: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
+// The Botany Lab: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
 function freshCeres(){ return {stock:0, meds:{medpal:0, medmes:0, medcen:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
 // Themes: the one new builds use, and which are unlocked
@@ -380,7 +380,7 @@ function upgradeSave(s){
   // science jobs moved into bays, one per scientist. Running jobs keep a bay; queued ones and extra incubators are cancelled and paid back.
   let back = 0;
   for(const k of ["projects", "trips", "clones", "log"]) if(!sc[k]) sc[k] = [];
-  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back the GHOST quality upgrades
+  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back Time Travel Lab quality upgrades
   for(const d of Object.values(sc.dna)) delete d.quality;
   for(const [id, pts] of [["ghostq1", 40], ["ghostq2", 90]]){
     if(sc.tech.includes(id)){ sc.tech = sc.tech.filter(t => t !== id); sc.points = (sc.points || 0) + pts; }
@@ -398,7 +398,7 @@ function upgradeSave(s){
     }
   }
   if(back) sc.log.unshift({day:s.day, text:`Science now runs one job per scientist. ${back} queued job${back === 1 ? " was" : "s were"} cancelled and paid back.`, ok:true});
-  // plant DNA, and the plants CERES grows, became per period (and exhibit planting stock went away): split what an era had across its periods
+  // plant DNA, and the plants the Botany Lab grows, became per period (and exhibit planting stock went away): split what an era had across its periods
   const periodsOf = era => Object.values(PLANT_DNA).filter(f => f.era === era);
   for(const era of ["mesozoic", "paleozoic"]){
     const old = sc.dna["flora-" + era];
@@ -423,7 +423,7 @@ function upgradeSave(s){
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
-  // and any medicine waiting at CERES moves to the PMC
+  // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
   if(!Array.isArray(s.biomePaint)) s.biomePaint = [];   // ground paint (js/biomepaint.js)
@@ -443,7 +443,7 @@ function upgradeSave(s){
   }
   // contemporary medicine used to be a counter the suppliers refilled; now it is stock in the PMC
   if(s.health.cmeds !== undefined){ const pmc = s.buildings.find(b => b.type === "pmc"); if(pmc && s.health.cmeds > 0){ pmc.store = pmc.store || {}; pmc.store[CMED] = (pmc.store[CMED] || 0) + s.health.cmeds; } delete s.health.cmeds; }
-  // medicine used to be one good. Split what's on hand across the eras ORACLE has researched (else Cenozoic), so nothing is lost.
+  // medicine used to be one good. Split what's on hand across the eras the Research Lab has researched (else Cenozoic), so nothing is lost.
   {
     const eras = Object.keys(MED_TECH).filter(e => s.science.tech.includes(MED_TECH[e])), into = (eras.length ? eras : ["cenozoic"]).map(e => MED_GOOD[e]);
     const split = (n, put) => { const each = Math.floor(n / into.length); into.forEach((g, i) => put(g, i === 0 ? n - each * (into.length - 1) : each)); };
@@ -459,8 +459,8 @@ function upgradeSave(s){
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
-  // discovery moved to GHOST's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
-  // animal already unlocked starts scouted with those animals seen, ORACLE species projects are paid back, and trips still out
+  // discovery moved to the Time Travel Lab's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
+  // animal already unlocked starts scouted with those animals seen, Research Lab species projects are paid back, and trips still out
   // are given a site so they land as expeditions.
   if(s.discoV !== 1){
     sc.drones = clamp(Math.max(sc.crew.temporal || 0, sc.trips.length, 1), 1, DRONES.max);
@@ -603,7 +603,7 @@ function exhibitReport(e){
     // old plant-eaters get sick on plants they never evolved for: Cenozoic planting, a grassland biome, or grass hay standing in for Paleoflora
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
     const sick = grazers.filter(s => grassSick(e, s) > 0), picky = grazers.filter(s => s.period === "Cretaceous" && grassShare(e, s) > 0);
-    const cure = e.grassFed ? "Feed them Paleoflora from CERES" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
+    const cure = e.grassFed ? "Feed them Paleoflora from the Botany Lab" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
     if(sick.length){ target += GRASS_HIT.intolerant * Math.max(...sick.map(s => grassSick(e, s))); issues.push({bad:true, text:`Eating plants it never evolved for. ${sick.map(s => s.name).join(", ")} can't digest grass. ${cure}.`}); }
     else if(picky.length){ target += GRASS_HIT.cretaceous * Math.max(...picky.map(s => grassShare(e, s))); issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. ${cure}.`}); }
   }
@@ -647,7 +647,7 @@ function exhibitReport(e){
   const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt. ${known === 1 ? "It needs" : "They need"} a vet. See Health below.`});
-  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from CERES cures it fully.`});
+  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from the Botany Lab cures it fully.`});
   else if(sick) issues.push({bad:true, text:"Some of the animals seem off. A vet's check-up would find out why."});
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
@@ -835,7 +835,7 @@ function dailyCosts(){
   return {feed:Math.round(feed), wages:Math.round(wages), upkeep:Math.round(upkeep), research};
 }
 
-/* ---------- science: ORACLE, GHOST, TAR, and CERES (the rest is in science.js) ---------- */
+/* ---------- science: Research Lab, the Time Travel Lab, the Genetics Lab, and the Botany Lab (the rest is in science.js) ---------- */
 
 const PERIOD_BY_ID = Object.fromEntries(TIME_PERIODS.map(p => [p.id, p]));
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -844,8 +844,8 @@ const rand = (a, b) => a + Math.random() * (b - a);
 function dept(type){ const b = state.buildings.find(x => x.type === type); return b && isReachable(b) ? b : null; }
 function hasDept(type){ return state.buildings.some(x => x.type === type); }
 function deptProblem(type){
-  if(!hasDept(type)) return `Build ${BUILDINGS[type].label} first.`;
-  if(!dept(type)) return `${BUILDINGS[type].label} isn't connected. Run a path or service road from the entrance to it.`;
+  if(!hasDept(type)) return `Build ${BUILDINGS[type].one} first.`;
+  if(!dept(type)) return `${BUILDINGS[type].one.replace(/^the/, "The")} isn't connected. Run a path or service road from the entrance to it.`;
   return null;
 }
 function logScience(text, ok){ state.science.log.unshift({day:state.day, text, ok}); state.science.log.length = Math.min(state.science.log.length, 8); }

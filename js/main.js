@@ -195,7 +195,7 @@ $("#menuBtn").onclick = () => {
 document.querySelectorAll("#rtools [data-dept]").forEach(b => b.onclick = () => {
   const k = b.dataset.dept, it = state.buildings.find(x => x.type === k);
   if(focusMode()) setFocus(false);
-  if(!it){ ui.toast(`Build ${BUILDINGS[k].label} first. It's under Buildings, Park Management.`, "bad"); return; }
+  if(!it){ ui.toast(`Build ${BUILDINGS[k].one} first. It's under Buildings, Park Management.`, "bad"); return; }
   if(sel && sel.kind === "building" && sel.id === it.id) closePanel(); else select("building", it.id);
 });
 panelEl.addEventListener("input", e => {

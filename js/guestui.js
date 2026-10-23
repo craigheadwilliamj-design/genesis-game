@@ -104,7 +104,7 @@ function guestBuildingHtml(b){
   if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
   if(b.type === "camera"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd><dt>Watches</dt><dd>${SECURITY.postRadius} m around it</dd></dl>`;
-    h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? "Any vandal it sees sends the nearest guard running." : "Research security cameras at ORACLE or it does nothing."} ${offices().length ? "" : "Build a Security Office with guards, or nobody will answer."}</div>`;
+    h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? "Any vandal it sees sends the nearest guard running." : "Research security cameras at the Research Lab or it does nothing."} ${offices().length ? "" : "Build a Security Office with guards, or nobody will answer."}</div>`;
     return h;
   }
   if(b.type === "nofeed"){
@@ -188,10 +188,10 @@ function modulesHtml(b){
   else h += `<div class="meta">No modules yet.</div>`;
   if(on.length >= EDU_CENTER.moduleSlots) h += `<div class="meta" style="margin-top:6px">The center is full. Remove a module to add another.</div>`;
   else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="modSel" aria-label="Module to add" style="flex:1;min-width:0">${ready.map(id => `<option value="${id}">${esc(EDU_MODULES[id].label)}, ${money(EDU_MODULES[id].price)}</option>`).join("")}</select><button class="btn" data-action="modAdd">Add</button></div>`;
-  if(locked) h += `<div class="meta" style="margin-top:6px">${locked} more module${locked === 1 ? "" : "s"} to research at ORACLE, under Park management, Buildings.</div>`;
+  if(locked) h += `<div class="meta" style="margin-top:6px">${locked} more module${locked === 1 ? "" : "s"} to research at the Research Lab, under Park management, Buildings.</div>`;
   return h + `</section>`;
 }
-// The museum: attractions on show, and a dropdown of the events GHOST has recorded that aren't up yet
+// The museum: attractions on show, and a dropdown of the events the Time Travel Lab has recorded that aren't up yet
 function museumHtml(b){
   const on = showsOf(b), ready = showsReady(b), dn = state.science.dna;
   let h = `<section><h3>Museum attractions <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${MUSEUM.slots}</span></h3>`;
@@ -201,7 +201,7 @@ function museumHtml(b){
   if(!hasTech(MUSEUM.needTech)) {}
   else if(on.length >= MUSEUM.slots) h += `<div class="meta" style="margin-top:6px">The center is full. Take one down to show another.</div>`;
   else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="showSel" aria-label="Attraction to add" style="flex:1;min-width:0">${ready.map(ev => `<option value="${ev.id}">${esc(ev.name)}, ${money(ev.price)}</option>`).join("")}</select><button class="btn" data-action="showAdd">Add</button></div>`;
-  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything GHOST has recorded is on show." : "GHOST can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
+  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything the Time Travel Lab has recorded is on show." : "The Time Travel Lab can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
   return h + `</section>`;
 }
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
@@ -221,7 +221,7 @@ function securityHtml(b){
   const broken = state.buildings.filter(isBroken).length, tagged = state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length;
   h += `<section><h3>Vandalism</h3><dl class="kv"><dt>Today</dt><dd>${L.acts} act${L.acts === 1 ? "" : "s"}, ${L.caught} caught</dd>${Y ? `<dt>Yesterday</dt><dd>${Y.acts} act${Y.acts === 1 ? "" : "s"}, ${Y.caught} caught</dd>` : ""}<dt>Broken props</dt><dd>${broken}</dd><dt>Buildings with graffiti</dt><dd>${tagged}</dd></dl>`;
   h += `<div class="meta" style="margin-top:6px">About 1 party in ${Math.round(1 / hooliganShare())} has a hooligan in it, and unhappy hooligans break things, throw trash at the animals, bang on the glass and sometimes sneak in without paying. Vandalism near a guard is ${Math.round((1 - SECURITY.deterCut) * 100)}% rarer, and a guard throws out any vandal within ${SECURITY.catchRadius} m. Lamp posts help, and heavy litter makes it worse. Mechanics fix broken props and custodians scrub off graffiti.</div>`;
-  h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? `Cameras watch ${SECURITY.cameraRadius} m around each office, and send the nearest guard straight to any vandal they see.` : "Research security cameras at ORACLE so each office watches the paths around it."}</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? `Cameras watch ${SECURITY.cameraRadius} m around each office, and send the nearest guard straight to any vandal they see.` : "Research security cameras at the Research Lab so each office watches the paths around it."}</div></section>`;
   return h;
 }
 // The Custodial Closet: its staff, and what they've been up to

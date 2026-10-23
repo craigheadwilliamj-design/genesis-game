@@ -8,7 +8,7 @@
    statues (state.decor), water (state.water) and open fences such as
    hedge rows (state.fences). Guests walking past them cheer up.
    Groves from an animal's own era make it happier and feed part of its
-   diet, and older groves (plants grown at CERES) keep old
+   diet, and older groves (plants grown at the Botany Lab) keep old
    plant-eaters off the grass. Shelters (and groves, for shade) cover
    animals from the weather, which is rolled here each night.
    Placing, drawing and reshaping them lives in map.js, next to the other tools.
@@ -37,7 +37,7 @@ const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
 // What bulldozing gets back for everything inside an exhibit
 const landRefund = e => Math.round((landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) + waterOf(e).reduce((n, w) => n + waterCost(w.points), 0)) * COST.refundShare);
 
-// Mesozoic and Paleozoic plants each use up one plant of their period and size from CERES
+// Mesozoic and Paleozoic plants each use up one plant of their period and size from the Botany Lab
 const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : null;
 const potsHave = t => potKey(t) ? (state.ceres.pots[potKey(t)] || 0) : Infinity;
 const potName = t => `${t.period || ERA_LABEL[t.flora]} ${t.size} plants`;
@@ -639,7 +639,7 @@ function fenceProblem(pts, barrier, free){
   const B = BARRIERS[barrier] || BARRIERS.wood;
   if(pts.length < 2) return "Needs at least 2 corners.";
   if(lineLength(pts) < 2) return "Too short.";
-  if(!free && B.tech && !hasTech(B.tech)) return `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.`;
+  if(!free && B.tech && !hasTech(B.tech)) return `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.`;
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "It runs into an exhibit.";
   if(state.buildings.some(b => lineEntersShape(pts, b.points) || lineShapeDist(pts, b.points) < .3)) return "It runs into a building.";
@@ -774,9 +774,9 @@ function landProblem(e, key, x, y, pic, biome){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
-  if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at ORACLE first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at ORACLE first.`;
-  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
-  if(t.ceres && state.ceres.stock < t.ceres) return `Takes ${t.ceres} Paleoflora from CERES, which has ${Math.floor(state.ceres.stock)}.`;
+  if(t.tech && !hasTech(t.tech)) return t.flora ? `Research ${FLORA[t.flora].label} flora at the Research Lab first.` : `Research ${(TECH.find(x => x.id === t.tech) || {label:"it"}).label} at the Research Lab first.`;
+  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from the Botany Lab, which has none.`;
+  if(t.ceres && state.ceres.stock < t.ceres) return `Takes ${t.ceres} Paleoflora from the Botany Lab, which has ${Math.floor(state.ceres.stock)}.`;
   const why = landFit(e, key, x, y, pic, biome);
   if(why) return why;
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;
@@ -814,9 +814,9 @@ function decorProblem(key, x, y, pic, biome){
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
   if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   if(t.statue && !statueOpen(key)) return statuesOn() ? `${t.label} is locked. ${statueHint(key)}` : "Statues aren't available yet.";
-  if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at ORACLE to plant this one out here.";
-  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at ORACLE first.`;
-  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from CERES, which has none.`;
+  if(t.flora && t.period !== "Quaternary" && !hasTech("sterile")) return "Only modern plants grow outside the exhibits. Research sterile prehistoric plants at the Research Lab to plant this one out here.";
+  if(t.tech && !hasTech(t.tech)) return `Research ${FLORA[t.flora].label} flora at the Research Lab first.`;
+  if(potKey(t) && potsHave(t) < 1) return `Needs ${potName(t)} from the Botany Lab, which has none.`;
   const why = decorFit(key, x, y, pic, biome);
   if(why) return why;
   if(!canAfford(t.price)) return `Costs ${money(t.price)}. You have ${money(state.money)}.`;

@@ -134,7 +134,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state = JSON.parse(JSON.stringify(state)); crew = []; syncCrew();
     out.carryPersists = crew.find(x => x.id === "k-t").carry.amount === 7;
 
-    // leftover Paleoflora goes back to CERES at night
+    // leftover Paleoflora goes back to the Botany Lab at night
     state.ceres.stock = 0; setCarry(crew.find(x => x.id === "k-t"), {type:"paleoflora", amount:3}); keepersNight();
     out.paleofloraReturned = state.ceres.stock === Math.min(3, ceresCap());
 
@@ -1105,7 +1105,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.everySpeciesHasASite = SPECIES.every(x => TIME_SITES.some(t => (t.fauna || []).includes(x.id) && epochOf(t.from).period === x.period));
     out.sitesHaveMaps = TIME_SITES.every(t => t.from > EPOCHS[0].from || Object.keys(t.at).length > 0) && Object.values(TIMELINE_MAPS).every(m => SPRITE_PACK[`sprites/timeline/${m}.png`]);
 
-    // animals are discovered by GHOST's drones scouting real sites; GHOST comes with one drone
+    // animals are discovered by the Time Travel Lab's drones scouting real sites; the Time Travel Lab comes with one drone
     const small = SPECIES.filter(x => !x.viv && speciesAvailable(x.id) && sitesOf(x.id).length).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
     const site = sitesOf(small.id).find(siteShown), other = TIME_SITES.find(t => siteShown(t) && !t.event && t.id !== site.id);
     out.digNeedsScout = expeditionProblem(site.id, small.id) === "Scout the site first.";
@@ -1189,10 +1189,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[small.id] = {genome:100};
     sc.tar = null;
 
-    // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
-    out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at CERES to tend a growing bed.";
+    // The Botany Lab: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from the Time Travel Lab; then it grows plants in its beds
+    out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at the Botany Lab to tend a growing bed.";
     hireScientist("botanist");
-    out.floraLocked = /ORACLE/.test(growProblem("plant", "Jurassic", "small"));
+    out.floraLocked = /Research Lab/.test(growProblem("plant", "Jurassic", "small"));
     sc.tech.push("paleoflora", "mesoplant", "medmeso");
     out.floraNeedsDna = /plant DNA/.test(growProblem("plant", "Jurassic", "small")) && !ceresRate();
     out.dnaPerPeriod = PLANT_DNA.Jurassic.id === "flora-Jurassic" && siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Jurassic.id) && !siteTargets(SITE_BY_ID.morrison).includes(PLANT_DNA.Triassic.id) && genomeOpen(PLANT_DNA.Jurassic.id) && !genomeOpen(PLANT_DNA.Devonian.id);
@@ -1213,7 +1213,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
     state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
     out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
-    // a pile of one era's medicine doesn't stop CERES regrowing another's
+    // a pile of one era's medicine doesn't stop the Botany Lab regrowing another's
     state.ceres.meds = {medpal:0, medmes:0, medcen:medCap()};
     out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
@@ -1239,7 +1239,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const money0 = oldS.money, up = upgradeSave(oldS);
     out.oldJobsGetBays = up.science.trips[0].bay === 0 && up.science.clones.length === 1 && up.science.clones[0].bay === 0 && up.science.clones[0].lane === undefined;
     out.oldExtraJobRefunded = up.money === money0 + SPECIES_BY_ID.lyst.price;
-    // discovery moved to GHOST: the Temporal Researcher became a drone, the trip still out became an expedition to a site,
+    // discovery moved to the Time Travel Lab: the Temporal Researcher became a drone, the trip still out became an expedition to a site,
     // and the sites of animals already unlocked are scouted
     out.oldDiscovery = up.discoV === 1 && up.science.drones === 1 && up.science.crew.temporal === undefined && up.science.trips[0].kind === "dig"
       && sitesOf("dryo").some(t => t.id === up.science.trips[0].site) && (up.science.seen.hellcreek || []).includes("trex") && Array.isArray(up.science.reports);
@@ -1554,7 +1554,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.science.tech = keep.tech; setTool("select"); recompute(); buildGuestGraph(); render();
     }
 
-    // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
+    // planted Paleo-Flora: groves need research and Botany Lab planting stock, keep old grazers off grass, feed them, and make them happier
     const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;
     state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
     const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], biome:"tropical"};
@@ -1564,7 +1564,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.pots["Jurassic-large"] = 0;
     out.groveNeedsTech = /Research/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     sc.tech.push("mesoplant");
-    out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "jur-tropical-large").why || "");
+    out.groveNeedsStock = /from the Botany Lab/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     out.treesNeedNoStock = landSpot(115, 115, "qua-tropical-large").ok;
     // a bare exhibit isn't grass; a Cenozoic planting, a grassland biome or grass hay make old grazers sick, and own-era groves dilute it
     const bareOk = grassSick(gx, grazer) === 0;
@@ -1586,7 +1586,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
-    // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use CERES stock of their era and size
+    // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use Botany Lab stock of their era and size
     const periods = Object.keys(ERA_OF), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
@@ -1618,7 +1618,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rockThumbsBiome = document.querySelector('[data-shapes="rock"] img').src.includes("rock-tropical-1.png") && document.querySelectorAll('[data-shapes="rock"] img').length === ROCK_SPRITES.tropical.rock.length;
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
-    out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
+    out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from the Botany Lab/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // square footprints (S47): plants and rocks take whole-cell squares inside their size range, sides from their own pictures
     { const rng = FOOT.range, sizes = [], bad = [];
       for(const [k, t] of Object.entries(LAND)){ if(!t.flora || t.vivToy) continue; const r = rng[t.size]; if(!(Number.isInteger(t.footSide) && t.footSide >= r[0] && t.footSide <= r[1])) bad.push(k); sizes.push(t.footSide); }
@@ -2424,7 +2424,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const melt = !landOf(ex).some(f => f.type === "icefish") && landOf(ex).some(f => f.type === "hay" && f.left === LAND.hay.lasts - 2);
         for(let i = 0; i < LAND.hay.lasts; i++) treatsNight();
         state.weather.today = w0;
-        // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from CERES and the research to bale it
+        // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from the Botany Lab and the research to bale it
         const st0 = state.ceres.stock, tech0 = state.science.tech.slice();
         state.science.tech = tech0.filter(k => k !== "paleoflora"); const noTech = !!landProblem(ex, "pbale", 430, 30);
         state.science.tech = tech0.concat("paleoflora"); state.ceres.stock = 10; const noStock = !!landProblem(ex, "pbale", 430, 30);
@@ -2446,7 +2446,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.money = m0;
       const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
       out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
-      // museum: GHOST records an event, and the finished record becomes an Education Center attraction
+      // museum: The Time Travel Lab records an event, and the finished record becomes an Education Center attraction
       {
         const sc = state.science, m1 = state.money; state.money = 1e6;
         const ec = {id:"ec1", type:"edcenter", points:sq(0, 0, 16), day:0, shows:[]};
@@ -2480,7 +2480,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
         const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
         out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
-        // botanical hall and simulation room need CERES and GHOST, and grow with finished plant DNA and event records
+        // botanical hall and simulation room need the Botany Lab and the Time Travel Lab, and grow with finished plant DNA and event records
         state.buildings.push({id:"tc", type:"ceres", points:sq(520, 0, 10), day:0}, {id:"tg", type:"ghost", points:sq(540, 0, 10), day:0});
         sc.tech.push("edbotanical", "edsimroom");
         const keepD = sc.dna, keepB = state.ceres.beds; sc.dna = {}; state.ceres.beds = [];
@@ -3136,7 +3136,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const sc = () => state.science;
     for(const k of ["paleo", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
     const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
-    // a GHOST expedition goes after another animal, seen at its site
+    // an expedition goes after another animal, seen at its site
     const tsp = SPECIES.find(s => s.id !== sp.id && speciesAvailable(s.id) && sitesOf(s.id).length), tsite = sitesOf(tsp.id).find(siteShown);
     sc().seen[tsite.id] = [tsp.id]; if(!isUnlocked(tsp.id)) sc().unlocked.push(tsp.id);
     // log the park minute each job actually finishes
@@ -3174,7 +3174,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rate = dt => { const s = sc(); s.projects = []; state.day = 12; state.minute = DAWN_MIN + 10; const p0 = s.points; for(let m = 0; m < 240; m += dt) tick(dt); return s.points - p0; };
     const a = rate(1), b = rate(8), c = rate(240);
     out.pointsIgnoreStepSize = Math.abs(a - b) < 1e-6 && Math.abs(a - c) < 1e-6 && a > 0;
-    // a clone waits (its clock held) while TAR has no geneticist, then finishes on schedule after one is hired
+    // a clone waits (its clock held) while the Genetics Lab has no geneticist, then finishes on schedule after one is hired
     sc().projects = []; state.ceres.beds = []; sc().trips = []; sc().clones = []; state.day = 14; state.minute = DAWN_MIN + 20;
     state.rating = 5; const why0 = cloneProblem(sp.id); orderClone(sp.id, null); if(!sc().clones[0]) return {why:"clone: " + why0 + " crew " + JSON.stringify(sc().crew) + " tar " + !!dept("tar")}; const cl = sc().clones[0], len = cl.end - cl.start, g = sc().crew.gene; sc().crew.gene = 0;
     for(const k of Object.keys(seen)) delete seen[k];
@@ -3346,7 +3346,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   Object.assign(checks, decks);
 
-  // Genome quality is completeness: TAR clones from 60%, and the closer to 100% the healthier the clone
+  // Genome quality is completeness: The Genetics Lab clones from 60%, and the closer to 100% the healthier the clone
   const gq = await page.evaluate(() => {
     const out = {}, sc = state.science, keep = {dna:sc.dna, sb:state.sandbox, clones:sc.clones.slice(), money:state.money, rating:state.rating, tech:sc.tech.slice()};
     const sp = SPECIES.find(s => !s.viv && !s.stars) || SPECIES.find(s => !s.viv);
@@ -3360,7 +3360,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[sp.id].genome = 60; sc.tech = sc.tech.slice();
     const had = sc.crew.gene, bays = freeBay("gene");
     out.noQualityField = !("quality" in sc.dna[sp.id]) && typeof bestQuality === "undefined" && typeof ghostQuality === "undefined" && !TECH.some(t => /^ghostq/.test(t)) && !TIME_PERIODS.some(p => "quality" in p);
-    // old saves: quality fields and the GHOST quality upgrades go, and the research points come back
+    // old saves: quality fields and Time Travel Lab quality upgrades go, and the research points come back
     const snap = JSON.parse(JSON.stringify(state)); snap.science.dna = {[sp.id]:{genome:70, quality:80}}; snap.science.tech.push("ghostq1", "ghostq2"); const pts = snap.science.points || 0;
     upgradeSave(snap);
     out.oldSaveDropsQuality = !("quality" in snap.science.dna[sp.id]) && snap.science.dna[sp.id].genome === 70 && !snap.science.tech.some(t => /^ghostq/.test(t)) && Math.round(snap.science.points - pts) === 130;
@@ -3572,7 +3572,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       return noPick && kept && bulldozeKeeps && /Removes 25 m² of water/.test(stat) && cut && erased && exhibit;
     })();
 
-    // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
+    // medicine logistics: a custodian tops the PMC up from the Botany Lab when a medicine is down to a couple of doses, not only once it is gone
     startWith(newPark(), false); setSpeed(0);
     {
       state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;

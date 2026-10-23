@@ -830,7 +830,7 @@ function block34(bl, t, S, P, col, line, inv){
   for(const i of [...Array(P.length).keys()].filter(j => norm34(P, j)[1] > .05)){
     const L = edgeLen34(P, i);
     if(S.glass){
-      // CERES: a concrete plinth under glass walls with frames every 2 meters
+      // The Botany Lab: a concrete plinth under glass walls with frames every 2 meters
       s += quad34(P, i, 0, 1, 0, 1.2, wallCol);
       for(let k = 1; k < Math.round(L / 2); k++){ const a = onEdge34(P, i, k * 2 / L, 1.2), b = onEdge34(P, i, k * 2 / L, W); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#E8F0EC" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
     } else if(S.front === "resort"){
@@ -2124,7 +2124,7 @@ function insidePlot(pts, closed){
 
 function pathProblem(pts, type){
   if(type === "tram" && !devMode()) return "That isn't available yet.";
-  if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`;
+  if(type === "tram" && !hasTech("transit")) return `Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at the Research Lab first.`;
   if(pts.length < 2) return "Needs at least 2 points.";
   if(lineLength(pts) < 2) return "Too short.";
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
@@ -2217,7 +2217,7 @@ function startDraw(kind){
   showBar(t, hint, "", {undo:true, finish:true, cancel:"Cancel"});
   updateDrawbar();
   if(kind === "tram" && !devMode()) setStat("That isn't available yet.", true);
-  else if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at ORACLE first.`, true);
+  else if(kind === "tram" && !hasTech("transit")) setStat(`Research ${TECH.find(x => x.id === "transit").label.toLowerCase()} at the Research Lab first.`, true);
 }
 
 function drawPoints(){ return draw.hover ? draw.pts.concat([draw.hover]) : draw.pts; }
@@ -2416,7 +2416,7 @@ function fenceBar(stat){
   const B = BARRIERS[fenceSel];
   showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece a meter, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
   $("#dUndo").disabled = false;
-  setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at ORACLE first.` : stat || `${money(fenceRate(fenceSel))} a meter.`, !!(B.tech && !hasTech(B.tech)));
+  setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.` : stat || `${money(fenceRate(fenceSel))} a meter.`, !!(B.tech && !hasTech(B.tech)));
 }
 // The pieces the current drag covers
 function fenceDragKeys(){
@@ -2585,7 +2585,7 @@ function placeGhost(clientX, clientY){
   let why = null;
   if(t.unique && hasDept(tool)) why = `You already have ${t.label}. There's one per park.`;
   if(!why && buildingHidden(tool)) why = "That isn't available yet.";
-  if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at ORACLE first.`;
+  if(!why && t.tech && !hasTech(t.tech)) why = `Research ${TECH.find(x => x.id === t.tech).label.toLowerCase()} at the Research Lab first.`;
   if(!why && t.needsDept && !hasDept(t.needsDept)) why = `Build ${BUILDINGS[t.needsDept].label} first.`;
   if(!why && !state.sandbox && t.minRating && state.rating < t.minRating) why = `Your park needs ${t.minRating} stars first.`;
   if(!why && t.rooms) why = hotelLocked(tool);
@@ -2926,7 +2926,7 @@ function findPlatformSpot(clientX, clientY){
   const g = segProj(Math.round(x/GRID_STEP)*GRID_STEP, Math.round(y/GRID_STEP)*GRID_STEP, a, b); x = g.x; y = g.y;
   const off = t.d/2 - 1.5, pts = rectPts(x + nx*off, y + ny*off, t.w, t.d, ang);
   let why = null;
-  if(!hasTech("platform")) why = "Research viewing platforms at ORACLE first.";
+  if(!hasTech("platform")) why = "Research viewing platforms at the Research Lab first.";
   else if(!insidePlot(pts)) why = "Keep it inside the park boundary.";
   else if(state.exhibits.some(o => o !== e && shapesOverlap(pts, o.points))) why = "It overlaps another exhibit.";
   else if(state.buildings.some(o => shapesOverlap(pts, o.points))) why = "It overlaps a building.";

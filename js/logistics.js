@@ -1,6 +1,6 @@
 /* =====================================================================
    LOGISTICS
-   Food and medicine are goods. The dock buys them, farms and CERES make them,
+   Food and medicine are goods. The dock buys them, farms and the Botany Lab make them,
    stores hold them (and let them spoil), and keepers carry them where they're needed.
    Work zones decide which keepers look after which exhibits and stores.
    Nobody draws supply lines. They appear from what keepers actually haul.
@@ -34,7 +34,7 @@ function takeGood(b, t, n){
   if(r > 0) b.store[t] -= r;
   return Math.max(0, r);
 }
-// CERES keeps its own stock of medicine (and Paleoflora), which keepers collect
+// The Botany Lab keeps its own stock of medicine (and Paleoflora), which keepers collect
 const cereses = () => state.buildings.filter(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]);
 function supplyOf(b, t){
   if(b.type === "ceres") return MED_GOODS.includes(t) ? Math.floor(cerMeds()[t] || 0) : 0;
@@ -51,14 +51,14 @@ function stashGood(t, n, first){
   for(const b of order){ if(left <= 0.01) break; left -= addGood(b, t, left); }
   return n - Math.max(0, left);
 }
-// CERES keeps a stock per medicine (state.ceres.meds is {medpal, medmes, medcen})
+// The Botany Lab keeps a stock per medicine (state.ceres.meds is {medpal, medmes, medcen})
 function cerMeds(){ const c = state.ceres; if(!c.meds || typeof c.meds !== "object") c.meds = {medpal:0, medmes:0, medcen:0}; return c.meds; }
 const cerMedTotal = () => MED_GOODS.reduce((s, t) => s + (cerMeds()[t] || 0), 0);
 // a good's number for the PMC (all three together when none is named)
 const pmcStock = g => { const p = pmcBuilding(); return p ? (g ? stockOf(p, g) : MED_GOODS.reduce((s, t) => s + stockOf(p, t), 0)) : 0; };   // no good named: the era medicines together
 const medOnHand = pmcStock;
 function useMeds(n, g){ const p = pmcBuilding(); if(p) takeGood(p, g, n); }
-// the eras whose medicine ORACLE has researched, so the PMC only reserves room for those
+// the eras whose medicine the Research Lab has researched, so the PMC only reserves room for those
 const medGoodsWanted = () => MED_GOODS.filter(g => hasTech(MED_TECH[Object.keys(MED_GOOD).find(k => MED_GOOD[k] === g)]));
 
 /* ---------- zones ---------- */
@@ -99,7 +99,7 @@ function setZone(kind, id, zid){
 
 /* ---------- what the park needs ---------- */
 
-// Units a day an exhibit wants of a store-held food. Plain hay stands in for Paleoflora when CERES has none.
+// Units a day an exhibit wants of a store-held food. Plain hay stands in for Paleoflora when the Botany Lab has none.
 function foodDemand(e, t){
   const need = dailyNeed(e);
   return (need[t] || 0) + (t === "plants" && !need.plants && !paleofloraReady() ? need.paleoflora || 0 : 0);
@@ -140,7 +140,7 @@ function storeTarget(b, t){
 /* ---------- restock hauls ---------- */
 
 const inbound = (id, t) => crew.concat(ccrew).reduce((s, c) => s + (c.haul && c.haul.dst === id && c.haul.t === t ? (c.carry && c.carry.dst === id ? c.carry.amount : c.haul.amount) : 0), 0);
-// Sources a restock can draw on. Stations and PMCs pull from bulk stores, docks, farms, and CERES. Bulk stores pull from docks and farms.
+// Sources a restock can draw on. Stations and PMCs pull from bulk stores, docks, farms, and the Botany Lab. Bulk stores pull from docks and farms.
 function haulSources(j){
   const out = [];
   for(const b of stores()){
@@ -297,7 +297,7 @@ function stockSummary(){
   for(const t of FEED_GOODS) out[t] = {have:0, cap:0, need:parkDemand(t), make:parkProduction(t)};
   out.paleoflora = {have:Math.floor(state.ceres.stock || 0), need:state.exhibits.reduce((s, e) => s + (dailyNeed(e).paleoflora || 0), 0)};
   for(const b of storesBuilt()) for(const t of FEED_GOODS){ if(storeOf(b).holds.includes(t)) out[t].cap += storeCap(b); out[t].have += stockOf(b, t); }
-  // medicine: one stock an era (PMC, cold stores and CERES), plus the supplier-restocked contemporary doses
+  // medicine: one stock an era (PMC, cold stores and the Botany Lab), plus the supplier-restocked contemporary doses
   for(const t of MED_GOODS){
     out[t] = {have:0, cap:0, ceres:Math.floor(cerMeds()[t] || 0), pmc:pmcStock(t)};
     for(const b of storesBuilt()) out[t].have += stockOf(b, t);

@@ -222,17 +222,17 @@ function servicesNight(){
 
 /* ---------- Museum attractions in the Education Center ---------- */
 
-// Each one is an event GHOST has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
+// Each one is an event the Time Travel Lab has fully recorded (MUSEUM_EVENTS). b.shows lists the ids on show.
 const showsOf = b => (b.shows || []).filter(id => MUSEUM_BY_ID[id]);
 const showsLearn = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].learn, 0);
 const showsJoy = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].joy, 0);
 const showsAppeal = b => showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].appeal, 0);
 const showsUpkeep = b => b.type === "edcenter" ? showsOf(b).reduce((n, id) => n + MUSEUM_BY_ID[id].upkeep, 0) : 0;
-// Events GHOST has finished recording that this center isn't showing yet
+// Events the Time Travel Lab has finished recording that this center isn't showing yet
 const showsReady = b => MUSEUM_EVENTS.filter(ev => genomeDone(ev.id) && !showsOf(b).includes(ev.id));
 function showProblem(b, id){
   const ev = MUSEUM_BY_ID[id];
-  return !ev || !genomeDone(id) ? "GHOST hasn't finished recording that yet."
+  return !ev || !genomeDone(id) ? "The Time Travel Lab hasn't finished recording that yet."
     : showsOf(b).includes(id) ? "It's already on show here."
     : showsOf(b).length >= MUSEUM.slots ? `An Education Center has room for ${MUSEUM.slots} attractions. Take one down first.`
     : !canAfford(ev.price) ? `Installing it costs ${money(ev.price)}. You have ${money(state.money)}.` : null;
@@ -259,7 +259,7 @@ function modLive(id){
     return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * busy / 4;
   }
   if(m.live === "botany"){
-    // plant DNA CERES has finished (6 periods, 4 is plenty), and beds growing now
+    // plant DNA the Botany Lab has finished (6 periods, 4 is plenty), and beds growing now
     const dna = Object.values(PLANT_DNA).filter(f => genomeDone(f.id)).length;
     return dept("ceres") ? EDU_LIVE.idle + (1 - EDU_LIVE.idle) * (.7 * Math.min(1, dna / 4) + (state.ceres.beds.length ? .3 : 0)) : 0;
   }
@@ -269,7 +269,7 @@ function modLive(id){
     return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.biomes);
   }
   if(m.live === "touch"){
-    // animal genomes GHOST has finished: more to hold
+    // animal genomes the Time Travel Lab has finished: more to hold
     const n = SPECIES.filter(s => genomeDone(s.id)).length;
     return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * Math.min(1, n / EDU_LIVE.genomes);
   }
@@ -291,8 +291,8 @@ const eduUpkeep = b => showsUpkeep(b) + (b.type === "edcenter" ? modsOf(b).reduc
 const modsReady = b => Object.keys(EDU_MODULES).filter(id => hasTech(EDU_MODULES[id].tech) && !modsOf(b).includes(id));
 function modProblem(b, id){
   const m = EDU_MODULES[id];
-  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at ORACLE first."
-    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "TAR"} first.`
+  return !m ? "No such module." : !hasTech(m.tech) ? "Research it at the Research Lab first."
+    : m.dept && !m.dept.some(hasDept) ? `Build ${m.dept.length > 1 ? "a science building" : "the Genetics Lab"} first.`
     : modsOf(b).includes(id) ? "It's already installed."
     : modsOf(b).length >= EDU_CENTER.moduleSlots ? `An Education Center has room for ${EDU_CENTER.moduleSlots} modules. Remove one first.`
     : !canAfford(m.price) ? `Installing it costs ${money(m.price)}. You have ${money(state.money)}.` : null;
