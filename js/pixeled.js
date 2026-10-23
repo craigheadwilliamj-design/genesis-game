@@ -538,7 +538,7 @@ function pxTryWhere(path){
   const m = path.match(/^sprites\/bld\/([a-zA-Z0-9]+)-(front|back|left|right)(?:-(\d+|broken|full))?\.png$/), t = m && BUILDINGS[m[1]]; if(!t) return "";
   const face = {front:"facing the bottom of the screen", back:"facing the top", left:"facing left", right:"facing right"}[m[2]];
   const when = m[3] === "broken" ? "broken" : m[3] === "full" ? "full" : t.prop ? (m[1] === "bin" ? "working and not full" : "working") : "";
-  return ` This one shows on ${t.one || t.label}${t.prop ? ` ${face}` : ` seen from the ${m[2]}`}${when ? `, when it is ${when}` : ""}, in the Genesis theme. Place one and turn it to match.`;
+  return ` This one shows on ${t.one || t.label}${t.prop ? ` ${face}` : ` seen from the ${m[2]}`}${when ? `, when it is ${when}` : ""}, in the Default theme. Place one and turn it to match.`;
 }
 const pxFirst = () => pxComp(0).toDataURL("image/png");
 // A plant's picture sets its ratio (a new one gets a stand-in PLANT_SPRITES entry); a rock shape is that biome's nth picture for its type
