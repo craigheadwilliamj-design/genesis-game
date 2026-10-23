@@ -1101,6 +1101,7 @@ Object.assign(BARRIERS.rope,     {wear:3.0, repair:3});    // decoration only (d
 const FENCE_SPRITES = {bars:{w:23, h:20, gate:true}, wood:{w:23, h:12, gate:true}, acrylic:{w:23, h:17, gate:true}, hedge:{w:23, h:14, gate:true, leafy:true}, concrete:{w:23, h:28, gate:true}, brick:{w:23, h:17, gate:true}, stone:{w:23, h:20, gate:true}, bamboo:{w:23, h:15, gate:true}, palisade:{w:23, h:22, gate:true}, iron:{w:23, h:17, gate:true}, drystone:{w:23, h:11, gate:true}, adobe:{w:23, h:16, gate:true}, stake:{w:23, h:12, gate:true}, bone:{w:23, h:18, gate:true}, rope:{w:23, h:10, gate:true}, electric:{w:23, h:27, gate:true, power:true, wires:[5, 9, 14, 18, 23]}};
 // A keeper gate swings open when a keeper, vet or mechanic is within `reach` meters: `speed` is how much of its swing (0 shut, 1 open) it covers a second, shown in `frames` pictures (<kind>-gate.png, then -1, -2, -3).
 const GATE_OPEN = {reach:3, speed:3, frames:4};
+const GATE_GHOST = {w:3, d:.6, h:1.5};   // the Gates tool's ghost: m along the fence (the gate picture is 23 px at 0.13 m), across it, and the least it stands up
 const FENCE_LOOK = {worn:60, minRun:.5, edge:3};
 
 // Clever animals that test and attack their fences, like predators do

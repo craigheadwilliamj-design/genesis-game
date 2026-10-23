@@ -1332,10 +1332,7 @@ function renderOverlay(){
       else s += doorArrowSvg(ghost.pts, ghost.face, col, inv);
     }
   }
-  if(gateGhost && !gateGhost.loose){
-    const gr = Math.max(1.6, 5*inv);
-    s += `<rect x="${gateGhost.x-gr}" y="${gateGhost.y-gr}" width="${gr*2}" height="${gr*2}" fill="${gateGhost.ok ? "#D8B04A" : "var(--bad)"}" fill-opacity=".8" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
-  }
+  if(gateGhost && !gateGhost.loose) s += gateGhostSvg(gateGhost, inv);
   if(tool === "zoneedit" && zedit){
     const z = zoneById(zedit.id);
     if(z){
@@ -2678,7 +2675,7 @@ function findGateSpot(clientX, clientY){
   const p = toWorld(clientX, clientY); let best = null;
   const near = (host, pts) => { for(let i = 0; i < pts.length; i++){
     const r = segProj(p.x, p.y, pts[i], pts[(i+1) % pts.length]);
-    if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {...host, x:r.x, y:r.y, d:r.d};
+    if(r.d * view.k < 16 && (!best || r.d < best.d)) best = {...host, x:r.x, y:r.y, d:r.d, a:pts[i], b:pts[(i+1) % pts.length]};
   } };
   for(const e of state.exhibits) if(!e.viv) near({e}, e.points);
   for(const f of penFaces()) near({pen:f}, f.pts);
@@ -2690,6 +2687,23 @@ function findGateSpot(clientX, clientY){
   const host = best.e || {points:best.pen.pts}, old = host.gate; host.gate = [best.x, best.y];
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
+}
+// The gate ghost: a block the gate's width standing in line with the fence side, as tall as that fence and GATE_GHOST.d deep, inside the side's ends like the gate picture; green where a gate works, red where it doesn't
+function gateGhostSvg(g, inv){
+  const [a, b] = [g.a, g.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+  const w = Math.min(L, GATE_GHOST.w), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
+  const hd = GATE_GHOST.d / 2, foot = [[-w / 2, -hd], [w / 2, -hd], [w / 2, hd], [-w / 2, hd]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
+  const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k];
+  const h = Math.max(GATE_GHOST.h, F ? F.h * ROCK_MPP : 0) / tf();   // the fence's height, stood back up against the squashed camera
+  const col = g.ok ? "var(--good)" : "var(--bad)";
+  return `<polygon points="${polyStr(hull2d(foot.concat(foot.map(p => [p[0], p[1] - h]))))}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+}
+// The convex hull of some points, in order round (monotone chain)
+function hull2d(P){
+  const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
+  for(const q of p){ while(lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+  for(const q of p.reverse()){ while(hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
+  return lo.slice(0, -1).concat(hi.slice(0, -1));
 }
 // A gate on a pen also buys the ground it fences in
 const penCost = f => GATE_COST + Math.round(newGround([f]) * COST.landPerSqM);
