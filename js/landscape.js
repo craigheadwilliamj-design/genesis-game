@@ -899,15 +899,15 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 // per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims. A biome with `shore` draws that one color
 // on all four edges instead of the lit and dark rims (`shoreW` px wide, default 1), and with no `damp` or `mud` has no bank
 const WATER_TEX = {
-  wetland:  {shore:"#827B24", shoreW:2, lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
+  wetland:  {shore:"#544636", shoreW:2, lit:"#5A865B", dark:"#4A6B49"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
   scrubland:{shore:"#B59A6D", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
-  temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
+  temperate:{shore:"#5C4A3D", shoreW:1, lit:"#7DB6B0", dark:"#2B6D5E"},   // a 1 px shore line, no bank
   desert:   {shore:"#E3C788", shoreW:1, lit:"#6CC0D8", dark:"#24748C"},   // a 1 px shore line, no bank
-  grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},
-  tropical: {damp:"#0A3A14", mud:"#4A3520", lit:"#3FC2A8", dark:"#0A5A5C"},
-  tundra:   {damp:"#C6CFBD", mud:"#E6EEEE", lit:"#9CD0DC", dark:"#4A8294"},
-  boreal:   {damp:"#4A6A52", mud:"#3A3830", lit:"#A8C6C8", dark:"#2A4854"},
+  grassland:{shore:"#7A6246", shoreW:1, lit:"#5096B8", dark:"#2F6682"},   // a 1 px shore line, no bank
+  tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
+  tundra:   {shore:"#EBF5F7", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
+  boreal:   {shore:"#4C4A44", shoreW:1, lit:"#2E667F", dark:"#1E4A5E"},   // a 1 px shore line, no bank
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.
