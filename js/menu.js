@@ -196,14 +196,23 @@ const plantRow = (k, tail) => { const t = LAND[k], water = t.aquatic ? ", in wat
 
 // Dev-only entries: the tram track, a dropdown with nothing left in it, or a held-back building
 const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && !devMode()) || (it.tool && buildingHidden(it.tool)) || (it.sub && it.sub.every(buildingHidden));
+// The left column's big buttons, each opening a flyout of the build groups it holds
+const BUILD_CATS = [
+  {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi", "toggles"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
+  {id:"land", label:"Landscaping", groups:["land", "land-buy"], icon:'<path d="M14 3l7 7M17.5 6.5L9 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M9 15l-5 1-1 5 5-1 3-3z" fill="currentColor"/>'},
+  {id:"exhibits", label:"Exhibits", groups:["exhibits"], icon:'<path d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2"/>'},
+  {id:"paths", label:"Paths", groups:["paths"], icon:'<path d="M8 21c0-5 6-5 6-9s-5-5-5-9M15 21c0-5 6-5 6-9s-5-5-5-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'},
+];
+const catOf = gid => (BUILD_CATS.find(c => c.groups.includes(gid)) || {}).id;
 function buildMenu(){
-  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
-  const rest = `<section class="sgroup flat"><div class="stitle">Toggles</div>
+  const groups = BUILD_MENU.map(g => `<section class="sgroup" data-group="${g.id}" data-cat="${catOf(g.id)}"><button class="shead" aria-expanded="false"><span>${esc(g.label)}</span><i class="chev" aria-hidden="true"></i></button><div class="sbody">${g.items.filter(it => !menuHidden(it)).map(menuRow).join("")}</div></section>`).join("");
+  const rest = `<section class="sgroup flat" data-cat="build"><div class="stitle">Toggles</div>
     <button class="srow" id="supplyBtn" aria-pressed="false" title="Show where keepers haul goods: stores, farms and the exhibits they feed">${menuIcon("supply")}<span class="tl"><b>Supply lines</b><span class="price">Off</span></span></button></section>`;
-  $("#sideMenu").innerHTML = `<div class="sidebar-top"><button class="sidetab" id="sideTab" aria-expanded="false" aria-controls="sideBody">${menuIcon("path").replace("ticon", "ticon tab")}<span class="tl"><b>Build</b></span></button>
-    <button class="sidetab sel" data-tool="select" aria-pressed="true" title="Look around and pick things (Esc)">${menuIcon("select")}<span class="tl"><b>Select</b></span></button>
-    <button class="sidetab" data-tool="bulldoze" aria-pressed="false" title="Remove things (${Math.round(COST.refundShare * 100)}% back)">${menuIcon("bulldoze")}<span class="tl"><b>Bulldoze</b></span></button>
-    <button class="sidetab" data-tool="move" aria-pressed="false" title="Drag a building, exhibit or path to a new spot">${menuIcon("move")}<span class="tl"><b>Move</b></span></button></div>
+  const big = BUILD_CATS.map(c => `<button class="tbtn big" id="cat-${c.id}" data-cat="${c.id}" aria-expanded="false" aria-controls="sideBody" title="${c.label}" aria-label="${c.label}"><svg viewBox="0 0 24 24" aria-hidden="true">${c.icon}</svg></button>`).join("");
+  $("#sideMenu").innerHTML = `<div class="lefttools"><div class="smallrow">
+    <button class="tbtn sm" data-tool="bulldoze" aria-pressed="false" title="Bulldoze: remove things (${Math.round(COST.refundShare * 100)}% back)" aria-label="Bulldoze">${menuIcon("bulldoze")}</button>
+    <button class="tbtn sm" data-tool="move" aria-pressed="false" title="Move: drag a building, exhibit or path to a new spot" aria-label="Move">${menuIcon("move")}</button></div>
+    ${big}</div>
     <div class="sidebody" id="sideBody" hidden>${groups}${rest}</div>`;
 }
 

@@ -3227,9 +3227,9 @@ function centerOn(it){
 /* ---------- picking things ---------- */
 function select(kind, id){
   sel = kind ? {kind, id} : null;
+  if(kind) officeOpen = false;
   render(); ui.panel();
   if(kind && focusMode()){ const it = selItem(); ui.toast(`Selected ${it && (it.name || BUILDINGS[it.type]?.label) || kind}. Press H to show the panel.`); return; }
-  if(kind && window.matchMedia("(max-width:760px)").matches) $("#aside").classList.add("open");
 }
 
 /* ---------- pointer and touch ---------- */
@@ -3451,18 +3451,22 @@ function setFocus(on, keep){
   const app = document.querySelector(".app"); if(app.classList.contains("focus") === on) return;
   const before = svgSize().w;
   app.classList.toggle("focus", on);
-  const fb = $("#focusBtn"); fb.setAttribute("aria-pressed", on); fb.textContent = on ? "Show menus" : "Hide menus"; fb.title = on ? "Bring the menus back (H)" : "Hide the menus to see only the map (H)";
   if(!keep){ try{ localStorage.setItem("genesis-focus", on ? "1" : "0"); }catch{} }
   const after = svgSize().w; if(before && after) view.tx += (after - before)/2;
   if(!on && state) ui.panel();
   if(state) render();
 }
-$("#focusBtn").onclick = () => setFocus(!focusMode());
 try{ if(localStorage.getItem("genesis-focus") === "1") setFocus(true, true); }catch{}
 buildMenu();
-const sideOpen = on => {
-  $("#sideTab").setAttribute("aria-expanded", on); $("#sideBody").hidden = !on; mapwrap.classList.toggle("side-open", on);
-  try{ localStorage.setItem("genesis-side-open", on ? "1" : "0"); }catch{}
+// Open one category's flyout (a BUILD_CATS id), or close it with false. A category with one group opens that group too.
+let sideCat = null;
+const sideOpen = cat => {
+  sideCat = cat || null;
+  document.querySelectorAll("#sideMenu .tbtn[data-cat]").forEach(b => b.setAttribute("aria-expanded", b.dataset.cat === sideCat));
+  const mine = [...document.querySelectorAll("#sideMenu .sgroup")].filter(g => g.dataset.cat === sideCat);
+  document.querySelectorAll("#sideMenu .sgroup").forEach(g => g.classList.toggle("other", g.dataset.cat !== sideCat));
+  if(mine.filter(g => !g.classList.contains("flat")).length === 1){ const g = mine.find(g => !g.classList.contains("flat")); g.classList.add("open"); g.firstElementChild.setAttribute("aria-expanded", true); }
+  $("#sideBody").hidden = !sideCat; mapwrap.classList.toggle("side-open", !!sideCat);
   if(typeof render === "function" && state) render();   // the fence end rings follow the menu
 };
 // Tapping a tool picks it and tucks the menu away so the map is clear. Tapping it again goes back to Select.
@@ -3476,7 +3480,7 @@ document.querySelectorAll("[data-fence]").forEach(b => b.addEventListener("click
   fenceSel = b.dataset.fence; setTool("exhibit"); sideOpen(false);
 }));
 // One group open at a time; dropdowns inside a group open on their own
-$("#sideTab").onclick = () => sideOpen($("#sideBody").hidden);
+document.querySelectorAll("#sideMenu .tbtn[data-cat]").forEach(b => b.addEventListener("click", () => sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat)));
 document.querySelectorAll(".shead").forEach(h => h.addEventListener("click", () => {
   const g = h.parentElement, was = g.classList.contains("open");
   document.querySelectorAll(".sgroup.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
@@ -3486,7 +3490,6 @@ document.querySelectorAll(".srow.head").forEach(h => h.addEventListener("click",
   const it = h.parentElement, was = it.classList.contains("open");
   it.classList.toggle("open", !was); h.setAttribute("aria-expanded", !was);
 }));
-try{ if(localStorage.getItem("genesis-side-open") === "1") sideOpen(true); }catch{}
 $("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick); });
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
@@ -3505,7 +3508,7 @@ document.addEventListener("keydown", e => {
     if(e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); undoDrawPoint(); return; }
   }
   if(e.key.toLowerCase() === "h" && !e.ctrlKey && !e.metaKey && !e.altKey){ setFocus(!focusMode()); return; }
-  if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sel) select(null); }
+  if(e.key === "Escape"){ if(tool !== "select") cancelTool(); else if(sideCat) sideOpen(false); else if(sel || officeOpen) closePanel(); }
   if(e.key === " "){ e.preventDefault(); setSpeed(speed ? 0 : (lastSpeed || 1)); }
   if(e.key.toLowerCase() === "r" && !e.ctrlKey && !e.metaKey){ if(isBuildTool(tool)) rotateTool(); else if(tool === "move" && mvSel) rotateMoved(); }
   if(e.key === "1") setSpeed(1);

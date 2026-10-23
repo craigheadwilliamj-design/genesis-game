@@ -45,29 +45,34 @@ button:disabled{cursor:default}
 .app{display:grid;grid-template-rows:auto 1fr;height:100%}
 
 /* ----- top bar ----- */
-.hud{display:flex;align-items:center;gap:14px;padding:8px 14px;background:var(--forest);color:var(--on-forest);flex-wrap:wrap;row-gap:6px}
-.brand{display:flex;align-items:center;gap:9px;min-width:0}
-.brand small{font:600 10px/1 "Barlow Condensed",sans-serif;opacity:.55;cursor:default;user-select:none;-webkit-user-select:none}
-.brand b{font:700 19px/1 "Barlow Condensed",sans-serif;letter-spacing:.01em;white-space:nowrap}
-.readouts{display:flex;gap:18px;align-items:center;flex-wrap:wrap;row-gap:4px}
-.ro{display:flex;flex-direction:column;line-height:1.05}
-.ro small{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.7}
-.ro span{font:600 20px/1.1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums;white-space:nowrap}
-.ro.money span{color:var(--money);font-size:24px}
-.ro.money.neg span{color:#FF9C8F}
-.stars{display:inline-flex;gap:1px;vertical-align:-2px}
-.clock{margin-left:auto;display:flex;align-items:center;gap:10px}
-.speed{display:flex;border:1px solid rgba(243,239,217,.28);border-radius:8px;overflow:hidden}
-.speed button{border:0;background:transparent;color:var(--on-forest);padding:6px 10px;font-weight:600;min-width:38px}
-.speed button+button{border-left:1px solid rgba(243,239,217,.2)}
+.hud{display:flex;align-items:center;gap:12px;padding:6px 12px;background:#1F3A2B;color:var(--on-forest);flex-wrap:wrap;row-gap:6px;border-bottom:3px solid #0A140D}
+/* HUD readouts are .hbox frames: flat greybox for now, each one gets a pixel frame later */
+.hbox{display:flex;align-items:center;gap:8px;min-height:38px;padding:4px 14px;border-radius:6px;background:#2A4A37;border:1px solid #3D6450;font:600 16px/1.1 "Barlow Condensed",sans-serif;white-space:nowrap;color:var(--on-forest)}
+.hbox.money{min-width:150px;justify-content:center}
+.hbox.money span{color:#8FE09B;font-size:23px}
+.hbox.money.neg span{color:#FF9C8F}
+.hstars{display:flex;align-items:center;padding:0 4px}
+.hstars .stars{display:flex;gap:2px}
+#roGuests{min-width:140px;justify-content:center;font-size:17px}
+#roWeather{margin-left:auto}
+.wxicon{display:flex;width:24px;height:24px}
+.wxicon svg{width:100%;height:100%}
+.clockbox{flex-direction:column;align-items:stretch;gap:2px;padding:3px 14px;min-width:140px;text-align:center}
+.clockbox b{font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+.clockbox #clock{font-size:17px;font-variant-numeric:tabular-nums}
+.clockbox .closed{color:#FF9C8F;font-size:12px;letter-spacing:.1em}
+.speed{display:flex;border:1px solid #3D6450;border-radius:6px;overflow:hidden;background:#2A4A37}
+.speed button{border:0;background:transparent;color:var(--on-forest);padding:6px 10px;font-weight:600;min-width:36px;min-height:38px}
+.speed button+button{border-left:1px solid #3D6450}
 .speed button[aria-pressed="true"]{background:var(--money);color:#1D2B22}
-.hbtn{padding:6px 11px;border-radius:8px;border:1px solid rgba(243,239,217,.28);background:transparent;color:var(--on-forest);white-space:nowrap}
-.hbtn:hover{background:rgba(243,239,217,.12)}
-.daybar{position:relative;width:120px;height:5px;border-radius:3px;background:rgba(243,239,217,.18);overflow:hidden;margin-top:4px}
+.hmenu{flex-direction:column;justify-content:center;gap:4px;width:52px;padding:0 13px;cursor:pointer}
+.hmenu i{display:block;width:100%;height:3px;border-radius:2px;background:currentColor}
+.hmenu:hover,.speed button:not([aria-pressed="true"]):hover{background:#355C46}
+.daybar{position:relative;height:5px;border-radius:3px;background:rgba(243,239,217,.18);overflow:hidden}
 .daybar i{position:absolute;inset:0 auto 0 0;background:var(--money);border-radius:3px}
 
 /* ----- map ----- */
-main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0}
+main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .mapwrap{position:relative;min-width:0;min-height:0;background:var(--outside)}
 #wxfx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;image-rendering:pixelated}
 #map{display:block;width:100%;height:100%;touch-action:none;user-select:none;-webkit-user-select:none}
@@ -88,14 +93,23 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .ticon{width:22px;height:22px}
 
 /* ----- build sidebar ----- */
-.side{display:flex;flex-direction:column;gap:8px;width:252px;max-width:calc(100vw - 24px)}
-.sidebar-top{display:flex;flex-wrap:wrap;gap:8px}
-.sidetab{display:grid;grid-template-columns:22px auto;gap:8px;align-items:center;padding:6px 14px 6px 10px;border:1px solid var(--line);border-radius:10px;background:var(--chrome);box-shadow:0 2px 10px rgba(0,0,0,.14);font-weight:600}
-.sidetab:hover{background:var(--chrome-2)}
-.sidetab[aria-expanded="true"],.sidetab[aria-pressed="true"]{background:var(--forest);color:var(--on-forest)}
-.sidetab .tl{display:flex;flex-direction:column;line-height:1.15}
-.sidebody{display:flex;flex-direction:column;gap:6px;max-height:calc(100vh - 190px);overflow-y:auto;scrollbar-width:thin;background:var(--chrome);border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.14);padding:4px 0}
+/* The tool columns: square .tbtn buttons on both sides of the map, greybox until their pixel art lands */
+.side{display:flex;align-items:flex-start;gap:8px}
+.lefttools{display:flex;flex-direction:column;gap:12px;flex-shrink:0}
+.smallrow{display:flex;gap:8px}
+.tbtn{display:flex;align-items:center;justify-content:center;width:44px;height:44px;padding:8px;border:2px solid #0F2418;border-radius:8px;background:#1F3A2B;color:var(--on-forest);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tbtn svg{width:100%;height:100%}
+.tbtn.big{width:84px;height:84px;padding:16px;border-radius:12px}
+.tbtn.sm{width:44px;height:44px}
+.tbtn:hover{background:#2E5440}
+.tbtn[aria-pressed="true"],.tbtn[aria-expanded="true"]{background:var(--money);color:#1D2B22;border-color:#7A5E14}
+.sidebody{display:flex;flex-direction:column;gap:6px;width:260px;max-width:calc(100vw - 190px);max-height:calc(100vh - 140px);overflow-y:auto;scrollbar-width:thin;background:var(--chrome);border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.14);padding:4px 0}
 .sidebody[hidden]{display:none}
+.sgroup.other{display:none}
+.rtools{position:absolute;top:12px;right:12px;z-index:5;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 24px);overflow-y:auto;scrollbar-width:none}
+.rtools .tbtn{flex-shrink:0;font-weight:700}
+.rtools .tbtn[hidden]{display:none}
+.verlabel{position:absolute;right:6px;bottom:2px;z-index:4;font:600 10px/1 "Barlow Condensed",sans-serif;color:var(--ink-2);opacity:.6;cursor:default;user-select:none;-webkit-user-select:none}
 .sgroup{display:flex;flex-direction:column}
 .sgroup+.sgroup{border-top:1px solid var(--line)}
 .shead{display:flex;justify-content:space-between;align-items:center;border:0;background:none;padding:9px 12px;font:600 15px/1.2 Barlow,sans-serif;text-align:left}
@@ -125,18 +139,22 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .ssub .snote{margin-left:10px}
 .sgroup.flat{padding:2px 0}
 .ticon.tab{width:20px;height:20px}
-.mapwrap.side-open .drawbar{left:292px}
+.mapwrap.side-open .drawbar{left:376px}
 .mapwrap.tool-move #map{cursor:move}
 .tgroup.zoom{flex-direction:row}
 .tgroup.zoom button{display:block;text-align:center;font-size:17px;padding:5px 0;width:44px}
 .tgroup.zoom button+button{border-top:0;border-left:1px solid var(--line)}
 .zoombar{position:absolute;left:12px;bottom:12px;z-index:6;width:max-content}
-.tgroup.zoom.zoombar button{width:38px;padding:4px 0}
-.tgroup.zoom.zoombar #zfit{width:42px}
+.tgroup.zoombar{flex-direction:row;gap:8px;background:none;border:0;box-shadow:none;overflow:visible}
+.tgroup.zoom.zoombar button{display:flex;align-items:center;justify-content:center;height:44px;border:2px solid #0F2418;border-radius:8px;background:#1F3A2B;color:var(--on-forest);font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.tgroup.zoom.zoombar button+button{border-left:2px solid #0F2418}
+.tgroup.zoom.zoombar button:hover{background:#2E5440}
+.tgroup.zoom.zoombar button{width:44px;padding:6px 0}
+.tgroup.zoom.zoombar #zfit{width:44px}
 
 .drawbar{position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:14px;background:var(--forest);color:var(--on-forest);border-radius:10px;padding:8px 8px 8px 14px;box-shadow:0 6px 20px rgba(0,0,0,.28);max-width:calc(100% - 24px)}
 .drawbar.on{display:flex}
-.drawbar{flex-wrap:wrap;width:max-content;max-width:min(780px,calc(100% - 196px));left:184px;right:12px;transform:none;margin-inline:auto}
+.drawbar{flex-wrap:wrap;width:max-content;max-width:min(780px,calc(100% - 196px));left:110px;right:64px;transform:none;margin-inline:auto}
 .drawbar .dtext{display:flex;flex-direction:column;min-width:min(260px,100%);flex:1 1 280px}
 .drawbar b{font:600 17px/1.15 "Barlow Condensed",sans-serif}
 .drawbar .dh{font-size:13px;opacity:.8}
@@ -157,7 +175,7 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 .drawbar .sizes button+button{border-left:1px solid rgba(243,239,217,.25)}
 .drawbar .sizes button[aria-pressed="true"]{background:var(--money);color:#1D2B22;font-weight:600}
 
-.toasts{position:absolute;right:12px;bottom:12px;align-items:flex-end;z-index:7;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100% - 24px));pointer-events:none}
+.toasts{position:absolute;right:64px;bottom:16px;align-items:flex-end;z-index:9;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100% - 24px));pointer-events:none}
 .toast{pointer-events:auto;background:var(--chrome);border:1px solid var(--line);border-left:4px solid var(--ink-2);border-radius:9px;padding:9px 12px;box-shadow:0 6px 18px rgba(0,0,0,.2);font-size:14px;animation:tin .25s ease-out}
 .toast.good{border-left-color:var(--good)}
 .toast.bad{border-left-color:var(--bad)}
@@ -173,7 +191,7 @@ main{position:relative;display:grid;grid-template-columns:1fr 340px;min-height:0
 @keyframes tin{from{transform:translateY(8px);opacity:0}}
 @media (prefers-reduced-motion: reduce){.toast{animation:none}}
 
-.paused-tag{position:absolute;top:12px;right:12px;z-index:5;background:var(--forest);color:var(--on-forest);font:600 13px/1 Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border-radius:7px;display:none}
+.paused-tag{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);z-index:5;background:var(--forest);color:var(--on-forest);font:600 13px/1 Barlow,sans-serif;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border-radius:7px;display:none}
 .paused-tag.on{display:block}
 
 /* pixel editor (js/pixeled.js) */
@@ -248,7 +266,13 @@ dialog.pixed[open]{display:flex}
 .pxrefrow select{flex:1;min-width:90px;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--field)}
 @media (max-width:760px){.pxmain{grid-template-columns:56px 1fr;grid-template-rows:1fr 45%}.pxside{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}}
 /* ----- side panel ----- */
-aside{border-left:1px solid var(--line);background:var(--chrome);overflow:auto;min-height:0}
+/* The panel floats over the map beside the right column, and only shows while something is open */
+aside{position:absolute;top:12px;right:64px;width:370px;max-width:calc(100% - 140px);max-height:calc(100% - 24px);overflow:auto;background:var(--chrome);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:8;display:none}
+aside.open{display:block}
+.sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
+.sheet-toggle{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-close{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--chrome-2);font-size:14px;line-height:1}
+.sheet-close:hover{background:var(--line)}
 .panel{padding:16px;display:flex;flex-direction:column;gap:14px}
 .panel h2{margin:0;font:600 23px/1.15 "Barlow Condensed",sans-serif;text-wrap:balance}
 .panel h3{margin:0 0 6px;font:600 13px/1.2 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
@@ -327,7 +351,6 @@ table.hist th{font-size:12px;text-align:right;color:var(--ink-2);font-weight:600
 table.hist th:first-child,table.hist td:first-child{text-align:left}
 table.hist td{text-align:right;padding:3px 0;border-top:1px solid var(--line)}
 .pos{color:var(--good)} .neg{color:var(--bad)}
-.sheet-toggle{display:none}
 dialog.catalog{width:min(760px,94vw);max-height:88vh;padding:0;display:none;flex-direction:column}
 dialog.catalog[open]{display:flex}
 .cat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 6px}
@@ -444,67 +467,51 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 .glyph{font-family:"Barlow Condensed",sans-serif;font-weight:700;fill:#fff;pointer-events:none;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:rgba(20,20,20,.6);stroke-width:.15em;stroke-linejoin:round}
 
 @media (max-width:760px){
-  .hud{gap:10px;padding:8px 12px}
-  .brand b{display:none}
-  .readouts{gap:12px}
-  .ro small{font-size:10px}
-  .ro span{font-size:17px}
-  .ro.money span{font-size:20px}
-  .ro.hide-sm{display:none}
-  .clock{margin-left:0;width:100%;justify-content:space-between}
-  main{grid-template-columns:1fr}
-  aside{position:absolute;left:0;right:0;bottom:0;max-height:55%;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.2);z-index:10;transform:translateY(calc(100% - 46px));transition:transform .2s ease}
-  aside.open{transform:none}
-  .sheet-toggle{display:block;width:100%;border:0;background:none;padding:13px 16px 6px;text-align:left;font-weight:600}
+  .hud{gap:6px;padding:6px 8px}
+  .hbox{min-height:32px;padding:3px 9px;font-size:14px}
+  .hbox.money{min-width:0}
+  .hbox.money span{font-size:18px}
+  #roGuests{min-width:0;font-size:14px}
+  #roWeather{margin-left:0}
+  #wxLabel{display:none}
+  .clockbox{min-width:110px}
+  .speed button{min-height:32px;min-width:32px;padding:4px 7px}
+  .hmenu{width:42px;padding:0 10px}
+  aside{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:55%;border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.2);z-index:10}
   .tools{top:8px;left:8px}
-  .tgroup button{padding:6px 8px;grid-template-columns:22px}
-  .tgroup .tl{display:none}
-  .side{width:min(252px,calc(100vw - 72px))}
-  .sidebody{max-height:calc(100vh - 230px)}
+  .lefttools{gap:8px}
+  .smallrow{flex-direction:column}
+  .tbtn,.tbtn.sm,.tbtn.big{width:44px;height:44px;padding:8px;border-radius:8px}
+  .rtools{top:8px;right:8px;gap:6px}
+  .rtools .tbtn{width:40px;height:40px;padding:7px}
+  .sidebody{width:min(260px,calc(100vw - 120px));max-height:calc(100vh - 230px)}
   .mapwrap.side-open .drawbar{left:62px}
-  .zoombar{left:8px;bottom:58px}
-  .tools{max-height:calc(100% - 112px)}
-  .toasts{bottom:58px}
-  .drawbar{top:8px;left:62px;right:8px;transform:none;max-width:calc(100vw - 70px);margin-inline:0;width:auto;flex-wrap:wrap;gap:8px}
+  .zoombar{left:8px;bottom:12px}
+  .tools{max-height:calc(100% - 70px)}
+  .toasts{right:56px;bottom:12px}
+  .drawbar{top:8px;left:62px;right:56px;transform:none;max-width:calc(100vw - 118px);margin-inline:0;width:auto;flex-wrap:wrap;gap:8px}
   .drawbar .dbtns{width:100%}
   .drawbar .dbtns button{flex:1}
   .drawbar .sizes.grid{grid-template-columns:repeat(2,1fr)}
 }
 .app.focus main{grid-template-columns:1fr}
-.app.focus #aside,.app.focus #sideMenu{display:none}
-@media (prefers-reduced-motion: reduce){aside{transition:none}}
+.app.focus #aside,.app.focus #sideMenu,.app.focus #rtools{display:none}
 </style>
 
 <div class="app">
   <header class="hud">
-    <div class="brand">
-      <svg width="30" height="30" viewBox="0 0 40 40" aria-hidden="true">
-        <circle cx="20" cy="22" r="15" fill="#D8B04A"/>
-        <path d="M6 30 Q8 14 20 12 Q32 14 34 30 Z" fill="#0E1912"/>
-        <path d="M8 22 L4 16 L11 18 L10 10 L16 14 L20 6 L24 14 L30 10 L29 18 L36 16 L32 22" fill="#0E1912"/>
-      </svg>
-      <b id="parkName" style="cursor:pointer" title="Open the park office">Genesis Park</b>
-      <small id="verLabel" title="Version">v0.9</small>
+    <div class="hbox money" id="roMoney" title="Money in the bank"><span id="money" class="num">$0</span></div>
+    <div class="hstars" id="rating" title="Park rating"></div>
+    <div class="hbox" id="roGuests">Guests: <span id="inpark" class="num">0</span></div>
+    <div class="hbox wx" id="roWeather"><span id="wxLabel">Fair</span><i id="wxIcon" class="wxicon" data-kind="fair" aria-hidden="true"></i></div>
+    <div class="hbox clockbox"><b id="dayLabel">1 Jan Y1</b><div class="daybar"><i id="dayFill"></i></div><span id="clock" class="num">8:00 AM</span><b id="closedTag" class="closed" hidden>Closed</b></div>
+    <div class="speed" role="group" aria-label="Game speed">
+      <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
+      <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
+      <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
+      <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
     </div>
-    <div class="readouts">
-      <div class="ro money" id="roMoney"><small>Bank</small><span id="money" class="num">$0</span></div>
-      <div class="ro"><small>Guests today</small><span id="guests" class="num">0</span></div>
-      <div class="ro hide-sm"><small>In the park</small><span id="inpark" class="num">0</span></div>
-      <div class="ro"><small>Rating</small><span id="rating"></span></div>    </div>
-    <div class="clock">
-      <div class="ro"><small id="dayLabel">1 Jan Y1</small><span id="clock" class="num">8:00 AM</span><b id="closedTag" hidden style="color:var(--bad);font:600 12px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase">Closed</b><div class="daybar"><i id="dayFill"></i></div></div>
-      <div class="speed" role="group" aria-label="Game speed">
-        <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>
-        <button id="sp1" data-speed="1" aria-pressed="true">1×</button>
-        <button id="sp2" data-speed="2" aria-pressed="false">2×</button>
-        <button id="sp4" data-speed="4" aria-pressed="false">4×</button>
-      </div>
-      <button class="hbtn" id="focusBtn" aria-pressed="false" title="Hide the menus to see only the map (H)">Hide menus</button>
-      <button class="hbtn" id="animalsBtn">Paleopedia</button>
-      <button class="hbtn" id="pixelBtn" title="Pixel editor (dev mode)" hidden>Pixels</button>
-      <button class="hbtn" id="mapBtn" title="See the whole park (M)">Park Map</button>
-      <button class="hbtn" id="menuBtn">Park</button>
-    </div>
+    <button class="hbox hmenu" id="menuBtn" title="Main menu (pauses the game)" aria-label="Main menu"><i></i><i></i><i></i></button>
   </header>
 
   <main>
@@ -881,6 +888,17 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <nav id="sideMenu" class="side" aria-label="Build menu"></nav>
       </div>
 
+      <nav class="rtools" id="rtools" aria-label="Park office and science">
+        <button class="tbtn" id="officeBtn" title="Park Office"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        <button class="tbtn" data-dept="oracle" title="ORACLE: research"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7 15h10" stroke="currentColor" stroke-width="1.6"/></svg></button>
+        <button class="tbtn" data-dept="ghost" title="GHOST: time travel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <button class="tbtn" data-dept="tar" title="TAR: cloning"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3c0 6 10 6 10 9s-10 3-10 9M17 3c0 6-10 6-10 9s10 3 10 9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 6.5h7M8.5 17.5h7" stroke="currentColor" stroke-width="1.4"/></svg></button>
+        <button class="tbtn" data-dept="ceres" title="CERES: paleo-botany"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21V10M12 13c-5 0-7-3-7-7 5 0 7 3 7 7zM12 10c0-4 2-7 7-7 0 4-2 7-7 7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="tbtn" id="animalsBtn" title="Paleopedia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="tbtn" id="mapBtn" title="See the whole park (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+        <button class="tbtn" id="pixelBtn" title="Pixel editor (dev mode)" hidden>Px</button>
+      </nav>
+
       <div class="tgroup zoom zoombar">
         <button id="zin" aria-label="Zoom in">+</button>
         <button id="zout" aria-label="Zoom out">−</button>
@@ -899,10 +917,11 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 
       <div class="paused-tag" id="pausedTag">Paused</div>
       <div class="toasts" id="toasts" aria-live="polite"></div>
+      <small id="verLabel" class="verlabel" title="Version">v0.9</small>
     </div>
 
     <aside id="aside">
-      <button class="sheet-toggle" id="sheetToggle">Park office</button>
+      <div class="sheet-head"><span class="sheet-toggle" id="sheetToggle">Park office</span><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
       <div class="panel" id="panel"></div>
     </aside>
   </main>
@@ -930,7 +949,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     <li><b>Add food stands and restrooms</b> so guests stay happy and spend more.</li>
     <li><b>Bring back the rest from the past.</b> GHOST's drones scout real fossil sites to discover animals and bring back their DNA, TAR clones them, ORACLE researches upgrades, and CERES grows plants and medicine. It all takes time.</li>
   </ol>
-  <p>Each day lasts about a minute. Guests pay at the gate, and you pay for food, wages, and upkeep when the park closes. The side panel always shows your next goal.</p>
+  <p>Each day lasts about a minute. Guests pay at the gate, and you pay for food, wages, and upkeep when the park closes. The Park Office button at the top right shows your next goal.</p>
   <div class="row"><button class="btn primary" id="introGo">Start building</button></div>
 </dialog>
 

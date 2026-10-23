@@ -180,11 +180,22 @@ $("#introGo").onclick = () => { $("#dlgIntro").close(); setSpeed(1); };
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
 function openParkOffice(tab){
   if(focusMode()) setFocus(false);
-  officeTab = typeof tab === "string" ? tab : "office"; select(null);
-  $("#aside").classList.add("open");
+  officeTab = typeof tab === "string" ? tab : "office"; officeOpen = true; select(null);
 }
-$("#menuBtn").onclick = () => openParkOffice();
-$("#parkName").onclick = () => openParkOffice();
+// The Office button toggles the Park Office. The ☰ button opens the Main Menu and pauses; closing the panel picks the speed back up.
+$("#officeBtn").onclick = () => officeOpen && !sel && officeTab !== "menu" ? closePanel() : openParkOffice();
+$("#menuBtn").onclick = () => {
+  if(officeOpen && !sel && officeTab === "menu"){ closePanel(); return; }
+  if(speed){ menuPaused = speed; setSpeed(0); }
+  openParkOffice("menu");
+};
+// The science buttons open their building's panel, or say to build it first
+document.querySelectorAll("#rtools [data-dept]").forEach(b => b.onclick = () => {
+  const k = b.dataset.dept, it = state.buildings.find(x => x.type === k);
+  if(focusMode()) setFocus(false);
+  if(!it){ ui.toast(`Build ${BUILDINGS[k].label} first. It's under Buildings, Park Management.`, "bad"); return; }
+  if(sel && sel.kind === "building" && sel.id === it.id) closePanel(); else select("building", it.id);
+});
 panelEl.addEventListener("input", e => {
   if(e.target.id !== "officeName") return;
   state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true);
