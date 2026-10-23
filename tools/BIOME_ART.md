@@ -50,7 +50,7 @@ Model: `wetland_tile` and `tile` in `tools/pixelground_flat.py`.
 
 ### 1b. Ground from 1 m tiles (boreal does this; use it for a biome when you want per-cell variety)
 
-Instead of one 18 m tile, a biome can be built from several 8 x 8 px tiles, each exactly 1 m (0.125 m a pixel). `buildGroundTiles` (end of `js/biomepaint.js`) lays them on the 1 m grid at random, so the 18 m repeat never shows. It replaces both the `#p-<biome>` (park ground and paint) and `#b-<biome>` (exhibit floor) patterns, so keep the old `sprites/ground/<biome>.png` and its `index.html` patterns in place as the fallback.
+Instead of one 18 m tile, a biome can be built from several 8 x 8 px tiles, each exactly 1 m (0.125 m a pixel). `buildTiles` (end of `js/biomepaint.js`, queued by `tileFill` the first time the biome is drawn) lays them on the 1 m grid at random, so the 18 m repeat never shows. It replaces both the `#p-<biome>` (park ground and paint) and `#b-<biome>` (exhibit floor) patterns, so keep the old `sprites/ground/<biome>.png` and its `index.html` patterns in place as the fallback.
 
 **Files.** `sprites/ground/<biome>-1.png`, `-2.png`, ... 8 x 8 px, opaque. The first `plain` tiles are plain ground, the next `detail` tiles carry one small mark (a twig, a stone). Light is from the top left. Draw each tile so nothing runs off its edge, because tiles are placed, turned and mirrored at random.
 

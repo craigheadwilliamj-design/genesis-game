@@ -141,7 +141,7 @@ function startWith(s, fresh){
 /* ---------- the start screen, and the park's biome: picked when a new park opens and locked for its life ---------- */
 // One card per biome: a swatch of the park's ground in it, its name, and what it looks like
 function biomeCards(el, cur){
-  el.innerHTML = Object.entries(BIOMES).map(([k, b]) => `<button type="button" data-biome="${k}" role="radio" aria-checked="${k === cur}" aria-pressed="${k === cur}"><svg viewBox="0 0 48 22" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="48" height="22" fill="${b.park}"/><rect width="48" height="22" fill="url(#p-${k})"/></svg>${esc(b.label)}<small>${esc(b.ground[0].toUpperCase() + b.ground.slice(1))}</small></button>`).join("");
+  el.innerHTML = Object.entries(BIOMES).map(([k, b]) => `<button type="button" data-biome="${k}" role="radio" aria-checked="${k === cur}" aria-pressed="${k === cur}"><svg viewBox="0 0 48 22" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="48" height="22" fill="${b.park}"/><rect width="48" height="22" fill="${tileFill("p", k)}"/></svg>${esc(b.label)}<small>${esc(b.ground[0].toUpperCase() + b.ground.slice(1))}</small></button>`).join("");
 }
 // only the start screen picks a biome, and only for the park about to open (never state.biome)
 let startBiome = DEFAULT_PARK_BIOME;
