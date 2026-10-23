@@ -40,7 +40,7 @@ const BUILD_MENU = [
     {label:"Paint Ground", tool:"paint", price:() => "Free in the park", note:"Drag a box to paint ground in another biome, pick the biome in the bar. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
     {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
-    ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at CERES. Out in the park, only Quaternary plants grow until the Research Lab researches sterile prehistoric plants." : undefined})),
+    ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at the Botany Lab. Out in the park, only Quaternary plants grow until the Research Lab researches sterile prehistoric plants." : undefined})),
   ]},
   {id:"guest", label:"Guest Buildings", items:[
     {label:"Restroom", tool:"restroom"},
@@ -66,7 +66,7 @@ const BUILD_MENU = [
     {label:"Research Lab", tool:"oracle"},
     {label:"GHOST", tool:"ghost"},
     {label:"Genetics Lab", tool:"tar"},
-    {label:"CERES", tool:"ceres"},
+    {label:"Botany Lab", tool:"ceres"},
   ]},
   {id:"logi", label:"Logistics Buildings", items:[
     {label:"Delivery Dock", tool:"dock"},

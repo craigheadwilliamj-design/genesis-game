@@ -2,7 +2,7 @@
    SCIENCE
    The Research Lab researches (fences, buildings, plants, medicine, the Genetics Lab and GHOST
    upgrades), GHOST's drones discover animals at real sites in deep time
-   and fill their genomes, the Genetics Lab clones animals, and CERES grows plants and
+   and fill their genomes, the Genetics Lab clones animals, and the Botany Lab grows plants and
    medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
    finish at any hour rather than at the daily rollover.
@@ -357,7 +357,7 @@ function finishClone(c){
   else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`The Genetics Lab finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
 }
 
-/* ---------- CERES: growing plants and medicine ---------- */
+/* ---------- Botany Lab: growing plants and medicine ---------- */
 
 const beds = () => dept("ceres") ? Math.max(0, state.science.crew.botanist) : 0;
 const growing = (kind, era, size) => state.ceres.beds.filter(b => b.kind === kind && b.era === era && (b.size || null) === (size || null)).length;
@@ -369,16 +369,16 @@ const growName = (kind, era, size) => kind === "plant" ? `${era} ${size} plants`
 
 function growProblem(kind, era, size){
   const sc = state.science, c = state.ceres;
-  if(!growInfo(kind, era, size)) return "CERES can't grow that.";
+  if(!growInfo(kind, era, size)) return "The Botany Lab can't grow that.";
   const blocker = deptProblem("ceres"); if(blocker) return blocker;
-  if(!sc.crew.botanist) return "Hire a botanist at CERES to tend a growing bed.";
+  if(!sc.crew.botanist) return "Hire a botanist at the Botany Lab to tend a growing bed.";
   if(kind === "plant"){
     const f = FLORA[ERA_OF[era]];
     if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at the Research Lab first.`;
     if(PLANT_DNA[era] && !plantDnaDone(era)) return `GHOST has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
   } else if(kind === "food"){
     if(!hasTech("paleoflora")) return "Research Paleoflora cultivation at the Research Lab first.";
-    if(!anyPlantDna()) return "CERES needs plant DNA first.";
+    if(!anyPlantDna()) return "The Botany Lab needs plant DNA first.";
   } else {
     if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at the Research Lab first.`;
     if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
@@ -392,14 +392,14 @@ function growBatch(kind, era, size){
   const gi = growInfo(kind, era, size), start = nowMin();
   spend(gi.cost, "science");
   state.ceres.beds.push({id:uid("g-"), kind, era, ...(size ? {size} : {}), bay:freeBay("botanist"), start, end:start + growMinutes(kind, era, size)});
-  events.toast(`CERES started a batch of ${growName(kind, era, size)}. Ready ${whenText(start + growMinutes(kind, era, size))}.`);
+  events.toast(`The Botany Lab started a batch of ${growName(kind, era, size)}. Ready ${whenText(start + growMinutes(kind, era, size))}.`);
   return true;
 }
 function finishBatch(b){
   const c = state.ceres;
-  if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`CERES finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
-  else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); events.toast("CERES finished a batch of Paleoflora food.", "good"); }
-  else { const g = MED_GOOD[b.era]; cerMeds()[g] = Math.min(medCap(), (cerMeds()[g] || 0) + growInfo("med", b.era).doses); events.toast(`CERES finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
+  if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`The Botany Lab finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
+  else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); events.toast("The Botany Lab finished a batch of Paleoflora food.", "good"); }
+  else { const g = MED_GOOD[b.era]; cerMeds()[g] = Math.min(medCap(), (cerMeds()[g] || 0) + growInfo("med", b.era).doses); events.toast(`The Botany Lab finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingFood = () => growing("food") * CERES_GROW.food.amount;
@@ -460,7 +460,7 @@ function scienceTick(dtMin){
       done.forEach(finishBatch);
     }
   }
-  // CERES keeps medicine stocked for the types set to "keep stocked"
+  // The Botany Lab keeps medicine stocked for the types set to "keep stocked"
   if(beds() && freeBay("botanist") >= 0){
     if(c.auto.food && c.stock + pendingFood() + CERES_GROW.food.amount <= ceresCap() && growBatch("food")) return;
     // each era's medicine has its own room, and the one running lowest goes first

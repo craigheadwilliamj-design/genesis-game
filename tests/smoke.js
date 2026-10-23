@@ -134,7 +134,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state = JSON.parse(JSON.stringify(state)); crew = []; syncCrew();
     out.carryPersists = crew.find(x => x.id === "k-t").carry.amount === 7;
 
-    // leftover Paleoflora goes back to CERES at night
+    // leftover Paleoflora goes back to the Botany Lab at night
     state.ceres.stock = 0; setCarry(crew.find(x => x.id === "k-t"), {type:"paleoflora", amount:3}); keepersNight();
     out.paleofloraReturned = state.ceres.stock === Math.min(3, ceresCap());
 
@@ -1189,8 +1189,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[small.id] = {genome:100};
     sc.tar = null;
 
-    // CERES: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
-    out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at CERES to tend a growing bed.";
+    // The Botany Lab: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
+    out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at the Botany Lab to tend a growing bed.";
     hireScientist("botanist");
     out.floraLocked = /Research Lab/.test(growProblem("plant", "Jurassic", "small"));
     sc.tech.push("paleoflora", "mesoplant", "medmeso");
@@ -1213,7 +1213,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.medGrows = growBatch("med", "mesozoic") && adv(growMinutes("med", "mesozoic") + 5, () => cerMeds().medmes >= 20) && cerMeds().medpal === 0 && cerMeds().medcen === 0;
     state.ceres.auto.mesozoic = true; state.ceres.meds = {medpal:0, medmes:0, medcen:0};
     out.autoRestocks = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20);
-    // a pile of one era's medicine doesn't stop CERES regrowing another's
+    // a pile of one era's medicine doesn't stop the Botany Lab regrowing another's
     state.ceres.meds = {medpal:0, medmes:0, medcen:medCap()};
     out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
@@ -1554,7 +1554,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.science.tech = keep.tech; setTool("select"); recompute(); buildGuestGraph(); render();
     }
 
-    // planted Paleo-Flora: groves need research and CERES planting stock, keep old grazers off grass, feed them, and make them happier
+    // planted Paleo-Flora: groves need research and Botany Lab planting stock, keep old grazers off grass, feed them, and make them happier
     const keepTech = [...sc.tech], keepPots = {...state.ceres.pots}, keepFeed = state.staff.feedFrom;
     state.money = 1e6; state.buildings = []; state.staff.feedFrom = 0;
     const gx = {id:"e-grove", name:"Grove test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], biome:"tropical"};
@@ -1564,7 +1564,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.tech = sc.tech.filter(t => t !== "mesoplant"); state.ceres.pots["Jurassic-large"] = 0;
     out.groveNeedsTech = /Research/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     sc.tech.push("mesoplant");
-    out.groveNeedsStock = /from CERES/.test(landSpot(115, 115, "jur-tropical-large").why || "");
+    out.groveNeedsStock = /from the Botany Lab/.test(landSpot(115, 115, "jur-tropical-large").why || "");
     out.treesNeedNoStock = landSpot(115, 115, "qua-tropical-large").ok;
     // a bare exhibit isn't grass; a Cenozoic planting, a grassland biome or grass hay make old grazers sick, and own-era groves dilute it
     const bareOk = grassSick(gx, grazer) === 0;
@@ -1586,7 +1586,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const kept = gx.land; gx.land = []; gx.stock = {paleoflora:100}; eatTick(60); const without = 100 - gx.stock.paleoflora; gx.land = kept;
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
-    // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use CERES stock of their era and size
+    // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use Botany Lab stock of their era and size
     const periods = Object.keys(ERA_OF), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
@@ -1618,7 +1618,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rockThumbsBiome = document.querySelector('[data-shapes="rock"] img').src.includes("rock-tropical-1.png") && document.querySelectorAll('[data-shapes="rock"] img').length === ROCK_SPRITES.tropical.rock.length;
       rockPick.rock = null; rockPick.boulder = null; rockBiome = rb; landGhost = ghost0; gx.biome = "tropical"; setTool("select"); renderOverlay(); refreshShapes();
       gx.land = land0; state.money = m0; }
-    out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from CERES/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
+    out.plantUsesStock = state.ceres.pots["Carboniferous-small"] === 0 && /from the Botany Lab/.test(landSpot(135, 135, "car-tropical-small").why || "") && haveOf(gx).plants > 0;
     // square footprints (S47): plants and rocks take whole-cell squares inside their size range, sides from their own pictures
     { const rng = FOOT.range, sizes = [], bad = [];
       for(const [k, t] of Object.entries(LAND)){ if(!t.flora || t.vivToy) continue; const r = rng[t.size]; if(!(Number.isInteger(t.footSide) && t.footSide >= r[0] && t.footSide <= r[1])) bad.push(k); sizes.push(t.footSide); }
@@ -2424,7 +2424,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const melt = !landOf(ex).some(f => f.type === "icefish") && landOf(ex).some(f => f.type === "hay" && f.left === LAND.hay.lasts - 2);
         for(let i = 0; i < LAND.hay.lasts; i++) treatsNight();
         state.weather.today = w0;
-        // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from CERES and the research to bale it
+        // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from the Botany Lab and the research to bale it
         const st0 = state.ceres.stock, tech0 = state.science.tech.slice();
         state.science.tech = tech0.filter(k => k !== "paleoflora"); const noTech = !!landProblem(ex, "pbale", 430, 30);
         state.science.tech = tech0.concat("paleoflora"); state.ceres.stock = 10; const noStock = !!landProblem(ex, "pbale", 430, 30);
@@ -2480,7 +2480,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
         const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
         out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
-        // botanical hall and simulation room need CERES and GHOST, and grow with finished plant DNA and event records
+        // botanical hall and simulation room need the Botany Lab and GHOST, and grow with finished plant DNA and event records
         state.buildings.push({id:"tc", type:"ceres", points:sq(520, 0, 10), day:0}, {id:"tg", type:"ghost", points:sq(540, 0, 10), day:0});
         sc.tech.push("edbotanical", "edsimroom");
         const keepD = sc.dna, keepB = state.ceres.beds; sc.dna = {}; state.ceres.beds = [];
@@ -3572,7 +3572,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       return noPick && kept && bulldozeKeeps && /Removes 25 m² of water/.test(stat) && cut && erased && exhibit;
     })();
 
-    // medicine logistics: a custodian tops the PMC up from CERES when a medicine is down to a couple of doses, not only once it is gone
+    // medicine logistics: a custodian tops the PMC up from the Botany Lab when a medicine is down to a couple of doses, not only once it is gone
     startWith(newPark(), false); setSpeed(0);
     {
       state.money = 1e7; state.day = 10; state.starters = []; state.staff.feedFrom = 0; state.safety.escapesFrom = 99;

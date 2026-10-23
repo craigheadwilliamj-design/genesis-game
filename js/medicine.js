@@ -4,7 +4,7 @@
    animals hurt each other. Mild illness is hidden until a vet's routine
    check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
    treat minor illnesses on the spot, and dart serious cases; keepers carry
-   those in, and the PMC treats them with CERES medicine once the Research Lab has
+   those in, and the PMC treats them with medicine from the Botany Lab once the Research Lab has
    researched it for their era.
    Vets also dart escaped animals, and keepers carry those home.
    ===================================================================== */
@@ -37,8 +37,8 @@ const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
 // Vets handle escapes whenever there's a vet and a connected PMC for them to work from
 const vetsOnDuty = () => state.staff.vets.length > 0 && pmcs().length > 0;
 
-/* ---------- CERES medicine ---------- */
-// CERES grows medicine in batches (see growBatch in science.js)
+/* ---------- Botany Lab medicine ---------- */
+// The Botany Lab grows medicine in batches (see growBatch in science.js)
 function medCap(){ return MEDICINE.capacity; }
 const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
@@ -217,7 +217,7 @@ function fieldTreatable(a){
 // What's happening to one sick animal, in words
 function sickStatus(e, a){
   const s = SPECIES_BY_ID[a.sp];
-  if(a.sick.chronic && !fieldTreatable(a)) return canTreat(s) ? `Chronic. A vet will cure it once CERES has ${eraMedName(s).toLowerCase()} on hand.` : `Chronic. Contemporary medicine eased it, but only ${eraMedName(s).toLowerCase()} from CERES can cure it fully.`;
+  if(a.sick.chronic && !fieldTreatable(a)) return canTreat(s) ? `Chronic. A vet will cure it once the Botany Lab has ${eraMedName(s).toLowerCase()} on hand.` : `Chronic. Contemporary medicine eased it, but only ${eraMedName(s).toLowerCase()} from the Botany Lab can cure it fully.`;
   if(a.darted){ const t = state.staff.transfers.find(x => x.animalId === a.id); return t && t.keeper ? "Darted. A keeper is coming to carry it to the PMC." : "Darted. Waiting for a keeper to carry it to the PMC."; }
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center and hire a vet to treat it.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
@@ -481,7 +481,7 @@ function vetStatus(v){
 
 function healthNight(){
   const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0};
-  // medicated feed: CERES doses go out to exhibits that asked for it and were fed
+  // medicated feed: Botany Lab doses go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
     if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;

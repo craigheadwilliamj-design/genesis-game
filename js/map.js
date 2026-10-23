@@ -830,7 +830,7 @@ function block34(bl, t, S, P, col, line, inv){
   for(const i of [...Array(P.length).keys()].filter(j => norm34(P, j)[1] > .05)){
     const L = edgeLen34(P, i);
     if(S.glass){
-      // CERES: a concrete plinth under glass walls with frames every 2 meters
+      // The Botany Lab: a concrete plinth under glass walls with frames every 2 meters
       s += quad34(P, i, 0, 1, 0, 1.2, wallCol);
       for(let k = 1; k < Math.round(L / 2); k++){ const a = onEdge34(P, i, k * 2 / L, 1.2), b = onEdge34(P, i, k * 2 / L, W); s += `<path d="M${a[0].toFixed(2)} ${a[1].toFixed(2)}L${b[0].toFixed(2)} ${b[1].toFixed(2)}" stroke="#E8F0EC" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>`; }
     } else if(S.front === "resort"){

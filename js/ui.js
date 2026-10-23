@@ -411,7 +411,7 @@ function needsHtml(e){
 
 // Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Props tab)
 const ROCKS = ["rock", "boulder"];
-const landLock = t => t.tech && !hasTech(t.tech) ? "Research at the Research Lab first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from CERES.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from CERES.` : "";
+const landLock = t => t.tech && !hasTech(t.tech) ? "Research at the Research Lab first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from the Botany Lab.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from the Botany Lab.` : "";
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
 function landHtml(e){
   const here = biomeOf(e), biomes = Object.keys(BIOMES).filter(b => Object.values(PLANTS_OF).some(p => p[b]));
@@ -448,7 +448,7 @@ function propsHtml(e){
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Toys keep animals busy so they don't pace. Hover a button for what it does.</div>`;
     for(const [sp, c] of counts){ const s = SPECIES_BY_ID[sp], need = enrichNeedOf(e, s, c), have = toyPoints(e, s);
       h += `<div class="factor" style="grid-template-columns:110px 1fr 64px;margin-top:6px"><span>${esc(s.name)}</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`; }
-    const tip = k => { const t = LAND[k]; return `${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `Everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from CERES` : ""}.`; };
+    const tip = k => { const t = LAND[k]; return `${t.toyFor ? Object.entries(t.toyFor).map(([d, p]) => `${DIETS[d].toLowerCase()}s ${p}`).join(", ") : `Everyone ${t.toy}`}${t.lasts ? `, lasts ${t.lasts} days` : ""}${t.hay ? `, feeds plant eaters ${t.hay} food a day` : ""}${t.paleo ? `, feeds older plant eaters ${t.paleo} Paleoflora a day, and takes ${t.ceres} from the Botany Lab` : ""}.`; };
     return h + `<div class="row" style="margin-top:8px">${btnsFor(list, tip, () => "")}</div></section>`;
   }
   if(sub === "shelters"){
@@ -543,8 +543,8 @@ function healthHtml(e){
   }
   if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
   if(!(e.animals.length && hasTech("genetherapy")) && hasDept("oracle") && e.animals.some(a => (a.q ?? 90) < 70)) items.push(hli("warn", "Some animals here have sickly DNA. Research Genome therapy at the Research Lab to improve them."));
-  if(!anyMedTech()) items.push(hli("warn", "Research medicine at the Research Lab so the PMC can treat animals and CERES can make medicated feed."));
-  else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs CERES medicine and fed animals.") : hli("warn", "No medicated feed."));
+  if(!anyMedTech()) items.push(hli("warn", "Research medicine at the Research Lab so the PMC can treat animals and the Botany Lab can make medicated feed."));
+  else if(e.animals.length) items.push(e.medFeed ? hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today. It needs medicine from the Botany Lab and fed animals.") : hli("warn", "No medicated feed."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   // every animal's health, the worst first; tap one to open it
   if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
@@ -553,11 +553,11 @@ function healthHtml(e){
     const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} below the lab's quality</span></div>`;
   }
-  // medicated feed from CERES
+  // medicated feed from the Botany Lab
   if(anyMedTech()){
     const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} CERES dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
-    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs CERES medicine and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at the Research Lab.` : "");
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} Botany Lab dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
+    const note = (e.medFeed ? (e.medFedOk ? "Medicated today. " : "Not medicated today. It needs medicine from the Botany Lab and fed animals. ") : "") + (treatable < e.animals.length ? `Only ${treatable} of ${e.animals.length} animals here have their era's medicine researched at the Research Lab.` : "");
     if(note) h += `<div class="meta">${note.trim()}</div>`;
   }
   return h + `</section>`;
@@ -705,7 +705,7 @@ function pmcHtml(b){
   h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
   h += `<div class="meta" style="margin-top:4px">Order it at a Delivery Dock, ${money(MODERN.cost)} a dose, and custodians carry it here. It eases any illness but never cures it fully: animals go home with a chronic case. It works best on Cenozoic animals and worst on Paleozoic ones.</div>`;
   h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label} animals: ${hasTech(id) ? "fully curable once the Research Lab refines the medicine for their period" : `contemporary medicine gets them to ${100 - MODERN.floor[era]}% at best. Research ${ERA_LABEL[era]} medicine at the Research Lab, and refine it for each period, for a full cure`}</li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build CERES to make medicine." : !anyMedTech() ? "CERES can grow medicine once the Research Lab researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. CERES has ${Math.floor(cerMedTotal())}, up to ${medCap()} of each era's. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
+  h += `<div class="meta" style="margin-top:6px">${!hasDept("ceres") ? "Build the Botany Lab to make medicine." : !anyMedTech() ? "The Botany Lab can grow medicine once the Research Lab researches any of it." : `The PMC holds ${Math.floor(pmcStock())} of ${storeCap(b)} doses. The Botany Lab has ${Math.floor(cerMedTotal())}, up to ${medCap()} of each era's. Grow more in its beds. Keepers carry them over.`}</div>${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
@@ -716,7 +716,7 @@ function pmcHtml(b){
 
 function greenhouseHtml(b){
   let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.greenhouse.blurb)}</div>`;
-  h += `<div class="meta" style="margin-top:6px">${hasDept("ceres") ? `CERES grows ${ceresRate()} Paleoflora a day with ${greenhouses().length} greenhouse${greenhouses().length === 1 ? "" : "s"}.` : "There's no CERES, so this greenhouse has nothing to supply."}</div>`;
+  h += `<div class="meta" style="margin-top:6px">${hasDept("ceres") ? `The Botany Lab grows ${ceresRate()} Paleoflora a day with ${greenhouses().length} greenhouse${greenhouses().length === 1 ? "" : "s"}.` : "There's no Botany Lab, so this greenhouse has nothing to supply."}</div>`;
   return h;
 }
 

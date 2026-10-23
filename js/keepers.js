@@ -7,21 +7,21 @@
    ===================================================================== */
 
 const FOOD_OF_DIET = {herbivore:"plants", omnivore:"plants", carnivore:"meat", piscivore:"fish", insectivore:"insects"};
-// Plant-eaters from before the Cenozoic eat Paleoflora from CERES
+// Plant-eaters from before the Cenozoic eat Paleoflora from the Botany Lab
 function foodType(s){
   const base = FOOD_OF_DIET[s.diet[0]] || "plants";
   return base === "plants" && ERA_OF[s.period] !== "cenozoic" ? "paleoflora" : base;
 }
 const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]);
 
-/* ---------- CERES growing Paleoflora ---------- */
+/* ---------- Botany Lab growing Paleoflora ---------- */
 const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b));
 function ceresRate(){ return dept("ceres") && hasTech("paleoflora") && anyPlantDna() ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
 function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLORA.storeDays; }
 function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / DAY_MIN); }
-// Keepers only go for Paleoflora when CERES has some to give
+// Keepers only go for Paleoflora when the Botany Lab has some to give
 const paleofloraReady = () => ceresOpen() && hasTech("paleoflora") && anyPlantDna() && state.ceres.stock >= 1;
-// Where keepers pick up a food: Paleoflora at CERES, everything else from a store that has some.
+// Where keepers pick up a food: Paleoflora at the Botany Lab, everything else from a store that has some.
 // A keeper in a zone uses that zone's stores first.
 function sourcesFor(t, k){
   if(t === "paleoflora") return cereses();
@@ -255,7 +255,7 @@ function syncCrew(){
   for(const k of state.staff.keepers) if(!crew.some(c => c.id === k.id)) crew.push({id:k.id, at:null, route:[], t:0, job:"idle", carry:k.carry || null, wait:0, plan:null});
 }
 function setCarry(c, v){ c.carry = v; const k = state.staff.keepers.find(x => x.id === c.id); if(k) k.carry = v; }
-// Hand back anything a keeper is holding: Paleoflora returns to CERES, other goods go back into a store
+// Hand back anything a keeper is holding: Paleoflora returns to the Botany Lab, other goods go back into a store
 function returnCarry(c){
   const h = c.carry;
   if(h && h.amount > 0){
@@ -276,7 +276,7 @@ function shortages(k, self){
     if(k && k.zone && e.zone !== k.zone) continue;   // keepers in a zone only feed that zone
     const need = dailyNeed(e); e.stock = e.stock || {};
     for(const need_t of Object.keys(need)){
-      // with no CERES, keepers bring plain plant food in place of Paleoflora
+      // with no Botany Lab, keepers bring plain plant food in place of Paleoflora
       const t = need_t === "paleoflora" && !paleofloraReady() ? "plants" : need_t;
       if(t === "plants" && need_t === "paleoflora" && need.plants) continue;   // the exhibit's own plant order covers it
       const coming = crew.reduce((s, c) => s + (c !== self && c.plan && c.plan.exhibitId === e.id && c.carry && c.carry.type === t ? c.carry.amount : 0), 0);
@@ -628,7 +628,7 @@ function arrive(c, k){
     if(!t){ c.job = "idle"; c.wait = 10; return; }
     const want = shortages(k).filter(j => j.t === t).reduce((s, j) => s + j.short, 0);
     let amount = Math.min(carryMax(), Math.max(1, Math.ceil(want)));
-    // CERES can only hand out what it has grown, and stores only what's on their shelves
+    // The Botany Lab can only hand out what it has grown, and stores only what's on their shelves
     const src = buildingById(c.plan && c.plan.src);
     if(t === "paleoflora"){ amount = Math.min(amount, Math.floor(state.ceres.stock)); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } state.ceres.stock -= amount; }
     else { amount = Math.min(amount, src ? Math.floor(stockOf(src, t)) : 0); if(amount < 1){ c.job = "idle"; c.wait = 10; return; } takeGood(src, t, amount); }
@@ -780,7 +780,7 @@ function keepersNight(){
   for(const c of crew){ c.cargo = null; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
-  // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to CERES
+  // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to the Botany Lab
   for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; c.fill = null; c.focusEx = null; } state.staff.calls = []; }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
@@ -800,7 +800,7 @@ function keeperStatus(k){
   const hb = c.haul && buildingById(c.haul.dst), hs = c.haul && c.haul.src && buildingById(c.haul.src);
   const hv = c.carry && c.carry.dst ? buildingById(c.carry.dst) : hb;
   const src = c.plan && c.plan.src && buildingById(c.plan.src);
-  return {toStation:`Heading to ${c.plan && c.plan.type === "paleoflora" ? "CERES" : src ? "the " + BUILDINGS[src.type].label.toLowerCase() : "a store"}` + (e ? ` for ${e.name}` : ""),
+  return {toStation:`Heading to ${c.plan && c.plan.type === "paleoflora" ? "the Botany Lab" : src ? "the " + BUILDINGS[src.type].label.toLowerCase() : "a store"}` + (e ? ` for ${e.name}` : ""),
           toHaulSrc:`Heading to the ${hs ? BUILDINGS[hs.type].label.toLowerCase() : "store"} to restock the ${hb ? BUILDINGS[hb.type].label.toLowerCase() : "store"}`,
           toHaulDst:`Restocking the ${hv ? BUILDINGS[hv.type].label.toLowerCase() : "store"}${carry}`, toExhibit:`Taking food to ${e ? e.name : "an exhibit"}${carry}`, filling:`Filling food trays in ${(state.exhibits.find(x => x.id === (c.fill && c.fill.e)) || {}).name || "an exhibit"}${carry}`,
           toClean:`Heading to muck out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`, mucking:`Mucking out ${(state.exhibits.find(x => x.id === c.cleanId) || {}).name || "an exhibit"}`,

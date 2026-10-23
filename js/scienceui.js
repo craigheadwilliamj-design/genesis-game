@@ -1,6 +1,6 @@
 /* =====================================================================
    SCIENCE SCREENS
-   The panels for the Research Lab, GHOST, the Genetics Lab and CERES, and their buttons.
+   The panels for the Research Lab, GHOST, the Genetics Lab and the Botany Lab, and their buttons.
    ===================================================================== */
 
 const PERIOD_ORDER = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
@@ -84,12 +84,12 @@ function oracleHtml(b){
     h += tabBar("omanage", MANAGE_TABS, secs.key);
     h += `<h3 style="margin-top:8px">${secs.title}</h3><ul class="shop">${techRows(secs.key)}</ul>`;
   } else if(oracleMain === "flora"){
-    h += `<div class="meta" style="margin-bottom:8px">Plants are grown at CERES. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
+    h += `<div class="meta" style="margin-bottom:8px">Plants are grown at the Botany Lab. Mesozoic and Paleozoic plants need DNA from GHOST first.</div>`;
     h += `<h3>Plants</h3><ul class="shop">${techRows("flora")}</ul>`;
     for(const era of ["mesozoic", "paleozoic"]) if(hasTech(FLORA[era].tech))
       h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA, which GHOST collects from each period: ${Object.values(PLANT_DNA).filter(f => f.era === era).map(f => `${f.period} ${(sc.dna[f.id] || {genome:0}).genome}%`).join(", ")}.</div>`;
   } else {
-    h += `<div class="meta" style="margin-bottom:8px">Medicine is grown at CERES.</div>`;
+    h += `<div class="meta" style="margin-bottom:8px">Medicine is grown at the Botany Lab.</div>`;
     h += tabBar("oera", ERA_ORDER.map(era => ({key:era, label:ERA_LABEL[era], color:ERA_COLOR[era], lock:!hasTech(MED_TECH[era])})), oracleEra);
     h += `<ul class="shop" style="margin-top:8px">${projectRow("tech", MED_TECH[oracleEra], esc(TECH.find(t => t.id === MED_TECH[oracleEra]).label), esc(TECH.find(t => t.id === MED_TECH[oracleEra]).text))}</ul>`;
     h += `<div class="meta" style="margin:10px 0 6px">${hasTech(MED_TECH[oracleEra]) ? `Refine the medicine for each period. Only refined medicine cures that period's animals fully.` : `Unlock ${ERA_LABEL[oracleEra]} medicine first, then refine it for each period.`}</div>`;
@@ -283,7 +283,7 @@ function tarHtml(b){
   return h;
 }
 
-/* ---------- CERES ---------- */
+/* ---------- Botany Lab ---------- */
 
 function growRow(kind, era, size){
   const gi = growInfo(kind, era, size), unlocked = kind === "plant" ? hasTech(FLORA[ERA_OF[era]].tech) : hasTech(MED_TECH[era]);
@@ -309,18 +309,18 @@ function ceresHtml(b){
   h += sciStaffHtml("botanist");
   const pe = state.exhibits.filter(e => e.animals.some(a => foodType(SPECIES_BY_ID[a.sp]) === "paleoflora"));
   h += `<section><h3>Paleoflora food</h3>`;
-  if(!hasTech("paleoflora")) h += `<div class="meta" style="color:var(--bad)">Research Paleoflora cultivation at the Research Lab before CERES can grow it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
-  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">CERES needs plant DNA first. Research Mesozoic or Paleozoic flora at the Research Lab, then send GHOST expeditions to a scouted site of that period to collect it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
+  if(!hasTech("paleoflora")) h += `<div class="meta" style="color:var(--bad)">Research Paleoflora cultivation at the Research Lab before the Botany Lab can grow it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
+  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">The Botany Lab needs plant DNA first. Research Mesozoic or Paleozoic flora at the Research Lab, then send GHOST expeditions to a scouted site of that period to collect it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
   else {
     const st = c.stock, cap = ceresCap(), need = state.exhibits.reduce((s, e) => s + (dailyNeed(e).paleoflora || 0), 0);
     h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter(st / cap * 100, FOOD_COLOR.paleoflora)}<span>${Math.floor(st)}/${Math.round(cap)}</span></div>`;
     h += `<dl class="kv" style="margin-top:6px"><dt>Grows</dt><dd>${ceresRate()} a day</dd><dt>Greenhouses</dt><dd>${greenhouses().length} (+${PALEOFLORA.greenhouse} a day each)</dd><dt>Your animals eat</dt><dd style="color:${need > ceresRate() ? "var(--bad)" : "inherit"}">${need} a day</dd></dl>`;
-    if(need > ceresRate()) h += `<div class="meta" style="color:var(--bad)">CERES can't keep up. ${hasTech("greenhouse") ? "Build greenhouses." : "Research greenhouses at the Research Lab."} When it runs dry, keepers bring grass hay instead.</div>`;
+    if(need > ceresRate()) h += `<div class="meta" style="color:var(--bad)">The Botany Lab can't keep up. ${hasTech("greenhouse") ? "Build greenhouses." : "Research greenhouses at the Research Lab."} When it runs dry, keepers bring grass hay instead.</div>`;
     const fg = CERES_GROW.food, fwhy = growProblem("food"), fq = growing("food");
     h += `<ul class="shop" style="margin-top:8px"><li><span class="nm">Extra Paleoflora food</span><button class="buy" data-action="grow" data-kind="food" data-era="food"${fwhy ? ` disabled title="${esc(fwhy)}"` : ""}>Grow ${money(fg.cost)}</button><span class="need">A batch takes ${spanText(growMinutes("food"))} and adds ${fg.amount} to the stock.${fq ? ` <b>${fq} growing.</b>` : ""}</span>`;
     h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="food" aria-pressed="${!!c.auto.food}" style="padding:3px 9px">${c.auto.food ? "Keeping it stocked" : "Keep it stocked"}</button> <span class="meta">${c.auto.food ? "A free bed starts a batch whenever there's room for more." : "Starts batches by itself when there's room."}</span></span></li></ul>`;
   }
-  h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect CERES to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect the Botany Lab to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
 
   h += baysHtml("Growing bays", "botanist", (j, i) => progressCard(growName(j.kind, j.era, j.size), "", j, i), "Empty. Grow something below.");
   h = h.replace(/<\/section>$/, `<div class="meta">Like the Genetics Lab's incubators, but with plants. Each botanist tends one bed, one batch at a time.</div></section>`);
@@ -333,9 +333,9 @@ function ceresHtml(b){
   h += `<ul class="shop" style="margin-top:8px">${PLANT_SIZES.map(sz => growRow("plant", cerePeriod, sz)).join("")}</ul></section>`;
 
   h += `<section><h3>Medicine</h3>`;
-  if(!anyMedTech()) h += `<div class="meta">Research medicine at the Research Lab and CERES can grow doses for the PMC and for medicated feed.</div>`;
+  if(!anyMedTech()) h += `<div class="meta">Research medicine at the Research Lab and the Botany Lab can grow doses for the PMC and for medicated feed.</div>`;
   const fed = state.exhibits.filter(e => e.medFeed && e.animals.length), use = fed.reduce((s, e) => s + feedDoses(e), 0);
-  h += `<div class="meta">CERES holds up to ${medCap()} doses of each era's medicine.</div>`;
+  h += `<div class="meta">The Botany Lab holds up to ${medCap()} doses of each era's medicine.</div>`;
   h += MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 74px"><span>${goodName(t).replace(" medicine", "")}</span>${meter((cerMeds()[t] || 0) / medCap() * 100, GOOD_COLOR[t])}<span>${Math.floor(cerMeds()[t] || 0)}/${medCap()}</span></div>`).join("");
   h += `<div class="meta">Keepers carry doses to the PMC${stores().some(s => storeOf(s).cold) ? " and cold stores" : ""}. Doses spoil slowly, and slower in a powered cold store. Medicated feed uses ${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}.</div>`;
   h += `<ul class="shop" style="margin-top:8px">${ERA_ORDER.map(era => growRow("med", era)).join("")}</ul></section>`;
@@ -362,6 +362,6 @@ panelEl.addEventListener("click", ev => {
   if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "stopResearch"){ const p = state.science.projects[+b.dataset.i]; if(p) stopProject(p); done(); return; }
   if(a === "discardClone"){ if(discardClone(b.dataset.id)) done(); return; }
-  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "CERES can't grow that.", "bad"); return; }
+  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "The Botany Lab can't grow that.", "bad"); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }
 });

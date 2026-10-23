@@ -259,7 +259,7 @@ function modLive(id){
     return EDU_LIVE.idle + (1 - EDU_LIVE.idle) * busy / 4;
   }
   if(m.live === "botany"){
-    // plant DNA CERES has finished (6 periods, 4 is plenty), and beds growing now
+    // plant DNA the Botany Lab has finished (6 periods, 4 is plenty), and beds growing now
     const dna = Object.values(PLANT_DNA).filter(f => genomeDone(f.id)).length;
     return dept("ceres") ? EDU_LIVE.idle + (1 - EDU_LIVE.idle) * (.7 * Math.min(1, dna / 4) + (state.ceres.beds.length ? .3 : 0)) : 0;
   }

@@ -139,13 +139,13 @@ function freshScience(){
     seen:{},           // site id (TIME_SITES) -> the animals scouting has turned up there; a site in here has been scouted
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
     reports:[],        // post-mission reports waiting at GHOST, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
-    clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and CERES beds carry a `bay` too, see science.js.
+    clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and Botany Lab beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
   };
 }
 
-// CERES: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
+// The Botany Lab: Paleoflora fodder (stock), medicine on hand, landscape plants by period, growing beds, and which medicines it keeps stocked
 function freshCeres(){ return {stock:0, meds:{medpal:0, medmes:0, medcen:0}, pots:{}, beds:[], auto:{cenozoic:false, mesozoic:false, paleozoic:false}}; }
 
 // Themes: the one new builds use, and which are unlocked
@@ -398,7 +398,7 @@ function upgradeSave(s){
     }
   }
   if(back) sc.log.unshift({day:s.day, text:`Science now runs one job per scientist. ${back} queued job${back === 1 ? " was" : "s were"} cancelled and paid back.`, ok:true});
-  // plant DNA, and the plants CERES grows, became per period (and exhibit planting stock went away): split what an era had across its periods
+  // plant DNA, and the plants the Botany Lab grows, became per period (and exhibit planting stock went away): split what an era had across its periods
   const periodsOf = era => Object.values(PLANT_DNA).filter(f => f.era === era);
   for(const era of ["mesozoic", "paleozoic"]){
     const old = sc.dna["flora-" + era];
@@ -423,7 +423,7 @@ function upgradeSave(s){
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
-  // and any medicine waiting at CERES moves to the PMC
+  // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
   if(!Array.isArray(s.biomePaint)) s.biomePaint = [];   // ground paint (js/biomepaint.js)
@@ -603,7 +603,7 @@ function exhibitReport(e){
     // old plant-eaters get sick on plants they never evolved for: Cenozoic planting, a grassland biome, or grass hay standing in for Paleoflora
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
     const sick = grazers.filter(s => grassSick(e, s) > 0), picky = grazers.filter(s => s.period === "Cretaceous" && grassShare(e, s) > 0);
-    const cure = e.grassFed ? "Feed them Paleoflora from CERES" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
+    const cure = e.grassFed ? "Feed them Paleoflora from the Botany Lab" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
     if(sick.length){ target += GRASS_HIT.intolerant * Math.max(...sick.map(s => grassSick(e, s))); issues.push({bad:true, text:`Eating plants it never evolved for. ${sick.map(s => s.name).join(", ")} can't digest grass. ${cure}.`}); }
     else if(picky.length){ target += GRASS_HIT.cretaceous * Math.max(...picky.map(s => grassShare(e, s))); issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. ${cure}.`}); }
   }
@@ -647,7 +647,7 @@ function exhibitReport(e){
   const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt. ${known === 1 ? "It needs" : "They need"} a vet. See Health below.`});
-  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from CERES cures it fully.`});
+  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from the Botany Lab cures it fully.`});
   else if(sick) issues.push({bad:true, text:"Some of the animals seem off. A vet's check-up would find out why."});
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
@@ -835,7 +835,7 @@ function dailyCosts(){
   return {feed:Math.round(feed), wages:Math.round(wages), upkeep:Math.round(upkeep), research};
 }
 
-/* ---------- science: Research Lab, GHOST, the Genetics Lab, and CERES (the rest is in science.js) ---------- */
+/* ---------- science: Research Lab, GHOST, the Genetics Lab, and the Botany Lab (the rest is in science.js) ---------- */
 
 const PERIOD_BY_ID = Object.fromEntries(TIME_PERIODS.map(p => [p.id, p]));
 const rand = (a, b) => a + Math.random() * (b - a);

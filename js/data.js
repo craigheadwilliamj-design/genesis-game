@@ -404,7 +404,7 @@ const SCIENTISTS = {
   gene:     {label:"Geneticist",          plural:"Geneticists",          dept:"tar",    hireCost:3500, wage:350,
              text:"Each one runs an incubator bay, so the Genetics Lab can grow that many clones at the same time."},
   botanist: {label:"Botanist",            plural:"Botanists",            dept:"ceres",  hireCost:3000, wage:300,
-             text:"Each one tends a growing bed, so CERES can grow that many batches at the same time."},
+             text:"Each one tends a growing bed, so the Botany Lab can grow that many batches at the same time."},
 };
 const RESEARCH_PER_PALEO = 4;   // research points each researcher earns per open day while they're on general research (no project)
 const RESEARCH_GUEST = .03;     // research points a guest adds on leaving, times how much they learned (0 to 1). Educated crowds fund science.
@@ -434,7 +434,7 @@ const GHOST_MK = [{name:"Mk. I", cut:0}, {name:"Mk. II", tech:"ghostmk2", cut:.1
 const TRIP_SIZE = [10, 5000];
 
 // Plant genomes, one per Mesozoic or Paleozoic period. GHOST collects each from its own period, once the Research Lab has researched that era's flora.
-// CERES needs a period's genome complete before it grows that period's plants (and any complete one lets it grow Paleoflora food).
+// The Botany Lab needs a period's genome complete before it grows that period's plants (and any complete one lets it grow Paleoflora food).
 //   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
 const PLANT_DNA = {};
 for(const [period, era, space] of [["Devonian", "paleozoic", 900], ["Carboniferous", "paleozoic", 900], ["Permian", "paleozoic", 900],
@@ -492,11 +492,11 @@ const EDU_MODULES = {
   auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
               text:"Tiered seating for lectures. More guests can sit through a talk at once."},
   labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
-              text:"A gallery over the working labs. It's only as good as what's going on: the Research Lab, GHOST, the Genetics Lab and CERES all busy makes the best show."},
+              text:"A gallery over the working labs. It's only as good as what's going on: the Research Lab, GHOST, the Genetics Lab and the Botany Lab all busy makes the best show."},
   nursery:   {label:"Nursery Window",   tech:"ednursery",   price:11000, upkeep:100, learn:3, joy:4, appeal:6, live:"nursery", dept:["tar"], boost:{family:.7, conservation:.3, spectacle:.2},
               text:"Watch clones in the incubators, and the day one hatches. Needs the Genetics Lab, and the best shows are while clones are growing."},
   botanical: {label:"Botanical Hall",   tech:"edbotanical", price:13000, upkeep:110, learn:5, joy:3, appeal:3, live:"botany", dept:["ceres"], boost:{conservation:.6, family:.4, research:.2},
-              text:"A glasshouse of living prehistoric plants from CERES. It grows richer as more plant DNA is finished and while beds are growing."},
+              text:"A glasshouse of living prehistoric plants from the Botany Lab. It grows richer as more plant DNA is finished and while beds are growing."},
   simroom:   {label:"Simulation Room",  tech:"edsimroom",   price:18000, upkeep:150, learn:7, joy:3, appeal:8, live:"sim", dept:["ghost"], boost:{spectacle:.5, research:.5, family:.2},
               text:"A VR walk through deep time, built from GHOST's records. Every finished event record adds a place to visit."},
   diorama:   {label:"Ecosystem Diorama", tech:"ediorama",   price:12000, upkeep:100, learn:6, joy:2, appeal:5, live:"biomes", boost:{conservation:.5, family:.4, spectacle:.2},
@@ -528,13 +528,13 @@ const CLONE_FAIL = {from:.2, to:.9, causes:[
   "Organ-field patterning arrested",
 ]};
 
-// What CERES grows in its beds. Works like the Genetics Lab's incubators, but with plants.
+// What the Botany Lab grows in its beds. Works like the Genetics Lab's incubators, but with plants.
 //   days    how long one batch takes, in open days
 //   cost    what one batch costs
 //   doses   (medicine) doses one batch makes
 const CERES_GROW = {
   medicine: {cenozoic:{days:.75, cost:900, doses:20}, mesozoic:{days:1.25, cost:1500, doses:20}, paleozoic:{days:1.75, cost:2200, doses:20}},
-  food: {days:.5, cost:500, amount:60},   // Paleoflora food: one batch adds `amount` to CERES's stock, on top of what it grows on its own
+  food: {days:.5, cost:500, amount:60},   // Paleoflora food: one batch adds `amount` to the Botany Lab's stock, on top of what it grows on its own
 };
 // Plants for the landscape come in three sizes (LAND size), grown in batches that make several plants each. Prices and times follow the era; each period's plants need that period's DNA.
 //   count   plants one batch makes
@@ -603,12 +603,12 @@ const BUILDINGS = {
   tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
-  oracle:   {label:"Research Lab", one:"the Research Lab", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
+  oracle:   {label:"Research Lab", tag:"RESEARCH", one:"the Research Lab", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
              blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and Genetics Lab upgrades. Research takes time."},
   ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:15000, upkeep:200, w:28, d:20, dept:true,
              full:"Genetic Harvesting of Organic Specimens through Time",
              blurb:"The time travel unit. Its drones scout real fossil sites across deep time to discover animals, then go back for their DNA."},
-  tar:      {label:"Genetics Lab", one:"the Genetics Lab", glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
+  tar:      {label:"Genetics Lab", tag:"GENETICS", one:"the Genetics Lab", glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
              blurb:"The cloning lab. Turns complete genomes into living animals."},
 };
 
@@ -1121,7 +1121,7 @@ BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W",
                       full:"Maintenance workshop", blurb:"Mechanics are based here. They inspect and repair exhibit barriers."};
 
 /* ---------------------------------------------------------------------
-   PALEOFLORA AND CERES
+   PALEOFLORA AND THE BOTANY LAB
    --------------------------------------------------------------------- */
 
 // Which era each period belongs to
@@ -1135,24 +1135,23 @@ const FLORA = {
   mesozoic:  {label:"Mesozoic",  plants:"cycads, conifers, ginkgos, and ferns",      tech:"mesoplant"},
   paleozoic: {label:"Paleozoic", plants:"lycopod trees, horsetails, and seed ferns", tech:"paleoplant"},
 };
-// CERES makes Paleoflora food at a steady rate and keeps a stock of it
+// The Botany Lab makes Paleoflora food at a steady rate and keeps a stock of it
 const PALEOFLORA = {
-  perDay:60,          // units CERES grows each day on its own
+  perDay:60,          // units the Botany Lab grows each day on its own
   greenhouse:40,      // extra units per day from each greenhouse
-  storeDays:2,        // CERES holds this many days of production
+  storeDays:2,        // The Botany Lab holds this many days of production
 };
 const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
 // Herbivores from these periods never evolved to eat grass, and get sick on it (Cenozoic plants, a grassland biome or grass hay)
 const GRASS_INTOLERANT = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full grass share
 
-BUILDINGS.ceres = {label:"CERES", tag:"CERES", one:"CERES", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
-                   full:"Cultivated Ecosystem Rations & Environmental Synthesis",
+BUILDINGS.ceres = {label:"Botany Lab", tag:"BOTANY", one:"the Botany Lab", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
                    blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once the Research Lab has researched them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
-// Greenhouses speed up Paleoflora. They need the research and a CERES in the park.
+// Greenhouses speed up Paleoflora. They need the research and a Botany Lab in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
-                        full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to CERES."};
+                        full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to the Botany Lab."};
 
 // Power for electrified fences
 const POWER = {
@@ -1183,7 +1182,7 @@ BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyp
    Food and medicine are real goods. They are bought at a Delivery Dock or made on site,
    sit in stores where they can spoil, and keepers carry them to where they're needed.
    --------------------------------------------------------------------- */
-// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at CERES.
+// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at the Botany Lab.
 //   spoil   share of a store's stock lost to rot each night
 const GOODS = {
   plants: {label:"Hay",      spoil:.04},
@@ -1203,7 +1202,7 @@ const FEED_GOODS = ["plants", "meat", "fish", "insects"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
 const CMED = "medmod";   // contemporary medicine: bought at the dock
 const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS, [CMED]);   // what the dock buys
-// CERES medicine is kept per era. Contemporary medicine (CMED) is a good of its own: the dock orders it, custodians carry it to the PMC
+// Botany Lab medicine is kept per era. Contemporary medicine (CMED) is a good of its own: the dock orders it, custodians carry it to the PMC
 const MED_GOOD = {paleozoic:"medpal", mesozoic:"medmes", cenozoic:"medcen"};
 const MED_GOODS = ["medpal", "medmes", "medcen"];
 const GOOD_COLOR = {...FOOD_COLOR, medpal:"#7A2E5C", medmes:"#B0384F", medcen:"#D9674A", medmod:"#8C8C96", snacks:"#D98A3A", drinks:"#4FA3C7", merch:"#9A5A8C"};
@@ -1287,7 +1286,7 @@ const TECH = [
   {id:"edauditorium", group:"build", label:"Education auditorium", points:55, needs:"education", text:"Add an Auditorium to an Education Center so more guests can sit through a talk at once."},
   {id:"edlabwindow", group:"build", label:"Live lab window", points:50, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
   {id:"ednursery", group:"build", label:"Nursery window", points:50, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch the Genetics Lab's clones grow, and love a hatching."},
-  {id:"edbotanical", group:"build", label:"Botanical hall", points:50, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as CERES finishes plant DNA and keeps beds growing."},
+  {id:"edbotanical", group:"build", label:"Botanical hall", points:50, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as the Botany Lab finishes plant DNA and keeps beds growing."},
   {id:"edsimroom", group:"build", label:"Simulation room", points:65, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
   {id:"ediorama", group:"build", label:"Ecosystem diorama", points:50, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
   {id:"edtouch", group:"build", label:"Touch gallery", points:40, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
@@ -1314,15 +1313,15 @@ const TECH = [
   {id:"ghostmk5", group:"ghost", label:"GHOST Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
   // Genetics
   {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
-  // Paleo-Flora: plants and medicine, grown at CERES
-  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"CERES starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
-  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
-  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then CERES grows its plants for exhibits."},
-  {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from CERES."},
-  {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near CERES to grow Paleoflora faster."},
-  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"CERES grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
-  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"CERES grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"CERES grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  // Paleo-Flora: plants and medicine, grown at the Botany Lab
+  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"The Botany Lab starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
+  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
+  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
+  {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from the Botany Lab."},
+  {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
+  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
+  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
 const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
@@ -1347,7 +1346,7 @@ const ESCAPE = {
    --------------------------------------------------------------------- */
 
 // Animals fall ill or get hurt. Vets from the Paleo-Medicine Center (PMC) dart them,
-// keepers carry them in, and the PMC treats them with medicine from CERES.
+// keepers carry them in, and the PMC treats them with medicine from the Botany Lab.
 const HEALTH = {
   startDay:18,         // new parks: nobody gets sick before this day
   illChance:.005,      // chance a well-kept animal falls ill each day
@@ -1382,9 +1381,9 @@ const GENE = {
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
                      "tric", "styr", "anky", "elas", "pcer", "prio", "dche"];
-// CERES grows medicine in batches (see CERES_GROW) once the Research Lab has unlocked its type
+// The Botany Lab grows medicine in batches (see CERES_GROW) once the Research Lab has unlocked its type
 const MEDICINE = {
-  capacity:60,         // doses CERES holds of each era's medicine
+  capacity:60,         // doses the Botany Lab holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
   feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
@@ -1408,7 +1407,7 @@ const VET = {
   patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:14, dept:true, unique:true,
-                 full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from CERES."};
+                 full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from the Botany Lab."};
 
 BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:MED_GOODS.concat(CMED), spoil:1, sink:true};
 
@@ -1429,7 +1428,7 @@ const WATER = {
 //   flora  a grove of plants from this era (see FLORA). Animals from that era feel at home in it and browse it.
 //   slots  shelter slots it gives (see coverSlots). only: species ids that can use it, whatever their size (a burrow). fits: the biggest animal (in coverSlots) it takes, 19 is a sauropod. look: how it's drawn (burrow, cave, canopy; none is a barn). noCold: canopies give no cover in a cold snap.
 //   tech   research needed first
-//   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at CERES.
+//   size   small, medium or large. Mesozoic and Paleozoic plants (tech) use up one plant of that era and size, grown at the Botany Lab.
 //   browse food units a day the animals nibble off it (Paleoflora for older groves, plants for Cenozoic ones)
 //   period, biome   plants made from PLANT_TABLE: one of each size per period and biome, any exhibit can have them, but animals only count plants from the exhibit's own biome and dislike the rest
 const LAND = {
@@ -1459,7 +1458,7 @@ const LAND = {
   shank:  {label:"Frozen Shank",    one:"a frozen whole shank", price:400, r:1.4, color:"#8A3A2A", toyFor:{carnivore:4, omnivore:2}, lasts:3, look:"ice"},
   buglog: {label:"Insect Log",      one:"an insect log",      price:1200, r:2.2, color:"#6E5034", toyFor:{insectivore:4, omnivore:3}, look:"buglog"},
   hay:    {label:"Hay Bale",        one:"a hay bale",         price:300,  r:1.8, color:"#D9B95A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, hay:40, look:"hay"},
-  // paleo: Paleoflora a day the older plant eaters eat off it; ceres: Paleoflora it takes from CERES to bale
+  // paleo: Paleoflora a day the older plant eaters eat off it; ceres: Paleoflora it takes from the Botany Lab to bale
   pbale:  {label:"Paleoflora Bale", one:"a Paleoflora bale",  price:500,  r:1.8, color:"#6E9A4A", ring:"#3E5F2A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, paleo:25, ceres:100, tech:"paleoflora", look:"hay"},
   // vivarium enrichment (vivToy instead of toy): picked from the vivarium's Enrichment list and set in the glass, never out in an open exhibit
   vbark:  {label:"Cork Bark Hide",     one:"a cork bark hide",     price:300,  r:.7, color:"#7A5A3A", toy:1, vivToy:true, hide:true, look:"vbark"},
@@ -2968,7 +2967,7 @@ const GOALS = [
   {id:"ghost",    text:"Bring back DNA with GHOST",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at GHOST and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
   {id:"clone",    text:"Build the Genetics Lab and clone an animal",      hint:"The Genetics Lab turns a complete genome into an animal. Hire a Geneticist at the Genetics Lab, then order clones from the Genetics Lab or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
-  {id:"ceres",    text:"Build CERES",                        hint:"Medicine for prehistoric animals is grown at CERES, once the Research Lab has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
+  {id:"ceres",    text:"Build the Botany Lab",                        hint:"Medicine for prehistoric animals is grown at the Botany Lab, once the Research Lab has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
   {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},

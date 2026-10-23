@@ -141,14 +141,14 @@ function logiOverviewHtml(){
     h += bar3(goodName(t), x.cap ? x.have / x.cap * 100 : 0, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
     h += `<div class="meta fnote">Eats ${Math.round(x.need)} a day${x.make ? `, farms make ${x.make}` : ""}. ${x.need ? (days < 1 ? `<b style="color:var(--bad)">Under a day in stores.</b>` : `${days >= 10 ? "10+" : days.toFixed(1)} days in stores.`) : ""}</div>`;
   }
-  if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at CERES`);
-  // medicine: one row an era (PMC, stores and CERES) and the contemporary doses the suppliers keep topped up
+  if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at the Botany Lab`);
+  // medicine: one row an era (PMC, stores and the Botany Lab) and the contemporary doses the suppliers keep topped up
   if(hasDept("pmc") || hasDept("ceres")){
     for(const t of MED_GOODS){
       const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
       if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
       h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
-      h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at CERES.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
+      h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at the Botany Lab.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
     }
     h += bar3(goodName(CMED), sum.cmed.have / sum.cmed.want * 100, GOOD_COLOR[CMED], `${Math.floor(sum.cmed.have)} stored`);
     h += `<div class="meta fnote">${Math.floor(sum.cmed.pmc)} at the PMC. Order it at the dock, ${money(MODERN.cost)} a dose.</div>`;
