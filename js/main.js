@@ -156,14 +156,16 @@ function showStart(){
 }
 // Click the version label 5 times in a row (each within 1.5 s of the last) to flip dev-mode.
 { let n = 0, last = 0;
-  $("#verLabel").addEventListener("click", () => {
+  document.addEventListener("click", e => {
+    if(!e.target.closest || !e.target.closest("#verLabel")) return;
     const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
     if(n < 5) return;
     n = 0;
     const on = !devMode(); devFlag = on;
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
     const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
-    ui.toast(on ? "Dev mode on. Pixels is in the top bar. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
+    buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
+    ui.toast(on ? "Dev mode on. The pixel editor is at the bottom of the right-hand column." : "Dev mode off.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
@@ -180,11 +182,22 @@ $("#introGo").onclick = () => { $("#dlgIntro").close(); setSpeed(1); };
 $("#dlgIntro").addEventListener("close", () => { if(!speed && !state.over) setSpeed(1); });
 function openParkOffice(tab){
   if(focusMode()) setFocus(false);
-  officeTab = typeof tab === "string" ? tab : "office"; select(null);
-  $("#aside").classList.add("open");
+  officeTab = typeof tab === "string" ? tab : "office"; officeOpen = true; select(null);
 }
-$("#menuBtn").onclick = () => openParkOffice();
-$("#parkName").onclick = () => openParkOffice();
+// The Office button toggles the Park Office. The ☰ button opens the Main Menu and pauses; closing the panel picks the speed back up.
+$("#officeBtn").onclick = () => officeOpen && !sel && officeTab !== "menu" ? closePanel() : openParkOffice();
+$("#menuBtn").onclick = () => {
+  if(officeOpen && !sel && officeTab === "menu"){ closePanel(); return; }
+  if(speed){ menuPaused = speed; setSpeed(0); }
+  openParkOffice("menu");
+};
+// The science buttons open their building's panel, or say to build it first
+document.querySelectorAll("#rtools [data-dept]").forEach(b => b.onclick = () => {
+  const k = b.dataset.dept, it = state.buildings.find(x => x.type === k);
+  if(focusMode()) setFocus(false);
+  if(!it){ ui.toast(`Build ${BUILDINGS[k].label} first. It's under Buildings, Park Management.`, "bad"); return; }
+  if(sel && sel.kind === "building" && sel.id === it.id) closePanel(); else select("building", it.id);
+});
 panelEl.addEventListener("input", e => {
   if(e.target.id !== "officeName") return;
   state.name = e.target.value.slice(0, 40) || "Genesis Park"; ui.hud(true);

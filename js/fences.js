@@ -411,7 +411,7 @@ function fenceRunSvg(pts, b, themed){
 // Makes connections readable at a glance: a dark footing line under every piece, a post cap where pieces meet, and an amber ring on each loose end that joins nothing (a gap or an unfinished pen). The rings only show while the build menu is open or the fence tool is active, so a lone wall can be scenery.
 function fenceJointsSvg(inv){
   const P = fencePieces(), keys = Object.keys(P); if(!keys.length) return "";
-  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), n2 = v => v.toFixed(2), fencing = tool === "exhibit" || !$("#sideBody").hidden;
+  const claimed = claimedPieces(), deg = new Map(), dirs = new Map(), at = new Map(), n2 = v => v.toFixed(2), fencing = tool === "exhibit" || sideCat === "exhibits";
   let foot = "", s = "";
   for(const k of keys){
     const [a, b] = pieceEnds(k), loose = !claimed.has(k);

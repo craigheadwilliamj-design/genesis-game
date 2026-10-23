@@ -4,6 +4,21 @@
    ===================================================================== */
 
 const panelEl = $("#panel"), aside = $("#aside");
+// The panel only shows while something is picked or the Park Office is open. The ✕, Esc and a pick on empty ground close it.
+// menuPaused holds the speed the Main Menu paused, so closing the panel picks it back up.
+let officeOpen = false, menuPaused = 0;
+function closePanel(){
+  officeOpen = false; select(null);
+  if(menuPaused && !speed) setSpeed(menuPaused);
+  menuPaused = 0;
+}
+// Placeholder weather icons for the HUD until the pixel ones are drawn
+const WX_ICON = {
+  fair:'<circle cx="12" cy="12" r="5" fill="#F4CE3C"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" stroke="#F4CE3C" stroke-width="2" stroke-linecap="round"/>',
+  hot:'<circle cx="12" cy="12" r="6" fill="#F08A3C"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2" stroke="#F08A3C" stroke-width="2" stroke-linecap="round"/>',
+  cold:'<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7" stroke="#A9D8F5" stroke-width="2" stroke-linecap="round"/>',
+  storm:'<path d="M6 15a4 4 0 0 1 1-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 17 15z" fill="#B9C2C8"/><path d="M12 14l-2 4h3l-2 4" fill="none" stroke="#F4CE3C" stroke-width="1.8" stroke-linejoin="round"/>',
+};
 
 const ui = {
   hudCache: {},
@@ -13,24 +28,32 @@ const ui = {
     const set = (id, v) => { if(force || this.hudCache[id] !== v){ this.hudCache[id] = v; $("#" + id).textContent = v; } };
     set("money", money(state.money));
     $("#roMoney").classList.toggle("neg", state.money < 0);
-    set("guests", state.today.guests.toLocaleString());
     set("inpark", guestCount().toLocaleString());
+    const gt = `${guestCount().toLocaleString()} in the park now, ${state.today.guests.toLocaleString()} came today.`;
+    if(force || this.hudCache.gt !== gt){ this.hudCache.gt = gt; $("#roGuests").title = gt; }
     set("clock", fmtClock(clockMin()));
     $("#closedTag").hidden = !state.parkClosed;
     const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; drawLights(); }
-    set("dayLabel", `${fmtDate(state.day)} · ${weatherNow().label}`);
-    set("parkName", state.name);
+    set("dayLabel", fmtDate(state.day));
+    set("wxLabel", weatherNow().label);
+    const wk = state.weather ? state.weather.today : "fair";
+    if(force || this.hudCache.wx !== wk){ this.hudCache.wx = wk; $("#wxIcon").dataset.kind = wk; $("#wxIcon").innerHTML = `<svg viewBox="0 0 24 24">${WX_ICON[wk] || WX_ICON.fair}</svg>`; }
     const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
-    if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#dayLabel").title = fc; }
+    if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#roWeather").title = fc; }
     $("#dayFill").style.width = (state.minute / DAY_MIN * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
-    if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 16); $("#rating").setAttribute("aria-label", `${r} stars`); }
+    if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 28); $("#rating").setAttribute("aria-label", `${r} stars`); }
   },
 
   panel(){
     if(document.querySelector(".app.focus")) return;
     const it = selItem();
     if(sel && !it) sel = null;
+    const open = !!sel || officeOpen;
+    aside.classList.toggle("open", open);
+    document.querySelectorAll("#rtools [data-dept]").forEach(b => b.setAttribute("aria-pressed", !!(sel && sel.kind === "building" && it && it.type === b.dataset.dept)));
+    $("#officeBtn").setAttribute("aria-pressed", !sel && officeOpen);
+    if(!open) return;
     let h;
     if(!sel) h = overviewHtml();
     else if(sel.kind === "exhibit") h = exhibitHtml(it);
@@ -49,7 +72,7 @@ const ui = {
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
     if(sel && sel.kind === "animal") animalLive(true);
-    $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : "Park office";
+    $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : officeTab === "menu" ? "Main menu" : "Park office";
   },
 
   toast(text, kind, html){
@@ -90,12 +113,14 @@ function grantsHtml(goal){
 function officeTabs(){
   return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
 }
+const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
   return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
     <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
     <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
     <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
-    <div class="row"><button class="btn" data-action="howTo">How to play</button><button class="btn danger" data-action="restart">Restart</button></div>`;
+    <div class="row"><button class="btn" data-action="howTo">How to play</button><button class="btn danger" data-action="restart">Restart</button></div>
+    <small id="verLabel" class="verlabel" title="Version">${GAME_VERSION}</small>`;
 }
 function overviewHtml(){
   const d = derived, t = state.today, goal = currentGoal();
@@ -890,7 +915,7 @@ panelEl.addEventListener("input", e => {
   const it = selItem();
   if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
 });
-$("#sheetToggle").onclick = () => aside.classList.toggle("open");
+$("#panelClose").onclick = closePanel;
 
 // Setting what a food tray holds: changing it empties the tray
 panelEl.addEventListener("change", ev => {

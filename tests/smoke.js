@@ -2513,7 +2513,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.buildings.push({id:"b-stf", type:"station", points:[[400,400],[404,400],[404,404],[400,404]]}, {id:"b-clo", type:"closet", points:[[410,400],[414,400],[414,404],[410,404]]});
       out.staffNeedsBuilding = typeof hireStaff("guard") === "string" && state.staff.guards.length === 0;
       out.staffHire = hireStaff("keeper") === null && hireStaff("custodian") === null && state.staff.keepers.length === 1 && state.staff.custodians.length === 1 && state.staff.keepers[0].morale === STAFF.startMorale;
-      officeTab = "staff"; select(null); ui.panel();
+      openParkOffice("staff");
       const tab = document.getElementById("panel").innerHTML;
       out.staffTab = tab.includes(state.staff.keepers[0].name) && tab.includes('data-action="fireStaff"') && tab.includes('data-action="hireStaff"') && tab.includes("Scientists");
       const k = state.staff.keepers[0]; select("staff", k.id);
@@ -2974,7 +2974,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const out = {}, q = x => document.querySelector(x), d = q("#dlgParkMap");
     document.querySelectorAll("dialog[open]").forEach(x => x.close());
     out.noTiltButton = !q("#ztilt") && tilt === true;
-    out.mapButtonThere = !!q("#mapBtn.hbtn");
+    out.mapButtonThere = !!q("#rtools #mapBtn.tbtn");
     q("#mapBtn").click();
     out.mapOpens = d.open;
     const cv = q("#parkMapCv"), g = cv.getContext("2d"), {b, S} = pmapGeo;
@@ -3001,16 +3001,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   Object.assign(checks, await page.evaluate(() => {
     const out = {}, q = x => document.querySelector(x), nm = state.name;
     document.querySelectorAll("dialog[open]").forEach(d => d.close());
-    for(const [id, key] of [["#parkName", "brandOpensOffice"], ["#menuBtn", "parkBtnOpensOffice"]]){
-      officeTab = "grants"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
-      q(id).click(); out[key] = !sel && officeTab === "office" && !!q("#officeName") && !q("#dlgMenu") && !q("dialog#dlgMenu[open]");
-    }
+    officeTab = "grants"; select("exhibit", state.exhibits[0] && state.exhibits[0].id);
+    q("#officeBtn").click(); out.officeBtnOpensOffice = !sel && officeTab === "office" && !!q("#officeName") && q("#aside").classList.contains("open") && !q("#dlgMenu");
+    q("#officeBtn").click(); out.officeBtnClosesOffice = !q("#aside").classList.contains("open");
+    setSpeed(2); q("#menuBtn").click(); out.menuBtnPausesOnMenu = officeTab === "menu" && speed === 0 && q("#aside").classList.contains("open");
+    q("#panelClose").click(); out.panelCloseResumes = speed === 2 && !q("#aside").classList.contains("open"); setSpeed(0);
+    q('#rtools [data-dept="ghost"]').click(); out.deptBtnNeedsBuilding = hasDept("ghost") ? sel && selItem().type === "ghost" : !sel;
+    select(null); openParkOffice();
     out.officeTabsRender = ["office", "money", "science", "guests", "staff", "grants"].every(t => {
       officeTab = t; ui.panel(); return !!q('#panel [data-action="otab2"][aria-selected="true"][data-k="' + t + '"]') && panelEl.textContent.length > 40;
     }) && !!(officeTab = "money", ui.panel(), q("#ticketOut")) && !!(officeTab = "guests", ui.panel(), q("#panel section"));
     officeTab = "office"; ui.panel();
     const inp = q("#officeName"); inp.value = "Renamed <b>Park</b>"; inp.dispatchEvent(new Event("input", {bubbles:true}));
-    out.renameUpdatesHud = state.name === "Renamed <b>Park</b>" && q("#parkName").textContent === state.name && !q("#parkName b") && !q("#officeTitle b");
+    out.renameUpdatesHud = state.name === "Renamed <b>Park</b>" && q("#officeTitle").textContent === state.name && !q("#officeTitle b");
     inp.value = "x".repeat(60); inp.dispatchEvent(new Event("input", {bubbles:true})); out.renameCapped = state.name.length === 40;
     state.name = nm; ui.hud(true);
     officeTab = "office"; ui.panel(); q('[data-action="otab2"][data-k="menu"]').click();
@@ -3093,17 +3096,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   });
   if(at){ checks.animalsTabMoveOne = at.moveOne; checks.animalsTabSorted = at.listed; checks.animalsTabRowOpensPanel = at.opened; checks.animalsTabSellRemovesOne = at.sold; checks.animalBackGoesToExhibit = at.backOk; }
 
-  // focus mode: H hides the build menu and side panel, the button/H brings them back
+  // focus mode: H hides the tool columns and the panel, H again brings them back
   const fm = await page.evaluate(() => {
     document.querySelectorAll("dialog[open]").forEach(d => d.close());
-    const vis = id => document.querySelector(id).getClientRects().length > 0, w = () => svg.getBoundingClientRect().width;
-    document.activeElement?.blur?.(); const w0 = w(), both0 = vis("#sideMenu") && vis("#aside");
+    const vis = id => document.querySelector(id).getClientRects().length > 0;
+    document.activeElement?.blur?.(); openParkOffice(); const both0 = vis("#sideMenu") && vis("#aside") && vis("#rtools");
     document.dispatchEvent(new KeyboardEvent("keydown", {key:"h"}));
-    const hidden = !vis("#sideMenu") && !vis("#aside") && w() > w0 && localStorage.getItem("genesis-focus") === "1";
-    ui.panel(); select("exhibit", state.exhibits[0]?.id);
-    document.querySelector("#focusBtn").click();
-    const back = vis("#sideMenu") && vis("#aside") && localStorage.getItem("genesis-focus") === "0";
-    select(null);
+    const hidden = !vis("#sideMenu") && !vis("#aside") && !vis("#rtools") && localStorage.getItem("genesis-focus") === "1";
+    document.dispatchEvent(new KeyboardEvent("keydown", {key:"h"}));
+    const back = vis("#sideMenu") && vis("#aside") && vis("#rtools") && localStorage.getItem("genesis-focus") === "0";
+    closePanel();
     return {both0, hidden, back};
   });
   checks.focusModeStartsShown = fm.both0;
@@ -3780,6 +3782,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
     document.querySelector("#dlgPixel").close();
     // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked
+    openParkOffice("menu");   // the version label lives at the foot of the Main Menu
     const wasDev = devMode(), tap = () => { for(let i = 0; i < 5; i++) document.querySelector("#verLabel").click(); };
     if(wasDev) tap(); tap(); const shown = !document.querySelector("#pixelBtn").hidden && devMode(); tap();
     out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
