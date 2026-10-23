@@ -140,7 +140,7 @@ main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .rtools{position:absolute;top:12px;right:12px;z-index:5;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 24px);overflow-y:auto;scrollbar-width:none}
 .rtools .tbtn{flex-shrink:0;font-weight:700}
 .rtools .tbtn[hidden]{display:none}
-.verlabel{position:absolute;right:6px;bottom:2px;z-index:4;font:600 10px/1 "Barlow Condensed",sans-serif;color:var(--ink-2);opacity:.6;cursor:default;user-select:none;-webkit-user-select:none}
+.verlabel{display:block;margin-top:14px;font:600 11px/1 "Barlow Condensed",sans-serif;color:var(--ink-2);opacity:.6;cursor:default;user-select:none;-webkit-user-select:none}
 .sgroup{display:flex;flex-direction:column}
 .sgroup+.sgroup{border-top:1px solid var(--line)}
 .shead{display:flex;justify-content:space-between;align-items:center;border:0;background:none;padding:9px 12px;font:600 15px/1.2 Barlow,sans-serif;text-align:left}
@@ -950,7 +950,6 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 
       <div class="paused-tag" id="pausedTag">Paused</div>
       <div class="toasts" id="toasts" aria-live="polite"></div>
-      <small id="verLabel" class="verlabel" title="Version">v0.9</small>
     </div>
 
     <aside id="aside">

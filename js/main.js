@@ -156,14 +156,16 @@ function showStart(){
 }
 // Click the version label 5 times in a row (each within 1.5 s of the last) to flip dev-mode.
 { let n = 0, last = 0;
-  $("#verLabel").addEventListener("click", () => {
+  document.addEventListener("click", e => {
+    if(!e.target.closest || !e.target.closest("#verLabel")) return;
     const now = Date.now(); n = now - last < 1500 ? n + 1 : 1; last = now;
     if(n < 5) return;
     n = 0;
     const on = !devMode(); devFlag = on;
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
     const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
-    ui.toast(on ? "Dev mode on. Pixels is in the top bar. Reload to refresh the build menu." : "Dev mode off. Reload to refresh the build menu.");
+    buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
+    ui.toast(on ? "Dev mode on. The pixel editor is at the bottom of the right-hand column." : "Dev mode off.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
