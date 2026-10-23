@@ -115,7 +115,7 @@ const ICON_LINES = {
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
   grid:'<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/>',
   supply:'<path d="M4 18L12 6l8 12" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2"/><circle cx="4" cy="18" r="2" fill="#E0A030"/><circle cx="20" cy="18" r="2" fill="#E0A030"/>',
-  bulldoze:'<path d="M3 17h11v-5H9l-2-4H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="6" cy="19" r="1.8" fill="currentColor"/><circle cx="11" cy="19" r="1.8" fill="currentColor"/><path d="M14 14h6l1 4h-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
+  bulldoze:'<path d="M2 9h2.5v11H2z" fill="currentColor"/><path d="M4.5 13l4-1M4.5 17h4" stroke="currentColor" stroke-width="1.6"/><path d="M8 11h4V5h6l2 6h1v6H8z" fill="currentColor"/><path d="M13.3 6.5h3.6l1.3 4.5h-4.9z" fill="#1F3A2B" fill-opacity=".75"/><rect x="7.5" y="17.5" width="15" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="20" r="1.1" fill="currentColor"/><circle cx="15" cy="20" r="1.1" fill="currentColor"/><circle cx="20" cy="20" r="1.1" fill="currentColor"/>',
   move:'<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   select:'<path d="M5 3l14 8-6 1.5L10 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
@@ -199,7 +199,7 @@ const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && 
 // The left column's big buttons, each opening a flyout of the build groups it holds
 const BUILD_CATS = [
   {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi", "toggles"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
-  {id:"land", label:"Landscaping", groups:["land", "land-buy"], icon:'<path d="M14 3l7 7M17.5 6.5L9 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M9 15l-5 1-1 5 5-1 3-3z" fill="currentColor"/>'},
+  {id:"land", label:"Landscaping", groups:["land", "land-buy"], icon:'<g transform="translate(12 12) rotate(40) scale(1.2) translate(-12 -12)"><path d="M9 1.5h6v3.5H9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M11 5h2v9h-2z" fill="currentColor"/><path d="M7.5 13.5h9v4.5c0 2.5-2 4-4.5 5-2.5-1-4.5-2.5-4.5-5z" fill="currentColor"/><path d="M12 15.5v4.5" stroke="#1F3A2B" stroke-opacity=".6" stroke-width="1.2"/></g>'},
   {id:"exhibits", label:"Exhibits", groups:["exhibits"], icon:'<path d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2"/>'},
   {id:"paths", label:"Paths", groups:["paths"], icon:'<path d="M8 21c0-5 6-5 6-9s-5-5-5-9M15 21c0-5 6-5 6-9s-5-5-5-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'},
 ];
