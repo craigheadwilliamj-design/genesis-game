@@ -1,9 +1,10 @@
 /* =====================================================================
    FENCES ON THE GRID
-   Fence goes down a piece at a time on the 1 m grid, Zoo Tycoon style: dragging lays a straight or
-   diagonal run, one piece a grid step. A piece runs along one grid edge (1 m) or corner to corner
-   across one square (about 1.4 m). They live in state.fenceGrid, keyed "x,y,d" with d one of
-   h (east from x,y), v (south from x,y), d (x,y to x+1,y+1) or a (x+1,y to x,y+1), each {b: barrier}.
+   Fence goes down a piece at a time on the 5 m grid (FENCE_GRID.step, the same grid as path chunks), Zoo Tycoon
+   style: dragging lays a straight or diagonal run, one piece a grid step. A piece runs along one grid edge (5 m)
+   or corner to corner across one square (about 7.1 m). They live in state.fenceGrid, keyed "x,y,d" in meters with
+   x,y on the grid and d one of h (east from x,y), v (south from x,y), d (x,y to x+S,y+S) or a (x+S,y to x,y+S),
+   each {b: barrier}.
    Any loop of pieces closes off a region. A region of at least FENCE_GRID.minArea becomes an exhibit
    with e.grid set, and its e.points are the loop, so everything that reads an exhibit's shape still works.
    When a grid exhibit's loop is broken it keeps its last shape with e.open set: the fence has a gap
@@ -11,6 +12,8 @@
    ===================================================================== */
 
 const fencePieces = () => state.fenceGrid || (state.fenceGrid = {});
+const FS = FENCE_GRID.step;
+const fenceSnap = v => Math.round(v / FS) * FS;
 const pieceKey = (x, y, d) => `${x},${y},${d}`;
 const pieceType = p => (p && p.b) || "wood";
 // A piece can carry a different fence on each side, for a wall two pens share: b is the side an exhibit sees when its loop runs the piece
@@ -23,14 +26,14 @@ const mkPiece = (a, b2) => { const p = a === "wood" ? {} : {b:a}; if(b2 !== unde
 const pieceWorth = (k, p) => pieceKinds(p).reduce((s, t) => s + pieceCost(k, t), 0);
 function pieceEnds(k){
   const [xs, ys, d] = k.split(","), x = +xs, y = +ys;
-  return d === "h" ? [[x, y], [x + 1, y]] : d === "v" ? [[x, y], [x, y + 1]] : d === "d" ? [[x, y], [x + 1, y + 1]] : [[x + 1, y], [x, y + 1]];
+  return d === "h" ? [[x, y], [x + FS, y]] : d === "v" ? [[x, y], [x, y + FS]] : d === "d" ? [[x, y], [x + FS, y + FS]] : [[x + FS, y], [x, y + FS]];
 }
-const pieceLen = k => /[hv]$/.test(k) ? 1 : Math.SQRT2;
+const pieceLen = k => /[hv]$/.test(k) ? FS : FS * Math.SQRT2;
 const pieceCost = (k, barrier) => pieceLen(k) * fenceRate(barrier || "wood");
 // The piece joining two neighboring grid points
 function pieceBetween(a, b){
   const dx = b[0] - a[0], dy = b[1] - a[1];
-  if(Math.abs(dx) > 1 || Math.abs(dy) > 1 || (!dx && !dy)) return null;
+  if(Math.abs(dx) > FS || Math.abs(dy) > FS || (!dx && !dy)) return null;
   const x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]);
   return !dy ? pieceKey(x, a[1], "h") : !dx ? pieceKey(a[0], y, "v") : dx === dy ? pieceKey(x, y, "d") : pieceKey(x, y, "a");
 }
@@ -39,16 +42,16 @@ function pieceLine(a, b){
   const dx = b[0] - a[0], dy = b[1] - a[1];
   if(!dx && !dy) return {end:a, keys:[]};
   const o = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)), sx = Math.round(Math.cos(o * Math.PI / 4)), sy = Math.round(Math.sin(o * Math.PI / 4));
-  const n = sx && sy ? Math.round((Math.abs(dx) + Math.abs(dy)) / 2) : sx ? Math.abs(dx) : Math.abs(dy);
+  const n = Math.round((sx && sy ? (Math.abs(dx) + Math.abs(dy)) / 2 : sx ? Math.abs(dx) : Math.abs(dy)) / FS);
   const keys = []; let p = a;
-  for(let i = 0; i < n; i++){ const q = [p[0] + sx, p[1] + sy]; keys.push(pieceBetween(p, q)); p = q; }
+  for(let i = 0; i < n; i++){ const q = [p[0] + sx * FS, p[1] + sy * FS]; keys.push(pieceBetween(p, q)); p = q; }
   return {end:p, keys};
 }
 // The pieces around a loop of grid points (each side straight or diagonal)
 function loopPieces(pts){
   const out = [];
   for(let i = 0; i < pts.length; i++){
-    const a = pts[i], b = pts[(i + 1) % pts.length], sx = Math.sign(b[0] - a[0]), sy = Math.sign(b[1] - a[1]), n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
+    const a = pts[i], b = pts[(i + 1) % pts.length], sx = Math.sign(b[0] - a[0]) * FS, sy = Math.sign(b[1] - a[1]) * FS, n = Math.round(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) / FS);
     for(let k = 0; k < n; k++) out.push(pieceBetween([a[0] + sx * k, a[1] + sy * k], [a[0] + sx * (k + 1), a[1] + sy * (k + 1)]));
   }
   return out;
@@ -59,7 +62,7 @@ const stepFwd = (k, a) => { const [e] = pieceEnds(k); return e[0] === a[0] && e[
 function loopSteps(pts){
   const out = [];
   for(let i = 0; i < pts.length; i++){
-    const a = pts[i], b = pts[(i + 1) % pts.length], sx = Math.sign(b[0] - a[0]), sy = Math.sign(b[1] - a[1]), n = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]));
+    const a = pts[i], b = pts[(i + 1) % pts.length], sx = Math.sign(b[0] - a[0]) * FS, sy = Math.sign(b[1] - a[1]) * FS, n = Math.round(Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) / FS);
     for(let j = 0; j < n; j++){ const p = [a[0] + sx * j, a[1] + sy * j], k = pieceBetween(p, [p[0] + sx, p[1] + sy]); out.push({k, fwd:stepFwd(k, p)}); }
   }
   return out;
@@ -138,7 +141,7 @@ function weakestOf(pts){
   return w || "wood";
 }
 // The first step of each side of a closed grid exhibit's loop: [{k, fwd}] a side
-const sideStart = (e, i) => { const P = e.points, a = P[i], b = P[(i + 1) % P.length], k = pieceBetween(a, [a[0] + Math.sign(b[0] - a[0]), a[1] + Math.sign(b[1] - a[1])]); return {k, fwd:stepFwd(k, a)}; };
+const sideStart = (e, i) => { const P = e.points, a = P[i], b = P[(i + 1) % P.length], k = pieceBetween(a, [a[0] + Math.sign(b[0] - a[0]) * FS, a[1] + Math.sign(b[1] - a[1]) * FS]); return {k, fwd:stepFwd(k, a)}; };
 // The kind of fence along each side of a closed grid exhibit, on the exhibit's own side of the wall
 const sideKinds = e => e.points.map((p, i) => { const s = sideStart(e, i); return pieceKind(fencePieces()[s.k], s.fwd); });
 // How far a side is nudged into its exhibit where it stands against another pen's fence on the same line, so the two walls are both seen: [dx, dy] a side
@@ -163,12 +166,10 @@ const ownPieceCost = e => ownPieces(e).reduce((s, k) => s + pieceWorth(k, fenceP
 function releaseSides(e){ for(const t of ownSides(e)){ const p = fencePieces()[t.k]; fencePieces()[t.k] = mkPiece(pieceKind(p, !t.fwd)); } }
 
 /* ---------- checking a run ---------- */
-// Is this piece on a path chunk? Running along the edge of a path is fine; through it, or along an edge two path chunks share, is not.
+// Is this piece on a path chunk? Pieces lie on chunk edges, so running along the edge of a path is fine; across a chunk, or along an edge two path chunks share, is not.
 function pieceOnPath(k){
-  const [xs, ys, d] = k.split(","), x = +xs, y = +ys, C = pathChunks(), has = (cx, cy) => !!C[chunkKey(cx, cy)], cx = Math.floor(x / CHUNK), cy = Math.floor(y / CHUNK);
-  if(d === "d" || d === "a") return has(cx, cy);
-  if(d === "h") return y % CHUNK === 0 ? has(cx, cy - 1) && has(cx, cy) : has(cx, cy);
-  return x % CHUNK === 0 ? has(cx - 1, cy) && has(cx, cy) : has(cx, cy);
+  const [xs, ys, d] = k.split(","), C = pathChunks(), has = (cx, cy) => !!C[chunkKey(cx, cy)], cx = Math.floor(+xs / CHUNK), cy = Math.floor(+ys / CHUNK);
+  return d === "d" || d === "a" ? has(cx, cy) : d === "h" ? has(cx, cy - 1) && has(cx, cy) : has(cx - 1, cy) && has(cx, cy);
 }
 // Why one piece can't go here, or null. with: other pieces going down at the same time.
 function pieceSpotProblem(k, with_ = new Set()){
@@ -376,11 +377,40 @@ function refenceExhibit(e, barrier){
   syncFenceExhibits();
 }
 
+/* ---------- older saves ---------- */
+// Fence from before pieces were 5 m long was laid a meter a piece. Each old piece's ends snap to the nearest 5 m grid point,
+// so a run stays joined up (a piece that shrinks to nothing goes). Each grid exhibit takes the new loop that holds most of
+// its old ground, and its gate moves onto that fence. Works on the save s itself, before it becomes state.
+function snapFencesToGrid5(s){
+  const old = s.fenceGrid || {}, P = {}, str = t => BARRIERS[t] ? BARRIERS[t].strength : 0;
+  const oldEnds = k => { const [x, y, d] = k.split(",").map((v, i) => i < 2 ? +v : v); return d === "h" ? [[x, y], [x + 1, y]] : d === "v" ? [[x, y], [x, y + 1]] : d === "d" ? [[x, y], [x + 1, y + 1]] : [[x + 1, y], [x, y + 1]]; };
+  for(const k in old){
+    const [a, b] = oldEnds(k).map(p => p.map(fenceSnap)), nk = pieceBetween(a, b); if(!nk) continue;
+    const [x, y, d] = nk.split(","), cross = pieceKey(x, y, d === "d" ? "a" : "d"); if((d === "d" || d === "a") && P[cross]) continue;   // diagonals can't cross
+    const p = old[k], fwd = stepFwd(nk, a), nx = mkPiece(pieceKind(p, fwd), pieceSplit(p) ? pieceKind(p, !fwd) : undefined), was = P[nk];
+    if(!was || Math.min(...pieceKinds(nx).map(str)) > Math.min(...pieceKinds(was).map(str))) P[nk] = nx;   // two old runs on one new piece: the stronger fence stays
+  }
+  s.fenceGrid = P;
+  const faces = fenceFaces(P).filter(f => f.simple && !f.nested), taken = new Set();
+  for(const e of s.exhibits.filter(e => e.grid)){
+    const S = faceSamples(e.points);
+    let best = null, bo = 0;
+    faces.forEach((f, i) => { if(taken.has(i)) return; const o = S.filter(([x, y]) => inPoly(x, y, f.pts)).length; if(o > bo && o >= S.length * FENCE_GRID.keepShare){ bo = o; best = i; } });
+    if(best !== null){ taken.add(best); e.points = faces[best].pts; delete e.open; }
+    else { e.points = e.points.map(p => p.map(fenceSnap)).filter((p, i, a) => p[0] !== a[(i + a.length - 1) % a.length][0] || p[1] !== a[(i + a.length - 1) % a.length][1]); e.open = true; }
+    if(e.gate && e.points.length > 1){
+      let g = null;
+      for(let i = 0; i < e.points.length; i++){ const r = segProj(e.gate[0], e.gate[1], e.points[i], e.points[(i + 1) % e.points.length]); if(!g || r.d < g.d) g = r; }
+      e.gate = [g.x, g.y];
+    }
+  }
+}
+
 /* ---------- drawing ---------- */
 // Loose pieces (not part of a closed exhibit) gathered into straight runs of one kind: [{pts, b, off}].
 // A wall two pens share with a different fence each side that has only one side held by an exhibit is drawn once for the side that is still loose, nudged (off) to its own side.
 function looseRuns(){
-  const P = fencePieces(), held = claimedSides(), step = {h:[1, 0], v:[0, 1], d:[1, 1], a:[-1, 1]}, runs = [];
+  const P = fencePieces(), held = claimedSides(), step = {h:[FS, 0], v:[0, FS], d:[FS, FS], a:[-FS, FS]}, runs = [];
   // the kind of fence loose on a piece: side 0 is a piece with one fence for both sides, 1 and -1 the fwd and other side of a piece with two
   const loose = (k, sgn) => {
     const p = P[k]; if(!p) return null;
@@ -437,7 +467,7 @@ function gridFenceSvg(e){
 // The nearest piece to a world point within r meters, or null
 function pieceNear(x, y, r){
   let best = null, bd = r;
-  for(let gx = Math.floor(x - r) - 1; gx <= x + r; gx++) for(let gy = Math.floor(y - r) - 1; gy <= y + r; gy++)
+  for(let gx = Math.floor((x - r) / FS) * FS - FS; gx <= x + r; gx += FS) for(let gy = Math.floor((y - r) / FS) * FS - FS; gy <= y + r; gy += FS)
     for(const d of ["h", "v", "d", "a"]){ const k = pieceKey(gx, gy, d); if(!fencePieces()[k]) continue; const [a, b] = pieceEnds(k), q = segProj(x, y, a, b); if(q.d < bd){ bd = q.d; best = k; } }
   return best;
 }
