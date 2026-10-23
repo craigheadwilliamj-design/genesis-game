@@ -1030,7 +1030,7 @@ function watersSvg(list, biome){
   let s = flat.map(flatWaterSvg).join("");
   if(!items.length) return s;
   const m = waterMask(items), T = WATER_TEX, layer = (part, fill) => m.kinds.map(k => fill(k) ? `<path d="${m.by[k][part]}" fill="${fill(k)}"/>` : "").join("");
-  s += `<g pointer-events="none" shape-rendering="crispEdges">` + layer("damp", k => T[k].damp) + layer("mud", k => T[k].mud) + layer("body", k => `url(#w-${k})`)
+  s += `<g pointer-events="none" shape-rendering="crispEdges">` + layer("damp", k => T[k].damp) + layer("mud", k => T[k].mud) + layer("body", k => tileFill("w", k))
     + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;
 }

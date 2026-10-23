@@ -104,7 +104,7 @@ function paintSvg(){
   if(paintCache && paintCache.state === state && paintCache.ver === paintVer && paintCache.n === list.length) return paintCache.s;
   const s = `<g clip-path="url(#plotClip)" pointer-events="none">` + list.map(o => {
     const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="url(#p-${o.biome})"/>` + groundShade(o.biome, "rect", a);
+    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="${tileFill("p", o.biome)}"/>` + groundShade(o.biome, "rect", a);
   }).join("") + `</g>`;
   paintCache = {state, ver:paintVer, n:list.length, s}; return s;
 }
@@ -139,7 +139,7 @@ function exhibitPaintSvg(e){
   const id = "pc-" + esc(e.id);
   return `<clipPath id="${id}"><polygon points="${polyStr(e.points)}"/></clipPath><g clip-path="url(#${id})" pointer-events="none">` + list.map(o => {
     const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].color}" fill-opacity=".8"/><rect ${a} fill="url(#b-${o.biome})"/>`;
+    return `<rect ${a} fill="${BIOMES[o.biome].color}" fill-opacity=".8"/><rect ${a} fill="${tileFill("b", o.biome)}"/>`;
   }).join("") + `</g>`;
 }
 // What painting a box in this biome costs: the biome's grading price for each square meter inside an exhibit that isn't already that biome
@@ -177,40 +177,59 @@ function groundPicks(plain, detail, share, salt = 0){
   }
   return out;
 }
-// the same builder lays WATER_TILES into #w-<biome> from sprites/water/ (its own salt, so marks in the water don't land on the ground's)
-function buildGroundTiles(table = GROUND_TILES, sel = biome => `#p-${biome} image, #b-${biome} image`, dir = "ground", salt = 0){
-  Object.entries(table).forEach(([biome, T]) => {
-    const imgs = document.querySelectorAll(sel(biome)); if(!imgs.length) return;
-    const gl = T.glint || 0, n = T.plain + T.detail + gl; let left = n; const tiles = [];
-    for(let i = 0; i < n; i++){
-      const t = new Image(); tiles.push(t);
-      t.onload = () => {
-        if(--left) return;
-        const px = GROUND_SPAN * GROUND_TILE_PX, pick = groundPicks(T.plain, T.detail, T.share, salt), urls = [];
-        // glint tiles (after the detail ones) play as the first `glint` of `frames` frames on every plain cell, each cell starting at its own frame, or by its diagonal (x + y) when `wave` is set, which makes a band of glints sweep down and right; the other frames show its plain tile
-        const lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0]), 1) : T.frames;
-        for(let f = 0; f < F; f++){
-          const c = document.createElement("canvas"); c.width = c.height = px;
-          const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
-          for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
-            let t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8);
-            if(gl && t < T.plain){ let k = gl;
-              if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const q = (f + P - Math.floor((x + y) % W * P / W) + j) % P; if(q < gl){ k = q; break; } } }
-              else k = (f + cellHash(x + 9001 + salt, y + 31337)) % T.frames;
-              if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
-            const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
-            g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
-            g.drawImage(tiles[t], -h, -h);
-          }
-          try { urls.push(c.toDataURL()); } catch(e){ return; }
-        }
-        const show = u => imgs.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
-        show(urls[0]);
-        if(urls.length > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % urls.length]), 1000 / T.fps); }
-      };
-      t.src = spriteUrl(`sprites/${dir}/${biome}-${i + 1}.png`);
-    }
-  });
+// A tile pattern's fill: `kind` is "p" (park ground), "b" (exhibit floor) or "w" (water). The first time a biome's pattern is drawn its tiles are queued to build (buildTiles);
+// until then, and while it builds, the pattern shows the single tile index.html gives it. Every place that fills with a tile pattern goes through this.
+const tileAsked = {};
+function tileFill(kind, biome){
+  const water = kind === "w", key = (water ? "w-" : "g-") + biome;
+  if(!tileAsked[key]){ tileAsked[key] = 1; const T = (water ? WATER_TILES : GROUND_TILES)[biome]; if(T) buildTiles(biome, T, water); }
+  return `url(#${kind}-${biome})`;
 }
-buildGroundTiles();
-buildGroundTiles(WATER_TILES, biome => `#w-${biome} image`, "water", 4000);
+// Frames are drawn one at a time in idle time (every biome's first frame before anyone's later ones) and saved with toBlob, which encodes off the main thread, so building never stalls a load or a draw.
+const tileQueue = {first:[], rest:[]}; let tilePumping = false;
+const tileIdle = fn => window.requestIdleCallback ? requestIdleCallback(fn, {timeout:400}) : setTimeout(fn, 30);
+function tilePump(){
+  const job = tileQueue.first.shift() || tileQueue.rest.shift(); if(!job){ tilePumping = false; return; }
+  job(); tileIdle(tilePump);
+}
+function tileQueueAdd(job, first){ tileQueue[first ? "first" : "rest"].push(job); if(!tilePumping){ tilePumping = true; tileIdle(tilePump); } }
+// builds one biome's ground (#p-<biome> and #b-<biome>) or water (#w-<biome>, from sprites/water/ with its own salt, so marks in the water don't land on the ground's)
+function buildTiles(biome, T, water){
+  const imgs = document.querySelectorAll(water ? `#w-${biome} image` : `#p-${biome} image, #b-${biome} image`); if(!imgs.length) return;
+  const dir = water ? "water" : "ground", salt = water ? 4000 : 0;
+  const gl = T.glint || 0, n = T.plain + T.detail + gl; let left = n; const tiles = [];
+  for(let i = 0; i < n; i++){
+    const t = new Image(); tiles.push(t);
+    t.onload = () => {
+      if(--left) return;
+      const px = GROUND_SPAN * GROUND_TILE_PX, pick = groundPicks(T.plain, T.detail, T.share, salt), urls = [];
+      // glint tiles (after the detail ones) play as the first `glint` of `frames` frames on every plain cell, each cell starting at its own frame, or by its diagonal (x + y) when `wave` is set, which makes a band of glints sweep down and right; the other frames show its plain tile
+      const lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0]), 1) : T.frames;
+      let done = 0, dead = false;
+      const show = u => imgs.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
+      const frame = f => {
+        if(dead) return;
+        const c = document.createElement("canvas"); c.width = c.height = px;
+        const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+        for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
+          let t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8);
+          if(gl && t < T.plain){ let k = gl;
+            if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const q = (f + P - Math.floor((x + y) % W * P / W) + j) % P; if(q < gl){ k = q; break; } } }
+            else k = (f + cellHash(x + 9001 + salt, y + 31337)) % T.frames;
+            if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
+          const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+          g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
+          g.drawImage(tiles[t], -h, -h);
+        }
+        try { c.toBlob(b => {
+          if(!b){ dead = true; return; }
+          urls[f] = URL.createObjectURL(b);
+          if(f === 0) show(urls[0]);
+          if(++done === F && F > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % F]), 1000 / T.fps); }
+        }); } catch(e){ dead = true; }   // a tainted canvas: keep the single tile
+      };
+      for(let f = 0; f < F; f++) tileQueueAdd(() => frame(f), f === 0);
+    };
+    t.src = spriteUrl(`sprites/${dir}/${biome}-${i + 1}.png`);
+  }
+}

@@ -125,7 +125,7 @@ function render(){
   $("#plotClipPoly").setAttribute("d", rd);
   // the park's own ground: its biome's color and texture, dimmed a little at night (dark mode)
   const pb = parkBiome();
-  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="url(#p-${pb})"/>` + groundShade(pb, "path", `d="${rd}"`);
+  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="${tileFill("p", pb)}"/>` + groundShade(pb, "path", `d="${rd}"`);
 
   // painted biome ground, over the park ground and under paths, buildings and exhibits
   s += paintSvg();
@@ -243,7 +243,7 @@ function render(){
       s += `<polygon points="${pts}" fill="#A9D3DA" fill-opacity=".85" stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : themeKey(e) !== "genesis" ? themeOf(e).edge : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2.2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
       if(c) s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${c}" fill-opacity=".35" pointer-events="none"/>`;
       // the biome shows through the glass
-      s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".35" pointer-events="none"/><polygon points="${polyStr(insetRect(e.points, .9))}" fill="url(#b-${biomeOf(e)})" pointer-events="none"/>`;
+      s += `<polygon points="${polyStr(insetRect(e.points, .9))}" fill="${BIOMES[biomeOf(e)].color}" fill-opacity=".35" pointer-events="none"/><polygon points="${polyStr(insetRect(e.points, .9))}" fill="${tileFill("b", biomeOf(e))}" pointer-events="none"/>`;
       }
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">V${e.viv}</text>`;
@@ -253,7 +253,7 @@ function render(){
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
       const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
-      s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="url(#b-${fb})" pointer-events="none"/>` + exhibitPaintSvg(e);
+      s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="${tileFill("b", fb)}" pointer-events="none"/>` + exhibitPaintSvg(e);
       // water lies on the floor, under the fence, so posts and rails stand over the bank
       s += watersSvg(waterOf(e), biomeOf(e));
       // a hedge row is drawn as a real hedge, as wide as it is
@@ -1298,7 +1298,7 @@ function renderOverlay(){
   }
   if(wdrag){
     const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
-    for(const q of b.parts.length ? b.parts : [b.r]) s += `<rect x="${q[0]}" y="${q[1]}" width="${q[2] - q[0]}" height="${q[3] - q[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? `url(#w-${b.look})` : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+    for(const q of b.parts.length ? b.parts : [b.r]) s += `<rect x="${q[0]}" y="${q[1]}" width="${q[2] - q[0]}" height="${q[3] - q[1]}" fill="${b.err ? c : WATER_TEX[b.look] ? tileFill("w", b.look) : "#3F7FBF"}" fill-opacity="${b.err ? .2 : .75}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
   if(fhover && !fdrag && fencePieces()[fhover]){ const [a, b] = pieceEnds(fhover); s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="var(--bad)" stroke-width="4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`; }
   if(landGhost && landKey(tool)){
