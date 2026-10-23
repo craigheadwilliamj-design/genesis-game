@@ -191,7 +191,7 @@ function modulesHtml(b){
   if(locked) h += `<div class="meta" style="margin-top:6px">${locked} more module${locked === 1 ? "" : "s"} to research at the Research Lab, under Park management, Buildings.</div>`;
   return h + `</section>`;
 }
-// The museum: attractions on show, and a dropdown of the events GHOST has recorded that aren't up yet
+// The museum: attractions on show, and a dropdown of the events the Time Travel Lab has recorded that aren't up yet
 function museumHtml(b){
   const on = showsOf(b), ready = showsReady(b), dn = state.science.dna;
   let h = `<section><h3>Museum attractions <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${MUSEUM.slots}</span></h3>`;
@@ -201,7 +201,7 @@ function museumHtml(b){
   if(!hasTech(MUSEUM.needTech)) {}
   else if(on.length >= MUSEUM.slots) h += `<div class="meta" style="margin-top:6px">The center is full. Take one down to show another.</div>`;
   else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="showSel" aria-label="Attraction to add" style="flex:1;min-width:0">${ready.map(ev => `<option value="${ev.id}">${esc(ev.name)}, ${money(ev.price)}</option>`).join("")}</select><button class="btn" data-action="showAdd">Add</button></div>`;
-  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything GHOST has recorded is on show." : "GHOST can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
+  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything the Time Travel Lab has recorded is on show." : "The Time Travel Lab can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
   return h + `</section>`;
 }
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);

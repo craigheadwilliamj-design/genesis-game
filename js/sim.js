@@ -133,12 +133,12 @@ function freshScience(){
     crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
     tech:["bars"],           // everything the Research Lab has researched (TECH ids, plus "ref-<Period>" for refined medicine)
     projects:[],       // The Research Lab's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
-    unlocked:[],       // animals discovered (GHOST's scouting turned them up), so drones can go back for their DNA
+    unlocked:[],       // animals discovered (the Time Travel Lab's scouting turned them up), so drones can go back for their DNA
     dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
-    drones:1,          // GHOST's drones, one trip each at a time (GHOST comes with one; buy more there)
+    drones:1,          // The Time Travel Lab's drones, one trip each at a time (the Time Travel Lab comes with one; buy more there)
     seen:{},           // site id (TIME_SITES) -> the animals scouting has turned up there; a site in here has been scouted
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
-    reports:[],        // post-mission reports waiting at GHOST, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
+    reports:[],        // post-mission reports waiting at the Time Travel Lab, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
     clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and Botany Lab beds carry a `bay` too, see science.js.
     ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
@@ -380,7 +380,7 @@ function upgradeSave(s){
   // science jobs moved into bays, one per scientist. Running jobs keep a bay; queued ones and extra incubators are cancelled and paid back.
   let back = 0;
   for(const k of ["projects", "trips", "clones", "log"]) if(!sc[k]) sc[k] = [];
-  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back the GHOST quality upgrades
+  // genome quality is gone (clone health follows how complete the genome is): drop it, and pay back Time Travel Lab quality upgrades
   for(const d of Object.values(sc.dna)) delete d.quality;
   for(const [id, pts] of [["ghostq1", 40], ["ghostq2", 90]]){
     if(sc.tech.includes(id)){ sc.tech = sc.tech.filter(t => t !== id); sc.points = (sc.points || 0) + pts; }
@@ -459,7 +459,7 @@ function upgradeSave(s){
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;
   // a dart that was mid-flight when the park was saved never landed
   for(const l of s.safety.loose) if(l.status === "darting"){ l.status = "loose"; l.vet = null; }
-  // discovery moved to GHOST's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
+  // discovery moved to the Time Travel Lab's sites and drones. Temporal Researchers become drones (their wages stop), every site holding an
   // animal already unlocked starts scouted with those animals seen, Research Lab species projects are paid back, and trips still out
   // are given a site so they land as expeditions.
   if(s.discoV !== 1){
@@ -835,7 +835,7 @@ function dailyCosts(){
   return {feed:Math.round(feed), wages:Math.round(wages), upkeep:Math.round(upkeep), research};
 }
 
-/* ---------- science: Research Lab, GHOST, the Genetics Lab, and the Botany Lab (the rest is in science.js) ---------- */
+/* ---------- science: Research Lab, the Time Travel Lab, the Genetics Lab, and the Botany Lab (the rest is in science.js) ---------- */
 
 const PERIOD_BY_ID = Object.fromEntries(TIME_PERIODS.map(p => [p.id, p]));
 const rand = (a, b) => a + Math.random() * (b - a);

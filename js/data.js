@@ -249,7 +249,7 @@ const VIVARIUMS = {
 };
 
 /* ---------------------------------------------------------------------
-   SCIENCE: The Research Lab, GHOST, and the Genetics Lab
+   SCIENCE: The Research Lab, the Time Travel Lab, and the Genetics Lab
    --------------------------------------------------------------------- */
 
 // Time periods. Every site in a period (TIME_SITES) shares its trip:
@@ -268,7 +268,7 @@ const TIME_PERIODS = [
   {id:"Devonian",      ago:"419–359 million years ago", trip:3500,  days:1.5, risk:.10},
 ];
 
-// GHOST's timeline: every period gets one equal bar on the slider, split equally into its epochs. Each epoch is
+// The Time Travel Lab's timeline: every period gets one equal bar on the slider, split equally into its epochs. Each epoch is
 // [name, years ago it began]; it ends where the next begins (the Holocene at TIMELINE_FLOOR, as a log scale can't reach 0).
 // Epochs are only for the slider and its labels: `period` stays the unit of every mechanic.
 const TIMELINE = [
@@ -286,7 +286,7 @@ const TIMELINE = [
   {id:"Quaternary", epochs:[["Pleistocene",2.58e6],["Holocene",11700]]},
 ];
 const TIMELINE_FLOOR = 10;
-// The map GHOST shows for an epoch (by its name) or else its period: sprites/timeline/<name>.png, 260 x 130 Mollweide,
+// The map the Time Travel Lab shows for an epoch (by its name) or else its period: sprites/timeline/<name>.png, 260 x 130 Mollweide,
 // drafted by tools/timeline/genmaps.py from the PALEOMAP PaleoDEMs (Scotese & Wright 2018, CC BY 4.0).
 const TIMELINE_MAPS = {
   Cambrian:"cambrian", Ordovician:"ordovician", Silurian:"silurian", Devonian:"devonian", Carboniferous:"carboniferous",
@@ -296,10 +296,10 @@ const TIMELINE_MAPS = {
 };
 const TIMELINE_MAP_SIZE = [260, 130];
 
-// Sites GHOST's drones visit: real fossil localities (or historical ranges for the recently extinct), plus museum events.
+// Sites the Time Travel Lab's drones visit: real fossil localities (or historical ranges for the recently extinct), plus museum events.
 //   from/to   years ago the site's animals lived there; it shows for the whole of any epoch that window touches
 //   at        its marker's pixel on each map it shows on (rotated back by plate reconstruction, nudged so markers never touch)
-//   fauna     species found there (only the ones speciesAvailable shows); event: a MUSEUM_EVENTS id GHOST records there
+//   fauna     species found there (only the ones speciesAvailable shows); event: a MUSEUM_EVENTS id the Time Travel Lab records there
 // TIME_SITES:BEGIN written by tools/timeline/placesites.py from sites.py; edit those, not this.
 const TIME_SITES = [
   {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:["tikt"]},
@@ -423,7 +423,7 @@ const TRIP = {fail:[.1, .35], trips:[2, 8], spread:.35, costMul:[.35, 1.3], bonu
 // chance, `find` [smallest animal, largest] (big ones are easier to spot), at most `max` a trip. An animal turning up is
 // what discovers it (state.science.unlocked).
 const SCOUT = {find:[.35, .65], max:2};
-// GHOST's drones replace expedition teams: each flies one trip at a time. GHOST comes with one; the next costs `price`, and each
+// The Time Travel Lab's drones replace expedition teams: each flies one trip at a time. The Time Travel Lab comes with one; the next costs `price`, and each
 // one after that `growth` times the last, up to `max`. They aren't staff (no wage).
 const DRONES = {max:5, price:15000, growth:1.5};
 // Drone marks: every park starts with Mk. I; the Research Lab researches the rest in order (TECH ghostmk2-5). `cut` is the share of the
@@ -433,7 +433,7 @@ const GHOST_MK = [{name:"Mk. I", cut:0}, {name:"Mk. II", tech:"ghostmk2", cut:.1
 // Size scale for TRIP: m² of room an animal needs at or below the first, and at or above the second
 const TRIP_SIZE = [10, 5000];
 
-// Plant genomes, one per Mesozoic or Paleozoic period. GHOST collects each from its own period, once the Research Lab has researched that era's flora.
+// Plant genomes, one per Mesozoic or Paleozoic period. The Time Travel Lab collects each from its own period, once the Research Lab has researched that era's flora.
 // The Botany Lab needs a period's genome complete before it grows that period's plants (and any complete one lets it grow Paleoflora food).
 //   space   how hard it is to find, like an animal's room (see TRIP_SIZE)
 const PLANT_DNA = {};
@@ -442,7 +442,7 @@ for(const [period, era, space] of [["Devonian", "paleozoic", 900], ["Carbonifero
   PLANT_DNA[period] = {id:"flora-" + period, era, period, name:period + " flora", space};
 const PLANT_DNA_BY_ID = Object.fromEntries(Object.values(PLANT_DNA).map(p => [p.id, p]));
 
-// Events from deep time. GHOST records each one on trips (like a genome: sc.dna[id]), and a finished record unlocks a museum
+// Events from deep time. The Time Travel Lab records each one on trips (like a genome: sc.dna[id]), and a finished record unlocks a museum
 // attraction for the Education Center. A trip's place is the event itself, so it carries what a TIME_PERIODS entry does.
 //   ago/trip/days/risk/space   as for a period and a genome (space is how hard it is to record, see TRIP_SIZE)
 //   price/upkeep   installing it in an Education Center, and its cost a day
@@ -465,7 +465,7 @@ const MUSEUM_EVENTS = [
 const MUSEUM_BY_ID = Object.fromEntries(MUSEUM_EVENTS.map(e => [e.id, e]));
 const MUSEUM = {
   slots:3,             // attractions one Education Center can show at once
-  needTech:"education",// GHOST can start recording events once the Research Lab has researched this
+  needTech:"education",// The Time Travel Lab can start recording events once the Research Lab has researched this
 };
 
 // What an Education Center is for. A center with a focus gets its effect every visit, times its strength:
@@ -481,28 +481,28 @@ const EDU_FOCUS = {
 // Modules added to a center (Research Lab tech `tech`, which needs education programs). Each also teaches on its own.
 //   boost    adds to the strength of those focuses
 //   slots    more guests that can sit through a visit at once
-//   perSpecies  learning grows with the animals GHOST has discovered
+//   perSpecies  learning grows with the animals the Time Travel Lab has discovered
 //   live     the module shows real work, so its effects scale with how busy that is (`modLive` in services.js): "lab", "nursery", "botany", "sim", "biomes" or "touch"
 //   dept     science buildings it needs (any one of them) before it can be installed
 const EDU_MODULES = {
   theater:   {label:"Theater",          tech:"edtheater",   price:12000, upkeep:110, learn:3, joy:2, appeal:5, boost:{spectacle:.6, family:.3},
               text:"A stage for puppet shows and animal talks. Crowds love it."},
   fossils:   {label:"Fossil Displays",  tech:"edfossils",   price:10000, upkeep:80,  learn:6, perSpecies:true, boost:{research:.5, conservation:.25},
-              text:"Real casts and bones. It teaches more as GHOST discovers more animals."},
+              text:"Real casts and bones. It teaches more as the Time Travel Lab discovers more animals."},
   auditorium:{label:"Education Auditorium", tech:"edauditorium", price:16000, upkeep:130, learn:5, slots:8, boost:{conservation:.5, research:.3},
               text:"Tiered seating for lectures. More guests can sit through a talk at once."},
   labwindow: {label:"Live Lab Window",  tech:"edlabwindow", price:14000, upkeep:120, learn:5, joy:1, appeal:4, live:"lab", dept:["oracle", "ghost", "tar", "ceres"], boost:{research:.6, conservation:.3, family:.2},
-              text:"A gallery over the working labs. It's only as good as what's going on: the Research Lab, GHOST, the Genetics Lab and the Botany Lab all busy makes the best show."},
+              text:"A gallery over the working labs. It's only as good as what's going on: the Research Lab, the Time Travel Lab, the Genetics Lab and the Botany Lab all busy makes the best show."},
   nursery:   {label:"Nursery Window",   tech:"ednursery",   price:11000, upkeep:100, learn:3, joy:4, appeal:6, live:"nursery", dept:["tar"], boost:{family:.7, conservation:.3, spectacle:.2},
               text:"Watch clones in the incubators, and the day one hatches. Needs the Genetics Lab, and the best shows are while clones are growing."},
   botanical: {label:"Botanical Hall",   tech:"edbotanical", price:13000, upkeep:110, learn:5, joy:3, appeal:3, live:"botany", dept:["ceres"], boost:{conservation:.6, family:.4, research:.2},
               text:"A glasshouse of living prehistoric plants from the Botany Lab. It grows richer as more plant DNA is finished and while beds are growing."},
   simroom:   {label:"Simulation Room",  tech:"edsimroom",   price:18000, upkeep:150, learn:7, joy:3, appeal:8, live:"sim", dept:["ghost"], boost:{spectacle:.5, research:.5, family:.2},
-              text:"A VR walk through deep time, built from GHOST's records. Every finished event record adds a place to visit."},
+              text:"A VR walk through deep time, built from the Time Travel Lab's records. Every finished event record adds a place to visit."},
   diorama:   {label:"Ecosystem Diorama", tech:"ediorama",   price:12000, upkeep:100, learn:6, joy:2, appeal:5, live:"biomes", boost:{conservation:.5, family:.4, spectacle:.2},
               text:"A walk-around model of how living things fit together. It gets richer with every kind of habitat you keep animals in."},
   touch:     {label:"Touch Gallery",    tech:"edtouch",     price:9000,  upkeep:70,  learn:4, joy:5, appeal:3, live:"touch", boost:{family:.6, conservation:.3, research:.2},
-              text:"Egg shells, casts, teeth and bones to hold. The shelves fill up as GHOST finishes more genomes."},
+              text:"Egg shells, casts, teeth and bones to hold. The shelves fill up as the Time Travel Lab finishes more genomes."},
 };
 const EDU_LIVE = {idle:.3, nurseryIdle:.25, hatchBonus:.5, cap:1.5, simIdle:.2, simPlaces:4, biomes:4, genomes:8};   // a live module with nothing going on still works at this share
 const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
@@ -511,7 +511,7 @@ const EDU_CENTER = {moduleSlots:3};   // modules one Education Center can hold
 const CLONE_DAYS_PER_SPACE = 1000;
 // Genetics Lab upgrades, researched at the Research Lab: each level of speed cuts clone time
 const TAR_UPGRADE = {speed:.75};
-// GHOST upgrades, researched at the Research Lab: trip price and time multipliers per level
+// The Time Travel Lab upgrades, researched at the Research Lab: trip price and time multipliers per level
 const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
 // Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
 // runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
@@ -603,12 +603,11 @@ const BUILDINGS = {
   tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
   // Backstage science departments. You can have one of each. They must touch a path or service road.
-  oracle:   {label:"Research Lab", tag:"RESEARCH", one:"the Research Lab", glyph:"O", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
+  oracle:   {label:"Research Lab", tag:"RESEARCH", one:"the Research Lab", glyph:"R", color:"#4B3A8C", price:9000, upkeep:120, w:24, d:16, dept:true,
              blurb:"The research hub. Unlocks animals, plants, medicine, fences, buildings, and Genetics Lab upgrades. Research takes time."},
-  ghost:    {label:"GHOST",  one:"GHOST",  glyph:"G", color:"#1F6F73", price:15000, upkeep:200, w:28, d:20, dept:true,
-             full:"Genetic Harvesting of Organic Specimens through Time",
+  ghost:    {label:"Time Travel Lab", tag:"TIME", one:"the Time Travel Lab", glyph:"T", color:"#1F6F73", price:15000, upkeep:200, w:28, d:20, dept:true,
              blurb:"The time travel unit. Its drones scout real fossil sites across deep time to discover animals, then go back for their DNA."},
-  tar:      {label:"Genetics Lab", tag:"GENETICS", one:"the Genetics Lab", glyph:"T", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
+  tar:      {label:"Genetics Lab", tag:"GENETICS", one:"the Genetics Lab", glyph:"G", color:"#8E2F3A", price:12000, upkeep:160, w:26, d:18, dept:true,
              blurb:"The cloning lab. Turns complete genomes into living animals."},
 };
 
@@ -1146,8 +1145,8 @@ const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants 
 const GRASS_INTOLERANT = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full grass share
 
-BUILDINGS.ceres = {label:"Botany Lab", tag:"BOTANY", one:"the Botany Lab", glyph:"C", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
-                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once the Research Lab has researched them and GHOST has found the plant DNA. Keepers collect Paleoflora here."};
+BUILDINGS.ceres = {label:"Botany Lab", tag:"BOTANY", one:"the Botany Lab", glyph:"B", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
+                   blurb:"The greenhouse lab. Grows Paleoflora food for prehistoric plant-eaters, plants for exhibits, and medicine for the PMC, once the Research Lab has researched them and the Time Travel Lab has found the plant DNA. Keepers collect Paleoflora here."};
 // Greenhouses speed up Paleoflora. They need the research and a Botany Lab in the park.
 BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyph:"G", color:"#6FA34A", price:6000, upkeep:60, w:12, d:8, dept:true,
                         tech:"greenhouse", needsDept:"ceres",
@@ -1287,9 +1286,9 @@ const TECH = [
   {id:"edlabwindow", group:"build", label:"Live lab window", points:50, needs:"education", text:"Add a Live Lab Window to an Education Center. Guests watch the labs at work, so it shines when they're busy."},
   {id:"ednursery", group:"build", label:"Nursery window", points:50, needs:"education", text:"Add a Nursery Window to an Education Center. Guests watch the Genetics Lab's clones grow, and love a hatching."},
   {id:"edbotanical", group:"build", label:"Botanical hall", points:50, needs:"paleoflora", text:"Add a Botanical Hall to an Education Center. It grows richer as the Botany Lab finishes plant DNA and keeps beds growing."},
-  {id:"edsimroom", group:"build", label:"Simulation room", points:65, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records GHOST has finished."},
+  {id:"edsimroom", group:"build", label:"Simulation room", points:65, needs:"education", text:"Add a Simulation Room to an Education Center. Guests walk through deep time using the event records the Time Travel Lab has finished."},
   {id:"ediorama", group:"build", label:"Ecosystem diorama", points:50, needs:"education", text:"Add an Ecosystem Diorama to an Education Center. It gets richer with every kind of habitat you keep animals in."},
-  {id:"edtouch", group:"build", label:"Touch gallery", points:40, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as GHOST finishes genomes."},
+  {id:"edtouch", group:"build", label:"Touch gallery", points:40, needs:"education", text:"Add a Touch Gallery to an Education Center. Hands-on casts and bones, and the shelves fill as the Time Travel Lab finishes genomes."},
   {id:"modern", group:"build", label:"Modern design", points:50, text:"Unlocks the Modern theme: polished stone, metal and glass for paths, buildings and exhibits."},
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:15, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
@@ -1302,21 +1301,21 @@ const TECH = [
   // Genetics Lab upgrades
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:35, text:"Clones finish in three quarters of the time."},
   {id:"fast2",    group:"tar", label:"Much faster incubators", points:80, needs:"fast1", text:"Clones finish in about half the time."},
-  // GHOST upgrades
+  // The Time Travel Lab upgrades
   {id:"ghostcost1", group:"ghost", label:"Leaner expeditions",   points:35, text:"Trips cost about a fifth less."},
   {id:"ghostcost2", group:"ghost", label:"Lean expeditions",     points:80, needs:"ghostcost1", text:"Trips cost about a third less."},
   {id:"ghostspeed1", group:"ghost", label:"Faster time engines", points:35, text:"Expeditions take three quarters of the time."},
   {id:"ghostspeed2", group:"ghost", label:"Much faster time engines", points:80, needs:"ghostspeed1", text:"Expeditions take about half the time."},
-  {id:"ghostmk2", group:"ghost", label:"GHOST Mk. II drones", points:40, text:"Drones come back empty handed 15% less often, scouting and on expeditions."},
-  {id:"ghostmk3", group:"ghost", label:"GHOST Mk. III drones", points:80, needs:"ghostmk2", text:"Drones come back empty handed 30% less often."},
-  {id:"ghostmk4", group:"ghost", label:"GHOST Mk. IV drones", points:140, needs:"ghostmk3", text:"Drones come back empty handed 40% less often."},
-  {id:"ghostmk5", group:"ghost", label:"GHOST Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
+  {id:"ghostmk2", group:"ghost", label:"Mk. II drones", points:40, text:"Drones come back empty handed 15% less often, scouting and on expeditions."},
+  {id:"ghostmk3", group:"ghost", label:"Mk. III drones", points:80, needs:"ghostmk2", text:"Drones come back empty handed 30% less often."},
+  {id:"ghostmk4", group:"ghost", label:"Mk. IV drones", points:140, needs:"ghostmk3", text:"Drones come back empty handed 40% less often."},
+  {id:"ghostmk5", group:"ghost", label:"Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
   // Genetics
-  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send GHOST for better samples to raise it."},
+  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send expeditions for better samples to raise it."},
   // Paleo-Flora: plants and medicine, grown at the Botany Lab
-  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"The Botany Lab starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from GHOST first."},
-  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, GHOST can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
-  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, GHOST can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
+  {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"The Botany Lab starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from the Time Travel Lab first."},
+  {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
+  {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
   {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from the Botany Lab."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
@@ -2959,19 +2958,19 @@ const GOALS = [
   {id:"zone",     text:"Draw a Work Zone",                   hint:"Zones split the park into areas with their own keepers and stores. Pick the Zone tool, draw around some exhibits and a station, then assign keepers to it from its panel.", reward:3000, check:g=>(g.state.zones||[]).length>0},
   {id:"g100",     text:"Get 100 Guests in one day",          hint:"More animals and happier animals bring more guests.", reward:5000,  statue:"lyst", check:g=>g.state.history.some(h=>h.guests>=100)},
   {id:"g1000",    text:"Get 1000 Guests in one day",         hint:"Keep adding animals, food, restrooms and room on the paths. Happy guests tell their friends.", reward:10000,  statue:"kele", check:g=>g.state.history.some(h=>h.guests>=1000)},
-  {id:"oracle",   text:"Build the Research Lab",                       hint:"The Research Lab researches everything from fences to GHOST's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
-  {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build GHOST, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
-  {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a GHOST drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
-  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Devonian, Carboniferous or Permian site with a GHOST drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
-  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with GHOST's expeditions, then clone it at the Genetics Lab.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
-  {id:"ghost",    text:"Bring back DNA with GHOST",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at GHOST and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
+  {id:"oracle",   text:"Build the Research Lab",                       hint:"The Research Lab researches everything from fences to the Time Travel Lab's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
+  {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build the Time Travel Lab, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
+  {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
+  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Devonian, Carboniferous or Permian site with a drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
+  {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with the Time Travel Lab's expeditions, then clone it at the Genetics Lab.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
+  {id:"ghost",    text:"Bring back DNA with the Time Travel Lab",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at the Time Travel Lab and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
   {id:"clone",    text:"Build the Genetics Lab and clone an animal",      hint:"The Genetics Lab turns a complete genome into an animal. Hire a Geneticist at the Genetics Lab, then order clones from the Genetics Lab or from an exhibit's panel.", reward:22000, statue:"orni", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl))},
   {id:"ceres",    text:"Build the Botany Lab",                        hint:"Medicine for prehistoric animals is grown at the Botany Lab, once the Research Lab has researched it. Place it beside a path or service road and hire a botanist.", reward:15000, check:g=>g.state.buildings.some(b=>b.type==="ceres")},
   {id:"sp4",      text:"Display 4 different species",        hint:"Variety raises your rating. Herbivores can share an exhibit.", reward:8000,  statue:"prot", check:g=>g.speciesShown()>=4},
   {id:"star3",    text:"Reach a 3-star rating",              hint:"Keep animals happy, give guests food and restrooms, and add variety.", reward:15000, statue:"marsh", check:g=>g.state.rating>=3},
   {id:"cash1m",   text:"Have $1,000,000 in the bank",        hint:"Earn more than you spend. Check the day report each morning.", theme:"gilded", check:g=>g.state.money>=1000000},
-  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Reach 4.5 stars, discover the Tyrannosaurus at Hell Creek with GHOST, collect its genome, and clone it. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
+  {id:"trex",     text:"Bring in a Tyrannosaurus rex",       hint:"Reach 4.5 stars, discover the Tyrannosaurus at Hell Creek with the Time Travel Lab, collect its genome, and clone it. It needs a lot of room.", reward:60000, statue:"cope", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.sp==="trex"))},
   {id:"camp",     text:"Build a Campground",                 hint:"Research Hotels at the Research Lab. Once your park has 2 stars and 100 guests a day, build a Campground beside a path. Guests stay the night and spend tomorrow in the park.", reward:10000, check:g=>g.state.buildings.some(b=>b.type==="campground")},
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},

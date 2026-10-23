@@ -64,7 +64,7 @@ const BUILD_MENU = [
   ]},
   {id:"mgmt", label:"Park Management", items:[
     {label:"Research Lab", tool:"oracle"},
-    {label:"GHOST", tool:"ghost"},
+    {label:"Time Travel Lab", tool:"ghost"},
     {label:"Genetics Lab", tool:"tar"},
     {label:"Botany Lab", tool:"ceres"},
   ]},

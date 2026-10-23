@@ -1,7 +1,7 @@
 /* =====================================================================
    SCIENCE
-   The Research Lab researches (fences, buildings, plants, medicine, the Genetics Lab and GHOST
-   upgrades), GHOST's drones discover animals at real sites in deep time
+   The Research Lab researches (fences, buildings, plants, medicine, the Genetics Lab and the Time Travel Lab
+   upgrades), the Time Travel Lab's drones discover animals at real sites in deep time
    and fill their genomes, the Genetics Lab clones animals, and the Botany Lab grows plants and
    medicine. All of it takes time: projects, trips, clones and
    batches carry start/end stamps in park minutes (see nowMin), so they
@@ -33,7 +33,7 @@ const doneShare = j => clamp((nowMin() - j.start) / Math.max(1, j.end - j.start)
 
 // Every scientist runs one bay. A bay holds one job (a research project, a clone or a growing batch) or nothing.
 // Jobs carry the `bay` they run in. The only way to get more bays is to hire more scientists.
-// GHOST works the same way with drones instead of staff: a trip's `bay` is its drone, and buying a drone is the only way to get more.
+// The Time Travel Lab works the same way with drones instead of staff: a trip's `bay` is its drone, and buying a drone is the only way to get more.
 const BAY_JOBS = {paleo:() => state.science.projects, temporal:() => state.science.trips, gene:() => state.science.clones, botanist:() => state.ceres.beds};
 const bayCount = kind => kind === "temporal" ? (dept("ghost") ? state.science.drones : 0) : state.science.crew[kind] || 0;
 const bayJob = (kind, i) => BAY_JOBS[kind]().find(j => j.bay === i) || null;
@@ -64,7 +64,7 @@ function fireScientist(kind){
 
 const labSlots = () => dept("oracle") ? state.science.crew.paleo : 0;
 const researching = (kind, id) => state.science.projects.some(p => p.kind === kind && p.id === id);
-// Discovered: GHOST's scouting turned it up (or, in old saves, the Research Lab unlocked it)
+// Discovered: The Time Travel Lab's scouting turned it up (or, in old saves, the Research Lab unlocked it)
 const isUnlocked = id => state.science.unlocked.includes(id);
 
 // A project is {kind, id}: "tech" (anything in TECH) or "refine" (an era's medicine, for one period)
@@ -109,9 +109,9 @@ function finishProject(p){
   events.toast(`The Research Lab finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 
-/* ---------- GHOST: the timeline, sites and drones ---------- */
+/* ---------- the Time Travel Lab: the timeline, sites and drones ---------- */
 
-// GHOST's slider runs over TIMELINE: one equal bar a period, split equally into its epochs, a log scale inside each epoch.
+// The Time Travel Lab's slider runs over TIMELINE: one equal bar a period, split equally into its epochs, a log scale inside each epoch.
 // Epochs flattened oldest first: {name, from, to (years ago), period, pi (period index), ej (epoch index in its period)}.
 const EPOCHS = [];
 TIMELINE.forEach((p, i) => p.epochs.forEach(([name, from], j) => {
@@ -173,16 +173,16 @@ function genomeInfo(id){
 }
 const genomeDone = id => { const d = state.science.dna[id]; return !!d && d.genome >= 100; };
 const plantDnaDone = period => !!PLANT_DNA[period] && genomeDone(PLANT_DNA[period].id);
-// Has GHOST finished plant DNA from any period of this era?
+// Has the Time Travel Lab finished plant DNA from any period of this era?
 const eraDnaDone = era => Object.values(PLANT_DNA).some(f => f.era === era && genomeDone(f.id));
 const anyPlantDna = () => Object.values(PLANT_DNA).some(f => genomeDone(f.id));
-// Can GHOST go after this yet? Animals need discovering, plants their flora research, events education programs.
+// Can the Time Travel Lab go after this yet? Animals need discovering, plants their flora research, events education programs.
 function genomeOpen(id){
   const g = genomeInfo(id); if(!g) return false;
   return g.animal ? isUnlocked(id) : g.event ? hasTech(MUSEUM.needTech) : hasTech(FLORA[g.plant.era].tech);
 }
 
-// GHOST upgrade multiplier for "cost" or "speed"
+// The Time Travel Lab upgrade multiplier for "cost" or "speed"
 const ghostLevel = kind => GHOST_UPGRADE[kind][hasTech("ghost" + kind + "2") ? 2 : hasTech("ghost" + kind + "1") ? 1 : 0];
 // The drones' mark (index into GHOST_MK) and the share of empty-handed trips it takes away
 const droneMk = () => GHOST_MK.reduce((k, m, i) => m.tech && hasTech(m.tech) ? i : k, 0);
@@ -202,20 +202,20 @@ const scoutCost = siteId => Math.round(placeOf(siteId).trip * ghostLevel("cost")
 const scoutChance = sp => state.sandbox ? 1 : 1 - (1 - lerpT(SCOUT.find, sizeT(SPECIES_BY_ID[sp].space))) * (1 - droneCut());
 const tripMinutes = siteId => Math.round(placeOf(siteId).days * DAY_MIN * ghostLevel("speed"));
 
-// Drones: GHOST comes with one, and buying more is the only way to fly more trips at once
+// Drones: The Time Travel Lab comes with one, and buying more is the only way to fly more trips at once
 const dronePrice = () => Math.round(DRONES.price * Math.pow(DRONES.growth, state.science.drones - 1) / 500) * 500;
 function droneProblem(){
-  return deptProblem("ghost") || (state.science.drones >= DRONES.max ? `GHOST's hangar holds ${DRONES.max} drones.` : null) ||
+  return deptProblem("ghost") || (state.science.drones >= DRONES.max ? `The Time Travel Lab's hangar holds ${DRONES.max} drones.` : null) ||
     (!canAfford(dronePrice()) ? `A drone costs ${money(dronePrice())}. You have ${money(state.money)}.` : null);
 }
 function buyDrone(){
   const why = droneProblem(); if(why) return why;
   spend(dronePrice(), "science"); state.science.drones++;
-  events.toast(`GHOST has ${state.science.drones} drones now.`, "good");
+  events.toast(`The Time Travel Lab has ${state.science.drones} drones now.`, "good");
   return null;
 }
 const outTo = (siteId, kind, sp) => state.science.trips.some(t => t.site === siteId && t.kind === kind && (sp === undefined || t.sp === sp));
-const ghostProblem = () => deptProblem("ghost") || (freeBay("temporal") < 0 ? `Every drone is out.${state.science.drones < DRONES.max ? " Buy another at GHOST to fly more at once." : ""}` : null);
+const ghostProblem = () => deptProblem("ghost") || (freeBay("temporal") < 0 ? `Every drone is out.${state.science.drones < DRONES.max ? " Buy another at the Time Travel Lab to fly more at once." : ""}` : null);
 
 function scoutProblem(siteId){
   const s = SITE_BY_ID[siteId];
@@ -226,7 +226,7 @@ function scoutProblem(siteId){
 }
 function expeditionProblem(siteId, id){
   const s = SITE_BY_ID[siteId], g = genomeInfo(id);
-  if(!s || !g || !siteShown(s) || !siteTargets(s).includes(id)) return s && !s.event && !siteLit(s) ? "Scout the site first." : "GHOST can't find that there.";
+  if(!s || !g || !siteShown(s) || !siteTargets(s).includes(id)) return s && !s.event && !siteLit(s) ? "Scout the site first." : "The Time Travel Lab can't find that there.";
   if(genomeDone(id)) return g.event ? "That record is complete." : "That genome is complete.";
   if(g.animal && state.rating + 1e-9 < starsNeed(g.animal)) return `Needs a ${starsNeed(g.animal)}-star park. You have ${starTxt(state.rating)}.`;
   if(outTo(siteId, "dig", id)) return `A drone is already after ${g.name} there.`;
@@ -251,7 +251,7 @@ function addSample(sp, gain){
   return {gain:g};
 }
 
-// A drone is back. Its post-mission report waits at GHOST (sc.reports) until dismissed: lines of [text, headline?].
+// A drone is back. Its post-mission report waits at the Time Travel Lab (sc.reports) until dismissed: lines of [text, headline?].
 function tripReturns(t){
   const sc = state.science, s = SITE_BY_ID[t.site], lines = [];
   if(t.kind === "scout"){
@@ -375,13 +375,13 @@ function growProblem(kind, era, size){
   if(kind === "plant"){
     const f = FLORA[ERA_OF[era]];
     if(f.tech && !hasTech(f.tech)) return `Research ${f.label} flora at the Research Lab first.`;
-    if(PLANT_DNA[era] && !plantDnaDone(era)) return `GHOST has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
+    if(PLANT_DNA[era] && !plantDnaDone(era)) return `The Time Travel Lab has to collect ${era} plant DNA first (${(sc.dna[PLANT_DNA[era].id] || {genome:0}).genome}% so far).`;
   } else if(kind === "food"){
     if(!hasTech("paleoflora")) return "Research Paleoflora cultivation at the Research Lab first.";
     if(!anyPlantDna()) return "The Botany Lab needs plant DNA first.";
   } else {
     if(!hasTech(MED_TECH[era])) return `Research ${ERA_LABEL[era]} medicine at the Research Lab first.`;
-    if(era !== "cenozoic" && !eraDnaDone(era)) return `GHOST has to collect ${ERA_LABEL[era]} plant DNA first.`;
+    if(era !== "cenozoic" && !eraDnaDone(era)) return `The Time Travel Lab has to collect ${ERA_LABEL[era]} plant DNA first.`;
   }
   if(freeBay("botanist") < 0) return bayFull("botanist", "botanist");
   if(!canAfford(growInfo(kind, era, size).cost)) return `A batch costs ${money(growInfo(kind, era, size).cost)}. You have ${money(state.money)}.`;

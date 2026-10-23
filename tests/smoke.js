@@ -1105,7 +1105,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.everySpeciesHasASite = SPECIES.every(x => TIME_SITES.some(t => (t.fauna || []).includes(x.id) && epochOf(t.from).period === x.period));
     out.sitesHaveMaps = TIME_SITES.every(t => t.from > EPOCHS[0].from || Object.keys(t.at).length > 0) && Object.values(TIMELINE_MAPS).every(m => SPRITE_PACK[`sprites/timeline/${m}.png`]);
 
-    // animals are discovered by GHOST's drones scouting real sites; GHOST comes with one drone
+    // animals are discovered by the Time Travel Lab's drones scouting real sites; the Time Travel Lab comes with one drone
     const small = SPECIES.filter(x => !x.viv && speciesAvailable(x.id) && sitesOf(x.id).length).sort((a, c) => a.space - c.space)[0], big = SPECIES.slice().sort((a, c) => c.space - a.space)[0];
     const site = sitesOf(small.id).find(siteShown), other = TIME_SITES.find(t => siteShown(t) && !t.event && t.id !== site.id);
     out.digNeedsScout = expeditionProblem(site.id, small.id) === "Scout the site first.";
@@ -1189,7 +1189,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[small.id] = {genome:100};
     sc.tar = null;
 
-    // The Botany Lab: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from GHOST; then it grows plants in its beds
+    // The Botany Lab: needs a botanist, flora unlocked, and complete plant DNA for the plant's own period from the Time Travel Lab; then it grows plants in its beds
     out.noBotanist = growProblem("plant", "Jurassic", "small") === "Hire a botanist at the Botany Lab to tend a growing bed.";
     hireScientist("botanist");
     out.floraLocked = /Research Lab/.test(growProblem("plant", "Jurassic", "small"));
@@ -1239,7 +1239,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const money0 = oldS.money, up = upgradeSave(oldS);
     out.oldJobsGetBays = up.science.trips[0].bay === 0 && up.science.clones.length === 1 && up.science.clones[0].bay === 0 && up.science.clones[0].lane === undefined;
     out.oldExtraJobRefunded = up.money === money0 + SPECIES_BY_ID.lyst.price;
-    // discovery moved to GHOST: the Temporal Researcher became a drone, the trip still out became an expedition to a site,
+    // discovery moved to the Time Travel Lab: the Temporal Researcher became a drone, the trip still out became an expedition to a site,
     // and the sites of animals already unlocked are scouted
     out.oldDiscovery = up.discoV === 1 && up.science.drones === 1 && up.science.crew.temporal === undefined && up.science.trips[0].kind === "dig"
       && sitesOf("dryo").some(t => t.id === up.science.trips[0].site) && (up.science.seen.hellcreek || []).includes("trex") && Array.isArray(up.science.reports);
@@ -2446,7 +2446,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.money = m0;
       const old = JSON.parse(JSON.stringify(state)); delete old.exhibits[0].animals[0].need;
       out.behaviorSave = !!upgradeSave(old).exhibits[0].animals[0].need;
-      // museum: GHOST records an event, and the finished record becomes an Education Center attraction
+      // museum: The Time Travel Lab records an event, and the finished record becomes an Education Center attraction
       {
         const sc = state.science, m1 = state.money; state.money = 1e6;
         const ec = {id:"ec1", type:"edcenter", points:sq(0, 0, 16), day:0, shows:[]};
@@ -2480,7 +2480,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const q0 = modLive("nursery"); sc.clones = [{id:"c1", sp:"x", bay:0, start:0, end:9e9}, {id:"c2", sp:"x", bay:1, start:0, end:9e9}];
         const q1 = modLive("nursery"); sc.hatchDay = state.day; const q2 = modLive("nursery");
         out.eduModules = out.eduModules && !!noLab && !!noTar && !modProblem(ec, "labwindow") && !modProblem(ec, "nursery") && q0 < q1 && q1 < q2 && q2 <= EDU_LIVE.cap && modLive("theater") === 1;
-        // botanical hall and simulation room need the Botany Lab and GHOST, and grow with finished plant DNA and event records
+        // botanical hall and simulation room need the Botany Lab and the Time Travel Lab, and grow with finished plant DNA and event records
         state.buildings.push({id:"tc", type:"ceres", points:sq(520, 0, 10), day:0}, {id:"tg", type:"ghost", points:sq(540, 0, 10), day:0});
         sc.tech.push("edbotanical", "edsimroom");
         const keepD = sc.dna, keepB = state.ceres.beds; sc.dna = {}; state.ceres.beds = [];
@@ -3136,7 +3136,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const sc = () => state.science;
     for(const k of ["paleo", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
     const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
-    // a GHOST expedition goes after another animal, seen at its site
+    // an expedition goes after another animal, seen at its site
     const tsp = SPECIES.find(s => s.id !== sp.id && speciesAvailable(s.id) && sitesOf(s.id).length), tsite = sitesOf(tsp.id).find(siteShown);
     sc().seen[tsite.id] = [tsp.id]; if(!isUnlocked(tsp.id)) sc().unlocked.push(tsp.id);
     // log the park minute each job actually finishes
@@ -3360,7 +3360,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna[sp.id].genome = 60; sc.tech = sc.tech.slice();
     const had = sc.crew.gene, bays = freeBay("gene");
     out.noQualityField = !("quality" in sc.dna[sp.id]) && typeof bestQuality === "undefined" && typeof ghostQuality === "undefined" && !TECH.some(t => /^ghostq/.test(t)) && !TIME_PERIODS.some(p => "quality" in p);
-    // old saves: quality fields and the GHOST quality upgrades go, and the research points come back
+    // old saves: quality fields and Time Travel Lab quality upgrades go, and the research points come back
     const snap = JSON.parse(JSON.stringify(state)); snap.science.dna = {[sp.id]:{genome:70, quality:80}}; snap.science.tech.push("ghostq1", "ghostq2"); const pts = snap.science.points || 0;
     upgradeSave(snap);
     out.oldSaveDropsQuality = !("quality" in snap.science.dna[sp.id]) && snap.science.dna[sp.id].genome === 70 && !snap.science.tech.some(t => /^ghostq/.test(t)) && Math.round(snap.science.points - pts) === 130;

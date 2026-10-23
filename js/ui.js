@@ -117,7 +117,7 @@ const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick
 function mainMenuHtml(){
   return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
     <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
-    <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and GHOST trips</span></label>
+    <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and time travel trips</span></label>
     <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
     <div class="row"><button class="btn" data-action="howTo">How to play</button><button class="btn danger" data-action="restart">Restart</button></div>
     <small id="verLabel" class="verlabel" title="Version">${GAME_VERSION}</small>`;
@@ -324,8 +324,8 @@ function cloneHtml(e, rep){
   h += `<section><h3>Add animals</h3>`;
   if(coming.length) h += `<div style="margin-bottom:8px">${coming.map(c => cloneCard(c)).join("")}</div>`;
   if(!ready.length && !forSale.length){
-    h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build the Research Lab to research time periods, GHOST to collect DNA, and the Genetics Lab to clone."
-      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Discover animals by scouting sites with GHOST, then send expeditions until a genome reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
+    h += `<div class="meta">${!hasDept("oracle") ? "Most animals come from the past. Build the Research Lab to research time periods, the Time Travel Lab to collect DNA, and the Genetics Lab to clone."
+      : `No complete genomes for ${e.viv ? "vivarium animals that fit here" : "open-habitat animals"} yet. Discover animals by scouting sites with the Time Travel Lab, then send expeditions until a genome reaches 100%.`} Partner parks don't sell anything that fits ${e.viv ? "this vivarium" : "an open habitat"}.</div>`;
   } else {
     const has = id => ready.some(s => s.period === id) || forSale.some(s => s.period === id);
     if(!has(exTabs.period)) exTabs.period = PERIOD_ORDER.find(has);
@@ -804,7 +804,7 @@ function pathHtml(p){
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
   let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
-  if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like the Research Lab, GHOST, and the Genetics Lab can use it.</div>`;
+  if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like the Research Lab, the Time Travel Lab, and the Genetics Lab can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
   if(!live) h += `<div class="meta">Nobody can reach this ${svc ? "road" : "path"}. Join it to the main walk or another connected path.</div>`;
   if(isBridge(p)) h += `<div class="meta">A timber footpath, the only path that crosses water.</div>`;
@@ -942,11 +942,11 @@ function speciesStatus(s){
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
   if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at the Genetics Lab for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
-  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A GHOST drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
-  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. The Genetics Lab needs ${CLONE_GENOME.min}% to clone it. Send a GHOST expedition for more.`, lock};
+  if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
+  if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. The Genetics Lab needs ${CLONE_GENOME.min}% to clone it. Send an expedition for more.`, lock};
   const where = sitesOf(s.id).filter(siteShown).map(x => isScouted(x.id) ? x.name : `an unscouted ${sitePeriod(x)} site`);
-  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Discovered. Send a GHOST expedition to ${where[0] || "its site"} to collect its DNA.`, lock};
-  return {group:"locked", cls:"no", how:`Not discovered yet. GHOST's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
+  if(isUnlocked(s.id)) return {group:"progress", cls:"wait", how:`Discovered. Send an expedition to ${where[0] || "its site"} to collect its DNA.`, lock};
+  return {group:"locked", cls:"no", how:`Not discovered yet. The Time Travel Lab's drones can scout for it ${where.length > 1 ? `at ${where.length} sites` : "at one site"} in the ${s.period}.`, lock};
 }
 
 // Known to the Paleopedia: a starter, a discovered species, or one with DNA already collected

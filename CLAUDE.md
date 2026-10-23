@@ -8,7 +8,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - When you change a system, update its `docs/` file, not this one. Add here only rules that apply to every change. Don't write changelogs ("used to be #ABC") anywhere; that's what commit messages are for.
 
 ## Docs (read the one you need)
-- `docs/core.md`: data.js, calendar, sim.js (loop, money, demand, rating, parcels/land, save migration), dev mode, science (Research Lab/GHOST/Genetics Lab/Botany Lab, genomes, cloning), key globals in full, time and clock.
+- `docs/core.md`: data.js, calendar, sim.js (loop, money, demand, rating, parcels/land, save migration), dev mode, science (Research Lab/Time Travel Lab/Genetics Lab/Botany Lab, genomes, cloning), key globals in full, time and clock.
 - `docs/animals.md`: keepers and food, vivarium dishes and trays, calls, escapes, power, maintenance, medicine and genome therapy, thrown trash, behavior (needs, acts, naps, attacks, shelters, hiding), animal sex and social ranks/packs, animal naming.
 - `docs/landscape.md`: water, rocks, plants, biomes, weather, vivarium fittings, park decor and statues, themes, biome ground paint.
 - `docs/fences.md`: grid fences, pens to exhibits, shared walls with two sides, fences bordering paths and water.

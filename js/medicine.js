@@ -98,7 +98,7 @@ function trashNight(out){
 }
 
 /* ---------- genome therapy ---------- */
-// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which GHOST raises by finding more of it.
+// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which the Time Travel Lab raises by finding more of it.
 const labQuality = sp => cloneQuality(sp);
 const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
