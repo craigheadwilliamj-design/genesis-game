@@ -2627,7 +2627,7 @@ const waterWant = s => s.semi ? HAB.waterSemi : (biomesOf(s) || []).length && bi
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
 const THEMES = {
-  genesis: {label:"Genesis", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
+  genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
     // warm gray concrete between dark green curbs
     path:{live:"#D9D4C7", dead:"#BDB8AC", edge:"#1F3D2B"},
