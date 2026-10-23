@@ -906,7 +906,7 @@ const WATER_TEX = {
   desert:   {shore:"#E3C788", shoreW:1, lit:"#6CC0D8", dark:"#24748C"},   // a 1 px shore line, no bank
   grassland:{shore:"#7A6246", shoreW:1, lit:"#5096B8", dark:"#2F6682"},   // a 1 px shore line, no bank
   tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
-  tundra:   {damp:"#C6CFBD", mud:"#E6EEEE", lit:"#9CD0DC", dark:"#4A8294"},
+  tundra:   {shore:"#E6EEEE", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
   boreal:   {shore:"#4C4A44", shoreW:1, lit:"#2E667F", dark:"#1E4A5E"},   // a 1 px shore line, no bank
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose

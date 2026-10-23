@@ -153,5 +153,5 @@ Biome notes for the common-name pass (a suggestion, adjust as you see fit): dese
 ## Known loose ends (not part of the brief, but you will notice them)
 
 - Wetland's Pecopteris and Cladophlebis are very similar; the Weeping Willow and Salix are close cousins on purpose.
-- `WATER_TEX` has an entry for every biome in `js/landscape.js`; wetland, fern, scrubland, desert, temperate, grassland, tropical and boreal are on the tile style (`WATER_TILES`), the rest on the older textured tile (a new one adds a `PAL` entry in `tools/pixelwater_flat.py`).
+- `WATER_TEX` has an entry for every biome in `js/landscape.js`; wetland, fern, scrubland, desert, temperate, grassland, tropical, boreal and tundra are on the tile style (`WATER_TILES`), the rest on the older textured tile (a new one adds a `PAL` entry in `tools/pixelwater_flat.py`).
 - Lystrosaurus `rest:7, restMs:260, holdMs:1400` is in `SPRITES` but there is no matching code in git; it lives in the published game. Someone should find where that work went.
