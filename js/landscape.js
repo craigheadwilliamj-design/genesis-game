@@ -902,7 +902,7 @@ const WATER_TEX = {
   wetland:  {shore:"#827B24", shoreW:2, lit:"#7FAA9C", dark:"#4A7872"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
   scrubland:{shore:"#B59A6D", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
-  temperate:{damp:"#6A9558", mud:"#5E563A", lit:"#7DB6B0", dark:"#3E7480"},
+  temperate:{shore:"#5C4A3D", shoreW:1, lit:"#7DB6B0", dark:"#2B6D5E"},   // a 1 px shore line, no bank
   desert:   {shore:"#E3C788", shoreW:1, lit:"#6CC0D8", dark:"#24748C"},   // a 1 px shore line, no bank
   grassland:{damp:"#A6B364", mud:"#8A7A4C", lit:"#78B49A", dark:"#2E6A64"},
   tropical: {damp:"#0A3A14", mud:"#4A3520", lit:"#3FC2A8", dark:"#0A5A5C"},
