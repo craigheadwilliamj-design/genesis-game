@@ -300,7 +300,7 @@ function exOverviewHtml(e, rep){
   h += callRow(e, "keeper");
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
-    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.</div>`;
   }
   return h + `</section>`;
 }
