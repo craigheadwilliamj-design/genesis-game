@@ -34,10 +34,10 @@ const BUILD_MENU = [
     {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges and rope fences are only for show: guests like them, but they can't hold animals."},
   ]},
   {id:"land", label:"Landscaping", items:[
-    {label:"Water", tool:"water", price:() => `${money(WATER.perSqM)}/m²`, note:"Drag a box to lay it in 5 m chunks, like a path. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
+    {label:"Water", water:true, note:"Pick a water type, then drag a box to lay it in 5 m chunks, like a path. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
     ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
-    {label:"Paint Ground", tool:"paint", price:() => "Free in the park", note:"Drag a box to paint ground in another biome, pick the biome in the bar. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
+    {label:"Paint Ground", paint:true, note:"Pick a biome, then drag a box to paint its ground. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
     {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at the Botany Lab. Out in the park, only Quaternary plants grow until the Research Lab researches sterile prehistoric plants." : undefined})),
@@ -125,6 +125,7 @@ function menuSprite(tool){
   const has = p => typeof SPRITE_PACK !== "undefined" && SPRITE_PACK[p] ? p : null, k = tool.replace(/^land-/, "");
   if(PATH_TILES[tool]) return has(`sprites/path/${PATH_TILES[tool]}.png`);
   if(tool === "water") return has("sprites/water/temperate-1.png");
+  if(/^(water|paint)-/.test(tool)) return has(`sprites/${tool.startsWith("water") ? "water" : "ground"}/${tool.replace(/^\w+-/, "")}-1.png`);
   if(tool === "gate") return has("sprites/fence/wood-gate.png");
   if(tool.startsWith("fence-")) return has(`sprites/fence/${k.slice(6)}-pristine.png`);
   if(BUILDINGS[tool] && BUILDINGS[tool].viv) return has(`sprites/menu/viv-${BUILDINGS[tool].viv}.png`);   // thumbnails from tools/pixelvivicon.py
@@ -134,9 +135,9 @@ function menuSprite(tool){
 }
 function menuIcon(tool, color, glyph){
   const pic = menuSprite(tool), img = a => `<image href="${spriteUrl(pic)}" ${a} style="image-rendering:pixelated"/>`;
-  // path and water tiles show a patch at their own pixel size (water's 8 px tile repeated), the rest fit the box standing on its bottom edge
-  let inner = !pic ? ICON_LINES[tool] : PATH_TILES[tool] ? img(`x="0" y="0" width="96" height="96"`)
-    : tool === "water" ? [0, 8, 16].flatMap(x => [0, 8, 16].map(y => img(`x="${x}" y="${y}" width="8.01" height="8.01"`))).join("")
+  // path, water and ground tiles show a patch at their own pixel size (an 8 px water or ground tile repeated), the rest fit the box standing on its bottom edge
+  let inner = !pic ? ICON_LINES[tool] || ICON_LINES[(tool.match(/^(water|paint)-/) || [])[1]] : PATH_TILES[tool] ? img(`x="0" y="0" width="96" height="96"`)
+    : /^(water|paint)\b/.test(tool) ? [0, 8, 16].flatMap(x => [0, 8, 16].map(y => img(`x="${x}" y="${y}" width="8.01" height="8.01"`))).join("")
     : img(`x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet"`);
   const b = BUILDINGS[tool];
   if(!inner && b) inner = b.viv ? ICON_LINES.viv : `<rect x="3" y="6" width="18" height="13" rx="2" fill="${b.color}"/>${b.glyph ? `<text x="12" y="13" class="glyph" font-size="10">${esc(b.glyph)}</text>` : ""}`;
@@ -178,6 +179,14 @@ function menuRow(it){
     const rows = biomes.map(biome => `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
     const ks = Object.values(PLANTS_OF[it.period]).map(l => l[1]), first = ks.find(k => PLANT_SPRITES[k]) || ks[0];   // the first medium plant with a picture
     return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${plantIcon(first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plantBiomeSelect()}${rows}</div></div>`;
+  }
+  if(it.water || it.paint){   // Water and Paint Ground list their types like the other lists: a row picks that type and turns the tool on
+    const own = typeof state !== "undefined" && state ? parkBiome() : DEFAULT_BIOME, attr = it.water ? "data-water" : "data-paint";
+    const opts = it.water ? [["auto", "Own biome", "The water that goes with the ground it's laid on", "water-" + own]].concat(waterTypes().map(k => [k, BIOMES[k].label, BIOMES[k].ground, "water-" + k]))
+      : Object.keys(BIOMES).map(b => [b, BIOMES[b].label, BIOMES[b].ground, "paint-" + b]).concat([["erase", "Erase", "Take ground paint off", "bulldoze"]]);
+    const price = k => it.water ? `${money(WATER.perSqM)}/m²` : k === "erase" ? "Free" : `$${BIOMES[k].perSqM.toFixed(2)}/m² in exhibits`;
+    const rows = opts.map(([k, label, tip, icon]) => `<button class="srow sub" ${attr}="${k}" aria-pressed="false" title="${esc(tip)}">${menuIcon(icon)}<span class="tl"><b>${esc(label)}</b><span class="price">${price(k)}</span></span></button>`).join("");
+    return `<div class="sitem" data-open="${it.water ? "water" : "paint"}"><button class="srow head" aria-expanded="false">${menuIcon(it.water ? "water" : "paint")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${it.water ? `${money(WATER.perSqM)}/m²` : "Free in the park"}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.sub){
     const rows = it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
