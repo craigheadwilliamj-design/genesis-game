@@ -348,7 +348,7 @@ function exGuestsHtml(e){
   h += `<section><h3>Visitors</h3>${day("", `<span class="meta">Today</span><span class="meta">Yesterday</span>`)}`;
   h += day("Stopped to watch", `<span>${Math.round(X.views)}</span><span>${Math.round(X.last.views)}</span>`);
   h += day("Donations", `<span>${money(Math.round(X.gifts))}</span><span>${money(Math.round(X.last.gifts))}</span>`);
-  h += `<div class="meta" style="margin-top:4px">Donations are what guests gave on the way out, shared among the exhibits by how much they learned at each.</div></section>`;
+  h += `</section>`;
   const th = exThoughts(e, 8);
   h += `<section><h3>Guest thoughts</h3>`;
   h += th.length ? `<ul class="issues">${th.map(t => `<li class="${t.good ? "" : "bad"}"><span>"${esc(t.text)}" <span class="meta">${Math.max(1, Math.round(t.share * 100))}%</span></span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Share of ${X.views ? "today's" : "yesterday's"} visitors who thought it here.</div>`
