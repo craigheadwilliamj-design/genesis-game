@@ -1539,6 +1539,7 @@ const AQUA_SCENES = {
   cambrian:  {label:"Cambrian sea",  periods:["Cambrian"]},
   paleozoic: {label:"Paleozoic sea", periods:["Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian"]},
   mesozoic:  {label:"Mesozoic sea",  periods:["Triassic", "Jurassic", "Cretaceous"]},
+  cenozoic:  {label:"Cenozoic sea",  periods:["Paleogene", "Neogene", "Quaternary"]},
 };
 const seaSceneOf = s => Object.keys(AQUA_SCENES).find(k => AQUA_SCENES[k].periods.includes(s.period)) || null;
 const HAB = {

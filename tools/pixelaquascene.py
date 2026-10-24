@@ -4,7 +4,7 @@
 #   sea-<scene>-<S|M|L>-wall.png    the back wall above the sill: the water in stepped bands with slanting light, far shapes, near shapes, a strip of sea floor
 #   sea-<scene>-<S|M|L>-floor.png   the floor, flat and seen from above, with its scatter of shells and bits
 # Scenes: cambrian (mud, microbial mats, sponges, stalked animals, no fish or coral), paleozoic (crinoid gardens, horn and honeycomb corals, Ordovician to Permian),
-# mesozoic (the first stony corals, glass sponges, ammonite shells). The aquarium's water tint is laid over all of it in the game, so the colors here run a little bright.
+# mesozoic (the first stony corals, glass sponges, ammonite shells), cenozoic (kelp forest and a modern reef: sea fans, table and branching corals, starfish). The aquarium's water tint is laid over all of it in the game, so the colors here run a little bright.
 # Usage: python3 -I tools/pixelaquascene.py [outdir] [--sheet sheet.png]   (default sprites/vivscene; the sheet is a x4 view of every backdrop)
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,8 +21,11 @@ SCENES = {   # the water (top and deep), the floor, what stands on it, what lies
     "mesozoic":  {"water":((104, 184, 206), (40, 108, 156)), "ground":(208, 192, 150), "dens":1.1,
                   "near":[("staghorn", 3), ("brain", 2), ("vase", 2), ("staghorn2", 2)], "dec":["ammonite", "belemnite", "coralbit", "ammonite"],
                   "col":{"staghorn":(214, 122, 102), "staghorn2":(220, 176, 96), "brain":(192, 172, 100), "vase":(184, 144, 92), "ammonite":(196, 168, 120), "belemnite":(168, 128, 90), "coralbit":(226, 196, 176)}},
+    "cenozoic":  {"water":((100, 192, 212), (30, 110, 152)), "ground":(222, 208, 166), "dens":1.1,
+                  "near":[("kelp", 4), ("seafan", 2), ("table", 2), ("staghorn3", 2)], "dec":["sanddollar", "scallop", "starfish", "coralbit"],
+                  "col":{"kelp":(150, 132, 52), "seafan":(156, 84, 146), "table":(188, 160, 116), "staghorn3":(228, 132, 70), "sanddollar":(220, 214, 186), "scallop":(214, 156, 120), "starfish":(222, 110, 60), "coralbit":(232, 200, 186)}},
 }
-TALL = {"sponge":.55, "stalk":.5, "strand":.7, "crinoid":.85, "crinoid2":.65, "horncoral":.35, "staghorn":.55, "staghorn2":.45, "vase":.5}   # height, as a share of the wall
+TALL = {"sponge":.55, "stalk":.5, "strand":.7, "crinoid":.85, "crinoid2":.65, "horncoral":.35, "staghorn":.55, "staghorn2":.45, "vase":.5, "kelp":.95, "seafan":.5, "table":.38, "staghorn3":.5}   # height, as a share of the wall
 LOW = {"mat":.14, "honeycomb":.24, "brain":.26}
 
 # Each shape gives (body pixels, extra pixels drawn in the body's darkest tone) standing on (x, b), h pixels tall
@@ -63,6 +66,20 @@ def vase(x, b, h):   # a glass sponge: a vase widening up to an open rim
     body = set()
     for i in range(h): w = 1 + round(i * 2.4 / max(1, h)); body |= {(x + k, b - i) for k in range(-w, w + 1)}
     return body, {(x + k, b - h + 1) for k in range(-1, 2)} | {(x, b - i) for i in range(2, h - 1, 3)}
+def kelp(x, b, h):   # a kelp frond: a stalk that steps side to side, a blade off it every few rows (alternating sides), a float bulb at each blade's root
+    body, ex = set(), set()
+    for i in range(h):
+        sx = x + (1 if (i // 4) % 2 else 0); body.add((sx, b - i))
+        if i > 2 and i % 4 == 1:
+            d = 1 if (i // 4) % 2 else -1; body |= {(sx + d * k, b - i - (k // 2)) for k in range(1, 4)}; ex.add((sx, b - i))
+    return body, ex
+def seafan(x, b, h):   # a sea fan: a short stem under a flat half-round net
+    body = line(x, b, x, b - 2) | {p for p in ell(x + .5, b - 2, h * .7, h - 2) if p[1] <= b - 2}
+    return body, {p for p in body if p[1] < b - 2 and (p[0] + p[1]) % 3 == 0 and (p[0] - p[1]) % 3 != 0}
+def table(x, b, h):   # a table coral: a stout stem holding up a wide flat plate
+    body = {(x + k, y) for y in range(b - h + 3, b + 1) for k in range(2)} | {(x + k, y) for y in range(b - h + 1, b - h + 3) for k in range(-round(h * .9), round(h * .9) + 2)}
+    return body, {(x + k, b - h + 2) for k in range(-round(h * .9) + 1, round(h * .9) + 1, 3)}
+def staghorn3(x, b, h): return staghorn(x, b, h)
 SHAPES = {k: globals()[k] for k in list(TALL) + list(LOW)}
 
 def palette(scene):
@@ -122,6 +139,12 @@ def floor(scene, size):
             for dx, dy, t in ((0, 0, "hi"), (1, -1, "mid"), (2, 0, "mid"), (3, -1, "lo"), (1, 0, "mid")): c.put(x + dx, y + dy, C["coralbit"][t])
         elif kind == "ammonite":
             for dx, dy, t in ((0, -1, "hi"), (1, -1, "hi"), (2, -1, "mid"), (-1, 0, "hi"), (2, 0, "lo"), (3, 0, "mid"), (-1, 1, "mid"), (0, 1, "deep"), (3, 1, "lo"), (0, 2, "lo"), (1, 2, "lo"), (2, 2, "lo"), (1, 0, "mid"), (1, 1, "mid")): c.put(x + dx, y + dy, C["ammonite"][t])
+        elif kind == "sanddollar":
+            shade(c, ell(x, y, 2.2, 1.4), C["sanddollar"], False); c.put(x, y, C["sanddollar"]["deep"]); c.put(x - 1, y, C["sanddollar"]["lo"]); c.put(x + 1, y, C["sanddollar"]["lo"])
+        elif kind == "scallop":
+            for dx, dy, t in ((0, -1, "hi"), (1, -1, "hi"), (2, -1, "mid"), (-1, 0, "hi"), (0, 0, "lo"), (1, 0, "mid"), (2, 0, "lo"), (3, 0, "mid"), (0, 1, "mid"), (1, 1, "mid"), (2, 1, "lo"), (1, 2, "deep")): c.put(x + dx, y + dy, C["scallop"][t])
+        elif kind == "starfish":
+            for dx, dy, t in ((0, 0, "mid"), (1, 0, "mid"), (0, -1, "hi"), (-1, 0, "hi"), (-2, 1, "hi"), (2, 0, "lo"), (3, 1, "lo"), (0, 1, "lo"), (-1, 2, "lo"), (1, 1, "lo"), (2, 2, "lo")): c.put(x + dx, y + dy, C["starfish"][t])
         elif kind == "belemnite":
             for k in range(5): c.put(x + k, y, C["belemnite"]["hi" if k < 2 else "mid" if k < 4 else "lo"])
     cw, ch = 9, 6   # one decal at most in each cell of a grid, nudged inside it, so they spread evenly
