@@ -747,8 +747,8 @@ const VIV34 = {
   M:{frame:["#7A5638", "#5E402A", "#432D1E"], top:"#94694A", sill:.45, post:.28, lamps:1, label:"M"},
   L:{frame:["#6F7980", "#4F575D", "#363C41"], top:"#8793A0", sill:.55, post:.34, lamps:2, mullion:true, label:"L"}};
 const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
-// An aquarium's water: its colour clean and foul (mixed by water quality), and how thick it looks clean and foul
-const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.5, .8], sand:"#C9B486"};
+// An aquarium's water: its colour clean and foul (mixed by water quality), how thick it looks clean and foul, and how much of that its top surface takes
+const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486"};
 // The waterline's height in meters: a little under the lid
 const aquaLine = e => VIVARIUMS[e.viv].d * .45 - .6;
 function vivMix34(a, b, t){
@@ -797,14 +797,13 @@ function viv34(e, which, hi){
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
   let s = "";
-  if(e.aqua){   // an aquarium's water: the far faces behind the animals, then the near faces and the surface over them; clear blue when clean, thicker and greener as it fouls
-    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = (AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w)).toFixed(2), wl = aquaLine(e);
-    for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back ? vivMix34(col, "#000000", .15) : col, a);
-  }
-  if(!back && e.aqua){
-    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = (AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w)).toFixed(2), wl = aquaLine(e);
-    s += flatPoly34(P.map(lift34(wl)), vivMix34(col, "#FFFFFF", .15), op(a), true);
-    for(let i = 0; i < P.length; i++){ const p = lift34(wl)(P[i]), q = lift34(wl)(P[(i + 1) % P.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
+  if(e.aqua){   // an aquarium's water: the far faces behind the animals, then the near faces and a thinner surface over them; clear blue when clean, thicker and greener as it fouls
+    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = aquaLine(e);
+    for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back ? vivMix34(col, "#000000", .15) : col, a.toFixed(2));
+    if(!back){
+      s += flatPoly34(P.map(lift34(wl)), vivMix34(col, "#FFFFFF", .15), op((a * AQUA34.surface).toFixed(2)), true);
+      for(let i = 0; i < P.length; i++){ const p = lift34(wl)(P[i]), q = lift34(wl)(P[(i + 1) % P.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
+    }
   }
   for(let i = 0; i < P.length; i++){
     const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;

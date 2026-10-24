@@ -1533,6 +1533,14 @@ const VIV_PLANT = {scale:.5, bonus:6, shift:.26, apart:3};   // bonus: happiness
 // A period can have its own scene for a biome: list "<period>-<biome>" in VIV_SCENE_PERIODS and draw its pictures, and a scene saved with that period uses them in place of its era's.
 const VIV_SCENE = {price:500, eras:["paleozoic", "mesozoic", "cenozoic"]};
 const VIV_SCENE_PERIODS = {};
+// An aquarium's backdrop: a stretch of sea floor from one part of the past (pictures from tools/pixelaquascene.py, sprites/vivscene/sea-<key>-<size>-<wall|floor>.png),
+// set like a vivarium's scene for VIV_SCENE.price. A sea animal is at home with the backdrop of its own period, worth the full VIV_PLANT.bonus.
+const AQUA_SCENES = {
+  cambrian:  {label:"Cambrian sea",  periods:["Cambrian"]},
+  paleozoic: {label:"Paleozoic sea", periods:["Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian"]},
+  mesozoic:  {label:"Mesozoic sea",  periods:["Triassic", "Jurassic", "Cretaceous"]},
+};
+const seaSceneOf = s => Object.keys(AQUA_SCENES).find(k => AQUA_SCENES[k].periods.includes(s.period)) || null;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after

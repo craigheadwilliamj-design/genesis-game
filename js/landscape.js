@@ -391,6 +391,9 @@ function habitatScore(e){
   if(e.aqua){   // an aquarium is all about its water
     const w = wqOf(e), why = filterText(e);
     if(why) out.issues.push({bad:true, text:why});
+    let fit = 0; for(const [sp, c] of speciesCounts(e)) fit += c * sceneFit(e, SPECIES_BY_ID[sp]);
+    fit /= e.animals.length; out.delta += VIV_PLANT.bonus * fit;
+    out.issues.push({bad:false, text:fit >= .99 ? "The backdrop is from their own time." : fit > 0 ? "The backdrop suits some of them." : e.vivScene ? "The backdrop is from another time." : "Bare."});
     if(w >= AQUA.murky){ out.delta += AQUA.happy * (w - AQUA.murky) / (100 - AQUA.murky); out.issues.push({bad:false, text:"Clean water."}); }
     else { out.delta -= AQUA.lack * (AQUA.murky - w) / AQUA.murky; out.issues.push({bad:true, text:w < AQUA.foul ? "Foul water." : "Murky water."}); }
     return out;
@@ -744,24 +747,26 @@ function relayViv(e){
   regatherViv(e);
 }
 // A vivarium's scene ({era, biome}, and a period once that period has its own pictures): what it costs, and what it gives each species, 0 to 1
-const vivSceneKey = sc => sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
-const sameScene = (a, b) => !a ? !b : !!b && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
+const vivSceneKey = sc => sc.sea ? "sea-" + sc.sea : sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
+const sameScene = (a, b) => !a ? !b : !!b && a.sea === b.sea && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
 // half for a scene from its own era (or its own period, for a period scene), half for one of its biomes
 function sceneFit(e, s){
   const sc = e.vivScene; if(!sc) return 0;
+  if(sc.sea) return AQUA_SCENES[sc.sea] && AQUA_SCENES[sc.sea].periods.includes(s.period) ? 1 : 0;   // a backdrop has no biome: its own time is the whole of it
   return ((sc.period ? sc.period === s.period : sc.era === ERA_OF[s.period]) ? .5 : 0) + (biomeFit(s, sc.biome) !== "away" ? .5 : 0);
 }
 function vivSceneProblem(e, sc){
   if(!e.viv) return "Only vivariums take a scene.";
-  if(sc && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
-  if(sameScene(e.vivScene, sc)) return sc ? "That's the scene it has." : "It has no scene.";
+  if(sc && e.aqua ? !AQUA_SCENES[sc.sea] : sc && sc.sea) return "Pick a backdrop.";
+  if(sc && !e.aqua && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
+  if(sameScene(e.vivScene, sc)) return sc ? `That's the ${e.aqua ? "backdrop" : "scene"} it has.` : `It has no ${e.aqua ? "backdrop" : "scene"}.`;
   if(sc && !canAfford(VIV_SCENE.price)) return `Costs ${money(VIV_SCENE.price)}.`;
   return null;
 }
 // a new scene costs the flat price; clearing it gives back the usual share
 function setVivScene(e, sc){
   if(sc) spend(VIV_SCENE.price, "built"); else earn(Math.round(VIV_SCENE.price * COST.refundShare), "sold");
-  e.vivScene = sc ? {era:sc.era, biome:sc.biome, ...(sc.period ? {period:sc.period} : {})} : null;
+  e.vivScene = !sc ? null : sc.sea ? {sea:sc.sea} : {era:sc.era, biome:sc.biome, ...(sc.period ? {period:sc.period} : {})};
 }
 
 // Which fittings a case takes: aquarium ones (filters, sea enrichment) only in aquariums, the rest only in vivariums; a food dish goes in either

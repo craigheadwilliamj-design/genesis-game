@@ -240,7 +240,7 @@ panelEl.addEventListener("change", ev => {
 const exTabs = {ex:null, tab:"main", period:null};   // which tab the exhibit panel shows
 // The exhibit panel's tabs, in order. A vivarium has no fence, and its Landscaping and Habitat Items are its scene and fittings.
 const exTabList = e => [{key:"main", label:"Overview", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"barrier", label:"Barrier", color:"#6E737A"}],
-  e.aqua ? [] : [{key:"land", label:"Landscaping", color:"#7A6A58"}], [{key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
+  [{key:"land", label:"Landscaping", color:"#7A6A58"}, {key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
    {key:"health", label:"Health", color:"#B3261E"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"guests", label:"Guests", color:"#B8860B"}]);
 function exhibitHtml(e){
   const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e), n = e.animals.length;
@@ -253,7 +253,7 @@ function exhibitHtml(e){
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
   h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? caseOf(e).label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
-  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.aqua ? aquaSceneHtml(x) : x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
   return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
@@ -391,6 +391,15 @@ function biomeHtml(e){
   return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button>${fits()}</section>`;
 }
 // A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
+// An aquarium's backdrop: one list of seas, and whether each animal is from that time
+function aquaSceneHtml(e){
+  const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]), pick0 = sc ? sc.sea : kinds.length ? seaSceneOf(kinds[0]) : "";
+  let h = `<section><h3>Backdrop</h3><div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(AQUA_SCENES[sc.sea].label)}</b>.` : "No backdrop yet."}</div>`;
+  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="aquaSceneSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"><option value="">No backdrop</option>${Object.entries(AQUA_SCENES).map(([k, x]) => `<option value="${k}"${k === pick0 ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`;
+  h += `<button class="btn" data-action="aquaScene">Set, ${money(VIV_SCENE.price)}</button></div>`;
+  for(const s of kinds){ const ok = sc && sceneFit(e, s) > 0, home = seaSceneOf(s); h += `<div class="need-line ${ok ? "ok" : "no"}">${esc(s.name)}: ${esc(home ? AQUA_SCENES[home].label : s.period)}</div>`; }
+  return h + `</section>`;
+}
 function vivSceneHtml(e){
   const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
   const era0 = sc ? sc.era : (kinds.length ? ERA_OF[kinds[0].period] : ""), bio0 = sc ? sc.biome : biomeOf(e);
@@ -896,6 +905,7 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
+  if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
