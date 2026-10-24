@@ -38,7 +38,6 @@ const BUILD_MENU = [
     ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
     {label:"Paint Ground", paint:true, note:"Pick a biome, then drag a box to paint its ground. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
-    {label:"Park Plants", parkPlants:true, note:"Modern plants grow anywhere: in gardens along the paths, where guests enjoy them, or in an exhibit of their biome, where they count as Quaternary plants. This list holds the Quaternary plants too, and the Quaternary list holds these. Mangroves, cattails and cypress knees can stand in water, and water lilies only grow in it."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},
     ...Object.keys(PLANTS_OF).map(period => ({label:period + " plants", period, note:period === "Devonian" ? "Every period has its own small, medium and large plants for each biome that existed then, and animals only count plants from their exhibit's own biome. Others make them unhappy. Groves from an animal's own era feed and shelter it. Every Mesozoic and Paleozoic plant uses a plant of its size grown at the Botany Lab. Out in the park, only Quaternary plants grow until the Research Lab researches sterile prehistoric plants." : undefined})),
   ]},
@@ -164,10 +163,6 @@ function menuRow(it){
     const rates = Object.keys(BARRIERS).map(fenceRate);
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon(menuSprite("fence-wood") ? "fence-wood" : "exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
-  if(it.parkPlants){
-    const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
-    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${plantIcon("q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${plantBiomeSelect()}${rows}</div></div>`;
-  }
   if(it.statues){
     const keys = Object.keys(LAND).filter(k => LAND[k].statue && (!LAND[k].sp || speciesAvailable(LAND[k].sp))), row = k => { const t = LAND[k], g = statueGrant(k);
       return `<button class="srow sub" data-tool="land-${k}" aria-pressed="false" data-tech="" data-lock="${k}"${g ? ` title="${esc(statueHint(k))}"` : ""}>${menuIcon("land-" + k)}<span class="tl"><b>${esc(t.label)}</b><span class="price">${money(t.price)}${t.free ? "" : ", grant"}</span></span></button>`; };
@@ -196,10 +191,8 @@ function menuRow(it){
   return `<button class="srow" data-tool="${it.tool}" aria-pressed="false" data-tech="${it.tech || (b ? b.tech || "" : "")}">${menuIcon(it.tool)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${price}</span></span></button>${it.shapes ? `<div class="shapes" data-shapes="${it.shapes}"></div>` : ""}${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}`;
 }
 
-// A plant's row in the build menu. Park plants and Quaternary plants are listed in both the Park Plants and the Quaternary dropdowns (both grow in exhibits and out in the park).
+// A plant's row in the build menu. Park plants are listed in the Quaternary dropdown with the other Quaternary plants (both grow in exhibits and out in the park).
 const bySize = ks => ks.slice().sort((a, b) => PLANT_SIZES.indexOf(LAND[a].size) - PLANT_SIZES.indexOf(LAND[b].size));
-const parkPlantKeys = size => Object.keys(PARK_PLANTS[size]).map(name => Object.keys(LAND).find(x => LAND[x].park && LAND[x].label === name)).concat(
-  Object.keys(PLANTS_OF.Quaternary).length ? Object.keys(PLANTS_OF.Quaternary).map(b => PLANTS_OF.Quaternary[b][PLANT_SIZES.indexOf(size)]) : []);
 // A plant's menu icon: its real sprite when it has one (pixelated, fitted to the icon box), else the drawn icon
 const plantIcon = k => PLANT_SPRITES[k] ? `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true"><image href="${spriteUrl(`sprites/plants/${k}.png`)}" x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet" style="image-rendering:pixelated"/></svg>` : menuIcon("land-" + k);
 // The biome dropdown at the top of every plant list. It only filters what the lists show (a plant's biome is part of the plant), and one pick covers all the lists.

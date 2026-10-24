@@ -1011,8 +1011,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     resetParties();
 
     // build sidebar and the Move tool
-    { // Park Plants dropdown: biome headings in BIOMES order, sizes ascending inside each
-      const sub = document.querySelector('#sideMenu [data-open="park-plants"] .ssub'), order = Object.keys(BIOMES).map(b => BIOMES[b].label), heads = [], sizes = []; let ok = !!sub;
+    { // Quaternary dropdown (holds the park plants): biome headings in BIOMES order, sizes ascending inside each
+      const sub = document.querySelector('#sideMenu [data-open="plants-Quaternary"] .ssub'), order = Object.keys(BIOMES).map(b => BIOMES[b].label), heads = [], sizes = []; let ok = !!sub;
       if(sub) for(const el of [...sub.children]){
         if(el.tagName === "P" && el.dataset.pbiome){ heads.push(el.textContent); sizes.push([]); }   // a biome heading (the biome dropdown and the "no plants" note are skipped)
         else if(el.tagName !== "BUTTON") continue;
