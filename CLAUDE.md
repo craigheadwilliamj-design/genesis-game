@@ -36,6 +36,7 @@ Buildings, props and paths now follow the **park style**, with the Genesis restr
 ## Rules
 - Escape user text with `esc()` before putting it in HTML. Toasts take plain text (textContent) unless the third `html` arg is used.
 - Match the existing style: terse one-liners, plain-English comments, user-facing text in short full sentences.
+- Panels and menus follow RollerCoaster/Zoo Tycoon and the Planet games: names, numbers, meters, status chips and buttons. No explainer paragraphs, no telling the player how to fix things, no repeating a building's blurb. Status says what's wrong in a few words ("No keeper gate.", "Out of meat."), never what to build or research. Longer help belongs in hover tooltips or How to play.
 - When adding save fields, add a default in `upgradeSave` (sim.js).
 - A file's helpers aren't always where you'd guess. Search for `function name` or `const name =` across `js/` before adding one.
 

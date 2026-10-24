@@ -281,7 +281,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.enrichFullOff = !me || enrichment(me) === 1;
       { const vv = {id:"e-vv", name:"V", viv:"S", points:[[0,0],[10,0],[10,10],[0,10]], animals:[{id:"vv1", sp:"coel"}, {id:"vv2", sp:"coel"}], land:[]};
         const bareHtml = vivToysHtml(vv), bareE = enrichment(vv);
-        out.vivToysShownOff = bareHtml.includes("Enrichment") && bareHtml.includes("vivToySel") && bareHtml.includes("Misters") && bareHtml.includes("Add enrichment") && !!vivToyProblem(vv, "vbark") === false;
+        out.vivToysShownOff = bareHtml.includes("Enrichment") && bareHtml.includes("vivToySel") && bareHtml.includes("Misters") && !!vivToyProblem(vv, "vbark") === false;
         out.vivBareNotHarshOff = bareE >= ENRICH.vivBase && bareE < 1;
         vv.land = [{id:"vt1", type:"vbark", x:3, y:3}, {id:"vt2", type:"vmist", x:6, y:6}];
         out.vivToysCountOff = toyPoints(vv) > 0 && enrichment(vv) > bareE; }
@@ -1261,7 +1261,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // out in the park, rocks are fine but habitat props aren't, and water outside the fence isn't this exhibit's
     out.landRejectsOutside = waterHost(sq(10, 10, 4)) === null && !!waterProblem(sq(102, 130, 4), lx, null, 0) && landSpot(10, 10, "rock").ok && /inside an open exhibit/.test(landSpot(10, 10, "shelter").why || "");
     const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
-    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /Dry/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
+    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /No water/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
     const pool = sq(130, 130, 6);
     out.landAcceptsInside = waterHost(pool) === lx && waterProblem(pool, lx, null, waterCost(pool)) === null;
     addWater(lx, pool);
@@ -1416,7 +1416,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.fenceMerge = state.exhibits.length === 1 && state.exhibits[0] === ge && area(ge.points) === 300 && ge.animals.length === 1;
       // a gap breaches it until it's closed again
       liftPieces(["245,115,h"]);
-      out.fenceGap = !!ge.open && isBreached(ge) && effectiveStrength(ge) === 0 && /gap/.test(escapeRisk(ge, gsp) || "") && looseRuns().length > 0;
+      out.fenceGap = !!ge.open && isBreached(ge) && effectiveStrength(ge) === 0 && /Gap/.test(escapeRisk(ge, gsp) || "") && looseRuns().length > 0;
       L([245,115],[250,115]);
       out.fenceClosedAgain = !ge.open && !isBreached(ge) && area(ge.points) === 300;
       // mixed fence: the weakest piece is what holds, and the panel's picker refences it all
@@ -1586,7 +1586,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const bm = gx.biome; gx.biome = "grassland"; const onGrassland = grassSick(gx, grazer) === 1; gx.biome = bm;
     gx.grassFed = true; const onHay = grassSick(gx, grazer) === 1; gx.grassFed = false;
     out.grassFromBiomeAndHay = onGrassland && onHay;
-    out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /own era/.test(i.text));
+    out.grovesHappier = exhibitReport(gx).target > groveTarget && exhibitReport(gx).issues.some(i => /their era/.test(i.text));
     gx.land = gx.land.filter(f => /^jur/.test(f.type));   // the Cenozoic plants come out again
     out.oldGroveOnlyIsFine = grassSick(gx, grazer) === 0;
     // browsing: the stock drains slower, but keepers are still needed
@@ -2295,9 +2295,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const ex = { id:"e-gt", name:"GT", points:[[214,240],[226,240],[226,255],[214,255]], animals:[], land:[], water:[], cond:100, gate:[215, 255] };
       state.exhibits = [ex]; redo();
       out.gateOnEdge = gateCheck(ex).ok;
-      ex.gate = [215, 245]; out.gateOffPath = !gateCheck(ex).ok && /touch/.test(gateCheck(ex).text);
+      ex.gate = [215, 245]; out.gateOffPath = !gateCheck(ex).ok && /not on a path/.test(gateCheck(ex).text);
       ex.gate = [215, 255]; removeChunks(["42,51"]); redo();
-      out.gateUnjoined = !gateCheck(ex).ok && /join/.test(gateCheck(ex).text);
+      out.gateUnjoined = !gateCheck(ex).ok && /not connected/.test(gateCheck(ex).text);
       // an exhibit beside a guest path is open to guests, one beside only a staff road is not
       layPath([42, 51], [42, 51], "s"); redo();
       out.exhibitStaffOnly = !isReachable(ex);
@@ -2406,7 +2406,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = [lone, pack]; state.minute = minuteAtClock(18 * 60); state.day = 1;
       for(let i = 0; i < 60; i++) behaviorTick(BEHAVIOR.step);
       out.behaviorLonelyPaces = lone.animals[0].act === "pace" && lone.animals[0].why === "lonely" && pack.animals.every(a => a.act !== "pace") && lone.animals[0].need.lonely > pack.animals[0].need.lonely;
-      out.behaviorTell = exhibitReport(lone).issues.some(i => i.bad && i.text.startsWith("Pacing.")) && behaviorHtml(lone).includes("Pacing because");
+      out.behaviorTell = exhibitReport(lone).issues.some(i => i.bad && i.text.startsWith("Pacing")) && behaviorHtml(lone).includes("Pacing:");
       const bare = enrichment(pack); pack.land = [{id:"t1", type:"logs", x:110, y:10}, {id:"t2", type:"wallow", x:140, y:40}];
       out.behaviorToys = enrichment(pack) > bare && toyPoints(pack) === 9 && !!decorProblem("logs", 0, 0);
       out.behaviorTab = behaviorHtml(pack).includes(NEED_TEXT.bored) && liveliness(pack) >= BEHAVIOR.lively[0];
@@ -2850,7 +2850,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.socialOneMale = !info(one, herd).bad && !info(one, herd).fights;
       out.socialTwoMales = info(two, herd).fights && info(two, herd).bad && /fighting/.test(info(two, herd).text) && info(two, herd).delta < 0;
       for(const p of [bach, two]) p.animals.forEach(a => { a.need = freshNeeds(); a.act = "rest"; });
-      out.socialBonusInReport = behaviorScore(bach).delta > behaviorScore(two).delta && behaviorScore(two).issues.some(i => /Social\. .*fighting/.test(i.text));
+      out.socialBonusInReport = behaviorScore(bach).delta > behaviorScore(two).delta && behaviorScore(two).issues.some(i => /fighting/.test(i.text));
       // more males fight more; less room fights more
       const three = mk("e-sx6", herd, [M, M, M, F]), tight = mk("e-sx7", herd, [M, M, F, F]); tight.points = [[0,0],[8,0],[8,8],[0,8]];
       out.fightsScaleWithMales = info(three, herd).delta < info(two, herd).delta;
@@ -3424,7 +3424,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // the animal panel still opens from the Animals tab, and says where it is
     select("animal", gone.id); out.panelOpensForInsideAnimal = !!selItem() && selItem().id === gone.id && /storm/i.test(actLabel(gone)); select(null);
     // the exhibit report says so
-    out.reportSaysSheltering = exhibitReport(e).issues.some(i => /inside a shelter/.test(i.text));
+    out.reportSaysSheltering = exhibitReport(e).issues.some(i => /In a shelter/.test(i.text));
     // fair weather brings them out again
     wx("fair", DAWN_MIN + 140); step(); step(); animateAnimals(.016);
     out.fairWeatherBringsOut = inside().length === 0 && gh.el.style.display !== "none";
@@ -3470,7 +3470,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.educatedPenalisedLess = learned > lo + 3 && learned > half && half > lo;
     const bo = pers => { hideAvg.set(e.id, .2); return hideBother(mkP(pers), e); };
     out.paleoAndConservLeastBothered = bo(["paleo", "neutral"]) < bo(["neutral", "neutral"]) && bo(["conserv", "neutral"]) < bo(["neutral", "neutral"]) && bo(["family", "neutral"]) > bo(["neutral", "neutral"]) && bo(["paleo", "neutral"]) <= bo(["conserv", "neutral"]);
-    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals are hiding\. Guests are let down/.test(i.text) && !/Add quiet signs/.test(i.text));
+    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals out of sight/.test(i.text) && !/Add quiet signs/.test(i.text));
     hideAvg.set(e.id, 1); out.noHintWhenVisible = !exhibitReport(e).issues.some(i => /animals are hiding/.test(i.text));
 
     // privacy screens and quiet signs cut the crowd the animals feel (ctx.seen)
@@ -3715,7 +3715,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0}) > cm0 && dailyCosts().upkeep === up0 + LAND.vlamp.upkeep && noteBad(ev, /basking lamp|Cold/) === false;
       // one lamp warms VIV_LAMP.per animals: a bigger group is only partly warmed
       const ev8 = mk("e-pv3", 8, 260); state.exhibits.push(ev8); addVivToy(ev8, "vlamp");
-      out.vivLampCovers = heatShare(ev8) === VIV_LAMP.per / 8 && exhibitReport(ev8).issues.some(i => /one lamp warms/.test(i.text)); state.exhibits = state.exhibits.filter(x => x !== ev8);
+      out.vivLampCovers = heatShare(ev8) === VIV_LAMP.per / 8 && exhibitReport(ev8).issues.some(i => /Not enough lamps/.test(i.text)); state.exhibits = state.exhibits.filter(x => x !== ev8);
       // animals gather under the lamp (a couple huddle in its glow, over a few tries since each starts somewhere random)
       let gathered = 0; for(let t = 0; t < 15 && gathered < 2; t++){ regatherViv(ev); render(); gathered = [...herd.values()].filter(h => h.exhibitId === ev.id && Math.hypot(h.x - lamp.x, (h.y - lamp.y) * 2) <= VIV_LAMP.radius + 1).length; }
       out.vivLampGather = gathered >= 2;

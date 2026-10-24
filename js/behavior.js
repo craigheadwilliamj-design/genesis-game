@@ -415,13 +415,6 @@ function behaviorNight(){
 /* ---------- what it means for the park ---------- */
 const actLabel = a => a.inside ? insideText(a) : a.act && ACTS[a.act] ? ACTS[a.act].label : "Settling in";
 const whyText = {bored:"bored", stressed:"stressed", lonely:"lonely", hungry:"hungry", thirsty:"thirsty"};
-const WHY_FIX = {
-  bored:"Enrichment props (Habitat Items), rocks, plants and more room give them something to do.",
-  stressed:"See the Behavior tab for what's bothering them.",
-  lonely:"They need more of their own kind.",
-  hungry:"There's no food. Keepers need to bring some.",
-  thirsty:"They want water to drink and wade in. Draw some in the exhibit.",
-};
 
 // Happiness from how the herd feels, plus the tells, for exhibitReport
 function behaviorScore(e){
@@ -435,15 +428,15 @@ function behaviorScore(e){
   if(pacing.length){
     const why = {}; for(const a of pacing) why[a.why || "bored"] = (why[a.why || "bored"] || 0) + 1;
     const top = Object.keys(why).sort((x, y) => why[y] - why[x])[0];
-    out.issues.push({bad:true, text:`Pacing. ${pacing.length} ${names(pacing)} ${pacing.length === 1 ? "is" : "are"} pacing, mostly because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[top]}.`});
+    out.issues.push({bad:true, text:`Pacing (${whyText[top]}): ${pacing.length} ${names(pacing)}.`});
   }
   const inside = list.filter(a => a.inside);
-  if(inside.length) out.issues.push({bad:false, text:`${inside.length} ${names(inside)} ${inside.length === 1 ? "is" : "are"} inside a shelter (${[...new Set(inside.map(insideText))].join(", ").toLowerCase()}). Guests can't see ${inside.length === 1 ? "it" : "them"}.`});
+  if(inside.length) out.issues.push({bad:false, text:`In a shelter: ${inside.length} ${names(inside)}.`});
   const gone = 1 - hideAvgOf(e);
-  if(gone > HIDING.from) out.issues.push({bad:true, text:`${gone >= .5 ? "Most" : "Many"} animals are hiding. Guests are let down by an exhibit with nothing to see.`});
-  if(hiding.length) out.issues.push({bad:true, text:`Hiding. ${hiding.length} ${names(hiding)} ${hiding.length === 1 ? "is" : "are"} hiding. Something here frightens ${hiding.length === 1 ? "it" : "them"}.`});
+  if(gone > HIDING.from) out.issues.push({bad:true, text:`${gone >= .5 ? "Most" : "Many"} animals out of sight.`});
+  if(hiding.length) out.issues.push({bad:true, text:`Hiding: ${hiding.length} ${names(hiding)}.`});
   if(stress >= 50 && !hiding.length && !pacing.length) out.issues.push({bad:true, text:`Stressed (${Math.round(stress)}%).`});
-  for(const i of socialInfo(e).values()){ out.delta += i.delta * i.n / list.length; out.issues.push({bad:i.bad, text:`Social. ${i.text}`}); }
+  for(const i of socialInfo(e).values()){ out.delta += i.delta * i.n / list.length; out.issues.push({bad:i.bad, text:i.text}); }
   if(playing.length) out.issues.push({bad:false, text:`${playing.length} ${names(playing)} ${playing.length === 1 ? "is" : "are"} playing.`});
   return out;
 }

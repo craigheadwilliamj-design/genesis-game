@@ -18,7 +18,7 @@ const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${item
 function baysHtml(title, kind, cardOf, emptyText){
   const n = bayCount(kind);
   let h = `<section><h3>${title} (${BAY_JOBS[kind]().length} of ${n} bay${n === 1 ? "" : "s"} busy)</h3>`;
-  if(!n) return h + `<div class="meta">No bays yet. Each ${SCIENTISTS[kind].label.toLowerCase()} you hire opens one.</div></section>`;
+  if(!n) return h + `<div class="meta">No bays.</div></section>`;
   for(let i = 0; i < n; i++){
     const j = bayJob(kind, i);
     h += j ? cardOf(j, i) : `<div class="card bay empty"><span class="bn">Bay ${i + 1}</span><span class="meta">${emptyText}</span></div>`;
@@ -26,14 +26,14 @@ function baysHtml(title, kind, cardOf, emptyText){
   return h + `</section>`;
 }
 const progressCard = (title, sub, j, bay) =>
-  `<div class="card bay"><div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${title}</b>${sub ? ` <span class="meta">${sub}</span>` : ""}<div style="margin-top:6px">${meter(doneShare(j), "var(--gold)")}</div><div class="meta" style="margin-top:4px">${leftText(j.end)} left. Ready ${whenText(j.end)}.</div></div>`;
+  `<div class="card bay"><div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${title}</b>${sub ? ` <span class="meta">${sub}</span>` : ""}<div style="margin-top:6px">${meter(doneShare(j), "var(--gold)")}</div><div class="meta" style="margin-top:4px">${leftText(j.end)} left</div></div>`;
 
 // A clone in an incubator: a progress bar that keeps moving (cloneLive), or, once it has died, a red CLONE FAILED overlay over the card with the bar
 // stopped where it failed and a button to discard the specimen. `bay` is the bay number, left out in an exhibit's Cloning tab.
 function cloneCard(c, bay){
   const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId), pct = Math.round(cloneProgress(c));
   const bar = `<div style="margin-top:6px;position:relative;z-index:2"><div class="meter" data-cbar="${c.id}"><i style="width:${pct}%;background:${c.failed ? "#d94b4b" : "var(--gold)"}"></i></div></div>`;
-  const txt = c.failed ? `Stopped at ${pct}%.` : `${pct}%. ${leftText(c.end)} left. Ready ${whenText(c.end)}.`;
+  const txt = c.failed ? `Stopped at ${pct}%.` : `${pct}% · ${leftText(c.end)} left`;
   const head = `<div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${esc(s.name)}</b> <span class="meta">${sexMark(c)} for ${e ? esc(e.name) : "no exhibit yet"}</span>`;
   const ov = c.failed ? `<div style="position:absolute;inset:0;z-index:1;border-radius:10px;background:rgba(140,18,18,.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:8px;text-align:center;gap:3px"><div style="font:800 19px/1.1 system-ui,sans-serif;letter-spacing:.12em">CLONE FAILED</div><div style="font-size:11px;opacity:.95;padding:0 10px">${esc(c.why || "Culture failure")}. Specimen lost at ${pct}%.</div><button class="btn" data-action="discardClone" data-id="${c.id}" style="margin-top:2px;padding:2px 10px">Discard specimen</button></div>` : "";
   return `<div class="card bay" style="position:relative${c.failed ? ";min-height:112px" : ""}">${head}${c.failed ? "<div style=\"height:46px\"></div>" : ""}${bar}<div class="meta" style="margin-top:4px;position:relative;z-index:2${c.failed ? ";color:#fff" : ""}" data-ctxt="${c.id}">${txt}</div>${ov}</div>`;
@@ -44,7 +44,7 @@ function cloneLive(){
     const c = state.science.clones.find(x => x.id === el.dataset.cbar); if(!c || c.failed) continue;
     const pct = Math.round(cloneProgress(c)), i = el.firstElementChild;
     if(i) i.style.width = pct + "%";
-    const t = document.querySelector(`[data-ctxt="${c.id}"]`); if(t) t.textContent = `${pct}%. ${leftText(c.end)} left. Ready ${whenText(c.end)}.`;
+    const t = document.querySelector(`[data-ctxt="${c.id}"]`); if(t) t.textContent = `${pct}% · ${leftText(c.end)} left`;
   }
 }
 
@@ -72,9 +72,9 @@ const techRows = group => TECH.filter(t => t.group === group && !techHidden(t.id
 function oracleHtml(b){
   const sc = state.science, n = sc.crew.paleo, idle = Math.max(0, n - sc.projects.length);
   let h = deptHead(b);
-  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">research points. ${n ? `+${idle * RESEARCH_PER_PALEO} a day from ${idle} researcher${idle === 1 ? "" : "s"} on general research${idle < n ? ` (${n - idle} busy on projects)` : ""}.` : "Hire a researcher to earn them."} Educated guests add more when they leave. Research takes time: ${spanText(projectMinutes(30))} for every 30 points.</span></div></section>`;
+  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">points${n ? ` · +${idle * RESEARCH_PER_PALEO} a day` : ""}</span></div></section>`;
   h += sciStaffHtml("paleo");
-  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `On general research: +${RESEARCH_PER_PALEO} points a day. Pick a project below to assign them.`);
+  h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `General research, +${RESEARCH_PER_PALEO} a day`);
   const block = labBlocker();
   if(block) h = h.replace(/<\/section>$/, `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div></section>`);
 
@@ -84,16 +84,13 @@ function oracleHtml(b){
     h += tabBar("omanage", MANAGE_TABS, secs.key);
     h += `<h3 style="margin-top:8px">${secs.title}</h3><ul class="shop">${techRows(secs.key)}</ul>`;
   } else if(oracleMain === "flora"){
-    h += `<div class="meta" style="margin-bottom:8px">Plants are grown at the Botany Lab. Mesozoic and Paleozoic plants need DNA from the Time Travel Lab first.</div>`;
     h += `<h3>Plants</h3><ul class="shop">${techRows("flora")}</ul>`;
     for(const era of ["mesozoic", "paleozoic"]) if(hasTech(FLORA[era].tech))
-      h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA, which the Time Travel Lab collects from each period: ${Object.values(PLANT_DNA).filter(f => f.era === era).map(f => `${f.period} ${(sc.dna[f.id] || {genome:0}).genome}%`).join(", ")}.</div>`;
+      h += `<div class="meta" style="margin-top:6px">${ERA_LABEL[era]} plant DNA: ${Object.values(PLANT_DNA).filter(f => f.era === era).map(f => `${f.period} ${(sc.dna[f.id] || {genome:0}).genome}%`).join(", ")}.</div>`;
   } else {
-    h += `<div class="meta" style="margin-bottom:8px">Medicine is grown at the Botany Lab.</div>`;
     h += tabBar("oera", ERA_ORDER.map(era => ({key:era, label:ERA_LABEL[era], color:ERA_COLOR[era], lock:!hasTech(MED_TECH[era])})), oracleEra);
     h += `<ul class="shop" style="margin-top:8px">${projectRow("tech", MED_TECH[oracleEra], esc(TECH.find(t => t.id === MED_TECH[oracleEra]).label), esc(TECH.find(t => t.id === MED_TECH[oracleEra]).text))}</ul>`;
-    h += `<div class="meta" style="margin:10px 0 6px">${hasTech(MED_TECH[oracleEra]) ? `Refine the medicine for each period. Only refined medicine cures that period's animals fully.` : `Unlock ${ERA_LABEL[oracleEra]} medicine first, then refine it for each period.`}</div>`;
-    h += `<ul class="shop">${TIME_PERIODS.filter(p => ERA_OF[p.id] === oracleEra).map(p => projectRow("refine", p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${p.id}`, `${p.ago}.`)).join("")}</ul>`;
+    h += `<h3 style="margin-top:12px">Refine</h3><ul class="shop">${TIME_PERIODS.filter(p => ERA_OF[p.id] === oracleEra).map(p => projectRow("refine", p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${p.id}`, `${p.ago}.`)).join("")}</ul>`;
     h += `<h3 style="margin-top:12px">Genome therapy</h3><ul class="shop">${techRows("gene")}</ul>`;
   }
   h += `</div></section>`;
@@ -152,14 +149,13 @@ function targetRow(s, id){
 }
 function ghostCardHtml(){
   const s = SITE_BY_ID[ghostSite];
-  if(!s || !siteShown(s)) return `<div class="meta">Pick a site on the map to see what's there.</div>`;
+  if(!s || !siteShown(s)) return `<div class="meta">Pick a site.</div>`;
   const lit = siteLit(s), rep = state.science.reports.find(r => r.site === s.id), btn = (action, label, why) => `<button class="buy" data-action="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
   const note = why => why ? `<div class="meta" style="color:var(--bad);margin-top:4px">${esc(why)}</div>` : "";
   if(s.event){
-    const ev = MUSEUM_BY_ID[s.event], why = lit ? expeditionProblem(s.id, s.event) : "Research education programs at the Research Lab first.";
+    const ev = MUSEUM_BY_ID[s.event], why = lit ? expeditionProblem(s.id, s.event) : "Locked.";
     return `<b class="gt-name">${esc(ev.name)}</b><div class="meta">${esc(s.name)}, ${esc(s.where)}</div>` +
       `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${esc(ev.ago)}</dd><dt>Trip</dt><dd>${money(tripOdds(s.event, s.id).cost)} · ${tripWhen(s.id)}</dd></dl>` +
-      `<div class="meta" style="margin:6px 0">A moment from deep time. Each trip records more of it; a finished record becomes an Education Center attraction.</div>` +
       (lit ? `<table class="gt-targets"><thead><tr><th>Record</th><th>Done</th><th>Survey Success</th></tr></thead><tbody>${targetRow(s, s.event)}</tbody></table>` : "") +
       (rep ? reportHtml(rep) : "") + `<div class="row" style="margin-top:8px">${btn("gdig", "Send expedition", why)}</div>${note(why)}`;
   }
@@ -180,17 +176,17 @@ function ghostCardHtml(){
 }
 function droneCard(i){
   const sc = state.science, t = sc.trips.find(x => x.bay === i), mk = GHOST_MK[droneMk()].name;
-  if(!t) return `<div class="card bay gt-drone"><div class="bn">Drone ${i + 1} · ${mk}</div><span class="meta">At the Time Travel Lab, ready.</span></div>`;
+  if(!t) return `<div class="card bay gt-drone"><div class="bn">Drone ${i + 1} · ${mk}</div><span class="meta">Ready</span></div>`;
   const s = SITE_BY_ID[t.site], what = t.kind === "scout" ? "Scouting for animals" : MUSEUM_BY_ID[t.sp] ? `Recording the ${esc(genomeInfo(t.sp).name)}` : `Looking for ${esc(genomeInfo(t.sp).name)}`;
   return `<div class="card bay gt-drone"><div class="bn">Drone ${i + 1} · ${mk}</div><b>${esc(placeName(t.site))}</b>${s && s.from <= EPOCHS[0].from ? ` <span class="meta">${esc(epochOf(s.from).name)}</span>` : ""}<div class="meta">${what}</div>` +
-    `<div style="margin-top:6px" data-dbar="${i}">${meter(doneShare(t), "var(--gold)")}</div><div class="meta" style="margin-top:4px" data-deta="${i}">Back in ${leftText(t.end)}.</div></div>`;
+    `<div style="margin-top:6px" data-dbar="${i}">${meter(doneShare(t), "var(--gold)")}</div><div class="meta" style="margin-top:4px" data-deta="${i}">Back in ${leftText(t.end)}</div></div>`;
 }
 // Moves the drone bars while the panel stays as it is
 function ghostLive(){
   for(const el of document.querySelectorAll("[data-dbar]")){
     const t = state.science.trips.find(x => x.bay === +el.dataset.dbar); if(!t) continue;
     const i = el.querySelector(".meter i"); if(i) i.style.width = doneShare(t).toFixed(0) + "%";
-    const e = document.querySelector(`[data-deta="${el.dataset.dbar}"]`); if(e) e.textContent = `Back in ${leftText(t.end)}.`;
+    const e = document.querySelector(`[data-deta="${el.dataset.dbar}"]`); if(e) e.textContent = `Back in ${leftText(t.end)}`;
   }
 }
 
@@ -198,13 +194,12 @@ function ghostHtml(b){
   const sc = state.science;
   if(ghostU === null) ghostU = ghostStart();
   let h = deptHead(b);
-  h += `<div class="meta">${esc(BUILDINGS.ghost.blurb)}</div>`;
   if(deptProblem("ghost")) h += `<div class="meta" style="color:var(--bad)">${esc(deptProblem("ghost"))}</div>`;
   // the drones: where each one is, what it's after and when it's back
   const dwhy = droneProblem();
   h += `<section class="gt-drones"><h3>Drones <span class="meta">${sc.drones} of ${DRONES.max}</span></h3>${Array.from({length:sc.drones}, (_, i) => droneCard(i)).join("")}`;
-  h += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">The Time Travel Lab's hangar is full.</span>`}</div>`;
-  h += `<div class="meta" style="margin-top:4px">Every drone is a ${GHOST_MK[droneMk()].name}.${droneMk() < GHOST_MK.length - 1 ? ` The Research Lab can research better ones under Park management, Time Travel Lab.` : ""}</div></section>`;
+  h += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">Hangar full</span>`}</div>`;
+  h += `</section>`;
   if(sc.reports.length) h += `<section><h3>Reports</h3>${sc.reports.map(reportHtml).join("")}</section>`;
   // the timeline: slide through deep time, tap a site
   const now = yearsAt(ghostU);
@@ -214,7 +209,7 @@ function ghostHtml(b){
   // events older than the slider
   const deep = TIME_SITES.filter(s => s.event && !Object.keys(s.at).length && siteShown(s));
   if(deep.length) h += `<section><h3>Deep time</h3><ul class="shop">${deep.map(s => {
-    const ev = MUSEUM_BY_ID[s.event], d = sc.dna[s.event], why = siteLit(s) ? expeditionProblem(s.id, s.event) : "Research education programs at the Research Lab first.";
+    const ev = MUSEUM_BY_ID[s.event], d = sc.dna[s.event], why = siteLit(s) ? expeditionProblem(s.id, s.event) : "Locked.";
     return `<li class="${siteLit(s) ? "" : "locked"}"><span class="nm">${esc(ev.name)} <span class="per">${esc(ev.ago)}</span></span><button class="buy" data-action="gdeep" data-site="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Record ${money(tripOdds(s.event, s.id).cost)}</button><span class="need" style="grid-column:1/-1">${dnaBar(d)}${esc(s.name)}, ${esc(s.where)}. Survey Success ${Math.round((1 - tripOdds(s.event, s.id).fail) * 100)}%.</span></li>`; }).join("")}</ul></section>`;
   if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open the Research Lab</button></div>`;
   if(sc.log.length) h += `<section><h3>Recent trips</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
@@ -260,22 +255,21 @@ panelEl.addEventListener("click", ev => {
 function tarHtml(b){
   const sc = state.science;
   let h = deptHead(b);
-  h += `<div class="meta">A genome that is ${CLONE_GENOME.min}% complete or more can be cloned as many times as you like. Clone quality follows how complete it is: under 70% makes sickly animals, under 50% frail ones.</div>`;
   h += sciStaffHtml("gene");
   const speed = Math.round(cloneSpeed() * 100);
-  h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty. Order a clone below or from an exhibit's panel.");
-  h = h.replace(/<\/section>$/, `<div class="meta">Clones take ${speed === 100 ? "their usual time" : `${speed}% of the usual time`}. ${hasTech("fast2") ? "" : "Research faster incubators at the Research Lab, under Park management."}</div></section>`);
-  if(sc.ready.length) h += `<section><h3>Waiting for an exhibit</h3><ul class="herd">${sc.ready.map(r => `<li><span class="dot" style="background:${PERIOD_COLOR[SPECIES_BY_ID[r.sp].period]}"></span><span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${sexMark(r)} ${r.q}% DNA</span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Tap an exhibit and choose "Move in here".</div></section>`;
+  h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");
+  if(speed !== 100) h = h.replace(/<\/section>$/, `<div class="meta">Speed ${Math.round(10000 / speed)}%</div></section>`);
+  if(sc.ready.length) h += `<section><h3>Waiting for an exhibit</h3><ul class="herd">${sc.ready.map(r => `<li><span class="dot" style="background:${PERIOD_COLOR[SPECIES_BY_ID[r.sp].period]}"></span><span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${sexMark(r)} ${r.q}% DNA</span></li>`).join("")}</ul></section>`;
   const lib = SPECIES.filter(s => sc.dna[s.id]);
   h += `<section><h3>Genome library</h3>`;
-  if(!lib.length) h += `<div class="meta">No DNA yet. The Time Travel Lab's expeditions fill this up.</div>`;
+  if(!lib.length) h += `<div class="meta">No DNA.</div>`;
   else {
     h += `<ul class="shop">`;
     for(const s of lib){
       const d = sc.dna[s.id], open = cloneOpen(s.id), why = open ? cloneProblem(s.id) : `Needs ${CLONE_GENOME.min}% genome.`;
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += open ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
-      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `Clones are ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% chance of failing` : ""}. Takes ${spanText(cloneMinutes(s.id))}.` : ""}</span></li>`;
+      h += `<span class="need" style="grid-column:1/-1">${dnaBar(d)}${open ? `${cloneQuality(s.id)}% quality${cloneFailChance(s.id) > 0 ? ` · ${Math.round(cloneFailChance(s.id) * 100)}% fail` : ""} · ${spanText(cloneMinutes(s.id))}` : ""}</span></li>`;
     }
     h += `</ul>`;
   }
@@ -292,52 +286,48 @@ function growRow(kind, era, size){
   let h = `<li class="${unlocked ? "" : "locked"}"><span class="nm">${name}</span>`;
   h += unlocked ? `<button class="buy" data-action="grow" data-kind="${kind}" data-era="${era}"${sz}${why ? ` disabled title="${esc(why)}"` : ""}>Grow ${money(gi.cost)}</button>` : `<span class="meta">Locked</span>`;
   h += `<span class="need">`;
-  if(!unlocked) h += `Research ${kind === "plant" ? `${FLORA[ERA_OF[era]].label} flora` : `${ERA_LABEL[era]} medicine`} at the Research Lab first.`;
+  if(!unlocked) h += "";
   else {
     const have = size ? c.pots[era + "-" + size] || 0 : 0;
-    h += `A batch takes ${spanText(growMinutes(kind, era, size))}. ${kind === "plant" ? `It makes ${gi.count} plants for any ${era} biome. ${have} ready.` : `It makes ${gi.doses} doses.`}${q ? ` <b>${q} growing.</b>` : ""}`;
+    h += `${spanText(growMinutes(kind, era, size))} · ${kind === "plant" ? `makes ${gi.count}, ${have} ready` : `makes ${gi.doses} doses`}${q ? ` · <b>${q} growing</b>` : ""}`;
     if(why && kind === "plant" && !plantDnaDone(era)) h += ` <span style="color:var(--bad)">${esc(why)}</span>`;
   }
   h += `</span>`;
-  if(unlocked && kind === "med") h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="${era}" aria-pressed="${!!c.auto[era]}" style="padding:3px 9px">${c.auto[era] ? "Keeping it stocked" : "Keep it stocked"}</button> <span class="meta">${c.auto[era] ? "A free bed starts a batch whenever there's room for more." : "Starts batches by itself when there's room."}</span></span>`;
+  if(unlocked && kind === "med") h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="${era}" aria-pressed="${!!c.auto[era]}" style="padding:3px 9px">Auto-grow</button></span>`;
   return h + `</li>`;
 }
 
 function ceresHtml(b){
   const sc = state.science, c = state.ceres;
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.ceres.blurb)}</div>`;
+  let h = deptHead(b);
   h += sciStaffHtml("botanist");
   const pe = state.exhibits.filter(e => e.animals.some(a => foodType(SPECIES_BY_ID[a.sp]) === "paleoflora"));
   h += `<section><h3>Paleoflora food</h3>`;
-  if(!hasTech("paleoflora")) h += `<div class="meta" style="color:var(--bad)">Research Paleoflora cultivation at the Research Lab before the Botany Lab can grow it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
-  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">The Botany Lab needs plant DNA first. Research Mesozoic or Paleozoic flora at the Research Lab, then send expeditions to a scouted site of that period to collect it. Until then, keepers feed prehistoric plant-eaters grass hay.</div>`;
+  if(!hasTech("paleoflora")) h += `<div class="meta">Locked</div>`;
+  else if(!anyPlantDna()) h += `<div class="meta" style="color:var(--bad)">No plant DNA.</div>`;
   else {
     const st = c.stock, cap = ceresCap(), need = state.exhibits.reduce((s, e) => s + (dailyNeed(e).paleoflora || 0), 0);
     h += `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span>In stock</span>${meter(st / cap * 100, FOOD_COLOR.paleoflora)}<span>${Math.floor(st)}/${Math.round(cap)}</span></div>`;
-    h += `<dl class="kv" style="margin-top:6px"><dt>Grows</dt><dd>${ceresRate()} a day</dd><dt>Greenhouses</dt><dd>${greenhouses().length} (+${PALEOFLORA.greenhouse} a day each)</dd><dt>Your animals eat</dt><dd style="color:${need > ceresRate() ? "var(--bad)" : "inherit"}">${need} a day</dd></dl>`;
-    if(need > ceresRate()) h += `<div class="meta" style="color:var(--bad)">The Botany Lab can't keep up. ${hasTech("greenhouse") ? "Build greenhouses." : "Research greenhouses at the Research Lab."} When it runs dry, keepers bring grass hay instead.</div>`;
+    h += `<dl class="kv" style="margin-top:6px"><dt>Grows</dt><dd>${ceresRate()} a day</dd><dt>Greenhouses</dt><dd>${greenhouses().length} (+${PALEOFLORA.greenhouse} a day each)</dd><dt>Eaten</dt><dd style="color:${need > ceresRate() ? "var(--bad)" : "inherit"}">${need} a day</dd></dl>`;
     const fg = CERES_GROW.food, fwhy = growProblem("food"), fq = growing("food");
-    h += `<ul class="shop" style="margin-top:8px"><li><span class="nm">Extra Paleoflora food</span><button class="buy" data-action="grow" data-kind="food" data-era="food"${fwhy ? ` disabled title="${esc(fwhy)}"` : ""}>Grow ${money(fg.cost)}</button><span class="need">A batch takes ${spanText(growMinutes("food"))} and adds ${fg.amount} to the stock.${fq ? ` <b>${fq} growing.</b>` : ""}</span>`;
-    h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="food" aria-pressed="${!!c.auto.food}" style="padding:3px 9px">${c.auto.food ? "Keeping it stocked" : "Keep it stocked"}</button> <span class="meta">${c.auto.food ? "A free bed starts a batch whenever there's room for more." : "Starts batches by itself when there's room."}</span></span></li></ul>`;
+    h += `<ul class="shop" style="margin-top:8px"><li><span class="nm">Extra Paleoflora food</span><button class="buy" data-action="grow" data-kind="food" data-era="food"${fwhy ? ` disabled title="${esc(fwhy)}"` : ""}>Grow ${money(fg.cost)}</button><span class="need">${spanText(growMinutes("food"))} · +${fg.amount}${fq ? ` · <b>${fq} growing</b>` : ""}</span>`;
+    h += `<span class="need" style="grid-column:1/-1"><button class="btn" data-action="autoGrow" data-era="food" aria-pressed="${!!c.auto.food}" style="padding:3px 9px">Auto-grow</button></span></li></ul>`;
   }
-  h += `<div class="meta" style="margin-top:6px">${isReachable(b) ? "" : "Connect the Botany Lab to a path or service road so keepers can collect Paleoflora. "}${pe.length} exhibit${pe.length === 1 ? "" : "s"} eat Paleoflora.</div></section>`;
+  h += `</section>`;
 
-  h += baysHtml("Growing bays", "botanist", (j, i) => progressCard(growName(j.kind, j.era, j.size), "", j, i), "Empty. Grow something below.");
-  h = h.replace(/<\/section>$/, `<div class="meta">Like the Genetics Lab's incubators, but with plants. Each botanist tends one bed, one batch at a time.</div></section>`);
+  h += baysHtml("Growing bays", "botanist", (j, i) => progressCard(growName(j.kind, j.era, j.size), "", j, i), "Empty");
 
   const planted = period => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].period === period && LAND[f.type].flora !== "cenozoic").length, 0);
-  h += `<section><h3>Plants for exhibits</h3><div class="meta">Small, medium and large plants for Landscaping, grown per period from the DNA the Time Travel Lab collects. Each one placed in an exhibit uses up one plant.</div>`;
+  h += `<section><h3>Plants for exhibits</h3>`;
   h += `<div style="margin-top:8px">${tabBar("cperiod", Object.keys(PLANT_DNA).map(p => ({key:p, label:p, color:PERIOD_COLOR[p], lock:!hasTech(FLORA[PLANT_DNA[p].era].tech)})), cerePeriod)}</div>`;
   const dna = sc.dna[PLANT_DNA[cerePeriod].id];
-  h += `<div class="meta" style="margin-top:4px">${cerePeriod} plant DNA: ${dna ? dna.genome : 0}%${dna && dna.genome >= 100 ? ". Complete." : hasTech(FLORA[PLANT_DNA[cerePeriod].era].tech) ? ". The Time Travel Lab is still collecting it." : "."} Planted so far: ${planted(cerePeriod)}.</div>`;
+  h += `<div class="meta" style="margin-top:4px">DNA ${dna ? dna.genome : 0}% · ${planted(cerePeriod)} planted</div>`;
   h += `<ul class="shop" style="margin-top:8px">${PLANT_SIZES.map(sz => growRow("plant", cerePeriod, sz)).join("")}</ul></section>`;
 
   h += `<section><h3>Medicine</h3>`;
-  if(!anyMedTech()) h += `<div class="meta">Research medicine at the Research Lab and the Botany Lab can grow doses for the PMC and for medicated feed.</div>`;
   const fed = state.exhibits.filter(e => e.medFeed && e.animals.length), use = fed.reduce((s, e) => s + feedDoses(e), 0);
-  h += `<div class="meta">The Botany Lab holds up to ${medCap()} doses of each era's medicine.</div>`;
   h += MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 74px"><span>${goodName(t).replace(" medicine", "")}</span>${meter((cerMeds()[t] || 0) / medCap() * 100, GOOD_COLOR[t])}<span>${Math.floor(cerMeds()[t] || 0)}/${medCap()}</span></div>`).join("");
-  h += `<div class="meta">Keepers carry doses to the PMC${stores().some(s => storeOf(s).cold) ? " and cold stores" : ""}. Doses spoil slowly, and slower in a powered cold store. Medicated feed uses ${use} a day for ${fed.length} exhibit${fed.length === 1 ? "" : "s"}.</div>`;
+  if(use) h += `<div class="meta">Medicated feed: ${use} a day</div>`;
   h += `<ul class="shop" style="margin-top:8px">${ERA_ORDER.map(era => growRow("med", era)).join("")}</ul></section>`;
 
   return h;

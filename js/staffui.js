@@ -10,8 +10,7 @@ const atvTag = () => ' <span class="vtag" style="background:#4F6273;color:#fff;b
 // On a department's panel: how many it has, and a way over to the Staff tab where they're hired
 function staffNote(t, extra){
   const T = STAFF_TYPES[t];
-  return `<section><h3>${T.plural} (${T.list().length})</h3><div class="meta">${money(T.wage())} a day each. ${extra ? esc(extra) + " " : ""}Hire and fire from the Staff tab in the park office.</div>
-    <div class="row" style="margin-top:8px"><button class="btn" data-action="gotoStaff">Open Staff tab</button></div></section>`;
+  return `<section><h3>${T.plural} (${T.list().length})</h3><div class="row"><span class="meta">${money(T.wage())} a day each</span><button class="btn" data-action="gotoStaff">Staff</button></div></section>`;
 }
 
 // One worker in the Staff tab's list
@@ -23,17 +22,17 @@ function staffRowHtml(s, t){
 function staffTabHtml(){
   const roster = staffRoster(), sci = Object.values(state.science.crew).reduce((a, n) => a + n, 0);
   const wages = roster.reduce((a, r) => a + staffWage(r.t), 0) + Object.entries(state.science.crew).reduce((a, [k, n]) => a + n * SCIENTISTS[k].wage, 0);
-  let h = `<div class="meta">${roster.length + sci} staff on the payroll, ${money(wages)} a day. Tap a name to see how they're doing.</div>`;
+  let h = `<div class="meta">${roster.length + sci} staff · ${money(wages)} a day</div>`;
   for(const t of STAFF_ORDER){
     const T = STAFF_TYPES[t], list = roster.filter(r => r.t === t), ok = T.ok(), cost = T.cost();
     h += `<section><h3>${T.plural} (${list.length})</h3>`;
-    h += list.length ? `<ul class="herd">${list.map(r => staffRowHtml(r.s, t)).join("")}</ul>` : `<div class="meta">No ${T.plural.toLowerCase()} yet.</div>`;
+    h += list.length ? `<ul class="herd">${list.map(r => staffRowHtml(r.s, t)).join("")}</ul>` : `<div class="meta">None.</div>`;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireStaff" data-t="${t}"${ok && canAfford(cost) ? "" : " disabled"}>Hire a ${T.label.toLowerCase()}, ${money(cost)}</button><span class="meta">${ok ? `${money(T.wage())} a day each` : esc(T.need)}</span></div></section>`;
   }
   h += `<section><h3>Scientists (${sci})</h3><ul class="herd">`;
   for(const [kind, k] of Object.entries(SCIENTISTS)){
     const n = state.science.crew[kind], ok = hasDept(k.dept);
-    h += `<li><span class="dot" style="background:#4B3A8C"></span><span><b>${esc(k.plural)}</b> <span class="meta">${n} · ${money(k.wage)} a day each</span>${ok ? "" : `<span class="meta" style="display:block">Build ${esc(BUILDINGS[k.dept].label)} first.</span>`}</span>` +
+    h += `<li><span class="dot" style="background:#4B3A8C"></span><span><b>${esc(k.plural)}</b> <span class="meta">${n} · ${money(k.wage)} a day each</span>${ok ? "" : `<span class="meta" style="display:block">Needs ${esc(BUILDINGS[k.dept].label)}</span>`}</span>` +
       `<span style="display:flex;gap:6px;align-items:center"><button class="btn sell" data-action="hireSciTab" data-k="${kind}"${ok && canAfford(k.hireCost) ? "" : " disabled"}>Hire, ${money(k.hireCost)}</button>${n ? `<button class="btn sell" data-action="fireSciAsk" data-k="${kind}">Fire</button>` : ""}</span></li>`;
   }
   return h + `</ul></section>` + zonesSectionHtml();
@@ -48,9 +47,9 @@ function staffHtml(s){
   h += `<div class="meta">${T.label} · ${money(T.wage())} a day</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="sStatus"></span></div>`;
   h += `<section><h3>Energy <span class="num" id="sEnergyN"></span></h3><div class="meter"><i id="sEnergyBar"></i></div></section>`;
-  h += `<section><h3>Morale <span class="num" id="sMoraleN"></span></h3><div class="meter"><i id="sMoraleBar"></i></div><div class="meta" style="margin-top:4px">How happy they are with the job.</div></section>`;
+  h += `<section><h3>Morale <span class="num" id="sMoraleN"></span></h3><div class="meter"><i id="sMoraleBar"></i></div></section>`;
   h += `<section><h3>Thoughts</h3><ul class="issues" id="sThoughts"></ul></section>`;
-  h += `<section><h3>Work zone</h3>${zones().length ? `<div class="row">${zoneSelect(T.zone, s.id, s.zone)}</div>` : `<div class="meta">Draw a work zone to send them to one part of the park.</div>`}</section>`;
+  h += `<section><h3>Work zone</h3>${zones().length ? `<div class="row">${zoneSelect(T.zone, s.id, s.zone)}</div>` : `<div class="meta">No zones.</div>`}</section>`;
   h += `<section><div class="row"><button class="btn danger" data-action="fireStaff" data-id="${s.id}">Fire ${esc(s.name)}</button></div></section>`;
   return h;
 }

@@ -222,7 +222,7 @@ function sickStatus(e, a){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center and hire a vet to treat it.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
   if(!dept("pmc")) return "The PMC isn't connected. Run a path or service road to it.";
-  if(!kGraph || !kGraph.anchors[e.id]) return `Vets can't get in. ${gateCheck(e).text}`;
+  if(!kGraph || !kGraph.anchors[e.id]) return "Vets can't get in.";
   const mine = vcrew.find(c => c.patient && c.patient.a === a.id);
   if(mine) return mine.patient.field ? (mine.job === "treating" ? "A vet is treating it here." : "A vet is on the way to treat it here.") : "A vet is on the way to dart it.";
   if(a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !fieldTreatable(a) && bedsFree() > 0) return "Minor, but the PMC is out of medicine, so it goes to the PMC. Waiting for a free vet.";
