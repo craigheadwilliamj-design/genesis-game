@@ -260,15 +260,15 @@ const SPECIES = [
 // Vivariums: ready-made glass enclosures for small animals. Placed like buildings.
 // w and d are the size in meters; the inside space is w × d.
 const VIVARIUMS = {
-  S: {label:"Small vivarium",  w:6,  d:4,  price:3000,  upkeep:30},
-  M: {label:"Medium vivarium", w:10, d:6,  price:7000,  upkeep:60},
-  L: {label:"Large vivarium",  w:16, d:10, price:15000, upkeep:120},
+  S: {label:"Small vivarium",  w:9,  d:6,  price:3000,  upkeep:30},
+  M: {label:"Medium vivarium", w:15, d:9,  price:7000,  upkeep:60},
+  L: {label:"Large vivarium",  w:24, d:15, price:15000, upkeep:120},
 };
 // Aquariums: vivariums full of sea water for the `aqua` species, the same sizes (so VIVARIUMS[size] gives their shape too). They need filters (AQUA).
 const AQUARIUMS = {
-  S: {label:"Small aquarium",  w:6,  d:4,  price:5000,  upkeep:45},
-  M: {label:"Medium aquarium", w:10, d:6,  price:11000, upkeep:90},
-  L: {label:"Large aquarium",  w:16, d:10, price:24000, upkeep:180},
+  S: {label:"Small aquarium",  w:9,  d:6,  price:5000,  upkeep:45},
+  M: {label:"Medium aquarium", w:15, d:9,  price:11000, upkeep:90},
+  L: {label:"Large aquarium",  w:24, d:15, price:24000, upkeep:180},
 };
 
 /* ---------------------------------------------------------------------
@@ -1529,7 +1529,7 @@ const VIV_SPRITES = {aboulder:{w:18, h:10}, abrain:{w:16, h:10}, acoral:{w:16, h
 const VIV_DISH = {cap:{S:6, M:10, L:16}, perDish:4};
 // Basking lamp: reptiles, amphibians and bugs want heat (not the feathered ones, WARM_BLOODED). One lamp warms `per` animals, and they gather within `radius` meters of it.
 // With heat: happy more, discomfort down, illness x`ill`; without it: happy less, and a cold snap makes them ill x`cold`.
-const VIV_LAMP = {per:4, radius:2.4, happy:6, lack:5, ill:.6, cold:1.5, comfort:.25};
+const VIV_LAMP = {per:4, radius:3.2, happy:6, lack:5, ill:.6, cold:1.5, comfort:.25};
 const WARM_BLOODED = ["anch", "yiqi", "arch", "micr", "scan", "mono", "comp", "long"];
 // Pool: a pool counts as water for water lovers (their water want in haveOf, and thirst), up to `bonus` happiness for a full fit; none and they're dry
 const VIV_POOL = {bonus:5};

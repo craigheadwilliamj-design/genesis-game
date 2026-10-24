@@ -156,7 +156,7 @@ function newPark(){
     animalSeq:{},
     version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
-    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, discoV:1, parkClosed:false,
+    day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, vivBig:1, discoV:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{}, fenceGrid5:true,
@@ -200,6 +200,17 @@ function upgradeSave(s){
   }
   // fittings used to fill the back-left first: lay each case out again from the front middle, once
   if(s.vivLay !== 1){ for(const e of s.exhibits || []) if(e.viv) relayViv(e); s.vivLay = 1; }
+  // the cases grew half again: each one standing grows back and out from the middle of its front glass, and its fittings are laid out again
+  if(s.vivBig !== 1){
+    for(const e of s.exhibits || []) if(e.viv && VIVARIUMS[e.viv]){
+      const V = VIVARIUMS[e.viv], k = Math.sqrt(V.w * V.d / Math.abs(area(e.points))), bb = bbox(e.points), ox = (bb.x0 + bb.x1) / 2, oy = bb.y1;
+      if(Math.abs(k - 1) < .01) continue;
+      e.points = e.points.map(([x, y]) => [ox + (x - ox) * k, oy + (y - oy) * k]);
+      for(const f of e.land || []){ f.x = ox + (f.x - ox) * k; f.y = oy + (f.y - oy) * k; }
+      relayViv(e);
+    }
+    s.vivBig = 1;
+  }
   // vivariums took plants one by one; a case that had any gets the scene of its biome and its animals' era (else the plants' own), and the plants go
   if(s.vivScene !== 1){
     for(const e of s.exhibits || []) if(e.viv){
