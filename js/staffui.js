@@ -44,7 +44,7 @@ let staffSelName = "", staffLiveAt = 0;
 const moraleWord = m => m >= 80 ? "Loving the job" : m >= 60 ? "Content" : m >= 40 ? "Getting by" : m >= 20 ? "Fed up" : "Ready to quit";
 function staffHtml(s){
   const f = staffById(s.id), T = STAFF_TYPES[f.t];
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(s.name)}</h2>`;
+  let h = `<h2>${esc(s.name)}</h2>`;
   h += `<div class="meta">${T.label} · ${money(T.wage())} a day</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="sStatus"></span></div>`;
   h += `<section><h3>Energy <span class="num" id="sEnergyN"></span></h3><div class="meter"><i id="sEnergyBar"></i></div></section>`;

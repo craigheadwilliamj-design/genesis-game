@@ -39,7 +39,7 @@ function animalHealthItems(a, e, s){
 }
 function animalHtml(a){
   const e = animalHome(a.id), s = SPECIES_BY_ID[a.sp];
-  let h = `<button class="back" data-action="${e ? "animalBack" : "deselect"}" data-id="${e ? esc(e.id) : ""}">‹ ${esc(e ? e.name : "Park office")}</button>`;
+  let h = `${e ? `<button class="back" data-action="animalBack" data-id="${esc(e.id)}">‹ ${esc(e.name)}</button>` : ""}`;
   h += `<label class="field"><span>Name</span><input id="aName" data-field="aname" value="${esc(a.name || "")}" maxlength="${ANIMAL_NAME_MAX}"></label>`;
   h += `<div class="meta">${esc(s.name)} · ${esc(s.period)}${e ? " · in " + esc(e.name) : ""}${a.cl ? " · clone" : ""} · ${a.q ?? 90}% DNA${a.sex ? ` · <b title="${a.sex}">${sexMark(a)}</b> ${a.sex}` : ""}</div>`;
   const rp = e ? rankPos(e, a) : null;

@@ -115,7 +115,7 @@ function officeTabs(){
 }
 const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
-  return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
+  return `<h2>Main Menu</h2>
     <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
     <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and time travel trips</span></label>
     <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
@@ -247,7 +247,7 @@ function exhibitHtml(e){
   const tabs = exTabList(e);
   if(!tabs.some(t => t.key === exTabs.tab)) exTabs.tab = "main";
   // the header shows on every tab: name, and the few things worth seeing at a glance
-  let h = `<button class="back" data-action="deselect">‹ Park office</button>`;
+  let h = ``;
   h += `<label class="field"><span>Exhibit name</span><input id="exName" data-field="name" value="${esc(e.name)}" maxlength="40"></label>`;
   h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
@@ -671,7 +671,7 @@ function animalCard(s, rep, mode){
 
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><div><h2>${t.label}</h2>${t.full ? `<div class="meta">${esc(t.full)}</div>` : ""}</div>`;
+  let h = `<div><h2>${t.label}</h2>${t.full ? `<div class="meta">${esc(t.full)}</div>` : ""}</div>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Staffed and running" : "Not connected"}</span><span class="meta">${money(t.upkeep)} a day to run</span></div>`;
   if(!ok) h += `<div class="meta" style="color:var(--bad)">Staff can't get here. Run a path or service road from the entrance to it. Until then it does nothing.</div>`;
   return h;
@@ -806,7 +806,7 @@ function buildingBody(b){
   if(BUILDINGS[b.type].tram) return tramStopHtml(b) + demolishRow(b);
   if(guestBuilding(b) || BUILDINGS[b.type].prop) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  let h = `<h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   return h + demolishRow(b);
@@ -823,7 +823,7 @@ function tramFareHtml(){
 function tramStopHtml(b){
   const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]), worn = !tramWorking(b), k = knownCond(b);
   const ok = foot && rail && !worn, why = !isReachable(b) ? "No path from the entrance." : worn ? "Out of order." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  let h = `<h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Open to riders" : why}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   h += `<div class="meta">Stops taking riders below ${TRAM.offlineBelow}%. Wears about ${Math.round(tramWear(b) * 10) / 10}% a day, more with more track. ${state.staff.mechanics.length ? "Mechanics repair it." : "Hire a mechanic at a Workshop to keep it running."}</div>`;
@@ -835,7 +835,7 @@ function tramStopHtml(b){
 // Tram track: how many working stations it serves, and what it costs
 function tramTrackHtml(p){
   const stops = tramStops(p).stops.length;
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>Tram track</h2>`;
+  let h = `<h2>Tram track</h2>`;
   h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
   h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run, and stations wear faster with more track.</div>`;
   h += tramFareHtml();
@@ -845,7 +845,7 @@ function tramTrackHtml(p){
 function pathHtml(p){
   if(isTram(p)) return tramTrackHtml(p);
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
+  let h = `<h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
   if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like the Research Lab, the Time Travel Lab, and the Genetics Lab can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
@@ -859,7 +859,7 @@ function pathHtml(p){
 // An open fence: a hedge row or a wall that isn't closed into an exhibit
 function fenceLineHtml(l){
   const B = BARRIERS[l.barrier] || BARRIERS.wood;
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(B.label)}</h2>`;
+  let h = `<h2>${esc(B.label)}</h2>`;
   h += `<div class="meta">${Math.round(lineLength(l.points))} m of open fence. ${B.hedge ? "Guests enjoy hedge rows along the paths." : "It marks off part of the park."} To make an exhibit, draw a fence that closes on its first corner.</div>`;
   h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("fence", l))}</button></div>`;
   return h;
