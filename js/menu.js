@@ -119,11 +119,25 @@ const ICON_LINES = {
   move:'<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   select:'<path d="M5 3l14 8-6 1.5L10 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
+// The picture a menu tool shows when it has one in the sprite pack: a building's or path prop's front view, a habitat prop, a rock, a fence section, a path or water tile
+const PATH_TILES = {path:"guest", service:"staff", bridge:"bridge"};
+function menuSprite(tool){
+  const has = p => typeof SPRITE_PACK !== "undefined" && SPRITE_PACK[p] ? p : null, k = tool.replace(/^land-/, "");
+  if(PATH_TILES[tool]) return has(`sprites/path/${PATH_TILES[tool]}.png`);
+  if(tool === "water") return has("sprites/water/temperate-1.png");
+  if(tool === "gate") return has("sprites/fence/wood-gate.png");
+  if(tool.startsWith("fence-")) return has(`sprites/fence/${k.slice(6)}-pristine.png`);
+  if(BUILDINGS[tool]) return (BLD_PICS[tool] || typeof PROP_PICS !== "undefined" && PROP_PICS[tool]) && has(`sprites/bld/${tool}-front.png`);   // only the pictures the map draws (a blank placeholder may sit in the pack)
+  if(tool === "land-rock" || tool === "land-boulder") return has(`sprites/rocks/${k}-temperate-1.png`);
+  return tool.startsWith("land-") && (has(`sprites/shelter/${k}.png`) || has(`sprites/tray/${k}.png`) || has(`sprites/viv/${k}.png`) || has(`sprites/plants/${k}.png`));
+}
 function menuIcon(tool, color, glyph){
-  let inner = ICON_LINES[tool];
+  const pic = menuSprite(tool), img = a => `<image href="${spriteUrl(pic)}" ${a} style="image-rendering:pixelated"/>`;
+  // path and water tiles show a patch at their own pixel size (water's 8 px tile repeated), the rest fit the box standing on its bottom edge
+  let inner = !pic ? ICON_LINES[tool] : PATH_TILES[tool] ? img(`x="0" y="0" width="96" height="96"`)
+    : tool === "water" ? [0, 8, 16].flatMap(x => [0, 8, 16].map(y => img(`x="${x}" y="${y}" width="8.01" height="8.01"`))).join("")
+    : img(`x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet"`);
   const b = BUILDINGS[tool];
-  // a building the map draws from pictures (BLD_PICS, map.js) shows its front picture
-  if(!inner && b && BLD_PICS[tool]) inner = `<image href="${spriteUrl(`sprites/bld/${tool}-front.png`)}" x="0" y="0" width="24" height="24" preserveAspectRatio="xMidYMax meet" style="image-rendering:pixelated"/>`;
   if(!inner && b) inner = b.viv ? ICON_LINES.viv : `<rect x="3" y="6" width="18" height="13" rx="2" fill="${b.color}"/>${b.glyph ? `<text x="12" y="13" class="glyph" font-size="10">${esc(b.glyph)}</text>` : ""}`;
   if(!inner && color) inner = `<path d="M3 16h18" stroke="${color}" stroke-width="5" stroke-linecap="round"/><path d="M3 16h18" stroke="#fff" stroke-width="1" stroke-dasharray="1 4" opacity=".6"/>`;
   return `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true">${inner || ""}</svg>`;
@@ -144,13 +158,13 @@ function menuRow(it){
     return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.fences){
-    const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${b.hedge ? menuIcon("hedge") : menuIcon("", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
+    const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon(menuSprite("fence-" + key) ? "fence-" + key : b.hedge ? "hedge" : "", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
     const rates = Object.keys(BARRIERS).map(fenceRate);
-    return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon("exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
+    return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon(menuSprite("fence-wood") ? "fence-wood" : "exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.parkPlants){
     const all = PLANT_SIZES.flatMap(parkPlantKeys), rows = Object.keys(BIOMES).map(biome => { const ks = bySize(all.filter(k => LAND[k].biome === biome)); return ks.length ? `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + ks.map(k => plantRow(k, "size")).join("") : ""; }).join("");
-    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${menuIcon("land-q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${plantBiomeSelect()}${rows}</div></div>`;
+    return `<div class="sitem" data-open="park-plants"><button class="srow head" aria-expanded="false">${plantIcon("q-white-oak")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(Object.keys(LAND).filter(k => LAND[k].park || LAND[k].period === "Quaternary"))}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.statues){
     const keys = Object.keys(LAND).filter(k => LAND[k].statue && (!LAND[k].sp || speciesAvailable(LAND[k].sp))), row = k => { const t = LAND[k], g = statueGrant(k);
@@ -161,8 +175,8 @@ function menuRow(it){
   if(it.period){
     const quat = it.period === "Quaternary", biomes = quat ? Object.keys(BIOMES).filter(b => PLANTS_OF.Quaternary[b] || PARK_PLANTS_OF[b]) : Object.keys(PLANTS_OF[it.period]);
     const rows = biomes.map(biome => `<p class="snote" data-pbiome="${biome}">${esc(BIOMES[biome].label)}</p>` + bySize((PLANTS_OF[it.period][biome] || []).concat(quat ? PARK_PLANTS_OF[biome] || [] : [])).map(k => plantRow(k, "size")).join("")).join("");
-    const first = PLANTS_OF[it.period][Object.keys(PLANTS_OF[it.period])[0]][1];
-    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${menuIcon("land-" + first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plantBiomeSelect()}${rows}</div></div>`;
+    const ks = Object.values(PLANTS_OF[it.period]).map(l => l[1]), first = ks.find(k => PLANT_SPRITES[k]) || ks[0];   // the first medium plant with a picture
+    return `${it.note ? `<p class="snote">${esc(it.note)}</p>` : ""}<div class="sitem" data-open="plants-${it.period}"><button class="srow head" aria-expanded="false">${plantIcon(first)}<span class="tl"><b>${esc(it.label)}</b><span class="price">${biomes.length} biomes</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub">${plantBiomeSelect()}${rows}</div></div>`;
   }
   if(it.sub){
     const rows = it.sub.filter(t => !buildingHidden(t)).map(t => `<button class="srow sub" data-tool="${t}" aria-pressed="false" data-tech="${BUILDINGS[t].tech || ""}">${menuIcon(t)}<span class="tl"><b>${esc(toolLabel(t))}</b><span class="price">${money(BUILDINGS[t].price)}</span></span></button>`).join("");
