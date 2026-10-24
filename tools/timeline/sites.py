@@ -5,10 +5,11 @@ Coordinates are approximate (to a degree or so, plenty for a 260 px world map). 
 lived there, rounded; for the Holocene they are in Ma too (0.000362 is 362 years ago).
 """
 SITES = {
+    # Cambrian
+    "burgess":     ("Burgess Shale", "British Columbia, Canada", 51.4, -116.5, 507, 505, ["anom", "opab", "olen"]),
     # Devonian
     "fram":        ("Fram Formation", "Ellesmere Island, Canada", 77.2, -86.0, 378, 372, ["tikt"]),
     "britta":      ("Britta Dal Formation", "East Greenland", 72.9, -23.6, 367, 360, ["icht", "both"]),
-    "cleveland":   ("Cleveland Shale", "Ohio, USA", 41.5, -81.7, 360, 359, ["dunk"]),
     # Carboniferous
     "ekirkton":    ("East Kirkton", "West Lothian, Scotland", 55.9, -3.6, 336, 334, ["pulm"]),
     "joggins":     ("Joggins Fossil Cliffs", "Nova Scotia, Canada", 45.7, -64.4, 315, 312, ["hylo", "arth"]),
@@ -20,7 +21,6 @@ SITES = {
     "elcobre":     ("El Cobre Canyon", "New Mexico, USA", 36.2, -106.6, 298, 293, ["plhy"]),
     "texasred":    ("Texas Red Beds", "Texas, USA", 33.6, -99.3, 290, 275, ["dime", "seym"]),
     "hennessey":   ("Hennessey Formation", "Oklahoma, USA", 35.4, -97.5, 276, 272, ["coty"]),
-    "phosphoria":  ("Phosphoria Formation", "Idaho, USA", 42.6, -111.4, 275, 270, ["heli"]),
     "pedrafogo":   ("Pedra de Fogo Formation", "Maranhão, Brazil", -7.0, -46.0, 280, 272, ["prio"]),
     "ocher":       ("Ocher", "Perm Krai, Russia", 57.9, 54.7, 268, 265, ["este"]),
     "karootapino": ("Karoo, Tapinocephalus Zone", "Western Cape, South Africa", -32.3, 22.6, 265, 260, ["mosc", "ante"]),
@@ -36,7 +36,7 @@ SITES = {
     "ghostranch":  ("Ghost Ranch", "New Mexico, USA", 36.3, -106.5, 212, 206, ["coel"]),
     "lisowice":    ("Lisowice", "Silesia, Poland", 50.8, 18.9, 208, 202, ["liso"]),
     # Jurassic
-    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel", "prom", "ichy", "plsa"]),
+    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel", "prom"]),
     "elliot":      ("Elliot Formation", "Eastern Cape, South Africa", -30.7, 27.8, 200, 190, ["hete"]),
     "kayenta":     ("Kayenta Formation", "Arizona, USA", 36.5, -111.3, 196, 183, ["dilo"]),
     "hanson":      ("Hanson Formation", "Mount Kirkpatrick, Antarctica", -84.4, 165.0, 194, 188, ["cryo"]),
@@ -54,7 +54,7 @@ SITES = {
     "elrhaz":      ("Elrhaz Formation", "Gadoufaoua, Niger", 17.5, 8.9, 115, 110, ["nige"]),
     "cerrobarcino": ("Cerro Barcino Formation", "Chubut, Argentina", -43.5, -69.0, 102, 101, ["pata"]),
     "kemkem":      ("Kem Kem Beds", "Morocco", 31.0, -4.0, 100, 94, ["spin", "carc"]),
-    "niobrara":    ("Niobrara Chalk", "Kansas, USA", 38.9, -100.8, 87, 82, ["pter", "xiph"]),
+    "niobrara":    ("Niobrara Chalk", "Kansas, USA", 38.9, -100.8, 87, 82, ["pter"]),
     "aguja":       ("Aguja Formation", "Big Bend, Texas, USA", 29.3, -103.3, 80, 75, ["dsuc"]),
     "dinopark":    ("Dinosaur Park Formation", "Alberta, Canada", 50.8, -111.5, 77, 75, ["styr", "para"]),
     "djadokhta":   ("Djadokhta Formation", "Gobi Desert, Mongolia", 44.2, 103.7, 75, 71, ["velo", "prot", "ovir", "mcer"]),

@@ -88,11 +88,14 @@ const UPKEEP = {
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
 
 const SPECIES = [
+  // Cambrian
+  {id:"anom", name:"Anomalocaris",   period:"Cambrian", diet:["carnivore"], price:7000, food:12, space:15, group:[1,3], appeal:7, stars:1, viv:"M", aqua:true},
+  {id:"opab", name:"Opabinia",       period:"Cambrian", diet:["carnivore"], price:3500, food:2, space:2, group:[3,8], appeal:5, stars:0.5, viv:"S", aqua:true},
+  {id:"olen", name:"Olenoides",      period:"Cambrian", diet:["carnivore"], bug:true, price:2000, food:2, space:2, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
   // Devonian
   {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
   {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
   {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true},
-  {id:"dunk", name:"Dunkleosteus",   period:"Devonian", diet:["piscivore"], predator:true, price:18000, food:80, space:120, group:[1,1], appeal:9, stars:2, viv:"L", aqua:true},
   // Carboniferous
   {id:"stet", name:"Stethacanthus",  period:"Carboniferous", diet:["piscivore"], price:6000, food:15, space:20, group:[2,5], appeal:5, stars:1, viv:"M", aqua:true},
   {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
@@ -103,7 +106,6 @@ const SPECIES = [
   {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
   // Permian
-  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["piscivore"], price:12000, food:40, space:60, group:[1,2], appeal:7, stars:1.5, viv:"L", aqua:true},
   {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
   {id:"lyst", name:"Lystrosaurus",   period:"Permian", diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
   {id:"seym", name:"Seymouria",      period:"Permian", diet:["insectivore","carnivore"], price:4000, food:8, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
@@ -130,8 +132,6 @@ const SPECIES = [
   {id:"liso", name:"Lisowicia",      period:"Triassic", diet:["herbivore"], price:16000, food:220, space:1300, group:[1,4], appeal:10, stars:2},
   // Jurassic
   {id:"prom", name:"Promicroceras",  period:"Jurassic", diet:["carnivore"], price:2500, food:3, space:3, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
-  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore"], price:9000, food:25, space:30, group:[2,4], appeal:7, stars:1.5, viv:"M", aqua:true},
-  {id:"plsa", name:"Plesiosaurus",   period:"Jurassic", diet:["piscivore"], price:14000, food:40, space:60, group:[1,3], appeal:8, stars:2, viv:"L", aqua:true},
   {id:"hete", name:"Heterodontosaurus", period:"Jurassic", diet:["herbivore"], price:3500, food:25, space:80, group:[3,10], appeal:3, stars:0},
   {id:"anch", name:"Anchiornis",     period:"Jurassic", diet:["insectivore","carnivore"], price:4500, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   {id:"comp", name:"Compsognathus",  period:"Jurassic", diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
@@ -155,7 +155,6 @@ const SPECIES = [
   {id:"brac", name:"Brachiosaurus",  period:"Jurassic", diet:["herbivore"], price:52000, food:680, space:5200, group:[2,5], appeal:20, stars:4},
   {id:"scan", name:"Scansoriopteryx", period:"Jurassic", diet:["insectivore"], price:4500, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   // Cretaceous
-  {id:"xiph", name:"Xiphactinus",    period:"Cretaceous", diet:["piscivore"], predator:true, price:15000, food:50, space:70, group:[1,2], appeal:7, stars:2, viv:"L", aqua:true},
   {id:"hyps", name:"Hypsilophodon",  period:"Cretaceous", diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
   {id:"beel", name:"Beelzebufo",     period:"Cretaceous", diet:["carnivore"], price:4000, food:8, space:8, group:[1,4], appeal:5, stars:0.5, viv:"M"},
   {id:"mono", name:"Mononykus",      period:"Cretaceous", diet:["insectivore"], price:4500, food:5, space:6, group:[2,8], appeal:4, stars:0.5, viv:"S"},
@@ -281,6 +280,7 @@ const TIME_PERIODS = [
   {id:"Permian",       ago:"299–252 million years ago", trip:4500,  days:1.5, risk:.12},
   {id:"Carboniferous", ago:"359–299 million years ago", trip:4000,  days:1.5, risk:.10},
   {id:"Devonian",      ago:"419–359 million years ago", trip:3500,  days:1.5, risk:.10},
+  {id:"Cambrian",      ago:"539–485 million years ago", trip:3000,  days:1.5, risk:.10},
 ];
 
 // The Time Travel Lab's timeline: every period gets one equal bar on the slider, split equally into its epochs. Each epoch is
@@ -317,9 +317,9 @@ const TIMELINE_MAP_SIZE = [260, 130];
 //   fauna     species found there (only the ones speciesAvailable shows); event: a MUSEUM_EVENTS id the Time Travel Lab records there
 // TIME_SITES:BEGIN written by tools/timeline/placesites.py from sites.py; edit those, not this.
 const TIME_SITES = [
+  {id:"burgess", name:"Burgess Shale", where:"British Columbia, Canada", from:507e6, to:505e6, at:{cambrian:[68, 66]}, fauna:["anom", "opab", "olen"]},
   {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:["tikt"]},
   {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:["icht", "both"]},
-  {id:"cleveland", name:"Cleveland Shale", where:"Ohio, USA", from:360e6, to:359e6, at:{devonian:[111, 93]}, fauna:["dunk"]},
   {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:["pulm"]},
   {id:"joggins", name:"Joggins Fossil Cliffs", where:"Nova Scotia, Canada", from:315e6, to:312e6, at:{carboniferous:[126, 70]}, fauna:["hylo", "arth"]},
   {id:"beargulch", name:"Bear Gulch Limestone", where:"Montana, USA", from:324e6, to:318e6, at:{carboniferous:[105, 58]}, fauna:["stet"]},
@@ -329,7 +329,6 @@ const TIME_SITES = [
   {id:"elcobre", name:"El Cobre Canyon", where:"New Mexico, USA", from:298e6, to:293e6, at:{permian:[104, 54]}, fauna:["plhy"]},
   {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[106, 61]}, fauna:["dime", "seym"]},
   {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[114, 60]}, fauna:["coty"]},
-  {id:"phosphoria", name:"Phosphoria Formation", where:"Idaho, USA", from:275e6, to:270e6, at:{permian:[104, 45]}, fauna:["heli"]},
   {id:"pedrafogo", name:"Pedra de Fogo Formation", where:"Maranhão, Brazil", from:280e6, to:272e6, at:{permian:[121, 87]}, fauna:["prio"]},
   {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[161, 37]}, fauna:["este"]},
   {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[109, 113]}, fauna:["mosc", "ante"]},
@@ -343,7 +342,7 @@ const TIME_SITES = [
   {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 40]}, fauna:["plat"]},
   {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[97, 55]}, fauna:["coel"]},
   {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[143, 32]}, fauna:["liso"]},
-  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:["dimo", "scel", "prom", "ichy", "plsa"]},
+  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:["dimo", "scel", "prom"]},
   {id:"elliot", name:"Elliot Formation", where:"Eastern Cape, South Africa", from:200e6, to:190e6, at:{"jurassic-early":[127, 101]}, fauna:["hete"]},
   {id:"kayenta", name:"Kayenta Formation", where:"Arizona, USA", from:196e6, to:183e6, at:{"jurassic-early":[92, 46]}, fauna:["dilo"]},
   {id:"hanson", name:"Hanson Formation", where:"Mount Kirkpatrick, Antarctica", from:194e6, to:188e6, at:{"jurassic-early":[146, 113]}, fauna:["cryo"]},
@@ -360,7 +359,7 @@ const TIME_SITES = [
   {id:"elrhaz", name:"Elrhaz Formation", where:"Gadoufaoua, Niger", from:115e6, to:110e6, at:{"cretaceous-early":[133, 60]}, fauna:["nige"]},
   {id:"cerrobarcino", name:"Cerro Barcino Formation", where:"Chubut, Argentina", from:102e6, to:101e6, at:{"cretaceous-early":[109, 101]}, fauna:["pata"]},
   {id:"kemkem", name:"Kem Kem Beds", where:"Morocco", from:100e6, to:94e6, at:{"cretaceous-late":[128, 45]}, fauna:["spin", "carc"]},
-  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:["pter", "xiph"]},
+  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:["pter"]},
   {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[76, 32]}, fauna:["dsuc"]},
   {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 12]}, fauna:["styr", "para"]},
   {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[190, 30]}, fauna:["velo", "prot", "ovir", "mcer"]},
@@ -1145,7 +1144,7 @@ BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W",
    --------------------------------------------------------------------- */
 
 // Which era each period belongs to
-const ERA_OF = {Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
+const ERA_OF = {Cambrian:"paleozoic", Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
                 Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
 
 // What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
@@ -1163,7 +1162,7 @@ const PALEOFLORA = {
 };
 const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
 // Herbivores from these periods never evolved to eat grass, and get sick on it (Cenozoic plants, a grassland biome or grass hay)
-const GRASS_INTOLERANT = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
+const GRASS_INTOLERANT = ["Cambrian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full grass share
 
 BUILDINGS.ceres = {label:"Botany Lab", tag:"BOTANY", one:"the Botany Lab", glyph:"B", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
@@ -1341,7 +1340,7 @@ const TECH = [
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
   {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Cambrian, Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
 const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
@@ -2482,14 +2481,12 @@ const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join
 const SPECIES_INFO = {
   icht:{sci:"Ichthyostega stensioei", ft:5, desc:"One of the first animals with four limbs. It lived in the swamps of Late Devonian Greenland, and it had seven toes on each hind foot. It probably dragged itself over mud banks more than it walked, and still breathed through gills in the water. It sits near the line between fish and land animals."},
   tikt:{sci:"Tiktaalik roseae", ft:9, desc:"A fish with a neck. Tiktaalik lived in shallow Late Devonian streams about 375 million years ago, and its fossils were found on Ellesmere Island in the Canadian Arctic in 2004. It still had gills and fins, but it also had a flat head with eyes on top, a neck that could turn, and strong fin bones that could prop it up like arms. Its name comes from an Inuktitut word for a big freshwater fish."},
+  anom:{sci:"Anomalocaris canadensis", ft:1.6, desc:"The biggest hunter of the Cambrian seas, about two feet long, at a time when most animals were the size of a finger. It swam by rippling the flaps along its sides, grabbed prey with two spiny arms in front of its face, and had a round mouth of plates. Its pieces were found separately at first and named as a shrimp, a jellyfish and a sponge before anyone saw they were one animal."},
+  opab:{sci:"Opabinia regalis", ft:.25, desc:"One of the oddest animals ever found: five stalked eyes on its head and a long flexible nozzle with a claw on the end, which it used to pass food back to its mouth. When it was first shown at a scientific meeting in 1972, the audience laughed. It lived on the sea floor of the Cambrian and is known only from the Burgess Shale."},
+  olen:{sci:"Olenoides serratus", ft:.3, desc:"A trilobite, one of the hard-shelled sea arthropods that crawled the ocean floor for nearly 300 million years. Olenoides is one of the few whose legs and antennae are preserved, in the Burgess Shale, so we know it walked on spiny legs and had a pair of feelers at the tail end too. It hunted and scavenged small animals in the mud."},
   both:{sci:"Bothriolepis canadensis", ft:1, desc:"A small armored fish from the Late Devonian, its front half boxed in bony plates like a little tank. Instead of front fins it had two jointed, armored arms, and its eyes sat close together on top of its head. It grazed on the bottom of lakes and coastal waters, and its fossils have been found on every continent."},
-  dunk:{sci:"Dunkleosteus terrelli", ft:14, desc:"One of the first giant predators, an armored fish from the seas of the Late Devonian. It had no teeth: its jaws were sharp bony blades that sharpened themselves as they ground together, and it could snap them open fast enough to suck prey in. Its best fossils come from the Cleveland Shale of Ohio."},
   stet:{sci:"Stethacanthus altonensis", ft:2.5, desc:"A small early shark with a strange crest on its back, flat-topped like an ironing board and covered in tiny tooth-like scales, with more of them on top of its head. Only the males had it, so it was probably for showing off. It swam in the shallow seas of the Carboniferous."},
-  heli:{sci:"Helicoprion bessonowi", ft:20, desc:"A Permian relative of ratfish with one of the strangest mouths ever: a spiral of teeth like a circular saw, set in its lower jaw. For a century nobody knew where the spiral went, until a scan of a fossil from Idaho in 2013 showed it filled the middle of the jaw and sliced squid-like prey as it closed."},
   prom:{sci:"Promicroceras planicosta", ft:.1, desc:"A small ammonite, a relative of squid and octopus that lived in a coiled shell, swimming by squirting water and staying afloat with gas in the shell's chambers. Its shells, packed together in limestone, are the famous \"Marston Marble\" of Somerset, and they turn up on the beaches of Lyme Regis."},
-  ichy:{sci:"Ichthyosaurus communis", ft:6.5, desc:"A sea reptile shaped like a dolphin, with a long toothed snout, big eyes, flippers and a fish-like tail. It gave birth to live young in the water. Mary Anning and her brother found the first known skeleton at Lyme Regis in the 1810s, when nobody yet knew such animals had existed."},
-  plsa:{sci:"Plesiosaurus dolichodeirus", ft:11, desc:"A sea reptile with a small head on a very long neck, a broad body and four big flippers it flew through the water with, like a sea turtle. Mary Anning found the first complete skeleton at Lyme Regis in 1823, and it looked so odd that some experts thought it was a fake."},
-  xiph:{sci:"Xiphactinus audax", ft:17, desc:"A huge bony fish of the Late Cretaceous inland sea, with a bulldog face and fangs. One famous fossil from Kansas has a whole 6-foot fish inside its belly: it seems to have died from swallowing a meal that was too big."},
   mibr:{sci:"Microbrachis pelikani", ft:.5, desc:"A tiny, snake-shaped amphibian with a long body, a small head and four little legs, no longer than a hand. Thousands of its fossils have been found in the coal swamps of what is now the Czech Republic, many of them showing feathery gills, so it lived its life in the water. It hunted tiny animals in the pools of the Carboniferous forest."},
   hylo:{sci:"Hylonomus lyelli", ft:.7, desc:"One of the oldest known reptiles, from about 312 million years ago. Its fossils were found inside the hollow stumps of giant club moss trees at Joggins, Nova Scotia, where it and other small animals fell in and could not climb out. It looked like a small lizard and ate millipedes and insects. As an early reptile it could lay eggs on dry land, so it was free of the water."},
   arth:{sci:"Arthropleura armata", ft:8, desc:"The biggest land invertebrate that ever lived: a millipede relative up to about 8 feet long. It crawled over the forest floor of Carboniferous Europe and North America, and its trackways are still preserved in stone. It probably ate rotting plants and fallen debris. Scientists think the high oxygen in the air then let bugs grow this big."},
@@ -2999,7 +2996,7 @@ const GOALS = [
   {id:"oracle",   text:"Build the Research Lab",                       hint:"The Research Lab researches everything from fences to the Time Travel Lab's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build the Time Travel Lab, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
   {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
-  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Devonian, Carboniferous or Permian site with a drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
+  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Cambrian, Devonian, Carboniferous or Permian site with a drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
   {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with the Time Travel Lab's expeditions, then clone it at the Genetics Lab.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
   {id:"ghost",    text:"Bring back DNA with the Time Travel Lab",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at the Time Travel Lab and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},
