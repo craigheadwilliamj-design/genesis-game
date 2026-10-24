@@ -141,7 +141,8 @@ function illChance(e, a){
   const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
   const gs = grassSick(e, s); if(gs > 0){ p *= 1 + (HEALTH.grassSick - 1) * gs; why.push("eating grass"); }
   if(thirsty(e, s)){ p *= HAB.dryIll; why.push(e.viv ? "no pool" : "no water"); }
-  if(e.viv && wantsHeat(s)){   // a basking lamp keeps the cold-blooded well; without one a cold snap makes them ill
+  if(e.aqua && wqOf(e) < AQUA.foul){ p *= 1 + (AQUA.ill - 1) * (1 - wqOf(e) / AQUA.foul); why.push("foul water"); }
+  if(e.viv && !e.aqua && wantsHeat(s)){   // a basking lamp keeps the cold-blooded well; without one a cold snap makes them ill
     const hs = heatShare(e);
     if(hs > 0) p *= 1 + (VIV_LAMP.ill - 1) * hs;
     if(hs < 1 && state.weather && state.weather.today === "cold"){ p *= 1 + (VIV_LAMP.cold - 1) * (1 - hs); why.push("the cold"); }

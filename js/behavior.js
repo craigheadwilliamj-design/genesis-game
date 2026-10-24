@@ -250,7 +250,7 @@ function comfortOf(e, s, ctx){
   const f = speciesFit(e, s), b = biomeFit(s, biomeOf(e));
   let c = .5 * (e.viv ? f.plants : f.sat) + .5 * (b === "away" ? .2 : 1) - .5 * ctx.x;
   if(ctx.dirt > CLEAN.penaltyFrom) c -= (ctx.dirt - CLEAN.penaltyFrom) / 100;
-  if(e.viv && wantsHeat(s)){ const hs = heatShare(e); c += hs > 0 ? VIV_LAMP.comfort * hs : -VIV_LAMP.comfort * .4; }   // warm under a basking lamp, chilly without one
+  if(e.viv && !e.aqua && wantsHeat(s)){ const hs = heatShare(e); c += hs > 0 ? VIV_LAMP.comfort * hs : -VIV_LAMP.comfort * .4; }   // warm under a basking lamp, chilly without one
   c = clamp(c, 0, 1); ctx.comfort.set(s.id, c);
   return c;
 }
@@ -330,7 +330,7 @@ function needsStep(e, a, s, ctx, dt){
   const n = needsOf(a), T = traitsOf(s), B = BEHAVIOR, aw = awake(s), food = foodOk(e, s, ctx), floor = thirstFloor(s, ctx);
   const mates = (ctx.counts.get(s.id) || 1) - 1, want = matesWanted(s);
   n.hunger += B.hunger * dt * (.5 + .5 * aw);
-  n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
+  if(!s.aqua) n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
   const temper = {curious:1.4, skittish:.8, aggressive:1.1}[T.temper] * (T.temper === "curious" ? 1 - .3 * ctx.seen : 1);   // curious ones like watching the guests
   n.bored += B.bored * dt * aw * temper * (1.4 - ctx.enrich);
   if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1); else n.lonely -= B.social * dt;

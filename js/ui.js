@@ -240,7 +240,7 @@ panelEl.addEventListener("change", ev => {
 const exTabs = {ex:null, tab:"main", period:null};   // which tab the exhibit panel shows
 // The exhibit panel's tabs, in order. A vivarium has no fence, and its Landscaping and Habitat Items are its scene and fittings.
 const exTabList = e => [{key:"main", label:"Overview", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"barrier", label:"Barrier", color:"#6E737A"}],
-  [{key:"land", label:"Landscaping", color:"#7A6A58"}, {key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
+  e.aqua ? [] : [{key:"land", label:"Landscaping", color:"#7A6A58"}], [{key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
    {key:"health", label:"Health", color:"#B3261E"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"guests", label:"Guests", color:"#B8860B"}]);
 function exhibitHtml(e){
   const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e), n = e.animals.length;
@@ -251,7 +251,7 @@ function exhibitHtml(e){
   let h = ``;
   h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
-  h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
+  h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? caseOf(e).label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
   const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
@@ -282,9 +282,13 @@ function exOverviewHtml(e, rep){
     const kc = knownCond(e), since = daysSinceInspect(e), broke = e.open || isBreached(e);
     rows.push(exJump("barrier", "Barrier", broke || kc < 30 ? "bad" : kc < 60 || since >= MAINT.inspectEvery ? "warn" : "", esc(e.open ? "Gap in the fence." : broke ? "Broken." : `${Math.round(kc)}% condition${since >= 99 ? ", never inspected" : ""}.`)));
   }
+  if(e.aqua && n){
+    const w = wqOf(e), why = filterText(e);
+    rows.push(exJump("props", "Water", w < AQUA.foul ? "bad" : w < AQUA.murky || why ? "warn" : "", esc(`${Math.round(w)}% clean${why ? ". " + why : ""}`)));
+  }
   if(n){
     const hr = healthReport(e), worst = hr.sick.length ? Math.max(...hr.sick.map(a => a.sick.sev)) : 0, dirt = e.dirt || 0;
-    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}, ${Math.round(100 - dirt)}% clean`)));
+    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% clean`}`)));
     const X = exLog(e);
     rows.push(exJump("guests", "Guests", isReachable(e) ? "" : "bad", esc(isReachable(e) ? `${Math.round(X.views)} visitor${Math.round(X.views) === 1 ? "" : "s"} today, ${money(Math.round(X.gifts))} donated` : "No path")));
   }
@@ -402,20 +406,30 @@ function vivSceneHtml(e){
   }
   return h + `</section>`;
 }
+// An aquarium's water: how clean it is, and what the filters clean against what the animals foul
+function aquaWaterHtml(e){
+  const w = wqOf(e), aim = wqAim(e), load = aquaLoad(e), clean = filters(e).reduce((n, f) => n + LAND[f.type].clean, 0), why = filterText(e);
+  let h = `<section><h3>Water</h3><div class="factor" style="grid-template-columns:80px 1fr 48px"><span>Clean</span>${meter(w, w >= AQUA.murky ? "var(--good)" : w >= AQUA.foul ? "var(--warn)" : "var(--bad)")}<span>${Math.round(w)}%</span></div>`;
+  if(Math.abs(aim - w) >= 1) h += `<div class="meta" style="margin-top:4px">${aim > w ? "Clearing" : "Clouding"} toward ${Math.round(aim)}%</div>`;
+  h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:6px" title="Filtering a day against what the animals foul a day"><span>Filtering</span>${meter(load ? Math.min(100, clean / load * 100) : 100, clean >= load ? "var(--good)" : "var(--bad)")}<span>${clean} of ${load}</span></div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ${why ? "no" : "ok"}">${esc(why || (filters(e).length ? `Filters on, ${filterKw(e)} kW` : "No filter"))}</span></div>`;
+  return h + `</section>`;
+}
 // Vivarium fittings and enrichment: pick one from a list and it's set in the glass wherever there's room
 const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy && !LAND[k].fit), VIV_FITS = Object.keys(LAND).filter(k => LAND[k].vivToy && LAND[k].fit);
-const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="${id}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${keys.map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${note(t)})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="${id === "vivFitSel" ? "vivFit" : "vivToy"}">Add</button></div>`;
+const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="${id}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${keys.filter(k => caseTakes(e, k)).map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${note(t)})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="${id === "vivFitSel" ? "vivFit" : "vivToy"}">Add</button></div>`;
 const vivHere = (e, fit) => { const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy && !!LAND[f.type].fit === fit); return here.length ? `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${t.color}"></span><span>${esc(t.label)}${t.tray ? ` (${Math.round(trayHas(f))}/${trayCap(f)}${trayKind(f) ? " " + esc(trayKind(f)) : ""})` : ""}</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>` : ""; };
 function vivToysHtml(e){
-  const n = e.animals.length, heat = heatCount(e), lovers = e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
-  let h = `<section><h3>Fittings</h3>`;
+  const n = e.animals.length, heat = e.aqua ? 0 : heatCount(e), lovers = e.aqua ? 0 : e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
+  let h = e.aqua ? aquaWaterHtml(e) : "";
+  h += `<section><h3>Fittings</h3>`;
   if(n){
     const need = dishesNeeded(e), have = trays(e).length;
     h += `<div class="row" style="margin-top:6px"><span class="status ${have >= need ? "ok" : "no"}">${have >= need ? `Food dishes ${have} of ${need}` : esc(dishText(e))}</span></div>`;
     if(heat) h += `<div class="row"><span class="status ${heatShare(e) >= 1 ? "ok" : "no"}">${vivFit(e, "lamp").length ? `Lamps warm ${Math.min(heat, vivFit(e, "lamp").length * VIV_LAMP.per)} of ${heat} that want heat` : `${heat} want a basking lamp`}</span></div>`;
     if(lovers) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
   }
-  h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
+  h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.filter ? `cleans ${t.clean} a day, ${t.kw} kW, ${money(t.upkeep)} a day` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
   const need = enrichNeed(e), have = toyPoints(e);
   h += `<section><h3>Enrichment</h3>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
@@ -610,7 +624,7 @@ function openMoveDialog(e, sp, id){
   const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length, one = id && e.animals.find(a => a.id === id);
   const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
   $("#moveTitle").textContent = `Move ${one ? one.name || s.name : s.name}`;
-  if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
+  if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
   const fromWhy = keeperMoveProblem(e);
   $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
     ${one ? "" : `<label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>`}
@@ -630,7 +644,7 @@ function openMoveDialog(e, sp, id){
 $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
-function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
+function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger">${s.aqua ? "A" : "V"}</span>` : ""); }
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
@@ -1050,7 +1064,7 @@ function ppCard(s){
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
-    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", s.aqua ? "the sea" : biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
     + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)

@@ -84,13 +84,17 @@ const UPKEEP = {
 //     herbivores and piscivores don't bother land animals
 //   shop     true means partner parks sell it, so you can buy it without cloning
 //   viv      "S", "M", or "L" means it lives in a vivarium at least that size, not an open exhibit
+//   aqua     true for sea animals: viv is then the aquarium size it needs, and it lives only in an aquarium
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
 
 const SPECIES = [
   // Devonian
   {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
   {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
+  {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true},
+  {id:"dunk", name:"Dunkleosteus",   period:"Devonian", diet:["piscivore"], predator:true, price:18000, food:80, space:120, group:[1,1], appeal:9, stars:2, viv:"L", aqua:true},
   // Carboniferous
+  {id:"stet", name:"Stethacanthus",  period:"Carboniferous", diet:["piscivore"], price:6000, food:15, space:20, group:[2,5], appeal:5, stars:1, viv:"M", aqua:true},
   {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
   {id:"hylo", name:"Hylonomus",      period:"Carboniferous", diet:["insectivore"], price:2800, food:4, space:5, group:[2,8], appeal:3, stars:0, viv:"S"},
   {id:"arth", name:"Arthropleura",   period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
@@ -99,6 +103,7 @@ const SPECIES = [
   {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
   {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
   // Permian
+  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["piscivore"], price:12000, food:40, space:60, group:[1,2], appeal:7, stars:1.5, viv:"L", aqua:true},
   {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
   {id:"lyst", name:"Lystrosaurus",   period:"Permian", diet:["herbivore"], price:3500,  food:30,  space:120,  group:[3,10], appeal:2,  stars:0,   },
   {id:"seym", name:"Seymouria",      period:"Permian", diet:["insectivore","carnivore"], price:4000, food:8, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
@@ -124,6 +129,9 @@ const SPECIES = [
   {id:"eryt", name:"Erythrosuchus",  period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:140, space:800, group:[1,3], appeal:9, stars:2},
   {id:"liso", name:"Lisowicia",      period:"Triassic", diet:["herbivore"], price:16000, food:220, space:1300, group:[1,4], appeal:10, stars:2},
   // Jurassic
+  {id:"prom", name:"Promicroceras",  period:"Jurassic", diet:["carnivore"], price:2500, food:3, space:3, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
+  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore"], price:9000, food:25, space:30, group:[2,4], appeal:7, stars:1.5, viv:"M", aqua:true},
+  {id:"plsa", name:"Plesiosaurus",   period:"Jurassic", diet:["piscivore"], price:14000, food:40, space:60, group:[1,3], appeal:8, stars:2, viv:"L", aqua:true},
   {id:"hete", name:"Heterodontosaurus", period:"Jurassic", diet:["herbivore"], price:3500, food:25, space:80, group:[3,10], appeal:3, stars:0},
   {id:"anch", name:"Anchiornis",     period:"Jurassic", diet:["insectivore","carnivore"], price:4500, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   {id:"comp", name:"Compsognathus",  period:"Jurassic", diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
@@ -147,6 +155,7 @@ const SPECIES = [
   {id:"brac", name:"Brachiosaurus",  period:"Jurassic", diet:["herbivore"], price:52000, food:680, space:5200, group:[2,5], appeal:20, stars:4},
   {id:"scan", name:"Scansoriopteryx", period:"Jurassic", diet:["insectivore"], price:4500, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   // Cretaceous
+  {id:"xiph", name:"Xiphactinus",    period:"Cretaceous", diet:["piscivore"], predator:true, price:15000, food:50, space:70, group:[1,2], appeal:7, stars:2, viv:"L", aqua:true},
   {id:"hyps", name:"Hypsilophodon",  period:"Cretaceous", diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
   {id:"beel", name:"Beelzebufo",     period:"Cretaceous", diet:["carnivore"], price:4000, food:8, space:8, group:[1,4], appeal:5, stars:0.5, viv:"M"},
   {id:"mono", name:"Mononykus",      period:"Cretaceous", diet:["insectivore"], price:4500, food:5, space:6, group:[2,8], appeal:4, stars:0.5, viv:"S"},
@@ -247,6 +256,12 @@ const VIVARIUMS = {
   M: {label:"Medium vivarium", w:10, d:6,  price:7000,  upkeep:60},
   L: {label:"Large vivarium",  w:16, d:10, price:15000, upkeep:120},
 };
+// Aquariums: vivariums full of sea water for the `aqua` species, the same sizes (so VIVARIUMS[size] gives their shape too). They need filters (AQUA).
+const AQUARIUMS = {
+  S: {label:"Small aquarium",  w:6,  d:4,  price:5000,  upkeep:45},
+  M: {label:"Medium aquarium", w:10, d:6,  price:11000, upkeep:90},
+  L: {label:"Large aquarium",  w:16, d:10, price:24000, upkeep:180},
+};
 
 /* ---------------------------------------------------------------------
    SCIENCE: The Research Lab, the Time Travel Lab, and the Genetics Lab
@@ -303,15 +318,18 @@ const TIMELINE_MAP_SIZE = [260, 130];
 // TIME_SITES:BEGIN written by tools/timeline/placesites.py from sites.py; edit those, not this.
 const TIME_SITES = [
   {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:["tikt"]},
-  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:["icht"]},
+  {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:["icht", "both"]},
+  {id:"cleveland", name:"Cleveland Shale", where:"Ohio, USA", from:360e6, to:359e6, at:{devonian:[111, 93]}, fauna:["dunk"]},
   {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:["pulm"]},
   {id:"joggins", name:"Joggins Fossil Cliffs", where:"Nova Scotia, Canada", from:315e6, to:312e6, at:{carboniferous:[126, 70]}, fauna:["hylo", "arth"]},
+  {id:"beargulch", name:"Bear Gulch Limestone", where:"Montana, USA", from:324e6, to:318e6, at:{carboniferous:[105, 58]}, fauna:["stet"]},
   {id:"nyrany", name:"Nýřany", where:"Bohemia, Czechia", from:308e6, to:306e6, at:{carboniferous:[144, 63]}, fauna:["mibr"]},
   {id:"commentry", name:"Commentry", where:"Allier, France", from:302e6, to:300e6, at:{carboniferous:[140, 70]}, fauna:["mega"]},
   {id:"pennredbeds", name:"Late Pennsylvanian red beds", where:"Texas and New Mexico, USA", from:304e6, to:299.5e6, at:{carboniferous:[103, 67]}, fauna:["dcau", "eryo"]},
   {id:"elcobre", name:"El Cobre Canyon", where:"New Mexico, USA", from:298e6, to:293e6, at:{permian:[104, 54]}, fauna:["plhy"]},
   {id:"texasred", name:"Texas Red Beds", where:"Texas, USA", from:290e6, to:275e6, at:{permian:[106, 61]}, fauna:["dime", "seym"]},
   {id:"hennessey", name:"Hennessey Formation", where:"Oklahoma, USA", from:276e6, to:272e6, at:{permian:[114, 60]}, fauna:["coty"]},
+  {id:"phosphoria", name:"Phosphoria Formation", where:"Idaho, USA", from:275e6, to:270e6, at:{permian:[104, 45]}, fauna:["heli"]},
   {id:"pedrafogo", name:"Pedra de Fogo Formation", where:"Maranhão, Brazil", from:280e6, to:272e6, at:{permian:[121, 87]}, fauna:["prio"]},
   {id:"ocher", name:"Ocher", where:"Perm Krai, Russia", from:268e6, to:265e6, at:{permian:[161, 37]}, fauna:["este"]},
   {id:"karootapino", name:"Karoo, Tapinocephalus Zone", where:"Western Cape, South Africa", from:265e6, to:260e6, at:{permian:[109, 113]}, fauna:["mosc", "ante"]},
@@ -325,7 +343,7 @@ const TIME_SITES = [
   {id:"trossingen", name:"Trossingen", where:"Baden-Württemberg, Germany", from:214e6, to:208e6, at:{triassic:[136, 40]}, fauna:["plat"]},
   {id:"ghostranch", name:"Ghost Ranch", where:"New Mexico, USA", from:212e6, to:206e6, at:{triassic:[97, 55]}, fauna:["coel"]},
   {id:"lisowice", name:"Lisowice", where:"Silesia, Poland", from:208e6, to:202e6, at:{triassic:[143, 32]}, fauna:["liso"]},
-  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:["dimo", "scel"]},
+  {id:"dorset", name:"Dorset Coast", where:"Lyme Regis, England", from:199e6, to:190e6, at:{"jurassic-early":[133, 32]}, fauna:["dimo", "scel", "prom", "ichy", "plsa"]},
   {id:"elliot", name:"Elliot Formation", where:"Eastern Cape, South Africa", from:200e6, to:190e6, at:{"jurassic-early":[127, 101]}, fauna:["hete"]},
   {id:"kayenta", name:"Kayenta Formation", where:"Arizona, USA", from:196e6, to:183e6, at:{"jurassic-early":[92, 46]}, fauna:["dilo"]},
   {id:"hanson", name:"Hanson Formation", where:"Mount Kirkpatrick, Antarctica", from:194e6, to:188e6, at:{"jurassic-early":[146, 113]}, fauna:["cryo"]},
@@ -342,7 +360,7 @@ const TIME_SITES = [
   {id:"elrhaz", name:"Elrhaz Formation", where:"Gadoufaoua, Niger", from:115e6, to:110e6, at:{"cretaceous-early":[133, 60]}, fauna:["nige"]},
   {id:"cerrobarcino", name:"Cerro Barcino Formation", where:"Chubut, Argentina", from:102e6, to:101e6, at:{"cretaceous-early":[109, 101]}, fauna:["pata"]},
   {id:"kemkem", name:"Kem Kem Beds", where:"Morocco", from:100e6, to:94e6, at:{"cretaceous-late":[128, 45]}, fauna:["spin", "carc"]},
-  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:["pter"]},
+  {id:"niobrara", name:"Niobrara Chalk", where:"Kansas, USA", from:87e6, to:82e6, at:{"cretaceous-late":[91, 27]}, fauna:["pter", "xiph"]},
   {id:"aguja", name:"Aguja Formation", where:"Big Bend, Texas, USA", from:80e6, to:75e6, at:{"cretaceous-late":[76, 32]}, fauna:["dsuc"]},
   {id:"dinopark", name:"Dinosaur Park Formation", where:"Alberta, Canada", from:77e6, to:75e6, at:{"cretaceous-late":[93, 12]}, fauna:["styr", "para"]},
   {id:"djadokhta", name:"Djadokhta Formation", where:"Gobi Desert, Mongolia", from:75e6, to:71e6, at:{"cretaceous-late":[190, 30]}, fauna:["velo", "prot", "ovir", "mcer"]},
@@ -853,6 +871,8 @@ const THOUGHTS = {
 // Each vivarium size is also a building you can place
 for(const [size, v] of Object.entries(VIVARIUMS))
   BUILDINGS["viv" + size] = {label:v.label, one:"a " + v.label.toLowerCase(), glyph:"V" + size, color:"#5E9AA6", price:v.price, upkeep:v.upkeep, w:v.w, d:v.d, viv:size};
+for(const [size, v] of Object.entries(AQUARIUMS))
+  BUILDINGS["aqua" + size] = {label:v.label, one:"a " + v.label.toLowerCase(), glyph:"A" + size, color:"#3E86A8", price:v.price, upkeep:v.upkeep, w:v.w, d:v.d, viv:size, aqua:true};
 
 /* ---------------------------------------------------------------------
    KEEPERS
@@ -1470,13 +1490,19 @@ const LAND = {
   vdish:  {label:"Food Dish",           one:"a food dish",          price:250,  r:.8, color:"#8A8F96", vivToy:true, tray:6, fit:true, look:"vdish"},
   vlamp:  {label:"Basking Lamp",        one:"a basking lamp",       price:900,  r:.7, color:"#B87034", vivToy:true, lamp:true, fit:true, upkeep:6, look:"vlamp"},
   vpool:  {label:"Pool",                one:"a pool",               price:1800, r:1.3, color:"#3E86A8", vivToy:true, pool:true, poolM2:2.5, fit:true, flat:true, look:"vpool"},
+  // aquarium fittings and enrichment (aqua: aquariums only; the dish goes in both): filters clean `clean` load a day (AQUA) and draw `kw` of power
+  afilter:{label:"Canister Filter",     one:"a canister filter",    price:1500, r:.6, color:"#5E7E8A", vivToy:true, aqua:true, fit:true, filter:true, clean:30, kw:10, upkeep:8, look:"afilter"},
+  asump:  {label:"Sump Filter",         one:"a sump filter",        price:5000, r:1, color:"#46606A", vivToy:true, aqua:true, fit:true, filter:true, clean:120, kw:30, upkeep:25, look:"asump"},
+  arock:  {label:"Rock Arch",           one:"a rock arch",          price:600,  r:1, color:"#80796C", toy:2, vivToy:true, aqua:true, hide:true, look:"arock"},
+  aweed:  {label:"Seaweed Bed",         one:"a seaweed bed",        price:500,  r:.9, color:"#4E7A3A", toy:2, vivToy:true, aqua:true, look:"aweed"},
+  abubble:{label:"Bubble Curtain",      one:"a bubble curtain",     price:1100, r:.8, color:"#9FCFE0", toy:3, vivToy:true, aqua:true, look:"abubble"},
 };
 // Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at ROCK_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
 // Shelter pictures (sprites/shelter/<key>.png, made by tools/pixelshelter.py): size in pixels at ROCK_MPP a pixel, and `b`, the picture's base (its bottom row) in radii below the spot.
 const SHELTER_SPRITES = {shelter:{w:48, h:40, b:.78}, barn:{w:84, h:62, b:.78}, burrow:{w:26, h:14, b:.85}, cavesm:{w:62, h:34, b:.85}, cavelg:{w:92, h:50, b:.85}, canopysm:{w:42, h:34, b:.6}, canopylg:{w:70, h:52, b:.6}};
 // Food tray pictures (sprites/tray/<key>.png): flat dishes centered on the spot; `well` is [cx, cy, rx, ry] in pixels, the hollow the food is drawn into.
 const TRAY_SPRITES = {traysm:{w:18, h:9, well:[9, 4.5, 6.5, 2.6]}, traymd:{w:30, h:14, well:[15, 7, 11.5, 4.6]}, traylg:{w:46, h:20, well:[23, 10, 18, 7.4]}};
-const VIV_SPRITES = {vbark:{w:16, h:10}, vbranch:{w:16, h:20}, vdig:{w:16, h:11}, vfeed:{w:10, h:15}, vmist:{w:14, h:17}, vdish:{w:12, h:6, flat:true}, vlamp:{w:10, h:19}, vpool:{w:20, h:11, flat:true}};
+const VIV_SPRITES = {afilter:{w:10, h:16}, asump:{w:18, h:14}, arock:{w:20, h:12}, aweed:{w:14, h:22}, abubble:{w:12, h:24}, vbark:{w:16, h:10}, vbranch:{w:16, h:20}, vdig:{w:16, h:11}, vfeed:{w:10, h:15}, vmist:{w:14, h:17}, vdish:{w:12, h:6, flat:true}, vlamp:{w:10, h:19}, vpool:{w:20, h:11, flat:true}};
 // Vivarium food: animals eat from dishes (LAND.vdish), and keepers can only deliver into dishes, so a case with none can't be fed. A dish holds one food at a time, up to cap units
 // by case size, and serves perDish animals; more animals than dishes go hungry. A dish costs nothing to run.
 const VIV_DISH = {cap:{S:6, M:10, L:16}, perDish:4};
@@ -1486,6 +1512,9 @@ const VIV_LAMP = {per:4, radius:2.4, happy:6, lack:5, ill:.6, cold:1.5, comfort:
 const WARM_BLOODED = ["anch", "yiqi", "arch", "micr", "scan", "mono", "comp", "long"];
 // Pool: a pool counts as water for water lovers (their water want in haveOf, and thirst), up to `bonus` happiness for a full fit; none and they're dry
 const VIV_POOL = {bonus:5};
+// Aquarium water: the animals foul it by their food a day (their load) and filters clean it (LAND `clean`, only while powered). Quality (0 to 100) heads for
+// 100 x cleaning / load at `rate` points a day. Under `murky` the animals are unhappy (up to `lack`), under `foul` they fall ill (x`ill` at 0); clean water is worth `happy`.
+const AQUA = {rate:40, murky:60, foul:30, happy:6, lack:14, ill:3};
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
 const TRAY = {
@@ -2453,6 +2482,14 @@ const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join
 const SPECIES_INFO = {
   icht:{sci:"Ichthyostega stensioei", ft:5, desc:"One of the first animals with four limbs. It lived in the swamps of Late Devonian Greenland, and it had seven toes on each hind foot. It probably dragged itself over mud banks more than it walked, and still breathed through gills in the water. It sits near the line between fish and land animals."},
   tikt:{sci:"Tiktaalik roseae", ft:9, desc:"A fish with a neck. Tiktaalik lived in shallow Late Devonian streams about 375 million years ago, and its fossils were found on Ellesmere Island in the Canadian Arctic in 2004. It still had gills and fins, but it also had a flat head with eyes on top, a neck that could turn, and strong fin bones that could prop it up like arms. Its name comes from an Inuktitut word for a big freshwater fish."},
+  both:{sci:"Bothriolepis canadensis", ft:1, desc:"A small armored fish from the Late Devonian, its front half boxed in bony plates like a little tank. Instead of front fins it had two jointed, armored arms, and its eyes sat close together on top of its head. It grazed on the bottom of lakes and coastal waters, and its fossils have been found on every continent."},
+  dunk:{sci:"Dunkleosteus terrelli", ft:14, desc:"One of the first giant predators, an armored fish from the seas of the Late Devonian. It had no teeth: its jaws were sharp bony blades that sharpened themselves as they ground together, and it could snap them open fast enough to suck prey in. Its best fossils come from the Cleveland Shale of Ohio."},
+  stet:{sci:"Stethacanthus altonensis", ft:2.5, desc:"A small early shark with a strange crest on its back, flat-topped like an ironing board and covered in tiny tooth-like scales, with more of them on top of its head. Only the males had it, so it was probably for showing off. It swam in the shallow seas of the Carboniferous."},
+  heli:{sci:"Helicoprion bessonowi", ft:20, desc:"A Permian relative of ratfish with one of the strangest mouths ever: a spiral of teeth like a circular saw, set in its lower jaw. For a century nobody knew where the spiral went, until a scan of a fossil from Idaho in 2013 showed it filled the middle of the jaw and sliced squid-like prey as it closed."},
+  prom:{sci:"Promicroceras planicosta", ft:.1, desc:"A small ammonite, a relative of squid and octopus that lived in a coiled shell, swimming by squirting water and staying afloat with gas in the shell's chambers. Its shells, packed together in limestone, are the famous \"Marston Marble\" of Somerset, and they turn up on the beaches of Lyme Regis."},
+  ichy:{sci:"Ichthyosaurus communis", ft:6.5, desc:"A sea reptile shaped like a dolphin, with a long toothed snout, big eyes, flippers and a fish-like tail. It gave birth to live young in the water. Mary Anning and her brother found the first known skeleton at Lyme Regis in the 1810s, when nobody yet knew such animals had existed."},
+  plsa:{sci:"Plesiosaurus dolichodeirus", ft:11, desc:"A sea reptile with a small head on a very long neck, a broad body and four big flippers it flew through the water with, like a sea turtle. Mary Anning found the first complete skeleton at Lyme Regis in 1823, and it looked so odd that some experts thought it was a fake."},
+  xiph:{sci:"Xiphactinus audax", ft:17, desc:"A huge bony fish of the Late Cretaceous inland sea, with a bulldog face and fangs. One famous fossil from Kansas has a whole 6-foot fish inside its belly: it seems to have died from swallowing a meal that was too big."},
   mibr:{sci:"Microbrachis pelikani", ft:.5, desc:"A tiny, snake-shaped amphibian with a long body, a small head and four little legs, no longer than a hand. Thousands of its fossils have been found in the coal swamps of what is now the Czech Republic, many of them showing feathery gills, so it lived its life in the water. It hunted tiny animals in the pools of the Carboniferous forest."},
   hylo:{sci:"Hylonomus lyelli", ft:.7, desc:"One of the oldest known reptiles, from about 312 million years ago. Its fossils were found inside the hollow stumps of giant club moss trees at Joggins, Nova Scotia, where it and other small animals fell in and could not climb out. It looked like a small lizard and ate millipedes and insects. As an early reptile it could lay eggs on dry land, so it was free of the water."},
   arth:{sci:"Arthropleura armata", ft:8, desc:"The biggest land invertebrate that ever lived: a millipede relative up to about 8 feet long. It crawled over the forest floor of Carboniferous Europe and North America, and its trackways are still preserved in stone. It probably ate rotting plants and fallen debris. Scientists think the high oxygen in the air then let bugs grow this big."},
@@ -2976,8 +3013,8 @@ const GOALS = [
   {id:"hotel",    text:"Build a Safari Lodge",               hint:"Once your park has 3 stars and 300 guests a day, build a Safari Lodge beside a path.", reward:40000, check:g=>g.state.buildings.some(b=>b.type==="lodge")},
   {id:"resort",   text:"Build a Resort Hotel",               hint:"Once your park has 4 stars and 700 guests a day, build a Resort Hotel beside a path.", reward:150000, check:g=>g.state.buildings.some(b=>b.type==="resort")},
 ];
-// Held back from the v1.0 game (shown only in dev-mode): hotels, Education Centers and their modules, the tram. Placed ones in old saves keep working.
-const DEV_BUILDINGS = ["campground", "lodge", "resort", "edcenter", "tramstop", "depot"];
+// Held back from the v1.0 game (shown only in dev-mode): hotels, Education Centers and their modules, the tram, aquariums. Placed ones in old saves keep working.
+const DEV_BUILDINGS = ["campground", "lodge", "resort", "edcenter", "tramstop", "depot", "aquaS", "aquaM", "aquaL"];
 const DEV_TECH = ["vehicles", "hotels", "transit", "education", "edtheater", "edfossils", "edauditorium", "edlabwindow", "ednursery", "edbotanical", "edsimroom", "ediorama", "edtouch"];
 const DEV_GOALS = ["camp", "hotel", "resort"];
 const devHidden = (list, id) => !devMode() && list.includes(id);

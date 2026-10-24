@@ -523,10 +523,12 @@ const tramFare = () => state.tramFare ?? TRAM.fare;
 const tramWill = () => clamp(1 - PRICE_SENSE * (tramFare() - TRAM.fare) / TRAM.fare, 0, 1);
 const tramNear = pts => state.paths.some(p => isTram(p) && lineShapeDist(p.points, pts) <= TRAM.reach);
 const vivRank = size => ({S:1, M:2, L:3})[size] || 0;
+// A glass case's own numbers (price, upkeep, label): an aquarium's or a vivarium's. Both share the shape in VIVARIUMS.
+const caseOf = e => (e.aqua ? AQUARIUMS : VIVARIUMS)[e.viv];
 // A diet can be written as one word or a list; treat it as a list everywhere
 for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
 const eats = (s, d) => s.diet.includes(d);
-const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.bug ? ", bug" : "");
+const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.aqua ? ", marine" : "") + (s.bug ? ", bug" : "");
 
 // Does species x go after species y? Returns how, or null if it leaves it alone.
 // The rules are explained next to SPECIES in data.js.
@@ -541,7 +543,7 @@ function attackReason(x, y){
 function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
-function fitsHabitat(s, e){ return e.viv ? !!s.viv && vivRank(e.viv) >= vivRank(s.viv) : !s.viv; }
+function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && vivRank(e.viv) >= vivRank(s.viv) : !s.viv; }
 
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
@@ -586,9 +588,11 @@ function exhibitReport(e){
   // Vivarium animals need a vivarium big enough, and big animals don't fit in one
   for(const sp of counts.keys()){
     const s = SPECIES_BY_ID[sp];
-    if(e.viv && !s.viv){ target -= 40; issues.push({bad:true, text:`${s.name} is far too big for a vivarium.`}); }
-    else if(e.viv && vivRank(e.viv) < vivRank(s.viv)){ target -= 25; issues.push({bad:true, text:`${s.name} needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.`}); }
-    else if(!e.viv && s.viv){ target -= 20; issues.push({bad:true, text:`${s.name} needs a vivarium.`}); }
+    const need = (s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv];
+    if(e.viv && !s.viv){ target -= 40; issues.push({bad:true, text:`${s.name} is far too big for ${e.aqua ? "an aquarium" : "a vivarium"}.`}); }
+    else if(e.viv && !!s.aqua !== !!e.aqua){ target -= 40; issues.push({bad:true, text:s.aqua ? `${s.name} needs an aquarium.` : `${s.name} can't live under water.`}); }
+    else if(e.viv && vivRank(e.viv) < vivRank(s.viv)){ target -= 25; issues.push({bad:true, text:`${s.name} needs a ${need.label.toLowerCase()} or bigger.`}); }
+    else if(!e.viv && s.viv){ target -= s.aqua ? 60 : 20; issues.push({bad:true, text:`${s.name} needs ${s.aqua ? "an aquarium" : "a vivarium"}.`}); }
   }
   // Clones made from poor DNA are sickly. Animals from partner parks count as healthy.
   if(e.animals.length){
@@ -597,7 +601,7 @@ function exhibitReport(e){
     else if(avgQ < 70){ target -= 5; issues.push({bad:true, text:`Sickly clones (${Math.round(avgQ)}% DNA).`}); }
   }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
-  if(counts.size){
+  if(counts.size && !e.aqua){   // an aquarium has no plants to speak of
     const kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
     // Cenozoic animals are at home on the grass underfoot; older ones need plants from their own period (in the exhibit's biome)
     const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(haveOf(e, s).plants > 0));
@@ -755,7 +759,7 @@ function pathCost(pts, type){ return Math.round(lineLength(pts) * (type === "ser
 const fenceLineCost = (pts, barrier) => Math.round(lineLength(pts) * fenceRate(barrier || "wood"));
 function refundFor(kind, item){
   if(kind === "exhibit" && item.grid) return Math.round((area(item.points) * COST.landPerSqM + ownPieceCost(item)) * COST.refundShare) + landRefund(item);
-  if(kind === "exhibit") return Math.round((item.viv ? VIVARIUMS[item.viv].price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
+  if(kind === "exhibit") return Math.round((item.viv ? caseOf(item).price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
   if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
@@ -795,6 +799,7 @@ function tickStep(dtMin){
   eatTick(m1 - m0);
   behaviorTick(m1 - m0);
   dirtTick(m1 - m0);
+  aquaTick(m1 - m0);
   keepersTick(m1 - m0);
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
@@ -823,7 +828,7 @@ function dailyCosts(){
   let feed = 0, wages = 0, upkeep = 0;
   for(const e of state.exhibits){
     if(freeFeeding()) for(const a of e.animals) feed += SPECIES_BY_ID[a.sp].food;
-    upkeep += e.viv ? VIVARIUMS[e.viv].upkeep + landOf(e).reduce((n, f) => n + ((LAND[f.type] || {}).upkeep || 0), 0) : area(e.points) * UPKEEP.exhibitPerSqM;   // a vivarium's lamps run on the bill
+    upkeep += e.viv ? caseOf(e).upkeep + landOf(e).reduce((n, f) => n + ((LAND[f.type] || {}).upkeep || 0), 0) : area(e.points) * UPKEEP.exhibitPerSqM;   // a vivarium's lamps run on the bill
   }
   for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
   for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);

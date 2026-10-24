@@ -1738,7 +1738,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
     // biomes: every animal has one, vivarium animals too, home ground makes them happier, the wrong one is flagged, wetland counts as some water
-    out.biomesCover = SPECIES.every(s => biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
+    out.biomesCover = SPECIES.every(s => s.aqua ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));   // sea animals have none
     const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
@@ -3737,10 +3737,29 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = state.exhibits.filter(x => x !== pv);
 
       // pictures: the five old props and the new ones all come from sprites/viv through the pack, and the dish shows its food
-      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool"];
+      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble"];
       picsEv.land = keys.map((k, i) => ({id:"pc" + i, type:k, x:196 + i * 1.5, y:300}));
       const svgp = landSvg(picsEv, null, () => false);
       out.vivSpritesDrawn = keys.every(k => VIV_SPRITES[k] && svgp.includes(`sprites/viv/${k}.png`)) && !svgp.includes("<circle") && Object.keys(VIV_SPRITES).length === keys.length;
+      // aquariums: sea animals only there and nowhere else, only aquarium fittings (and a dish), filters keep the water clean while powered, foul water makes them unhappy and ill
+      const aq = {id:"e-aq", name:"Aq", viv:"L", aqua:true, wq:100, points:rectPts(320, 300, V.w, V.d, 0), animals:[0, 1, 2].map(i => ({id:"aq" + i, sp:"ichy", q:90})), happy:70};
+      state.exhibits.push(aq); recompute();
+      const sea = SPECIES_BY_ID.ichy, land = SPECIES_BY_ID.tikt;
+      out.aquaFits = fitsHabitat(sea, aq) && !fitsHabitat(land, aq) && !fitsHabitat(sea, ev) && !fitsHabitat(sea, {points:[]}) && fitsHabitat(land, ev) && SPECIES.filter(x => x.aqua).every(x => x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)));
+      out.aquaFittings = !vivToyProblem(aq, "afilter") && !vivToyProblem(aq, "vdish") && !!vivToyProblem(aq, "vlamp") && !!vivToyProblem(aq, "vpool") && !!vivToyProblem(ev, "afilter") && !vivToyProblem(ev, "vlamp");
+      const noFilter = filterText(aq), aim0 = wqAim(aq);
+      aquaTick(DAY_MIN); const dirty1 = wqOf(aq);
+      addVivToy(aq, "asump"); aq.filterPowered = true;
+      const aim1 = wqAim(aq); aq.filterPowered = false; const aimOff = wqAim(aq), offText = filterText(aq); aq.filterPowered = true;
+      aq.wq = 10; const repFoul = exhibitReport(aq), illFoul = illChance(aq, aq.animals[0]);
+      aq.wq = 100; const repClean = exhibitReport(aq), illClean = illChance(aq, aq.animals[0]);
+      out.aquaWater = noFilter === "No filter." && aim0 === 0 && Math.abs(dirty1 - (100 - AQUA.rate)) < .01 && aim1 === 100 && aimOff === 0 && /power/.test(offText) && !filterText(aq)
+        && repFoul.target < repClean.target && repFoul.issues.some(i => /Foul water/.test(i.text)) && illFoul.why.includes("foul water") && !illClean.why.includes("foul water") && illFoul.p > illClean.p
+        && !thirsty(aq, sea) && !(aq.dirt > 0) && aquaLoad(aq) === 3 * sea.food;
+      const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();
+      out.aquaPowerDraw = d0 - d1 === LAND.asump.kw;
+      out.aquaDrawn = (() => { const g = viv34(aq, "front", null); aq.wq = 0; const f = viv34(aq, "front", null); aq.wq = 100; const c = AQUA34.clean.toLowerCase(); return f !== g && g.includes(c) && f.includes(AQUA34.foul.toLowerCase()) && !viv34(ev, "front", null).includes(c); })();   // the water's colour follows its quality
+      state.exhibits = state.exhibits.filter(x => x !== aq);
       const dfull = {id:"pd", type:"vdish", x:200, y:300, cap:6, food:{[ft]:6}};
       out.vivDishShowsFood = vivPropSvg(dfull, LAND.vdish).includes("<rect") && !vivPropSvg({...dfull, food:{}}, LAND.vdish).includes("<rect");
 

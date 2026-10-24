@@ -28,6 +28,7 @@ const BUILD_MENU = [
   ]},
   {id:"exhibits", label:"Exhibit Tools", items:[
     {label:"Vivariums", sub:["vivS", "vivM", "vivL"]},
+    {label:"Aquariums", sub:["aquaS", "aquaM", "aquaL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
     {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold. Animals walk inside to hide, sleep and wait out bad weather, and aren't seen there. A privacy screen by the fence shields shy animals from the path's view without hiding them. Keepers walk in to fill food trays, which each hold one kind of food. Rubbing posts, log piles and mud wallows give bored animals something to do."},
@@ -80,7 +81,7 @@ const BUILD_MENU = [
 ];
 
 // Names the build menu shows when they differ from the building's own label
-const BUILD_NAMES = {vivS:"Small", vivM:"Medium", vivL:"Large", kiosk:"Cart", food:"Stand", restaurant:"Restaurant", cart:"Cart", shop:"Stand", megastore:"Shop",
+const BUILD_NAMES = {vivS:"Small", vivM:"Medium", vivL:"Large", aquaS:"Small", aquaM:"Medium", aquaL:"Large", kiosk:"Cart", food:"Stand", restaurant:"Restaurant", cart:"Cart", shop:"Stand", megastore:"Shop",
   campground:"Campground", lodge:"Safari Lodge", resort:"Resort Hotel"};
 
 const ICON_LINES = {
@@ -112,6 +113,7 @@ const ICON_LINES = {
   paint:'<rect x="3" y="5" width="18" height="14" rx="2" fill="#BFA96C"/><path d="M3 12l6-7h6l-9 14H5a2 2 0 0 1-2-2z" fill="#7DAA68"/><path d="M15 19l6-8v6a2 2 0 0 1-2 2z" fill="#DFC48A"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
+  aqua:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/><rect x="4" y="9" width="16" height="9" fill="#3E86A8"/><path d="M4 9h16" stroke="#BFE6F5" stroke-width="1"/><circle cx="9" cy="14" r="1.2" fill="#BFE6F5"/><circle cx="12" cy="11.5" r=".8" fill="#BFE6F5"/>',
   grid:'<path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="14.6" cy="9.3" r="2.2" fill="currentColor"/>',
   supply:'<path d="M4 18L12 6l8 12" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2"/><circle cx="4" cy="18" r="2" fill="#E0A030"/><circle cx="20" cy="18" r="2" fill="#E0A030"/>',
   bulldoze:'<g transform="matrix(-1 0 0 1 24 0)"><path d="M2 9h2.5v11H2z" fill="currentColor"/><path d="M4.5 13l4-1M4.5 17h4" stroke="currentColor" stroke-width="1.6"/><path d="M8 11h4V5h6l2 6h1v6H8z" fill="currentColor"/><path d="M13.3 6.5h3.6l1.3 4.5h-4.9z" fill="#1F3A2B" fill-opacity=".75"/><rect x="7.5" y="17.5" width="15" height="5" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="10" cy="20" r="1.1" fill="currentColor"/><circle cx="15" cy="20" r="1.1" fill="currentColor"/><circle cx="20" cy="20" r="1.1" fill="currentColor"/></g>',
@@ -127,6 +129,7 @@ function menuSprite(tool){
   if(/^(water|paint)-/.test(tool)) return has(`sprites/${tool.startsWith("water") ? "water" : "ground"}/${tool.replace(/^\w+-/, "")}-1.png`);
   if(tool === "gate") return has("sprites/fence/wood-gate.png");
   if(tool.startsWith("fence-")) return has(`sprites/fence/${k.slice(6)}-pristine.png`);
+  if(BUILDINGS[tool] && BUILDINGS[tool].aqua) return null;   // drawn icon until aquariums have thumbnails
   if(BUILDINGS[tool] && BUILDINGS[tool].viv) return has(`sprites/menu/viv-${BUILDINGS[tool].viv}.png`);   // thumbnails from tools/pixelvivicon.py
   if(BUILDINGS[tool]) return (BLD_PICS[tool] || typeof PROP_PICS !== "undefined" && PROP_PICS[tool]) && has(`sprites/bld/${tool}-front.png`);   // only the pictures the map draws (a blank placeholder may sit in the pack)
   if(tool === "land-rock" || tool === "land-boulder") return has(`sprites/rocks/${k}-temperate-1.png`);
@@ -139,7 +142,7 @@ function menuIcon(tool, color, glyph){
     : /^(water|paint)\b/.test(tool) ? [0, 8, 16].flatMap(x => [0, 8, 16].map(y => img(`x="${x}" y="${y}" width="8.01" height="8.01"`))).join("")
     : img(`x="1" y="1" width="22" height="22" preserveAspectRatio="xMidYMax meet"`);
   const b = BUILDINGS[tool];
-  if(!inner && b) inner = b.viv ? ICON_LINES.viv : `<rect x="3" y="6" width="18" height="13" rx="2" fill="${b.color}"/>${b.glyph ? `<text x="12" y="13" class="glyph" font-size="10">${esc(b.glyph)}</text>` : ""}`;
+  if(!inner && b) inner = b.aqua ? ICON_LINES.aqua : b.viv ? ICON_LINES.viv : `<rect x="3" y="6" width="18" height="13" rx="2" fill="${b.color}"/>${b.glyph ? `<text x="12" y="13" class="glyph" font-size="10">${esc(b.glyph)}</text>` : ""}`;
   if(!inner && color) inner = `<path d="M3 16h18" stroke="${color}" stroke-width="5" stroke-linecap="round"/><path d="M3 16h18" stroke="#fff" stroke-width="1" stroke-dasharray="1 4" opacity=".6"/>`;
   return `<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true">${inner || ""}</svg>`;
 }
