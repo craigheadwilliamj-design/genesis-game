@@ -136,7 +136,7 @@ function socialInfo(e, ratio){
       const parts = [];
       if(i.alone) parts.push(`Pack too small. A lone ${s.name} is anxious and lonely: they live in packs of ${min} or more.`);
       else if(small) parts.push(`Pack too small. ${s.name} live in packs of ${min} or more, and there are only ${n}.`);
-      if(!po.pair) parts.push(i.alone ? "No alpha pair." : `No alpha pair. ${m ? "Only males" : "Only females"} lead the ${s.name}; a male and a female should.`);
+      if(!po.pair) parts.push(i.alone ? "No alpha pair." : `No alpha pair. ${m ? "Only males" : "Only females"} lead the ${s.name}.`);
       if(i.short) parts.push("Short of food. The alpha pair eats first and the rest go hungry.");
       i.bad = !!parts.length;
       i.text = parts.length ? parts.join(" ") : `A settled ${s.name} pack, led by an alpha pair.`;
@@ -435,14 +435,14 @@ function behaviorScore(e){
   if(pacing.length){
     const why = {}; for(const a of pacing) why[a.why || "bored"] = (why[a.why || "bored"] || 0) + 1;
     const top = Object.keys(why).sort((x, y) => why[y] - why[x])[0];
-    out.issues.push({bad:true, text:`Pacing. ${pacing.length} ${names(pacing)} ${pacing.length === 1 ? "is" : "are"} pacing, mostly because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[top]}. ${WHY_FIX[top]}`});
+    out.issues.push({bad:true, text:`Pacing. ${pacing.length} ${names(pacing)} ${pacing.length === 1 ? "is" : "are"} pacing, mostly because ${pacing.length === 1 ? "it's" : "they're"} ${whyText[top]}.`});
   }
   const inside = list.filter(a => a.inside);
   if(inside.length) out.issues.push({bad:false, text:`${inside.length} ${names(inside)} ${inside.length === 1 ? "is" : "are"} inside a shelter (${[...new Set(inside.map(insideText))].join(", ").toLowerCase()}). Guests can't see ${inside.length === 1 ? "it" : "them"}.`});
   const gone = 1 - hideAvgOf(e);
-  if(gone > HIDING.from) out.issues.push({bad:true, text:`${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests are let down by an exhibit with nothing to see.`});
-  if(hiding.length) out.issues.push({bad:true, text:`Hiding. ${hiding.length} ${names(hiding)} ${hiding.length === 1 ? "is" : "are"} hiding. Something here frightens ${hiding.length === 1 ? "it" : "them"}. See Behavior.`});
-  if(stress >= 50 && !hiding.length && !pacing.length) out.issues.push({bad:true, text:`Stressed (${Math.round(stress)}%). See Behavior.`});
+  if(gone > HIDING.from) out.issues.push({bad:true, text:`${gone >= .5 ? "Most" : "Many"} animals are hiding. Guests are let down by an exhibit with nothing to see.`});
+  if(hiding.length) out.issues.push({bad:true, text:`Hiding. ${hiding.length} ${names(hiding)} ${hiding.length === 1 ? "is" : "are"} hiding. Something here frightens ${hiding.length === 1 ? "it" : "them"}.`});
+  if(stress >= 50 && !hiding.length && !pacing.length) out.issues.push({bad:true, text:`Stressed (${Math.round(stress)}%).`});
   for(const i of socialInfo(e).values()){ out.delta += i.delta * i.n / list.length; out.issues.push({bad:i.bad, text:`Social. ${i.text}`}); }
   if(playing.length) out.issues.push({bad:false, text:`${playing.length} ${names(playing)} ${playing.length === 1 ? "is" : "are"} playing.`});
   return out;

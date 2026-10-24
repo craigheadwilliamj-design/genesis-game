@@ -38,7 +38,7 @@ const moodWord = m => m >= 80 ? "Delighted" : m >= 60 ? "Happy" : m >= 40 ? "Oka
 const moodColor = m => m >= 60 ? "#3E9B4F" : m >= 35 ? "#E3B23C" : "#D9483B";
 // The panel for a tapped party. The numbers inside are filled in (and kept fresh) by guestLive.
 function guestHtml(p){
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(p.name)}</h2>`;
+  let h = `<h2>${esc(p.name)}</h2>`;
   h += `<div class="meta">Party of ${p.n}${p.hotel ? " · hotel guests" : ""}${p.sneaked ? " · slipped in without a ticket" : ""}</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="gStatus"></span></div>`;
   h += `<section><h3>Happiness <span class="num" id="gMoodN"></span></h3><div class="meter"><i id="gMoodBar"></i></div></section>`;
@@ -84,7 +84,7 @@ function guestLive(force){
 function guestBuildingHtml(b){
   const t = BUILDINGS[b.type], reach = isReachable(b), q = queueAt(b);
   const served = b.served && b.served.day === state.day ? b.served : {n:0, money:0, items:{}};
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  let h = `<h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   if(t.rooms) return h + hotelHtml(b);
   if(t.kind) h += menuHtml(b, served) + vendorStockHtml(b);

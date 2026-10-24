@@ -47,7 +47,7 @@ function dockHtml(b){
       <button class="buy" data-action="rush" data-t="${t}"${canAfford(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup)) ? "" : " disabled"} title="Delivered now">Rush ${LOGI.rushLot}, ${money(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup))}</button>
       <span class="need">${isGuestGood(t) ? `$${unitPrice(t).toFixed(2)}` : money(Math.round(unitPrice(t)))} a unit. Tonight: ${n} units${n && price ? ` (${money(Math.round(n * price))})` : ""}.</span></li>`;
   }).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? `Partner parks pay for deliveries until ${fmtDate(state.staff.feedFrom)}.` : `Tonight's delivery costs about ${money(Math.round(cost))}.`} Farms and ranches make food cheaper once you have researched food production.</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? "" : `Tonight's delivery costs about ${money(Math.round(cost))}. `}Farms and ranches make food cheaper once you have researched food production.</div></section>`;
   return h;
 }
 
@@ -68,7 +68,7 @@ function warehouseHtml(b){
 
 function zoneHtml(z){
   const m = zoneMembers(z);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><label class="field"><span>Zone name</span><input id="zName" data-field="name" value="${esc(z.name)}" maxlength="40"></label>`;
+  let h = "";
   h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
   h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed and clean only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
 

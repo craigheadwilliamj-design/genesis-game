@@ -72,6 +72,8 @@ const ui = {
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
     if(sel && sel.kind === "animal") animalLive(true);
+    { const nm = $("#sheetName"), rename = !!it && (sel.kind === "exhibit" || sel.kind === "zone");   // an exhibit or zone is renamed right in the top bar
+      $("#sheetToggle").hidden = rename; nm.hidden = !rename; if(rename && document.activeElement !== nm) nm.value = it.name; }
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : officeTab === "menu" ? "Main menu" : "Park office";
   },
 
@@ -115,7 +117,7 @@ function officeTabs(){
 }
 const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
-  return `<button class="back" data-action="otab2" data-k="office">‹ Park office</button><h2>Main Menu</h2>
+  return `<h2>Main Menu</h2>
     <p class="meta" style="margin-bottom:10px">Park biome: ${esc(BIOMES[parkBiome()].label)}. It was set when the park opened and can't be changed.</p>
     <label class="field" style="margin:10px 0"><span><input type="checkbox" id="sandboxToggle"${state.sandbox ? " checked" : ""}> Sandbox mode: unlimited money and research points, instant research, cloning, growing and time travel trips</span></label>
     <p id="saveInfo" class="meta">${esc(saveMsg || "Saved in this browser.")} Your park saves by itself as you play.</p>
@@ -247,14 +249,13 @@ function exhibitHtml(e){
   const tabs = exTabList(e);
   if(!tabs.some(t => t.key === exTabs.tab)) exTabs.tab = "main";
   // the header shows on every tab: name, and the few things worth seeing at a glance
-  let h = `<button class="back" data-action="deselect">‹ Park office</button>`;
-  h += `<label class="field"><span>Exhibit name</span><input id="exName" data-field="name" value="${esc(e.name)}" maxlength="40"></label>`;
+  let h = ``;
   h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
   h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
-  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => (x.viv ? vivSceneHtml(x) : landHtml(x)) + themeHtml("exhibit", x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
   return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
@@ -271,7 +272,7 @@ function exOverviewHtml(e, rep){
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
-      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
+      <div style="margin-top:6px;font-size:14px;color:var(--ink)">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
   } else {
     h += `<section><h3>Empty</h3><div class="meta">${e.viv ? `Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}. ` : ""}No animals live here yet. Clones and animals from partner parks move in from the Cloning tab.</div>
       <div class="row" style="margin-top:6px"><button class="btn" data-action="extab" data-k="clone">Add animals</button></div></section>`;
@@ -299,7 +300,7 @@ function exOverviewHtml(e, rep){
   h += callRow(e, "keeper");
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
-    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
+    h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.</div>`;
   }
   return h + `</section>`;
 }
@@ -318,10 +319,11 @@ function exBarrierHtml(e){
   notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
   h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
   h += callRow(e, "mech") + `</section>`;
-  h += `<section><h3>Extra security</h3><div class="row">`;
-  h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at the Research Lab</span>`;
-  h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at the Research Lab</span>`;
-  h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at the Research Lab</span>`;
+  const sec = (name, st, body) => `<div class="sec-item ${st}"><span class="sec-name">${name}</span><span class="sec-act">${body}</span></div>`, lock = `<span class="status">Research at the Research Lab</span>`;
+  h += `<section><h3>Extra security</h3><div class="sec-list">`;
+  h += sec("Moat", e.moat ? "on" : hasTech("moat") ? "" : "locked", e.moat ? `<span class="status ok">Nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : lock);
+  h += sec("Aviary netting", e.aviary ? "on" : hasTech("aviary") ? "" : "locked", e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : lock);
+  h += sec("Catch netting", e.net ? "on" : hasTech("catchnet") ? "" : "locked", e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : lock);
   return h + `</div></section>`;
 }
 // Health tab: sanitation, the animals' health, and the vet
@@ -336,17 +338,17 @@ function exGuestsHtml(e){
   const X = exLog(e), a = exhibitAppeal(e), ranked = state.exhibits.filter(x => x.animals.length).map(x => [x, exhibitAppeal(x)]).sort((p, q) => q[1] - p[1]);
   const rank = ranked.findIndex(([x]) => x === e) + 1, view = Math.round(viewFactor(e, derived.reach) * 100);
   let h = `<section><h3>Guest appeal</h3>`;
-  h += e.animals.length ? `<div class="meta">${rank === 1 && ranked.length > 1 ? "The biggest draw in the park." : ranked.length > 1 ? `${ordinal(rank)} biggest draw of ${ranked.length} exhibits with animals.` : "The only exhibit with animals."} Bigger and rarer animals, and happier ones, draw more guests.</div>`
+  h += e.animals.length ? `<div class="meta">${rank === 1 && ranked.length > 1 ? "The biggest draw in the park." : ranked.length > 1 ? `${ordinal(rank)} biggest draw of ${ranked.length} exhibits with animals.` : "The only exhibit with animals."}</div>`
     : `<div class="meta">Guests only stop at an exhibit with animals in it.</div>`;
-  if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div><div class="meta" style="margin-top:4px">How well guests can see in past the fence. Viewing platforms raise it.</div>`;
+  if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div>`;
   const plats = e.viv ? 0 : state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
   if(!e.viv && (plats || hasTech("platform"))) h += `<div class="row" style="margin-top:6px"><span class="meta">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}.` : "No viewing platforms."}</span>${hasTech("platform") ? `<button class="btn" data-action="platformTool">Add a viewing platform</button>` : ""}</div>`;
-  h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Has an info sign, so guests learn far more here." : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</li></ul></section>`;
+  h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Has an exhibit sign." : "No exhibit signs."}</li></ul></section>`;
   const day = (v, w) => `<div class="factor exday"><span>${v}</span>${w}</div>`;
   h += `<section><h3>Visitors</h3>${day("", `<span class="meta">Today</span><span class="meta">Yesterday</span>`)}`;
   h += day("Stopped to watch", `<span>${Math.round(X.views)}</span><span>${Math.round(X.last.views)}</span>`);
   h += day("Donations", `<span>${money(Math.round(X.gifts))}</span><span>${money(Math.round(X.last.gifts))}</span>`);
-  h += `<div class="meta" style="margin-top:4px">Donations are what guests gave on the way out, shared among the exhibits by how much they learned at each.</div></section>`;
+  h += `</section>`;
   const th = exThoughts(e, 8);
   h += `<section><h3>Guest thoughts</h3>`;
   h += th.length ? `<ul class="issues">${th.map(t => `<li class="${t.good ? "" : "bad"}"><span>"${esc(t.text)}" <span class="meta">${Math.max(1, Math.round(t.share * 100))}%</span></span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Share of ${X.views ? "today's" : "yesterday's"} visitors who thought it here.</div>`
@@ -523,12 +525,14 @@ function behaviorHtml(e){
   const ctx = behaviorCtx(e), en = Math.round(ctx.enrich * 100), col = v => v < 35 ? "var(--good)" : v < 65 ? "var(--warn)" : "var(--bad)";
   let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
   h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
-  h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Habitat Items tab), plants from their own period" : "enrichment props (Habitat Items), the rocks, plants and water they like"}, and room to roam.</div></section>`;
+  h += `</section>`;
   if(!e.viv){
     const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
     h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;
-    h += `<div class="meta" style="margin-top:4px;color:${gone > HIDING.from ? "var(--bad)" : "inherit"}">${gone > HIDING.from ? `${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests who see an empty exhibit are let down, though well-informed ones forgive it.` : "Most of the animals are out where guests can see them."}</div>`;
-    h += `<div class="meta" style="margin-top:4px">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%${quietSigns(e).length ? `, with ${quietSigns(e).length} quiet sign${quietSigns(e).length === 1 ? "" : "s"} by the fence` : ""}${screenShare(e) ? `, ${Math.round(screenShare(e) * 100)}% of the herd behind a privacy screen` : ""}. ${shy ? "Shy animals feel it most. " : ""}Animals inside a shelter are out of sight, sleeping at night doesn't count against you, and weather shelter only a little.</div></section>`;
+    const qs = quietSigns(e).length, ss = screenShare(e), extra = [qs ? `${qs} quiet sign${qs === 1 ? "" : "s"} by the fence` : "", ss ? `${Math.round(ss * 100)}% of the herd behind a privacy screen` : ""].filter(Boolean);
+    h += `<div style="margin-top:8px;font-size:17px;font-weight:600;color:var(--ink)">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%</div>`;
+    if(extra.length || shy) h += `<div class="meta" style="margin-top:2px">${extra.length ? `With ${extra.join(", ")}. ` : ""}${shy ? "Shy animals feel it most." : ""}</div>`;
+    h += `</section>`;
   }
   const soc = [...ctx.soc.values()];
   if(soc.length) h += `<section><h3>Social</h3>${soc.map(i => `<div class="meta" style="color:${i.bad ? "var(--bad)" : "var(--good)"}">${esc(i.text)}</div>`).join("")}</section>`;
@@ -641,7 +645,6 @@ $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
-const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `At home in ${biomeNames(s)}. ` : "") + traitText(s) + ". ";
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
@@ -650,18 +653,21 @@ function animalCard(s, rep, mode){
   let warn = "";
   for(const sp of rep.counts.keys()){ const w = conflict(s, SPECIES_BY_ID[sp]); if(w){ warn = w; break; } }
   const have = rep.counts.get(s.id) || 0, fits = Math.floor(free / s.space);
-  const fitText = fits > 0 ? `Room for ${fits} more.` : "";
-  const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>`
-    : have === 0 && s.group[0] > 1 ? `<span class="need">${fitText} Get at least ${s.group[0]} so they aren't lonely.</span>` : `<span class="fit">${fitText}</span>`;
+  const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>` : "";
   let h = `<li class="${locked ? "locked" : ""}"><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)} <span class="per">${s.period}</span></span>`;
   if(locked) h += `<span class="meta">Needs ${starsNeed(s)}★ (you have ${starTxt(state.rating)})</span>`;
   else if(mode === "clone"){
     const why = cloneProblem(s.id);
     h += `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>`;
   } else { const off = canAfford(s.price) ? "" : " disabled"; h += `<button class="buy" data-action="buy" data-sex="male" data-sp="${s.id}"${off}>Buy M ${money(s.price)}</button><button class="buy" data-action="buy" data-sex="female" data-sp="${s.id}"${off}>Buy F ${money(s.price)}</button>`; }
-  h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
-  if(mode === "clone") h += ` Genome ${state.science.dna[s.id].genome}% complete, clones ${cloneQuality(s.id)}% DNA quality${cloneFailChance(s.id) > 0 ? `, ${Math.round(cloneFailChance(s.id) * 100)}% failure risk` : ""}. ${freeBay("gene") >= 0 ? ` Ready ${whenText(cloneReadyMin(s.id))}.` : ""}`;
-  h += `</span>`;
+  if(mode === "clone"){
+    // how long a clone takes, as a bar against the slowest species, with when it would be ready and the chance it fails
+    const fail = cloneFailChance(s.id), risk = fail > 0 ? `${Math.round(fail * 100)}% failure risk` : "";
+    if(freeBay("gene") >= 0){
+      const slow = Math.max(...SPECIES.map(x => cloneMinutes(x.id))), pct = Math.max(4, Math.round(cloneMinutes(s.id) / slow * 100));
+      h += `<span class="need" style="grid-column:1/-1"><span class="meter" style="display:block;margin-bottom:4px"><i style="display:block;width:${pct}%;background:var(--gold)"></i></span>Ready ${whenText(cloneReadyMin(s.id))}${risk ? `. ${risk}` : ""}.</span>`;
+    } else if(risk) h += `<span class="need" style="grid-column:1/-1">${risk}.</span>`;
+  }
   if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build the Genetics Lab to clone it.</span>`;
   else if(mode === "clone" && !dept("tar")) h += `<span class="warn">The Genetics Lab isn't connected to a path or service road.</span>`;
   else if(!locked) h += fitLine;
@@ -671,7 +677,7 @@ function animalCard(s, rep, mode){
 
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><div><h2>${t.label}</h2>${t.full ? `<div class="meta">${esc(t.full)}</div>` : ""}</div>`;
+  let h = `<div><h2>${t.label}</h2>${t.full ? `<div class="meta">${esc(t.full)}</div>` : ""}</div>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Staffed and running" : "Not connected"}</span><span class="meta">${money(t.upkeep)} a day to run</span></div>`;
   if(!ok) h += `<div class="meta" style="color:var(--bad)">Staff can't get here. Run a path or service road from the entrance to it. Until then it does nothing.</div>`;
   return h;
@@ -690,7 +696,7 @@ function stationHtml(b){
   h += `<div class="meta">${esc(BUILDINGS.station.blurb)} Keepers carry ${Math.round(carryMax())} food units of one type at a time.</div>` + zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
   h += staffNote("keeper");
-  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? `Partner parks are feeding your animals until ${fmtDate(state.staff.feedFrom)}.` : "Your keepers are feeding the animals."} Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
+  h += `<section><h3>Feeding</h3><div class="meta">${freeFeeding() ? "" : "Your keepers are feeding the animals. "}Food comes from the Delivery Dock or your own farms, and sits in stores until a keeper carries it out. Exhibits need a gate on a service road. Vivariums don't.</div>`;
   const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
   if(cut.length) h += `<div class="meta" style="color:var(--bad);margin-top:6px">Keepers can't get into: ${cut.map(e => esc(e.name)).join(", ")}.</div>`;
   h += `</section>`;
@@ -806,7 +812,7 @@ function buildingBody(b){
   if(BUILDINGS[b.type].tram) return tramStopHtml(b) + demolishRow(b);
   if(guestBuilding(b) || BUILDINGS[b.type].prop) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  let h = `<h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   return h + demolishRow(b);
@@ -823,7 +829,7 @@ function tramFareHtml(){
 function tramStopHtml(b){
   const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]), worn = !tramWorking(b), k = knownCond(b);
   const ok = foot && rail && !worn, why = !isReachable(b) ? "No path from the entrance." : worn ? "Out of order." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${t.label}</h2>`;
+  let h = `<h2>${t.label}</h2>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Open to riders" : why}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   h += `<div class="meta">Stops taking riders below ${TRAM.offlineBelow}%. Wears about ${Math.round(tramWear(b) * 10) / 10}% a day, more with more track. ${state.staff.mechanics.length ? "Mechanics repair it." : "Hire a mechanic at a Workshop to keep it running."}</div>`;
@@ -835,7 +841,7 @@ function tramStopHtml(b){
 // Tram track: how many working stations it serves, and what it costs
 function tramTrackHtml(p){
   const stops = tramStops(p).stops.length;
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>Tram track</h2>`;
+  let h = `<h2>Tram track</h2>`;
   h += `<div class="row"><span class="status ${stops >= 2 ? "ok" : "no"}">${stops >= 2 ? `Runs between ${stops} stations` : "Needs two connected stations"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
   h += `<div class="meta">Guests ride between stations at ${TRAM.speedMult} times walking pace. Build a Tram station beside a footpath and this track. It costs ${money(TRAM.upkeepPerMeter)} a meter a day to run, and stations wear faster with more track.</div>`;
   h += tramFareHtml();
@@ -845,7 +851,7 @@ function tramTrackHtml(p){
 function pathHtml(p){
   if(isTram(p)) return tramTrackHtml(p);
   const svc = isService(p), live = (svc ? derived.joinedAll : derived.joined).has(p.id);
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
+  let h = `<h2>${p.fixed ? esc(p.name) : svc ? "Service road" : isWide(p) ? "Wide path" : isBridge(p) ? "Wooden bridge" : "Footpath"}</h2>`;
   h += `<div class="row"><span class="status ${live ? "ok" : "no"}">${live ? "Connected to the entrance" : "Not connected to the entrance"}</span><span class="meta">${Math.round(lineLength(p.points))} m</span></div>`;
   if(svc) h += `<div class="meta">Staff only. Guests won't walk here, and exhibits beside it can't be seen. Backstage buildings like the Research Lab, the Time Travel Lab, and the Genetics Lab can use it.</div>`;
   if(isWide(p)) h += `<div class="meta">10 m wide. Holds twice the crowd before guests feel packed.</div>`;
@@ -859,7 +865,7 @@ function pathHtml(p){
 // An open fence: a hedge row or a wall that isn't closed into an exhibit
 function fenceLineHtml(l){
   const B = BARRIERS[l.barrier] || BARRIERS.wood;
-  let h = `<button class="back" data-action="deselect">‹ Park office</button><h2>${esc(B.label)}</h2>`;
+  let h = `<h2>${esc(B.label)}</h2>`;
   h += `<div class="meta">${Math.round(lineLength(l.points))} m of open fence. ${B.hedge ? "Guests enjoy hedge rows along the paths." : "It marks off part of the park."} To make an exhibit, draw a fence that closes on its first corner.</div>`;
   h += `<div class="row"><button class="btn danger" data-action="demolish">Bulldoze for +${money(refundFor("fence", l))}</button></div>`;
   return h;
@@ -954,10 +960,12 @@ panelEl.addEventListener("click", e => {
     bulldozeItem(sel.kind, it);
   }
 });
-panelEl.addEventListener("input", e => {
-  const it = selItem();
-  if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
+$("#sheetName").addEventListener("input", e => {
+  const it = selItem(); if(!it || !(sel.kind === "exhibit" || sel.kind === "zone")) return;
+  it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon();
 });
+$("#sheetName").addEventListener("change", e => { const it = selItem(); if(it) e.target.value = it.name; });
+$("#sheetName").addEventListener("keydown", e => { if(e.key === "Enter") e.target.blur(); });
 $("#panelClose").onclick = closePanel;
 
 /* ---------- moving and resizing the panel like a window ---------- */
@@ -977,7 +985,7 @@ function placePanel(){
 function savePanelBox(){ try { if(panelBox) localStorage.setItem(PANEL_KEY, JSON.stringify(panelBox)); else localStorage.removeItem(PANEL_KEY); } catch {} }
 aside.addEventListener("pointerdown", e => {
   if(panelNarrow() || e.button) return;
-  const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button");
+  const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button, input");
   if(!grip && !head) return;
   e.preventDefault();
   const m = aside.parentElement.getBoundingClientRect(), r = aside.getBoundingClientRect(), dir = grip ? grip.dataset.rsz : "";
@@ -997,7 +1005,7 @@ aside.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 // Double-click the top bar to put the panel back by the right column
-aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
+aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button, input") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
 addEventListener("resize", placePanel);
 placePanel();
 

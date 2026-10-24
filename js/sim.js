@@ -574,13 +574,13 @@ function exhibitReport(e){
     const ratio = a / need;
     if(ratio < 1){ target -= (1 - ratio) * 70; issues.push({bad:true, text:`Cramped. The animals need ${fmtArea(need)} and have ${fmtArea(a)}.`}); }
     else if(ratio >= 1.5){ target += 12; issues.push({bad:false, text:"Plenty of room to roam."}); }
-    else { target += 4; issues.push({bad:false, text:`Enough room. Half again as much (${fmtArea(need * 1.5)}) would make them happier.`}); }
+    else { target += 4; issues.push({bad:false, text:"Enough room."}); }
   }
   let groupsOk = counts.size > 0;
   for(const [sp, n] of counts){
     const s = SPECIES_BY_ID[sp], [lo, hi] = s.group;
-    if(n < lo){ groupsOk = false; target -= 22 * (lo - n) / lo; issues.push({bad:true, text:`Lonely. ${s.name} likes groups of ${lo} to ${hi}.`}); }
-    if(n > hi){ groupsOk = false; target -= 12; issues.push({bad:true, text:`Too many ${s.name}. They get along in groups of ${lo} to ${hi}.`}); }
+    if(n < lo){ groupsOk = false; target -= 22 * (lo - n) / lo; issues.push({bad:true, text:`Lonely. ${s.name} wants more company.`}); }
+    if(n > hi){ groupsOk = false; target -= 12; issues.push({bad:true, text:`Too many ${s.name}. It's crowded.`}); }
   }
   if(groupsOk){ target += 5; issues.push({bad:false, text:"Every species is in a group size it likes."}); }
   // Vivarium animals need a vivarium big enough, and big animals don't fit in one
@@ -593,7 +593,7 @@ function exhibitReport(e){
   // Clones made from poor DNA are sickly. Animals from partner parks count as healthy.
   if(e.animals.length){
     const avgQ = e.animals.reduce((s, x) => s + (x.q ?? 90), 0) / e.animals.length;
-    if(avgQ < 50){ target -= 12; issues.push({bad:true, text:`Frail clones. Their DNA quality averages ${Math.round(avgQ)}%. Better samples make healthier clones.`}); }
+    if(avgQ < 50){ target -= 12; issues.push({bad:true, text:`Frail clones. Their DNA quality averages ${Math.round(avgQ)}%.`}); }
     else if(avgQ < 70){ target -= 5; issues.push({bad:true, text:`Some clones are sickly. DNA quality averages ${Math.round(avgQ)}%.`}); }
   }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
@@ -602,30 +602,29 @@ function exhibitReport(e){
     // Cenozoic animals are at home on the grass underfoot; older ones need plants from their own period (in the exhibit's biome)
     const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(haveOf(e, s).plants > 0));
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === "cenozoic") ? FLORA.cenozoic.plants : "plants from their own time"}.`}); }
-    else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era. Plants from ${away.length === 1 ? "its" : "their"} own period would suit ${away.length === 1 ? "it" : "them"}.`}); }
+    else { target += FLORA_HAPPY.away; issues.push({bad:true, text:`${away.map(s => s.name).join(", ")} ${away.length === 1 ? "lives" : "live"} among plants from another era.`}); }
     // old plant-eaters get sick on plants they never evolved for: Cenozoic planting, a grassland biome, or grass hay standing in for Paleoflora
     const grazers = kinds.filter(s => foodType(s) === "paleoflora");
     const sick = grazers.filter(s => grassSick(e, s) > 0), picky = grazers.filter(s => s.period === "Cretaceous" && grassShare(e, s) > 0);
-    const cure = e.grassFed ? "Feed them Paleoflora from the Botany Lab" : biomeOf(e) === "grassland" ? "Regrade the exhibit to a biome from their own time" : "Pull out the Cenozoic plants, or plant groves from their own era";
-    if(sick.length){ target += GRASS_HIT.intolerant * Math.max(...sick.map(s => grassSick(e, s))); issues.push({bad:true, text:`Eating plants it never evolved for. ${sick.map(s => s.name).join(", ")} can't digest grass. ${cure}.`}); }
-    else if(picky.length){ target += GRASS_HIT.cretaceous * Math.max(...picky.map(s => grassShare(e, s))); issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass. ${cure}.`}); }
+    if(sick.length){ target += GRASS_HIT.intolerant * Math.max(...sick.map(s => grassSick(e, s))); issues.push({bad:true, text:`Eating plants it never evolved for. ${sick.map(s => s.name).join(", ")} can't digest grass.`}); }
+    else if(picky.length){ target += GRASS_HIT.cretaceous * Math.max(...picky.map(s => grassShare(e, s))); issues.push({bad:true, text:`${picky.map(s => s.name).join(", ")} would rather not eat grass.`}); }
   }
   // Dirt: a filthy exhibit makes animals miserable fast
   if(e.animals.length && (e.dirt || 0) > CLEAN.penaltyFrom){
     target -= (e.dirt - CLEAN.penaltyFrom) * CLEAN.penaltyPer;
-    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%). ${state.staff.keepers.length ? "Keepers will muck it out when they're free." + (hasUpgrade("shovels") ? "" : " Shovels from the Tool Shed make it much faster.") : "Hire keepers to clean it."}`});
+    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%).`});
   }
   // Barriers: say which animals could get out
   if(!e.viv && state.safety){
     for(const sp of counts.keys()){ const r = escapeRisk(e, SPECIES_BY_ID[sp]); if(r) issues.push({bad:true, text:`Escape risk. ${r}`}); }
-    if(isBreached(e)) issues.push({bad:true, text:"The barrier is broken. A mechanic from a Workshop needs to repair it."});
+    if(isBreached(e)) issues.push({bad:true, text:"The barrier is broken."});
   }
   // Food: an empty store for any food type means hungry animals
   if(e.animals.length && state.staff && !freeFeeding()){
     const need = dailyNeed(e), stock = e.stock || {};
     const empty = Object.keys(need).filter(t => stockFor(e, t) <= 0.01);
     const low = Object.keys(need).filter(t => !empty.includes(t) && stockFor(e, t) < storeMax(e, t) * .25);
-    if(empty.length){ target -= 40; issues.push({bad:true, text:`Hungry. They're out of ${empty.join(" and ")}. ${dishText(e) || (gateCheck(e).ok ? "Keepers need to bring more." : gateCheck(e).text)}`}); }
+    if(empty.length){ target -= 40; issues.push({bad:true, text:`Hungry. They're out of ${empty.join(" and ")}.${dishText(e) ? " " + dishText(e) : gateCheck(e).ok ? "" : " " + gateCheck(e).text}`}); }
     else if(low.length) issues.push({bad:true, text:`Running low on ${low.join(" and ")}.`});
     if(!empty.length && dishText(e)){ target -= 12 * (1 - vivServed(e)); issues.push({bad:true, text:`Some can't reach a dish. ${dishText(e)}`}); }
   }
@@ -649,9 +648,9 @@ function exhibitReport(e){
   const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : 1) : 0), 0);
   const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
-  if(known) issues.push({bad:true, text:`${known} sick or hurt. ${known === 1 ? "It needs" : "They need"} a vet. See Health below.`});
-  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness. Only their era's medicine from the Botany Lab cures it fully.`});
-  else if(sick) issues.push({bad:true, text:"Some of the animals seem off. A vet's check-up would find out why."});
+  if(known) issues.push({bad:true, text:`${known} sick or hurt.`});
+  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness.`});
+  else if(sick) issues.push({bad:true, text:"Some of the animals seem off."});
   return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
 

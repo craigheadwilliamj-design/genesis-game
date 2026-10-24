@@ -315,6 +315,10 @@ aside.dragging,aside.resizing{user-select:none;-webkit-user-select:none}
 aside.dragging .sheet-head{cursor:grabbing}
 .sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
 .sheet-toggle{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-name{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:transparent;border:0;border-bottom:1px dashed var(--line);border-radius:0;padding:4px 0;outline:0}
+.sheet-name:hover{border-bottom-color:var(--ink-2)}
+.sheet-name:focus{border-bottom:1px solid var(--gold)}
+.sheet-name[hidden]{display:none}
 .sheet-close{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--chrome-2);font-size:14px;line-height:1}
 .sheet-close:hover{background:var(--line)}
 .panel{padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -353,6 +357,13 @@ aside.dragging .sheet-head{cursor:grabbing}
 .hl-list li.ok{color:#7CC21B}.hl-list li.ok::before{background:#7CC21B}
 .hl-list li.warn{color:#E8B923}.hl-list li.warn::before{background:#E8B923}
 .hl-list li.bad{color:#E5392E}.hl-list li.bad::before{background:#E5392E}
+.sec-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.sec-item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-left:5px solid var(--gold);border-radius:8px;background:var(--chrome-2)}
+.sec-item.on{border-left-color:var(--good)}
+.sec-item.locked{border-left-color:var(--line)}
+.sec-name{font-size:15px;font-weight:700;color:var(--ink)}
+.sec-act{font-size:13px;text-align:right}
+.sec-item.locked .status{color:var(--ink-2);background:transparent;padding:0;font-weight:500}
 .status{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--chrome-2)}
 .need-sp{margin-bottom:10px}
 .need-name{font-weight:600;margin-bottom:2px}
@@ -954,7 +965,6 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
         <button class="tbtn" id="animalsBtn" title="Paleopedia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         <button class="tbtn" id="mapBtn" title="See the whole park (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         <button class="tbtn" id="pixelBtn" title="Pixel editor (dev mode)" hidden>Px</button>
-        <button class="tbtn" id="uiedBtn" title="UI editor (dev mode)" aria-pressed="false" hidden>UI</button>
       </nav>
 
       <div class="tgroup zoom zoombar">
@@ -978,7 +988,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     </div>
 
     <aside id="aside">
-      <div class="sheet-head" title="Drag to move. Double-click to put it back."><span class="sheet-toggle" id="sheetToggle">Park office</span><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
+      <div class="sheet-head" title="Drag to move. Double-click to put it back."><span class="sheet-toggle" id="sheetToggle">Park office</span><input class="sheet-name" id="sheetName" maxlength="40" aria-label="Name" title="Click to rename" spellcheck="false" hidden><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
       <div class="panel" id="panel"></div>
       <div class="rsz" data-rsz="n"></div><div class="rsz" data-rsz="s"></div><div class="rsz" data-rsz="e"></div><div class="rsz" data-rsz="w"></div><div class="rsz" data-rsz="ne"></div><div class="rsz" data-rsz="nw"></div><div class="rsz" data-rsz="se"></div><div class="rsz" data-rsz="sw"></div>
     </aside>
@@ -1088,6 +1098,5 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/animalui.js"></script>
 <script src="js/parkmap.js"></script>
 <script src="js/pixeled.js"></script>
-<script src="js/uiedit.js"></script>
 <script src="js/main.js"></script>
 
