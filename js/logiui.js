@@ -34,11 +34,10 @@ function zoneRow(kind, b){
 }
 
 function dockHtml(b){
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.dock.blurb)}</div>` + zoneRow("building", b);
+  let h = deptHead(b) + zoneRow("building", b);
   const auto = b.auto !== false, orders = dockOrders(b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
   h += `<section><h3>Overnight orders</h3><div class="row"><button class="btn" data-action="dockAuto">${auto ? "Auto-ordering is on" : "Ordering by hand"}</button></div>`;
-  h += `<div class="meta" style="margin-top:6px">${auto ? `It tops up to ${LOGI.autoDays} days of the park's animal food and shop stock each night, less what your farms already make.` : "Set how much of each good the dock should hold after tonight's delivery."}</div>`;
   let cost = 0;
   h += `<ul class="shop" style="margin-top:6px">${ORDER_GOODS.filter(t => !isGuestGood(t) || orders[t] || stockOf(b, t) || b.auto === false).map(t => {
     const stock = stockOf(b, t), want = orders[t], n = Math.max(0, Math.min(Math.floor(want - stock), Math.floor(storeRoom(b, t)))), price = freeFeeding() && !isGuestGood(t) ? 0 : unitPrice(t);
@@ -47,19 +46,19 @@ function dockHtml(b){
       <button class="buy" data-action="rush" data-t="${t}"${canAfford(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup)) ? "" : " disabled"} title="Delivered now">Rush ${LOGI.rushLot}, ${money(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup))}</button>
       <span class="need">${isGuestGood(t) ? `$${unitPrice(t).toFixed(2)}` : money(Math.round(unitPrice(t)))} a unit. Tonight: ${n} units${n && price ? ` (${money(Math.round(n * price))})` : ""}.</span></li>`;
   }).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">${freeFeeding() ? "" : `Tonight's delivery costs about ${money(Math.round(cost))}. `}Farms and ranches make food cheaper once you have researched food production.</div></section>`;
+  h += `${freeFeeding() ? "" : `<dl class="kv" style="margin-top:6px"><dt>Tonight's delivery</dt><dd>${money(Math.round(cost))}</dd></dl>`}</section>`;
   return h;
 }
 
 function warehouseHtml(b){
   const d = storeOf(b), made = BUILDINGS[b.type].makes;
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS[b.type].blurb)}</div>` + zoneRow("building", b);
+  let h = deptHead(b) + zoneRow("building", b);
   h += `<section><h3>${made ? "Output" : "Stock"}</h3>${stockRows(b)}${spoilLine(b)}`;
   if(made){
     const full = storeTotal(b) >= storeCap(b) - .5;
-    h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `Makes ${n} ${goodName(t).toLowerCase()} a day.`).join(" ")} ${full ? "<b style='color:var(--bad)'>It's full, so production has stopped.</b>" : ""} Custodians carry it to stores and stations. Spare output keeps spoiling until someone does.</div>`;
+    h += `<div class="meta" style="margin-top:6px">${Object.entries(made).map(([t, n]) => `${n} ${goodName(t).toLowerCase()} a day`).join(", ")}${full ? " <b style='color:var(--bad)'>Full, stopped.</b>" : ""}</div>`;
   } else {
-    h += `<div class="meta" style="margin-top:6px">${d.holds.filter(t => !MED_GOODS.includes(t)).map(t => `The park ${isGuestGood(t) ? "sells" : "eats"} ${Math.round(demandOf(t))} ${goodName(t).toLowerCase()} a day.`).join(" ")} Custodians fill it from the dock and farms and take from it to restock stations, stands, and shops.</div>`;
+    h += `<div class="meta" style="margin-top:6px">Park use: ${d.holds.filter(t => !MED_GOODS.includes(t)).map(t => `${Math.round(demandOf(t))} ${goodName(t).toLowerCase()}`).join(", ")} a day</div>`;
   }
   return h + `</section>`;
 }
@@ -70,11 +69,10 @@ function zoneHtml(z){
   const m = zoneMembers(z);
   let h = "";
   h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
-  h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed and clean only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
 
   const issues = [];
-  if(m.exhibits.some(e => e.animals.length) && !m.keepers.length) issues.push(state.staff.keepers.some(k => !k.zone) ? "No keeper is assigned here. Unassigned keepers will cover it." : "No keeper is assigned here, so nobody feeds these animals.");
-  if(m.exhibits.some(e => e.animals.length) && !m.stores.some(b => storeOf(b) && storeOf(b).holds.some(t => FEED_GOODS.includes(t)))) issues.push("No station or store in this zone. Keepers fetch food from elsewhere.");
+  if(m.exhibits.some(e => e.animals.length) && !m.keepers.length) issues.push(state.staff.keepers.some(k => !k.zone) ? "No keeper assigned (unassigned keepers cover it)." : "No keeper assigned.");
+  if(m.exhibits.some(e => e.animals.length) && !m.stores.some(b => storeOf(b) && storeOf(b).holds.some(t => FEED_GOODS.includes(t)))) issues.push("No food store in this zone.");
   for(const e of m.exhibits) if(e.animals.length && !gateCheck(e).ok) issues.push(`${e.name}: keepers can't get in.`);
   if(issues.length) h += `<ul class="issues" style="margin-top:6px">${issues.map(i => `<li class="bad">${esc(i)}</li>`).join("")}</ul>`;
 
@@ -100,7 +98,7 @@ function zoneHtml(z){
   h += `<section><h3>Keepers</h3>`;
   h += m.keepers.length ? `<ul class="herd">${m.keepers.map(k => row("keeper", k, k.name, esc(keeperStatus(k)))).join("")}</ul>` : `<div class="meta">None assigned.</div>`;
   const freeK = state.staff.keepers.filter(k => !k.zone), otherK = state.staff.keepers.filter(k => k.zone && k.zone !== z.id);
-  h += `<div class="meta" style="margin-top:6px">${freeK.length ? `${freeK.length} unassigned keeper${freeK.length === 1 ? "" : "s"} work anywhere.` : "Every keeper belongs to a zone."}</div>`;
+  h += `<div class="meta" style="margin-top:6px">${freeK.length ? `${freeK.length} unassigned keeper${freeK.length === 1 ? "" : "s"}` : "No unassigned keepers"}</div>`;
   h += addRow(z, [...freeK.map(k => ["keeper", k.id, k.name]), ...otherK.map(k => ["keeper", k.id, `${k.name} (${zoneName(k.zone)})`])], "Add a keeper…");
   h += `</section>`;
   if(state.staff.mechanics.length || m.mechanics.length) h += staffSection("Mechanics", "mechanic", state.staff.mechanics, m.mechanics, mechanicStatus);
@@ -117,7 +115,7 @@ function zoneHtml(z){
   h += addRow(z, state.buildings.filter(b => zb(b) && b.zone !== z.id).map(b => ["building", b.id, b.zone ? `${BUILDINGS[b.type].label} (${zoneName(b.zone)})` : BUILDINGS[b.type].label]), "Add a building…");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="claimZone">Claim everything inside</button></div></section>`;
   h += zoneThemeHtml(z);
-  h += `<div class="row"><button class="btn" data-action="zoneEdit">Reshape zone</button><span class="meta">Move corners, add more</span></div>`;
+  h += `<div class="row"><button class="btn" data-action="zoneEdit">Reshape zone</button></div>`;
   h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Remove zone</button></div>`;
   return h;
 }
@@ -139,7 +137,7 @@ function logiOverviewHtml(){
   for(const t of rows){
     const x = sum[t], days = x.need ? x.have / x.need : 99;
     h += bar3(goodName(t), x.cap ? x.have / x.cap * 100 : 0, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
-    h += `<div class="meta fnote">Eats ${Math.round(x.need)} a day${x.make ? `, farms make ${x.make}` : ""}. ${x.need ? (days < 1 ? `<b style="color:var(--bad)">Under a day in stores.</b>` : `${days >= 10 ? "10+" : days.toFixed(1)} days in stores.`) : ""}</div>`;
+    h += `<div class="meta fnote">${Math.round(x.need)} a day${x.make ? `, farms ${x.make}` : ""}${x.need ? (days < 1 ? ` · <b style="color:var(--bad)">under a day left</b>` : ` · ${days >= 10 ? "10+" : days.toFixed(1)} days left`) : ""}</div>`;
   }
   if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at the Botany Lab`);
   // medicine: one row an era (PMC, stores and the Botany Lab) and the contemporary doses the suppliers keep topped up
@@ -148,13 +146,13 @@ function logiOverviewHtml(){
       const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
       if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
       h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
-      h += `<div class="meta fnote">${Math.floor(x.pmc)} at the PMC, ${x.ceres} at the Botany Lab.${hasTech(MED_TECH[era]) ? "" : " Not researched yet."}</div>`;
+      h += `<div class="meta fnote">PMC ${Math.floor(x.pmc)}, Botany Lab ${x.ceres}${hasTech(MED_TECH[era]) ? "" : " · locked"}</div>`;
     }
     h += bar3(goodName(CMED), sum.cmed.have / sum.cmed.want * 100, GOOD_COLOR[CMED], `${Math.floor(sum.cmed.have)} stored`);
-    h += `<div class="meta fnote">${Math.floor(sum.cmed.pmc)} at the PMC. Order it at the dock, ${money(MODERN.cost)} a dose.</div>`;
+    h += `<div class="meta fnote">PMC ${Math.floor(sum.cmed.pmc)}</div>`;
   }
   const L = state.logi;
-  if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Last night ${Math.round(L.lost)} units spoiled, about ${money(Math.round(L.lostCost))}. Cold stores, cooler boxes, and short supply chains cut that.</div>`;
+  if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Spoiled last night: ${Math.round(L.lost)} units, ${money(Math.round(L.lostCost))}</div>`;
   return h + `</section>`;
 }
 
@@ -163,7 +161,7 @@ function zonesSectionHtml(){
   let h = `<section id="zonesSection">`;
   h += `<h3>Work zones</h3>`;
   if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
-  else h += `<div class="meta">Zones group keepers with the exhibits and stores around them. Draw one to split the park into work areas.</div>`;
+  else h += `<div class="meta">No zones.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="zoneTool">Draw a zone</button><button class="btn" data-action="supplyToggle">${supplyOn ? "Hide" : "Show"} supply lines</button></div></section>`;
   return h;
 }

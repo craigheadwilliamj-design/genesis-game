@@ -21,13 +21,13 @@ function guestsOverviewHtml(){
     ${gGraph ? `<dt>Dark paths</dt><dd>${darkStretches} stretch${darkStretches === 1 ? "" : "es"}${darkStretches ? " no lamp lights" : ""}</dd>` : ""}
     ${vandalLog().acts ? `<dt>Vandalism today</dt><dd>${vandalLog().acts} act${vandalLog().acts === 1 ? "" : "s"}, ${vandalLog().caught} caught</dd>` : ""}
   </dl>`;
-  if(derived.wom !== 1) h += `<div class="meta" style="margin-top:4px">Word of mouth is ${derived.wom > 1 ? "bringing in" : "costing you"} about ${Math.round(Math.abs(derived.wom - 1) * 100)}% ${derived.wom > 1 ? "more" : "of your"} guests.</div>`;
+  if(derived.wom !== 1) h += `<div class="meta" style="margin-top:4px">Word of mouth: ${derived.wom > 1 ? "+" : "−"}${Math.round(Math.abs(derived.wom - 1) * 100)}% guests</div>`;
   const th = topThoughts(5);
   if(th.length) h += `<ul class="issues" style="margin-top:8px">${th.map(x => `<li class="${x.good ? "" : "bad"}"><span>"${esc(x.text)}" <span class="meta">${Math.round(x.share * 100)}%</span></span></li>`).join("")}</ul>`;
-  else h += `<div class="meta" style="margin-top:4px">Guests haven't said much yet.</div>`;
+  else h += `<div class="meta" style="margin-top:4px">No thoughts yet.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="moodColors">${moodColors ? "Show guests' personalities" : "Color guests by mood"}</button></div>`;
-  if(!moodColors) h += `<ul class="herd" style="margin-top:8px">${PERS_KEYS.map(k => `<li><span class="dot" style="background:${PERSONALITIES[k].color}"></span><span><b>${esc(PERSONALITIES[k].label)}</b> <span class="meta">${esc(PERSONALITIES[k].text)}</span></span></li>`).join("")}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">Tap a guest on the map to see how they feel, what they're thinking, and to call security on them.</div></section>`;
+  if(!moodColors) h += `<ul class="herd" style="margin-top:8px">${PERS_KEYS.map(k => `<li><span class="dot" style="background:${PERSONALITIES[k].color}"></span><span><b>${esc(PERSONALITIES[k].label)}</b></span></li>`).join("")}</ul>`;
+  h += `</section>`;
   return h;
 }
 
@@ -39,10 +39,10 @@ const moodColor = m => m >= 60 ? "#3E9B4F" : m >= 35 ? "#E3B23C" : "#D9483B";
 // The panel for a tapped party. The numbers inside are filled in (and kept fresh) by guestLive.
 function guestHtml(p){
   let h = `<h2>${esc(p.name)}</h2>`;
-  h += `<div class="meta">Party of ${p.n}${p.hotel ? " · hotel guests" : ""}${p.sneaked ? " · slipped in without a ticket" : ""}</div>`;
+  h += `<div class="meta">Party of ${p.n}${p.hotel ? " · hotel guests" : ""}${p.sneaked ? " · sneaked in" : ""}</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="gStatus"></span></div>`;
   h += `<section><h3>Happiness <span class="num" id="gMoodN"></span></h3><div class="meter"><i id="gMoodBar"></i></div></section>`;
-  h += `<section><h3>Personalities</h3><ul class="herd">${p.pers.map((k, i) => `<li><span class="dot" style="background:${PERSONALITIES[k].color};align-self:flex-start;margin-top:5px"></span><span><b>${esc(PERSONALITIES[k].label)}</b> <span class="meta">${i ? "Secondary" : "Primary"}</span><br><span class="meta">${esc(PERSONALITIES[k].text)}</span></span></li>`).join("")}</ul></section>`;
+  h += `<section><h3>Personalities</h3><ul class="herd">${p.pers.map((k, i) => `<li><span class="dot" style="background:${PERSONALITIES[k].color};align-self:flex-start;margin-top:5px"></span><span><b>${esc(PERSONALITIES[k].label)}</b> <span class="meta">${i ? "Secondary" : "Primary"}</span></span></li>`).join("")}</ul></section>`;
   h += `<section><h3>Thoughts</h3><ul class="issues" id="gThoughts"></ul></section>`;
   h += `<section><h3>Needs</h3>${Object.keys(NEEDS).map(k => `<div class="need-row"><span>${NEED_LABELS[k]}</span><span id="gN-${k}"></span></div><div class="meter"><i id="gB-${k}"></i></div>`).join("")}</section>`;
   h += `<section><h3>Wallet</h3><dl class="kv"><dt>Cash</dt><dd id="gCash"></dd><dt>People in the group</dt><dd>${p.n}</dd><dt>Learned</dt><dd id="gEdu"></dd></dl></section>`;
@@ -77,7 +77,7 @@ function guestLive(force){
   const why = ejectProblem(p), btn = document.getElementById("gEject");
   const label = p.ejecting === "escort" ? "Being walked out" : p.ejecting ? "Security called" : p.home && p.why === "home" ? "Already leaving" : "Eject from park";
   if(btn){ set("gEject", label); btn.disabled = !!why; }
-  set("gEjectNote", why ? (p.ejecting ? "" : why) : isHooligan(p) ? "Hooligans won't wait around. A guard has to catch this party first." : "Calls security. The party stops and waits for a guard, who walks them to the gate.");
+  set("gEjectNote", why ? (p.ejecting ? "" : why) : isHooligan(p) ? "Hooligan: a guard has to catch them." : "");
 }
 
 // A food stand, gift shop, restroom, Education Center, or anything beside the path
@@ -91,42 +91,39 @@ function guestBuildingHtml(b){
   if(t.prop){
     const c = propCond(b), broke = isBroken(b);
     h += `<section><h3>Condition</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(c, broke ? "var(--bad)" : c < 60 ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(c)}%</span></div>`;
-    h += `<div class="meta" style="margin-top:4px">${broke ? "Broken by vandals. It doesn't work until a mechanic repairs it." : c < 60 ? "Damaged by vandals. A mechanic will fix it." : "In good shape."}${b.type === "lamp" ? ` Lamps make vandalism within ${VANDAL.lampReach} m half as likely, and at night they light ${LAMP.radius} m of path.` : ""}</div></section>`;
+    h += `<div class="meta" style="margin-top:4px">${broke ? "Broken." : c < 60 ? "Damaged." : "Good."}</div></section>`;
   }
   if(b.type === "sign"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
     const [x, y] = centroid(b.points), near = state.exhibits.filter(e => distToEdge(x, y, e.points) <= EDU.signReach);
-    h += `<section><h3>Tells guests about</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}${e.animals.length ? "" : ' <span class="meta">empty</span>'}</li>`).join("")}</ul>` : `<div class="meta">No exhibit within ${EDU.signReach} m. Move it closer to a fence.</div>`}`;
-    h += `<div class="meta" style="margin-top:6px">Guests who stop at an exhibit with a sign learn about its animals, more so with several species inside. Learning makes guests happier, tidier, and more generous.</div></section>`;
+    h += `<section><h3>Tells guests about</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}${e.animals.length ? "" : ' <span class="meta">empty</span>'}</li>`).join("")}</ul>` : `<div class="meta">No exhibit in range.</div>`}</section>`;
     return h;
   }
   if(b.type === "edcenter") h += eduCenterHtml(b, served);
-  if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Covered in graffiti. Guests here are put off. ${state.staff.custodians.length ? "A custodian will scrub it off." : "Hire a custodian to scrub it off."}</div>`;
+  if((b.graffiti || 0) >= VANDAL.grossAt) h += `<div class="meta" style="color:var(--bad)">Graffiti.</div>`;
   if(b.type === "camera"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd><dt>Watches</dt><dd>${SECURITY.postRadius} m around it</dd></dl>`;
-    h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? "Any vandal it sees sends the nearest guard running." : "Research security cameras at the Research Lab or it does nothing."} ${offices().length ? "" : "Build a Security Office with guards, or nobody will answer."}</div>`;
+    if(!hasTech("cameras") || !offices().length) h += `<div class="meta" style="margin-top:6px;color:var(--bad)">${hasTech("cameras") ? "No Security Office." : "Not researched."}</div>`;
     return h;
   }
   if(b.type === "nofeed"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
     const [x, y] = centroid(b.points), near = state.exhibits.filter(e => !e.viv && distToEdge(x, y, e.points) <= THROWN.signReach);
-    h += `<section><h3>Protects</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No open exhibit within ${THROWN.signReach} m. Move it closer to a fence.</div>`}`;
-    h += `<div class="meta" style="margin-top:6px">Guests are ${Math.round((1 - THROWN.signCut) * 100)}% less likely to throw trash into these exhibits. Trash makes animals ill, and some die. Bins and guards nearby help too.</div></section>`;
+    h += `<section><h3>Protects</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No exhibit in range.</div>`}</section>`;
     return h;
   }
   if(b.type === "quiet"){
     h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
     const [x, y] = centroid(b.points), near = state.exhibits.filter(e => !e.viv && distToEdge(x, y, e.points) <= QUIET.reach);
-    h += `<section><h3>Quiets guests for</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No open exhibit within ${QUIET.reach} m. Move it closer to a fence.</div>`}`;
-    h += `<div class="meta" style="margin-top:6px">Guests within ${QUIET.hear} m of it count ${Math.round(QUIET.cut * 100)}% less toward the crowd these exhibits' animals feel, and rowdy ones mostly ignore it. Shy animals stress less and hide less.</div></section>`;
+    h += `<section><h3>Quiets guests for</h3>${near.length ? `<ul class="issues">${near.map(e => `<li>${esc(e.name)}</li>`).join("")}</ul>` : `<div class="meta">No exhibit in range.</div>`}</section>`;
     return h;
   }
   if(b.type === "donate"){
-    h += `<section><h3>Donations</h3><dl class="kv"><dt>Given so far</dt><dd>${money(Math.round(b.gift || 0))}</dd></dl><div class="meta" style="margin-top:4px">Guests within ${DONATE.reach} m may drop a little in, more if they learned something. Vandals can break it.</div></section>`;
+    h += `<section><h3>Donations</h3><dl class="kv"><dt>Given so far</dt><dd>${money(Math.round(b.gift || 0))}</dd></dl></section>`;
   } else if(b.type === "bin"){
     const fill = b.fill || 0, full = fill >= LITTER.binCap;
     h += `<section><h3>Trash</h3><div class="factor" style="grid-template-columns:1fr 70px"><span>${meter(fill / LITTER.binCap * 100, full ? "var(--bad)" : "var(--good)")}</span><span>${Math.round(fill)} of ${LITTER.binCap}</span></div>`;
-    h += `<div class="meta" style="margin-top:4px">Guests with a wrapper or cup throw it in a bin within ${LITTER.binReach} m. ${full ? "This one is full, so trash spills onto the path. " : ""}The night crew empties bins at the daily rollover.</div></section>`;
+    h += `${full ? `<div class="meta" style="margin-top:4px;color:var(--bad)">Full.</div>` : ""}</section>`;
   } else if(!t.slots) h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   else {
     h += `<dl class="kv"><dt>${t.seats && !t.kind ? "Sitting here now" : "Serving now"}</dt><dd>${q.busy} of ${t.slots} parties</dd>`;
@@ -138,15 +135,9 @@ function guestBuildingHtml(b){
   if(b.type === "restroom"){
     const dirt = b.dirt || 0;
     h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= RESTROOM.avoid ? "var(--bad)" : dirt >= RESTROOM.gross ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
-    h += `<div class="meta" style="margin-top:4px">${dirt >= RESTROOM.avoid ? "Filthy. Only desperate guests will use it." : dirt >= RESTROOM.gross ? "Getting grubby. Guests complain." : "Clean."} It gets dirtier with every visitor, and the night crew scrubs it at the daily rollover. More restrooms means each one stays cleaner.</div></section>`;
+    h += `<div class="meta" style="margin-top:4px">${dirt >= RESTROOM.avoid ? "Filthy." : dirt >= RESTROOM.gross ? "Grubby." : "Clean."}</div></section>`;
   }
-  const text = {
-    restroom:"Free to use. Guests who can't find one in time go home upset.",
-    bench:"Tired guests sit down for a rest. It doesn't take bookings: if it's full, they move on.",
-    picnic:"Seats a few parties at once. Tired guests sit down for a rest.",
-  }[b.type];
-  if(text) h += `<div class="meta">${text}</div>`;
-  if(!t.prop && q.waiting >= t.slots * 2) h += `<div class="meta" style="color:var(--bad)">The line is getting long. Another ${t.label.toLowerCase()} nearby would help.</div>`;
+  if(!t.prop && q.waiting >= t.slots * 2) h += `<div class="meta" style="color:var(--bad)">Long line.</div>`;
   return h;
 }
 
@@ -154,28 +145,26 @@ function guestBuildingHtml(b){
 function hotelHtml(b){
   const t = BUILDINGS[b.type], rate = roomRate(b), will = roomWill(b), dirt = b.dirt || 0, bk = b.booked;
   let h = `<section><h3>Room rate</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="roomRate" data-d="-10" aria-label="Lower the rate" style="padding:2px 9px">−</button><b class="num" style="min-width:56px;text-align:center">${money(rate)}</b><button class="btn" data-action="roomRate" data-d="10" aria-label="Raise the rate" style="padding:2px 9px">+</button><span class="meta">a night</span></div>`;
-  h += `<div class="meta" style="margin-top:4px">${will >= 1 ? "Everyone who wants a room will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual rate is ${money(t.roomPrice)}.</div></section>`;
+  h += `<div class="meta" style="margin-top:4px">${Math.round(will * 100)}% will pay · usual ${money(t.roomPrice)}</div></section>`;
   h += `<dl class="kv"><dt>Rooms</dt><dd>${t.rooms}, for ${LODGING.perRoom} guests each</dd><dt>Booked last night</dt><dd>${bk ? `${bk.rooms} room${bk.rooms === 1 ? "" : "s"}, ${money(bk.money || 0)}` : "Not open a night yet"}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= 50 ? "var(--bad)" : dirt >= LODGING.cleanAt ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
-  h += `<div class="meta" style="margin-top:4px">Rooms get dirty every night they're used, and a dirty hotel books fewer rooms. ${state.staff.custodians.length ? "Custodians clean it during the day." : "Hire a custodian to clean it."}</div></section>`;
-  h += `<section><h3>Toiletries</h3>${stockRows(b)}<div class="meta" style="margin-top:6px">Each booked room uses ${LODGING.toiletries} units of merchandise. ${guestGoodsFree() ? `Suppliers bring them until ${fmtDate(state.logi.guestFrom)}.` : roomsStocked(b) < t.rooms ? "Running low: custodians restock it from the dock or a warehouse." : "Custodians keep it stocked."}</div></section>`;
-  h += `<div class="meta">Each night, some of the day's guests book a room, more at a higher-rated park. Next morning they start the day here, with no ticket to buy and more to spend.</div>`;
+  h += `</section>`;
+  h += `<section><h3>Toiletries</h3>${stockRows(b)}${!guestGoodsFree() && roomsStocked(b) < t.rooms ? `<div class="meta" style="margin-top:6px;color:var(--bad)">Running low.</div>` : ""}</section>`;
   return h;
 }
 // The Education Center: its entry fee, and what guests get from it
 function eduCenterHtml(b){
   const fee = b.fee || 0, will = clamp(1 - PRICE_SENSE * (fee - EDU.centerFee) / EDU.centerFee, 0, 1);
   let h = `<section><h3>Entry fee</h3><div class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="eduFee" data-d="-1" aria-label="Lower the fee" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${fee ? money(fee) : "Free"}</b><button class="btn" data-action="eduFee" data-d="1" aria-label="Raise the fee" style="padding:2px 9px">+</button></div>`;
-  h += `<div class="meta" style="margin-top:4px">${fee <= EDU.centerFee ? "Everyone will pay this." : will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`} The usual price is ${money(EDU.centerFee)}.</div></section>`;
+  h += `<div class="meta" style="margin-top:4px">${Math.round(will * 100)}% will pay · usual ${money(EDU.centerFee)}</div></section>`;
   h += focusHtml(b) + modulesHtml(b) + museumHtml(b);
-  h += `<div class="meta">Guests spend ${BUILDINGS.edcenter.serveMin} minutes here, sitting through a talk and using the restrooms, and come out knowing far more about prehistoric life. Learning makes them happier, tidier, and more generous, and counts toward your rating.</div>`;
   return h;
 }
 // The center's focus: what it is for. Modules make it stronger.
 function focusHtml(b){
   const cur = focusOf(b);
   let h = `<section><h3>Focus</h3><div class="row" style="gap:4px">${Object.entries(EDU_FOCUS).map(([k, f]) => `<button class="btn${cur === k ? " on" : ""}" data-action="eduFocus" data-f="${k}" aria-pressed="${cur === k}" style="padding:4px 10px">${esc(f.label)}</button>`).join("")}</div>`;
-  h += `<div class="meta" style="margin-top:6px">${cur ? `${esc(EDU_FOCUS[cur].text)} Strength ${Math.round(focusPower(b) * 100)}%.` : "Pick what this center is for. Modules boost the focus they suit."}</div></section>`;
+  h += `<div class="meta" style="margin-top:6px">${cur ? `Strength ${Math.round(focusPower(b) * 100)}%` : "No focus"}</div></section>`;
   return h;
 }
 // Modules: what's installed, and a dropdown of researched ones to add
@@ -184,11 +173,9 @@ function modulesHtml(b){
   const boosts = m => Object.keys(m.boost).map(k => `${EDU_FOCUS[k].label} +${Math.round(m.boost[k] * 100)}%`).join(", ");
   let h = `<section><h3>Modules <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${EDU_CENTER.moduleSlots}</span></h3>`;
   if(on.length) h += `<ul class="shop">${on.map(id => { const m = EDU_MODULES[id];
-    return `<li><span class="nm">${esc(m.label)}</span><span class="need">${esc(m.text)} ${m.live ? `<b>${modLive(id) >= .95 ? "Busy" : modLive(id) >= .5 ? "Something's happening" : "Quiet"} right now (${Math.round(modLive(id) * 100)}%).</b> ` : ""}Teaches ${Math.round(modLearn(id))} more${m.slots ? `, seats ${m.slots} more guests` : ""}. Boosts ${boosts(m)}. ${money(m.upkeep)} a day.</span><span class="need"><button class="btn" data-action="modDrop" data-id="${id}" style="padding:2px 9px">Remove</button></span></li>`; }).join("")}</ul>`;
-  else h += `<div class="meta">No modules yet.</div>`;
-  if(on.length >= EDU_CENTER.moduleSlots) h += `<div class="meta" style="margin-top:6px">The center is full. Remove a module to add another.</div>`;
-  else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="modSel" aria-label="Module to add" style="flex:1;min-width:0">${ready.map(id => `<option value="${id}">${esc(EDU_MODULES[id].label)}, ${money(EDU_MODULES[id].price)}</option>`).join("")}</select><button class="btn" data-action="modAdd">Add</button></div>`;
-  if(locked) h += `<div class="meta" style="margin-top:6px">${locked} more module${locked === 1 ? "" : "s"} to research at the Research Lab, under Park management, Buildings.</div>`;
+    return `<li><span class="nm">${esc(m.label)}</span><span class="need">${m.live ? `<b>${Math.round(modLive(id) * 100)}% live</b> · ` : ""}+${Math.round(modLearn(id))} learning${m.slots ? `, +${m.slots} seats` : ""} · ${boosts(m)} · ${money(m.upkeep)} a day</span><span class="need"><button class="btn" data-action="modDrop" data-id="${id}" style="padding:2px 9px">Remove</button></span></li>`; }).join("")}</ul>`;
+  else h += `<div class="meta">None.</div>`;
+  if(on.length < EDU_CENTER.moduleSlots && ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="modSel" aria-label="Module to add" style="flex:1;min-width:0">${ready.map(id => `<option value="${id}">${esc(EDU_MODULES[id].label)}, ${money(EDU_MODULES[id].price)}</option>`).join("")}</select><button class="btn" data-action="modAdd">Add</button></div>`;
   return h + `</section>`;
 }
 // The museum: attractions on show, and a dropdown of the events the Time Travel Lab has recorded that aren't up yet
@@ -196,38 +183,35 @@ function museumHtml(b){
   const on = showsOf(b), ready = showsReady(b), dn = state.science.dna;
   let h = `<section><h3>Museum attractions <span class="meta" style="text-transform:none;letter-spacing:0">${on.length} of ${MUSEUM.slots}</span></h3>`;
   if(on.length) h += `<ul class="shop">${on.map(id => { const ev = MUSEUM_BY_ID[id];
-    return `<li><span class="nm">${esc(ev.name)}<span class="per">${esc(ev.ago)}</span></span><span class="need">${esc(ev.text)} Teaches ${ev.learn} more, ${money(ev.upkeep)} a day.</span><span class="need"><button class="btn" data-action="showDrop" data-id="${id}" style="padding:2px 9px">Take it down</button></span></li>`; }).join("")}</ul>`;
-  else h += `<div class="meta">Nothing on show yet.</div>`;
+    return `<li><span class="nm">${esc(ev.name)}<span class="per">${esc(ev.ago)}</span></span><span class="need">+${ev.learn} learning · ${money(ev.upkeep)} a day</span><span class="need"><button class="btn" data-action="showDrop" data-id="${id}" style="padding:2px 9px">Take it down</button></span></li>`; }).join("")}</ul>`;
+  else h += `<div class="meta">None.</div>`;
   if(!hasTech(MUSEUM.needTech)) {}
-  else if(on.length >= MUSEUM.slots) h += `<div class="meta" style="margin-top:6px">The center is full. Take one down to show another.</div>`;
-  else if(ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="showSel" aria-label="Attraction to add" style="flex:1;min-width:0">${ready.map(ev => `<option value="${ev.id}">${esc(ev.name)}, ${money(ev.price)}</option>`).join("")}</select><button class="btn" data-action="showAdd">Add</button></div>`;
-  else h += `<div class="meta" style="margin-top:6px">${MUSEUM_EVENTS.some(ev => genomeDone(ev.id)) ? "Everything the Time Travel Lab has recorded is on show." : "The Time Travel Lab can record events from deep time under its Events tab. Each finished record becomes an attraction you can add here."}</div>`;
+  else if(on.length < MUSEUM.slots && ready.length) h += `<div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap"><select id="showSel" aria-label="Attraction to add" style="flex:1;min-width:0">${ready.map(ev => `<option value="${ev.id}">${esc(ev.name)}, ${money(ev.price)}</option>`).join("")}</select><button class="btn" data-action="showAdd">Add</button></div>`;
   return h + `</section>`;
 }
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
 // What's on the shelves, and who fills them
 function vendorStockHtml(b){
   let h = `<section><h3>Stock</h3>${stockRows(b)}`;
-  if(guestGoodsFree()) h += `<div class="meta" style="margin-top:6px">Suppliers deliver straight to your stands and shops until ${fmtDate(state.logi.guestFrom)}. After that, they sell only what's on the shelves: the Delivery Dock orders stock, and custodians carry it here.</div>`;
-  else h += `<div class="meta" style="margin-top:6px">${state.staff.custodians.length ? "Custodians restock it from the dock, a warehouse, or a cold store." : "Nobody is restocking it. Build a Custodial Closet and hire a custodian."} Each item uses as many units as it costs you in dollars.</div>`;
+  if(guestGoodsFree()) h += `<div class="meta" style="margin-top:6px">Free supply until ${fmtDate(state.logi.guestFrom)}</div>`;
+  else if(!state.staff.custodians.length) h += `<div class="meta" style="margin-top:6px;color:var(--bad)">No custodians.</div>`;
   return h + `</section>`;
 }
 // The Security Office: its guards, and today's trouble
 function securityHtml(b){
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.security.blurb)}</div>` + zoneRow("building", b);
+  let h = deptHead(b) + zoneRow("building", b);
   const L = vandalLog(), Y = state.guestLog.last.vandal;
   h += staffNote("guard");
-  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireGuard"${canAfford(SECURITY.hireCost) ? "" : " disabled"}>Hire a guard, ${money(SECURITY.hireCost)}</button><span class="meta">${money(SECURITY.wage)} a day each.</span></div></section>`;
+  h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="hireGuard"${canAfford(SECURITY.hireCost) ? "" : " disabled"}>Hire a guard, ${money(SECURITY.hireCost)}</button></div></section>`;
   const broken = state.buildings.filter(isBroken).length, tagged = state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length;
   h += `<section><h3>Vandalism</h3><dl class="kv"><dt>Today</dt><dd>${L.acts} act${L.acts === 1 ? "" : "s"}, ${L.caught} caught</dd>${Y ? `<dt>Yesterday</dt><dd>${Y.acts} act${Y.acts === 1 ? "" : "s"}, ${Y.caught} caught</dd>` : ""}<dt>Broken props</dt><dd>${broken}</dd><dt>Buildings with graffiti</dt><dd>${tagged}</dd></dl>`;
-  h += `<div class="meta" style="margin-top:6px">About 1 party in ${Math.round(1 / hooliganShare())} has a hooligan in it, and unhappy hooligans break things, throw trash at the animals, bang on the glass and sometimes sneak in without paying. Vandalism near a guard is ${Math.round((1 - SECURITY.deterCut) * 100)}% rarer, and a guard throws out any vandal within ${SECURITY.catchRadius} m. Lamp posts help, and heavy litter makes it worse. Mechanics fix broken props and custodians scrub off graffiti.</div>`;
-  h += `<div class="meta" style="margin-top:6px">${hasTech("cameras") ? `Cameras watch ${SECURITY.cameraRadius} m around each office, and send the nearest guard straight to any vandal they see.` : "Research security cameras at the Research Lab so each office watches the paths around it."}</div></section>`;
+  h += `</section>`;
   return h;
 }
 // The Custodial Closet: its staff, and what they've been up to
 function closetHtml(b){
-  let h = deptHead(b) + `<div class="meta">${esc(BUILDINGS.closet.blurb)}</div>` + zoneRow("building", b);
-  h += staffNote("custodian", `Each carries ${custCarry()} units of stock a trip.`);
+  let h = deptHead(b) + zoneRow("building", b);
+  h += staffNote("custodian");
   const dirty = state.buildings.filter(x => x.type === "restroom" && (x.dirt || 0) >= CUSTODIAN.restroomAt).length;
   const full = state.buildings.filter(x => x.type === "bin" && (x.fill || 0) >= LITTER.binCap * CUSTODIAN.binAt).length;
   const low = state.buildings.filter(x => isVendor(x) && storeOf(x).holds.some(t => storeTarget(x, t) && stockOf(x, t) < storeTarget(x, t) * .35)).length;
@@ -237,26 +221,24 @@ function closetHtml(b){
     <li class="${full ? "bad" : ""}">${full ? `${full} bin${full === 1 ? "" : "s"} need emptying` : "Bins have room"}</li>
     <li class="${litterTotal() >= 10 ? "bad" : ""}">${Math.round(litterTotal())} pieces of litter on the paths</li>
     ${state.buildings.some(x => (x.graffiti || 0) >= VANDAL.grossAt) ? `<li class="bad">${state.buildings.filter(x => (x.graffiti || 0) >= VANDAL.grossAt).length} buildings with graffiti</li>` : ""}</ul>`;
-  h += `<div class="meta" style="margin-top:6px">They restock stations, stands, and shops, anything about to run out first, then clean, then top up the rest. Whatever they miss, the night crew cleans up for a fee. The Tool Shed sells litter pickers, janitor carts, and pressure washers for them.</div></section>`;
+  h += `</section>`;
   return h;
 }
 // What a stand or shop sells, at what price, and what else it could sell
 function menuHtml(b, served){
   const t = BUILDINGS[b.type], menu = menuOf(b);
   let h = `<section><h3>On the menu <span class="meta" style="text-transform:none;letter-spacing:0">${menu.length} of ${t.menuSlots}</span></h3>`;
-  if(!menu.length) h += `<div class="card"><b>Nothing for sale yet.</b><div class="meta">Pick what this ${t.label.toLowerCase()} sells below. Guests walk right past an empty one.</div></div>`;
+  if(!menu.length) h += `<div class="meta">Nothing for sale.</div>`;
   else h += `<ul class="shop">${menu.map(m => {
     const it = MENU[m.id], will = willPay(m.id, m.price), sold = served.items[m.id] || 0;
-    const what = it.fills ? Object.keys(it.fills).map(k => ({hunger:"hunger", thirst:"thirst", energy:"tiredness"}[k])).join(" and ") : null;
     return `<li><span class="nm">${esc(it.label)}<span class="per">${sold} sold today</span></span>
       <span class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="menuPrice" data-id="${m.id}" data-d="-1" aria-label="Lower the price" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${money(m.price)}</b><button class="btn" data-action="menuPrice" data-id="${m.id}" data-d="1" aria-label="Raise the price" style="padding:2px 9px">+</button></span>
-      <span class="need">${what ? `Fixes ${what}. ` : ""}Costs you ${cents(it.cost)} each. Usual price ${money(it.price)}.${it.text ? " " + esc(it.text) : ""}</span>
-      ${will < 1 ? `<span class="${will < .6 ? "warn" : "need"}">${will <= 0 ? "Nobody will pay this much." : `About ${Math.round(will * 100)}% of guests will pay this much.`}</span>` : ""}
-      <span class="need"><button class="btn" data-action="menuDrop" data-id="${m.id}" style="padding:2px 9px">Take off the menu</button></span></li>`;
+      <span class="need">Cost ${cents(it.cost)} · usual ${money(it.price)}</span>
+      ${will < 1 ? `<span class="${will < .6 ? "warn" : "need"}">${Math.round(will * 100)}% will pay</span>` : ""}
+      <span class="need"><button class="btn" data-action="menuDrop" data-id="${m.id}" style="padding:2px 9px">Remove</button></span></li>`;
   }).join("")}</ul>`;
   const more = Object.keys(MENU).filter(id => MENU[id].kind === t.kind && (!MENU[id].only || MENU[id].only === b.type) && !menuItem(b, id));
-  if(menu.length < t.menuSlots && more.length) h += `<div class="meta" style="margin:8px 0 4px">Add to the menu:</div><div class="row">${more.map(id => `<button class="btn" data-action="menuAdd" data-id="${id}" style="padding:4px 10px">${esc(MENU[id].label)}</button>`).join("")}</div>`;
-  else if(menu.length >= t.menuSlots) h += `<div class="meta" style="margin-top:6px">The menu is full. Take something off to sell something else.</div>`;
+  if(menu.length < t.menuSlots && more.length) h += `<div class="row" style="margin-top:8px">${more.map(id => `<button class="btn" data-action="menuAdd" data-id="${id}" style="padding:4px 10px">${esc(MENU[id].label)}</button>`).join("")}</div>`;
   return h + `</section>`;
 }
 

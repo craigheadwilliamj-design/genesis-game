@@ -85,13 +85,13 @@ function freeFeeding(){ return state.day < state.staff.feedFrom; }
 
 // Where keepers get into an exhibit: its gate, or for a vivarium the path beside it
 function gateCheck(e){
-  if(e.viv) return {ok:true, text:"Vivariums are always open to keepers."};
-  if(!e.gate) return {ok:false, text:"No gate. Use Gates (Exhibit Tools) on a fence that touches a service road."};
+  if(e.viv) return {ok:true, text:"Keepers can get in."};
+  if(!e.gate) return {ok:false, text:"No keeper gate."};
   // the gate is on a path when it is within GATE_REACH of its middle, which is GATE_REACH - 2.5 m from its edge
   const d = GATE_REACH - PATH_HALF_WIDTH, sq = [[e.gate[0] - .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] - .05], [e.gate[0] + .05, e.gate[1] + .05], [e.gate[0] - .05, e.gate[1] + .05]];
   const loose = state.paths.filter(p => !p.d && !isTram(p)).some(q => q.points.some((v, i) => i > 0 && segProj(e.gate[0], e.gate[1], q.points[i-1], v).d <= GATE_REACH));
-  if(!loose && !nearCells(sq, d, false, true)) return {ok:false, text:"The gate doesn't touch a path or service road."};
-  if(!loose && !nearCells(sq, d, false)) return {ok:false, text:"The path at the gate doesn't join the entrance. Staff paths join the entrance by touching a guest path or the entrance walk."};
+  if(!loose && !nearCells(sq, d, false, true)) return {ok:false, text:"Gate not on a path."};
+  if(!loose && !nearCells(sq, d, false)) return {ok:false, text:"Gate path not connected."};
   return {ok:true, text:"Gate opens onto a path."};
 }
 

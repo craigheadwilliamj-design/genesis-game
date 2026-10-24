@@ -29,11 +29,11 @@ function escapeRisk(e, s){
   if(e.viv) return null;
   if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out.`;
   if(e.moat) return null;
-  if(e.open) return `There's a gap in the fence. ${s.name} can walk right out until it's closed.`;
+  if(e.open) return "Gap in the fence.";
   const b = barrierOf(e), str = escapeStrength(s);
-  if(str > b.strength) return `${s.name} can break through ${b.label.toLowerCase()} (strength ${b.strength}, it needs ${str}).`;
-  if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return `The electric fence has no power, so it's just wire. ${s.name} can push through.`;
-  if(str > effectiveStrength(e)) return isBreached(e) ? `The fence is broken. ${s.name} can walk right out.` : `The fence is worn. ${s.name} can push through it.`;
+  if(str > b.strength) return `${s.name} can break this fence (${b.strength} of ${str}).`;
+  if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return "Electric fence has no power.";
+  if(str > effectiveStrength(e)) return isBreached(e) ? "Fence broken." : "Fence worn.";
   return null;
 }
 
