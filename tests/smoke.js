@@ -3775,16 +3775,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       {
         const pa = {id:"e-pa", name:"Pa", viv:"M", points:rectPts(350, 300, V.w, V.d, 0), animals:[0, 1, 2, 3].map(i => ({id:"pa" + i, sp:"tikt", q:90})), happy:70, biome:"tropical"};
         state.exhibits.push(pa); recompute();
+        addVivToy(pa, "vlamp"); addVivToy(pa, "vdish");   // fittings laid out while it's dry, some at the front
         const dry = habitatScore(pa).delta, m0 = state.money, okOn = !paluProblem(pa, true); setPalu(pa, true);
+        const onBank = landOf(pa).every(f => f.y < paluY(pa)); addVivToy(pa, "vbark");
         const tk = SPECIES_BY_ID.tikt, enal = SPECIES_BY_ID.enal, load = aquaLoad(pa), noF = filterText(pa);
-        addVivToy(pa, "afilter"); pa.filterPowered = true; pa.wq = 100; const wetHappy = habitatScore(pa).delta;
+        addVivToy(pa, "afilter"); pa.filterPowered = true;
+        const placed = landOf(pa).every(f => LAND[f.type].filter ? f.y > paluY(pa) : f.y < paluY(pa)) && onBank; pa.wq = 100; const wetHappy = habitatScore(pa).delta;
         pa.wq = 10; const foul = habitatScore(pa).delta, ill = illChance(pa, pa.animals[0]); pa.wq = 100;
         const drawn = viv34(pa, "front", null) !== viv34(ev, "front", null) && vivFloor34(pa, null, false, false, true).length > vivFloor34(ev, null, false, false, true).length;   // a scene-less paludarium draws its water on the floor
         pa.vivScene = {era:"paleozoic", biome:"wetland"}; const paluFloor = vivScene34(pa, "floor").includes("paleozoic-wetland-M-palu") && !!SPRITE_PACK["sprites/vivscene/paleozoic-wetland-M-palu.png"] && Object.keys(BIOMES).every(b => ["S", "M", "L"].every(z => SPRITE_PACK[`sprites/vivscene/mesozoic-${b}-${z}-palu.png`])); pa.vivScene = null;
         const blockF = !!paluProblem(pa, false);
         const L = {viv:"L", palu:true, points:[]}, Ld = {viv:"L", points:[]};
         out.paludarium = okOn && pa.palu && state.money < m0 && paluSwims(tk) && !paluSwims(SPECIES_BY_ID.arth) && load === 4 * tk.food * PALU.load && noF === "No filter."
-          && wetHappy > dry && foul < wetHappy && ill.why.includes("foul water") && drawn && paluFloor && blockF && !thirsty(pa, tk)
+          && wetHappy > dry && foul < wetHappy && ill.why.includes("foul water") && drawn && paluFloor && placed && blockF && !thirsty(pa, tk)
           && !vivToyProblem(pa, "afilter") && !!vivToyProblem(pa, "vpool") && !!vivToyProblem(pa, "acoral") && !!vivToyProblem(ev, "afilter")
           && fitsHabitat(enal, L) && !fitsHabitat(enal, Ld) && !fitsHabitat(enal, aq) && paluWet(pa, 351, paluY(pa) + .1) && !paluWet(pa, 351, paluY(pa) - .1) && !paluWet(ev, 201, 309);
         pa.land = pa.land.filter(f => !LAND[f.type].filter); pa.animals.push({id:"pa-e", sp:"enal", q:90});

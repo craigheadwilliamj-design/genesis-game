@@ -735,12 +735,14 @@ function statueSeen(p, id){
 /* ---------- vivarium plants ---------- */
 // A fitting goes where it's furthest from the others, so they spread over the whole floor: the first sits at the middle of the case (`VIV_PLANT.shift` toward the front), the next at the emptiest spot, and so on.
 // The front keeps the sill margin (like vivSpot) so nothing hides behind the front frame. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in. `skip` is an item being re-laid, `k` its scale.
+// In a paludarium filters go in the water and everything else stays on the bank.
 function vivPlantSpot(e, key, skip, k){
   const t = LAND[key], r = t.r * (k || (t.vivToy ? 1 : VIV_PLANT.scale)), bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, m = K.sill / TILT + .15;
   const ax = (bb.x0 + bb.x1) / 2, front = bb.y1 - m, ay = Math.min((bb.y0 + bb.y1) / 2 + VIV_PLANT.shift, front), others = landOf(e).filter(f => f !== skip && LAND[f.type]);
   let best = null, bs = -Infinity;
   for(let y = bb.y0 + r; y <= front + 1e-6; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5){
     if(!deepInside(x, y, e.points, r + .3)) continue;
+    if(e.palu && (t.filter ? y < paluY(e) + .3 : y > paluY(e) - .3)) continue;
     let gap = Infinity;   // the room left to the nearest fitting
     for(const f of others) gap = Math.min(gap, Math.hypot(f.x - x, f.y - y) - r - LAND[f.type].r * (f.k || 1));
     if(gap < 0) continue;
@@ -793,7 +795,7 @@ function paluProblem(e, on){
 function setPalu(e, on){
   if(on){ spend(PALU.price, "built"); e.palu = true; e.wq = 100; }
   else { earn(Math.round(PALU.price * COST.refundShare), "sold"); delete e.palu; delete e.wq; delete e.filterPowered; }
-  regatherViv(e);
+  relayViv(e);   // the fittings move up onto the bank (or spread back out), and the animals find their spots again
 }
 // Which fittings a case takes: aquarium ones (filters, sea enrichment) only in aquariums, the rest only in vivariums; a food dish goes in either
 const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu))); };   // a paludarium takes filters too, and needs no pool
