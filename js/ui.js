@@ -666,6 +666,13 @@ function animalCard(s, rep, mode){
   if(mode !== "clone"){
     h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
     h += `</span>`;
+  } else {
+    // how long a clone takes, as a bar against the slowest species, with when it would be ready and the chance it fails
+    const fail = cloneFailChance(s.id), risk = fail > 0 ? `${Math.round(fail * 100)}% failure risk` : "";
+    if(freeBay("gene") >= 0){
+      const slow = Math.max(...SPECIES.map(x => cloneMinutes(x.id))), pct = Math.max(4, Math.round(cloneMinutes(s.id) / slow * 100));
+      h += `<span class="need" style="grid-column:1/-1"><span class="meter" style="display:block;margin-bottom:4px"><i style="display:block;width:${pct}%;background:var(--gold)"></i></span>Ready ${whenText(cloneReadyMin(s.id))}${risk ? `. ${risk}` : ""}.</span>`;
+    } else if(risk) h += `<span class="need" style="grid-column:1/-1">${risk}.</span>`;
   }
   if(mode === "clone" && !hasDept("tar")) h += `<span class="warn">Build the Genetics Lab to clone it.</span>`;
   else if(mode === "clone" && !dept("tar")) h += `<span class="warn">The Genetics Lab isn't connected to a path or service road.</span>`;
