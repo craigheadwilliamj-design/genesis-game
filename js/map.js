@@ -785,11 +785,19 @@ function vivFloor34(e, c, dead, on, reach){
   const stroke = dead || on || !reach ? `stroke="${dead ? "var(--bad)" : on ? "var(--sel)" : "#24414A"}" stroke-width="${on || dead ? 3.5 : 2}" ${reach ? "" : `stroke-dasharray="4 3"`} stroke-linejoin="round" vector-effect="non-scaling-stroke"` : "";
   const scene = vivScene34(e, "floor");   // a scene's floor takes the place of the plain substrate; the outline goes back over it
   if(scene) return flatPoly34(P, sub) + scene + (stroke ? flatPoly34(P, "none", stroke, true) : "") + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "");
-  return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det;
+  return flatPoly34(P, sub, stroke) + (c ? flatPoly34(P, c, `fill-opacity=".2"`, true) : "") + det + (e.palu ? paluWater34(e) : "");
 }
-// A vivarium's scene (tools/pixelvivscene.py): "floor" lies over the whole floor; "wall" fills the back pane from the top of the sill to the top of the glass
+// A paludarium with no scene: its front flooded in flat water, a row of stones along the shore, rows of ripple dashes
+function paluWater34(e){
+  const W = paluPoly(e), bb = bbox(W), col = AQUA34.clean, lt = vivMix34(col, "#FFFFFF", .35), dk = vivMix34(col, "#000000", .25);
+  let s = flatPoly34(W, col, "", true) + flatPoly34([[bb.x0, bb.y0], [bb.x1, bb.y0], [bb.x1, bb.y0 + .25], [bb.x0, bb.y0 + .25]], "#8A8478", "", true), d = "";
+  for(let r = 0, y = bb.y0 + .7; y < bb.y1 - .2; r++, y += .45) for(let x = bb.x0 + (r * 1.3) % 2 + .3; x < bb.x1 - .5; x += 2.2){ const a = flatSnap34([x, y]), b = flatSnap34([x + .45, y + .13]); d += `M${a[0].toFixed(2)} ${a[1].toFixed(2)}H${b[0].toFixed(2)}V${b[1].toFixed(2)}H${a[0].toFixed(2)}z`; }
+  return s + flatPoly34([[bb.x0, bb.y1 - .5], [bb.x1, bb.y1 - .5], [bb.x1, bb.y1], [bb.x0, bb.y1]], dk, "", true) + `<path d="${d}" fill="${lt}" shape-rendering="crispEdges" pointer-events="none"/>`;
+}
+// A vivarium's scene (tools/pixelvivscene.py): "floor" lies over the whole floor (a paludarium's floor, flooded at the front, from tools/pixelpaluscene.py); "wall" fills the back pane from the top of the sill to the top of the glass
 function vivScene34(e, layer){
   if(!e.vivScene || !VIVARIUMS[e.viv]) return "";
+  if(layer === "floor" && e.palu && !e.vivScene.sea) layer = "palu";
   const bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, H = VIVARIUMS[e.viv].d * .45, n2 = v => v.toFixed(2);
   const [a, b] = layer === "wall" ? [flatSnap34([bb.x0, bb.y0 - H / TILT]), flatSnap34([bb.x1, bb.y0 - K.sill / TILT])] : [flatSnap34([bb.x0, bb.y0]), flatSnap34([bb.x1, bb.y1])];
   return `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-${layer}.png`)}" x="${n2(a[0])}" y="${n2(a[1])}" width="${n2(b[0] - a[0])}" height="${n2(b[1] - a[1])}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
@@ -802,8 +810,12 @@ function viv34(e, which, hi){
   let s = "";
   if(e.aqua || e.palu && !back){   // the water: an aquarium's far faces behind the animals, then the near faces and a thinner surface over them (a paludarium's only over its flooded front); clear blue when clean, thicker and greener as it fouls
     const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = e.palu ? paluLine(e) : aquaLine(e), WP = e.palu ? paluPoly(e) : P;
-    for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back ? vivMix34(col, "#000000", .15) : col, a.toFixed(2));
-    if(!back){
+    for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back || e.palu ? vivMix34(col, "#000000", e.palu ? .3 : .15) : col, a.toFixed(2));   // a paludarium's front band darker, as deep water seen through the glass
+    if(!back && e.palu){   // a paludarium's water is drawn on its floor: here only a film of murk on it as it fouls, and the waterline on the front glass
+      if(w < 1) s += flatPoly34(WP, AQUA34.foul, op(((1 - w) * .6).toFixed(2)), true);
+      for(let i = 0; i < P.length; i++) if(norm34(P, i)[1] > .05){ const p = onEdge34(P, i, 0, wl), q = onEdge34(P, i, 1, wl); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".8" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
+    }
+    else if(!back){
       s += flatPoly34(WP.map(lift34(wl)), vivMix34(col, "#FFFFFF", .15), op((a * AQUA34.surface).toFixed(2)), true);
       for(let i = 0; i < WP.length; i++){ const p = lift34(wl)(WP[i]), q = lift34(wl)(WP[(i + 1) % WP.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
     }
@@ -1436,7 +1448,7 @@ function animalUp(h){ const up = (h.lift || 0) + (h.bob || 0); return tilt ? `${
 // Floor crawlers (`floor` in SPECIES) wander the sand instead. Resting ones drift slowly near the bottom. The highest it goes keeps its picture under the waterline.
 // In a paludarium the swimmers (h.swimmer) do the same, heading for the water `palu` of the time and otherwise climbing out to walk the bank at `crawl`.
 const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6, palu:.6};
-function paluTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, paluLine(e) / TILT - ht - .1); }
+const paluTop = () => 0;   // a paludarium is shallow: its swimmers paddle at the surface, cut at the waterline (drawAnimal)
 function aquaTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, aquaLine(e) / TILT - ht - .3); }
 function aquaSwim(h, e, dt){
   const s = SPECIES_BY_ID[h.sp] || {}, rest = h.act === "rest", wet = !e.palu || paluWet(e, h.x, h.y), crawl = !!s.floor || !wet, A = AQUA_SWIM;
@@ -1458,6 +1470,7 @@ function aquaSwim(h, e, dt){
   const nx = h.x + v[0] * dt, ny = h.y + v[1] * dt;
   if(vivSpot(h, e, [nx, ny])){ h.x = nx; h.y = ny; } else { v[0] = v[1] = 0; h.goal = null; }
   h.lift = clamp(lift + v[2] * dt, 0, top);
+  if(e.palu && paluWet(e, h.x, h.y) !== !!h.sub) drawAnimal(h, e, h.a);   // into or out of the water: cut at the waterline or whole again
   if(h.goal && !(h.hover > 0) && d < .15){ h.goal = null; h.hover = A.hover[0] + Math.random() * (A.hover[1] - A.hover[0]) * (rest ? 2 : 1); }
   h.bobT = (h.bobT ?? Math.random() * 7) + dt;
   h.bob = crawl || !wet ? 0 : Math.sin(h.bobT * A.bobRate) * A.bob * Math.min(1, h.lift / A.bob);   // no bobbing into the sand
@@ -1591,6 +1604,22 @@ function vivHomeSpot(h, e, hm){
 
 function animalRadius(sp){ return clamp(Math.sqrt(SPECIES_BY_ID[sp].space) / 9, 1.2, 6); }
 
+// An animal's picture (or dot), its sick and pacing rings, and the waterline cut when it's in water; drawn by syncAnimals, and again when a swimmer crosses a shore
+function drawAnimal(h, e, a){
+  const s = SPECIES_BY_ID[a.sp], r = h.r, sprite = h.spr, showLetter = r * view.k >= 8;
+  // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
+  h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
+  // in a vivarium pool or a paludarium's water: the body is cut at the waterline, with a ripple over the cut
+  const pool = e.viv && (vivPoolAt(e, h.x, h.y) || h.swimmer && paluWet(e, h.x, h.y)), body = sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` + (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
+  h.sub = !!pool;
+  const subSvg = () => { const S = SPRITES[a.sp], w = sprite ? r * 4 * (S.size || 1) : r * 2, ht = sprite ? w / S.ratio : r * 2, wl = sprite ? r * .5 - ht * .09 : r * .1, cut = wl + (sprite && e.viv ? ht * (1 - (S.foot || 1)) * .7 : 0), cid = "vc-" + esc(a.id);
+    return `<clipPath id="${cid}"><rect x="${(-w).toFixed(2)}" y="${(-ht * 3).toFixed(2)}" width="${(2 * w).toFixed(2)}" height="${(ht * 3 + cut).toFixed(2)}"/></clipPath><g clip-path="url(#${cid})">${body}</g>`
+      + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${wl.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(wl + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
+  h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
+    (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
+    (pool ? subSvg() : body);
+  h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+}
 function syncAnimals(){
   const seen = new Set(), inv = 1/view.k;
   for(const e of state.exhibits){
@@ -1617,18 +1646,7 @@ function syncAnimals(){
         if(e.viv && !ok){ const p = vivMidSpot(h, e); if(p){ [h.x, h.y] = p; ok = true; } }
         for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !vivCrowd(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
-      // sick animals get a red ring, pacing ones an amber one, and hiding ones fade into their cover
-      h.el.setAttribute("opacity", a.act === "hide" ? .45 : a.act === "rest" ? .85 : 1);
-      // in a vivarium pool: the body is cut at the waterline, with a ripple over the cut
-      const pool = e.viv && vivPoolAt(e, h.x, h.y), body = sprite ? spriteSvg(a.sp, h) : `<circle r="${r}" fill="${PERIOD_COLOR[s.period]}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` + (showLetter ? `<text class="glyph" font-size="${r*1.1}" fill="#1D2B22" style="fill:#1D2B22">${s.name[0]}</text>` : "");
-      h.sub = !!pool;
-      const subSvg = () => { const S = SPRITES[a.sp], w = sprite ? r * 4 * (S.size || 1) : r * 2, ht = sprite ? w / S.ratio : r * 2, wl = sprite ? r * .5 - ht * .09 : r * .1, cut = wl + (sprite && e.viv ? ht * (1 - (S.foot || 1)) * .7 : 0), cid = "vc-" + esc(a.id);
-        return `<clipPath id="${cid}"><rect x="${(-w).toFixed(2)}" y="${(-ht * 3).toFixed(2)}" width="${(2 * w).toFixed(2)}" height="${(ht * 3 + cut).toFixed(2)}"/></clipPath><g clip-path="url(#${cid})">${body}</g>`
-          + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${wl.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(wl + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
-      h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
-        (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
-        (pool ? subSvg() : body);
-      h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+      drawAnimal(h, e, a);
     }
   }
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
