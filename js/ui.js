@@ -645,7 +645,6 @@ $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
-const habitatText = s => (s.viv ? `Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger. ` : "") + (biomesOf(s) ? `At home in ${biomeNames(s)}. ` : "") + traitText(s) + ". ";
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
@@ -654,19 +653,14 @@ function animalCard(s, rep, mode){
   let warn = "";
   for(const sp of rep.counts.keys()){ const w = conflict(s, SPECIES_BY_ID[sp]); if(w){ warn = w; break; } }
   const have = rep.counts.get(s.id) || 0, fits = Math.floor(free / s.space);
-  const fitText = fits > 0 ? `Room for ${fits} more.` : "";
-  const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>`
-    : have === 0 && s.group[0] > 1 ? `<span class="need">${fitText} Get at least ${s.group[0]} so they aren't lonely.</span>` : `<span class="fit">${fitText}</span>`;
+  const fitLine = warn ? `<span class="warn">${esc(warn)}</span>` : fits <= 0 ? `<span class="warn">No room left for one of these.</span>` : "";
   let h = `<li class="${locked ? "locked" : ""}"><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)} <span class="per">${s.period}</span></span>`;
   if(locked) h += `<span class="meta">Needs ${starsNeed(s)}★ (you have ${starTxt(state.rating)})</span>`;
   else if(mode === "clone"){
     const why = cloneProblem(s.id);
     h += `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>`;
   } else { const off = canAfford(s.price) ? "" : " disabled"; h += `<button class="buy" data-action="buy" data-sex="male" data-sp="${s.id}"${off}>Buy M ${money(s.price)}</button><button class="buy" data-action="buy" data-sex="female" data-sp="${s.id}"${off}>Buy F ${money(s.price)}</button>`; }
-  if(mode !== "clone"){
-    h += `<span class="need">${habitatText(s)}${s.space.toLocaleString()} m² each, groups of ${s.group[0]}–${s.group[1]}, ${money(s.food)} a day to feed. ${dietText(s)}.`;
-    h += `</span>`;
-  } else {
+  if(mode === "clone"){
     // how long a clone takes, as a bar against the slowest species, with when it would be ready and the chance it fails
     const fail = cloneFailChance(s.id), risk = fail > 0 ? `${Math.round(fail * 100)}% failure risk` : "";
     if(freeBay("gene") >= 0){
