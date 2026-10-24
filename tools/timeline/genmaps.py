@@ -5,7 +5,7 @@ Needs numpy, h5py and Pillow. The DEMs are Scotese & Wright 2018, "PALEOMAP Pale
 (PaleoDEMS) for the Phanerozoic", https://zenodo.org/records/5460860 (CC BY 4.0): unzip the 1x1 degree netCDF set
 and pass its folder.
 
-Each map is 260 x 130 px, a Mollweide ellipse with a 2 px navy rim, in one flat palette: deep ocean, shallow sea (shelf above -200 m), land, mountains (the top 8% of each map's land,
+Each map is 260 x 130 px, a Mollweide ellipse with a 2 px navy rim, in one flat palette: deep ocean, shallow sea (shelf above -200 m), land (bare grey-tan rock before land plants), mountains (the top 8% of each map's land,
 at least 900 m), desert (land in the dry belts: 3 px from the sea at 20 to 30 degrees, needing more distance the further out of that band,
 so deserts swell in continental interiors) and ice (by hand-set rules
 per map below, since the DEMs carry none). These are drafts: tidy them in the pixel editor.
@@ -23,7 +23,7 @@ W, H = 260, 130
 S = W / 130   # distances below are tuned in 130 px map pixels
 PAL = {
     "rim": (0x1A, 0x2B, 0x4C), "deep": (0x1B, 0x60, 0xB8), "shallow": (0x4C, 0x8F, 0xD8), "land": (0x03, 0xA7, 0x22),
-    "mountain": (0x8B, 0x6B, 0x43), "desert": (0xD9, 0xC2, 0x7A), "ice": (0xEA, 0xF2, 0xF8),
+    "barren": (0xA8, 0x94, 0x78), "mountain": (0x8B, 0x6B, 0x43), "desert": (0xD9, 0xC2, 0x7A), "ice": (0xEA, 0xF2, 0xF8),
 }
 
 # Ice rules: (lat, lon, px from the sea) -> True where land is under ice. Paleo coordinates, as the DEM for that age
@@ -36,6 +36,9 @@ def lgm(la, lo, d):   # last glacial maximum, modern coordinates
             or (-11 < lo < 70 and la > 52 - inland(d) + max(0, lo - 25) * .5))          # Scandinavian and British, thinning east
 def today(la, lo, d):
     return la < -60 or (la > 60 and -75 < lo < -10)
+
+# Maps from before land plants: the land is bare rock (PAL "barren"), not green.
+BARREN = {"cambrian", "ordovician"}
 
 # name: (age in Ma of the DEM, sea level shift in m, ice rule or None)
 MAPS = {
@@ -117,6 +120,7 @@ def build(name, age, sea, ice, mask, folder):
                 if ice and ice(la, lo, dist[px, py] or 0): k = "ice"
                 elif elev[px, py] > mtn: k = "mountain"
                 elif (dist[px, py] or 0) >= (3 + max(0, abs(abs(la) - 25) - 5) / 2.5) * S: k = "desert"
+            if k == "land" and name in BARREN: k = "barren"
             img.putpixel((px, py), PAL[k] + (255,))
     img.save(os.path.join(OUT, name + ".png"))
     os.makedirs(GAME, exist_ok=True)
