@@ -432,6 +432,7 @@ function upgradeSave(s){
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
   if(s.guestLog.edu === undefined) s.guestLog.edu = null;
+  for(const e of s.exhibits || []) if(!e.glog) e.glog = freshExLog();   // per-exhibit guest log (guests.js)
   if(!s.lodging) s.lodging = freshLodging();
   // parks from before litter and seats get told what changed
   if(!s.litter){ s.litter = {}; if(s.buildings.some(b => OLD_MENUS[b.type] || b.type === "restroom")) s.guestLog.notice = true; }
