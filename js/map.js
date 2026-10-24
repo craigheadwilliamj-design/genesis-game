@@ -1428,23 +1428,33 @@ function place34(h){
 }
 
 // an animal stands on its spot in the 3/4 view: a dot on its lower edge, a picture on its feet (spriteSvg puts them half a dot down)
-function animalUp(h){ return tilt ? `${h.lift ? ` translate(0 ${(-h.lift).toFixed(2)})` : ""}${upright()} translate(0 ${(-(h.r || 0) * (h.spr ? .5 : .85)).toFixed(2)})` : ""; }
-// In an aquarium the animals swim: each glides to a spot in the glass at some depth (h.lift, how far up the picture it is drawn), then picks another.
-// Resting ones drift slowly near the floor. The highest it goes keeps its picture under the waterline.
-const AQUA_SWIM = {speed:.7, rest:.15, rise:.5};
+function animalUp(h){ const up = (h.lift || 0) + (h.bob || 0); return tilt ? `${up ? ` translate(0 ${(-up).toFixed(2)})` : ""}${upright()} translate(0 ${(-(h.r || 0) * (h.spr ? .5 : .85)).toFixed(2)})` : ""; }
+// In an aquarium the animals drift like fish: each steers toward a spot in the glass at some depth (h.lift, how far up the picture it is drawn) with some
+// momentum (h.vel: across, back, up), so it curves and eases in, hangs there a moment (h.hover), then picks another; a slow bob keeps it from ever sitting dead still.
+// Floor crawlers (`floor` in SPECIES) wander the sand instead. Resting ones drift slowly near the bottom. The highest it goes keeps its picture under the waterline.
+const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6};
 function aquaTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, aquaLine(e) / TILT - ht - .3); }
 function aquaSwim(h, e, dt){
-  const rest = h.act === "rest", top = aquaTop(h, e);
-  if(!h.goal || !vivSpot(h, e, h.goal)){
+  const s = SPECIES_BY_ID[h.sp] || {}, rest = h.act === "rest", crawl = !!s.floor, top = crawl ? 0 : aquaTop(h, e), A = AQUA_SWIM;
+  const v = h.vel || (h.vel = [0, 0, 0]), lift = h.lift || 0;
+  if(h.hover > 0) h.hover -= dt;
+  else if(!h.goal || !vivSpot(h, e, h.goal)){
     let p = null;
     for(let i = 0; i < 20 && !p; i++){ const q = randomInside(e.points); if(vivSpot(h, e, q)) p = q; }
-    h.goal = p || [h.x, h.y]; h.liftTo = rest ? Math.random() * top * .2 : Math.random() * top;
+    h.goal = p || [h.x, h.y]; h.liftTo = crawl ? 0 : rest ? Math.random() * top * .2 : Math.random() * top;
   }
-  const dx = h.goal[0] - h.x, dy = h.goal[1] - h.y, d = Math.hypot(dx, dy), v = (rest ? AQUA_SWIM.rest : AQUA_SWIM.speed) * dt, step = Math.min(d, v);
-  if(d > .01){ h.x += dx / d * step; h.y += dy / d * step; }
-  const dl = (h.liftTo || 0) - (h.lift || 0); h.lift = (h.lift || 0) + Math.sign(dl) * Math.min(Math.abs(dl), AQUA_SWIM.rise * v / AQUA_SWIM.speed);
-  if(d < .05 && Math.abs(dl) < .05) h.goal = null;
-  if(Math.abs(dx) > .05){ const face = dx > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const g = h.el.querySelector(".spr"); if(g) g.setAttribute("transform", `scale(${face} 1)`); } }
+  // steer: the velocity it wants points at the goal, slowing inside `near`; the one it has turns toward that at `accel` a second
+  const g = h.hover > 0 || !h.goal ? [h.x, h.y, lift] : [h.goal[0], h.goal[1], h.liftTo || 0], dx = g[0] - h.x, dy = g[1] - h.y, dl = g[2] - lift, d = Math.hypot(dx, dy, dl);
+  const sp = (rest ? A.rest : crawl ? A.crawl : A.speed) * Math.min(1, d / A.near), want = d > .01 ? [dx / d * sp, dy / d * sp, dl / d * sp] : [0, 0, 0];
+  const ax = want[0] - v[0], ay = want[1] - v[1], al = want[2] - v[2], am = Math.hypot(ax, ay, al), k = am > 0 ? Math.min(1, A.accel * dt / am) : 0;
+  v[0] += ax * k; v[1] += ay * k; v[2] += al * k;
+  const nx = h.x + v[0] * dt, ny = h.y + v[1] * dt;
+  if(vivSpot(h, e, [nx, ny])){ h.x = nx; h.y = ny; } else { v[0] = v[1] = 0; h.goal = null; }
+  h.lift = clamp(lift + v[2] * dt, 0, top);
+  if(h.goal && !(h.hover > 0) && d < .15){ h.goal = null; h.hover = A.hover[0] + Math.random() * (A.hover[1] - A.hover[0]) * (rest ? 2 : 1); }
+  h.bobT = (h.bobT ?? Math.random() * 7) + dt;
+  h.bob = crawl ? 0 : Math.sin(h.bobT * A.bobRate) * A.bob * Math.min(1, h.lift / A.bob);   // no bobbing into the sand
+  if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const el = h.el.querySelector(".spr"); if(el) el.setAttribute("transform", `scale(${face} 1)`); } }
   const S = SPRITES[h.sp];
   if(h.spr && rigOf(h.sp)) rigStep(h, rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);

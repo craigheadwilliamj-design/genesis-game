@@ -85,19 +85,20 @@ const UPKEEP = {
 //   shop     true means partner parks sell it, so you can buy it without cloning
 //   viv      "S", "M", or "L" means it lives in a vivarium at least that size, not an open exhibit
 //   aqua     true for sea animals: viv is then the aquarium size it needs, and it lives only in an aquarium
+//   floor    a sea animal that crawls the bottom of its aquarium instead of swimming
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
 
 const SPECIES = [
   // Cambrian
   {id:"anom", name:"Anomalocaris",   period:"Cambrian", diet:["carnivore"], price:7000, food:12, space:15, group:[1,3], appeal:7, stars:1, viv:"M", aqua:true},
   {id:"opab", name:"Opabinia",       period:"Cambrian", diet:["carnivore"], price:3500, food:2, space:2, group:[3,8], appeal:5, stars:0.5, viv:"S", aqua:true},
-  {id:"olen", name:"Olenoides",      period:"Cambrian", diet:["carnivore"], bug:true, price:2000, food:2, space:2, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
+  {id:"olen", name:"Olenoides",      period:"Cambrian", diet:["carnivore"], bug:true, price:2000, food:2, space:2, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true, floor:true},
   // Silurian
   {id:"ptry", name:"Pterygotus",     period:"Silurian", diet:["carnivore"], bug:true, price:12000, food:30, space:60, group:[1,2], appeal:8, stars:1.5, viv:"L", aqua:true},
   // Devonian
   {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
   {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
-  {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true},
+  {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true, floor:true},
   // Carboniferous
   {id:"stet", name:"Stethacanthus",  period:"Carboniferous", diet:["piscivore"], price:6000, food:15, space:20, group:[2,5], appeal:5, stars:1, viv:"M", aqua:true},
   {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
