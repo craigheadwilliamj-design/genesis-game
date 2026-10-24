@@ -3,7 +3,7 @@
 // until "Send to repo" writes the PNG to the db collection `pixeled`, where tools/pixeledpull.py picks it up (docs/art.md: Pixel editor).
 
 const PX_PARK = [[18,34,19],[63,124,69],[48,94,50],[43,84,45],[28,26,16],[33,26,14],[106,100,77],[227,221,195],[198,188,147],
-  [44,35,19],[66,53,29],[165,125,74],[143,109,64],[110,85,49],[132,101,59],[231,231,231],[189,72,58],[222,182,72],[29,43,34,100]];   // PAL in tools/genesis_style.py
+  [44,35,19],[66,53,29],[165,125,74],[143,109,64],[110,85,49],[132,101,59],[231,231,231],[189,72,58],[222,182,72],[36,65,74],[126,168,170],[176,214,218],[232,244,244],[29,43,34,100]];   // PAL in tools/genesis_style.py
 const PX_TOOLS = [["pencil", "Pencil", "B"], ["eraser", "Eraser", "E"], ["bucket", "Fill (Shift: every pixel of that color)", "G"], ["line", "Line", "L"],
   ["rect", "Rectangle (Shift: filled)", "R"], ["ellipse", "Ellipse (Shift: filled)", "O"], ["select", "Select a box and move it", "M"], ["lasso", "Lasso: draw around pixels to select them (the line snaps to pixels)", "Q"], ["shade", "Shade: left lightens, right darkens", "U"], ["picker", "Pick a color", "I"], ["pan", "Pan: drag to move the view (or hold Space)", "H"]];
 const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M4 14l7-7 6 6-5 5H7zM9 18h9", bucket:"M5 9l6-6 6 6-6 6zM17 12c1 2 2 3 2 4a2 2 0 01-4 0c0-1 1-2 2-4z",

@@ -8,6 +8,7 @@ PAL = {
   "C":(28,26,16), "D":(33,26,14), "T":(106,100,77), "a":(227,221,195), "Z":(198,188,147),   # as the restroom walls: dark edge, dark inside, soffit, plaster, plaster shade
   "G":(44,35,19), "M":(66,53,29), "X":(165,125,74), "W":(143,109,64), "U":(110,85,49), "V":(132,101,59),   # browns, as the restroom's base slab
   "w":(231,231,231), "r":(189,72,58), "y":(222,182,72), "b":(132,101,59),   # litter
+  "e":(36,65,74), "k":(126,168,170), "g":(176,214,218), "n":(232,244,244),   # glass: dark teal frame, the back seen through it, lit edge, glint
   "S":(29,43,34,100),                                                       # shadow, see-through
 }
 

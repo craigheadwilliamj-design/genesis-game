@@ -119,7 +119,7 @@ const ICON_LINES = {
   move:'<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
   select:'<path d="M5 3l14 8-6 1.5L10 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>',
 };
-// The picture a menu tool shows when it has one in the sprite pack: a building's or path prop's front view, a habitat prop, a rock, a fence section, a path or water tile
+// The picture a menu tool shows when it has one in the sprite pack: a vivarium's thumbnail, a building's or path prop's front view, a habitat prop, a rock, a fence section, a path or water tile
 const PATH_TILES = {path:"guest", service:"staff", bridge:"bridge"};
 function menuSprite(tool){
   const has = p => typeof SPRITE_PACK !== "undefined" && SPRITE_PACK[p] ? p : null, k = tool.replace(/^land-/, "");
@@ -127,6 +127,7 @@ function menuSprite(tool){
   if(tool === "water") return has("sprites/water/temperate-1.png");
   if(tool === "gate") return has("sprites/fence/wood-gate.png");
   if(tool.startsWith("fence-")) return has(`sprites/fence/${k.slice(6)}-pristine.png`);
+  if(BUILDINGS[tool] && BUILDINGS[tool].viv) return has(`sprites/menu/viv-${BUILDINGS[tool].viv}.png`);   // thumbnails from tools/pixelvivicon.py
   if(BUILDINGS[tool]) return (BLD_PICS[tool] || typeof PROP_PICS !== "undefined" && PROP_PICS[tool]) && has(`sprites/bld/${tool}-front.png`);   // only the pictures the map draws (a blank placeholder may sit in the pack)
   if(tool === "land-rock" || tool === "land-boulder") return has(`sprites/rocks/${k}-temperate-1.png`);
   return tool.startsWith("land-") && (has(`sprites/shelter/${k}.png`) || has(`sprites/tray/${k}.png`) || has(`sprites/viv/${k}.png`) || has(`sprites/plants/${k}.png`));
