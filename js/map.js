@@ -2154,6 +2154,7 @@ function setTool(t){
   }
   if(t === "paint"){ paintBar(); }
   if(t === "water"){ waterBar(); }
+  pressPicks();
   const nSz = $("#dSizes").children.length;   // long lists (biomes) go in an even grid of at most 5 columns
   $("#dSizes").classList.toggle("grid", nSz > 5); $("#dSizes").style.setProperty("--cols", Math.ceil(nSz / Math.ceil(nSz / 5)));
   mapwrap.className = "mapwrap tool-" + t;
@@ -2333,10 +2334,12 @@ function finishDraw(){
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
   showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Paint ground over water to remove it. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
-  $("#dSizes").hidden = false;
-  $("#dSizes").innerHTML = Object.keys(BIOMES).map(b => `<button data-pickbiome="${b}" aria-pressed="${b === paintPick}" title="${esc(BIOMES[b].ground)}">${esc(BIOMES[b].label)}</button>`).join("") + `<button data-pickbiome="erase" aria-pressed="${paintPick === "erase"}">Erase</button>`;
 }
-$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickbiome]"); if(b && tool === "paint"){ paintPick = b.dataset.pickbiome; paintBar(); } });
+// The Water and Paint Ground lists in the Landscaping tray show the picked type pressed while that tool is on
+function pressPicks(){
+  document.querySelectorAll("#sideMenu [data-water]").forEach(b => b.setAttribute("aria-pressed", tool === "water" && b.dataset.water === waterPick));
+  document.querySelectorAll("#sideMenu [data-paint]").forEach(b => b.setAttribute("aria-pressed", tool === "paint" && b.dataset.paint === paintPick));
+}
 function paintDragStat(){
   if(!pdrag) return;
   const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
@@ -2375,11 +2378,7 @@ const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
   showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Paint ground over water to remove it.", "", {undo:false, finish:false, cancel:"Done"});
-  $("#dSizes").hidden = false;
-  $("#dSizes").innerHTML = `<button data-pickwater="auto" aria-pressed="${waterPick === "auto"}" title="The water that goes with the ground it's laid on">Own biome</button>`
-    + waterTypes().map(k => `<button data-pickwater="${k}" aria-pressed="${k === waterPick}" title="${esc(BIOMES[k].ground)}">${esc(BIOMES[k].label)}</button>`).join("");
 }
-$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pickwater]"); if(b && tool === "water"){ waterPick = b.dataset.pickwater; waterBar(); renderOverlay(); } });
 // the kind (water type) a new box is laid with: undefined means the biome of where it goes
 const waterKindPick = () => waterPick !== "auto" && WATER_TEX[waterPick] ? waterPick : undefined;
 // the box being dragged: its meters, the exhibit it's in (null: out in the park), the parts of it the fence leaves room for, price and why not
@@ -3494,6 +3493,12 @@ $("#sideMenu").addEventListener("click", e => {
   if(b.matches(".tbtn[data-cat]")){ sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat); return; }
   if(b.id === "supplyBtn"){ supplyOn = !supplyOn; b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On" : "Off"; render(); return; }
   if(b.dataset.fence){ fenceSel = b.dataset.fence; setTool("exhibit"); return; }
+  // a Water or Paint Ground row picks its type and turns the tool on; tapping the pressed one again goes back to Select
+  if(b.dataset.water || b.dataset.paint){
+    const t = b.dataset.water ? "water" : "paint", k = b.dataset.water || b.dataset.paint, on = tool === t && (t === "water" ? waterPick : paintPick) === k;
+    if(t === "water") waterPick = k; else paintPick = k;
+    setTool(on ? "select" : t); return;
+  }
   if(b.dataset.tool){
     const t = b.dataset.tool, active = t === tool || (familyOf(tool) && familyOf(tool) === familyOf(t));
     setTool(active && tool !== "select" && !familyOf(t) ? "select" : t); return;

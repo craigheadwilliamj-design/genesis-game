@@ -1255,7 +1255,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = [lx];
     const fish = SPECIES.find(s => s.semi);
     lx.animals = [{id:"a-l1", sp:fish.id, q:90}];
-    out.landMenu = !!document.querySelector('[data-tool="water"]') && !!document.querySelector('[data-tool="land-rock"]');
+    out.landMenu = !!document.querySelector('[data-water="auto"]') && !!document.querySelector('[data-tool="land-rock"]');
     setTool("water"); out.landTool = tool === "water" && $("#drawbar").classList.contains("on"); setTool("select");
     const sq = (x, y, r) => [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
     // out in the park, rocks are fine but habitat props aren't, and water outside the fence isn't this exhibit's
@@ -3539,8 +3539,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       return first && minority && tipped && free && priced && drawn && panel;
     })();
     out.vivNeverPainted = (() => { const v = {viv:"S", biome:"desert", points:[[0,0],[5,0],[5,5],[0,5]], animals:[]}; const k = state.biomePaint; state.biomePaint = [{id:"x", biome:"tropical", r:[0,0,5,5]}]; paintTouch(); const ok = biomeOf(v) === "desert"; state.biomePaint = k; paintTouch(); return ok; })();
-    out.paintMenuAndTool = !!document.querySelector('#sideMenu [data-tool="paint"]');
-    out.paintToolBar = (() => { setTool("paint"); const ok = document.querySelectorAll("#dSizes [data-pickbiome]").length === Object.keys(BIOMES).length + 1 && !$("#dSizes").hidden;
+    out.paintMenuAndTool = !!document.querySelector('#sideMenu .sitem[data-open="paint"] .ssub [data-paint="erase"]');
+    out.waterMenuList = (() => { setTool("select"); const b = document.querySelector('#sideMenu .sitem[data-open="water"] [data-water="desert"]'); if(!b) return false; b.click();
+      const on = tool === "water" && waterPick === "desert" && b.getAttribute("aria-pressed") === "true" && $("#dSizes").hidden; b.click();
+      const off = tool === "select" && b.getAttribute("aria-pressed") === "false"; waterPick = "auto"; return on && off; })();
+    out.paintToolBar = (() => { setTool("select"); document.querySelector('#sideMenu [data-paint="tropical"]').click(); const ok = tool === "paint" && paintPick === "tropical" && document.querySelectorAll("#sideMenu [data-paint]").length === Object.keys(BIOMES).length + 1 && document.querySelector('#sideMenu [data-paint="tropical"]').getAttribute("aria-pressed") === "true" && $("#dSizes").hidden;
       const [pcx, pcy] = chunkAt(x + 20, y), px = pcx * 5, py = pcy * 5;
       pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
       const drawn = state.biomePaint.some(p => p.r.join() === [px, py, px + 10, py + 5].join());
