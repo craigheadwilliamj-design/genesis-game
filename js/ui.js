@@ -338,12 +338,12 @@ function exGuestsHtml(e){
   const X = exLog(e), a = exhibitAppeal(e), ranked = state.exhibits.filter(x => x.animals.length).map(x => [x, exhibitAppeal(x)]).sort((p, q) => q[1] - p[1]);
   const rank = ranked.findIndex(([x]) => x === e) + 1, view = Math.round(viewFactor(e, derived.reach) * 100);
   let h = `<section><h3>Guest appeal</h3>`;
-  h += e.animals.length ? `<div class="meta">${rank === 1 && ranked.length > 1 ? "The biggest draw in the park." : ranked.length > 1 ? `${ordinal(rank)} biggest draw of ${ranked.length} exhibits with animals.` : "The only exhibit with animals."} Bigger and rarer animals, and happier ones, draw more guests.</div>`
+  h += e.animals.length ? `<div class="meta">${rank === 1 && ranked.length > 1 ? "The biggest draw in the park." : ranked.length > 1 ? `${ordinal(rank)} biggest draw of ${ranked.length} exhibits with animals.` : "The only exhibit with animals."}</div>`
     : `<div class="meta">Guests only stop at an exhibit with animals in it.</div>`;
-  if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div><div class="meta" style="margin-top:4px">How well guests can see in past the fence. Viewing platforms raise it.</div>`;
+  if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div>`;
   const plats = e.viv ? 0 : state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
   if(!e.viv && (plats || hasTech("platform"))) h += `<div class="row" style="margin-top:6px"><span class="meta">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}.` : "No viewing platforms."}</span>${hasTech("platform") ? `<button class="btn" data-action="platformTool">Add a viewing platform</button>` : ""}</div>`;
-  h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Has an info sign, so guests learn far more here." : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</li></ul></section>`;
+  h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Has an exhibit sign." : "No exhibit signs."}</li></ul></section>`;
   const day = (v, w) => `<div class="factor exday"><span>${v}</span>${w}</div>`;
   h += `<section><h3>Visitors</h3>${day("", `<span class="meta">Today</span><span class="meta">Yesterday</span>`)}`;
   h += day("Stopped to watch", `<span>${Math.round(X.views)}</span><span>${Math.round(X.last.views)}</span>`);
