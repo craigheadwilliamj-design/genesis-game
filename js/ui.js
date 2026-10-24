@@ -255,7 +255,7 @@ function exhibitHtml(e){
   h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
-  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => (x.viv ? vivSceneHtml(x) : landHtml(x)) + themeHtml("exhibit", x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
   return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
