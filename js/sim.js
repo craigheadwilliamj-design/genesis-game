@@ -240,6 +240,7 @@ function upgradeSave(s){
   // the old slanted plot became a rectangle on the 5 m grid; the entrance stays where it was
   if(JSON.stringify(s.boundary) === JSON.stringify(OLD_PLOT)) s.boundary = PARK_PLOT.map(p => p.slice());
   if(!s.parcels) s.parcels = [];
+  if(!s.parcelRows4){ s.parcelRows4 = true; s.parcels = s.parcels.map(id => { const [i, j] = id.split(",").map(Number); return i + "," + (j + 2); }); }   // two more rows of land north: plot row numbers moved down by 2
   if(s.sandbox === undefined) s.sandbox = false;
   if(s.over === "shutdown") s.over = false;   // the deaths shutdown is gone
   if(s.debtWarned === undefined) s.debtWarned = false;
