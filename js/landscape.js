@@ -360,7 +360,7 @@ function exposure(e){
   const c = coverOf(e);
   return c.need ? clamp(1 - c.have / c.need, 0, 1) : 0;
 }
-const WEATHER_TEXT = {hot:"no shade. Shelters and groves give shade", cold:"nowhere warm. Shelters keep them warm", storm:"nowhere to shelter"};
+const WEATHER_TEXT = {hot:"no shade", cold:"nowhere warm", storm:"nowhere to shelter"};
 
 // What the exhibit's biome does to happiness: each animal is either on one of its two biomes or not
 function biomeScore(e, out, n){
