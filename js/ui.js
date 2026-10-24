@@ -529,7 +529,6 @@ function behaviorHtml(e){
   if(!e.viv){
     const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
     h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;
-    h += `<div class="meta" style="margin-top:4px;color:${gone > HIDING.from ? "var(--bad)" : "inherit"}">${gone > HIDING.from ? `${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests who see an empty exhibit are let down, though well-informed ones forgive it.` : "Most of the animals are out where guests can see them."}</div>`;
     const qs = quietSigns(e).length, ss = screenShare(e), extra = [qs ? `${qs} quiet sign${qs === 1 ? "" : "s"} by the fence` : "", ss ? `${Math.round(ss * 100)}% of the herd behind a privacy screen` : ""].filter(Boolean);
     h += `<div style="margin-top:8px;font-size:17px;font-weight:600;color:var(--ink)">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%</div>`;
     if(extra.length || shy) h += `<div class="meta" style="margin-top:2px">${extra.length ? `With ${extra.join(", ")}. ` : ""}${shy ? "Shy animals feel it most." : ""}</div>`;

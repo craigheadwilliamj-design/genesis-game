@@ -3470,7 +3470,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.educatedPenalisedLess = learned > lo + 3 && learned > half && half > lo;
     const bo = pers => { hideAvg.set(e.id, .2); return hideBother(mkP(pers), e); };
     out.paleoAndConservLeastBothered = bo(["paleo", "neutral"]) < bo(["neutral", "neutral"]) && bo(["conserv", "neutral"]) < bo(["neutral", "neutral"]) && bo(["family", "neutral"]) > bo(["neutral", "neutral"]) && bo(["paleo", "neutral"]) <= bo(["conserv", "neutral"]);
-    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals are hiding\. Guests are let down/.test(i.text) && !/Add quiet signs/.test(i.text)) && /Add quiet signs/.test(behaviorHtml(e));
+    hideAvg.set(e.id, .2); out.reportAndPanelHint = exhibitReport(e).issues.some(i => i.bad && /Most animals are hiding\. Guests are let down/.test(i.text) && !/Add quiet signs/.test(i.text));
     hideAvg.set(e.id, 1); out.noHintWhenVisible = !exhibitReport(e).issues.some(i => /animals are hiding/.test(i.text));
 
     // privacy screens and quiet signs cut the crowd the animals feel (ctx.seen)
