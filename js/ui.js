@@ -272,7 +272,7 @@ function exOverviewHtml(e, rep){
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
-      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
+      <div style="margin-top:8px;font-size:17px;font-weight:600;color:var(--ink)">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
   } else {
     h += `<section><h3>Empty</h3><div class="meta">${e.viv ? `Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}. ` : ""}No animals live here yet. Clones and animals from partner parks move in from the Cloning tab.</div>
       <div class="row" style="margin-top:6px"><button class="btn" data-action="extab" data-k="clone">Add animals</button></div></section>`;
