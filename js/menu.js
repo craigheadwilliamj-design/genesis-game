@@ -284,6 +284,12 @@ document.addEventListener("click", ev => {
   if(tool !== "land-" + type) setTool("land-" + type);
   refreshShapes(); if(landGhost) renderOverlay();
 });
+// A Rock or Boulder picked from an exhibit's Landscaping tab opens the Landscaping tray, so its shape picker shows too
+function showRockPicker(){
+  if(tool !== "land-rock" && tool !== "land-boulder") return;
+  if(sideCat !== "land") sideOpen("land");
+  refreshShapes();
+}
 function refreshMenu(){
   if(!state) return;
   refreshShapes(); refreshPlantBiome();
