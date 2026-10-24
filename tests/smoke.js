@@ -1596,7 +1596,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
     // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use Botany Lab stock of their era and size
-    const periods = Object.keys(ERA_OF).filter(p => p !== "Cambrian"), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());   // nothing grew on land in the Cambrian
+    const periods = Object.keys(ERA_OF).filter(p => PLANTS_OF[p]), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());   // the Cambrian and Silurian have no landscape plants
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
     out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;

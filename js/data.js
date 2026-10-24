@@ -92,6 +92,8 @@ const SPECIES = [
   {id:"anom", name:"Anomalocaris",   period:"Cambrian", diet:["carnivore"], price:7000, food:12, space:15, group:[1,3], appeal:7, stars:1, viv:"M", aqua:true},
   {id:"opab", name:"Opabinia",       period:"Cambrian", diet:["carnivore"], price:3500, food:2, space:2, group:[3,8], appeal:5, stars:0.5, viv:"S", aqua:true},
   {id:"olen", name:"Olenoides",      period:"Cambrian", diet:["carnivore"], bug:true, price:2000, food:2, space:2, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
+  // Silurian
+  {id:"ptry", name:"Pterygotus",     period:"Silurian", diet:["carnivore"], bug:true, price:12000, food:30, space:60, group:[1,2], appeal:8, stars:1.5, viv:"L", aqua:true},
   // Devonian
   {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
   {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
@@ -280,6 +282,7 @@ const TIME_PERIODS = [
   {id:"Permian",       ago:"299–252 million years ago", trip:4500,  days:1.5, risk:.12},
   {id:"Carboniferous", ago:"359–299 million years ago", trip:4000,  days:1.5, risk:.10},
   {id:"Devonian",      ago:"419–359 million years ago", trip:3500,  days:1.5, risk:.10},
+  {id:"Silurian",      ago:"443–419 million years ago", trip:3200,  days:1.5, risk:.10},
   {id:"Cambrian",      ago:"539–485 million years ago", trip:3000,  days:1.5, risk:.10},
 ];
 
@@ -318,6 +321,7 @@ const TIMELINE_MAP_SIZE = [260, 130];
 // TIME_SITES:BEGIN written by tools/timeline/placesites.py from sites.py; edit those, not this.
 const TIME_SITES = [
   {id:"burgess", name:"Burgess Shale", where:"British Columbia, Canada", from:507e6, to:505e6, at:{cambrian:[68, 66]}, fauna:["anom", "opab", "olen"]},
+  {id:"lesmahagow", name:"Lesmahagow Inlier", where:"South Lanarkshire, Scotland", from:430e6, to:427e6, at:{silurian:[118, 86]}, fauna:["ptry"]},
   {id:"fram", name:"Fram Formation", where:"Ellesmere Island, Canada", from:378e6, to:372e6, at:{devonian:[117, 65]}, fauna:["tikt"]},
   {id:"britta", name:"Britta Dal Formation", where:"East Greenland", from:367e6, to:360e6, at:{devonian:[127, 71]}, fauna:["icht", "both"]},
   {id:"ekirkton", name:"East Kirkton", where:"West Lothian, Scotland", from:336e6, to:334e6, at:{carboniferous:[136, 61]}, fauna:["pulm"]},
@@ -1144,7 +1148,7 @@ BUILDINGS.workshop = {label:"Workshop", tag:"SHOP", one:"a workshop", glyph:"W",
    --------------------------------------------------------------------- */
 
 // Which era each period belongs to
-const ERA_OF = {Cambrian:"paleozoic", Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
+const ERA_OF = {Cambrian:"paleozoic", Silurian:"paleozoic", Devonian:"paleozoic", Carboniferous:"paleozoic", Permian:"paleozoic", Triassic:"mesozoic", Jurassic:"mesozoic", Cretaceous:"mesozoic",
                 Paleogene:"cenozoic", Neogene:"cenozoic", Quaternary:"cenozoic"};
 
 // What an exhibit is planted with. Every exhibit starts with Cenozoic plants (grass).
@@ -1162,7 +1166,7 @@ const PALEOFLORA = {
 };
 const FLORA_HAPPY = {home:6, away:-4};     // happiness for living among plants from the animal's own era, or another one
 // Herbivores from these periods never evolved to eat grass, and get sick on it (Cenozoic plants, a grassland biome or grass hay)
-const GRASS_INTOLERANT = ["Cambrian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
+const GRASS_INTOLERANT = ["Cambrian", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic"];
 const GRASS_HIT = {intolerant:-15, cretaceous:-5};   // happiness hit at full grass share
 
 BUILDINGS.ceres = {label:"Botany Lab", tag:"BOTANY", one:"the Botany Lab", glyph:"B", color:"#4E7F2E", price:10000, upkeep:120, w:26, d:18, dept:true, unique:true,
@@ -1340,7 +1344,7 @@ const TECH = [
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
   {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
   {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Cambrian, Devonian, Carboniferous and Permian animals. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Paleozoic animals, from the Cambrian to the Permian. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
 ];
 // Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
 const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
@@ -2481,6 +2485,7 @@ const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join
 const SPECIES_INFO = {
   icht:{sci:"Ichthyostega stensioei", ft:5, desc:"One of the first animals with four limbs. It lived in the swamps of Late Devonian Greenland, and it had seven toes on each hind foot. It probably dragged itself over mud banks more than it walked, and still breathed through gills in the water. It sits near the line between fish and land animals."},
   tikt:{sci:"Tiktaalik roseae", ft:9, desc:"A fish with a neck. Tiktaalik lived in shallow Late Devonian streams about 375 million years ago, and its fossils were found on Ellesmere Island in the Canadian Arctic in 2004. It still had gills and fins, but it also had a flat head with eyes on top, a neck that could turn, and strong fin bones that could prop it up like arms. Its name comes from an Inuktitut word for a big freshwater fish."},
+  ptry:{sci:"Pterygotus lanarkensis", ft:5.2, desc:"A sea scorpion, and the biggest of its kind grew as long as a person is tall, among the largest arthropods that ever lived. It hunted the shallow seas of the Silurian and Devonian with a pair of long, toothed claws held out in front of its head, steered with a flat tail fin and spotted prey with big forward-facing eyes. Sea scorpions are distant relatives of today's scorpions and horseshoe crabs."},
   anom:{sci:"Anomalocaris canadensis", ft:1.6, desc:"The biggest hunter of the Cambrian seas, about two feet long, at a time when most animals were the size of a finger. It swam by rippling the flaps along its sides, grabbed prey with two spiny arms in front of its face, and had a round mouth of plates. Its pieces were found separately at first and named as a shrimp, a jellyfish and a sponge before anyone saw they were one animal."},
   opab:{sci:"Opabinia regalis", ft:.25, desc:"One of the oddest animals ever found: five stalked eyes on its head and a long flexible nozzle with a claw on the end, which it used to pass food back to its mouth. When it was first shown at a scientific meeting in 1972, the audience laughed. It lived on the sea floor of the Cambrian and is known only from the Burgess Shale."},
   olen:{sci:"Olenoides serratus", ft:.3, desc:"A trilobite, one of the hard-shelled sea arthropods that crawled the ocean floor for nearly 300 million years. Olenoides is one of the few whose legs and antennae are preserved, in the Burgess Shale, so we know it walked on spiny legs and had a pair of feelers at the tail end too. It hunted and scavenged small animals in the mud."},
@@ -2996,7 +3001,7 @@ const GOALS = [
   {id:"oracle",   text:"Build the Research Lab",                       hint:"The Research Lab researches everything from fences to the Time Travel Lab's drones. Place it beside a path or service road.", reward:12000, statue:"anning", check:g=>g.state.buildings.some(b=>b.type==="oracle")},
   {id:"cenozoic", text:"Discover a Cenozoic Animal",          hint:"Build the Time Travel Lab, slide its timeline to the Paleogene, Neogene or Quaternary, tap a site on the map and send a drone to scout it.", reward:6000, statue:"proc", check:eraUnlocked("cenozoic")},
   {id:"mesozoic", text:"Discover a Mesozoic Animal",          hint:"Scout a Triassic, Jurassic or Cretaceous site with a drone.", reward:8000, statue:"coel", check:eraUnlocked("mesozoic")},
-  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Cambrian, Devonian, Carboniferous or Permian site with a drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
+  {id:"paleozoic",text:"Discover a Paleozoic Animal",         hint:"Scout a Paleozoic site, from the Cambrian to the Permian, with a drone.", reward:10000, statue:"dime", check:eraUnlocked("paleozoic")},
   {id:"cloneq",   text:"Clone a Quaternary Animal",          hint:"Discover a Quaternary animal, collect its genome with the Time Travel Lab's expeditions, then clone it at the Genetics Lab.", theme:"stone", check:g=>g.state.exhibits.some(e=>e.animals.some(a=>a.cl && SPECIES_BY_ID[a.sp].period==="Quaternary"))},
   {id:"ghost",    text:"Bring back DNA with the Time Travel Lab",          hint:"Once a scouting trip has discovered an animal, pick it as the target on its site's card at the Time Travel Lab and send an expedition.", reward:30000, statue:"brown", check:g=>Object.keys(g.state.science.dna).length>0},
   {id:"genome",   text:"Complete a genome",                  hint:"Each sample fills part of a genome. Keep sending trips for the same species until it reaches 100%.", reward:10000, statue:"herr", check:g=>Object.values(g.state.science.dna).some(d=>d.genome>=100)},

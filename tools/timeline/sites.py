@@ -7,6 +7,8 @@ lived there, rounded; for the Holocene they are in Ma too (0.000362 is 362 years
 SITES = {
     # Cambrian
     "burgess":     ("Burgess Shale", "British Columbia, Canada", 51.4, -116.5, 507, 505, ["anom", "opab", "olen"]),
+    # Silurian
+    "lesmahagow":  ("Lesmahagow Inlier", "South Lanarkshire, Scotland", 55.6, -3.9, 430, 427, ["ptry"]),
     # Devonian
     "fram":        ("Fram Formation", "Ellesmere Island, Canada", 77.2, -86.0, 378, 372, ["tikt"]),
     "britta":      ("Britta Dal Formation", "East Greenland", 72.9, -23.6, 367, 360, ["icht", "both"]),
