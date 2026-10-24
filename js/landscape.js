@@ -382,20 +382,20 @@ function habitatScore(e){
     if(want){
       sat /= n;
       out.delta += VIV_PLANT.bonus * sat;
-      out.issues.push({bad:false, text:sat >= .99 ? "The scene is from their own era and biome." : sat > 0 ? "The scene half suits them. One from their own era and biome would suit them better." : e.vivScene ? "The scene is from another era and biome. One of their own would make it feel like home." : "Bare. A scene from their own era and biome would make it feel like home."});
+      out.issues.push({bad:false, text:sat >= .99 ? "The scene is from their own era and biome." : sat > 0 ? "The scene half suits them." : e.vivScene ? "The scene is from another era and biome." : "Bare."});
     }
     // water lovers want a pool; a basking lamp warms the ones that want heat
     const lovers = [...speciesCounts(e)].filter(([sp]) => likesOf(SPECIES_BY_ID[sp]).water >= HAB.wantsWater);
     if(lovers.length){
       const dry = lovers.filter(([sp]) => thirsty(e, SPECIES_BY_ID[sp]));
       if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.map(([sp]) => SPECIES_BY_ID[sp].name).join(", ")} need${dry.length === 1 ? "s" : ""} a pool to drink from and wade in.`}); }
-      else { const fit = lovers.reduce((n, [sp, c]) => n + c * waterFit(haveOf(e, SPECIES_BY_ID[sp]).water, wantsOf(e, SPECIES_BY_ID[sp]).water), 0) / lovers.reduce((n, [, c]) => n + c, 0); out.delta += VIV_POOL.bonus * fit; out.issues.push({bad:fit < .6, text:fit >= .6 ? "A pool to wade in." : "A pool, but not enough water for them. Another would help."}); }
+      else { const fit = lovers.reduce((n, [sp, c]) => n + c * waterFit(haveOf(e, SPECIES_BY_ID[sp]).water, wantsOf(e, SPECIES_BY_ID[sp]).water), 0) / lovers.reduce((n, [, c]) => n + c, 0); out.delta += VIV_POOL.bonus * fit; out.issues.push({bad:fit < .6, text:fit >= .6 ? "A pool to wade in." : "A pool, but not enough water for them."}); }
     }
     const heat = heatCount(e);
     if(heat){
       const hs = heatShare(e);
-      if(hs > 0){ out.delta += VIV_LAMP.happy * hs; out.issues.push({bad:hs < 1, text:hs >= 1 ? "Warm under the basking lamp." : `Some bask under the lamp, but one lamp warms ${VIV_LAMP.per} animals. Another would help.`}); }
-      if(hs < 1){ out.delta -= VIV_LAMP.lack * (1 - hs); if(hs <= 0) out.issues.push({bad:true, text:"Cold. They want a basking lamp to warm up under."}); }
+      if(hs > 0){ out.delta += VIV_LAMP.happy * hs; out.issues.push({bad:hs < 1, text:hs >= 1 ? "Warm under the basking lamp." : `Some bask under the lamp, but one lamp warms ${VIV_LAMP.per} animals.`}); }
+      if(hs < 1){ out.delta -= VIV_LAMP.lack * (1 - hs); if(hs <= 0) out.issues.push({bad:true, text:"Cold."}); }
     }
     return out;
   }
@@ -408,17 +408,17 @@ function habitatScore(e){
     else for(const k of ["water", "rock", "plants"]) if(f[k] < .6) lack[k].push(s.name);
   }
   sat /= n || 1;
-  if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.join(", ")} ${dry.length === 1 ? "needs" : "need"} water. Draw some in the exhibit.`}); }
+  if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`Dry. ${dry.join(", ")} ${dry.length === 1 ? "needs" : "need"} water.`}); }
   if(sat > 0){
     out.delta += HAB.bonus * sat;
-    out.issues.push({bad:false, text:sat >= .6 ? "Water, rocks and plants make it feel like home." : "Some water, rocks and plants. More of what they want would make them feel more at home."});
+    out.issues.push({bad:false, text:sat >= .6 ? "Water, rocks and plants make it feel like home." : "Some water, rocks and plants, but not enough to feel like home."});
   }
   const what = {water:"the right amount of water", rock:"enough rocks", plants:"enough plants from their own period"}, uniq = l => [...new Set(l)].join(", ");
   for(const k of ["water", "rock", "plants"]) if(lack[k].length) out.issues.push({bad:false, text:`${uniq(lack[k])} ${lack[k].length === 1 ? "wants" : "want"} ${what[k]}.`});
   const wrongM2 = landOf(e).reduce((m, f) => { const t = LAND[f.type]; return m + (t && t.flora && !plantHere(t, e) ? landM2(f) : 0); }, 0);
   if(wrongM2 > 0){
     out.delta -= HAB.wrongPlants * clamp(wrongM2 / (area(e.points) || 1) / HAB.groveFull, 0, 1);
-    out.issues.push({bad:true, text:`Wrong plants. ${Math.round(wrongM2)} m² of plants here belong in another biome and don't suit ${BIOMES[biomeOf(e)].label.toLowerCase()}. Bulldoze them or regrade the exhibit.`});
+    out.issues.push({bad:true, text:`Wrong plants. ${Math.round(wrongM2)} m² of plants here belong in another biome and don't suit ${BIOMES[biomeOf(e)].label.toLowerCase()}.`});
   }
   biomeScore(e, out, n);
   // groves from the animals' own era
@@ -427,7 +427,7 @@ function habitatScore(e){
   home /= n || 1;
   if(home > 0){
     out.delta += HAB.groveBonus * home;
-    out.issues.push({bad:false, text:home >= .6 ? "Groves from their own era to browse and shelter in." : "A few groves from their era. More would suit them."});
+    out.issues.push({bad:false, text:home >= .6 ? "Groves from their own era to browse and shelter in." : "A few groves from their era."});
   }
   // today's weather
   const w = weatherNow(), x = exposure(e);

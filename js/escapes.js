@@ -27,13 +27,13 @@ function barrierNeeded(s){
 // Can this animal get out of this exhibit? Returns why, or null if it's held.
 function escapeRisk(e, s){
   if(e.viv) return null;
-  if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out. It needs aviary netting.`;
+  if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out.`;
   if(e.moat) return null;
   if(e.open) return `There's a gap in the fence. ${s.name} can walk right out until it's closed.`;
   const b = barrierOf(e), str = escapeStrength(s);
-  if(str > b.strength) return `${s.name} can break through ${b.label.toLowerCase()} (strength ${b.strength}, it needs ${str}). Use ${barrierNeeded(s)} or a moat.`;
-  if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return `The electric fence has no power, so it's just wire. ${s.name} can push through. Build or repair generators.`;
-  if(str > effectiveStrength(e)) return isBreached(e) ? `The fence is broken. ${s.name} can walk right out until a mechanic repairs it.` : `The fence is worn. ${s.name} can push through it until a mechanic repairs it.`;
+  if(str > b.strength) return `${s.name} can break through ${b.label.toLowerCase()} (strength ${b.strength}, it needs ${str}).`;
+  if(str > effectiveStrength(e) && e.barrier === "electric" && e.powered === false) return `The electric fence has no power, so it's just wire. ${s.name} can push through.`;
+  if(str > effectiveStrength(e)) return isBreached(e) ? `The fence is broken. ${s.name} can walk right out.` : `The fence is worn. ${s.name} can push through it.`;
   return null;
 }
 
