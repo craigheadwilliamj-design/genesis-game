@@ -68,7 +68,7 @@ function warehouseHtml(b){
 
 function zoneHtml(z){
   const m = zoneMembers(z);
-  let h = `<label class="field"><span>Zone name</span><input id="zName" data-field="name" value="${esc(z.name)}" maxlength="40"></label>`;
+  let h = "";
   h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
   h += `<div class="meta" style="margin-top:6px">Keepers in a zone feed and clean only what's in it, using the zone's own stores first. Mechanics only check its fences and machines. Vets only give its exhibits check-ups and treatment, but any vet still answers an escape.</div>`;
 

@@ -72,6 +72,8 @@ const ui = {
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
     if(sel && sel.kind === "animal") animalLive(true);
+    { const nm = $("#sheetName"), rename = !!it && (sel.kind === "exhibit" || sel.kind === "zone");   // an exhibit or zone is renamed right in the top bar
+      $("#sheetToggle").hidden = rename; nm.hidden = !rename; if(rename && document.activeElement !== nm) nm.value = it.name; }
     $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : officeTab === "menu" ? "Main menu" : "Park office";
   },
 
@@ -248,7 +250,6 @@ function exhibitHtml(e){
   if(!tabs.some(t => t.key === exTabs.tab)) exTabs.tab = "main";
   // the header shows on every tab: name, and the few things worth seeing at a glance
   let h = ``;
-  h += `<label class="field"><span>Exhibit name</span><input id="exName" data-field="name" value="${esc(e.name)}" maxlength="40"></label>`;
   h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
   h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
@@ -954,10 +955,12 @@ panelEl.addEventListener("click", e => {
     bulldozeItem(sel.kind, it);
   }
 });
-panelEl.addEventListener("input", e => {
-  const it = selItem();
-  if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
+$("#sheetName").addEventListener("input", e => {
+  const it = selItem(); if(!it || !(sel.kind === "exhibit" || sel.kind === "zone")) return;
+  it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon();
 });
+$("#sheetName").addEventListener("change", e => { const it = selItem(); if(it) e.target.value = it.name; });
+$("#sheetName").addEventListener("keydown", e => { if(e.key === "Enter") e.target.blur(); });
 $("#panelClose").onclick = closePanel;
 
 /* ---------- moving and resizing the panel like a window ---------- */
@@ -977,7 +980,7 @@ function placePanel(){
 function savePanelBox(){ try { if(panelBox) localStorage.setItem(PANEL_KEY, JSON.stringify(panelBox)); else localStorage.removeItem(PANEL_KEY); } catch {} }
 aside.addEventListener("pointerdown", e => {
   if(panelNarrow() || e.button) return;
-  const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button");
+  const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button, input");
   if(!grip && !head) return;
   e.preventDefault();
   const m = aside.parentElement.getBoundingClientRect(), r = aside.getBoundingClientRect(), dir = grip ? grip.dataset.rsz : "";
@@ -997,7 +1000,7 @@ aside.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 // Double-click the top bar to put the panel back by the right column
-aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
+aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button, input") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
 addEventListener("resize", placePanel);
 placePanel();
 

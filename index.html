@@ -315,6 +315,10 @@ aside.dragging,aside.resizing{user-select:none;-webkit-user-select:none}
 aside.dragging .sheet-head{cursor:grabbing}
 .sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
 .sheet-toggle{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet-name{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink);background:transparent;border:0;border-bottom:1px dashed var(--line);border-radius:0;padding:4px 0;outline:0}
+.sheet-name:hover{border-bottom-color:var(--ink-2)}
+.sheet-name:focus{border-bottom:1px solid var(--gold)}
+.sheet-name[hidden]{display:none}
 .sheet-close{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--chrome-2);font-size:14px;line-height:1}
 .sheet-close:hover{background:var(--line)}
 .panel{padding:16px;display:flex;flex-direction:column;gap:14px}
@@ -977,7 +981,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     </div>
 
     <aside id="aside">
-      <div class="sheet-head" title="Drag to move. Double-click to put it back."><span class="sheet-toggle" id="sheetToggle">Park office</span><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
+      <div class="sheet-head" title="Drag to move. Double-click to put it back."><span class="sheet-toggle" id="sheetToggle">Park office</span><input class="sheet-name" id="sheetName" maxlength="40" aria-label="Name" title="Click to rename" spellcheck="false" hidden><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
       <div class="panel" id="panel"></div>
       <div class="rsz" data-rsz="n"></div><div class="rsz" data-rsz="s"></div><div class="rsz" data-rsz="e"></div><div class="rsz" data-rsz="w"></div><div class="rsz" data-rsz="ne"></div><div class="rsz" data-rsz="nw"></div><div class="rsz" data-rsz="se"></div><div class="rsz" data-rsz="sw"></div>
     </aside>
