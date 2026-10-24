@@ -39,7 +39,7 @@ def today(la, lo, d):
 
 # Maps from before land plants: the land is bare rock (PAL "barren"), not green.
 BARREN = {"cambrian", "ordovician", "silurian"}
-MOSS = {"silurian": 3}   # the first plants hugged the shore: barren land within this many px of the sea is moss, easing into the Devonian's green
+MOSS = {"silurian": 5}   # the first plants hugged the shore: barren land within this many px of the sea is moss, easing into the Devonian's green
 
 # name: (age in Ma of the DEM, sea level shift in m, ice rule or None)
 MAPS = {
