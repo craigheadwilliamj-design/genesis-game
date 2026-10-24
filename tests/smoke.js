@@ -111,9 +111,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const pLow = next ? parcelPrice(next[0], next[1]) : 0; state.parcels = kept;
       out.parcelCap = state.parcels.length === 16 && !!next && pHigh > pLow && !parcelProblem(next[0], next[1]);
       // an old save that owns south land keeps it
-      state.parcels = [parcelId(2, 5), parcelId(2, 6)];
+      state.parcels = [parcelId(2, 7), parcelId(2, 8)];
       const old = upgradeSave(JSON.parse(JSON.stringify(state)));
-      out.oldSouthSave = old.parcels.length === 2 && ownsParcel(2, 5) && ownsParcel(2, 6) && insidePlot([[100,320],[100,350]]) && !ownedEdges().some(([p, q]) => p[1] > 505);
+      out.oldSouthSave = old.parcels.length === 2 && ownsParcel(2, 7) && ownsParcel(2, 8) && insidePlot([[100,320],[100,350]]) && !ownedEdges().some(([p, q]) => p[1] > 505);
       state.parcels = keep; state.money = m0;
     }
     const oldS = JSON.parse(JSON.stringify(state)); delete oldS.starters;

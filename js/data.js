@@ -10,7 +10,7 @@
 // A parcel costs its area times the rate for its ring, and can be bought once it touches land you own.
 const PARCELS = {
   xs:[-280,-140,0,140,280,420,560,700],
-  ys:[-200,-100,0,100,200,305],  // 305 is the entrance line (state.gate): nothing is for sale south of it
+  ys:[-400,-300,-200,-100,0,100,200,305],  // 305 is the entrance line (state.gate): nothing is for sale south of it
   home:[0,0,420,305],
   growth:0.12,  // every plot already bought adds this much to the price of the next (0.12 = +12% of the base price each)
   rates:[0, 0.8, 1.4],  // dollars per m² by ring (1 touches the home plot, 2 is the next one out)
