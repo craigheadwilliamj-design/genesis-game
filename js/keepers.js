@@ -466,7 +466,8 @@ function dirtPerDay(e){
 // Dirt removed per minute of work
 function cleanRate(e){ return CLEAN.handRate * (hasUpgrade("shovels") ? 1 : CLEAN.bareFactor) * (hasUpgrade("hoses") ? CLEAN.hoseBoost : 1) / Math.sqrt(Math.max(area(e.points), 20) / 1000); }
 function dirtTick(dtMin){
-  for(const e of state.exhibits) if(e.animals.length) e.dirt = Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / DAY_MIN);
+  for(const e of state.exhibits) if(e.animals.length && !e.aqua) e.dirt =   // an aquarium's mess is in its water (aquaTick)
+    Math.min(100, (e.dirt || 0) + dirtPerDay(e) * dtMin / DAY_MIN);
 }
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
 function cleanJob(c, k, min = CLEAN.dirtyAt){

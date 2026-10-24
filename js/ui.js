@@ -251,9 +251,9 @@ function exhibitHtml(e){
   let h = ``;
   h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
-  h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
+  h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? caseOf(e).label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
-  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.aqua ? aquaSceneHtml(x) : x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
   return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
@@ -282,9 +282,13 @@ function exOverviewHtml(e, rep){
     const kc = knownCond(e), since = daysSinceInspect(e), broke = e.open || isBreached(e);
     rows.push(exJump("barrier", "Barrier", broke || kc < 30 ? "bad" : kc < 60 || since >= MAINT.inspectEvery ? "warn" : "", esc(e.open ? "Gap in the fence." : broke ? "Broken." : `${Math.round(kc)}% condition${since >= 99 ? ", never inspected" : ""}.`)));
   }
+  if(wetCase(e) && aquaLoad(e) > 0){
+    const w = wqOf(e), why = filterText(e);
+    rows.push(exJump("props", "Water", w < AQUA.foul ? "bad" : w < AQUA.murky || why ? "warn" : "", esc(`${Math.round(w)}% clean${why ? ". " + why : ""}`)));
+  }
   if(n){
     const hr = healthReport(e), worst = hr.sick.length ? Math.max(...hr.sick.map(a => a.sick.sev)) : 0, dirt = e.dirt || 0;
-    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}, ${Math.round(100 - dirt)}% clean`)));
+    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% clean`}`)));
     const X = exLog(e);
     rows.push(exJump("guests", "Guests", isReachable(e) ? "" : "bad", esc(isReachable(e) ? `${Math.round(X.views)} visitor${Math.round(X.views) === 1 ? "" : "s"} today, ${money(Math.round(X.gifts))} donated` : "No path")));
   }
@@ -387,10 +391,25 @@ function biomeHtml(e){
   return `<section><h3>Biome</h3><div class="need-line ok"><b>${esc(BIOMES[b].label)}</b>: ${esc(BIOMES[b].ground)}${parts && Object.keys(sh.counts).length > 1 ? ` (${parts})` : ""}.</div><button class="btn" data-action="paintTool" style="padding:3px 9px">Paint ground</button>${fits()}</section>`;
 }
 // A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
+// An aquarium's backdrop: one list of seas, and whether each animal is from that time
+function aquaSceneHtml(e){
+  const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]), pick0 = sc ? sc.sea : kinds.length ? seaSceneOf(kinds[0]) : "";
+  let h = `<section><h3>Backdrop</h3><div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(AQUA_SCENES[sc.sea].label)}</b>.` : "No backdrop yet."}</div>`;
+  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="aquaSceneSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"><option value="">No backdrop</option>${Object.entries(AQUA_SCENES).map(([k, x]) => `<option value="${k}"${k === pick0 ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`;
+  h += `<button class="btn" data-action="aquaScene">Set, ${money(VIV_SCENE.price)}</button></div>`;
+  for(const s of kinds){ const ok = sc && sceneFit(e, s) > 0, home = seaSceneOf(s); h += `<div class="need-line ${ok ? "ok" : "no"}">${esc(s.name)}: ${esc(home ? AQUA_SCENES[home].label : s.period)}</div>`; }
+  return h + `</section>`;
+}
 function vivSceneHtml(e){
   const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
   const era0 = sc ? sc.era : (kinds.length ? ERA_OF[kinds[0].period] : ""), bio0 = sc ? sc.biome : biomeOf(e);
-  let h = `<section><h3>Scene</h3>`;
+  let h = "";
+  if(devMode() || e.palu){   // dry, or flooded at the front as a paludarium (dev mode only for now)
+    h += `<section><h3>Layout</h3><div class="row"><span class="status ${e.palu ? "ok" : ""}">${e.palu ? "Paludarium" : "Dry"}</span>`;
+    h += e.palu ? `<button class="btn sell" data-action="palu" data-on="0">Drain it +${money(Math.round(PALU.price * COST.refundShare))}</button>` : `<button class="btn" data-action="palu" data-on="1">Paludarium, ${money(PALU.price)}</button>`;
+    h += `</div></section>`;
+  }
+  h += `<section><h3>Scene</h3>`;
   h += `<div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(ERA_LABEL[sc.era])} ${esc(BIOMES[sc.biome].label.toLowerCase())}</b>.` : "No scene yet."}</div>`;
   const sel = `style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"`;
   h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="vivEraSel" ${sel}><option value="">No scene</option>${VIV_SCENE.eras.map(x => `<option value="${x}"${x === era0 ? " selected" : ""}>${esc(ERA_LABEL[x])}</option>`).join("")}</select>`;
@@ -402,20 +421,30 @@ function vivSceneHtml(e){
   }
   return h + `</section>`;
 }
+// An aquarium's water: how clean it is, and what the filters clean against what the animals foul
+function aquaWaterHtml(e){
+  const w = wqOf(e), aim = wqAim(e), load = aquaLoad(e), clean = filters(e).reduce((n, f) => n + LAND[f.type].clean, 0), why = filterText(e);
+  let h = `<section><h3>Water</h3><div class="factor" style="grid-template-columns:80px 1fr 48px"><span>Clean</span>${meter(w, w >= AQUA.murky ? "var(--good)" : w >= AQUA.foul ? "var(--warn)" : "var(--bad)")}<span>${Math.round(w)}%</span></div>`;
+  if(Math.abs(aim - w) >= 1) h += `<div class="meta" style="margin-top:4px">${aim > w ? "Clearing" : "Clouding"} toward ${Math.round(aim)}%</div>`;
+  h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:6px" title="Filtering a day against what the animals foul a day"><span>Filtering</span>${meter(load ? Math.min(100, clean / load * 100) : 100, clean >= load ? "var(--good)" : "var(--bad)")}<span>${clean} of ${load}</span></div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ${why ? "no" : "ok"}">${esc(why || (filters(e).length ? `Filters on, ${filterKw(e)} kW` : "No filter"))}</span></div>`;
+  return h + `</section>`;
+}
 // Vivarium fittings and enrichment: pick one from a list and it's set in the glass wherever there's room
 const VIV_TOYS = Object.keys(LAND).filter(k => LAND[k].vivToy && !LAND[k].fit), VIV_FITS = Object.keys(LAND).filter(k => LAND[k].vivToy && LAND[k].fit);
-const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="${id}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${keys.map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${note(t)})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="${id === "vivFitSel" ? "vivFit" : "vivToy"}">Add</button></div>`;
+const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="${id}" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)">${keys.filter(k => caseTakes(e, k)).map(k => { const t = LAND[k], why = vivToyProblem(e, k); return `<option value="${k}"${why ? " disabled" : ""}>${esc(t.label)}, ${money(t.price)} (${note(t)})${why ? ` - ${esc(why)}` : ""}</option>`; }).join("")}</select><button class="btn" data-action="${id === "vivFitSel" ? "vivFit" : "vivToy"}">Add</button></div>`;
 const vivHere = (e, fit) => { const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy && !!LAND[f.type].fit === fit); return here.length ? `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${t.color}"></span><span>${esc(t.label)}${t.tray ? ` (${Math.round(trayHas(f))}/${trayCap(f)}${trayKind(f) ? " " + esc(trayKind(f)) : ""})` : ""}</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>` : ""; };
 function vivToysHtml(e){
-  const n = e.animals.length, heat = heatCount(e), lovers = e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
-  let h = `<section><h3>Fittings</h3>`;
+  const n = e.animals.length, heat = e.aqua ? 0 : heatCount(e), lovers = e.aqua ? 0 : e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
+  let h = wetCase(e) ? aquaWaterHtml(e) : "";
+  h += `<section><h3>Fittings</h3>`;
   if(n){
     const need = dishesNeeded(e), have = trays(e).length;
     h += `<div class="row" style="margin-top:6px"><span class="status ${have >= need ? "ok" : "no"}">${have >= need ? `Food dishes ${have} of ${need}` : esc(dishText(e))}</span></div>`;
     if(heat) h += `<div class="row"><span class="status ${heatShare(e) >= 1 ? "ok" : "no"}">${vivFit(e, "lamp").length ? `Lamps warm ${Math.min(heat, vivFit(e, "lamp").length * VIV_LAMP.per)} of ${heat} that want heat` : `${heat} want a basking lamp`}</span></div>`;
-    if(lovers) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
+    if(lovers && !e.palu) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
   }
-  h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
+  h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.filter ? `cleans ${t.clean} a day, ${t.kw} kW, ${money(t.upkeep)} a day` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
   const need = enrichNeed(e), have = toyPoints(e);
   h += `<section><h3>Enrichment</h3>`;
   if(e.animals.length) h += `<div class="factor" style="grid-template-columns:80px 1fr 64px;margin-top:8px"><span>Toys</span>${meter(Math.min(100, have / (need || 1) * 100), have >= need ? "var(--good)" : have >= need / 2 ? "var(--warn)" : "var(--bad)")}<span>${have} of ${Math.ceil(need)}</span></div>`;
@@ -610,7 +639,7 @@ function openMoveDialog(e, sp, id){
   const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length, one = id && e.animals.find(a => a.id === id);
   const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
   $("#moveTitle").textContent = `Move ${one ? one.name || s.name : s.name}`;
-  if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
+  if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
   const fromWhy = keeperMoveProblem(e);
   $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
     ${one ? "" : `<label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>`}
@@ -630,7 +659,7 @@ function openMoveDialog(e, sp, id){
 $("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
-function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${VIVARIUMS[s.viv].label.toLowerCase()} or bigger">V</span>` : ""); }
+function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger">${s.aqua ? "A" : "V"}</span>` : ""); }
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
@@ -882,6 +911,8 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
+  if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
+  if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
@@ -1050,7 +1081,7 @@ function ppCard(s){
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
-    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", biomesOf(s) ? biomeNames(s) : "any")
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", s.aqua ? "the sea" : biomesOf(s) ? biomeNames(s) : "any")
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
     + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
@@ -1060,7 +1091,7 @@ function ppCard(s){
 }
 
 function catalogHtml(){
-  const order = ["Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
+  const order = ["Cambrian", "Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
   const all = SPECIES.filter(s => speciesAvailable(s.id)), pers = order.filter(per => all.some(s => s.period === per));
   if(!pers.includes(ppPeriod)) ppPeriod = null;
   const tabs = pers.map(per => `<button class="pp-tab" data-per="${per}" aria-pressed="${per === ppPeriod}">${per}</button>`).join("");

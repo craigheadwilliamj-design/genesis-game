@@ -1596,7 +1596,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
     // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use Botany Lab stock of their era and size
-    const periods = Object.keys(ERA_OF), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());
+    const periods = Object.keys(ERA_OF).filter(p => PLANTS_OF[p]), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());   // the Cambrian, Ordovician and Silurian have no landscape plants
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
     out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;
@@ -1738,7 +1738,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
     // biomes: every animal has one, vivarium animals too, home ground makes them happier, the wrong one is flagged, wetland counts as some water
-    out.biomesCover = SPECIES.every(s => biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));
+    out.biomesCover = SPECIES.every(s => s.aqua ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));   // sea animals have none
     const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
@@ -2821,7 +2821,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
       events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
       const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
-      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator).id;
+      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator && !s.viv).id;   // an open-exhibit herd: room matters there
       const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
       state.science.clones = []; state.science.ready = [];
       const dest = pen("e-sx0", []); state.exhibits = [dest];
@@ -3737,10 +3737,65 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = state.exhibits.filter(x => x !== pv);
 
       // pictures: the five old props and the new ones all come from sprites/viv through the pack, and the dish shows its food
-      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool"];
+      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble", "aboulder", "abrain", "acoral", "afan", "asponge", "akelp", "ashell"];
       picsEv.land = keys.map((k, i) => ({id:"pc" + i, type:k, x:196 + i * 1.5, y:300}));
       const svgp = landSvg(picsEv, null, () => false);
       out.vivSpritesDrawn = keys.every(k => VIV_SPRITES[k] && svgp.includes(`sprites/viv/${k}.png`)) && !svgp.includes("<circle") && Object.keys(VIV_SPRITES).length === keys.length;
+      // aquariums: sea animals only there and nowhere else, only aquarium fittings (and a dish), filters keep the water clean while powered, foul water makes them unhappy and ill
+      const aq = {id:"e-aq", name:"Aq", viv:"L", aqua:true, wq:100, points:rectPts(320, 300, V.w, V.d, 0), animals:[0, 1, 2].map(i => ({id:"aq" + i, sp:"stet", q:90})), happy:70};
+      state.exhibits.push(aq); recompute();
+      const sea = SPECIES_BY_ID.stet, land = SPECIES_BY_ID.tikt;
+      out.aquaFits = fitsHabitat(sea, aq) && !fitsHabitat(land, aq) && !fitsHabitat(sea, ev) && !fitsHabitat(sea, {points:[]}) && fitsHabitat(land, ev) && SPECIES.filter(x => x.aqua).every(x => x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)));
+      out.aquaFittings = !vivToyProblem(aq, "afilter") && !vivToyProblem(aq, "vdish") && !!vivToyProblem(aq, "vlamp") && !!vivToyProblem(aq, "vpool") && !!vivToyProblem(ev, "afilter") && !vivToyProblem(ev, "vlamp");
+      const noFilter = filterText(aq), aim0 = wqAim(aq);
+      aquaTick(DAY_MIN); const dirty1 = wqOf(aq);
+      addVivToy(aq, "asump"); aq.filterPowered = true;
+      const aim1 = wqAim(aq); aq.filterPowered = false; const aimOff = wqAim(aq), offText = filterText(aq); aq.filterPowered = true;
+      aq.wq = 10; const repFoul = exhibitReport(aq), illFoul = illChance(aq, aq.animals[0]);
+      aq.wq = 100; const repClean = exhibitReport(aq), illClean = illChance(aq, aq.animals[0]);
+      out.aquaWater = noFilter === "No filter." && aim0 === 0 && Math.abs(dirty1 - (100 - AQUA.rate)) < .01 && aim1 === 100 && aimOff === 0 && /power/.test(offText) && !filterText(aq)
+        && repFoul.target < repClean.target && repFoul.issues.some(i => /Foul water/.test(i.text)) && illFoul.why.includes("foul water") && !illClean.why.includes("foul water") && illFoul.p > illClean.p
+        && !thirsty(aq, sea) && !(aq.dirt > 0) && aquaLoad(aq) === 3 * sea.food;
+      const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();
+      out.aquaPowerDraw = d0 - d1 === LAND.asump.kw;
+      out.aquaDrawn = (() => { const g = viv34(aq, "front", null); aq.wq = 0; const f = viv34(aq, "front", null); aq.wq = 100; const c = AQUA34.clean.toLowerCase(); return f !== g && g.includes(c) && f.includes(AQUA34.foul.toLowerCase()) && !viv34(ev, "front", null).includes(c); })();   // the water's colour follows its quality
+      // backdrops: one for each sea, every size drawn, an animal's own sea counts in full, a vivarium can't take one and an aquarium can't take a land scene
+      {
+      const pics = Object.keys(AQUA_SCENES).every(k => Object.keys(VIVARIUMS).every(z => ["wall", "floor"].every(l => SPRITE_PACK[`sprites/vivscene/sea-${k}-${z}-${l}.png`])));
+      const bare = habitatScore(aq).delta, m0 = state.money, okSea = !vivSceneProblem(aq, {sea:"paleozoic"}); setVivScene(aq, {sea:"paleozoic"});
+      const home = habitatScore(aq).delta, fitHome = sceneFit(aq, sea); setVivScene(aq, {sea:"cambrian"}); const away = habitatScore(aq).delta;
+      out.aquaBackdrops = pics && okSea && state.money < m0 && fitHome === 1 && sceneFit(aq, sea) === 0 && Math.abs(home - bare - VIV_PLANT.bonus) < .01 && away === bare
+        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.saca) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.kntr) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
+        && !!vivSceneProblem(ev, {sea:"cambrian"}) && !!vivSceneProblem(aq, {era:"paleozoic", biome:"wetland"}) && vivScene34(aq, "wall").includes("sea-cambrian-L-wall")
+        && aquaSceneHtml(aq).includes("aquaSceneSel") && exTabList(aq).some(t => t.key === "land");
+      }
+      state.exhibits = state.exhibits.filter(x => x !== aq);
+      // paludariums: a vivarium flooded at the front from Landscaping; waders swim there and like it, its water fouls by the swimmers' load and takes filters, and
+      // Enaliarctos lives only in one; it can't be drained with a paludarium animal or a filter in it
+      {
+        const pa = {id:"e-pa", name:"Pa", viv:"M", points:rectPts(350, 300, V.w, V.d, 0), animals:[0, 1, 2, 3].map(i => ({id:"pa" + i, sp:"tikt", q:90})), happy:70, biome:"tropical"};
+        state.exhibits.push(pa); recompute();
+        addVivToy(pa, "vlamp"); addVivToy(pa, "vdish");   // fittings laid out while it's dry, some at the front
+        const dry = habitatScore(pa).delta, m0 = state.money, okOn = !paluProblem(pa, true); setPalu(pa, true);
+        const onBank = landOf(pa).every(f => f.y < paluY(pa)); addVivToy(pa, "vbark");
+        const tk = SPECIES_BY_ID.tikt, enal = SPECIES_BY_ID.enal, load = aquaLoad(pa), noF = filterText(pa);
+        addVivToy(pa, "afilter"); pa.filterPowered = true;
+        const placed = landOf(pa).every(f => LAND[f.type].filter ? f.y > paluY(pa) : f.y < paluY(pa)) && onBank; pa.wq = 100; const wetHappy = habitatScore(pa).delta;
+        pa.wq = 10; const foul = habitatScore(pa).delta, ill = illChance(pa, pa.animals[0]); pa.wq = 100;
+        const drawn = viv34(pa, "front", null) !== viv34(ev, "front", null) && vivFloor34(pa, null, false, false, true).length > vivFloor34(ev, null, false, false, true).length;   // a scene-less paludarium draws its water on the floor
+        pa.vivScene = {era:"paleozoic", biome:"wetland"}; const paluFloor = vivScene34(pa, "floor").includes("paleozoic-wetland-M-palu") && !!SPRITE_PACK["sprites/vivscene/paleozoic-wetland-M-palu.png"] && Object.keys(BIOMES).every(b => ["S", "M", "L"].every(z => SPRITE_PACK[`sprites/vivscene/mesozoic-${b}-${z}-palu.png`])); pa.vivScene = null;
+        const blockF = !!paluProblem(pa, false);
+        const L = {viv:"L", palu:true, points:[]}, Ld = {viv:"L", points:[]};
+        out.paludarium = okOn && pa.palu && state.money < m0 && paluSwims(tk) && !paluSwims(SPECIES_BY_ID.arth) && load === 4 * tk.food * PALU.load && noF === "No filter."
+          && wetHappy > dry && foul < wetHappy && ill.why.includes("foul water") && drawn && paluFloor && placed && blockF && !thirsty(pa, tk)
+          && !vivToyProblem(pa, "afilter") && !!vivToyProblem(pa, "vpool") && !!vivToyProblem(pa, "acoral") && !!vivToyProblem(ev, "afilter")
+          && fitsHabitat(enal, L) && !fitsHabitat(enal, Ld) && !fitsHabitat(enal, aq) && paluWet(pa, 351, paluY(pa) + .1) && !paluWet(pa, 351, paluY(pa) - .1) && !paluWet(ev, 201, 309);
+        pa.land = pa.land.filter(f => !LAND[f.type].filter); pa.animals.push({id:"pa-e", sp:"enal", q:90});
+        const blockE = /Enaliarctos/.test(paluProblem(pa, false) || ""); pa.animals.pop();
+        const m1 = state.money; setPalu(pa, false);
+        out.paludariumDrains = blockE && !pa.palu && pa.wq === undefined && state.money > m1 && habitatScore(pa).delta === dry;
+        state.exhibits = state.exhibits.filter(x => x !== pa);
+      }
       const dfull = {id:"pd", type:"vdish", x:200, y:300, cap:6, food:{[ft]:6}};
       out.vivDishShowsFood = vivPropSvg(dfull, LAND.vdish).includes("<rect") && !vivPropSvg({...dfull, food:{}}, LAND.vdish).includes("<rect");
 

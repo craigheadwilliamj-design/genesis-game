@@ -5,12 +5,19 @@ Coordinates are approximate (to a degree or so, plenty for a 260 px world map). 
 lived there, rounded; for the Holocene they are in Ma too (0.000362 is 362 years ago).
 """
 SITES = {
+    # Cambrian
+    "burgess":     ("Burgess Shale", "British Columbia, Canada", 51.4, -116.5, 507, 505, ["anom", "opab", "olen"]),
+    # Ordovician
+    "anzaldo":     ("Anzaldo Formation", "Sacabamba, Cochabamba, Bolivia", -17.8, -65.4, 467, 460, ["saca"]),
+    # Silurian
+    "lesmahagow":  ("Lesmahagow Inlier", "South Lanarkshire, Scotland", 55.6, -3.9, 430, 427, ["ptry"]),
     # Devonian
     "fram":        ("Fram Formation", "Ellesmere Island, Canada", 77.2, -86.0, 378, 372, ["tikt"]),
-    "britta":      ("Britta Dal Formation", "East Greenland", 72.9, -23.6, 367, 360, ["icht"]),
+    "britta":      ("Britta Dal Formation", "East Greenland", 72.9, -23.6, 367, 360, ["icht", "both"]),
     # Carboniferous
     "ekirkton":    ("East Kirkton", "West Lothian, Scotland", 55.9, -3.6, 336, 334, ["pulm"]),
     "joggins":     ("Joggins Fossil Cliffs", "Nova Scotia, Canada", 45.7, -64.4, 315, 312, ["hylo", "arth"]),
+    "beargulch":   ("Bear Gulch Limestone", "Montana, USA", 47.1, -108.9, 324, 318, ["stet"]),
     "nyrany":      ("Nýřany", "Bohemia, Czechia", 49.7, 13.2, 308, 306, ["mibr"]),
     "commentry":   ("Commentry", "Allier, France", 46.3, 2.7, 302, 300, ["mega"]),
     "pennredbeds": ("Late Pennsylvanian red beds", "Texas and New Mexico, USA", 34.5, -104.0, 304, 299.5, ["dcau", "eryo"]),
@@ -33,7 +40,7 @@ SITES = {
     "ghostranch":  ("Ghost Ranch", "New Mexico, USA", 36.3, -106.5, 212, 206, ["coel"]),
     "lisowice":    ("Lisowice", "Silesia, Poland", 50.8, 18.9, 208, 202, ["liso"]),
     # Jurassic
-    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel"]),
+    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel", "prom"]),
     "elliot":      ("Elliot Formation", "Eastern Cape, South Africa", -30.7, 27.8, 200, 190, ["hete"]),
     "kayenta":     ("Kayenta Formation", "Arizona, USA", 36.5, -111.3, 196, 183, ["dilo"]),
     "hanson":      ("Hanson Formation", "Mount Kirkpatrick, Antarctica", -84.4, 165.0, 194, 188, ["cryo"]),
@@ -74,6 +81,8 @@ SITES = {
     "whiteriver":  ("White River Badlands", "South Dakota, USA", 43.8, -102.3, 34, 30, ["hyae"]),
     "bugti":       ("Dera Bugti", "Balochistan, Pakistan", 29.0, 69.1, 28, 23.1, ["pcer"]),
     # Neogene
+    "pyramid":     ("Pyramid Hill", "Kern County, California, USA", 35.4, -118.9, 23, 22, ["enal"]),
+    "calvert":     ("Calvert Cliffs", "Chesapeake Bay, Maryland, USA", 38.5, -76.5, 16, 14, ["kntr"]),
     "agate":       ("Nebraska Miocene beds", "Agate Fossil Beds, Nebraska, USA", 42.4, -103.8, 22, 15, ["daeo", "aepy", "amph"]),
     "rusinga":     ("Rusinga Island", "Lake Victoria, Kenya", -0.4, 34.2, 18, 17, ["proc"]),
     "patagonia":   ("Santa Cruz and Collón Curá Formations", "Patagonia, Argentina", -45.0, -69.5, 18, 14, ["psil", "kele"]),

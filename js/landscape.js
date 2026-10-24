@@ -257,7 +257,7 @@ function wantsOf(e, s){
   const a = area(e.points) || 1, l = likesOf(s), B = BIOMES[biomeOf(e)];
   const meat = !s.diet.some(d => d === "herbivore" || d === "omnivore");
   // no plants at all if its period had none in this biome (nothing to plant)
-  const none = !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);
+  const none = s.aqua || !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);   // sea animals want no plants
   return {water:waterWant(s), rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
 // A plant counts for a species when it's from the animal's own period
@@ -308,18 +308,36 @@ const wantsHeat = s => ERA_OF[s.period] !== "cenozoic" && !WARM_BLOODED.includes
 const heatCount = e => e.animals.filter(a => SPECIES_BY_ID[a.sp] && wantsHeat(SPECIES_BY_ID[a.sp])).length;
 // Share of the animals that want heat that the case's lamps cover (VIV_LAMP.per each); 1 when none want it
 const heatShare = e => { const n = heatCount(e); return !n ? 1 : clamp(vivFit(e, "lamp").length * VIV_LAMP.per / n, 0, 1); };
+// Aquarium water (AQUA): the load is the animals' food a day, the cleaning what the filters manage while they have power (e.filterPowered, power.js)
+// Paludariums (PALU): the swimmers, where the water starts (it runs from there to the front of the case), and whether a spot is in it
+const paluSwims = s => !!s && !s.aqua && (!!s.wade || likesOf(s).water >= HAB.wantsWater);
+const paluY = e => { const bb = bbox(e.points); return bb.y1 - (bb.y1 - bb.y0) * PALU.water; };
+const paluWet = (e, x, y) => !!e.palu && y >= paluY(e);
+const wetCase = e => !!(e.aqua || e.palu);
+const filters = e => wetCase(e) ? vivFit(e, "filter") : [];
+const filterKw = e => filters(e).reduce((n, f) => n + (LAND[f.type].kw || 0), 0);
+const aquaLoad = e => e.animals.reduce((n, a) => { const s = SPECIES_BY_ID[a.sp]; return n + (!s ? 0 : e.aqua ? s.food : e.palu && paluSwims(s) ? s.food * PALU.load : 0); }, 0);
+const aquaClean = e => e.filterPowered === false ? 0 : filters(e).reduce((n, f) => n + LAND[f.type].clean, 0);
+const wqAim = e => { const l = aquaLoad(e); return l <= 0 ? 100 : clamp(100 * aquaClean(e) / l, 0, 100); };
+const wqOf = e => e.wq ?? 100;
+// The water creeps toward what the filters can hold it at, AQUA.rate points a day
+function aquaTick(dtMin){
+  for(const e of state.exhibits) if(wetCase(e)){ const aim = wqAim(e), w = wqOf(e), step = AQUA.rate * dtMin / DAY_MIN; e.wq = w < aim ? Math.min(aim, w + step) : Math.max(aim, w - step); }
+}
+// What's wrong with an aquarium's filtering, in a few words, or null
+const filterText = e => !wetCase(e) || aquaLoad(e) <= 0 ? null : !filters(e).length ? "No filter." : e.filterPowered === false ? "No power for the filters." : aquaClean(e) < aquaLoad(e) ? "Not enough filtering." : null;
 // Where an animal in a vivarium likes to be: in the pool (water lovers) or under a lamp (heat lovers), as {x, y, rx, ry} areas in meters
 function vivHomes(e, s){
   const out = [];
   if(!e.viv) return out;
-  if(likesOf(s).water >= HAB.wantsWater) for(const f of vivFit(e, "pool")) out.push({x:f.x, y:f.y, rx:LAND[f.type].r * .7, ry:LAND[f.type].r * .3, pool:true});
+  if(likesOf(s).water >= HAB.wantsWater && !e.palu) for(const f of vivFit(e, "pool")) out.push({x:f.x, y:f.y, rx:LAND[f.type].r * .7, ry:LAND[f.type].r * .3, pool:true});
   if(wantsHeat(s)) for(const f of vivFit(e, "lamp")) out.push({x:f.x, y:f.y + .5, rx:VIV_LAMP.radius * .8, ry:VIV_LAMP.radius * .3});
   return out;
 }
 // The pool an animal at (x, y) is standing in, or null (the water is the pool's inner ellipse, a bit smaller than its rim)
 const vivPoolAt = (e, x, y) => vivFit(e, "pool").find(f => { const r = LAND[f.type].r; return ((x - f.x) / (r * .85)) ** 2 + ((y - f.y) / (r * .42)) ** 2 <= 1; }) || null;
 // A water lover with no water to drink from or wade in (a vivarium's water is its pools)
-const thirsty = (e, s) => likesOf(s).water >= HAB.wantsWater && (e.viv ? vivPoolM2(e) <= 0 : habitatOf(e).wet === 0);
+const thirsty = (e, s) => !s.aqua && likesOf(s).water >= HAB.wantsWater && (e.viv ? vivPoolM2(e) <= 0 && !e.palu : habitatOf(e).wet === 0);
 
 /* ---------- weather and shelter ---------- */
 function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
@@ -375,6 +393,16 @@ function biomeScore(e, out, n){
 function habitatScore(e){
   const out = {delta:0, issues:[]};
   if(!e.animals.length) return out;
+  if(e.aqua){   // an aquarium is all about its water
+    const w = wqOf(e), why = filterText(e);
+    if(why) out.issues.push({bad:true, text:why});
+    let fit = 0; for(const [sp, c] of speciesCounts(e)) fit += c * sceneFit(e, SPECIES_BY_ID[sp]);
+    fit /= e.animals.length; out.delta += VIV_PLANT.bonus * fit;
+    out.issues.push({bad:false, text:fit >= .99 ? "The backdrop is from their own time." : fit > 0 ? "The backdrop suits some of them." : e.vivScene ? "The backdrop is from another time." : "Bare."});
+    if(w >= AQUA.murky){ out.delta += AQUA.happy * (w - AQUA.murky) / (100 - AQUA.murky); out.issues.push({bad:false, text:"Clean water."}); }
+    else { out.delta -= AQUA.lack * (AQUA.murky - w) / AQUA.murky; out.issues.push({bad:true, text:w < AQUA.foul ? "Foul water." : "Murky water."}); }
+    return out;
+  }
   if(e.viv){   // a vivarium has its biome and plants: no water or rocks
     biomeScore(e, out, e.animals.length);
     let sat = 0, n = 0, want = 0;
@@ -384,9 +412,16 @@ function habitatScore(e){
       out.delta += VIV_PLANT.bonus * sat;
       out.issues.push({bad:false, text:sat >= .99 ? "The scene is from their own era and biome." : sat > 0 ? "The scene half suits them." : e.vivScene ? "The scene is from another era and biome." : "Bare."});
     }
-    // water lovers want a pool; a basking lamp warms the ones that want heat
+    // water lovers want a pool, or a paludarium's water, as clean as an aquarium's; a basking lamp warms the ones that want heat
     const lovers = [...speciesCounts(e)].filter(([sp]) => likesOf(SPECIES_BY_ID[sp]).water >= HAB.wantsWater);
-    if(lovers.length){
+    const swim = e.palu ? [...speciesCounts(e)].filter(([sp]) => paluSwims(SPECIES_BY_ID[sp])) : [];
+    if(swim.length){
+      const share = swim.reduce((n, [, c]) => n + c, 0) / e.animals.length, w = wqOf(e), why = filterText(e);
+      out.delta += PALU.happy * share; out.issues.push({bad:false, text:"Water to swim in."});
+      if(why) out.issues.push({bad:true, text:why});
+      if(w < AQUA.murky){ out.delta -= AQUA.lack * (AQUA.murky - w) / AQUA.murky * share; out.issues.push({bad:true, text:w < AQUA.foul ? "Foul water." : "Murky water."}); }
+    }
+    else if(lovers.length && !e.palu){
       const dry = lovers.filter(([sp]) => thirsty(e, SPECIES_BY_ID[sp]));
       if(dry.length){ out.delta -= HAB.dry; out.issues.push({bad:true, text:`No pool: ${dry.map(([sp]) => SPECIES_BY_ID[sp].name).join(", ")}.`}); }
       else { const fit = lovers.reduce((n, [sp, c]) => n + c * waterFit(haveOf(e, SPECIES_BY_ID[sp]).water, wantsOf(e, SPECIES_BY_ID[sp]).water), 0) / lovers.reduce((n, [, c]) => n + c, 0); out.delta += VIV_POOL.bonus * fit; out.issues.push({bad:fit < .6, text:fit >= .6 ? "A pool to wade in." : "A pool, but not enough water for them."}); }
@@ -700,12 +735,14 @@ function statueSeen(p, id){
 /* ---------- vivarium plants ---------- */
 // A fitting goes where it's furthest from the others, so they spread over the whole floor: the first sits at the middle of the case (`VIV_PLANT.shift` toward the front), the next at the emptiest spot, and so on.
 // The front keeps the sill margin (like vivSpot) so nothing hides behind the front frame. Plants are shrunk (f.k) to fit, and only ones from the vivarium's biome go in. `skip` is an item being re-laid, `k` its scale.
+// In a paludarium filters go in the water and everything else stays on the bank.
 function vivPlantSpot(e, key, skip, k){
   const t = LAND[key], r = t.r * (k || (t.vivToy ? 1 : VIV_PLANT.scale)), bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, m = K.sill / TILT + .15;
   const ax = (bb.x0 + bb.x1) / 2, front = bb.y1 - m, ay = Math.min((bb.y0 + bb.y1) / 2 + VIV_PLANT.shift, front), others = landOf(e).filter(f => f !== skip && LAND[f.type]);
   let best = null, bs = -Infinity;
   for(let y = bb.y0 + r; y <= front + 1e-6; y += .5) for(let x = bb.x0 + r; x <= bb.x1 - r; x += .5){
     if(!deepInside(x, y, e.points, r + .3)) continue;
+    if(e.palu && (t.filter ? y < paluY(e) + .3 : y > paluY(e) - .3)) continue;
     let gap = Infinity;   // the room left to the nearest fitting
     for(const f of others) gap = Math.min(gap, Math.hypot(f.x - x, f.y - y) - r - LAND[f.type].r * (f.k || 1));
     if(gap < 0) continue;
@@ -724,30 +761,49 @@ function relayViv(e){
   regatherViv(e);
 }
 // A vivarium's scene ({era, biome}, and a period once that period has its own pictures): what it costs, and what it gives each species, 0 to 1
-const vivSceneKey = sc => sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
-const sameScene = (a, b) => !a ? !b : !!b && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
+const vivSceneKey = sc => sc.sea ? "sea-" + sc.sea : sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
+const sameScene = (a, b) => !a ? !b : !!b && a.sea === b.sea && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
 // half for a scene from its own era (or its own period, for a period scene), half for one of its biomes
 function sceneFit(e, s){
   const sc = e.vivScene; if(!sc) return 0;
+  if(sc.sea) return AQUA_SCENES[sc.sea] && AQUA_SCENES[sc.sea].periods.includes(s.period) ? 1 : 0;   // a backdrop has no biome: its own time is the whole of it
   return ((sc.period ? sc.period === s.period : sc.era === ERA_OF[s.period]) ? .5 : 0) + (biomeFit(s, sc.biome) !== "away" ? .5 : 0);
 }
 function vivSceneProblem(e, sc){
   if(!e.viv) return "Only vivariums take a scene.";
-  if(sc && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
-  if(sameScene(e.vivScene, sc)) return sc ? "That's the scene it has." : "It has no scene.";
+  if(sc && e.aqua ? !AQUA_SCENES[sc.sea] : sc && sc.sea) return "Pick a backdrop.";
+  if(sc && !e.aqua && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
+  if(sameScene(e.vivScene, sc)) return sc ? `That's the ${e.aqua ? "backdrop" : "scene"} it has.` : `It has no ${e.aqua ? "backdrop" : "scene"}.`;
   if(sc && !canAfford(VIV_SCENE.price)) return `Costs ${money(VIV_SCENE.price)}.`;
   return null;
 }
 // a new scene costs the flat price; clearing it gives back the usual share
 function setVivScene(e, sc){
   if(sc) spend(VIV_SCENE.price, "built"); else earn(Math.round(VIV_SCENE.price * COST.refundShare), "sold");
-  e.vivScene = sc ? {era:sc.era, biome:sc.biome, ...(sc.period ? {period:sc.period} : {})} : null;
+  e.vivScene = !sc ? null : sc.sea ? {sea:sc.sea} : {era:sc.era, biome:sc.biome, ...(sc.period ? {period:sc.period} : {})};
 }
 
+// Laying a vivarium out as a paludarium (on) or draining it back to a dry case
+function paluProblem(e, on){
+  if(!e.viv || e.aqua) return "Only vivariums can be flooded.";
+  if(on === !!e.palu) return on ? "It's already a paludarium." : "It's already dry.";
+  if(on && !canAfford(PALU.price)) return `Costs ${money(PALU.price)}.`;
+  const need = !on && e.animals.map(a => SPECIES_BY_ID[a.sp]).find(s => s && s.palu); if(need) return `Move the ${need.name} out first.`;
+  if(!on && filters(e).length) return "Take the filters out first.";
+  return null;
+}
+function setPalu(e, on){
+  if(on){ spend(PALU.price, "built"); e.palu = true; e.wq = 100; }
+  else { earn(Math.round(PALU.price * COST.refundShare), "sold"); delete e.palu; delete e.wq; delete e.filterPowered; }
+  relayViv(e);   // the fittings move up onto the bank (or spread back out), and the animals find their spots again
+}
+// Which fittings a case takes: aquarium ones (filters, sea enrichment) only in aquariums, the rest only in vivariums; a food dish goes in either
+const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu))); };   // a paludarium takes filters too, and needs no pool
 // Vivarium enrichment goes in the same way, full size
 function vivToyProblem(e, key){
   const t = LAND[key];
-  if(!e.viv || !t || !t.vivToy) return "Only vivarium enrichment goes here.";
+  if(t && t.pool && e.palu) return "It has water already.";
+  if(!caseTakes(e, key)) return `Only ${e.aqua ? "aquarium" : "vivarium"} fittings go here.`;
   if(!vivPlantSpot(e, key)) return "No room left for one that size.";
   if(!canAfford(t.price)) return `Costs ${money(t.price)}.`;
   return null;
