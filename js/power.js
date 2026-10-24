@@ -24,8 +24,8 @@ function updatePower(){
   let cut = 0, dry = 0;
   for(const e of fences){ const d = fenceDraw(e); e.powered = left >= d; if(e.powered) left -= d; else cut++; }
   for(const e of state.exhibits) if(e.barrier !== "electric") delete e.powered;
-  // aquarium filters come next, the biggest tanks first; an unpowered filter cleans nothing
-  for(const e of state.exhibits.filter(x => x.aqua).sort((a, b) => aquaLoad(b) - aquaLoad(a))){ const d = filterKw(e); e.filterPowered = left >= d; if(e.filterPowered) left -= d; else if(e.animals.length) dry++; }
+  // aquarium and paludarium filters come next, the biggest loads first; an unpowered filter cleans nothing
+  for(const e of state.exhibits.filter(wetCase).sort((a, b) => aquaLoad(b) - aquaLoad(a))){ const d = filterKw(e); e.filterPowered = left >= d; if(e.filterPowered) left -= d; else if(e.animals.length) dry++; }
   // cold stores come after fences; without power they only keep food like a plain store
   for(const b of coldStores()){ b.powered = left >= LOGI.coldPower; if(b.powered) left -= LOGI.coldPower; }
   if((cut || dry) && state.minute > 0 && powerShortNotified !== state.day){

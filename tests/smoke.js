@@ -3770,6 +3770,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && aquaSceneHtml(aq).includes("aquaSceneSel") && exTabList(aq).some(t => t.key === "land");
       }
       state.exhibits = state.exhibits.filter(x => x !== aq);
+      // paludariums: a vivarium flooded at the front from Landscaping; waders swim there and like it, its water fouls by the swimmers' load and takes filters, and
+      // Enaliarctos lives only in one; it can't be drained with a paludarium animal or a filter in it
+      {
+        const pa = {id:"e-pa", name:"Pa", viv:"M", points:rectPts(350, 300, V.w, V.d, 0), animals:[0, 1, 2, 3].map(i => ({id:"pa" + i, sp:"tikt", q:90})), happy:70, biome:"tropical"};
+        state.exhibits.push(pa); recompute();
+        const dry = habitatScore(pa).delta, m0 = state.money, okOn = !paluProblem(pa, true); setPalu(pa, true);
+        const tk = SPECIES_BY_ID.tikt, enal = SPECIES_BY_ID.enal, load = aquaLoad(pa), noF = filterText(pa);
+        addVivToy(pa, "afilter"); pa.filterPowered = true; pa.wq = 100; const wetHappy = habitatScore(pa).delta;
+        pa.wq = 10; const foul = habitatScore(pa).delta, ill = illChance(pa, pa.animals[0]); pa.wq = 100;
+        const drawn = viv34(pa, "front", null).includes(AQUA34.clean.toLowerCase()) && !viv34(ev, "front", null).includes(AQUA34.clean.toLowerCase());
+        const blockF = !!paluProblem(pa, false);
+        const L = {viv:"L", palu:true, points:[]}, Ld = {viv:"L", points:[]};
+        out.paludarium = okOn && pa.palu && state.money < m0 && paluSwims(tk) && !paluSwims(SPECIES_BY_ID.arth) && load === 4 * tk.food * PALU.load && noF === "No filter."
+          && wetHappy > dry && foul < wetHappy && ill.why.includes("foul water") && drawn && blockF && !thirsty(pa, tk)
+          && !vivToyProblem(pa, "afilter") && !!vivToyProblem(pa, "vpool") && !!vivToyProblem(pa, "acoral") && !!vivToyProblem(ev, "afilter")
+          && fitsHabitat(enal, L) && !fitsHabitat(enal, Ld) && !fitsHabitat(enal, aq) && paluWet(pa, 351, paluY(pa) + .1) && !paluWet(pa, 351, paluY(pa) - .1) && !paluWet(ev, 201, 309);
+        pa.land = pa.land.filter(f => !LAND[f.type].filter); pa.animals.push({id:"pa-e", sp:"enal", q:90});
+        const blockE = /Enaliarctos/.test(paluProblem(pa, false) || ""); pa.animals.pop();
+        const m1 = state.money; setPalu(pa, false);
+        out.paludariumDrains = blockE && !pa.palu && pa.wq === undefined && state.money > m1 && habitatScore(pa).delta === dry;
+        state.exhibits = state.exhibits.filter(x => x !== pa);
+      }
       const dfull = {id:"pd", type:"vdish", x:200, y:300, cap:6, food:{[ft]:6}};
       out.vivDishShowsFood = vivPropSvg(dfull, LAND.vdish).includes("<rect") && !vivPropSvg({...dfull, food:{}}, LAND.vdish).includes("<rect");
 

@@ -543,7 +543,7 @@ function attackReason(x, y){
 function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
-function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && vivRank(e.viv) >= vivRank(s.viv) : !s.viv; }
+function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv; }
 
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
@@ -591,6 +591,7 @@ function exhibitReport(e){
     const need = (s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv];
     if(e.viv && !s.viv){ target -= 40; issues.push({bad:true, text:`${s.name} is far too big for ${e.aqua ? "an aquarium" : "a vivarium"}.`}); }
     else if(e.viv && !!s.aqua !== !!e.aqua){ target -= 40; issues.push({bad:true, text:s.aqua ? `${s.name} needs an aquarium.` : `${s.name} can't live under water.`}); }
+    else if(e.viv && s.palu && !e.palu){ target -= 30; issues.push({bad:true, text:`${s.name} needs a paludarium.`}); }
     else if(e.viv && vivRank(e.viv) < vivRank(s.viv)){ target -= 25; issues.push({bad:true, text:`${s.name} needs a ${need.label.toLowerCase()} or bigger.`}); }
     else if(!e.viv && s.viv){ target -= s.aqua ? 60 : 20; issues.push({bad:true, text:`${s.name} needs ${s.aqua ? "an aquarium" : "a vivarium"}.`}); }
   }

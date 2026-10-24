@@ -86,6 +86,8 @@ const UPKEEP = {
 //   viv      "S", "M", or "L" means it lives in a vivarium at least that size, not an open exhibit
 //   aqua     true for sea animals: viv is then the aquarium size it needs, and it lives only in an aquarium
 //   floor    a sea animal that crawls the bottom of its aquarium instead of swimming
+//   palu     a semi-aquatic vivarium animal that needs its vivarium laid out as a paludarium (PALU)
+//   wade     a vivarium animal that swims in a paludarium's water and is happier for it, but does fine in a dry case (semi ones swim there too)
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
 
 const SPECIES = [
@@ -96,17 +98,17 @@ const SPECIES = [
   // Silurian
   {id:"ptry", name:"Pterygotus",     period:"Silurian", diet:["carnivore"], bug:true, price:12000, food:30, space:60, group:[1,2], appeal:8, stars:1.5, viv:"L", aqua:true},
   // Devonian
-  {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M"},
-  {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M"},
+  {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M", wade:true},
+  {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M", wade:true},
   {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true, floor:true},
   // Carboniferous
   {id:"stet", name:"Stethacanthus",  period:"Carboniferous", diet:["piscivore"], price:6000, food:15, space:20, group:[2,5], appeal:5, stars:1, viv:"M", aqua:true},
-  {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S"},
+  {id:"mibr", name:"Microbrachis",   period:"Carboniferous", diet:["insectivore"], price:2500, food:4, space:4, group:[3,10], appeal:3, stars:0, viv:"S", wade:true},
   {id:"hylo", name:"Hylonomus",      period:"Carboniferous", diet:["insectivore"], price:2800, food:4, space:5, group:[2,8], appeal:3, stars:0, viv:"S"},
   {id:"arth", name:"Arthropleura",   period:"Carboniferous", diet:["herbivore"], bug:true, price:5000,  food:20,  space:25,   group:[1,6],  appeal:4,  stars:0,   viv:"L"},
   {id:"pulm", name:"Pulmonoscorpius", period:"Carboniferous", diet:["insectivore","carnivore"], bug:true, price:3000,  food:8,   space:6,    group:[1,3],  appeal:4,  stars:0,   viv:"S"},
   {id:"mega", name:"Meganeura",      period:"Carboniferous", diet:["insectivore"], bug:true, price:5000,  food:8,   space:20,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
-  {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M"},
+  {id:"dcau", name:"Diplocaulus",    period:"Carboniferous", diet:["piscivore"], price:4000,  food:12,  space:10,   group:[2,6],  appeal:4,  stars:0.5, viv:"M", wade:true},
   {id:"eryo", name:"Eryops",         period:"Carboniferous", diet:["carnivore","piscivore"], price:5000, food:40, space:100, group:[2,5], appeal:4, stars:0.5},
   // Permian
   {id:"diic", name:"Diictodon",      period:"Permian", diet:["herbivore"], price:3000, food:6, space:6, group:[3,10], appeal:4, stars:0, viv:"S"},
@@ -159,14 +161,14 @@ const SPECIES = [
   {id:"scan", name:"Scansoriopteryx", period:"Jurassic", diet:["insectivore"], price:4500, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   // Cretaceous
   {id:"hyps", name:"Hypsilophodon",  period:"Cretaceous", diet:["herbivore"], price:4000,  food:40,  space:150,  group:[3,8],  appeal:3,  stars:0,   },
-  {id:"beel", name:"Beelzebufo",     period:"Cretaceous", diet:["carnivore"], price:4000, food:8, space:8, group:[1,4], appeal:5, stars:0.5, viv:"M"},
+  {id:"beel", name:"Beelzebufo",     period:"Cretaceous", diet:["carnivore"], price:4000, food:8, space:8, group:[1,4], appeal:5, stars:0.5, viv:"M", wade:true},
   {id:"mono", name:"Mononykus",      period:"Cretaceous", diet:["insectivore"], price:4500, food:5, space:6, group:[2,8], appeal:4, stars:0.5, viv:"S"},
   {id:"mcer", name:"Microceratus",   period:"Cretaceous", diet:["herbivore"], price:4500, food:6, space:8, group:[3,10], appeal:4, stars:0.5, viv:"S"},
   {id:"micr", name:"Microraptor",    period:"Cretaceous", diet:["carnivore","piscivore"], price:6000,  food:10,  space:12,   group:[2,6],  appeal:6,  stars:1,   viv:"M"},
   {id:"psit", name:"Psittacosaurus", period:"Cretaceous", diet:["herbivore"], price:6000,  food:50,  space:200,  group:[3,10], appeal:4,  stars:0.5},
   {id:"prot", name:"Protoceratops",  period:"Cretaceous", diet:["herbivore"], price:7000,  food:70,  space:250,  group:[2,8],  appeal:5,  stars:1.5},
   {id:"ornm", name:"Ornithomimus",   period:"Cretaceous", diet:["herbivore","insectivore"], price:7000, food:60, space:250, group:[3,10], appeal:5, stars:1},
-  {id:"kool", name:"Koolasuchus",    period:"Cretaceous", diet:["piscivore"], price:7000, food:30, space:30, group:[1,3], appeal:6, stars:1, viv:"L"},
+  {id:"kool", name:"Koolasuchus",    period:"Cretaceous", diet:["piscivore"], price:7000, food:30, space:30, group:[1,3], appeal:6, stars:1, viv:"L", wade:true},
   {id:"simo", name:"Simosuchus",     period:"Cretaceous", diet:["herbivore"], price:5500, food:14, space:14, group:[2,5], appeal:3, stars:0.5, viv:"M"},
   {id:"ovir", name:"Oviraptor",      period:"Cretaceous", diet:["omnivore"], price:8000,  food:60,  space:250,  group:[2,8],  appeal:5,  stars:1},
   {id:"minm", name:"Minmi",          period:"Cretaceous", diet:["herbivore"], price:8000, food:70, space:300, group:[2,8], appeal:5, stars:1},
@@ -211,6 +213,7 @@ const SPECIES = [
   {id:"tita", name:"Titanoboa",      period:"Paleogene", diet:["carnivore","piscivore"], predator:true, price:30000, food:250, space:1500, group:[1,2],  appeal:16, stars:3},
   {id:"pcer", name:"Paraceratherium", period:"Paleogene", diet:["herbivore"], price:40000, food:550, space:4000, group:[1,4],  appeal:17, stars:3.5},
   // Neogene
+  {id:"enal", name:"Enaliarctos",    period:"Neogene", diet:["piscivore"], semi:true, price:11000, food:30, space:50, group:[2,4], appeal:7, stars:1.5, viv:"L", palu:true},
   {id:"kntr", name:"Kentriodon",     period:"Neogene", diet:["piscivore"], price:12000, food:30, space:60, group:[2,4], appeal:8, stars:1.5, viv:"L", aqua:true},
   {id:"dino", name:"Dinopithecus",   period:"Neogene", diet:["omnivore"], price:7000, food:70, space:250, group:[4,12], appeal:6, stars:1},
   {id:"daeo", name:"Daeodon",        period:"Neogene", diet:["omnivore"], predator:true, price:11000, food:120, space:700,  group:[2,5],  appeal:8,  stars:1.5},
@@ -386,6 +389,7 @@ const TIME_SITES = [
   {id:"fayum", name:"Fayum Depression", where:"Egypt", from:37e6, to:30e6, at:{paleogene:[147, 47]}, fauna:["arsi"]},
   {id:"whiteriver", name:"White River Badlands", where:"South Dakota, USA", from:34e6, to:30e6, at:{paleogene:[84, 27]}, fauna:["hyae"]},
   {id:"bugti", name:"Dera Bugti", where:"Balochistan, Pakistan", from:28e6, to:23.1e6, at:{paleogene:[175, 61]}, fauna:["pcer"]},
+  {id:"pyramid", name:"Pyramid Hill", where:"Kern County, California, USA", from:23e6, to:22e6, at:{neogene:[61, 34]}, fauna:["enal"]},
   {id:"calvert", name:"Calvert Cliffs", where:"Chesapeake Bay, Maryland, USA", from:16e6, to:14e6, at:{neogene:[86, 31]}, fauna:["kntr"]},
   {id:"agate", name:"Nebraska Miocene beds", where:"Agate Fossil Beds, Nebraska, USA", from:22e6, to:15e6, at:{neogene:[70, 28]}, fauna:["daeo", "aepy", "amph"]},
   {id:"rusinga", name:"Rusinga Island", where:"Lake Victoria, Kenya", from:18e6, to:17e6, at:{neogene:[153, 66]}, fauna:["proc"]},
@@ -1528,6 +1532,10 @@ const VIV_POOL = {bonus:5};
 // Aquarium water: the animals foul it by their food a day (their load) and filters clean it (LAND `clean`, only while powered). Quality (0 to 100) heads for
 // 100 x cleaning / load at `rate` points a day. Under `murky` the animals are unhappy (up to `lack`), under `foul` they fall ill (x`ill` at 0); clean water is worth `happy`.
 const AQUA = {rate:40, murky:60, foul:30, happy:6, lack:14, ill:3};
+// A vivarium can be laid out as a paludarium from its Landscaping tab: the front `water` share of its floor flooded `depth` of the glass deep, a bank behind, for
+// `price` (draining it refunds COST.refundShare). Its water fouls like an aquarium's (AQUA, and it takes the aquarium filters), but only the animals that swim in it
+// count, at `load` of their food. Water lovers swim and get `happy` there, and need no pool. Species with `palu` live only in one.
+const PALU = {price:2500, water:.5, depth:.4, load:.5, happy:6};
 // Food trays (LAND items with `tray`, food units they hold). Each holds one kind of food at a time (any kind). Keepers walk inside the fence to fill them,
 // and the animals eat from them first, so an exhibit with trays holds more food and needs fewer trips.
 const TRAY = {
@@ -2485,7 +2493,7 @@ const SPECIES_BIOMES = Object.fromEntries(Object.entries({
   arct:"boreal temperate",    doed:"grassland scrubland",  mgth:"temperate scrubland",  mlan:"scrubland desert",
   smil:"grassland temperate", mast:"boreal temperate",     elas:"grassland boreal",     mamm:"tundra boreal",
   colm:"grassland temperate",  mglo:"grassland boreal",  pach:"boreal scrubland",
-  icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
+  enal:"temperate wetland",   icht:"wetland tropical",    tikt:"wetland tropical",     mibr:"wetland tropical",     hylo:"tropical temperate",
   dcau:"wetland tropical",    arth:"tropical wetland",     pulm:"tropical scrubland",   mega:"tropical wetland",
   diic:"scrubland desert",    seym:"scrubland wetland",    plhy:"scrubland desert",     shar:"temperate wetland",
   long:"temperate wetland",   gigt:"scrubland tropical",   anch:"temperate boreal",   comp:"scrubland temperate",
@@ -2504,6 +2512,7 @@ const biomeNames = s => biomesOf(s).map(b => BIOMES[b].label.toLowerCase()).join
 const SPECIES_INFO = {
   icht:{sci:"Ichthyostega stensioei", ft:5, desc:"One of the first animals with four limbs. It lived in the swamps of Late Devonian Greenland, and it had seven toes on each hind foot. It probably dragged itself over mud banks more than it walked, and still breathed through gills in the water. It sits near the line between fish and land animals."},
   tikt:{sci:"Tiktaalik roseae", ft:9, desc:"A fish with a neck. Tiktaalik lived in shallow Late Devonian streams about 375 million years ago, and its fossils were found on Ellesmere Island in the Canadian Arctic in 2004. It still had gills and fins, but it also had a flat head with eyes on top, a neck that could turn, and strong fin bones that could prop it up like arms. Its name comes from an Inuktitut word for a big freshwater fish."},
+  enal:{sci:"Enaliarctos mealsi", ft:5, desc:"The dawn sea lion, one of the first seals, from the coast of California about 23 million years ago. It had flippers on all four limbs, but its body still looked a lot like a bear's or an otter's, and it probably spent as much time on rocky shores as in the water. Every seal, sea lion and walrus alive today comes from animals like it."},
   kntr:{sci:"Kentriodon pernix", ft:6.5, desc:"An early dolphin from the warm Miocene seas off Maryland, about 15 million years ago, a little smaller than a bottlenose. It already had the dolphin's long beak full of small pointed teeth, and a skull shaped to hold the fatty melon that today's dolphins use to send out clicks, so it could probably find fish by echo. Its fossils weather out of Calvert Cliffs on Chesapeake Bay."},
   ptry:{sci:"Pterygotus lanarkensis", ft:5.2, desc:"A sea scorpion, and the biggest of its kind grew as long as a person is tall, among the largest arthropods that ever lived. It hunted the shallow seas of the Silurian and Devonian with a pair of long, toothed claws held out in front of its head, steered with a flat tail fin and spotted prey with big forward-facing eyes. Sea scorpions are distant relatives of today's scorpions and horseshoe crabs."},
   anom:{sci:"Anomalocaris canadensis", ft:1.6, desc:"The biggest hunter of the Cambrian seas, about two feet long, at a time when most animals were the size of a finger. It swam by rippling the flaps along its sides, grabbed prey with two spiny arms in front of its face, and had a round mouth of plates. Its pieces were found separately at first and named as a shrimp, a jellyfish and a sponge before anyone saw they were one animal."},

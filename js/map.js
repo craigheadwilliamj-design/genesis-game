@@ -751,6 +751,9 @@ const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
 const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486"};
 // The waterline's height in meters: a little under the lid
 const aquaLine = e => VIVARIUMS[e.viv].d * .45 - .6;
+// A paludarium's water: its depth in meters, and the flooded part of the floor (the front of the case, from paluY)
+const paluLine = e => VIVARIUMS[e.viv].d * .45 * PALU.depth;
+const paluPoly = e => { const b = bbox(e.points), y = paluY(e); return [[b.x0, y], [b.x1, y], [b.x1, b.y1], [b.x0, b.y1]]; };
 function vivMix34(a, b, t){
   const h = c => /^#[0-9a-f]{6}$/i.test(c) ? [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)) : null, x = h(a), y = h(b);
   return x && y ? "#" + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("") : a;
@@ -797,12 +800,12 @@ function viv34(e, which, hi){
   const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
   let s = "";
-  if(e.aqua){   // an aquarium's water: the far faces behind the animals, then the near faces and a thinner surface over them; clear blue when clean, thicker and greener as it fouls
-    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = aquaLine(e);
+  if(e.aqua || e.palu && !back){   // the water: an aquarium's far faces behind the animals, then the near faces and a thinner surface over them (a paludarium's only over its flooded front); clear blue when clean, thicker and greener as it fouls
+    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = e.palu ? paluLine(e) : aquaLine(e), WP = e.palu ? paluPoly(e) : P;
     for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back ? vivMix34(col, "#000000", .15) : col, a.toFixed(2));
     if(!back){
-      s += flatPoly34(P.map(lift34(wl)), vivMix34(col, "#FFFFFF", .15), op((a * AQUA34.surface).toFixed(2)), true);
-      for(let i = 0; i < P.length; i++){ const p = lift34(wl)(P[i]), q = lift34(wl)(P[(i + 1) % P.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
+      s += flatPoly34(WP.map(lift34(wl)), vivMix34(col, "#FFFFFF", .15), op((a * AQUA34.surface).toFixed(2)), true);
+      for(let i = 0; i < WP.length; i++){ const p = lift34(wl)(WP[i]), q = lift34(wl)(WP[(i + 1) % WP.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
     }
   }
   for(let i = 0; i < P.length; i++){
@@ -1431,16 +1434,21 @@ function animalUp(h){ const up = (h.lift || 0) + (h.bob || 0); return tilt ? `${
 // In an aquarium the animals drift like fish: each steers toward a spot in the glass at some depth (h.lift, how far up the picture it is drawn) with some
 // momentum (h.vel: across, back, up), so it curves and eases in, hangs there a moment (h.hover), then picks another; a slow bob keeps it from ever sitting dead still.
 // Floor crawlers (`floor` in SPECIES) wander the sand instead. Resting ones drift slowly near the bottom. The highest it goes keeps its picture under the waterline.
-const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6};
+// In a paludarium the swimmers (h.swimmer) do the same, heading for the water `palu` of the time and otherwise climbing out to walk the bank at `crawl`.
+const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6, palu:.6};
+function paluTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, paluLine(e) / TILT - ht - .1); }
 function aquaTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, aquaLine(e) / TILT - ht - .3); }
 function aquaSwim(h, e, dt){
-  const s = SPECIES_BY_ID[h.sp] || {}, rest = h.act === "rest", crawl = !!s.floor, top = crawl ? 0 : aquaTop(h, e), A = AQUA_SWIM;
+  const s = SPECIES_BY_ID[h.sp] || {}, rest = h.act === "rest", wet = !e.palu || paluWet(e, h.x, h.y), crawl = !!s.floor || !wet, A = AQUA_SWIM;
+  const top = crawl ? 0 : e.palu ? paluTop(h, e) : aquaTop(h, e);
   const v = h.vel || (h.vel = [0, 0, 0]), lift = h.lift || 0;
   if(h.hover > 0) h.hover -= dt;
   else if(!h.goal || !vivSpot(h, e, h.goal)){
     let p = null;
-    for(let i = 0; i < 20 && !p; i++){ const q = randomInside(e.points); if(vivSpot(h, e, q)) p = q; }
-    h.goal = p || [h.x, h.y]; h.liftTo = crawl ? 0 : rest ? Math.random() * top * .2 : Math.random() * top;
+    const swim = !e.palu || Math.random() < A.palu;   // a paludarium swimmer picks the water or the bank
+    for(let i = 0; i < 20 && !p; i++){ const q = randomInside(e.points); if(vivSpot(h, e, q) && (!e.palu || paluWet(e, q[0], q[1]) === swim)) p = q; }
+    const deep = e.palu ? (swim ? paluTop(h, e) : 0) : top;
+    h.goal = p || [h.x, h.y]; h.liftTo = s.floor ? 0 : rest ? Math.random() * deep * .2 : Math.random() * deep;
   }
   // steer: the velocity it wants points at the goal, slowing inside `near`; the one it has turns toward that at `accel` a second
   const g = h.hover > 0 || !h.goal ? [h.x, h.y, lift] : [h.goal[0], h.goal[1], h.liftTo || 0], dx = g[0] - h.x, dy = g[1] - h.y, dl = g[2] - lift, d = Math.hypot(dx, dy, dl);
@@ -1452,7 +1460,7 @@ function aquaSwim(h, e, dt){
   h.lift = clamp(lift + v[2] * dt, 0, top);
   if(h.goal && !(h.hover > 0) && d < .15){ h.goal = null; h.hover = A.hover[0] + Math.random() * (A.hover[1] - A.hover[0]) * (rest ? 2 : 1); }
   h.bobT = (h.bobT ?? Math.random() * 7) + dt;
-  h.bob = crawl ? 0 : Math.sin(h.bobT * A.bobRate) * A.bob * Math.min(1, h.lift / A.bob);   // no bobbing into the sand
+  h.bob = crawl || !wet ? 0 : Math.sin(h.bobT * A.bobRate) * A.bob * Math.min(1, h.lift / A.bob);   // no bobbing into the sand
   if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const el = h.el.querySelector(".spr"); if(el) el.setAttribute("transform", `scale(${face} 1)`); } }
   const S = SPRITES[h.sp];
   if(h.spr && rigOf(h.sp)) rigStep(h, rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
@@ -1524,6 +1532,7 @@ function restPose(h, S){
 // Can a vivarium animal stand at p with its picture wholly inside the case? Its width clears the side walls and posts, and its feet stay behind the sill (the front glass's frame covers the bottom of the floor).
 function vivSpot(h, e, p){
   const K = VIV34[e.viv] || VIV34.M, S = SPRITES[h.sp], hw = (S ? 2 * (S.size || 1) : 1) * (h.r || 1) + K.post, m = K.sill / TILT + .15, P = e.points;
+  if(e.palu && !h.swimmer && p[1] > paluY(e) - .2) return false;   // only the swimmers go in a paludarium's water
   return inPoly(p[0], p[1], P) && inPoly(p[0] - hw, p[1], P) && inPoly(p[0] + hw, p[1], P) && inPoly(p[0], p[1] + m, P) && inPoly(p[0] - hw, p[1] + m, P) && inPoly(p[0] + hw, p[1] + m, P);
 }
 // The room a vivarium animal's picture takes: half its width, and half the height of its body (a fraction of the picture's box) in the case's depth
@@ -1601,7 +1610,7 @@ function syncAnimals(){
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? (SPRITES[a.sp] ? VIVARIUMS[e.viv].d / 7 : Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
-      h.r = r; h.spr = sprite; h.viv = !!e.viv;
+      h.r = r; h.spr = sprite; h.viv = !!e.viv; h.swimmer = !!e.palu && paluSwims(s);
       if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
       if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
         for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
@@ -1953,9 +1962,9 @@ function animateAnimals(dt){
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
     const act = h.a && h.a.act;
     // a new act: drop what it was doing and head off at once
-    if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); if(e.viv && !e.aqua) vivJump(h, e); }
+    if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); if(e.viv && !e.aqua && !h.swimmer) vivJump(h, e); }
     // vivarium animals don't walk: they jump on a new act (vivJump) and play their rig, or cycle an idle strip if their picture has one (else the standing picture or dot)
-    if(e.aqua){ aquaSwim(h, e, dt); continue; }
+    if(e.aqua || h.swimmer){ aquaSwim(h, e, dt); continue; }
     if(e.viv){
       const S = SPRITES[h.sp];
       if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle");   // a rig plays its stand loop and idle clips here like in the park

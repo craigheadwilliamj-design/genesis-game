@@ -282,7 +282,7 @@ function exOverviewHtml(e, rep){
     const kc = knownCond(e), since = daysSinceInspect(e), broke = e.open || isBreached(e);
     rows.push(exJump("barrier", "Barrier", broke || kc < 30 ? "bad" : kc < 60 || since >= MAINT.inspectEvery ? "warn" : "", esc(e.open ? "Gap in the fence." : broke ? "Broken." : `${Math.round(kc)}% condition${since >= 99 ? ", never inspected" : ""}.`)));
   }
-  if(e.aqua && n){
+  if(wetCase(e) && aquaLoad(e) > 0){
     const w = wqOf(e), why = filterText(e);
     rows.push(exJump("props", "Water", w < AQUA.foul ? "bad" : w < AQUA.murky || why ? "warn" : "", esc(`${Math.round(w)}% clean${why ? ". " + why : ""}`)));
   }
@@ -403,7 +403,13 @@ function aquaSceneHtml(e){
 function vivSceneHtml(e){
   const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]);
   const era0 = sc ? sc.era : (kinds.length ? ERA_OF[kinds[0].period] : ""), bio0 = sc ? sc.biome : biomeOf(e);
-  let h = `<section><h3>Scene</h3>`;
+  let h = "";
+  if(devMode() || e.palu){   // dry, or flooded at the front as a paludarium (dev mode only for now)
+    h += `<section><h3>Layout</h3><div class="row"><span class="status ${e.palu ? "ok" : ""}">${e.palu ? "Paludarium" : "Dry"}</span>`;
+    h += e.palu ? `<button class="btn sell" data-action="palu" data-on="0">Drain it +${money(Math.round(PALU.price * COST.refundShare))}</button>` : `<button class="btn" data-action="palu" data-on="1">Paludarium, ${money(PALU.price)}</button>`;
+    h += `</div></section>`;
+  }
+  h += `<section><h3>Scene</h3>`;
   h += `<div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(ERA_LABEL[sc.era])} ${esc(BIOMES[sc.biome].label.toLowerCase())}</b>.` : "No scene yet."}</div>`;
   const sel = `style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"`;
   h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="vivEraSel" ${sel}><option value="">No scene</option>${VIV_SCENE.eras.map(x => `<option value="${x}"${x === era0 ? " selected" : ""}>${esc(ERA_LABEL[x])}</option>`).join("")}</select>`;
@@ -430,13 +436,13 @@ const vivSelect = (id, keys, e, note) => `<div class="row" style="margin-top:6px
 const vivHere = (e, fit) => { const here = landOf(e).filter(f => LAND[f.type] && LAND[f.type].vivToy && !!LAND[f.type].fit === fit); return here.length ? `<div class="meta" style="margin-top:6px">In the glass:</div><ul class="herd">${here.map(f => { const t = LAND[f.type]; return `<li><span class="dot" style="background:${t.color}"></span><span>${esc(t.label)}${t.tray ? ` (${Math.round(trayHas(f))}/${trayCap(f)}${trayKind(f) ? " " + esc(trayKind(f)) : ""})` : ""}</span><button class="btn sell" data-action="vivPlantOff" data-id="${esc(f.id)}">Remove +${money(Math.round(t.price * COST.refundShare))}</button></li>`; }).join("")}</ul>` : ""; };
 function vivToysHtml(e){
   const n = e.animals.length, heat = e.aqua ? 0 : heatCount(e), lovers = e.aqua ? 0 : e.animals.filter(a => likesOf(SPECIES_BY_ID[a.sp]).water >= HAB.wantsWater).length;
-  let h = e.aqua ? aquaWaterHtml(e) : "";
+  let h = wetCase(e) ? aquaWaterHtml(e) : "";
   h += `<section><h3>Fittings</h3>`;
   if(n){
     const need = dishesNeeded(e), have = trays(e).length;
     h += `<div class="row" style="margin-top:6px"><span class="status ${have >= need ? "ok" : "no"}">${have >= need ? `Food dishes ${have} of ${need}` : esc(dishText(e))}</span></div>`;
     if(heat) h += `<div class="row"><span class="status ${heatShare(e) >= 1 ? "ok" : "no"}">${vivFit(e, "lamp").length ? `Lamps warm ${Math.min(heat, vivFit(e, "lamp").length * VIV_LAMP.per)} of ${heat} that want heat` : `${heat} want a basking lamp`}</span></div>`;
-    if(lovers) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
+    if(lovers && !e.palu) h += `<div class="row"><span class="status ${vivPoolM2(e) > 0 ? "ok" : "no"}">${vivPoolM2(e) > 0 ? "Pool to wade in" : `${lovers} want a pool`}</span></div>`;
   }
   h += vivSelect("vivFitSel", VIV_FITS, e, t => t.tray ? `holds ${VIV_DISH.cap[e.viv] || t.tray} units` : t.filter ? `cleans ${t.clean} a day, ${t.kw} kW, ${money(t.upkeep)} a day` : t.lamp ? `warms ${VIV_LAMP.per}, ${money(t.upkeep)} a day` : "water to wade in") + vivHere(e, true) + `</section>`;
   const need = enrichNeed(e), have = toyPoints(e);
@@ -905,6 +911,7 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
+  if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
   if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
