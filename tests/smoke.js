@@ -3765,7 +3765,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const bare = habitatScore(aq).delta, m0 = state.money, okSea = !vivSceneProblem(aq, {sea:"paleozoic"}); setVivScene(aq, {sea:"paleozoic"});
       const home = habitatScore(aq).delta, fitHome = sceneFit(aq, sea); setVivScene(aq, {sea:"cambrian"}); const away = habitatScore(aq).delta;
       out.aquaBackdrops = pics && okSea && state.money < m0 && fitHome === 1 && sceneFit(aq, sea) === 0 && Math.abs(home - bare - VIV_PLANT.bonus) < .01 && away === bare
-        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.enal) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
+        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.kntr) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
         && !!vivSceneProblem(ev, {sea:"cambrian"}) && !!vivSceneProblem(aq, {era:"paleozoic", biome:"wetland"}) && vivScene34(aq, "wall").includes("sea-cambrian-L-wall")
         && aquaSceneHtml(aq).includes("aquaSceneSel") && exTabList(aq).some(t => t.key === "land");
       }

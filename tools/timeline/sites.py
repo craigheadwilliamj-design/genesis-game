@@ -79,7 +79,7 @@ SITES = {
     "whiteriver":  ("White River Badlands", "South Dakota, USA", 43.8, -102.3, 34, 30, ["hyae"]),
     "bugti":       ("Dera Bugti", "Balochistan, Pakistan", 29.0, 69.1, 28, 23.1, ["pcer"]),
     # Neogene
-    "pyramid":     ("Pyramid Hill", "Kern County, California, USA", 35.4, -118.9, 23, 22, ["enal"]),
+    "calvert":     ("Calvert Cliffs", "Chesapeake Bay, Maryland, USA", 38.5, -76.5, 16, 14, ["kntr"]),
     "agate":       ("Nebraska Miocene beds", "Agate Fossil Beds, Nebraska, USA", 42.4, -103.8, 22, 15, ["daeo", "aepy", "amph"]),
     "rusinga":     ("Rusinga Island", "Lake Victoria, Kenya", -0.4, 34.2, 18, 17, ["proc"]),
     "patagonia":   ("Santa Cruz and Collón Curá Formations", "Patagonia, Argentina", -45.0, -69.5, 18, 14, ["psil", "kele"]),
