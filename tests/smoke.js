@@ -3737,7 +3737,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = state.exhibits.filter(x => x !== pv);
 
       // pictures: the five old props and the new ones all come from sprites/viv through the pack, and the dish shows its food
-      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble"];
+      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble", "aboulder", "abrain", "acoral", "afan", "asponge", "akelp", "ashell"];
       picsEv.land = keys.map((k, i) => ({id:"pc" + i, type:k, x:196 + i * 1.5, y:300}));
       const svgp = landSvg(picsEv, null, () => false);
       out.vivSpritesDrawn = keys.every(k => VIV_SPRITES[k] && svgp.includes(`sprites/viv/${k}.png`)) && !svgp.includes("<circle") && Object.keys(VIV_SPRITES).length === keys.length;
@@ -3765,7 +3765,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const bare = habitatScore(aq).delta, m0 = state.money, okSea = !vivSceneProblem(aq, {sea:"paleozoic"}); setVivScene(aq, {sea:"paleozoic"});
       const home = habitatScore(aq).delta, fitHome = sceneFit(aq, sea); setVivScene(aq, {sea:"cambrian"}); const away = habitatScore(aq).delta;
       out.aquaBackdrops = pics && okSea && state.money < m0 && fitHome === 1 && sceneFit(aq, sea) === 0 && Math.abs(home - bare - VIV_PLANT.bonus) < .01 && away === bare
-        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
+        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.enal) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
         && !!vivSceneProblem(ev, {sea:"cambrian"}) && !!vivSceneProblem(aq, {era:"paleozoic", biome:"wetland"}) && vivScene34(aq, "wall").includes("sea-cambrian-L-wall")
         && aquaSceneHtml(aq).includes("aquaSceneSel") && exTabList(aq).some(t => t.key === "land");
       }
