@@ -7,6 +7,8 @@ lived there, rounded; for the Holocene they are in Ma too (0.000362 is 362 years
 SITES = {
     # Cambrian
     "burgess":     ("Burgess Shale", "British Columbia, Canada", 51.4, -116.5, 507, 505, ["anom", "opab", "olen"]),
+    # Ordovician
+    "anzaldo":     ("Anzaldo Formation", "Sacabamba, Cochabamba, Bolivia", -17.8, -65.4, 467, 460, ["saca"]),
     # Silurian
     "lesmahagow":  ("Lesmahagow Inlier", "South Lanarkshire, Scotland", 55.6, -3.9, 430, 427, ["ptry"]),
     # Devonian

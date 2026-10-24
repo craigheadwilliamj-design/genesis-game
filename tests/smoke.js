@@ -1596,7 +1596,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.grovesBrowse = share > 0 && share <= HAB.browseMax && withGroves < without && Math.abs(withGroves - without * (1 - share)) < 1e-6;
     out.treesFeedPlantsOnly = browseRate(gx, "plants") === 0 && browseRate(gx, "paleoflora") === 3 * LAND["jur-tropical-large"].browse;
     // plants per period and biome: three sizes each, no grassland before the Neogene, only in an exhibit of their biome, and they use Botany Lab stock of their era and size
-    const periods = Object.keys(ERA_OF).filter(p => PLANTS_OF[p]), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());   // the Cambrian and Silurian have no landscape plants
+    const periods = Object.keys(ERA_OF).filter(p => PLANTS_OF[p]), allKeys = periods.flatMap(p => Object.values(PLANTS_OF[p]).flat());   // the Cambrian, Ordovician and Silurian have no landscape plants
     out.plantsThree = periods.every(p => Object.values(PLANTS_OF[p]).every(k => k.length === 3 && k.map(x => LAND[x].size).join() === "small,medium,large"));
     out.plantsUnique = new Set(allKeys.map(k => LAND[k].label)).size === allKeys.length;
     out.plantsNoOldGrass = periods.filter(p => ERA_OF[p] !== "cenozoic" || p === "Paleogene").every(p => !PLANTS_OF[p].grassland) && !!PLANTS_OF.Neogene.grassland && !!PLANTS_OF.Quaternary.grassland;
@@ -2821,7 +2821,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
       events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
       const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
-      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator).id;
+      const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator && !s.viv).id;   // an open-exhibit herd: room matters there
       const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
       state.science.clones = []; state.science.ready = [];
       const dest = pen("e-sx0", []); state.exhibits = [dest];
@@ -3765,7 +3765,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const bare = habitatScore(aq).delta, m0 = state.money, okSea = !vivSceneProblem(aq, {sea:"paleozoic"}); setVivScene(aq, {sea:"paleozoic"});
       const home = habitatScore(aq).delta, fitHome = sceneFit(aq, sea); setVivScene(aq, {sea:"cambrian"}); const away = habitatScore(aq).delta;
       out.aquaBackdrops = pics && okSea && state.money < m0 && fitHome === 1 && sceneFit(aq, sea) === 0 && Math.abs(home - bare - VIV_PLANT.bonus) < .01 && away === bare
-        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.kntr) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
+        && seaSceneOf(sea) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.anom) === "cambrian" && seaSceneOf(SPECIES_BY_ID.saca) === "paleozoic" && seaSceneOf(SPECIES_BY_ID.prom) === "mesozoic" && seaSceneOf({period:"Neogene"}) === "cenozoic" && seaSceneOf(SPECIES_BY_ID.kntr) === "cenozoic" && SPECIES.filter(x => x.aqua).every(seaSceneOf)
         && !!vivSceneProblem(ev, {sea:"cambrian"}) && !!vivSceneProblem(aq, {era:"paleozoic", biome:"wetland"}) && vivScene34(aq, "wall").includes("sea-cambrian-L-wall")
         && aquaSceneHtml(aq).includes("aquaSceneSel") && exTabList(aq).some(t => t.key === "land");
       }
