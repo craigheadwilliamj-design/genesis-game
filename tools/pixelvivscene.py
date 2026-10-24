@@ -9,7 +9,7 @@ import sys, os, math, zlib, random
 from PIL import Image
 
 PX, TILT = .13, .7
-SIZES = {"S":(6, 4, .35), "M":(10, 6, .45), "L":(16, 10, .55)}   # w, d (VIVARIUMS) and sill height (VIV34 in map.js); the glass stands d * .45 tall
+SIZES = {"S":(9, 6, .35), "M":(15, 9, .45), "L":(24, 15, .55)}   # w, d (VIVARIUMS) and sill height (VIV34 in map.js); the glass stands d * .45 tall
 def dims(size):
     w, d, sill = SIZES[size]
     return round(w / PX), round((d * .45 - sill) / PX), round(d * TILT / PX)   # width, wall rows, floor rows

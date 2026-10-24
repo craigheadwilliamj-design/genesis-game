@@ -3703,6 +3703,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const od = up.exhibits.find(e => e.id === "e-od"), dishes = e => landOf(e).filter(f => f.type === "vdish");
       out.vivOldSaveDish = up.vivDish === 1 && dishes(od).length === 1 && dishes(od)[0].cap === VIV_DISH.cap.M && trayFood(od, ft) === 3 && up.exhibits.every(e => !e.viv || dishes(e).length === 1) && !Object.keys(od.stock).length
         && dishes(up2.exhibits.find(e => e.id === "e-od")).length === 1 && !vivNoDish(od);
+      // cases from before they grew: each grows to its size now, its front glass where it was, its fittings still inside
+      const sm = JSON.parse(JSON.stringify(newPark())); delete sm.vivBig;
+      sm.exhibits.push({id:"e-sm", name:"Small", points:rectPts(200, 270, 10, 6, 0), animals:[], happy:70, viv:"M", land:[{id:"l-sm", type:"vdish", x:203, y:272, cap:1, food:{}}]});
+      const smE = upgradeSave(sm).exhibits.find(e => e.id === "e-sm"), sb = bbox(smE.points), sb0 = bbox(rectPts(200, 270, 10, 6, 0));
+      out.vivGrewOldSave = sm.vivBig === 1 && Math.abs(sb.x1 - sb.x0 - VIVARIUMS.M.w) < .01 && Math.abs(sb.y1 - sb.y0 - VIVARIUMS.M.d) < .01 && Math.abs(sb.y1 - sb0.y1) < .01
+        && Math.abs((sb.x0 + sb.x1) - (sb0.x0 + sb0.x1)) < .01 && smE.land.every(f => inPoly(f.x, f.y, smE.points));
 
       // basking lamp: heat lovers get warmer and happier, less ill, it costs upkeep, and they gather under it
       const wantHeat = SPECIES_BY_ID.tikt, ok = wantsHeat(wantHeat) && !wantsHeat(SPECIES_BY_ID.ples) && !wantsHeat(SPECIES_BY_ID.arch);
