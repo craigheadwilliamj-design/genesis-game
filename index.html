@@ -298,7 +298,21 @@ dialog.pixed[open]{display:flex}
 /* ----- side panel ----- */
 /* The panel floats over the map beside the right column, and only shows while something is open */
 aside{position:absolute;top:12px;right:64px;width:370px;max-width:calc(100% - 140px);max-height:calc(100% - 24px);overflow:auto;background:var(--chrome);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);z-index:8;display:none}
-aside.open{display:block}
+aside.open{display:flex;flex-direction:column;overflow:hidden}
+aside .panel{flex:1;min-height:0;overflow:auto}
+/* The panel moves and resizes like a window: drag the top bar, pull any edge or corner. Not on phones, where it's a bottom sheet. */
+.sheet-head{cursor:move;touch-action:none;user-select:none;-webkit-user-select:none}
+.sheet-head .sheet-close{cursor:pointer}
+.rsz{position:absolute;z-index:3;touch-action:none}
+.rsz[data-rsz="n"],.rsz[data-rsz="s"]{left:10px;right:10px;height:8px;cursor:ns-resize}
+.rsz[data-rsz="e"],.rsz[data-rsz="w"]{top:10px;bottom:10px;width:8px;cursor:ew-resize}
+.rsz[data-rsz="n"]{top:-3px}.rsz[data-rsz="s"]{bottom:-3px}.rsz[data-rsz="e"]{right:-3px}.rsz[data-rsz="w"]{left:-3px}
+.rsz[data-rsz$="e"][data-rsz^="n"],.rsz[data-rsz$="e"][data-rsz^="s"],.rsz[data-rsz$="w"][data-rsz^="n"],.rsz[data-rsz$="w"][data-rsz^="s"]{width:16px;height:16px}
+.rsz[data-rsz="nw"]{top:-3px;left:-3px;cursor:nwse-resize}.rsz[data-rsz="se"]{bottom:-3px;right:-3px;cursor:nwse-resize}
+.rsz[data-rsz="ne"]{top:-3px;right:-3px;cursor:nesw-resize}.rsz[data-rsz="sw"]{bottom:-3px;left:-3px;cursor:nesw-resize}
+.rsz[data-rsz="se"]::after{content:"";position:absolute;right:6px;bottom:6px;width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);opacity:.55}
+aside.dragging,aside.resizing{user-select:none;-webkit-user-select:none}
+aside.dragging .sheet-head{cursor:grabbing}
 .sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
 .sheet-toggle{flex:1;min-width:0;font:600 12px/1 Barlow,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sheet-close{width:30px;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--chrome-2);font-size:14px;line-height:1}
@@ -515,6 +529,8 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .clockbox{min-width:110px}
   .speed button{min-height:32px;min-width:32px;padding:4px 7px}
   .hmenu{width:42px;padding:0 10px}
+  .rsz{display:none}
+  .sheet-head{cursor:default}
   aside{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:55%;border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.2);z-index:10}
   .tools{top:8px;left:8px}
   .lefttools{gap:8px}
@@ -961,8 +977,9 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     </div>
 
     <aside id="aside">
-      <div class="sheet-head"><span class="sheet-toggle" id="sheetToggle">Park office</span><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
+      <div class="sheet-head" title="Drag to move. Double-click to put it back."><span class="sheet-toggle" id="sheetToggle">Park office</span><button class="sheet-close" id="panelClose" aria-label="Close the panel" title="Close (Esc)">✕</button></div>
       <div class="panel" id="panel"></div>
+      <div class="rsz" data-rsz="n"></div><div class="rsz" data-rsz="s"></div><div class="rsz" data-rsz="e"></div><div class="rsz" data-rsz="w"></div><div class="rsz" data-rsz="ne"></div><div class="rsz" data-rsz="nw"></div><div class="rsz" data-rsz="se"></div><div class="rsz" data-rsz="sw"></div>
     </aside>
   </main>
 </div>

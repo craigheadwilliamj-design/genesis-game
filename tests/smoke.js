@@ -3015,6 +3015,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     q("#officeBtn").click(); out.officeBtnOpensOffice = !sel && officeTab === "office" && !!q("#officeName") && q("#aside").classList.contains("open") && !q("#dlgMenu");
     q("#officeBtn").click(); out.officeBtnClosesOffice = !q("#aside").classList.contains("open");
     setSpeed(2); q("#menuBtn").click(); out.menuBtnPausesOnMenu = officeTab === "menu" && speed === 0 && q("#aside").classList.contains("open");
+    { // the panel drags by its top bar, resizes from its edges (not below its minimum), and a double-click on the bar puts it back
+      openParkOffice(); const A = q("#aside"), r0 = A.getBoundingClientRect(), pe = (t, el, x, y) => el.dispatchEvent(new PointerEvent(t, {bubbles:true, clientX:x, clientY:y, button:0, pointerId:1}));
+      const hd = q(".sheet-toggle"), hr = hd.getBoundingClientRect();
+      pe("pointerdown", hd, hr.left + 5, hr.top + 5); pe("pointermove", window, hr.left - 95, hr.top + 45); pe("pointerup", window, hr.left - 95, hr.top + 45);
+      const r1 = A.getBoundingClientRect(), moved = Math.abs(r1.left - (r0.left - 100)) < 2 && Math.abs(r1.top - (r0.top + 40)) < 2 && Math.abs(r1.width - r0.width) < 2;
+      const se = q('[data-rsz="se"]'), sr = se.getBoundingClientRect();
+      pe("pointerdown", se, sr.left + 4, sr.top + 4); pe("pointermove", window, sr.left + 64, sr.top + 4 - 1000); pe("pointerup", window, sr.left + 64, sr.top - 996);
+      const r2 = A.getBoundingClientRect(), sized = Math.abs(r2.width - (r1.width + 60)) < 2 && Math.abs(r2.height - PANEL_MIN.h) < 2 && Math.abs(r2.left - r1.left) < 2;
+      const kept = JSON.parse(localStorage.getItem(PANEL_KEY) || "null");
+      q(".sheet-head").dispatchEvent(new MouseEvent("dblclick", {bubbles:true})); const r3 = A.getBoundingClientRect();
+      out.panelDragResize = moved && sized && !!kept && Math.round(kept.w) === Math.round(r2.width) && Math.abs(r3.left - r0.left) < 2 && Math.abs(r3.width - r0.width) < 2 && !localStorage.getItem(PANEL_KEY);
+    }
     q("#panelClose").click(); out.panelCloseResumes = speed === 2 && !q("#aside").classList.contains("open"); setSpeed(0);
     q('#rtools [data-dept="ghost"]').click(); out.deptBtnNeedsBuilding = hasDept("ghost") ? sel && selItem().type === "ghost" : !sel;
     select(null); openParkOffice();

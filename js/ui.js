@@ -65,9 +65,9 @@ const ui = {
     else if(sel.kind === "animal") h = animalHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
-    const sc = aside.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
+    const sc = panelEl.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
     panelEl.innerHTML = h;
-    aside.scrollTop = sc;
+    panelEl.scrollTop = sc;
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
@@ -959,6 +959,47 @@ panelEl.addEventListener("input", e => {
   if(e.target.dataset.field === "name" && it){ it.name = e.target.value.slice(0, 40) || (sel.kind === "zone" ? "Zone" : "Exhibit"); render(); $("#sheetToggle").textContent = it.name; saveSoon(); }
 });
 $("#panelClose").onclick = closePanel;
+
+/* ---------- moving and resizing the panel like a window ---------- */
+// Where it sits is a per-browser convenience (localStorage), never saved in the game. null is the default spot by the right column.
+const PANEL_MIN = {w:300, h:200}, PANEL_KEY = "genesis-panel";
+const panelNarrow = () => matchMedia("(max-width:760px)").matches;   // phones: a fixed bottom sheet
+let panelBox = null;   // {x, y, w, h} in px inside <main>
+try { const b = JSON.parse(localStorage.getItem(PANEL_KEY)); if(b && [b.x, b.y, b.w, b.h].every(Number.isFinite)) panelBox = b; } catch {}
+function placePanel(){
+  const s = aside.style;
+  if(!panelBox || panelNarrow()){ s.left = s.top = s.width = s.height = s.right = s.maxWidth = s.maxHeight = ""; return; }
+  const m = aside.parentElement.getBoundingClientRect(), b = panelBox;
+  b.w = Math.min(Math.max(b.w, PANEL_MIN.w), m.width); b.h = Math.min(Math.max(b.h, PANEL_MIN.h), m.height);
+  b.x = clamp(b.x, 0, m.width - b.w); b.y = clamp(b.y, 0, m.height - b.h);
+  Object.assign(s, {left:b.x + "px", top:b.y + "px", width:b.w + "px", height:b.h + "px", right:"auto", maxWidth:"none", maxHeight:"none"});
+}
+function savePanelBox(){ try { if(panelBox) localStorage.setItem(PANEL_KEY, JSON.stringify(panelBox)); else localStorage.removeItem(PANEL_KEY); } catch {} }
+aside.addEventListener("pointerdown", e => {
+  if(panelNarrow() || e.button) return;
+  const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button");
+  if(!grip && !head) return;
+  e.preventDefault();
+  const m = aside.parentElement.getBoundingClientRect(), r = aside.getBoundingClientRect(), dir = grip ? grip.dataset.rsz : "";
+  const st = {x:r.left - m.left, y:r.top - m.top, w:r.width, h:r.height}, cx = e.clientX, cy = e.clientY;
+  aside.classList.add(grip ? "resizing" : "dragging");
+  const move = ev => {
+    const dx = ev.clientX - cx, dy = ev.clientY - cy, b = {...st};
+    if(!dir){ b.x += dx; b.y += dy; }
+    if(dir.includes("e")) b.w = st.w + dx;
+    if(dir.includes("s")) b.h = st.h + dy;
+    // pulling the left or top edge keeps the opposite edge where it is
+    if(dir.includes("w")){ b.x = clamp(st.x + dx, 0, st.x + st.w - PANEL_MIN.w); b.w = st.x + st.w - b.x; }
+    if(dir.includes("n")){ b.y = clamp(st.y + dy, 0, st.y + st.h - PANEL_MIN.h); b.h = st.y + st.h - b.y; }
+    panelBox = b; placePanel();
+  };
+  const up = () => { removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up); aside.classList.remove("dragging", "resizing"); savePanelBox(); };
+  addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
+});
+// Double-click the top bar to put the panel back by the right column
+aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
+addEventListener("resize", placePanel);
+placePanel();
 
 // Setting what a food tray holds: changing it empties the tray
 panelEl.addEventListener("change", ev => {
