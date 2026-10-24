@@ -24,7 +24,7 @@ function uiedLoad(){
   try{ s = JSON.parse(localStorage.getItem(UIED_KEY) || "null"); }catch{}
   s = s && typeof s === "object" ? s : {};
   s.vars = s.vars || {}; s.vars.light = s.vars.light || {}; s.vars.dark = s.vars.dark || {};
-  s.rules = s.rules || {}; s.css = typeof s.css === "string" ? s.css : ""; s.regions = Array.isArray(s.regions) ? s.regions : [];
+  s.adds = Array.isArray(s.adds) ? s.adds : []; s.rules = s.rules || {}; s.css = typeof s.css === "string" ? s.css : ""; s.regions = Array.isArray(s.regions) ? s.regions : [];
   UIED.store = s;
 }
 function uiedSave(){ try{ localStorage.setItem(UIED_KEY, JSON.stringify(UIED.store)); }catch{} uiedApply(); }
@@ -32,6 +32,11 @@ function uiedIsDark(){
   const t = document.documentElement.dataset.theme;
   return t === "dark" || (t !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
 }
+const UIED_ADD_CSS = `.uied-add{box-sizing:border-box}
+.uied-addbar{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;margin:6px 0}
+.uied-addbar .meter{min-width:60px}
+.uied-addbadge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--forest);color:var(--on-forest)}
+.uied-adderr{color:var(--bad)}`;
 const uiedRuleText = (sel, o) => `${sel}{${Object.entries(o).map(([p, v]) => `${p}:${v} !important`).join(";")}}`;
 function uiedCss(forExport){
   const s = UIED.store, out = [];
@@ -46,6 +51,7 @@ function uiedCss(forExport){
   const rules = Object.entries(s.rules).filter(([, o]) => Object.keys(o).length);
   if(rules.length) out.push((forExport ? "/* Element edits (forced with !important so they win over inline styles) */\n" : "") + rules.map(([sel, o]) => uiedRuleText(sel, o)).join("\n"));
   if(s.css.trim()) out.push((forExport ? "/* Free CSS */\n" : "") + s.css.trim());
+  if(s.adds.length) out.push(forExport ? "/* Added elements. One per line, to build into the real UI:\n" + s.adds.map(a => JSON.stringify(a)).join("\n").replace(/\*\//g, "* /") + "\n*/" : UIED_ADD_CSS);
   return out.join("\n\n");
 }
 function uiedApply(){
@@ -178,6 +184,9 @@ function uiedBuild(){
 #uied .row>input[type=text],#uied .row>input:not([type]){flex:1}
 #uied .row.chg>label{color:#E9C766}
 #uied .x{padding:0 6px;color:#F2867D}
+#uied .uied-card{border:1px solid #3B4D5E;border-radius:6px;padding:6px 8px;margin:8px 0;background:#1B2835}
+#uied .uied-card .cnt{color:#8FA6BC}
+#uied .row>select{flex:1}
 #uied .hint{color:#8FA6BC;margin:4px 0}
 #uied .chips{display:flex;flex-wrap:wrap;gap:3px;margin:4px 0}
 #uied .chips button{padding:1px 6px;font-size:11px}
@@ -208,18 +217,18 @@ function uiedBuild(){
   });
   const win = uiedEl("uiedWin");
   win.addEventListener("keydown", e => e.stopPropagation());   // typing here is never a game hotkey
-  win.addEventListener("focusin", e => { if(e.target.matches("input,textarea,select")) uiedSnap(); });
+  win.addEventListener("focusin", e => { if(e.target.matches("input,textarea,select")) uiedSnap(); if(e.target.dataset.ad) UIED.lastIn = {ad:e.target.dataset.ad, f:e.target.dataset.f}; });
   win.addEventListener("click", uiedClick);
   win.addEventListener("input", uiedInput);
   win.addEventListener("change", uiedChange);
   win.addEventListener("keydown", uiedStep);
 }
-const UIED_TABS = [["pick", "Pick"], ["layout", "Layout"], ["colors", "Colors"], ["css", "CSS"], ["export", "Export"]];
+const UIED_TABS = [["pick", "Pick"], ["layout", "Layout"], ["add", "Add"], ["colors", "Colors"], ["css", "CSS"], ["export", "Export"]];
 function uiedRender(){
   if(!UIED.open) return;
   uiedEl("uiedTabs").innerHTML = UIED_TABS.map(([k, n]) => `<button data-a="tab" data-k="${k}" ${UIED.tab === k ? 'class="on"' : ""}>${n}</button>`).join("");
   const body = uiedEl("uiedBody"), keep = body.scrollTop;
-  body.innerHTML = ({pick:uiedPickHtml, layout:uiedLayoutHtml, colors:uiedColorsHtml, css:uiedCssHtml, export:uiedExportHtml})[UIED.tab]();
+  body.innerHTML = ({pick:uiedPickHtml, layout:uiedLayoutHtml, add:uiedAddTabHtml, colors:uiedColorsHtml, css:uiedCssHtml, export:uiedExportHtml})[UIED.tab]();
   body.scrollTop = keep;
   if(UIED.tab === "pick" && UIED.el) uiedLoadSource();
 }
@@ -318,6 +327,14 @@ function uiedClick(e){
     for(const [, s] of uiedRegions()){ const r = S.rules[s]; if(r){ delete r.translate; delete r.width; delete r.height; if(!Object.keys(r).length) delete S.rules[s]; } }
     uiedSave(); uiedRender();
   }
+  else if(a === "addnew"){ uiedSnap(); const id = "a" + Date.now().toString(36); S.adds.push({id, kind:b.dataset.k, target:UIED.sel || "", where:"end", text:b.dataset.k === "bar" ? "" : b.dataset.k === "html" ? "<b>Hello</b> {1 + 1}" : "Label {it && it.happy}", label:"Mood", expr:"it ? it.happy : 0", max:"100", color:"auto", style:""}); UIED.lastIn = null; uiedSave(); uiedAddsSync(); uiedRender(); }
+  else if(a === "addel"){ uiedSnap(); S.adds = S.adds.filter(x => x.id !== b.dataset.id); uiedSave(); uiedAddsSync(); uiedRender(); }
+  else if(a === "adduse"){ const ad = S.adds.find(x => x.id === b.dataset.id); if(ad && UIED.sel){ uiedSnap(); ad.target = UIED.sel; uiedSave(); uiedAddsSync(); uiedRender(); } else ui.toast("Pick something on the Pick tab first.", "bad"); }
+  else if(a === "addfield"){
+    const li = UIED.lastIn, inp = li && document.querySelector(`#uiedBody [data-ad="${li.ad}"][data-f="${li.f}"]`);
+    if(!inp){ ui.toast("Click into a Value, Max or Text field first."); return; }
+    uiedSnap(); inp.value = /^(expr|max)$/.test(li.f) ? b.dataset.e : inp.value + `{${b.dataset.e}}`; inp.dispatchEvent(new Event("input", {bubbles:true}));
+  }
   else if(a === "unvar"){ uiedSnap(); delete S.vars[uiedIsDark() ? "dark" : "light"][b.dataset.v]; uiedSave(); uiedRender(); }
   else if(a === "copy"){
     const t = uiedEl("uiedOut"); t.select();
@@ -331,6 +348,14 @@ function uiedClick(e){
 }
 function uiedInput(e){
   const t = e.target;
+  if(t.dataset.ad){
+    const ad = UIED.store.adds.find(x => x.id === t.dataset.ad); if(!ad) return;
+    ad[t.dataset.f] = t.value; uiedSave(); uiedAddsSync();
+    const pair = t.closest(".row").querySelector(t.dataset.sw ? "input:not([data-sw])" : "input[data-sw]");
+    if(pair && t.dataset.sw) pair.value = t.value; else if(pair){ const hx = uiedHex(t.value); if(hx) pair.value = hx; }
+    if(t.dataset.f === "target"){ const c = t.closest(".uied-card").querySelector(".cnt"); if(c) c.textContent = `${Math.max(uiedCount(t.value.trim()), 0)} found`; }
+    return;
+  }
   if(t.id === "uiedFree"){ UIED.store.css = t.value; uiedSave(); return; }
   if(t.id === "uiedSelIn"){ UIED.sel = t.value.trim(); const c = uiedEl("uiedCnt"); if(c) c.textContent = `${Math.max(uiedCount(UIED.sel), 0)} match`; return; }
   if(t.dataset.p){
@@ -349,6 +374,7 @@ function uiedInput(e){
   }
 }
 function uiedChange(e){
+  if(e.target.dataset.ad && e.target.tagName === "SELECT"){ uiedRender(); return; }
   if(e.target.id === "uiedCand"){ UIED.sel = e.target.value; uiedRender(); }
   else if(e.target.id === "uiedSelIn"){ uiedRender(); }
   else if(e.target.dataset.p || e.target.dataset.v) { const t = e.target; if(!t.value.trim()) uiedRender(); }
@@ -365,6 +391,99 @@ function uiedStep(e){   // up and down arrows nudge the number at the cursor
   t.value = s.slice(0, hit.index) + n + s.slice(hit.index + hit[0].length);
   t.setSelectionRange(hit.index, hit.index + String(n).length);
   t.dispatchEvent(new Event("input", {bubbles:true}));
+}
+
+
+/* ---------- added elements ---------- */
+// Bars, colored text, badges or raw HTML put next to (or inside) any element on screen. Panels redraw all the time,
+// so a MutationObserver puts them back before the next paint. Values are JS expressions: `it` is the picked item
+// (the open exhibit, building...), `state` and `derived` are the game's, `$el` is the element it sits by.
+const uiedFns = new Map();
+function uiedEval(src, $el){
+  try{
+    let f = uiedFns.get(src); if(!f){ f = new Function("it", "$el", "return (" + src + "\n)"); uiedFns.set(src, f); }
+    return {v:f(uiedItem(), $el)};
+  }catch(e){ return {err:String(e && e.message || e)}; }
+}
+function uiedItem(){ try{ return sel ? findItem(sel.kind, sel.id) : null; }catch{ return null; } }
+const uiedFmt = v => typeof v === "number" ? String(Math.round(v * 10) / 10) : String(v ?? "");
+function uiedTpl(t, $el, raw){
+  return String(t ?? "").split(/(\{[^{}]+\})/).map(p => {
+    if(!/^\{[^{}]+\}$/.test(p)) return raw ? p : esc(p);
+    const r = uiedEval(p.slice(1, -1), $el); return r.err ? `<span class="uied-adderr" title="${esc(r.err)}">⚠</span>` : esc(uiedFmt(r.v));
+  }).join("");
+}
+function uiedAddHtml(a, $el){
+  const st = a.style ? ` style="${esc(a.style)}"` : "", col = a.color && a.color !== "auto" ? a.color : "";
+  if(a.kind === "bar"){
+    const r = uiedEval(a.expr || "0", $el), m = uiedEval(a.max || "100", $el), mx = +m.v > 0 ? +m.v : 100, v = r.err ? 0 : +r.v || 0, pct = Math.max(0, Math.min(100, v / mx * 100));
+    const val = r.err ? `<span class="uied-adderr" title="${esc(r.err)}">⚠</span>` : mx === 100 ? Math.round(v) + "%" : `${uiedFmt(v)}/${uiedFmt(mx)}`;
+    return `<div class="uied-addbar"${st}>${a.label ? `<span>${esc(a.label)}</span>` : "<span></span>"}${meter(pct, col || happyColor(pct))}<span>${val}</span></div>`;
+  }
+  if(a.kind === "badge") return `<span class="uied-addbadge"${col ? ` style="background:${esc(col)};${esc(a.style || "")}"` : st}>${uiedTpl(a.text, $el)}</span>`;
+  if(a.kind === "html") return `<div${st}>${uiedTpl(a.text, $el, true)}</div>`;
+  return `<span${col || a.style ? ` style="${col ? "color:" + esc(col) + ";" : ""}${esc(a.style || "")}"` : ""}>${uiedTpl(a.text, $el)}</span>`;
+}
+let uiedBusy = false;
+function uiedAddsSync(){
+  if(uiedBusy) return; uiedBusy = true;
+  try{
+    const on = devMode() ? UIED.store.adds : [], keep = new Set();
+    for(const a of on){
+      if(!a.target) continue;
+      let els = []; try{ els = [...document.querySelectorAll(a.target)].filter(e => !e.closest("#uied") && !e.closest("[data-uied-add]")).slice(0, 30); }catch{}
+      for(const t of els){
+        const w = a.where || "end";
+        let m = w === "before" ? t.previousElementSibling : w === "after" ? t.nextElementSibling : [...t.children].find(c => c.dataset.uiedAdd === a.id && (w === "start" ? c === t.firstElementChild : true));
+        if(!(m && m.dataset.uiedAdd === a.id)){
+          m = document.createElement("div"); m.dataset.uiedAdd = a.id; m.className = "uied-add"; m.style.display = "contents";
+          if(w === "before") t.before(m); else if(w === "after") t.after(m); else if(w === "start") t.prepend(m); else t.append(m);
+        }
+        keep.add(m);
+        const h = uiedAddHtml(a, t); if(m.dataset.h !== h){ m.dataset.h = h; m.innerHTML = h; }
+      }
+    }
+    document.querySelectorAll("[data-uied-add]").forEach(m => { if(!keep.has(m)) m.remove(); });
+  }finally{ uiedBusy = false; if(uiedObs) uiedObs.takeRecords(); }
+}
+let uiedObs = null, uiedTimer = 0;
+function uiedAddsStart(){
+  if(uiedObs) return;
+  uiedObs = new MutationObserver(recs => {
+    if(!UIED.store.adds.length && !document.querySelector("[data-uied-add]")) return;
+    if(recs.every(r => r.target.closest && r.target.closest("#map, #uied, #uiedLive"))) return;
+    uiedAddsSync();
+  });
+  uiedObs.observe(document.body, {childList:true, subtree:true});
+  uiedTimer = setInterval(() => { if(UIED.store.adds.length || document.querySelector("[data-uied-add]")) uiedAddsSync(); }, 300);
+}
+const UIED_ADD_KINDS = [["bar", "Bar"], ["text", "Text"], ["badge", "Badge"], ["html", "HTML"]];
+function uiedAddTabHtml(){
+  const S = UIED.store;
+  let h = `<p class="hint">Put new things into the game: a bar, colored text, a badge, or your own HTML. Each shows up next to whatever its target selector matches, and stays put when the panel redraws. Values are small JS expressions. <code>it</code> is what's open in the game (an exhibit, a building…), and <code>state</code> works too.</p>
+    <div class="row">${UIED_ADD_KINDS.map(([k, n]) => `<button data-a="addnew" data-k="${k}">+ ${n}</button>`).join("")}</div>
+    <div class="hint">New ones go by the selector chosen on the Pick tab${UIED.sel ? `: <code>${esc(UIED.sel)}</code>` : " (pick something first, or type a selector in the card)"}.</div>`;
+  for(const a of S.adds){
+    const f = (k, ph) => `data-ad="${a.id}" data-f="${k}" value="${esc(a[k] ?? "")}" placeholder="${esc(ph || "")}" spellcheck="false"`;
+    let n = 0; try{ n = a.target ? document.querySelectorAll(a.target).length : 0; }catch{ n = -1; }
+    h += `<div class="uied-card"><div class="row"><b style="flex:1">${esc((UIED_ADD_KINDS.find(k => k[0] === a.kind) || [0, a.kind])[1])}</b><button class="x" data-a="addel" data-id="${a.id}" title="Delete">×</button></div>
+      <div class="row"><label>Put it by</label><input ${f("target", "selector")}><button data-a="adduse" data-id="${a.id}" title="Use the selector from the Pick tab">←</button></div>
+      <div class="row"><label>Where</label><select data-ad="${a.id}" data-f="where">${[["end", "Inside, at the end"], ["start", "Inside, at the start"], ["before", "Before it"], ["after", "After it"]].map(([v, t]) => `<option value="${v}" ${a.where === v ? "selected" : ""}>${t}</option>`).join("")}</select><span class="cnt hint">${n} found</span></div>`;
+    if(a.kind === "bar") h += `<div class="row"><label>Label</label><input ${f("label", "e.g. Happiness")}></div><div class="row"><label>Value</label><input ${f("expr", "e.g. it.happy")}></div><div class="row"><label>Out of</label><input ${f("max", "100")}></div>`;
+    else if(a.kind === "html") h += `<div class="row"><textarea style="min-height:70px" data-ad="${a.id}" data-f="text" spellcheck="false">${esc(a.text)}</textarea></div><div class="hint">Put expressions in braces, like {Math.round(it.happy)}.</div>`;
+    else h += `<div class="row"><label>Text</label><input ${f("text", "Mood: {it.happy}%")}></div>`;
+    h += `<div class="row"><label>Color</label><input type="color" data-ad="${a.id}" data-f="color" data-sw="1" value="${uiedHex(a.color) || "#2f7d4a"}"><input ${f("color", "auto")}></div>
+      <div class="row"><label>Extra CSS</label><input ${f("style", "font-weight:700; margin-top:6px")}></div></div>`;
+  }
+  // what's on the open item, for filling in values
+  const it = uiedItem();
+  h += `<h4>Fields on what's open in the game</h4>`;
+  if(!it) h += `<div class="hint">Nothing is picked in the game. Close Pick mode, click an exhibit or building, and come back. Click a field to put it in the value you last clicked into.</div>`;
+  else {
+    const rows = Object.entries(it).filter(([, v]) => typeof v === "number" || typeof v === "string" || typeof v === "boolean").slice(0, 60);
+    h += `<div class="hint"><code>${esc(sel.kind)}</code>, click a field to use it.</div>` + rows.map(([k, v]) => `<pre class="pick" data-a="addfield" data-e="it.${esc(k)}">it.${esc(k)} = ${esc(typeof v === "number" ? uiedFmt(v) : JSON.stringify(v).slice(0, 40))}</pre>`).join("");
+  }
+  return h;
 }
 
 /* ---------- pick and layout modes ---------- */
@@ -460,7 +579,7 @@ function uiedClose(){
 function uiedSync(){
   const b = uiedEl("uiedBtn"); if(b) b.hidden = !devMode();
   if(!devMode()) uiedClose();
-  uiedApply();
+  uiedApply(); uiedAddsSync();
 }
 {
   uiedLoad();
@@ -471,5 +590,6 @@ function uiedSync(){
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", uiedApply);
   const b = uiedEl("uiedBtn");
   if(b) b.onclick = () => UIED.open ? uiedClose() : uiedOpen();
+  uiedAddsStart();
   uiedSync();
 }

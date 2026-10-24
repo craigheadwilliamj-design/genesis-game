@@ -3821,6 +3821,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     uiedUndo(); out.uiEditorUndo = !UIED.store.rules["#money"];
     UIED.store.rules["#money"] = {"font-size": "31px"}; uiedSave(); devFlag = false; uiedSync();
     out.uiEditorDevOnly = document.getElementById("uiedLive").textContent === "" && document.querySelector("#uiedBtn").hidden && !UIED.open;
+    // added elements come back after a redraw, take values from `it`, and go away with dev mode
+    devFlag = true; UIED.store.adds = [{id:"smk", kind:"bar", target:"#panel", where:"end", label:"Cash", expr:"state.money / 1500", max:"100", color:"auto", text:"", style:""}];
+    uiedAddsSync(); const addN = () => document.querySelectorAll("#panel [data-uied-add=smk]").length;
+    const added = addN() === 1 && /Cash/.test(document.querySelector("#panel [data-uied-add=smk]").textContent);
+    document.querySelector("#panel").innerHTML = "<p>redrawn</p>"; uiedAddsSync();
+    const back = addN() === 1; devFlag = false; uiedSync();
+    out.uiEditorAddedElements = added && back && addN() === 0;
     UIED.store = JSON.parse(uiBefore); uiedSave(); UIED.stack = []; devFlag = null;
     return out;
   }, coelRig));
