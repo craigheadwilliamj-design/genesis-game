@@ -3492,6 +3492,8 @@ $("#sideMenu").addEventListener("click", e => {
   const b = e.target.closest("button"); if(!b) return;
   if(b.matches(".tbtn[data-cat]")){ sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat); return; }
   if(b.id === "supplyBtn"){ supplyOn = !supplyOn; b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On" : "Off"; render(); return; }
+  // picking a plain tool row closes any open sub-list (a biome's plants, say), so its own shape picker shows instead
+  if(!b.matches(".srow.head") && b.closest(".trayA")) b.closest(".trayA").querySelectorAll(".sitem.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
   if(b.dataset.fence){ fenceSel = b.dataset.fence; setTool("exhibit"); return; }
   // a Water or Paint Ground row picks its type and turns the tool on; tapping the pressed one again goes back to Select
   if(b.dataset.water || b.dataset.paint){
