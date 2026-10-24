@@ -20,6 +20,10 @@ const guestCount = () => parties.reduce((s, p) => s + p.n, 0);
 const guestBuilding = b => !!(BUILDINGS[b.type].serves || BUILDINGS[b.type].kind);
 const NO_THOUGHT = {hunger:"noFood", thirst:"noDrink", bladder:"noRestroom", energy:"noSeat"};
 function freshGuestLog(){ return {thoughts:{}, guests:0, mood:null, edu:null, vandal:freshVandalLog(), last:{thoughts:{}, guests:0}}; }
+// One exhibit's guest day: visitors who stopped to watch, donations from what they learned here, and what it made them think
+function freshExLog(){ return {views:0, gifts:0, thoughts:{}, last:{views:0, gifts:0, thoughts:{}}}; }
+const exLog = e => e.glog || (e.glog = freshExLog());
+let seeingEx = null;   // the exhibit a party is looking at while seeExhibit runs, so its thoughts are filed under it
 
 /* ---------- the guests' map of footpaths ---------- */
 
@@ -188,9 +192,21 @@ function guestsArrive(n){
   const p = parties[parties.length - 1 - Math.floor(Math.random() * Math.min(50, parties.length))];
   p.n += n; p.cash += n * rand(...GUEST.cash);
 }
-function thinks(p, k){ p.thought.add(k); }
-// A party learns something. Learning is per guest, 0 to 100, and cheers them up as it comes.
-function learn(p, n){ const g = clamp(n * pm(p, "learn"), 0, 100 - (p.edu || 0)); p.edu = (p.edu || 0) + g; p.mood += g * EDU.joy; }
+function thinks(p, k){
+  p.thought.add(k);
+  if(seeingEx && !seeingEx.th.has(k)){ seeingEx.th.add(k); const L = exLog(seeingEx.e); L.thoughts[k] = (L.thoughts[k] || 0) + p.n; }
+}
+// A party learns something. Learning is per guest, 0 to 100, and cheers them up as it comes. Learning at an exhibit is remembered for its donations.
+function learn(p, n, e){
+  const g = clamp(n * pm(p, "learn"), 0, 100 - (p.edu || 0)); p.edu = (p.edu || 0) + g; p.mood += g * EDU.joy;
+  if(e && g > 0) (p.learnAt || (p.learnAt = {}))[e.id] = (p.learnAt[e.id] || 0) + g;
+}
+// Share a party's donation among the exhibits it learned at, by how much it learned at each
+function creditGifts(p, g){
+  const at = p.learnAt, tot = at ? Object.values(at).reduce((s, v) => s + v, 0) : 0;
+  if(!tot) return;
+  for(const [id, v] of Object.entries(at)){ const e = state.exhibits.find(x => x.id === id); if(e) exLog(e).gifts += g * v / tot; }
+}
 // A party walks out of the gate. How it feels now counts toward the day's guest comfort.
 function partyLeaves(p){
   if(p.gone) return;
@@ -204,7 +220,7 @@ function partyLeaves(p){
   t.eduSum += edu * p.n; t.eduN += p.n;
   if(edu >= EDU.learned) thinks(p, "learned");
   // guests who learned something drop a little in the donation box
-  if(edu > 0) earn(p.n * EDU.donate * edu / 100 * pm(p, "donate"), "donations");
+  if(edu > 0){ const g = p.n * EDU.donate * edu / 100 * pm(p, "donate"); earn(g, "donations"); creditGifts(p, g); }
   // and educated guests fund science
   if(edu > 0 && dept("oracle")) state.science.points += p.n * RESEARCH_GUEST * edu / 100;
   L.guests += p.n;
@@ -520,6 +536,11 @@ function seeExhibit(p, e, quick){
   if(p.seen.has(e.id)) return;
   p.seen.add(e.id);
   if(!e.animals.length) return;
+  exLog(e).views += p.n;
+  seeingEx = {e, th:new Set()};
+  try { lookAt(p, e, quick); } finally { seeingEx = null; }
+}
+function lookAt(p, e, quick){
   const a = exhibitAppeal(e), bother = hideBother(p, e);   // animals that are all indoors let a visit down (educated guests, paleo-nerds and conservationists forgive it)
   // stop and watch for a while: longer for a bigger draw
   if(!quick){ p.lingerAt = e.id; p.watch = {id:e.id}; }
@@ -535,7 +556,7 @@ function seeExhibit(p, e, quick){
   else if(play / n >= .3){ thinks(p, "playful"); p.mood += 2; }
   // what they learn: a little from looking, a lot more with an info sign to read, and more again with a field guide
   const sign = hasSign(e);
-  learn(p, (EDU.see + (sign ? EDU.sign * (1 + speciesCounts(e).size * .25) : 0)) * (p.guide ? EDU.guideBoost : 1));
+  learn(p, (EDU.see + (sign ? EDU.sign * (1 + speciesCounts(e).size * .25) : 0)) * (p.guide ? EDU.guideBoost : 1), e);
   if(!sign && (p.noSign = (p.noSign || 0) + 1) >= EDU.noInfo) thinks(p, "noInfo");
 }
 // Is there a working info sign by this exhibit's fence?
@@ -701,6 +722,13 @@ function guestsNight(){
   if(t.eduN) L.edu = t.eduSum / t.eduN;
   L.last = {thoughts:L.thoughts, guests:L.guests, vandal:L.vandal};
   L.thoughts = {}; L.guests = 0; L.vandal = freshVandalLog();
+  for(const e of state.exhibits){ const X = exLog(e); X.last = {views:X.views, gifts:X.gifts, thoughts:X.thoughts}; X.views = 0; X.gifts = 0; X.thoughts = {}; }
+}
+// What visitors thought of one exhibit, most common first, as a share of its visitors. Falls back to yesterday before anyone has looked today.
+function exThoughts(e, n){
+  const X = exLog(e), use = X.views ? X : X.last;
+  return Object.entries(use.thoughts).filter(([k]) => THOUGHTS[k]).map(([k, v]) => ({k, share:Math.min(1, v / Math.max(1, use.views)), ...THOUGHTS[k]}))
+    .sort((a, b) => b.share - a.share).slice(0, n);
 }
 function resetParties(){ parties = []; svcQ = new Map(); arrivalCarry = 0; }
 

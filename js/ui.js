@@ -237,24 +237,33 @@ panelEl.addEventListener("change", ev => {
 
 /* ---------- an exhibit ---------- */
 const exTabs = {ex:null, tab:"main", period:null};   // which tab the exhibit panel shows
+// The exhibit panel's tabs, in order. A vivarium has no fence, and its Landscaping and Habitat Items are its scene and fittings.
+const exTabList = e => [{key:"main", label:"Overview", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"barrier", label:"Barrier", color:"#6E737A"}],
+  [{key:"land", label:"Landscaping", color:"#7A6A58"}, {key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
+   {key:"health", label:"Health", color:"#B3261E"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"guests", label:"Guests", color:"#B8860B"}]);
 function exhibitHtml(e){
-  const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e);
+  const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e), n = e.animals.length;
+  if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
+  const tabs = exTabList(e);
+  if(!tabs.some(t => t.key === exTabs.tab)) exTabs.tab = "main";
+  // the header shows on every tab: name, and the few things worth seeing at a glance
   let h = `<button class="back" data-action="deselect">‹ Park office</button>`;
   h += `<label class="field"><span>Exhibit name</span><input id="exName" data-field="name" value="${esc(e.name)}" maxlength="40"></label>`;
-  h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span><span class="meta">${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
-  if(e.viv) h += `<div class="meta">Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.</div>`;
+  h += `<div class="row exhead"><span class="status ${reach ? "ok" : "no"}">${reach ? "Guests can see it" : "No path reaches it"}</span>`;
+  if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
+  h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? VIVARIUMS[e.viv].label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   if(!reach) h += `<div class="meta">Draw a path from the entrance (or another connected path) up to this exhibit's fence.</div>`;
-  if(exTabs.ex !== e.id){ exTabs.ex = e.id; exTabs.tab = "main"; }
-  h += `<div style="margin:8px 0">${tabBar("extab", [{key:"main", label:"Exhibit", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"land", label:"Landscape Needs", color:"#7A6A58"}, {key:"props", label:"Habitat Props", color:"#8C6A2E"}], [{key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"animals", label:"Animals", color:"#4E7F2E"}, {key:"health", label:"Health", color:"#B3261E"}]), exTabs.tab)}</div>`;
-  if((exTabs.tab === "land" || exTabs.tab === "props") && e.viv) exTabs.tab = "main";
-  if(exTabs.tab === "land") return h + `${landHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "props") return h + `${propsHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "behave") return h + `${behaviorHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "animals") return h + `${animalsTabHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "clone") return h + `${cloneHtml(e, rep)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-  if(exTabs.tab === "health") return h + `${dirtHtml(e)}${healthHtml(e)}<div class="row"><button class="btn" data-action="center">Center on map</button></div>`;
-
+  h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => (x.viv ? vivSceneHtml(x) : landHtml(x)) + themeHtml("exhibit", x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+    animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
+  h += body;
+  return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
+}
+// A link in the Overview that opens another tab
+const exJump = (k, label, level, text) => `<li class="${level}"><button class="exjump" data-action="extab" data-k="${k}"><b>${label}</b><span>${text}</span><span class="meta">›</span></button></li>`;
+function exOverviewHtml(e, rep){
   const n = e.animals.length;
+  let h = "";
   if(n){
     const trend = rep.target - e.happy;
     h += `<section><h3>Happiness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(e.happy, happyColor(e.happy))}</span><span>${Math.round(e.happy)}%</span></div>
@@ -262,53 +271,87 @@ function exhibitHtml(e){
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
-      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div>
-      <div class="meta" style="margin-top:4px">${hasSign(e) ? "" : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</div></section>`;
+      <div class="meta" style="margin-top:4px">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
+  } else {
+    h += `<section><h3>Empty</h3><div class="meta">${e.viv ? `Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}. ` : ""}No animals live here yet. Clones and animals from partner parks move in from the Cloning tab.</div>
+      <div class="row" style="margin-top:6px"><button class="btn" data-action="extab" data-k="clone">Add animals</button></div></section>`;
   }
 
-  // barriers, moats, and aviary netting
+  // one line per other tab that needs a look
+  const rows = [];
   if(!e.viv){
-    h += `<section><h3>Barrier</h3>`;
-    const kc = knownCond(e), since = daysSinceInspect(e);
-    h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(kc, kc >= 60 ? "var(--good)" : kc >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(kc)}%</span></div>`;
-    const notes = [];
-    if(e.open) notes.push(["bad", "There's a gap in the fence. Animals can walk out until you close it."]);
-    else if(isBreached(e)) notes.push(["bad", "Broken. Animals can walk out until a mechanic repairs it."]);
-    notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
-    h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
-    h += `<div class="meta" style="margin-top:6px">Guest appeal: ${Math.round(viewFactor(e, derived.reach) * 100)}%</div>`;
-    h += `<div class="row" style="margin-top:8px">`;
-    h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at the Research Lab</span>`;
-    h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at the Research Lab</span>`;
-    h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at the Research Lab</span>`;
-    h += `</div>`;
-    const plats = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
-    h += `<div class="meta" style="margin-top:6px">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}. ` : ""}${hasTech("platform") ? ` <button class="btn" data-action="platformTool" style="padding:3px 9px">Add a viewing platform</button>` : ""}</div>`;
-    h += `</section>`;
+    const kc = knownCond(e), since = daysSinceInspect(e), broke = e.open || isBreached(e);
+    rows.push(exJump("barrier", "Barrier", broke || kc < 30 ? "bad" : kc < 60 || since >= MAINT.inspectEvery ? "warn" : "", esc(e.open ? "There's a gap in the fence." : broke ? "Broken." : `${Math.round(kc)}% condition${since >= 99 ? ", never inspected" : ""}.`)));
   }
-
-  if(e.viv) h += vivSceneHtml(e) + vivToysHtml(e);
-
-  h += themeHtml("exhibit", e);
-
+  if(n){
+    const hr = healthReport(e), worst = hr.sick.length ? Math.max(...hr.sick.map(a => a.sick.sev)) : 0, dirt = e.dirt || 0;
+    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Everyone looks healthy"}, ${Math.round(100 - dirt)}% clean.`)));
+    const X = exLog(e);
+    rows.push(exJump("guests", "Guests", isReachable(e) ? "" : "bad", esc(isReachable(e) ? `${Math.round(X.views)} visitor${Math.round(X.views) === 1 ? "" : "s"} today, ${money(Math.round(X.gifts))} in donations.` : "No path reaches it.")));
+  }
+  if(rows.length) h += `<section><h3>At a glance</h3><ul class="issues exglance">${rows.join("")}</ul></section>`;
 
   // food and keeper access
   const g = gateCheck(e), need = dailyNeed(e);
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? (e.viv ? "Keepers can reach it" : "Keeper gate works") : "Keepers can't get in"}</span></div><div class="meta" style="margin-top:4px">${esc(g.text)}</div>${dishText(e) ? `<div class="row" style="margin-top:4px"><span class="status no">${esc(dishText(e))}</span></div>` : ""}`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
-  for(const kind of e.viv ? ["keeper", "vet"] : ["keeper", "vet", "mech"]){
-    const K = CALLS[kind], why = callProblem(e, kind), called = state.staff.calls.find(x => x.ex === e.id && callKind(x) === kind), w = called && called.keeper && K.staff().find(x => x.id === called.keeper);
-    h += `<div class="row" style="margin-top:6px">${called ? `<span class="status ok">${w ? esc(w.name) + " is on the way" : "Waiting for a free " + K.word}</span><button class="btn" data-action="cancelCall" data-kind="${kind}">Cancel</button>` : `<button class="btn" data-action="callKeeper" data-kind="${kind}"${why ? ` disabled title="${esc(why)}"` : ""}>Call ${K.word}</button><span class="meta">${why ? esc(why) : kind === "keeper" ? "Nearest keeper drops what they're doing to check here." : kind === "vet" ? "A vet checks the animals and sees to the sick ones first." : "A mechanic inspects and repairs the fence now."}</span>`}</div>`;
-  }
+  h += callRow(e, "keeper");
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">They eat ${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(" and ")} a day.${freeFeeding() ? ` Partner parks feed them until ${fmtDate(state.staff.feedFrom)}.` : ""}</div>`;
   }
-  h += `</section>`;
-
-  h += `<div class="row"><button class="btn" data-action="center">Center on map</button><button class="btn danger" data-action="demolish">Bulldoze exhibit</button></div>`;
-  return h;
+  return h + `</section>`;
+}
+// Call a keeper, vet or mechanic to this exhibit, or cancel the call
+function callRow(e, kind){
+  const K = CALLS[kind], why = callProblem(e, kind), called = state.staff.calls.find(x => x.ex === e.id && callKind(x) === kind), w = called && called.keeper && K.staff().find(x => x.id === called.keeper);
+  return `<div class="row" style="margin-top:6px">${called ? `<span class="status ok">${w ? esc(w.name) + " is on the way" : "Waiting for a free " + K.word}</span><button class="btn" data-action="cancelCall" data-kind="${kind}">Cancel</button>` : `<button class="btn" data-action="callKeeper" data-kind="${kind}"${why ? ` disabled title="${esc(why)}"` : ""}>Call ${K.word}</button><span class="meta">${why ? esc(why) : kind === "keeper" ? "Nearest keeper drops what they're doing to check here." : kind === "vet" ? "A vet checks the animals and sees to the sick ones first." : "A mechanic inspects and repairs the fence now."}</span>`}</div>`;
+}
+// Barrier tab: the fence's state, the mechanic, and moats and netting
+function exBarrierHtml(e){
+  const kc = knownCond(e), since = daysSinceInspect(e);
+  let h = `<section><h3>Fence</h3><div class="factor" style="grid-template-columns:80px 1fr 44px"><span>Condition</span>${meter(kc, kc >= 60 ? "var(--good)" : kc >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(kc)}%</span></div>`;
+  const notes = [];
+  if(e.open) notes.push(["bad", "There's a gap in the fence. Animals can walk out until you close it."]);
+  else if(isBreached(e)) notes.push(["bad", "Broken. Animals can walk out until a mechanic repairs it."]);
+  notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
+  h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
+  h += callRow(e, "mech") + `</section>`;
+  h += `<section><h3>Extra security</h3><div class="row">`;
+  h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at the Research Lab</span>`;
+  h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at the Research Lab</span>`;
+  h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at the Research Lab</span>`;
+  return h + `</div></section>`;
+}
+// Health tab: sanitation, the animals' health, and the vet
+function exHealthHtml(e){
+  const h = dirtHtml(e) + healthHtml(e);
+  return (h || `<section><h3>Health</h3><div class="meta">No animals here yet.</div></section>`) + `<section><h3>Vet</h3>${callRow(e, "vet")}</section>`;
+}
+// 1st, 2nd, 3rd, 4th...
+const ordinal = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+// Guests tab: how much guests want to see it, how many came, what they gave and what they thought
+function exGuestsHtml(e){
+  const X = exLog(e), a = exhibitAppeal(e), ranked = state.exhibits.filter(x => x.animals.length).map(x => [x, exhibitAppeal(x)]).sort((p, q) => q[1] - p[1]);
+  const rank = ranked.findIndex(([x]) => x === e) + 1, view = Math.round(viewFactor(e, derived.reach) * 100);
+  let h = `<section><h3>Guest appeal</h3>`;
+  h += e.animals.length ? `<div class="meta">${rank === 1 && ranked.length > 1 ? "The biggest draw in the park." : ranked.length > 1 ? `${ordinal(rank)} biggest draw of ${ranked.length} exhibits with animals.` : "The only exhibit with animals."} Bigger and rarer animals, and happier ones, draw more guests.</div>`
+    : `<div class="meta">Guests only stop at an exhibit with animals in it.</div>`;
+  if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div><div class="meta" style="margin-top:4px">How well guests can see in past the fence. Viewing platforms raise it.</div>`;
+  const plats = e.viv ? 0 : state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
+  if(!e.viv && (plats || hasTech("platform"))) h += `<div class="row" style="margin-top:6px"><span class="meta">${plats ? `${plats} viewing platform${plats === 1 ? "" : "s"}.` : "No viewing platforms."}</span>${hasTech("platform") ? `<button class="btn" data-action="platformTool">Add a viewing platform</button>` : ""}</div>`;
+  h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Has an info sign, so guests learn far more here." : `No info sign. Put one beside the path within ${EDU.signReach} m of the fence and guests will learn far more here.`}</li></ul></section>`;
+  const day = (v, w) => `<div class="factor exday"><span>${v}</span>${w}</div>`;
+  h += `<section><h3>Visitors</h3>${day("", `<span class="meta">Today</span><span class="meta">Yesterday</span>`)}`;
+  h += day("Stopped to watch", `<span>${Math.round(X.views)}</span><span>${Math.round(X.last.views)}</span>`);
+  h += day("Donations", `<span>${money(Math.round(X.gifts))}</span><span>${money(Math.round(X.last.gifts))}</span>`);
+  h += `<div class="meta" style="margin-top:4px">Donations are what guests gave on the way out, shared among the exhibits by how much they learned at each.</div></section>`;
+  const th = exThoughts(e, 8);
+  h += `<section><h3>Guest thoughts</h3>`;
+  h += th.length ? `<ul class="issues">${th.map(t => `<li class="${t.good ? "" : "bad"}"><span>"${esc(t.text)}" <span class="meta">${Math.max(1, Math.round(t.share * 100))}%</span></span></li>`).join("")}</ul><div class="meta" style="margin-top:6px">Share of ${X.views ? "today's" : "yesterday's"} visitors who thought it here.</div>`
+    : `<div class="meta">${!e.animals.length ? "Nobody stops at an empty exhibit." : !isReachable(e) ? "Guests can't reach it yet." : "No visitors yet today."}</div>`;
+  return h + `</section>`;
 }
 
 // Cloning tab: finished clones waiting for a home, and species with a complete genome, by period
@@ -409,7 +452,7 @@ function needsHtml(e){
   return `<div style="margin-top:6px">${body}</div>`;
 }
 
-// Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Props tab)
+// Water, rocks and groves in one exhibit, and buttons to add more (barns are in the Habitat Items tab)
 const ROCKS = ["rock", "boulder"];
 const landLock = t => t.tech && !hasTech(t.tech) ? "Research at the Research Lab first." : potKey(t) && potsHave(t) < 1 ? `Needs ${potName(t)} from the Botany Lab.` : t.ceres && state.ceres.stock < t.ceres ? `Takes ${t.ceres} Paleoflora from the Botany Lab.` : "";
 const landTabs = {ex:null, biome:null, period:null, sub:"plants"};   // which biome and period tab the plant list shows
@@ -442,7 +485,7 @@ function propsHtml(e){
   const btnsFor = (list, tip, extra) => list.map(k => { const t = LAND[k], why = landLock(t), img = thumb(k), more = extra ? extra(t) : t.tray ? `${t.tray} units` : "", title = why || (tip ? tip(k) : "");
     return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:4px 9px;display:inline-flex;align-items:center;gap:6px"${title ? ` title="${esc(title)}"` : ""}${why ? " disabled" : ""}>${img ? `<img src="${spriteUrl(img)}" alt="" style="height:30px;max-width:64px;object-fit:contain;image-rendering:pixelated">` : ""}<span>${esc(t.label)}<br><small>${money(t.price)}${more ? ` · ${more}` : ""}</small></span></button>`; }).join("");
   const haveText = list => { const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c); return have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}.` : "None here yet."; };
-  let h = `<section><h3>Habitat props</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
+  let h = `<section><h3>Habitat items</h3>${tabBar("psub", [{key:"shelters", label:"Shelters", color:"#8C6A2E"}, {key:"trays", label:"Food Trays", color:"#6E737A"}, {key:"toys", label:"Enrichment", color:"#7A5A3A"}], sub)}`;
   if(sub === "toys"){
     const list = HABITAT_PROPS.filter(k => isToy(k) && !toyHidden(k)), counts = devMode() ? speciesCounts(e) : [];
     h += `<div class="meta" style="margin-top:6px">${haveText(list)} Toys keep animals busy so they don't pace. Hover a button for what it does.</div>`;
@@ -480,7 +523,7 @@ function behaviorHtml(e){
   const ctx = behaviorCtx(e), en = Math.round(ctx.enrich * 100), col = v => v < 35 ? "var(--good)" : v < 65 ? "var(--warn)" : "var(--bad)";
   let h = `<section><h3>Behavior</h3><div class="meta">Right now: ${esc(actsSummary(e.animals))}.</div>`;
   h += `<div class="factor" style="grid-template-columns:90px 1fr 44px;margin-top:8px"><span>Enrichment</span>${meter(en, en >= 60 ? "var(--good)" : en >= 30 ? "var(--warn)" : "var(--bad)")}<span>${en}%</span></div>`;
-  h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Exhibit tab), plants from their own period" : "enrichment props (Habitat Props), the rocks, plants and water they like"}, and room to roam.</div></section>`;
+  h += `<div class="meta">How much there is to do: ${e.viv ? "enrichment in the glass (Habitat Items tab), plants from their own period" : "enrichment props (Habitat Items), the rocks, plants and water they like"}, and room to roam.</div></section>`;
   if(!e.viv){
     const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
     h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;

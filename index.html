@@ -421,6 +421,14 @@ dialog.catalog .cat-head .btn{background:transparent;color:var(--on-forest);bord
 .ptab{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;font-size:13px;font-weight:500;color:var(--ink-2);box-shadow:inset 0 -3px 0 var(--pc)}
 .ptab[aria-selected="true"]{background:var(--chrome-2);color:var(--ink);font-weight:600;border-color:var(--ink-2)}
 .ptab-body{padding-top:10px}
+.extabs{margin:8px 0}
+.extabs .ptabs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+.extabs .ptab{justify-content:center;padding:6px 4px;font-size:13px}
+.exhead{flex-wrap:wrap;gap:6px}
+.exday{grid-template-columns:1fr 70px 70px}.exday span:not(:first-child){text-align:right}
+.exglance li{grid-template-columns:10px 1fr}
+.exjump{display:grid;grid-template-columns:62px 1fr 10px;gap:8px;align-items:baseline;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.exjump:hover b,.exjump:hover span:nth-child(2){text-decoration:underline}
 /* The Time Travel Lab's timeline: slider, map of the past, sites and their cards */
 .gt-epoch{display:block;font:600 22px/1.1 'Barlow Condensed',sans-serif}
 .gt-ago{font-weight:600;font-variant-numeric:tabular-nums}

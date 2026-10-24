@@ -167,7 +167,7 @@ function boxCheck(p){
     (p.gave || (p.gave = new Set())).add(s.b.id);
     if(Math.random() >= DONATE.chance * (1 + DONATE.eduBoost * edu) * pm(p, "donate")) continue;
     const g = p.n * DONATE.amount * (1 + DONATE.eduBoost * edu) * pm(p, "donate");
-    earn(g, "donations"); s.b.gift = (s.b.gift || 0) + g;
+    earn(g, "donations"); s.b.gift = (s.b.gift || 0) + g; creditGifts(p, g);
   }
 }
 // Where along the footpaths each litter square's specks go. Called when the guest map is rebuilt.

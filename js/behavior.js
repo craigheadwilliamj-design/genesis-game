@@ -389,7 +389,7 @@ function treatsNight(){
       if(f.left > 0) return true;
       gone.push(t.label.toLowerCase()); return false;
     });
-    if(gone.length && e.animals.length) events.toast(`${e.name}: the ${[...new Set(gone)].join(" and ")} ${gone.length === 1 ? "is" : "are"} all used up. Put out more in Habitat Props.`, "bad");
+    if(gone.length && e.animals.length) events.toast(`${e.name}: the ${[...new Set(gone)].join(" and ")} ${gone.length === 1 ? "is" : "are"} all used up. Put out more in Habitat Items.`, "bad");
   }
 }
 // Overnight they eat what's left, drink, sleep it off and wake up fresh
@@ -416,7 +416,7 @@ function behaviorNight(){
 const actLabel = a => a.inside ? insideText(a) : a.act && ACTS[a.act] ? ACTS[a.act].label : "Settling in";
 const whyText = {bored:"bored", stressed:"stressed", lonely:"lonely", hungry:"hungry", thirsty:"thirsty"};
 const WHY_FIX = {
-  bored:"Enrichment props (Habitat Props, or Enrichment for a vivarium), rocks, plants and more room give them something to do.",
+  bored:"Enrichment props (Habitat Items), rocks, plants and more room give them something to do.",
   stressed:"See the Behavior tab for what's bothering them.",
   lonely:"They need more of their own kind.",
   hungry:"There's no food. Keepers need to bring some.",
