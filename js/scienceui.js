@@ -35,7 +35,7 @@ function cloneCard(c, bay){
   const bar = `<div style="margin-top:6px;position:relative;z-index:2"><div class="meter" data-cbar="${c.id}"><i style="width:${pct}%;background:${c.failed ? "#d94b4b" : "var(--gold)"}"></i></div></div>`;
   const txt = c.failed ? `Stopped at ${pct}%.` : `${pct}% · ${leftText(c.end)} left`;
   const head = `<div class="bn">${bay === undefined ? "" : `Bay ${bay + 1}`}</div><b>${esc(s.name)}</b> <span class="meta">${sexMark(c)} for ${e ? esc(e.name) : "no exhibit yet"}</span>`;
-  const ov = c.failed ? `<div style="position:absolute;inset:0;z-index:1;border-radius:10px;background:rgba(140,18,18,.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:8px;text-align:center;gap:3px"><div style="font:800 19px/1.1 system-ui,sans-serif;letter-spacing:.12em">CLONE FAILED</div><div style="font-size:11px;opacity:.95;padding:0 10px">${esc(c.why || "Culture failure")}. Specimen lost at ${pct}%.</div><button class="btn" data-action="discardClone" data-id="${c.id}" style="margin-top:2px;padding:2px 10px">Discard specimen</button></div>` : "";
+  const ov = c.failed ? `<div style="position:absolute;inset:0;z-index:1;border-radius:10px;background:rgba(140,18,18,.88);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:8px;text-align:center;gap:3px"><div style="font:700 19px/1.1 var(--font-head);letter-spacing:.12em">CLONE FAILED</div><div style="font-size:11px;opacity:.95;padding:0 10px">${esc(c.why || "Culture failure")}. Specimen lost at ${pct}%.</div><button class="btn" data-action="discardClone" data-id="${c.id}" style="margin-top:2px;padding:2px 10px">Discard specimen</button></div>` : "";
   return `<div class="card bay" style="position:relative${c.failed ? ";min-height:112px" : ""}">${head}${c.failed ? "<div style=\"height:46px\"></div>" : ""}${bar}<div class="meta" style="margin-top:4px;position:relative;z-index:2${c.failed ? ";color:#fff" : ""}" data-ctxt="${c.id}">${txt}</div>${ov}</div>`;
 }
 // Moves the clone bars while the panel stays as it is (the panel is not rebuilt while the mouse is over it)
@@ -72,7 +72,7 @@ const techRows = group => TECH.filter(t => t.group === group && !techHidden(t.id
 function oracleHtml(b){
   const sc = state.science, n = sc.crew.paleo, idle = Math.max(0, n - sc.projects.length);
   let h = deptHead(b);
-  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 'Barlow Condensed',sans-serif">${Math.floor(sc.points)}</b> <span class="meta">points${n ? ` · +${idle * RESEARCH_PER_PALEO} a day` : ""}</span></div></section>`;
+  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 var(--font-head)">${Math.floor(sc.points)}</b> <span class="meta">points${n ? ` · +${idle * RESEARCH_PER_PALEO} a day` : ""}</span></div></section>`;
   h += sciStaffHtml("paleo");
   h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `General research, +${RESEARCH_PER_PALEO} a day`);
   const block = labBlocker();
