@@ -319,10 +319,11 @@ function exBarrierHtml(e){
   notes.push(since >= 99 ? ["bad", "Never inspected."] : [since >= MAINT.inspectEvery * 2 ? "bad" : since >= MAINT.inspectEvery ? "warn" : "good", since === 0 ? "Inspected today." : `Last inspected ${since} day${since === 1 ? "" : "s"} ago.`]);
   h += `<ul class="issues" style="margin-top:6px">${notes.map(([k, t]) => `<li class="${k}" style="color:var(--${k === "bad" ? "bad" : k === "warn" ? "warn" : "good"})">${esc(t)}</li>`).join("")}</ul>`;
   h += callRow(e, "mech") + `</section>`;
-  h += `<section><h3>Extra security</h3><div class="row">`;
-  h += e.moat ? `<span class="status ok">Moat: nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : `<span class="meta">Moats: research at the Research Lab</span>`;
-  h += e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : `<span class="meta">Aviary netting: research at the Research Lab</span>`;
-  h += e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : `<span class="meta">Catch netting: research at the Research Lab</span>`;
+  const sec = (name, st, body) => `<div class="sec-item ${st}"><span class="sec-name">${name}</span><span class="sec-act">${body}</span></div>`, lock = `<span class="status">Research at the Research Lab</span>`;
+  h += `<section><h3>Extra security</h3><div class="sec-list">`;
+  h += sec("Moat", e.moat ? "on" : hasTech("moat") ? "" : "locked", e.moat ? `<span class="status ok">Nothing gets out</span>` : hasTech("moat") ? `<button class="btn" data-action="moat"${canAfford(moatCost(e)) ? "" : " disabled"}>Dig a moat, ${money(moatCost(e))}</button>` : lock);
+  h += sec("Aviary netting", e.aviary ? "on" : hasTech("aviary") ? "" : "locked", e.aviary ? `<button class="btn" data-action="aviaryOff">Remove aviary netting</button>` : hasTech("aviary") ? `<button class="btn" data-action="aviary"${canAfford(aviaryCost(e)) ? "" : " disabled"}>Add aviary netting, ${money(aviaryCost(e))}</button>` : lock);
+  h += sec("Catch netting", e.net ? "on" : hasTech("catchnet") ? "" : "locked", e.net ? `<button class="btn" data-action="netOff">Remove catch netting</button>` : hasTech("catchnet") ? `<button class="btn" data-action="net"${canAfford(netCost(e)) ? "" : " disabled"}>Add catch netting, ${money(netCost(e))}</button>` : lock);
   return h + `</div></section>`;
 }
 // Health tab: sanitation, the animals' health, and the vet
