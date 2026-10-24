@@ -1447,7 +1447,11 @@ function animalUp(h){ const up = (h.lift || 0) + (h.bob || 0); return tilt ? `${
 // momentum (h.vel: across, back, up), so it curves and eases in, hangs there a moment (h.hover), then picks another; a slow bob keeps it from ever sitting dead still.
 // Floor crawlers (`floor` in SPECIES) wander the sand instead. Resting ones drift slowly near the bottom. The highest it goes keeps its picture under the waterline.
 // In a paludarium the swimmers (h.swimmer) do the same, heading for the water `palu` of the time and otherwise climbing out to walk the bank at `crawl`.
-const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6, palu:.6};
+// A rig strokes its walk clip (its swim stroke) above stroke[1] speed and hovers on its stand loop below stroke[0]; a turn round takes `turn` seconds; pitch is
+// how much of its climb angle it noses up (a share, then the most in degrees).
+const AQUA_SWIM = {speed:.7, crawl:.25, rest:.15, accel:.9, near:1.2, hover:[.5, 3], bob:.06, bobRate:1.6, palu:.6, stroke:[.08, .15], turn:.3, pitch:[.6, 20]};
+// the middle of an animal's picture, up from its spot (spriteSvg and rigSvg sit the picture on the same box), to turn it about
+function sprMid(h){ const S = SPRITES[h.sp] || {}, R = rigOf(h.sp), w = h.r * (h.viv ? 4 : 2.5) * ((R && S.rsize) || S.size || 1), ht = R ? w * R.h / R.w : w / (S.ratio || 1); return h.r * .5 - ht * (S.foot || 1) + ht / 2; }
 const paluTop = () => 0;   // a paludarium is shallow: its swimmers paddle at the surface, cut at the waterline (drawAnimal)
 function aquaTop(h, e){ const S = SPRITES[h.sp], ht = h.spr && S ? h.r * 4 * (S.size || 1) / S.ratio : h.r * 2; return Math.max(0, aquaLine(e) / TILT - ht - .3); }
 function aquaSwim(h, e, dt){
@@ -1474,9 +1478,18 @@ function aquaSwim(h, e, dt){
   if(h.goal && !(h.hover > 0) && d < .15){ h.goal = null; h.hover = A.hover[0] + Math.random() * (A.hover[1] - A.hover[0]) * (rest ? 2 : 1); }
   h.bobT = (h.bobT ?? Math.random() * 7) + dt;
   h.bob = crawl || !wet ? 0 : Math.sin(h.bobT * A.bobRate) * A.bob * Math.min(1, h.lift / A.bob);   // no bobbing into the sand
-  if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== h.face){ h.face = face; const el = h.el.querySelector(".spr"); if(el) el.setAttribute("transform", `scale(${face} 1)`); } }
-  const S = SPRITES[h.sp];
-  if(h.spr && rigOf(h.sp)) rigStep(h, rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
+  const spd = Math.hypot(v[0], v[1], v[2]); h.stride = (h.stride || 0) + spd * dt; h.stroke = spd > A.stroke[h.stroke ? 0 : 1];   // a rig strokes its walk (swim) clip by distance above this speed, hovers below
+  if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== (h.face || 1)){ h.face = face; h.turn = 0; } }
+  // turning round it narrows through head-on (never quite to nothing) instead of flipping, and a swimmer noses up as it rises and down as it dives
+  h.turn = Math.min(1, (h.turn ?? 1) + dt / A.turn);
+  const pt = crawl ? 0 : clamp(-Math.atan2(v[2], Math.hypot(v[0], v[1]) + .1) * 180 / Math.PI * A.pitch[0], -A.pitch[1], A.pitch[1]);
+  h.pitch = (h.pitch || 0) + (pt - (h.pitch || 0)) * Math.min(1, dt * 4);
+  const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
+  if(el){
+    const c = Math.cos(Math.PI * h.turn), sx = (h.face || 1) * (h.turn < .5 ? -1 : 1) * Math.max(.2, Math.abs(c));
+    el.setAttribute("transform", `scale(${sx.toFixed(3)} 1)${Math.abs(h.pitch) > .3 ? ` rotate(${h.pitch.toFixed(1)} 0 ${sprMid(h).toFixed(2)})` : ""}`);
+  }
+  if(h.spr && rigOf(h.sp)) rigStep(h, h.stroke && !crawl ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
   if(tilt) place34(h);
 }
