@@ -530,7 +530,10 @@ function behaviorHtml(e){
     const vis = Math.round(hideAvgOf(e) * 100), gone = 1 - hideAvgOf(e), shy = e.animals.filter(a => traitsOf(SPECIES_BY_ID[a.sp]).temper === "skittish").length;
     h += `<section><h3>In view</h3><div class="factor" style="grid-template-columns:90px 1fr 44px"><span>Guests see</span>${meter(vis, vis >= 80 ? "var(--good)" : vis >= 60 ? "var(--warn)" : "var(--bad)")}<span>${vis}%</span></div>`;
     h += `<div class="meta" style="margin-top:4px;color:${gone > HIDING.from ? "var(--bad)" : "inherit"}">${gone > HIDING.from ? `${gone >= .5 ? "Most" : "Many"} animals are hiding. Add quiet signs or give shy animals more places to hide. Guests who see an empty exhibit are let down, though well-informed ones forgive it.` : "Most of the animals are out where guests can see them."}</div>`;
-    h += `<div class="meta" style="margin-top:4px">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%${quietSigns(e).length ? `, with ${quietSigns(e).length} quiet sign${quietSigns(e).length === 1 ? "" : "s"} by the fence` : ""}${screenShare(e) ? `, ${Math.round(screenShare(e) * 100)}% of the herd behind a privacy screen` : ""}. ${shy ? "Shy animals feel it most. " : ""}Animals inside a shelter are out of sight, sleeping at night doesn't count against you, and weather shelter only a little.</div></section>`;
+    const qs = quietSigns(e).length, ss = screenShare(e), extra = [qs ? `${qs} quiet sign${qs === 1 ? "" : "s"} by the fence` : "", ss ? `${Math.round(ss * 100)}% of the herd behind a privacy screen` : ""].filter(Boolean);
+    h += `<div style="margin-top:8px;font-size:17px;font-weight:600;color:var(--ink)">Crowd the animals feel: ${Math.round(ctx.seen * 100)}%</div>`;
+    if(extra.length || shy) h += `<div class="meta" style="margin-top:2px">${extra.length ? `With ${extra.join(", ")}. ` : ""}${shy ? "Shy animals feel it most." : ""}</div>`;
+    h += `</section>`;
   }
   const soc = [...ctx.soc.values()];
   if(soc.length) h += `<section><h3>Social</h3>${soc.map(i => `<div class="meta" style="color:${i.bad ? "var(--bad)" : "var(--good)"}">${esc(i.text)}</div>`).join("")}</section>`;
