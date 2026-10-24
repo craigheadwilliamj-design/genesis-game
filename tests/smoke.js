@@ -3812,23 +3812,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     if(wasDev) tap(); tap(); const shown = !document.querySelector("#pixelBtn").hidden && devMode(); tap();
     out.pixelBtnNoReload = shown && document.querySelector("#pixelBtn").hidden && !devMode();
     devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
-    // UI editor: edits show live in dev mode only, undo takes them back, a color variable and a layout move are plain CSS
-    const uiBefore = JSON.stringify(UIED.store); devFlag = true; uiedSync();
-    uiedOpen(); uiedSnap(); uiedSet("#money", "font-size", "31px"); UIED.store.vars.light["--forest"] = "#aa2222"; UIED.store.vars.dark["--forest"] = "#aa2222"; uiedTranslate("#rtools", -20, 8);
-    const liveOn = getComputedStyle(document.querySelector("#money")).fontSize === "31px" && getComputedStyle(document.documentElement).getPropertyValue("--forest").trim() === "#aa2222";
-    uiedSave(); const exp = uiedCss(true);
-    out.uiEditorLiveAndExport = liveOn && /#money\{font-size:31px !important\}/.test(exp) && /translate:-20px 8px/.test(exp) && /--forest:#aa2222/.test(exp);
-    uiedUndo(); out.uiEditorUndo = !UIED.store.rules["#money"];
-    UIED.store.rules["#money"] = {"font-size": "31px"}; uiedSave(); devFlag = false; uiedSync();
-    out.uiEditorDevOnly = document.getElementById("uiedLive").textContent === "" && document.querySelector("#uiedBtn").hidden && !UIED.open;
-    // added elements come back after a redraw, take values from `it`, and go away with dev mode
-    devFlag = true; UIED.store.adds = [{id:"smk", kind:"bar", target:"#panel", where:"end", label:"Cash", expr:"state.money / 1500", max:"100", color:"auto", text:"", style:""}];
-    uiedAddsSync(); const addN = () => document.querySelectorAll("#panel [data-uied-add=smk]").length;
-    const added = addN() === 1 && /Cash/.test(document.querySelector("#panel [data-uied-add=smk]").textContent);
-    document.querySelector("#panel").innerHTML = "<p>redrawn</p>"; uiedAddsSync();
-    const back = addN() === 1; devFlag = false; uiedSync();
-    out.uiEditorAddedElements = added && back && addN() === 0;
-    UIED.store = JSON.parse(uiBefore); uiedSave(); UIED.stack = []; devFlag = null;
     return out;
   }, coelRig));
 

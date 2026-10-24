@@ -164,9 +164,8 @@ function showStart(){
     const on = !devMode(); devFlag = on;
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
     const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
-    uiedSync();   // so does the UI editor's
     buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
-    ui.toast(on ? "Dev mode on. The pixel editor (Px) and UI editor (UI) are at the bottom of the right-hand column." : "Dev mode off.");
+    ui.toast(on ? "Dev mode on. The pixel editor is at the bottom of the right-hand column." : "Dev mode off.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
