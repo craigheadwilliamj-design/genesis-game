@@ -2322,6 +2322,7 @@ function setTool(t){
   else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "gallery") showBar("Place a viewing gallery", "Tap a pool's fence beside a guest path. The gallery stands outside it, its glass against the water.", `${money(BUILDINGS.gallery.price)} each, ${money(BUILDINGS.gallery.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "uncrate" && crateMode === "deliver"){ const r = specimens().find(x => x.id === crateSel); showBar(r ? `Deliver the ${SPECIES_BY_ID[r.sp].name}` : "Deliver a specimen", "Tap the exhibit it goes to.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there, or open ground to set it down.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(landKey(t)){
     const L = LAND[landKey(t)];
@@ -3195,19 +3196,23 @@ function crateSvg(c, on, inv){
   return `<g data-kind="crate" data-id="${esc(c.id)}" style="cursor:pointer">${on ? `<circle cx="${c.x}" cy="${c.y}" r="${(g.w * .7).toFixed(2)}" fill="none" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>` : ""}`
     + `<image href="${spriteUrl("sprites/crate.png")}" x="${g.x.toFixed(2)}" y="${g.y.toFixed(2)}" width="${g.w.toFixed(2)}" height="${g.h.toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated"/></g>`;
 }
-let crateSel = null, crateGhost = null;   // the crate being carried (an id in crates()), and the ghost under the pointer: {x, y, e, r, open, why}
-function startUncrate(id){ crateSel = id; crateGhost = null; closePanel(); setTool("uncrate"); }
+let crateSel = null, crateGhost = null, crateMode = "crate";   // the crate being carried (an id in crates(), or in specimens() when crateMode is "deliver"), and the ghost under the pointer: {x, y, e, r, open, why}
+function startUncrate(id){ crateSel = id; crateMode = "crate"; crateGhost = null; closePanel(); setTool("uncrate"); }
+// A finished specimen's crate rides the pointer; tapping an exhibit it fits queues its delivery (sendSpecimen, ui.js)
+function startDeliver(id){ crateSel = id; crateMode = "deliver"; crateGhost = null; closePanel(); setTool("uncrate"); }
 // Over an exhibit it fits, the crate opens there; anywhere else it's set down if the spot is free
 function crateSpot(ev){
-  const p = toWorld(ev.clientX, ev.clientY), r = crates().find(x => x.id === crateSel);
+  const deliver = crateMode === "deliver", p = toWorld(ev.clientX, ev.clientY), r = (deliver ? specimens() : crates()).find(x => x.id === crateSel);
   const e = state.exhibits.find(x => inPoly(p.x, p.y, x.points)) || null;
-  if(!r) return {x:p.x, y:p.y, e, r, open:false, why:"That crate is gone."};
+  if(!r) return {x:p.x, y:p.y, e, r, open:false, deliver, why:"That crate is gone."};
+  if(deliver){ const why = e ? crateProblem(r, e) || keeperMoveProblem(e) : "Tap an exhibit."; return {x:p.x, y:p.y, e, r, open:!why, deliver, why}; }
   const open = !!e && !crateProblem(r, e);
   return {x:p.x, y:p.y, e, r, open, why:open ? null : crateSpotProblem(p.x, p.y, r.sp, r)};
 }
 function crateHover(ev){
   crateGhost = crateSpot(ev);
   const g = crateGhost, fight = g.r && g.open && g.e.animals.map(a => conflict(SPECIES_BY_ID[g.r.sp], SPECIES_BY_ID[a.sp])).find(x => x);
+  if(g.deliver){ setStat(g.open ? (fight ? `Deliver it to ${g.e.name}. ${fight}` : `Deliver it to ${g.e.name}.`) : g.why, !g.open); renderOverlay(); return; }
   setStat(g.open ? (fight ? `Open it in ${g.e.name}. ${fight}` : `Open it in ${g.e.name}.`) : g.why || (g.e && g.r ? `${g.e.name}: ${crateProblem(g.r, g.e)} Set it down here.` : "Set it down here."), !g.open && !!g.why);
   renderOverlay();
 }
@@ -3215,12 +3220,18 @@ function crateHover(ev){
 function crateGhostSvg(g){
   if(!g.r) return "";
   const col = g.open ? "var(--good)" : "var(--bad)", a = crateArt(g.r.sp, g.x, g.y);
-  return (g.open ? `<polygon points="${polyStr(g.e.points)}" fill="${col}" fill-opacity=".14" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "")
-    + `<image href="${spriteUrl("sprites/crate.png")}" x="${a.x.toFixed(2)}" y="${a.y.toFixed(2)}" width="${a.w.toFixed(2)}" height="${a.h.toFixed(2)}" preserveAspectRatio="none" opacity="${g.why ? .55 : .95}" style="image-rendering:pixelated" pointer-events="none"/>`;
+  return (g.open || (g.deliver && g.e) ? `<polygon points="${polyStr(g.e.points)}" fill="${col}" fill-opacity=".14" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "")
+    + `<image href="${spriteUrl("sprites/crate.png")}" x="${a.x.toFixed(2)}" y="${a.y.toFixed(2)}" width="${a.w.toFixed(2)}" height="${a.h.toFixed(2)}" preserveAspectRatio="none" opacity="${g.open || !g.why ? .95 : .55}" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 function crateTap(ev){
   const g = crateSpot(ev);
   if(!g.r){ setStat(g.why, true); return; }
+  if(g.deliver){
+    if(!g.open){ setStat(g.why, true); return; }
+    const r = g.r, e = g.e; crateSel = null; crateGhost = null; setTool(null);
+    sendSpecimen(r, e);
+    return;
+  }
   if(g.why){ setStat(g.why, true); return; }
   const s = SPECIES_BY_ID[g.r.sp], name = g.r.name || s.name, id = g.r.id;
   if(g.open){ uncrate(id, g.e); sel = null; }

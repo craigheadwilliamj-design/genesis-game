@@ -668,24 +668,14 @@ function openMoveDialog(e, sp, id){
   };
   $("#dlgMove").showModal();
 }
-// The delivery dialog: which exhibit a finished specimen goes to
-function openSpecimenDialog(id){
-  const r = specimens().find(x => x.id === id); if(!r) return;
-  const s = SPECIES_BY_ID[r.sp], dests = state.exhibits.filter(x => !crateProblem(r, x));
-  $("#moveTitle").textContent = `Deliver ${r.name || s.name}`;
-  if(!dests.length){ $("#moveBody").innerHTML = `<p>No exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.` : "Build an exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
-  $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
-    <p style="margin-top:10px">A keeper, custodian or vet carries the crate from the Genetics Lab to the exhibit's gate.</p>`;
-  $("#moveGo").hidden = false;
-  $("#moveGo").onclick = () => {
-    const to = state.exhibits.find(x => x.id === $("#moveTo").value);
-    const go = () => { $("#dlgMove").close(); const why = deliverSpecimen(r.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${r.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
-    const mix = mixWarning(s, to);
-    if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
-    if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); }
-    else go();
-  };
-  $("#dlgMove").showModal();
+// Queue a finished specimen's delivery to an exhibit, after a yes to the predator/prey or flyer warning
+function sendSpecimen(r, to){
+  const s = SPECIES_BY_ID[r.sp];
+  const go = () => { const why = deliverSpecimen(r.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${r.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
+  const mix = mixWarning(s, to);
+  if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
+  if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
+  go();
 }
 $("#moveCancel").onclick = () => $("#dlgMove").close();
 
@@ -979,7 +969,7 @@ panelEl.addEventListener("click", e => {
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
   if(a === "tartab"){ tarTab = b.dataset.k; ui.panel(); return; }
-  if(a === "specMove"){ openSpecimenDialog(b.dataset.id); return; }
+  if(a === "specMove"){ startDeliver(b.dataset.id); return; }
   if(a === "specCancel"){ cancelDelivery(b.dataset.id); ui.panel(); saveSoon(); return; }
   if(a === "howTo"){ $("#dlgIntro").showModal(); return; }
   if(a === "restart"){ askConfirm("Restart?", "This leaves the park you're in and returns to the start screen. Anything not saved is lost, and a new park replaces your save when you start it.", "Restart", () => { setSpeed(0); showStart(); }); return; }
