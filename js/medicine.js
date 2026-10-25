@@ -544,7 +544,7 @@ function healthNight(){
       const home = state.exhibits.find(x => x.id === p.home);
       if(home) state.staff.transfers.push({id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmcBuilding().id, to:home.id, med:true});
       else { discharge(p.a.id); state.science.ready.push({id:p.a.id, name:p.a.name, sex:p.a.sex, rank:p.a.rank, sp:p.a.sp, q:p.a.q ?? 90}); }
-      events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in holding."}`, chronic ? "" : "good");
+      events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in a crate."}`, chronic ? "" : "good");
     }
   }
   for(const e of state.exhibits) e.hungryMin = 0;

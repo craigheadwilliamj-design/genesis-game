@@ -3878,8 +3878,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const iss = re => exhibitReport(pe).issues.some(i => re.test(i.text));
       // the lagoon wall: the only fence that holds sea water and pool animals, with its pictures; never offered as advice, and laid only with pools on
       const box = rectPtsOf([405, 405, 415, 415]), wasBar = pe.barrier;
-      const lagoonOk = waterProblem(box, pe, null, 0, true, "sea") === null && fitsHabitat(N, pe); pe.barrier = "bars";
-      const barsNo = waterProblem(box, pe, null, 0, true, "sea") === "Only a lagoon wall holds sea water." && waterProblem(box, pe, null, 0, true) === null && !fitsHabitat(N, pe) && iss(/Nothosaurus needs a lagoon wall/)
+      const lagoonOk = waterProblem(box, pe, null, 0, true, "sea") === null && !fitsHabitat(N, pe) && crateProblem({sp:"noth"}, pe) === "No water for it."; pe.barrier = "bars";
+      const barsNo = waterProblem(box, pe, null, 0, true, "sea") === "Only a lagoon wall holds sea water." && waterProblem(box, pe, null, 0, true) === null && !fitsHabitat(N, pe) && crateProblem({sp:"noth"}, pe) === "Needs a lagoon wall." && iss(/Nothosaurus needs a lagoon wall/)
         && waterProblem(rectPtsOf([600, 600, 610, 610]), null, null, 0, true, "deep") === "Only a lagoon wall holds sea water.";
       pe.barrier = wasBar;
       const Pk = fencePieces(), keepP = {...Pk}, sq = [[500, 500], [520, 500], [520, 520], [500, 520]], ge = {id:"e-lagoongrid", name:"Lagoon grid", grid:true, points:sq, animals:[], water:[{id:"w-lg", kind:"sea", points:rectPtsOf([505, 505, 515, 515])}]};
@@ -3894,11 +3894,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && !/lagoon/i.test(barrierNeeded(M)) && (devMode() || /aren't open yet/.test(planPieces(pieceLine([700, 700], [710, 700]).keys, "lagoon").why || ""));
       out.seaWaterPrices = waterRate("sea") === WATER.perSqM * SEA_WATER.sea.price && waterRate("deep") === WATER.perSqM * SEA_WATER.deep.price && waterRate(undefined) === WATER.perSqM
         && SEA_WATER.deep.price > SEA_WATER.sea.price && WATER_TEX.sea && WATER_TEX.deep && WATER_TILES.sea && WATER_TILES.deep && (devMode() === waterTypes().includes("sea"));
-      out.poolOnlyOpen = fitsHabitat(N, pe) && !fitsHabitat(N, {viv:"L", aqua:true, points:[]}) && !biomesOf(N) && SPECIES.filter(x => x.pool).every(x => !x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)) && SPECIES_INFO[x.id]);
+      out.poolOnlyOpen = !fitsHabitat(N, {viv:"L", aqua:true, points:[]}) && !biomesOf(N) && SPECIES.filter(x => x.pool).every(x => !x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)) && SPECIES_INFO[x.id]);
       const dryT = exhibitReport(pe).target, dryFlag = iss(/No sea water: Nothosaurus/);
       fill(undefined); const freshN = poolFit(pe, N).fit, freshR = poolFit(pe, R).fit;
       fill("sea"); const seaT = exhibitReport(pe).target;
-      out.poolNeedsSea = dryFlag && freshN === 0 && freshR === 1 && poolFit(pe, N).fit === 1 && seaT > dryT + 30 && iss(/Open water to swim in/) && !iss(/plants from another era|No water|Wrong biome/);
+      out.poolNeedsSea = dryFlag && fitsHabitat(N, pe) && freshN === 0 && freshR === 1 && poolFit(pe, N).fit === 1 && seaT > dryT + 30 && iss(/Open water to swim in/) && !iss(/plants from another era|No water|Wrong biome/);
       out.poolAnimalsNeedNothingElse = !thirsty(pe, N) && escapeRisk(pe, N) === null && coverOf(pe).need === 0 && wantsOf(pe, N).plants === 0 && wantsOf(pe, N).rock === 0 && /marine/.test(dietText(N));
       pe.animals = [{id:"pm1", sp:"mosa", q:90}, {id:"pm2", sp:"mosa", q:90}];
       const shallow = iss(/Too shallow: Mosasaurus/), cramped = iss(/Cramped: .* of water for/);
@@ -3911,13 +3911,36 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const hs = [...herd.values()].filter(h => h.exhibitId === pe.id);
       let wet = hs.length === 2 && hs.every(h => h.pool && h.el.querySelector(".dive") && poolSpot(h, pe, [h.x, h.y]));
       for(const h of hs) h.act = null;   // a resting animal stays up at the surface
-      for(let i = 0; i < 400 && wet; i++) for(const h of hs){ poolSwim(h, pe, .1); if(!poolSpot(h, pe, [h.x, h.y])) wet = false; }
-      out.poolSwimStaysWet = wet && hs.some(h => (h.dive || 0) > 0);
+      let dove = 0;
+      for(let i = 0; i < 400 && wet; i++) for(const h of hs){ poolSwim(h, pe, .1); dove = Math.max(dove, h.dive || 0); if(!poolSpot(h, pe, [h.x, h.y])) wet = false; }
+      out.poolSwimStaysWet = wet && dove > .2;
       // galleries: on park ground beside the pool, a better view than a platform
       const gb = {id:"b-galtest", type:"gallery", exhibitId:pe.id, points:rectPts(430, 454.4, 16, 8, 0), face:2}, pb = {id:"b-plattest", type:"platform", exhibitId:pe.id, points:rectPts(430, 446, 14, 7, 0), inward:true};
       state.buildings = [pb]; const platV = viewFactor(pe, {[pb.id]:true}); state.buildings = [pb, gb]; const bothV = viewFactor(pe, {[pb.id]:true, [gb.id]:true});
       out.galleryView = isPool(pe) && !isPool({points:pts, water:[], animals:[]}) && parkGround(gb) && !parkGround(pb) && bothV > platV && Math.abs(bothV / Math.max(1, barrierOf(pe).view) - GALLERY.view) < 1e-9
         && buildingHidden("gallery") === !devMode() && STAND34.gallery && building34(gb, BUILDINGS.gallery, false, false, true, 1).includes("GALLERY");
+      // crates: instant boxing keeps the animal whole, it goes back in only where it fits, a crate costs a fee a night, stranded pool animals and a bulldozed exhibit's animals are crated
+      {
+        const keepR = state.science.ready.slice(); state.science.ready.length = 0;
+        const a0 = pe.animals[0]; a0.sick = {kind:"illness", sev:10}; a0.q = 77;
+        const r = crateAnimal(pe, a0), land = {id:"e-cland", name:"Land", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[], land:[], water:[]};
+        state.exhibits.push(land);
+        const boxed = !!r && !pe.animals.includes(a0) && crates()[0] === r && r.crated === state.day && r.q === 77 && r.sick && r.name === a0.name && crateDays(r) === 0;
+        const refuse = crateProblem(r, land) === "Needs a lagoon wall." && crateProblem(r, {viv:"S", points:[]}) === "Too big for a case." && crateProblem(r, null) === "Tap an exhibit." && !!uncrate(r.id, land) && crates().length === 1;
+        const back = uncrate(r.id, pe) === null && pe.animals.some(x => x.id === a0.id && x.q === 77 && x.sick) && !crates().length;
+        crateAnimal(pe, pe.animals.find(x => x.id === a0.id)); const fee0 = state.money; cratesNight();
+        const night = state.money === fee0 - CRATE.fee && crateDays({crated:state.day - CRATE.warn}) === CRATE.warn;
+        const sold = sellCrate(a0.id) === Math.round(M.price * COST.animalResale) && !crates().length;
+        pe.barrier = "bars"; const n0 = pe.animals.length, stranded = crateStranded() === n0 && !pe.animals.length && crates().length === n0; pe.barrier = "lagoon";
+        state.science.ready.length = 0; land.animals = [{id:"cl1", sp:SPECIES.find(x => !x.viv && !x.pool).id, q:90}]; const m1 = state.money;
+        removeItem("exhibit", land);
+        const bulldozed = crates().length === 1 && crates()[0].id === "cl1" && !state.exhibits.includes(land) && state.money >= m1;
+        openParkOffice("crates"); ui.panel(); ui.hud(true);
+        const shown = /Crates/.test(officeTabs()) && /sprites\/crate\.png/.test(cratesHtml()) && /data-action="crateTool"/.test(cratesHtml()) && !document.querySelector("#crateBtn").hidden && document.querySelector("#crateN").textContent === "1";
+        const ghost = crateGhostSvg({x:10, y:10, e:pe, why:null}).includes("sprites/crate.png") && !!SPRITE_PACK["sprites/crate.png"];
+        out.crates = boxed && refuse && back && night && sold && stranded && bulldozed && shown && ghost;
+        closePanel(); state.science.ready.length = 0; state.science.ready.push(...keepR); ui.hud(true);
+      }
       state.exhibits = keepEx; state.buildings = keepB; state.money = m0; render();
     }
     // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked

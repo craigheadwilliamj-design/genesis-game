@@ -554,7 +554,7 @@ function attackReason(x, y){
 function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
-function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (!s.pool || lagoonWalled(e)); }   // pool animals: only inside a lagoon wall
+function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (!s.pool || (lagoonWalled(e) && poolM2(e, s) > 0)); }   // pool animals: only inside a lagoon wall, with their water in
 
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
@@ -890,6 +890,7 @@ function endDay(){
   healthNight();
   vetsNight();
   behaviorNight();
+  cratesNight();
   // today's weather has done its harm; tomorrow's forecast comes true
   rollWeather();
   if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer${weatherNow().guests < .9 ? ", and fewer guests will come" : ""}.`, "bad");

@@ -294,6 +294,8 @@ const POOL = {
   happy:8,         // happiness a pool with enough water (deep enough) gives
   lack:45,         // happiness lost with no pool at all, less as the water nears what they want
 };
+// Crates: animals boxed off the map wait in one until they're placed (science.js). fee: what a crate costs a day; warn: days in a crate before a reminder
+const CRATE = {fee:40, warn:3};
 const poolsOn = () => devMode();   // pools, sea water, their animals and the Viewing Gallery: dev mode only until the animals have art
 // Sea water: price is times WATER.perSqM. Pool animals swim in it; to land animals it is just water.
 const SEA_WATER = {

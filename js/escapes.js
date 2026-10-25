@@ -150,7 +150,7 @@ function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
   if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
-  else { state.science.ready.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in holding. Tap an exhibit to move it in.`, "good"); }
+  else { state.science.ready.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in a crate.`, "good"); }
   events.changed();
 }
 

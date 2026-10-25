@@ -25,6 +25,7 @@ const ui = {
 
   // Update the numbers in the top bar. Cheap enough to call every frame.
   hud(force){
+    { const n = crates().length, b = $("#crateBtn"); if(b && b.hidden !== !n) b.hidden = !n; if(n && $("#crateN").textContent !== String(n)) $("#crateN").textContent = n; }   // the rail's crate button shows while anything is crated
     const set = (id, v) => { if(force || this.hudCache[id] !== v){ this.hudCache[id] = v; $("#" + id).textContent = v; } };
     set("money", money(state.money));
     $("#roMoney").classList.toggle("neg", state.money < 0);
@@ -112,8 +113,16 @@ function grantsHtml(goal){
   h += `<section><h3>Grants <span class="num">${activeGoals().filter(g => state.goalsDone.includes(g.id)).length} of ${activeGoals().length}</span></h3><ul class="checklist">${activeGoals().map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
+// The Crates tab: every crated animal with its days in the box, and Place (the uncrate tool) and Sell
+const crateImg = () => `<img src="${spriteUrl("sprites/crate.png")}" width="21" height="26" alt="" style="image-rendering:pixelated;flex:none">`;
+function cratesHtml(){
+  const list = crates();
+  if(!list.length) return `<section><h3>Crates</h3><div class="meta">No animals in crates.</div></section>`;
+  return `<section><h3>Crates <span class="num">${list.length}</span></h3><div class="meta">${money(CRATE.fee)} a day each</div><ul class="herd">${list.map(r => { const s = SPECIES_BY_ID[r.sp], d = crateDays(r);
+    return `<li>${crateImg()}<span><b>${esc(r.name || s.name)}</b>${r.sex ? ` <b title="${esc(r.sex)}">${esc(sexMark(r))}</b>` : ""} <span class="meta">${esc(s.name)} · ${r.q ?? 90}% DNA · ${d ? `${d} day${d === 1 ? "" : "s"}` : "today"}</span></span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="crateTool" data-id="${esc(r.id)}">Place</button><button class="btn sell" data-action="crateSell" data-id="${esc(r.id)}">Sell +${money(Math.round(s.price * COST.animalResale))}</button></span></li>`; }).join("")}</ul></section>`;
+}
 function officeTabs(){
-  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
+  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}].concat(crates().length || officeTab === "crates" ? [{key:"crates", label:"Crates", color:"#8A6238"}] : []), officeTab);
 }
 const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
@@ -131,6 +140,7 @@ function overviewHtml(){
   h += officeTabs();
   if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
+  if(officeTab === "crates") return h + cratesHtml();
 
   if(officeTab === "money"){
   const c = dailyCosts();
@@ -359,12 +369,12 @@ function exGuestsHtml(e){
   return h + `</section>`;
 }
 
-// Cloning tab: finished clones waiting for a home, and species with a complete genome, by period
+// Cloning tab: crated animals (a Move in here button for the ones that fit), and species with a complete genome, by period
 function cloneHtml(e, rep){
   const sc = state.science;
   let h = "";
   if(sc.ready.length){
-    h += `<section><h3>Waiting at the Genetics Lab</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} <span class="meta">${sexMark(r)} ${r.q}% DNA</span></span><button class="btn sell" data-action="place" data-id="${r.id}">Move in here</button></li>`; }).join("")}</ul></section>`;
+    h += `<section><h3>Crated</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp], why = crateProblem(r, e); return `<li>${crateImg()}<span>${esc(r.name || s.name)} <span class="meta">${esc(s.name)} ${sexMark(r)} ${r.q}% DNA</span></span>${why ? `<span class="meta">${esc(why)}</span>` : `<button class="btn sell" data-action="place" data-id="${esc(r.id)}">Move in here</button>`}</li>`; }).join("")}</ul></section>`;
   }
   const ready = SPECIES.filter(s => speciesAvailable(s.id) && cloneOpen(s.id) && fitsHabitat(s, e));
   const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
@@ -926,13 +936,16 @@ panelEl.addEventListener("click", e => {
   if(a === "animalOpen"){ const an = animalById(b.dataset.id); if(an){ animalSelName = an.name; select("animal", an.id); } return; }
   if(a === "animalBack"){ select("exhibit", b.dataset.id); return; }
   if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
+  if(a === "animalCrate"){ crateAnimalNow(b.dataset.id); return; }
+  if(a === "crateTool"){ startUncrate(b.dataset.id); return; }
+  if(a === "crateSell"){ const r = crates().find(x => x.id === b.dataset.id); if(r) askConfirm("Sell animal?", `Sell ${r.name || SPECIES_BY_ID[r.sp].name} for ${money(Math.round(SPECIES_BY_ID[r.sp].price * COST.animalResale))}?`, "Sell", () => { sellCrate(r.id); afterChange(); }); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
-  if(a === "place"){ if(placeReady(b.dataset.id, sel.id)) done(); return; }
+  if(a === "place"){ const why = uncrate(b.dataset.id, it); if(why) ui.toast(why, "bad"); else { afterChange(); render(); } done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }

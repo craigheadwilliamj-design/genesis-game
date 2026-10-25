@@ -185,6 +185,7 @@ function openParkOffice(tab){
   officeTab = typeof tab === "string" ? tab : "office"; officeOpen = true; select(null);
 }
 // The Office button toggles the Park Office. The ☰ button opens the Main Menu and pauses; closing the panel picks the speed back up.
+$("#crateBtn").onclick = () => officeOpen && !sel && officeTab === "crates" ? closePanel() : openParkOffice("crates");
 $("#officeBtn").onclick = () => officeOpen && !sel && officeTab !== "menu" ? closePanel() : openParkOffice();
 $("#menuBtn").onclick = () => {
   if(officeOpen && !sel && officeTab === "menu"){ closePanel(); return; }
