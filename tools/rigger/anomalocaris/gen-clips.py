@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write anom-clips.json from anom-shaded.json (the hand-made anom-rig.json restyled by tools/pixelanom_rig_shade.py), and clips from one rippling stroke:
-`swim` (the side flaps beat in a wave from front to back, the far flaps half a beat behind, the tail fan sweeping and the body
-bobbing, grasping arms tucked back), `hover` (the same stroke small and slow, the arms swaying) and `grab` (the arms reach forward,
+`swim` (the side flaps beat in a wave from front to back, the far flaps half a beat behind, the tail fan sweeping, the shell
+held rigid, grasping arms tucked back), `hover` (the same stroke small and slow, the arms swaying) and `grab` (the arms reach forward,
 snap back under the head to the mouth, chew a moment and let go).
     python3 gen-clips.py [SHEETS=dir]   then   rigtogame.py tools/rigger/anomalocaris/anom-clips.json anom --walk swim --stand hover --idle grab
 In an aquarium the walk clip is its swim stroke. With SHEETS=<dir> in the environment it also writes a contact sheet and GIF of each clip."""
@@ -22,8 +22,8 @@ def stroke(t, amp, armR, armAmp):
         FAF: {"r": amp * w(.5), "dx": 0, "dy": 0},
         FBF: {"r": amp * w(.68), "dx": 0, "dy": 0},
         TAIL: {"r": amp * .7 * w(.35), "dx": 0, "dy": 0},
-        BODY: {"r": amp * .08 * w(.25), "dx": 0, "dy": round(.8 * amp / 14 * w(.1), 2)},
-        HEAD: {"r": -amp * .1 * w(.25), "dx": 0, "dy": 0},
+        BODY: {"r": 0, "dx": 0, "dy": 0},   # the shell stays rigid: tilting or nudging it by under a pixel makes the thin segment grooves shimmer
+        HEAD: {"r": 0, "dx": 0, "dy": 0},
         ARM: {"r": armR + armAmp * w(.4), "dx": 0, "dy": 0},
         ARMF: {"r": armR + armAmp * w(.6), "dx": 0, "dy": 0},
     }
@@ -46,8 +46,8 @@ def grab():
     return out
 
 proj["clips"] = [
-    {"name": "swim", "fps": 8, "frames": loop(8, amp=14, armR=14, armAmp=4)},
-    {"name": "hover", "fps": 4, "frames": loop(8, amp=5, armR=6, armAmp=5)},
+    {"name": "swim", "fps": 8, "frames": loop(8, amp=8, armR=14, armAmp=3)},   # a gentle beat: big swings read as the flaps flashing near against far
+    {"name": "hover", "fps": 4, "frames": loop(8, amp=3, armR=6, armAmp=4)},
     {"name": "grab", "fps": 10, "frames": grab()},
 ]
 for c in proj["clips"]:
