@@ -256,7 +256,7 @@ function render(){
       const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
       s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="${tileFill("b", fb)}" pointer-events="none"/>` + exhibitPaintSvg(e);
       // water lies on the floor, under the fence, so posts and rails stand over the bank
-      s += watersSvg(waterOf(e), biomeOf(e));
+      s += watersSvg(waterOf(e), biomeOf(e), lagoonWalled(e));
       // a hedge row is drawn as a real hedge, as wide as it is
       if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
       // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
