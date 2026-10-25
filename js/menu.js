@@ -6,7 +6,7 @@
    ===================================================================== */
 
 // What each group holds. {tool} picks a tool, {sub} opens a dropdown of tools, {fence} picks a fence.
-const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "screen", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay", "pbale"];
+const HABITAT_PROPS = ["burrow", "cavesm", "cavelg", "canopysm", "canopylg", "shelter", "barn", "screen", "traysm", "traymd", "traylg", "post", "logs", "wallow", "ball", "icefish", "icefruit", "iceshell", "shank", "buglog", "hay", "pbale"];
 const BUILD_MENU = [
   {id:"paths", label:"Path Tools", items:[
     {label:"Guest Paths", tool:"path", price:() => `${money(pathChunkCost("g"))}/chunk`, note:"A 5 m square a chunk. Drag along the grid, straight or diagonal. Lay paths side by side for a wider walk."},

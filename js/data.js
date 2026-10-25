@@ -72,7 +72,8 @@ const UPKEEP = {
 //   group    [fewest, most] of this species that are happy living together
 //   appeal   how much guests want to see it
 //   stars    park rating needed before you can buy or clone it
-//   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore
+//   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore, frugivore, molluscovore
+//            the first one sets its food and how it behaves with other species; frugivore and molluscovore go second (after herbivore, piscivore or carnivore) and are for labels and toys
 //   predator true means it attacks any other species, so it can only live with its own kind
 //   bug      true for insects, arachnids, and other arthropods
 //   semi     true for the semi-aquatic tag, shown after the diet; they want more water in the exhibit and wade and swim in it
@@ -92,7 +93,7 @@ const UPKEEP = {
 //   deep     a pool animal that needs deep sea water for POOL.deepNeed of its pool
 //   fresh    a pool animal from rivers and estuaries: any water counts for its pool, not just sea water
 //   breach   a pool animal that now and then leaps clear of the water as it surfaces
-const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
+const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore", frugivore:"Frugivore", molluscovore:"Molluscovore"};
 
 const SPECIES = [
   // Cambrian
@@ -132,7 +133,7 @@ const SPECIES = [
   {id:"ante", name:"Anteosaurus",    period:"Permian", diet:["carnivore"], predator:true, price:15000, food:150, space:800, group:[1,3], appeal:9, stars:2},
   {id:"inos", name:"Inostrancevia",  period:"Permian", diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
   {id:"prio", name:"Prionosuchus",   period:"Permian", diet:["piscivore"], semi:true, price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
-  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["carnivore"], price:22000, food:110, space:700, group:[1,3], appeal:12, stars:2.5, pool:true, deep:true},
+  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["carnivore","molluscovore"], price:22000, food:110, space:700, group:[1,3], appeal:12, stars:2.5, pool:true, deep:true},
   // Triassic
   {id:"sile", name:"Silesaurus",     period:"Triassic", diet:["omnivore"], price:3500, food:25, space:100, group:[3,10], appeal:3, stars:0},
   {id:"shar", name:"Sharovipteryx",  period:"Triassic", diet:["insectivore"], price:3800, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
@@ -143,13 +144,13 @@ const SPECIES = [
   {id:"desm", name:"Desmatosuchus",  period:"Triassic", diet:["herbivore"], price:9000, food:110, space:500, group:[2,6], appeal:6, stars:1},
   {id:"plat", name:"Plateosaurus",   period:"Triassic", diet:["herbivore"], price:12000, food:160, space:900,  group:[3,8],  appeal:8,  stars:1.5},
   {id:"noth", name:"Nothosaurus",    period:"Triassic", diet:["piscivore"], price:9000, food:40, space:150, group:[2,6], appeal:7, stars:1, pool:true},
-  {id:"shon", name:"Shonisaurus",    period:"Triassic", diet:["piscivore"], price:48000, food:400, space:3000, group:[1,3], appeal:18, stars:3.5, pool:true, breach:true, deep:true},
+  {id:"shon", name:"Shonisaurus",    period:"Triassic", diet:["piscivore","molluscovore"], price:48000, food:400, space:3000, group:[1,3], appeal:18, stars:3.5, pool:true, breach:true, deep:true},
   {id:"post", name:"Postosuchus",    period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:130, space:700,  group:[1,3],  appeal:9,  stars:2},
   {id:"eryt", name:"Erythrosuchus",  period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:140, space:800, group:[1,3], appeal:9, stars:2},
   {id:"liso", name:"Lisowicia",      period:"Triassic", diet:["herbivore"], price:16000, food:220, space:1300, group:[1,4], appeal:10, stars:2},
   // Jurassic
   {id:"prom", name:"Promicroceras",  period:"Jurassic", diet:["carnivore"], price:2500, food:3, space:3, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
-  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore"], price:10000, food:30, space:120, group:[3,8], appeal:8, stars:1.5, pool:true, breach:true},
+  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore","molluscovore"], price:10000, food:30, space:120, group:[3,8], appeal:8, stars:1.5, pool:true, breach:true},
   {id:"hete", name:"Heterodontosaurus", period:"Jurassic", diet:["herbivore"], price:3500, food:25, space:80, group:[3,10], appeal:3, stars:0},
   {id:"anch", name:"Anchiornis",     period:"Jurassic", diet:["insectivore","carnivore"], price:4500, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   {id:"comp", name:"Compsognathus",  period:"Jurassic", diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
@@ -246,12 +247,12 @@ const SPECIES = [
   {id:"nura", name:"Nuralagus rex",  period:"Neogene", diet:["herbivore"], price:9000, food:16, space:20, group:[2,6], appeal:4, stars:1, viv:"L"},
   {id:"hopl", name:"Hoplitomeryx",   period:"Neogene", diet:["herbivore"], price:11000, food:22, space:26, group:[2,5], appeal:5, stars:1, viv:"L"},
   {id:"psil", name:"Psilopterus",    period:"Neogene", diet:["carnivore"], price:10000, food:20, space:26, group:[1,3], appeal:4, stars:1, viv:"L"},
-  {id:"proc", name:"Proconsul",      period:"Neogene", diet:["herbivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
+  {id:"proc", name:"Proconsul",      period:"Neogene", diet:["herbivore","frugivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
   {id:"arge", name:"Argentavis",     period:"Neogene", diet:["carnivore"], price:22000, food:150, space:800, group:[1,3], appeal:13, stars:3},
   // Quaternary
   {id:"ornw", name:"Ornimegalonyx",  period:"Quaternary", diet:["carnivore"], price:6000, food:25, space:14, group:[1,3], appeal:7, stars:1, viv:"M"},
-  {id:"dodo", name:"Dodo",           period:"Quaternary", diet:["herbivore"], price:14000, food:24, space:30, group:[2,5], appeal:6, stars:1.5, viv:"L"},
-  {id:"ppig", name:"Passenger Pigeon", period:"Quaternary", diet:["herbivore"], price:2600, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
+  {id:"dodo", name:"Dodo",           period:"Quaternary", diet:["herbivore","frugivore"], price:14000, food:24, space:30, group:[2,5], appeal:6, stars:1.5, viv:"L"},
+  {id:"ppig", name:"Passenger Pigeon", period:"Quaternary", diet:["herbivore","frugivore"], price:2600, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
   {id:"gtod", name:"Golden Toad",    period:"Quaternary", diet:["insectivore"], price:2800, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
   {id:"rmlo", name:"Rocky Mountain Locust", period:"Quaternary", diet:["herbivore"], bug:true, price:2400, food:3, space:4, group:[4,12], appeal:2, stars:0, viv:"S"},
   {id:"sdel", name:"Sicilian Dwarf Elephant", period:"Quaternary", diet:["herbivore"], price:15000, food:28, space:40, group:[1,3], appeal:6, stars:1.5, viv:"L"},
@@ -1544,7 +1545,8 @@ const LAND = {
   // hay: plant food a day herbivores eat off it, like a grove (only those that eat plain plants; older ones need Paleoflora)
   ball:   {label:"Enrichment Ball", one:"an enrichment ball", price:800,  r:1.5, color:"#C8452B", toy:2, look:"ball"},
   icefish:{label:"Frozen Fish",     one:"a frozen fish block", price:250, r:1.2, color:"#E07A3A", toyFor:{piscivore:4, carnivore:2, omnivore:2}, lasts:3, look:"ice"},
-  icefruit:{label:"Frozen Fruit",   one:"a frozen fruit block", price:200, r:1.2, color:"#C83A5A", toyFor:{herbivore:3, omnivore:4}, lasts:3, look:"ice"},
+  icefruit:{label:"Frozen Fruit",   one:"a frozen fruit block", price:200, r:1.2, color:"#C83A5A", toyFor:{herbivore:3, omnivore:4, frugivore:4}, lasts:3, look:"ice"},
+  iceshell:{label:"Frozen Shellfish", one:"a frozen shellfish block", price:300, r:1.2, color:"#6FA3B8", toyFor:{molluscovore:4, piscivore:2, carnivore:2, omnivore:2}, lasts:3, look:"ice"},
   shank:  {label:"Frozen Shank",    one:"a frozen whole shank", price:400, r:1.4, color:"#8A3A2A", toyFor:{carnivore:4, omnivore:2}, lasts:3, look:"ice"},
   buglog: {label:"Insect Log",      one:"an insect log",      price:1200, r:2.2, color:"#6E5034", toyFor:{insectivore:4, omnivore:3}, look:"buglog"},
   hay:    {label:"Hay Bale",        one:"a hay bale",         price:300,  r:1.8, color:"#D9B95A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, hay:40, look:"hay"},
