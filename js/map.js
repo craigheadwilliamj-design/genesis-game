@@ -2353,7 +2353,7 @@ function setTool(t){
   else if(t === "gate") showBar("Place a keeper gate", "Tap a closed pen's fence to make it an exhibit, or an exhibit's fence where a path or service road meets it. One gate per exhibit; tapping again moves it.", `${money(GATE_COST)} each`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "move"){
     mvCorner = null;
-    showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 90°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
+    showBar("Move", "", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", "", "", {undo:false, finish:false, cancel:"Done"});
@@ -2574,7 +2574,7 @@ function endWaterDrag(){
 const gridAt = ev => { const w = toWorld(ev.clientX, ev.clientY); return [fenceSnap(w.x), fenceSnap(w.y)]; };   // the fence grid point under the pointer
 function fenceBar(stat){
   const B = BARRIERS[fenceSel];
-  showBar(`Lay ${B.label.toLowerCase()}`, "Drag along the grid to lay fence, a piece every 5 m, straight or diagonal. Close a loop to fence off an exhibit. Lift fence with Bulldoze. Over other fence it replaces it, or on a wall two pens share, just the side your pointer is on; the button below switches to leaving it and laying against it.", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
+  showBar(`Lay ${B.label.toLowerCase()}`, "", "", {undo:true, finish:false, cancel:"Done", undoText:fenceMeet ? "Over fence: keep it" : "Over fence: replace it"});
   $("#dUndo").disabled = false;
   setStat(B.tech && !hasTech(B.tech) ? `Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.` : stat || `${money(fenceRate(fenceSel) * FENCE_GRID.step)} a piece.`, !!(B.tech && !hasTech(B.tech)));
 }
