@@ -1951,7 +1951,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // the guest walking graph still finds a building placed at the reach limit, in both turns
       setTool("restroom");
       for(const r of [0, 2]){
-        rot = r; state.buildings = []; const g = at(205 + (r ? BUILDINGS.restroom.d : BUILDINGS.restroom.w) / 2 + 3, 270);
+        rot = r; state.buildings = []; const g = at(205 + (r ? BUILDINGS.restroom.d : BUILDINGS.restroom.w) / 2 + 2.9, 270);
         state.buildings = [{id:"b-lim" + r, type:"restroom", points:g.pts}]; recompute(); buildGuestGraph();
         out["guestStopAtLimit" + r] = g.ok && isReachable(state.buildings[0]) && gGraph.anchors["b-lim" + r] !== undefined;
       }
@@ -1999,9 +1999,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       { const key = Object.keys(state.pathChunks).find(k => { const [x, y] = k.split(",").map(Number); return guestCell(state.pathChunks[k]) && !state.pathChunks[`${x},${y + 1}`]; }), [qx, qy] = key.split(",").map(Number), Y = (qy + 1) * CHUNK, t = BUILDINGS.kiosk;
         const kc = y1 => ({id:"b-kback", type:"kiosk", face:0, day:0, points:rectPts(qx * CHUNK + 2.5, y1 - t.d / 2, t.w, t.d, 0)}), msg = y1 => moveProblem("building", kc(y1));
         const mv = y1 => { const sv = JSON.parse(JSON.stringify(state)); delete sv.cardBack2; sv.buildings = [kc(y1)]; upgradeSave(sv); return sv.cardBack2 === true ? bbox(sv.buildings[0].points).y1 : NaN; }, o = BLD_PICS.kiosk.backOver;
-        out.cartBacksOntoPath = msg(Y + t.d - o) !== "It sits on a path." && msg(Y + t.d - o - .1) === "It sits on a path." && msg(Y) === "It sits on a path."
-          && !bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + 3, 8, 6, 0)) && bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + 2.9, 8, 6, 0))
-          && [Y, Y + t.d, Y + t.d - o].every(y1 => Math.abs(mv(y1) - (Y + t.d - o)) < 1e-6); }
+        out.cartBacksOntoPath = msg(Y + t.d - o) !== "It sits on a path." && msg(Y + t.d - o - .6) === "It sits on a path." && msg(Y) === "It sits on a path."
+          && !bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + BUILDINGS.restroom.d / 2, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0)) && bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + BUILDINGS.restroom.d / 2 - .1, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0))
+          && [Y + 2, Y + t.d, Y + t.d - o].every(y1 => Math.abs(mv(y1) - (Y + t.d - o)) < 1e-6); }
+      // every building (not path props like bins and benches) has sides that are multiples of 5 m
+      out.buildingFootprintsFive = Object.values(BUILDINGS).every(t => t.prop || (t.w % 5 === 0 && t.d % 5 === 0));
       // the door point is the middle of the wall that faces that way
       const sq = rectPts(211, 270, 8, 6, 0), dp = f => doorPoint({points:sq, face:f}).map(v => Math.round(v * 1e6) / 1e6).join();
       out.faceDoorPoint = dp(0) === "211,267" && dp(1) === "215,270" && dp(2) === "211,273" && dp(3) === "207,270";
@@ -2017,7 +2019,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.faceGuestStopAtDoor = !!aN && !!aS && aN.y < aS.y - 3;
       // reach: a door facing away from the path still works, but the ghost says so
       state.buildings = [{id:"b-fb", type:"restroom", points:sq, face:1, day:0}]; recompute(); const awayOk = isReachable(state.buildings[0]);
-      state.buildings = []; setTool("restroom"); rot = 6; at(211, 270); const hint = stat().includes("door faces away"); rot = 2; at(211, 270);
+      state.buildings = []; setTool("restroom"); rot = 6; at(205 + BUILDINGS.restroom.d / 2 + 2.9, 270); const hint = stat().includes("door faces away"); rot = 2; at(205 + BUILDINGS.restroom.d / 2 + 2.9, 270);
       out.faceReachDoorAway = awayOk && hint && ghost.ok && !stat().includes("door faces away"); rot = 0;
       // every look draws in all four facings, with the door and the name where the camera can see them
       const types = ["restroom", "food", "restaurant", "workshop", "farm", "closet", "lodge", "oracle", "greenhouse"], bad = [];
@@ -3315,13 +3317,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     { const b34 = (ty, r) => building34({id:"pk", type:ty, points:rectPts(150, 150, BUILDINGS[ty].w, BUILDINGS[ty].d, r * Math.PI / 2)}, BUILDINGS[ty], false, false, true, .1);
       out.restroomSpriteByFacing = ["front", "left", "back", "right"].some(v => b34("restroom", 0).includes(spriteUrl(`sprites/bld/restroom-${v}.png`)));
       const kv = [0, 1, 2, 3].map(f => building34({id:"pk", type:"kiosk", face:f, points:rectPts(150, 150, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}, BUILDINGS.kiosk, false, false, true, .1)), has = v => kv.some(a => a.includes(spriteUrl(`sprites/bld/kiosk-${v}.png`)) && a.includes(spriteUrl(`sprites/bld/kiosk-${v}-2.png`)));
-      // an old 5 x 4 m food cart shrinks to its picture's base, its door wall staying put
+      // an old 5 x 4 m food cart is resized to the current footprint, its door wall staying put
       { const sv = JSON.parse(JSON.stringify(state)), old = rectPts(150, 150, 4, 5, 0); sv.buildings = [{id:"pko", type:"kiosk", face:1, day:0, points:old}];
         upgradeSave(sv); const P = sv.buildings[0].points, b = bbox(P), b0 = bbox(old);
         out.oldKioskShrinks = Math.abs(b.x1 - b0.x1) < 1e-6 && Math.abs((b.x1 - b.x0) - BUILDINGS.kiosk.d) < 1e-6 && Math.abs((b.y1 - b.y0) - BUILDINGS.kiosk.w) < 1e-6 && Math.abs((b.y0 + b.y1) - (b0.y0 + b0.y1)) < 1e-6
           && JSON.stringify(upgradeSave(JSON.parse(JSON.stringify(sv))).buildings[0].points) === JSON.stringify(P);
         // one placed at the new size 0.3 m back from the grid slides onto it
-        const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:2, day:0, points:rectPts(150, 151.6, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
+        const sv2 = JSON.parse(JSON.stringify(state)); sv2.buildings = [{id:"pko2", type:"kiosk", face:2, day:0, points:rectPts(150, 152.9 - BUILDINGS.kiosk.d / 2, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}];
         upgradeSave(sv2); out.oldKioskShrinks = out.oldKioskShrinks && Math.abs(bbox(sv2.buildings[0].points).y1 - 153) < 1e-6; }
       // every view stands on the box's south edge (the back one backOver higher, to meet the path it backs onto), with a tappable box over the picture
       { const at = f => { const a = kv[f], m = a.match(/<image href="[^"]*" x="[^"]+" y="([^"]+)" width="[^"]+" height="([^"]+)"/), r = /<rect [^>]*fill="transparent"/.test(a); return m && r ? +m[1] + +m[2] : NaN; }, P = rectPts(150, 150, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0), px = FLAT34.px;
@@ -3738,8 +3740,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         && dishes(up2.exhibits.find(e => e.id === "e-od")).length === 1 && !vivNoDish(od);
       // cases from before they grew: each grows to its size now, its front glass where it was, its fittings still inside
       const sm = JSON.parse(JSON.stringify(newPark())); delete sm.vivBig;
-      sm.exhibits.push({id:"e-sm", name:"Small", points:rectPts(200, 270, 10, 6, 0), animals:[], happy:70, viv:"M", land:[{id:"l-sm", type:"vdish", x:203, y:272, cap:1, food:{}}]});
-      const smE = upgradeSave(sm).exhibits.find(e => e.id === "e-sm"), sb = bbox(smE.points), sb0 = bbox(rectPts(200, 270, 10, 6, 0));
+      sm.exhibits.push({id:"e-sm", name:"Small", points:rectPts(200, 270, 9, 6, 0), animals:[], happy:70, viv:"M", land:[{id:"l-sm", type:"vdish", x:203, y:272, cap:1, food:{}}]});
+      const smE = upgradeSave(sm).exhibits.find(e => e.id === "e-sm"), sb = bbox(smE.points), sb0 = bbox(rectPts(200, 270, 9, 6, 0));
       out.vivGrewOldSave = sm.vivBig === 1 && Math.abs(sb.x1 - sb.x0 - VIVARIUMS.M.w) < .01 && Math.abs(sb.y1 - sb.y0 - VIVARIUMS.M.d) < .01 && Math.abs(sb.y1 - sb0.y1) < .01
         && Math.abs((sb.x0 + sb.x1) - (sb0.x0 + sb0.x1)) < .01 && smE.land.every(f => inPoly(f.x, f.y, smE.points));
 
