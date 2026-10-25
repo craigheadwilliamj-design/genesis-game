@@ -163,8 +163,8 @@ function menuRow(it){
     return `<div class="sitem" data-open="props"><button class="srow head" aria-expanded="false">${menuIcon("land-" + props[0])}<span class="tl"><b>${esc(it.label)}</b><span class="price">${priceRange2(props)}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.fences){
-    const rows = Object.entries(BARRIERS).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon(menuSprite("fence-" + key) ? "fence-" + key : b.hedge ? "hedge" : "", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
-    const rates = Object.keys(BARRIERS).map(fenceRate);
+    const rows = Object.entries(BARRIERS).filter(([, b]) => !b.pool || poolsOn()).map(([key, b]) => `<button class="srow sub" data-fence="${key}" aria-pressed="false" data-tech="${b.tech || ""}">${menuIcon(menuSprite("fence-" + key) ? "fence-" + key : b.hedge ? "hedge" : "", b.color)}<span class="tl"><b>${esc(b.label)}</b><span class="price">${money(fenceRate(key))}/m</span></span></button>`).join("");
+    const rates = Object.keys(BARRIERS).filter(k => !BARRIERS[k].pool || poolsOn()).map(fenceRate);
     return `<div class="sitem" data-open="fence"><button class="srow head" aria-expanded="false">${menuIcon(menuSprite("fence-wood") ? "fence-wood" : "exhibit-fence", "#3B3226")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${money(Math.min(...rates))}–${money(Math.max(...rates))}/m</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }
   if(it.statues){

@@ -528,9 +528,10 @@ function mergeWater(e, w){
 // The open exhibit a new body of water starts in (null: out in the park)
 const waterHost = pts => pts.length ? state.exhibits.find(e => !e.viv && inPoly(pts[0][0], pts[0][1], e.points)) || null : null;
 // Why this water shape won't work in exhibit e (or out in the park, with no e), or null. skip is the water being reshaped; cost is what it would cost now.
-// over: laying a new box of water, which may go over water already there (it covers it, like paint).
-function waterProblem(pts, e, skip, cost, over){
+// over: laying a new box of water, which may go over water already there (it covers it, like paint). kind: its water type; sea water goes only inside a lagoon wall (lagoonWalled).
+function waterProblem(pts, e, skip, cost, over, kind){
   if(pts.length < 3) return "Needs at least 3 corners.";
+  if(SEA_WATER[kind] && !lagoonWalled(e)) return "Only a lagoon wall holds sea water.";
   if(!e) return parkWaterProblem(pts, skip, cost, over);
   if(selfCrosses(pts)) return "The shore crosses itself.";
   if(!insideFence(pts, e.points, WATER.margin)) return "Keep it inside the fence.";

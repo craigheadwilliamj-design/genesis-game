@@ -3872,10 +3872,26 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     {
       const keepEx = state.exhibits, keepB = state.buildings, m0 = state.money; state.money = 1e7;
       const pts = [[400, 400], [460, 400], [460, 450], [400, 450]], N = SPECIES_BY_ID.noth, M = SPECIES_BY_ID.mosa, R = SPECIES_BY_ID.rhiz;
-      const pe = {id:"e-pooltest", name:"Pool test", points:pts, animals:[{id:"pn1", sp:"noth", q:90}, {id:"pn2", sp:"noth", q:90}], happy:70, cond:100, land:[], water:[], gate:[400, 425]};
+      const pe = {id:"e-pooltest", name:"Pool test", points:pts, animals:[{id:"pn1", sp:"noth", q:90}, {id:"pn2", sp:"noth", q:90}], happy:70, cond:100, land:[], water:[], gate:[400, 425], barrier:"lagoon"};
       state.exhibits = [pe]; state.buildings = [];
       const fill = (kind, x1 = 460) => { pe.water = []; for(let x = 400; x < x1; x += 5) for(let y = 400; y < 450; y += 5) for(const q of waterClip(pe, [x, y, x + 5, y + 5])) layWater(pe, rectPtsOf(q), kind); };
       const iss = re => exhibitReport(pe).issues.some(i => re.test(i.text));
+      // the lagoon wall: the only fence that holds sea water and pool animals, with its pictures; never offered as advice, and laid only with pools on
+      const box = rectPtsOf([405, 405, 415, 415]), wasBar = pe.barrier;
+      const lagoonOk = waterProblem(box, pe, null, 0, true, "sea") === null && fitsHabitat(N, pe); pe.barrier = "bars";
+      const barsNo = waterProblem(box, pe, null, 0, true, "sea") === "Only a lagoon wall holds sea water." && waterProblem(box, pe, null, 0, true) === null && !fitsHabitat(N, pe) && iss(/Nothosaurus needs a lagoon wall/)
+        && waterProblem(rectPtsOf([600, 600, 610, 610]), null, null, 0, true, "deep") === "Only a lagoon wall holds sea water.";
+      pe.barrier = wasBar;
+      const Pk = fencePieces(), keepP = {...Pk}, sq = [[500, 500], [520, 500], [520, 520], [500, 520]], ge = {id:"e-lagoongrid", name:"Lagoon grid", grid:true, points:sq, animals:[], water:[{id:"w-lg", kind:"sea", points:rectPtsOf([505, 505, 515, 515])}]};
+      const ring = sq.flatMap((p, i) => pieceLine(p, sq[(i + 1) % 4]).keys);
+      for(const k of ring) Pk[k] = mkPiece("lagoon");
+      state.exhibits = [pe, ge];
+      const gridOk = lagoonWalled(ge), swapNo = /needs its lagoon wall/.test(seaWallProblem({[ring[0]]:mkPiece("bars")}) || "") && seaWallProblem({[ring[0]]:mkPiece("lagoon")}) === null;
+      Pk[ring[1]] = mkPiece("concrete"); const mixedNo = !lagoonWalled(ge);
+      for(const k in Pk) delete Pk[k]; Object.assign(Pk, keepP); state.exhibits = [pe];
+      out.lagoonWall = lagoonOk && barsNo && gridOk && swapNo && mixedNo && BARRIERS.lagoon.pool && FENCE_SPRITES.lagoon && FENCE34.lagoon.sprite === "lagoon" && FENCE_EDGE.lagoon
+        && ["pristine", "degrading", "broken", "gate", "gate-1", "gate-2", "gate-3"].every(k => SPRITE_PACK[`sprites/fence/lagoon-${k}.png`])
+        && !/lagoon/i.test(barrierNeeded(M)) && (devMode() || /aren't open yet/.test(planPieces(pieceLine([700, 700], [710, 700]).keys, "lagoon").why || ""));
       out.seaWaterPrices = waterRate("sea") === WATER.perSqM * SEA_WATER.sea.price && waterRate("deep") === WATER.perSqM * SEA_WATER.deep.price && waterRate(undefined) === WATER.perSqM
         && SEA_WATER.deep.price > SEA_WATER.sea.price && WATER_TEX.sea && WATER_TEX.deep && WATER_TILES.sea && WATER_TILES.deep && (devMode() === waterTypes().includes("sea"));
       out.poolOnlyOpen = fitsHabitat(N, pe) && !fitsHabitat(N, {viv:"L", aqua:true, points:[]}) && !biomesOf(N) && SPECIES.filter(x => x.pool).every(x => !x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)) && SPECIES_INFO[x.id]);
@@ -3894,6 +3910,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       render();
       const hs = [...herd.values()].filter(h => h.exhibitId === pe.id);
       let wet = hs.length === 2 && hs.every(h => h.pool && h.el.querySelector(".dive") && poolSpot(h, pe, [h.x, h.y]));
+      for(const h of hs) h.act = null;   // a resting animal stays up at the surface
       for(let i = 0; i < 400 && wet; i++) for(const h of hs){ poolSwim(h, pe, .1); if(!poolSpot(h, pe, [h.x, h.y])) wet = false; }
       out.poolSwimStaysWet = wet && hs.some(h => (h.dive || 0) > 0);
       // galleries: on park ground beside the pool, a better view than a platform

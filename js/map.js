@@ -249,7 +249,7 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">${e.aqua ? "A" : "V"}${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5, lagoon:3.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
@@ -528,6 +528,7 @@ const FENCE34 = {
   stake:   {h:1.5, col:"#B8925C", sprite:"stake"},
   bone:    {h:2.4, col:"#E2D4B0", sprite:"bone"},
   rope:    {h:1.3, col:"#B8905A", sprite:"rope"},
+  lagoon:  {h:2.3, col:"#D6D0C0", solid:1, sprite:"lagoon"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -575,6 +576,7 @@ const FENCE_EDGE = {
   rope:{steel:{hi:"#D2AE7C", mid:"#B8905A", lo:"#8A6A40", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is frayed grey rope
   bone:{steel:{hi:"#F2E8CC", mid:"#E2D4B0", lo:"#B4A584", deep:"#867A5E"}, rust:{hi:"#DCC884", mid:"#C4AC70", lo:"#9A8450", deep:"#6E5C34"}},   // rust is yellowed bone
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
+  lagoon:{steel:{hi:"#E2DED3", mid:"#D6D0C0", lo:"#9E9A8E", deep:"#73706A"}, rust:{hi:"#9AB57F", mid:"#587C42", lo:"#415C31", deep:"#2F4323"}},   // rust is algae
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
 const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
@@ -2533,7 +2535,8 @@ function waterBox(){
   const look = kind || (host ? biomeOf(host) : parkBiome());
   let err = same ? "That water is already there." : null;
   if(!err && !parts.length) err = "Keep it inside the fence.";
-  for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true);
+  if(!err && SEA_WATER[kind] && !lagoonWalled(host)) err = "Only a lagoon wall holds sea water.";
+  for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true, kind);
   return {r, parts, ptsOf, host, kind, cost, same, look, m2:parts.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), err};
 }
 function waterDragStat(){

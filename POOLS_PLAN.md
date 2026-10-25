@@ -1,6 +1,6 @@
 # Pools: big marine animals (sessions S1 to S6)
 
-Decisions: a pool is a drawn exhibit, not a building. You fence a pen like any other and flood it with sea water using the water tool. Sea water is two water types with their own textures: Shallow sea (`sea`) and Deep sea (`deep`). Aquariums stay for the small sea animals; pools are for the big ones. Viewing Galleries are a building. Feeding shows come later (S6). Everything ships dev-only (`poolsOn()`, `DEV_BUILDINGS`, and the species are off `LAUNCH_ROSTER`) until the animals have art.
+Decisions: a pool is a drawn exhibit, not a building. You fence a pen with lagoon wall (the only fence that holds sea water and pool animals) and flood it with sea water using the water tool. Sea water is two water types with their own textures: Shallow sea (`sea`) and Deep sea (`deep`). Aquariums stay for the small sea animals; pools are for the big ones. Viewing Galleries are a building. Feeding shows come later (S6). Everything ships dev-only (`poolsOn()`, `DEV_BUILDINGS`, and the species are off `LAUNCH_ROSTER`) until the animals have art.
 
 Roster, one or two per period:
 

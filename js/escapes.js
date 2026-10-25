@@ -20,7 +20,7 @@ function isBreached(e){ return !e.viv && (condOf(e) <= 0 || !!e.open); }
 // The weakest barrier the animal needs, for advice
 function barrierNeeded(s){
   if(isFlyer(s)) return "aviary netting";
-  const ok = Object.values(BARRIERS).filter(b => b.strength >= escapeStrength(s)).sort((a, b) => a.strength - b.strength)[0];
+  const ok = Object.values(BARRIERS).filter(b => !b.pool && b.strength >= escapeStrength(s)).sort((a, b) => a.strength - b.strength)[0];
   return ok ? ok.label.toLowerCase() : "a moat";
 }
 
