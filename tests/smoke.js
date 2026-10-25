@@ -2570,6 +2570,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       for(let i = 0; i < 40; i++) staffTick(5);
        out.staffMorale = moraleOf(k) < m0 && moraleOf(k) >= 0 && c.stamina < 100 && moraleFactors(k, "keeper").some(f => !f.good);
       staffNight(); out.staffNight = c.stamina === 100 && k.workMin === 0;
+      // a worn-out custodian goes on break (slowly, at their closet, with no break room) and comes back
+      c.stamina = 10; cc.job = "idle"; cc.route = []; cc.cargo = null; const rn = {x:100, y:200, adj:new Map(), svc:new Set()}; cc.at = rn; kGraph.anchors["b-clo"] = rn;
+      const sent = staffMaybeRest(cc, [buildingById("b-clo")]) && cc.job === "resting";
+      for(let i = 0; i < 20; i++) staffRestStep(cc, 10);
+      delete kGraph.anchors["b-clo"];
+      out.staffBreak = sent && c.stamina >= 95 && cc.job === "idle" && custodianStatus(c).length > 0;
       // fire asks first, then removes; panel closes with the worker
       staffFireDialog(k.id);
       const dlg = document.getElementById("dlgConfirm"), asked = dlg.open && document.getElementById("confirmTitle").textContent === "Are you sure?" && state.staff.keepers.length === 1;

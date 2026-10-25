@@ -735,7 +735,7 @@ function stationHtml(b){
 }
 function breakroomHtml(b){
   let h = deptHead(b);
-  const resting = crew.filter(c => c.job === "resting" && kGraph && kGraph.anchors[b.id] === c.at);
+  const resting = [crew, vcrew, mcrew, ccrew, gcrew].flat().filter(c => c.job === "resting" && kGraph && kGraph.anchors[b.id] === c.at);
   h += `<div class="meta">${resting.length ? `${resting.length} on break` : "Nobody on break"}</div>`;
   return h;
 }

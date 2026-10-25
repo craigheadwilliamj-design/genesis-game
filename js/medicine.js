@@ -345,6 +345,7 @@ function vetDecide(c){
   // a vet the player called looks at that exhibit's sick animals first
   const call = callJob(c, "vet");
   if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
+  if(staffMaybeRest(c, pmcs())) return;
   // a finished specimen from the Genetics Lab goes to its exhibit before patients and check-ups
   const dv = deliveryJob(c, walkFrom(c.at, c));
   if(dv){
@@ -364,6 +365,7 @@ function vetDecide(c){
 }
 
 function vetArrive(c){
+  if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toPickup"){ labPickup(c, (n, job) => vetGo(c, n, job)); return; }
   if(c.job === "toDropoff"){ labDrop(c); return; }
   if(c.job === "hunting"){
@@ -454,6 +456,7 @@ function vetsTick(dtMin){
         if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone})[c.job](c);
         continue;
       }
+      if(c.job === "resting"){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = VET.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
@@ -485,7 +488,7 @@ function vetStatus(v){
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
-          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC",
+          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC", toRest:"Going on break", resting:"On break",
           toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the Genetics Lab`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
 }
 

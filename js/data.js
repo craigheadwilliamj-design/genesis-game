@@ -948,8 +948,10 @@ const KEEPER = {
 };
 // Staff overview: energy and morale for every hired worker (keepers tire by walking, so theirs lives in KEEPER)
 const STAFF = {
-  workDrain:.1,        // energy a mechanic, vet, custodian or guard loses per minute on a task
+  workDrain:.16,       // energy a mechanic, vet, custodian or guard loses per minute on a task
   idleDrain:.03,       // and per minute waiting around
+  restBelow:25,        // they take a break when energy drops under this
+  restPerMin:2,        // energy regained per minute in a break room (a quarter of that resting at their own building)
   moraleStep:200,      // morale closes the gap to what the job gives them over about this many minutes
   startMorale:70,
   worked:[.35, .85],   // a share of the day spent working that feels like a good day (less is boring, more is a grind)
