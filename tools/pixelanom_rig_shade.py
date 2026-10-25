@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Restyle the Anomalocaris rig's parts to the art direction: the dark outlines go (a silhouette edge becomes the lit or shaded
-shade of the color inside it by which side it faces, segment lines inside become grooves in the base's shadow tone with a lit
-line just behind each), and the hot crimson and peach move to the earthy palette family (brick red, rust orange, sand).
+shade of the color inside it by which side it faces, segment lines inside become deep grooves, each plate shaded on its back edge and lit on
+its front edge so the segments stand out), and the hot crimson and peach move to the earthy palette family (brick red, rust orange, sand).
 Each part is done in its own frame; far flaps stay a step darker and flat. Reads anom-rig.json, writes anom-shaded.json.
     python3 -I tools/pixelanom_rig_shade.py   then   python3 tools/rigger/anomalocaris/gen-clips.py"""
 import base64, io, json, os
@@ -21,9 +21,11 @@ ROLE = {   # old color -> (ramp, role); role "edge" means an outline pixel
     (208, 97, 37): (FLAP, 1), (173, 61, 1): (FLAP, "edge"), (130, 61, 25): (FLAP, 2), (229, 158, 121): (SAND, 1), (235, 150, 99): (SAND, 1),
     (150, 70, 29): (FARF, 1), (125, 44, 1): (FARF, "edge"), (94, 44, 20): (FARF, 2), (175, 134, 121): (FARF, 0),
 }
+BASES = ((168, 36, 62), (181, 39, 67), (155, 33, 57), (208, 97, 37))
 def restyle(im, far):
     W, H = im.size; px = im.load(); out = im.copy(); o = out.load()
     solid = lambda x, y: 0 <= x < W and 0 <= y < H and px[x, y][3] >= 128
+    grooves = []
     for y in range(H):
         for x in range(W):
             c = px[x, y]
@@ -37,10 +39,13 @@ def restyle(im, far):
                 if not solid(x, y - 1) or not solid(x - 1, y): role = 0 if not far else 1
                 elif not solid(x, y + 1): role = 3
                 elif not solid(x + 1, y): role = 2
-                else:   # a segment line inside: a groove, lit just behind it
-                    role = 2
-                    if solid(x - 1, y) and px[x - 1, y][:3] in ((168, 36, 62), (208, 97, 37)): o[x - 1, y] = (*ramp[0], 255)
+                else: role = 3; grooves.append((x, y, ramp))   # a segment line inside: a deep groove
             o[x, y] = (*ramp[role], 255)
+    # each plate's back edge (left of a groove) faces right, so it's shaded; its front edge (right of a groove) faces left, so it's lit
+    if not far:
+        for x, y, ramp in grooves:
+            if solid(x - 1, y) and px[x - 1, y][:3] in BASES: o[x - 1, y] = (*ramp[2], 255)
+            if solid(x + 1, y) and px[x + 1, y][:3] in BASES: o[x + 1, y] = (*ramp[0], 255)
     return out
 
 for n in proj["nodes"]:

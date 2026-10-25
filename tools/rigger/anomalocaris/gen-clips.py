@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Write anom-clips.json from anom-rig.json (the hand-made project): the parts as they are, and clips from one rippling stroke:
+"""Write anom-clips.json from anom-shaded.json (the hand-made anom-rig.json restyled by tools/pixelanom_rig_shade.py), and clips from one rippling stroke:
 `swim` (the side flaps beat in a wave from front to back, the far flaps half a beat behind, the tail fan sweeping and the body
 bobbing, grasping arms tucked back), `hover` (the same stroke small and slow, the arms swaying) and `grab` (the arms reach forward,
 snap back under the head to the mouth, chew a moment and let go).
@@ -8,7 +8,7 @@ In an aquarium the walk clip is its swim stroke. With SHEETS=<dir> in the enviro
 import json, math, os, sys
 here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(here, ".."))
-proj = json.load(open(os.path.join(here, "anom-rig.json")))
+proj = json.load(open(os.path.join(here, "anom-shaded.json")))   # the parts after tools/pixelanom_rig_shade.py
 BODY, HEAD, TAIL, ARM, ARMF = "n2", "n4", "n14", "n6", "n8"
 FA, FB, FAF, FBF = "n12", "n10", "n15", "n17"   # near front flaps, near rear flaps, and the far ones
 TAU = 2 * math.pi
