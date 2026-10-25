@@ -539,7 +539,7 @@ function waterProblem(pts, e, skip, cost, over, kind){
   if(!over && waterOf(e).some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && rectsHitPoly(footRects(f, e), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
-  if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
+  if(e.gate && !lagoonWalled(e) && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";   // a lagoon wall's gate is a platform over the water
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
 }
