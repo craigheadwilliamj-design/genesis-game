@@ -2356,7 +2356,7 @@ function setTool(t){
     showBar("Move", "Drag a building, exhibit, path or fence to a new spot. Tap a building, then Rotate (R) to turn it 90°. Drag a corner of an exhibit or any water to reshape it, or a + on an edge to add a corner. Tap a corner, then Delete corner.", "", {undo:true, finish:true, cancel:"Done", undoText:"Delete corner", finishText:"Rotate"});
     updateMoveBar();
   }
-  else if(t === "bulldoze") showBar("Bulldoze", `Tap an exhibit or building to remove it, tap an exhibit's gate to un-make it (the fence stays), or drag along a fence to lift what you sweep over. On bare ground, a tap takes the path chunk under it and a drag box takes every path chunk it touches (lit red as you drag) and lifts the fence in it; with no path or fence in it, it takes off painted biome ground. You get ${Math.round(COST.refundShare*100)}% of the build cost back.`, "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "bulldoze") showBar("Bulldoze", "", "", {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
