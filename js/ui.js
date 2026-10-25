@@ -270,7 +270,7 @@ function exOverviewHtml(e, rep){
     if(rep.issues.length) h += `<ul class="issues" style="margin-top:8px">${rep.issues.map(i => `<li class="${i.bad ? "bad" : ""}">${esc(i.text)}</li>`).join("")}</ul>`;
     h += `</section>`;
     h += `<section><h3>Animals here</h3><ul class="herd">${[...rep.counts].map(([sp, c]) => { const s = SPECIES_BY_ID[sp]; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span>${esc(s.name)} × ${c}${sexSplit(e, sp)}</span></li>`; }).join("")}</ul>
-      <div style="margin-top:6px;font-size:14px;color:var(--ink)">Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.</div></section>`;
+      <div style="margin-top:6px;font-size:14px;color:var(--ink)">${rep.need || !rep.wetNeed ? `Room used: ${fmtArea(rep.need)} of ${fmtArea(rep.area)}.` : ""}${rep.wetNeed ? `${rep.need ? " " : ""}Water used: ${fmtArea(rep.wetNeed)} of ${fmtArea(rep.wet)}.` : ""}</div></section>`;
   } else {
     h += `<section><h3>Empty</h3><div class="meta">${e.viv ? `Fits ${SPECIES.filter(s => fitsHabitat(s, e)).map(s => esc(s.name)).join(", ")}.` : "No animals."}</div>
       <div class="row" style="margin-top:6px"><button class="btn" data-action="extab" data-k="clone">Add animals</button></div></section>`;
@@ -344,6 +344,8 @@ function exGuestsHtml(e){
   if(!e.viv) h += `<div class="factor" style="grid-template-columns:80px 1fr 48px;margin-top:8px"><span>View</span>${meter(Math.min(100, view), view >= 100 ? "var(--good)" : view >= 60 ? "var(--warn)" : "var(--bad)")}<span>${view}%</span></div>`;
   const plats = e.viv ? 0 : state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id).length;
   if(!e.viv && (plats || hasTech("platform"))) h += `<div class="row" style="margin-top:6px"><span class="meta">Viewing platforms: ${plats}</span>${hasTech("platform") ? `<button class="btn" data-action="platformTool">Add a viewing platform</button>` : ""}</div>`;
+  const gals = state.buildings.filter(b => b.type === "gallery" && b.exhibitId === e.id).length;
+  if(isPool(e) && (gals || !buildingHidden("gallery"))) h += `<div class="row" style="margin-top:6px"><span class="meta">Viewing galleries: ${gals}</span>${buildingHidden("gallery") ? "" : `<button class="btn" data-action="galleryTool">Add a viewing gallery</button>`}</div>`;
   h += `<ul class="issues" style="margin-top:8px"><li class="${hasSign(e) ? "" : "warn"}">${hasSign(e) ? "Info sign" : "No info sign"}</li></ul></section>`;
   const day = (v, w) => `<div class="factor exday"><span>${v}</span>${w}</div>`;
   h += `<section><h3>Visitors</h3>${day("", `<span class="meta">Today</span><span class="meta">Yesterday</span>`)}`;
@@ -663,7 +665,7 @@ function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" titl
 
 // One animal in a buy or clone list, with warnings about fit and fighting
 function animalCard(s, rep, mode){
-  const free = rep.area - rep.need;
+  const free = s.pool && !rep.exhibit.viv ? poolM2(rep.exhibit, s) - (rep.wetNeed || 0) : rep.area - rep.need;   // a pool animal's room is its water
   const locked = state.rating + 1e-9 < starsNeed(s);
   let warn = "";
   for(const sp of rep.counts.keys()){ const w = conflict(s, SPECIES_BY_ID[sp]); if(w){ warn = w; break; } }
@@ -908,6 +910,7 @@ panelEl.addEventListener("click", e => {
   if(a === "netOff"){ it.net = false; done(); return; }
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
+  if(a === "galleryTool"){ setTool("gallery"); return; }
   if(a === "paintTool"){ setTool("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }

@@ -459,8 +459,8 @@ function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
   for(const e of state.exhibits){ if(cross(e.points.concat([e.points[0]]))) return false; if(inPoly(x1, y1, e.points)) return false; }
   for(const l of parkFences()) if(cross(l.points)) return false;
-  // only on guest paving the whole way (up to the last meter or so for a platform's steps, which stand just off the path)
-  const L = Math.hypot(x1 - x0, y1 - y0), end = skip && skip.type === "platform" ? L - 1.5 : L;
+  // only on guest paving the whole way (up to the last meter or so for a platform's steps or a gallery's door, which stand just off the path)
+  const L = Math.hypot(x1 - x0, y1 - y0), end = skip && (skip.type === "platform" || skip.type === "gallery") ? L - 1.5 : L;
   for(let t = 0; t <= end; t += .5){ const k = L ? t / L : 0; if(offPath(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
   if(end === L && offPath(x1, y1)) return false;
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
@@ -475,11 +475,11 @@ function standOk(x0, y0, x1, y1, skip){
 function standNear(p, pts, e, bld){
   const n = p.at;
   if(!n || !pts) return;
-  // a viewing platform on this exhibit within a short stroll: most would rather stand up there
+  // a viewing platform or gallery on this exhibit within a short stroll: most would rather watch from there
   if(e && Math.random() < SIGHT.deckShare){
     let best = null, bd = SIGHT.deckReach;
     for(const b of state.buildings){
-      if(b.type !== "platform" || b.exhibitId !== e.id || !(derived.reach && derived.reach[b.id])) continue;
+      if((b.type !== "platform" && b.type !== "gallery") || b.exhibitId !== e.id || !(derived.reach && derived.reach[b.id])) continue;
       const [cx, cy] = centroid(b.points), d = Math.hypot(cx - n.x, cy - n.y);
       if(d < bd){ bd = d; best = b; }
     }

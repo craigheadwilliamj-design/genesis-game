@@ -182,7 +182,7 @@ function pieceSpotProblem(k, with_ = new Set()){
     if(waterOf(e).some(w => lineThroughShape(seg, w.points))) return `It runs into the water in ${e.name}.`;
     if(landOf(e).some(f => LAND[f.type] && rectsHitLine(footRects(f, e), seg))) return `It runs into something in ${e.name}. Bulldoze it first.`;
   }
-  if(state.buildings.some(b => !b.exhibitId && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
+  if(state.buildings.some(b => parkGround(b) && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
   if(state.paths.some(p => !p.d && (linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) || pieceOnPath(k)) return "It runs into a path.";
   if(parkWater().some(w => lineThroughShape(seg, w.points))) return "It runs into water.";
   if(decorOf().some(f => LAND[f.type] && rectsHitLine(footRects(f, null), seg))) return "It runs into a plant, rock or statue.";
@@ -203,7 +203,7 @@ function faceProblem(f){
   if(!f.simple || f.nested) return "A pen inside another one has to share a wall with it.";
   const P = f.raw, inside = p => inPoly(p[0], p[1], P);
   if(state.paths.some(p => !p.d && p.points.some(inside)) || Object.keys(pathChunks()).some(k => { const [cx, cy] = chunkXY(k); return inside([(cx + .5) * CHUNK, (cy + .5) * CHUNK]); })) return "That would fence in a path.";
-  if(state.buildings.some(b => !b.exhibitId && inside(centroid(b.points)))) return "That would fence in a building.";
+  if(state.buildings.some(b => parkGround(b) && inside(centroid(b.points)))) return "That would fence in a building.";
   if(state.exhibits.some(e => !e.grid && inside(e.points[0]))) return "That would fence in another exhibit.";
   if(fenceLines().some(l => l.points.some(inside))) return "That would fence in another fence.";
   if(inside(state.gate)) return "That would fence in the entrance.";
@@ -361,7 +361,7 @@ function rehomeContents(notes){
     for(const w of waterOf(e).slice()){
       const [x, y] = centroid(w.points); if(inPoly(x, y, e.points)) continue;
       const to = home(x, y); e.water.splice(e.water.indexOf(w), 1);
-      if(to) (to.water = to.water || []).push(w); else { earn(Math.round(waterCost(w.points) * COST.refundShare), "sold"); sold++; }
+      if(to) (to.water = to.water || []).push(w); else { earn(Math.round(waterCost(w.points, w.kind) * COST.refundShare), "sold"); sold++; }
     }
   }
   if(sold) notes.push(`${sold} thing${sold === 1 ? "" : "s"} left outside the fence ${sold === 1 ? "was" : "were"} sold back.`);

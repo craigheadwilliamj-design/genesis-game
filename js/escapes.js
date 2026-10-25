@@ -26,7 +26,7 @@ function barrierNeeded(s){
 
 // Can this animal get out of this exhibit? Returns why, or null if it's held.
 function escapeRisk(e, s){
-  if(e.viv) return null;
+  if(e.viv || s.pool) return null;   // a pool animal can't leave the water
   if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out.`;
   if(e.moat) return null;
   if(e.open) return "Gap in the fence.";
@@ -37,12 +37,14 @@ function escapeRisk(e, s){
   return null;
 }
 
-// How well guests can see into an exhibit. Viewing platforms give an aerial view over any wall.
+// How well guests can see into an exhibit. Viewing platforms give an aerial view over any wall, a pool's viewing galleries a view under the water.
 function viewFactor(e, reach){
   if(e.viv) return 1;
   let f = barrierOf(e).view;
   const n = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id && reach[b.id]).length;
-  if(n) f = Math.max(f, 1) * Math.min(1.7, 1.4 + .15 * (n - 1));
+  const g = state.buildings.filter(b => b.type === "gallery" && b.exhibitId === e.id && reach[b.id]).length;
+  const k = Math.max(n ? Math.min(1.7, 1.4 + .15 * (n - 1)) : 1, g ? Math.min(GALLERY.most, GALLERY.view + GALLERY.more * (g - 1)) : 1);
+  if(k > 1) f = Math.max(f, 1) * k;
   return f;
 }
 

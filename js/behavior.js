@@ -330,7 +330,7 @@ function needsStep(e, a, s, ctx, dt){
   const n = needsOf(a), T = traitsOf(s), B = BEHAVIOR, aw = awake(s), food = foodOk(e, s, ctx), floor = thirstFloor(s, ctx);
   const mates = (ctx.counts.get(s.id) || 1) - 1, want = matesWanted(s);
   n.hunger += B.hunger * dt * (.5 + .5 * aw);
-  if(!s.aqua) n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
+  if(!s.aqua && !s.pool) n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
   const temper = {curious:1.4, skittish:.8, aggressive:1.1}[T.temper] * (T.temper === "curious" ? 1 - .3 * ctx.seen : 1);   // curious ones like watching the guests
   n.bored += B.bored * dt * aw * temper * (1.4 - ctx.enrich);
   if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1); else n.lonely -= B.social * dt;

@@ -33,9 +33,11 @@ const statueGrant = key => !statuesOn() ? null : GOALS.find(g => g.statue && "st
 const statueOpen = key => { const t = LAND[key]; if(!t || !t.statue) return true; if(!statuesOn()) return false; if(t.free) return true; const g = statueGrant(key); return !!g && state.goalsDone.includes(g.id); };
 const statueHint = key => { const g = statueGrant(key); return g ? `Earn it with the grant "${g.text}".` : ""; };
 const circlePts = (x, y, r, n = 14) => Array.from({length:n}, (_, i) => [x + r * Math.cos(i * 2 * Math.PI / n), y + r * Math.sin(i * 2 * Math.PI / n)]);
-const waterCost = pts => Math.round(area(pts) * WATER.perSqM);
+// a square meter of water: sea water costs more (SEA_WATER), deep sea most
+const waterRate = kind => WATER.perSqM * (SEA_WATER[kind] ? SEA_WATER[kind].price : 1);
+const waterCost = (pts, kind) => Math.round(area(pts) * waterRate(kind));
 // What bulldozing gets back for everything inside an exhibit
-const landRefund = e => Math.round((landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) + waterOf(e).reduce((n, w) => n + waterCost(w.points), 0)) * COST.refundShare);
+const landRefund = e => Math.round((landOf(e).reduce((n, f) => n + (LAND[f.type] ? LAND[f.type].price : 0), 0) + waterOf(e).reduce((n, w) => n + waterCost(w.points, w.kind), 0)) * COST.refundShare);
 
 // Mesozoic and Paleozoic plants each use up one plant of their period and size from the Botany Lab
 const potKey = t => t.tech && t.size ? (t.period || t.flora) + "-" + t.size : null;
@@ -257,8 +259,8 @@ function wantsOf(e, s){
   const a = area(e.points) || 1, l = likesOf(s), B = BIOMES[biomeOf(e)];
   const meat = !s.diet.some(d => d === "herbivore" || d === "omnivore");
   // no plants at all if its period had none in this biome (nothing to plant)
-  const none = s.aqua || !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);   // sea animals want no plants
-  return {water:waterWant(s), rock:Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
+  const none = s.aqua || s.pool || !(PLANTS_OF[s.period] && PLANTS_OF[s.period][biomeOf(e)]);   // sea animals want no plants
+  return {water:waterWant(s), rock:s.pool ? 0 : Math.max(1, Math.ceil(a / HAB.rockEvery * HAB.rockBase * B.rock * l.rock / .4)), plants:none ? 0 : Math.round(a * B.plants * (meat ? HAB.meatPlants : 1))};
 }
 // A plant counts for a species when it's from the animal's own period
 // Plants from another biome don't count for anything and make animals unhappy
@@ -327,6 +329,17 @@ function aquaTick(dtMin){
 // What's wrong with an aquarium's filtering, in a few words, or null
 const filterText = e => !wetCase(e) || aquaLoad(e) <= 0 ? null : !filters(e).length ? "No filter." : e.filterPowered === false ? "No power for the filters." : aquaClean(e) < aquaLoad(e) ? "Not enough filtering." : null;
 // Where an animal in a vivarium likes to be: in the pool (water lovers) or under a lamp (heat lovers), as {x, y, rx, ry} areas in meters
+/* ---------- pools: open exhibits flooded with sea water for the `pool` species (POOL, SEA_WATER) ---------- */
+// The water a pool animal swims in: the sea water, or any water for a `fresh` one
+const poolWater = (e, s) => waterOf(e).filter(w => (s && s.fresh) || SEA_WATER[w.kind]);
+const poolM2 = (e, s) => poolWater(e, s).reduce((n, w) => n + area(w.points), 0);
+const deepM2 = e => waterOf(e).filter(w => w.kind === "deep").reduce((n, w) => n + area(w.points), 0);
+const poolKinds = e => [...speciesCounts(e).keys()].map(sp => SPECIES_BY_ID[sp]).filter(s => s && s.pool);
+// How well the exhibit's water suits a pool animal, 0 to 1: enough of the floor under its water (wet), and enough of that deep for a `deep` one
+function poolFit(e, s){
+  const m2 = poolM2(e, s), wet = clamp(m2 / (area(e.points) || 1) / POOL.need, 0, 1), deep = !s.deep ? 1 : m2 > 0 ? clamp(deepM2(e) / m2 / POOL.deepNeed, 0, 1) : 0;
+  return {wet, deep, fit:wet * deep};
+}
 function vivHomes(e, s){
   const out = [];
   if(!e.viv) return out;
@@ -337,7 +350,7 @@ function vivHomes(e, s){
 // The pool an animal at (x, y) is standing in, or null (the water is the pool's inner ellipse, a bit smaller than its rim)
 const vivPoolAt = (e, x, y) => vivFit(e, "pool").find(f => { const r = LAND[f.type].r; return ((x - f.x) / (r * .85)) ** 2 + ((y - f.y) / (r * .42)) ** 2 <= 1; }) || null;
 // A water lover with no water to drink from or wade in (a vivarium's water is its pools)
-const thirsty = (e, s) => !s.aqua && likesOf(s).water >= HAB.wantsWater && (e.viv ? vivPoolM2(e) <= 0 && !e.palu : habitatOf(e).wet === 0);
+const thirsty = (e, s) => !s.aqua && !s.pool && likesOf(s).water >= HAB.wantsWater && (e.viv ? vivPoolM2(e) <= 0 && !e.palu : habitatOf(e).wet === 0);
 
 /* ---------- weather and shelter ---------- */
 function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
@@ -359,9 +372,9 @@ function rollWeather(){
 // Biggest animals go first, into the snuggest shelter they fit. `shelter` is what animals actually get, `idle` is room nobody here can use.
 function coverOf(e){
   const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
-  let need = 0, shade = 0;
+  let need = 0, shade = 0;   // pool animals ride out any weather under water
   const sizes = [], pools = [];
-  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push([n, s.id]); } }
+  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!s.pool && !(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push([n, s.id]); } }
   for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots && !(wk === "cold" && L.noCold)) pools.push({left:L.slots, fits:L.fits || 99, only:L.only}); shade += (L.shade || 0) * w.grove; }
   pools.sort((x, y) => x.fits - y.fits);
   let shelter = 0;
@@ -433,6 +446,17 @@ function habitatScore(e){
       if(hs < 1){ out.delta -= VIV_LAMP.lack * (1 - hs); if(hs <= 0) out.issues.push({bad:true, text:"Cold."}); }
     }
     return out;
+  }
+  // pool animals want nothing but water: enough of it, deep enough for the deep-sea ones
+  const pools = poolKinds(e);
+  if(pools.length){
+    const short = [], shallow = []; let fit = 0, pn = 0;
+    for(const [sp, c] of speciesCounts(e)){ const s = SPECIES_BY_ID[sp]; if(!s.pool) continue; const f = poolFit(e, s); fit += c * f.fit; pn += c; if(f.wet < 1) short.push(s.name); else if(f.deep < 1) shallow.push(s.name); }
+    fit /= pn; out.delta += (POOL.happy * fit - POOL.lack * (1 - fit)) * pn / e.animals.length;
+    if(short.length) out.issues.push({bad:true, text:`${pools.every(s => !poolM2(e, s)) ? "No sea water" : "Not enough water"}: ${short.join(", ")}.`});
+    if(shallow.length) out.issues.push({bad:true, text:`Too shallow: ${shallow.join(", ")}.`});
+    if(!short.length && !shallow.length) out.issues.push({bad:false, text:"Open water to swim in."});
+    if(pn === e.animals.length) return out;
   }
   const h = habitatOf(e), dry = [];
   let sat = 0, n = 0;
@@ -534,7 +558,7 @@ function parkWaterProblem(pts, skip, cost, over){
   return null;
 }
 function addWater(e, pts, kind, cost){
-  spend(cost === undefined ? waterCost(pts) : cost, "built");
+  spend(cost === undefined ? waterCost(pts, kind) : cost, "built");
   const w = {id:uid("w-"), points:pts};
   if(kind) w.kind = kind;   // the water's look (a WATER_TEX key); none means the biome it sits in
   if(e) (e.water = e.water || []).push(w); else (state.water = state.water || []).push(w);
@@ -545,23 +569,24 @@ function addWater(e, pts, kind, cost){
 const waterList = e => e ? (e.water = e.water || []) : (state.water = state.water || []);
 const rectPtsOf = r => [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]];
 function waterNetCost(e, pts, kind){
-  const r = rectOfPts(pts); if(!r) return waterCost(pts);
+  const r = rectOfPts(pts); if(!r) return waterCost(pts, kind);
   let same = 0;
   for(const o of waterList(e)){
     const q = rectOfPts(o.points); if(!q || o.kind !== kind) continue;
     same += Math.max(0, Math.min(r[2], q[2]) - Math.max(r[0], q[0])) * Math.max(0, Math.min(r[3], q[3]) - Math.max(r[1], q[1]));
   }
-  return Math.round(Math.max(0, area(pts) - same) * WATER.perSqM);
+  return Math.round(Math.max(0, area(pts) - same) * waterRate(kind));
 }
 // Is every part of this box already that water? (nothing to lay)
 function waterCovered(e, pts, kind){ const r = rectOfPts(pts); return !!r && waterNetCost(e, pts, kind) === 0; }
 // Cut a box out of the water of host (an exhibit, null: the park). Older boxes are split around it so boxes never overlap.
-// Returns the m² of water that went and the pieces that were left of the boxes it touched. Old corner-drawn water is left alone.
+// Returns the m² of water that went, what it cost to lay (worth) and the pieces that were left of the boxes it touched. Old corner-drawn water is left alone.
 function cutWater(host, r){
-  const list = waterList(host), left = []; let m2 = 0;
+  const list = waterList(host), left = []; let m2 = 0, worth = 0;
   for(const o of list.slice()){
     const q = rectOfPts(o.points); if(!q || !rectOverlap(q, r)) continue;
-    m2 += (Math.min(q[2], r[2]) - Math.max(q[0], r[0])) * (Math.min(q[3], r[3]) - Math.max(q[1], r[1]));
+    const cut = (Math.min(q[2], r[2]) - Math.max(q[0], r[0])) * (Math.min(q[3], r[3]) - Math.max(q[1], r[1]));
+    m2 += cut; worth += cut * waterRate(o.kind);
     const y0 = Math.max(q[1], r[1]), y1 = Math.min(q[3], r[3]);
     const top = [q[0], q[1], q[2], Math.max(q[1], r[1])], bottom = [q[0], Math.min(q[3], r[3]), q[2], q[3]];   // above and below the box, full width
     const pieces = [top, bottom, [q[0], y0, Math.max(q[0], r[0]), y1], [Math.min(q[2], r[2]), y0, q[2], y1]].filter(p => p[2] - p[0] > 0 && p[3] - p[1] > 0);
@@ -571,7 +596,7 @@ function cutWater(host, r){
     const more = pieces.slice(1).map(p => ({id:uid("w-"), points:rectPtsOf(p), ...(o.kind ? {kind:o.kind} : {})}));
     list.splice(at + 1, 0, ...more); left.push(...more);
   }
-  return {m2, left};
+  return {m2, worth, left};
 }
 // A chunk box cut to what an exhibit's fence leaves for water: the cells (half a meter across) that sit wholly inside the fence with WATER.margin to spare,
 // joined into rectangles. A straight wall gives one box; a slanted one gives steps. Out in the park (no host) the box is kept as it is.
@@ -632,17 +657,18 @@ function layWater(e, pts, kind){
 }
 // Painting ground over water takes it away, in the park and in every exhibit. The refund is the build price at refundShare.
 const waterHosts = () => [null, ...state.exhibits.filter(e => waterOf(e).length)];
-function waterCutM2(r){
-  let m2 = 0;
-  for(const h of waterHosts()) for(const o of waterOf(h || state)){ const q = rectOfPts(o.points); if(q && rectOverlap(q, r)) m2 += (Math.min(q[2], r[2]) - Math.max(q[0], r[0])) * (Math.min(q[3], r[3]) - Math.max(q[1], r[1])); }
-  return m2;
+// The water a box would take away: {m2, worth} (worth: what it cost to lay)
+function waterCut(r){
+  let m2 = 0, worth = 0;
+  for(const h of waterHosts()) for(const o of waterOf(h || state)){ const q = rectOfPts(o.points); if(!q || !rectOverlap(q, r)) continue; const c = (Math.min(q[2], r[2]) - Math.max(q[0], r[0])) * (Math.min(q[3], r[3]) - Math.max(q[1], r[1])); m2 += c; worth += c * waterRate(o.kind); }
+  return {m2, worth};
 }
-const waterCutRefund = m2 => Math.round(m2 * WATER.perSqM * COST.refundShare);
+const waterCutRefund = worth => Math.round(worth * COST.refundShare);
 // Cut the box out of all water, join what is left, pay the refund. Returns {m2, refund}.
 function cutWaterAll(r){
-  let m2 = 0;
-  for(const h of waterHosts()){ const c = cutWater(h, r); m2 += c.m2; for(const w of c.left) if(waterList(h).includes(w)) mergeWater(h, w); }
-  const refund = waterCutRefund(m2);
+  let m2 = 0, worth = 0;
+  for(const h of waterHosts()){ const c = cutWater(h, r); m2 += c.m2; worth += c.worth; for(const w of c.left) if(waterList(h).includes(w)) mergeWater(h, w); }
+  const refund = waterCutRefund(worth);
   if(refund) earn(refund, "sold");
   return {m2, refund};
 }
@@ -961,6 +987,8 @@ const WATER_TEX = {
   tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
   tundra:   {shore:"#EBF5F7", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
   boreal:   {shore:"#4C4A44", shoreW:1, lit:"#2E667F", dark:"#1E4A5E"},   // a 1 px shore line, no bank
+  sea:      {shore:"#E2D2A2", shoreW:1, lit:"#3AA6B4", dark:"#2C8896"},   // shallow sea (SEA_WATER): a pale sand shore line, no bank
+  deep:     {shore:"#C9B98C", shoreW:1, lit:"#1E4C86", dark:"#173E70"},   // deep sea: a darker sand shore line, and none against shallow sea
 };
 // A textured body of water is cut to the pixel grid (ROCK_MPP meters a pixel, the same as the tiles), so its shore is stair-stepped: one rect per run of cells whose
 // centers are inside the shape, a rim of shallows one pixel wide inside it (lighter on the top and left, deeper on the bottom and right) and a wet-mud bank outside it, cached by shape.

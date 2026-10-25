@@ -31,6 +31,7 @@ const BUILD_MENU = [
     {label:"Aquariums", sub:["aquaS", "aquaM", "aquaL"]},
     {label:"Gates", tool:"gate", price:() => money(GATE_COST)},
     {label:"Viewing Platforms", tool:"platform"},
+    {label:"Viewing Galleries", tool:"gallery"},
     {label:"Habitat Props", props:HABITAT_PROPS, note:"Place these inside an open exhibit. Barns, caves and burrows cover animals from heat waves, cold snaps and storms. Canopies cover them from heat and storms, but not the cold. Animals walk inside to hide, sleep and wait out bad weather, and aren't seen there. A privacy screen by the fence shields shy animals from the path's view without hiding them. Keepers walk in to fill food trays, which each hold one kind of food. Rubbing posts, log piles and mud wallows give bored animals something to do."},
     {label:"Fence Types", fences:true, note:"Pick a fence, then tap corners on the map. Close it on the first corner to make an exhibit, then give it a keeper gate. Or tap the last corner again to leave it open, like a hedge row along a path. Hedges and rope fences are only for show: guests like them, but they can't hold animals."},
   ]},
@@ -180,9 +181,9 @@ function menuRow(it){
   }
   if(it.water || it.paint){   // Water and Paint Ground list their types like the other lists: a row picks that type and turns the tool on
     const own = typeof state !== "undefined" && state ? parkBiome() : DEFAULT_BIOME, attr = it.water ? "data-water" : "data-paint";
-    const opts = it.water ? [["auto", "Own biome", "The water that goes with the ground it's laid on", "water-" + own]].concat(waterTypes().map(k => [k, BIOMES[k].label, BIOMES[k].ground, "water-" + k]))
+    const opts = it.water ? [["auto", "Own biome", "The water that goes with the ground it's laid on", "water-" + own]].concat(waterTypes().map(k => [k, waterLabel(k), SEA_WATER[k] ? "Sea water for pool animals" : BIOMES[k].ground, "water-" + k]))
       : Object.keys(BIOMES).map(b => [b, BIOMES[b].label, BIOMES[b].ground, "paint-" + b]).concat([["erase", "Erase", "Take ground paint off", "bulldoze"]]);
-    const price = k => it.water ? `${money(WATER.perSqM)}/m²` : k === "erase" ? "Free" : `$${BIOMES[k].perSqM.toFixed(2)}/m² in exhibits`;
+    const price = k => it.water ? `${money(waterRate(k))}/m²` : k === "erase" ? "Free" : `$${BIOMES[k].perSqM.toFixed(2)}/m² in exhibits`;
     const rows = opts.map(([k, label, tip, icon]) => `<button class="srow sub" ${attr}="${k}" aria-pressed="false" title="${esc(tip)}">${menuIcon(icon)}<span class="tl"><b>${esc(label)}</b><span class="price">${price(k)}</span></span></button>`).join("");
     return `<div class="sitem" data-open="${it.water ? "water" : "paint"}"><button class="srow head" aria-expanded="false">${menuIcon(it.water ? "water" : "paint")}<span class="tl"><b>${esc(it.label)}</b><span class="price">${it.water ? `${money(WATER.perSqM)}/m²` : "Free in the park"}</span></span><i class="chev" aria-hidden="true"></i></button><div class="ssub"><p class="snote">${esc(it.note)}</p>${rows}</div></div>`;
   }

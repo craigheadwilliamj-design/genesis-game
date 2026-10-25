@@ -539,7 +539,7 @@ const caseOf = e => (e.aqua ? AQUARIUMS : VIVARIUMS)[e.viv];
 // A diet can be written as one word or a list; treat it as a list everywhere
 for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
 const eats = (s, d) => s.diet.includes(d);
-const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.aqua ? ", marine" : "") + (s.bug ? ", bug" : "");
+const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.aqua || s.pool ? ", marine" : "") + (s.bug ? ", bug" : "");
 
 // Does species x go after species y? Returns how, or null if it leaves it alone.
 // The rules are explained next to SPECIES in data.js.
@@ -578,14 +578,16 @@ function connectedPathIds(guestsOnly){
 // Everything worth knowing about one exhibit: how happy it should be and why
 function exhibitReport(e){
   const counts = speciesCounts(e), a = area(e.points);
-  let need = 0;
-  for(const [sp, n] of counts) need += SPECIES_BY_ID[sp].space * n;
+  // pool animals' room is their water (POOL), everyone else's the floor
+  let need = 0, wetNeed = 0;
+  for(const [sp, n] of counts){ const s = SPECIES_BY_ID[sp]; if(s.pool && !e.viv) wetNeed += s.space * n; else need += s.space * n; }
+  const pools = wetNeed ? poolKinds(e) : [], wet = wetNeed ? poolM2(e, {fresh:pools.every(s => s.fresh)}) : 0;
   const issues = [];
   // A perfect exhibit (lots of room, right group sizes, home-era plants, fed, clean, no fighting) reaches 95%
   let target = 72;
-  if(need > 0){
-    const ratio = a / need;
-    if(ratio < 1){ target -= (1 - ratio) * 70; issues.push({bad:true, text:`Cramped: ${fmtArea(a)} of ${fmtArea(need)}.`}); }
+  if(need + wetNeed > 0){
+    const ratio = Math.min(need ? a / need : Infinity, wetNeed ? wet / wetNeed : Infinity);
+    if(ratio < 1){ target -= (1 - ratio) * 70; issues.push({bad:true, text:wetNeed && wet / wetNeed <= (need ? a / need : Infinity) ? `Cramped: ${fmtArea(wet)} of water for ${fmtArea(wetNeed)}.` : `Cramped: ${fmtArea(a)} of ${fmtArea(need)}.`}); }
     else if(ratio >= 1.5){ target += 12; issues.push({bad:false, text:"Plenty of room to roam."}); }
     else { target += 4; issues.push({bad:false, text:"Enough room."}); }
   }
@@ -613,8 +615,9 @@ function exhibitReport(e){
     else if(avgQ < 70){ target -= 5; issues.push({bad:true, text:`Sickly clones (${Math.round(avgQ)}% DNA).`}); }
   }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
-  if(counts.size && !e.aqua){   // an aquarium has no plants to speak of
-    const kinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]);
+  const landKinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]).filter(s => !s.pool);
+  if(landKinds.length && !e.aqua){   // an aquarium has no plants to speak of, and pool animals don't care
+    const kinds = landKinds;
     // Cenozoic animals are at home on the grass underfoot; older ones need plants from their own period (in the exhibit's biome)
     const away = kinds.filter(s => ERA_OF[s.period] !== "cenozoic" && !(haveOf(e, s).plants > 0));
     if(!away.length){ target += FLORA_HAPPY.home; issues.push({bad:false, text:`At home among ${kinds.every(s => ERA_OF[s.period] === "cenozoic") ? FLORA.cenozoic.plants : "plants from their own time"}.`}); }
@@ -667,7 +670,7 @@ function exhibitReport(e){
   if(known) issues.push({bad:true, text:`${known} sick or hurt.`});
   if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness.`});
   else if(sick) issues.push({bad:true, text:"Something seems off."});
-  return {area:a, need, target:clamp(target, 0, 100), issues, counts, exhibit:e};
+  return {area:a, need, wet, wetNeed, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
 
 // Rebuild all the worked-out numbers. Called whenever the park changes.
@@ -773,7 +776,7 @@ function refundFor(kind, item){
   if(kind === "exhibit" && item.grid) return Math.round((area(item.points) * COST.landPerSqM + ownPieceCost(item)) * COST.refundShare) + landRefund(item);
   if(kind === "exhibit") return Math.round((item.viv ? caseOf(item).price : exhibitCost(item.points, item.barrier)) * COST.refundShare) + landRefund(item);
   if(kind === "land") return Math.round(LAND[item.type].price * COST.refundShare);
-  if(kind === "water") return Math.round(waterCost(item.points) * COST.refundShare);
+  if(kind === "water") return Math.round(waterCost(item.points, item.kind) * COST.refundShare);
   if(kind === "path") return Math.round(pathCost(item.points, item.type) * COST.refundShare);
   if(kind === "fence") return Math.round(fenceLineCost(item.points, item.barrier) * COST.refundShare);
   if(kind === "building") return Math.round(BUILDINGS[item.type].price * COST.refundShare);
