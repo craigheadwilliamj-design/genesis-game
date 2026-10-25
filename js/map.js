@@ -2854,7 +2854,12 @@ function gateGhostSvg(g, inv){
   const [a, b] = [g.a, g.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
   const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k], gw = F && F.gateW ? F.gateW * ROCK_MPP : GATE_GHOST.w;
   const w = Math.min(L, gw), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
-  const hd = (F && F.gateW ? gw : GATE_GHOST.d) / 2, foot = [[-w / 2, -hd], [w / 2, -hd], [w / 2, hd], [-w / 2, hd]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
+  let v0 = -GATE_GHOST.d / 2, v1 = GATE_GHOST.d / 2;
+  if(F && F.gateW){   // a catwalk: the deck lies inside the fence, gw deep from the wall line
+    const poly = g.e ? g.e.points : g.pen ? g.pen.pts : null, mx = a[0] + ux * t, my = a[1] + uy * t, sgn = poly && inPoly(mx + uy * -1.5, my + ux * 1.5, poly) ? 1 : -1;
+    [v0, v1] = sgn > 0 ? [0, gw] : [-gw, 0];
+  }
+  const foot = [[-w / 2, v0], [w / 2, v0], [w / 2, v1], [-w / 2, v1]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
   const h = Math.max(GATE_GHOST.h, F ? F.h * ROCK_MPP : 0) / tf();   // the fence's height, stood back up against the squashed camera
   const col = g.ok ? "var(--good)" : "var(--bad)";
   return `<polygon points="${polyStr(hull2d(foot.concat(foot.map(p => [p[0], p[1] - h]))))}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
