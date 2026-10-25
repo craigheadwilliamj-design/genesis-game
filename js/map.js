@@ -3779,6 +3779,8 @@ $("#sideMenu").addEventListener("wheel", e => {
 }, {passive:false});
 $("#sideMenu").addEventListener("click", e => {
   const b = e.target.closest("button"); if(!b) return;
+  if(b.dataset.close === "a"){ sideOpen(false); return; }
+  if(b.dataset.close === "b"){ const it = b.closest(".sitem"); if(it){ it.classList.remove("open"); it.firstElementChild.setAttribute("aria-expanded", false); } return; }
   if(b.matches(".tbtn[data-cat]")){ sideOpen(sideCat === b.dataset.cat ? false : b.dataset.cat); return; }
   if(b.id === "supplyBtn"){ supplyOn = !supplyOn; b.setAttribute("aria-pressed", supplyOn); b.querySelector(".price").textContent = supplyOn ? "On" : "Off"; render(); return; }
   // picking a plain tool row closes any open sub-list (a biome's plants, say), so its own shape picker shows instead
