@@ -6,10 +6,11 @@
    either kind of path. Vivariums need no gate.
    ===================================================================== */
 
-const FOOD_OF_DIET = {herbivore:"plants", omnivore:"plants", carnivore:"meat", piscivore:"fish", insectivore:"insects"};
+const FOOD_OF_DIET = {herbivore:"plants", omnivore:"plants", carnivore:"meat", piscivore:"fish", insectivore:"insects", frugivore:"fruit", molluscovore:"shellfish"};
 // Plant-eaters from before the Cenozoic eat Paleoflora from the Botany Lab
 function foodType(s){
-  const base = FOOD_OF_DIET[s.diet[0]] || "plants";
+  const pick = ["frugivore", "molluscovore"].find(d => s.diet.includes(d)),   // a specialist eats its own food, whatever its first diet
+        base = FOOD_OF_DIET[pick || s.diet[0]] || "plants";
   return base === "plants" && ERA_OF[s.period] !== "cenozoic" ? "paleoflora" : base;
 }
 const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]);

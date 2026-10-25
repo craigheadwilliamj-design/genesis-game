@@ -960,7 +960,7 @@ const STORE_DAYS = 1.5;      // exhibits hold this many days of food
 const GATE_COST = 1500;
 const GATE_REACH = 4;        // a gate counts as on a road within this many meters
 
-const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
+const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E", fruit:"#C8466E", shellfish:"#8A7FB8"};
 
 // Staff buildings. They go beside a path or service road.
 BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:4000, upkeep:80, w:15, d:10, dept:true,
@@ -1263,13 +1263,15 @@ BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyp
    Food and medicine are real goods. They are bought at a Delivery Dock or made on site,
    sit in stores where they can spoil, and keepers carry them to where they're needed.
    --------------------------------------------------------------------- */
-// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at the Botany Lab.
+// Goods stored in buildings. Exhibits eat plants, meat, fish, insects, fruit, and shellfish. Paleoflora lives at the Botany Lab.
 //   spoil   share of a store's stock lost to rot each night
 const GOODS = {
   plants: {label:"Hay",      spoil:.04},
   meat:   {label:"Meat",     spoil:.15},
   fish:   {label:"Fish",     spoil:.20},
   insects:{label:"Insects",  spoil:.10},
+  fruit:  {label:"Fruit",    spoil:.18},
+  shellfish:{label:"Shellfish", spoil:.20},
   medpal: {label:"Paleozoic medicine", spoil:.02},
   medmes: {label:"Mesozoic medicine",  spoil:.02},
   medcen: {label:"Cenozoic medicine",  spoil:.02},
@@ -1279,7 +1281,7 @@ const GOODS = {
   drinks: {label:"Drinks",      spoil:.01},
   merch:  {label:"Merchandise", spoil:0},
 };
-const FEED_GOODS = ["plants", "meat", "fish", "insects"];
+const FEED_GOODS = ["plants", "meat", "fish", "insects", "fruit", "shellfish"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
 const CMED = "medmod";   // contemporary medicine: bought at the dock
 const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS, [CMED]);   // what the dock buys
@@ -1307,7 +1309,7 @@ const LOGI = {
   coldPower:25,        // kW a cold store draws
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
 };
-const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1};   // multiplied by the markup and FOOD_UNIT_COST
+const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1, fruit:1, shellfish:1};   // multiplied by the markup and FOOD_UNIT_COST
 const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, before the dock's markup
 
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
@@ -1317,8 +1319,8 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:15, d:10, dept:true,
-                       store:{cap:600, holds:["meat", "fish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
-                       full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
+                       store:{cap:600, holds:["meat", "fish", "fruit", "shellfish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops. Trucks come overnight and every two hours while the park is open. They need a service road to the entrance. Keepers and custodians carry it from here."};
@@ -1341,6 +1343,12 @@ BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery",
 BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:12000, upkeep:220, w:15, d:10, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
                        full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
+BUILDINGS.orchard   = {label:"Fruit Orchard", tag:"FRUIT", one:"a fruit orchard", glyph:"O", color:"#B8486A", price:13500, upkeep:260, w:20, d:15, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["fruit"], spoil:1, source:true}, makes:{fruit:40},
+                       full:"Fruit orchard", blurb:"Grows 40 units of fruit a day. It spoils fast, so keep a cold store nearby."};
+BUILDINGS.shellfarm = {label:"Shellfish Farm", tag:"SHELL", one:"a shellfish farm", glyph:"S", color:"#6F78A8", price:15000, upkeep:320, w:20, d:15, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["shellfish"], spoil:1, source:true}, makes:{shellfish:30},
+                       full:"Shellfish farm", blurb:"Raises 30 units of shellfish a day. It spoils fast, so keep a cold store nearby."};
 
 // Work zones: groups of keepers, exhibits, and stores. Keepers in a zone look after that zone's exhibits.
 const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
@@ -2771,8 +2779,8 @@ const waterWant = s => s.pool ? POOL.need : s.semi ? HAB.waterSemi : (biomesOf(s
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 // How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
-const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
-  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
+const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
@@ -2782,7 +2790,7 @@ const THEMES = {
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc"].includes(type) ? 1
-        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary"].includes(type) ? 2 : 0,
+        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary", "orchard", "shellfarm"].includes(type) ? 2 : 0,
       btex:["genesis-seam", "genesis-lab", "genesis-slate"],
       trim:[[{c:"#C9A24B", w:.9, at:.94}],
         [{c:"#1F3D2B", w:5, at:.985}, {c:"#C9A24B", w:.9, at:.92}],
@@ -2949,7 +2957,7 @@ const THEMES = {
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
     // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
-        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery"].includes(type) ? 1 : 2,
+        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
       btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
       trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
         [{c:"#33281E", w:3.2, at:1}, {c:"#CFC9B4", w:1.6, at:.94}, {c:"#33281E", w:.6, at:.9}],

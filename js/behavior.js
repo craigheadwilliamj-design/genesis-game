@@ -56,7 +56,7 @@ function napRoll(a, k, daily){
   return (x >>> 0) / 4294967296;
 }
 // Meat, fish and bug eaters hunt their food; plant eaters forage
-const isHunter = s => ["meat", "fish", "insects"].includes(foodType(s));
+const isHunter = s => ["meat", "fish", "insects", "shellfish"].includes(foodType(s));
 
 /* ---------- enrichment ---------- */
 // Toy points (Rubbing Posts, Log Piles, balls, treats and the like; bark hides, branches and so on in a vivarium) an exhibit's animals want: more for bigger herds and bigger animals

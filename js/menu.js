@@ -77,6 +77,8 @@ const BUILD_MENU = [
     {label:"Livestock Ranch", tool:"ranch"},
     {label:"Fish Hatchery", tool:"hatchery"},
     {label:"Insectary", tool:"insectary"},
+    {label:"Fruit Orchard", tool:"orchard"},
+    {label:"Shellfish Farm", tool:"shellfarm"},
     {label:"Paleo-Greenhouse", tool:"greenhouse"},
   ]},
 ];

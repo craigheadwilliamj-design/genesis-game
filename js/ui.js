@@ -516,7 +516,7 @@ function landHtml(e){
 
 // Habitat props tab: Shelters (barns, caves, canopies) and Food Trays, each with its own sub-tab
 const propsTabs = {sub:"shelters"};
-const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects"];
+const TRAY_FOODS = ["plants", "paleoflora", "meat", "fish", "insects", "fruit", "shellfish"];
 function propsHtml(e){
   const sub = ["trays", "toys"].includes(propsTabs.sub) ? propsTabs.sub : "shelters", isTray = k => !!LAND[k].tray, isToy = k => !LAND[k].vivToy && !!(LAND[k].toy || LAND[k].toyFor);
   const thumb = k => SHELTER_SPRITES[k] ? `sprites/shelter/${k}.png` : TRAY_SPRITES[k] ? `sprites/tray/${k}.png` : "";

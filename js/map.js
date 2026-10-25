@@ -457,6 +457,8 @@ const STAND34 = {
   greenhouse:{wall:3.5, rise:0, front:"lab", glass:true},
   insectary: {wall:4,   rise:0, front:"lab", glass:true, glassCol:"#C6D3A8"},
   hatchery:  {wall:3.5, rise:0, front:"lab", top:"tanks"},
+  shellfarm: {wall:3.5, rise:0, front:"lab", top:"tanks"},
+  orchard:   {wall:4,   rise:0, front:"lab", glass:true, glassCol:"#E3B5C0"},
   farm:      {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#9A3B2E", roofCol:"#6B6B66"},
   // the rest of the guest side
   edcenter:  {wall:5,   rise:2.6, front:"glass", sign:"EDUCATION"},
