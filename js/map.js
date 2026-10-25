@@ -548,8 +548,11 @@ function fenceSpriteSvg(kind, a, b, cond, gate, powered){
   if(gate){
     // the fence runs up to the gate's left post and starts again under its right one; the gate goes on top
     const GW = S.gateW || S.w, gw = Math.min(GW, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
-    for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
-    for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
+    if(S.gateW) for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));   // a catwalk stands over a whole wall
+    else {
+      for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
+      for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
+    }
     return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `, S.gateH || S.h, GW, S.gateDrop || 0);
   }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
