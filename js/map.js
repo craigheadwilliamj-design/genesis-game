@@ -543,14 +543,14 @@ function fenceSpriteSvg(kind, a, b, cond, gate, powered){
   if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
   const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st0 = fenceState(cond), off = !!FENCE_SPRITES[kind].power && powered === false, st = off && st0 !== "broken" ? st0 + "-off" : st0, Lp = L / ROCK_MPP;
   // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
-  const put = (at, w, pic = st, attr = "") => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image ${attr}href="${spriteUrl(`sprites/fence/${kind}-${pic}.png`)}" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
+  const put = (at, w, pic = st, attr = "", ph = S.h, iw = S.w, drop = 0) => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP + (drop - ph) * ROCK_MPP / TILT)})"><svg width="${w}" height="${ph}" viewBox="0 0 ${w} ${ph}"><image ${attr}href="${spriteUrl(`sprites/fence/${kind}-${pic}.png`)}" width="${iw}" height="${ph}" style="image-rendering:pixelated"/></svg></g>`;
   let s = "";
   if(gate){
     // the fence runs up to the gate's left post and starts again under its right one; the gate goes on top
-    const gw = Math.min(S.w, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
+    const GW = S.gateW || S.w, gw = Math.min(GW, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
     for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
     for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
-    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `);
+    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `, S.gateH || S.h, GW, S.gateDrop || 0);
   }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
   return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
@@ -609,12 +609,12 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
     if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
   }
   if(gate){
-    const y1 = Math.min(yb, Math.max(ya, gate.p[1] - S.w * px / 2) + S.w * px), y0 = Math.max(ya, y1 - S.w * px), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
+    const GW = (S.gateW || S.w) * px, y1 = Math.min(yb, Math.max(ya, gate.p[1] - GW / 2) + GW), y0 = Math.max(ya, y1 - GW), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
     for(const y of [y0, y1]) s += rect(x0, y - h, 3 * px, py, C.hi) + rect(x0 + px, y - h - py, px, py, au.hi) + rect(x0 + px, y - h, px, py, au.mid) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
     // shut: a latch on the split. Open (drawGates swaps them): a leaf swung out from each post.
     const swung = gate.f >= 2 && kind !== "lagoon", latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
     const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - h * .7, 4 * px, h * .5, C.mid) + rect(x0 + 3 * px, y - h * .7, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - h * .7, px, h * .5, C.lo)).join("");
-    if(kind === "lagoon") s += rect(x0 + 3 * px, ym - h * .25, 4 * px, py, C.deep) + rect(x0 + 3 * px, ym - h * .25 - py, 4 * px, py, "#3A92A0");   // a platform over the water, never swinging
+    if(kind === "lagoon") s += rect(x0 - 17 * px, y0 - h, 37 * px, y1 - y0, "#3A92A0") + rect(x0 - 17 * px, y0 - h, 37 * px, py, "#6AB0BE") + rect(x0 - 17 * px, y1 - h - py, 37 * px, py, "#2A6A76");   // a catwalk over the water, never swinging
     else s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
   }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
@@ -2841,9 +2841,9 @@ function findGateSpot(clientX, clientY){
 // The gate ghost: a block the gate's width standing in line with the fence side, as tall as that fence and GATE_GHOST.d deep, inside the side's ends like the gate picture; green where a gate works, red where it doesn't
 function gateGhostSvg(g, inv){
   const [a, b] = [g.a, g.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
-  const w = Math.min(L, GATE_GHOST.w), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
-  const hd = GATE_GHOST.d / 2, foot = [[-w / 2, -hd], [w / 2, -hd], [w / 2, hd], [-w / 2, hd]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
-  const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k];
+  const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k], gw = F && F.gateW ? F.gateW * ROCK_MPP : GATE_GHOST.w;
+  const w = Math.min(L, gw), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
+  const hd = (F && F.gateW ? gw : GATE_GHOST.d) / 2, foot = [[-w / 2, -hd], [w / 2, -hd], [w / 2, hd], [-w / 2, hd]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
   const h = Math.max(GATE_GHOST.h, F ? F.h * ROCK_MPP : 0) / tf();   // the fence's height, stood back up against the squashed camera
   const col = g.ok ? "var(--good)" : "var(--bad)";
   return `<polygon points="${polyStr(hull2d(foot.concat(foot.map(p => [p[0], p[1] - h]))))}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;

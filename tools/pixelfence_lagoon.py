@@ -3,7 +3,7 @@
 # (a breach smashed through the parapet, the rail snapped and hanging, a rubble heap).
 # Pixels are 0.13 m (ROCK_MPP), so a 3 m section is 23 px wide and the 2.3 m wall (FENCE34.lagoon.h) is 18 px tall, side-on, a pilaster and stanchion on the left edge so sections tile end to end.
 # Flat fills, no outline, light from the top left: a lit coping top and pilaster edge, shade under the coping, tiles in a steady rhythm of grout lines, panel seams as plain lines.
-# The keeper platform (lagoon-gate.png, same size) never wears or breaks: a pillar each end with a gold cap, the wall open (see-through) between them and a teal steel deck jutting out over the water with a rail and a gold marker plate (#D8B04A).
+# The keeper catwalk (lagoon-gate.png, 38 x 45 px: 5 m across, FENCE_SPRITES.lagoon gateW/gateH/gateDrop) never wears or breaks: a 5 m deep teal deck over the water seen from above with a rail on three sides, gold capped corner posts, and a ladder down the outside through a hatch, on stilts.
 # It doesn't swing: frames -1, -2, -3 are the same picture.
 # Usage: python3 -I tools/pixelfence_lagoon.py [outdir] [sheet.png]   (default sprites/fence; the optional sheet is a x14 view of every picture, wall on the top row and gate under it)
 import sys, os
@@ -22,12 +22,12 @@ GROUT = mix(C["mid"], C["lo"], .5)
 TOP = 5                         # the coping's top row: the rail stands on the five rows above it
 
 class Sec:
-    def __init__(s): s.px = {}
+    def __init__(s, w=W, h=H): s.px = {}; s.w = w; s.h = h
     def put(s, x, y, c):
-        if 0 <= x < W and 0 <= y < H: s.px[(x, y)] = c
+        if 0 <= x < s.w and 0 <= y < s.h: s.px[(x, y)] = c
     def clear(s, x, y): s.px.pop((x, y), None)
     def img(s):
-        im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0))
         for (x, y), c in s.px.items(): im.putpixel((x, y), c + (255,))
         return im
 
@@ -95,23 +95,41 @@ def broken():
     return s
 
 # ---- the keeper gate: pillars at x 0..2 and 20..22, teal steel double doors between with a split at x 10/11
-def gpost(s, x0):
-    for y in range(0, H - 1): s.put(x0, y, C["hi"]); s.put(x0 + 1, y, C["mid"]); s.put(x0 + 2, y, C["lo"])
-    for x in range(3): s.put(x0 + x, 0, G["hi"] if x == 1 else C["hi"]); s.put(x0 + x, 1, G["mid"] if x == 1 else C["mid"]); s.put(x0 + x, 2, C["lo"]); s.put(x0 + x, H - 1, C["deep"])
-    s.put(x0 + 1, TOP + 3, T["mid"]); s.put(x0 + 1, TOP + 4, T["lo"])
+GW, GH = 38, 45                 # the keeper catwalk: 5 m across (38 px), a 5 m deep deck seen from above (rows 0..26, half of it behind the wall line) and its 2.3 m face below (rows 27..44)
+DECK = 27
 
 def gate(sc=1.0):
-    # a keeper platform: the wall is open between two gold-capped pillars and a teal steel deck juts out over the water (the bottom rows), with a low rail along its front edge
-    s = Sec(); gpost(s, 0); gpost(s, 20)
-    for x in range(3, 20): s.put(x, H - 5, T["hi"]); s.put(x, H - 4, T["mid"]); s.put(x, H - 3, T["lo"])     # the deck's lit edge, planks, shaded underside
-    for x in range(4, 19, 3): s.put(x, H - 4, T["lo"])                                                         # plank seams
-    for x in range(3, 20): s.put(x, H - 2, T["deep"])
-    for x in (3, 19):
-        for y in range(TOP + 1, H - 5): s.put(x, y, S["hi"] if x == 3 else S["lo"])                            # rail posts at the deck's ends
-    for x in range(3, 20): s.put(x, TOP + 3, S["mid"]); s.put(x, TOP + 4, S["lo"])                             # the front rail
-    for x in (8, 14): 
-        for y in range(TOP + 3, H - 5): s.put(x, y, S["lo"])
-    for x in (10, 11): s.put(x, H - 4, G["hi"]); s.put(x, H - 3, G["mid"])                                     # the gold marker plate
+    s = Sec(GW, GH)
+    for y in range(5, DECK):                                                                                   # the deck: teal planks along its length, a seam every 5 px
+        for x in range(GW): s.put(x, y, T["hi"] if y % 5 == 0 else T["mid"] if y % 5 != 4 else T["lo"])
+    for y in range(5, DECK):
+        for x in range(4, GW - 3, 6): s.put(x, y, T["lo"])
+    for x in range(GW): s.put(x, 5, T["hi"]); s.put(x, DECK - 1, T["hi"])
+    for x in range(18, 22):                                                                                    # the hatch the ladder goes down through
+        for y in range(DECK - 6, DECK): s.put(x, y, mix(T["deep"], (20, 30, 40), .5))
+    for x in range(GW):                                                                                        # the back rail: a top rail and a mid rail on stanchions
+        s.put(x, 0, S["hi"]); s.put(x, 1, S["lo"]); s.put(x, 3, S["mid"])
+    for x in range(0, GW, 9): 
+        for y in range(0, 6): s.put(x, y, S["hi"]); s.put(x + 1, y, S["lo"])
+    for x in (0, 1, GW - 2, GW - 1):                                                                           # the side rails, seen end on, and gold capped corner posts
+        for y in range(0, DECK): s.put(x, y, S["hi"] if x < 2 else S["lo"])
+    for x in (0, GW - 2):
+        for y in (0, 1): s.put(x, y, G["hi"]); s.put(x + 1, y, G["mid"])
+    for y in range(2, DECK, 4):
+        for x in (2, GW - 3): s.put(x, y, S["mid"])
+    for x in (16, 21):
+        for y in range(DECK - 9, DECK): s.put(x, y, S["hi"] if x == 16 else S["lo"])                          # the ladder's rails rising through the hatch
+    for x in range(GW):                                                                                        # the fascia beam under the deck edge, then open stilts and the ladder down the outside
+        s.put(x, DECK, C["hi"]); s.put(x, DECK + 1, C["mid"]); s.put(x, DECK + 2, C["lo"]); s.put(x, DECK + 3, C["deep"])
+    for x0 in (2, GW - 5):
+        for y in range(DECK + 4, GH - 1):
+            s.put(x0, y, C["hi"]); s.put(x0 + 1, y, C["mid"]); s.put(x0 + 2, y, C["lo"])
+        for x in range(3): s.put(x0 + x, GH - 1, C["deep"])
+    for y in range(DECK + 4, GH):
+        s.put(16, y, S["hi"]); s.put(17, y, S["lo"]); s.put(20, y, S["hi"]); s.put(21, y, S["lo"])
+        if (y - DECK) % 3 == 0:
+            for x in range(18, 20): s.put(x, y, S["mid"])
+    for x in (18, 19): s.put(x, DECK + 1, G["hi"]); s.put(x, DECK + 2, G["mid"])                                # the gold marker plate on the fascia
     return s
 
 if __name__ == "__main__":
@@ -121,10 +139,10 @@ if __name__ == "__main__":
     states = {"pristine": pristine(), "degrading": degrading(), "broken": broken()}
     gates = {"": gate(1.0), "-1": gate(1.0), "-2": gate(1.0), "-3": gate(1.0)}
     z, gap = 14, 4
-    sheet = Image.new("RGBA", ((max(len(states), len(gates)) * (W + gap) + gap) * z, (2 * (H + gap) + gap // 2) * z), (176, 190, 150, 255))
+    sheet = Image.new("RGBA", ((max(len(states) * (W + gap), len(gates) * (GW + gap)) + gap) * z, (H + GH + 3 * gap) * z), (176, 190, 150, 255))
     for row, (pre, group) in enumerate((("lagoon-", states), ("lagoon-gate", gates))):
         for i, (name, sec) in enumerate(group.items()):
             im = sec.img(); im.save(f"{out}/{pre}{name}.png")
-            sheet.alpha_composite(im.resize((W * z, H * z), Image.NEAREST), ((gap + i * (W + gap)) * z, (gap // 2 + row * (H + gap)) * z))
+            sheet.alpha_composite(im.resize((im.width * z, im.height * z), Image.NEAREST), ((gap + i * (im.width + gap)) * z, (gap + row * (H + gap)) * z))
             print(pre + name, im.size)
     if sheet_path: sheet.save(sheet_path)
