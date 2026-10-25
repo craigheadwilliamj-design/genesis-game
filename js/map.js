@@ -298,9 +298,11 @@ function render(){
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
-    if(e.gate){   // a gate with its own picture only shows the marker when it has a problem
-      const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
-      if(gi < 0 || !ok) s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    if(e.gate && gi < 0){   // a gate with no picture of its own shows the standard gate
+      let bs = null;
+      e.points.forEach((v, i) => { const q = e.points[(i + 1) % e.points.length], r = segProj(e.gate[0], e.gate[1], v, q); if(!bs || r.d < bs.d) bs = {d:r.d, a:v, b:q}; });
+      const L = Math.hypot(bs.b[0] - bs.a[0], bs.b[1] - bs.a[1]) || 1, hw = Math.min(L, GATE_GHOST.w) / 2, ux = (bs.b[0] - bs.a[0]) / L, uy = (bs.b[1] - bs.a[1]) / L;
+      s += gateGlyphSvg([e.gate[0] - ux * hw, e.gate[1] - uy * hw], [e.gate[0] + ux * hw, e.gate[1] + uy * hw], GATE_GHOST.h / tf(), "#D8B04A");
     }
     s += `</g>`;
     if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
@@ -2849,7 +2851,7 @@ function findGateSpot(clientX, clientY){
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
 }
-// The gate ghost: a block the gate's width standing in line with the fence side, as tall as that fence and GATE_GHOST.d deep, inside the side's ends like the gate picture; green where a gate works, red where it doesn't
+// The gate ghost: the standard gate (posts, rails, panel) the gate's width in line with the fence side, as tall as that fence; green where a gate works, red where it doesn't
 function gateGhostSvg(g, inv){
   const [a, b] = [g.a, g.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
   const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k], gw = F && F.gateW ? F.gateW * ROCK_MPP : GATE_GHOST.w;
@@ -2861,15 +2863,14 @@ function gateGhostSvg(g, inv){
   }
   const foot = [[-w / 2, v0], [w / 2, v0], [w / 2, v1], [-w / 2, v1]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
   const h = Math.max(GATE_GHOST.h, F ? F.h * ROCK_MPP : 0) / tf();   // the fence's height, stood back up against the squashed camera
-  const col = g.ok ? "var(--good)" : "var(--bad)";
-  return `<polygon points="${polyStr(hull2d(foot.concat(foot.map(p => [p[0], p[1] - h]))))}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  const mid = (v0 + v1) / 2, p0 = [a[0] + ux * (t - w / 2) - uy * mid, a[1] + uy * (t - w / 2) + ux * mid], p1 = [a[0] + ux * (t + w / 2) - uy * mid, a[1] + uy * (t + w / 2) + ux * mid];
+  return gateGlyphSvg(p0, p1, h, g.ok ? "var(--good)" : "var(--bad)");
 }
-// The convex hull of some points, in order round (monotone chain)
-function hull2d(P){
-  const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
-  for(const q of p){ while(lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
-  for(const q of p.reverse()){ while(hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
-  return lo.slice(0, -1).concat(hi.slice(0, -1));
+// The standard gate picture: two posts, a top and a middle rail and a faint panel between, from foot point p0 to p1 and h tall
+function gateGlyphSvg(p0, p1, h, col){
+  const up = p => [p[0], p[1] - h], q0 = up(p0), q1 = up(p1), m0 = [p0[0], p0[1] - h * .45], m1 = [p1[0], p1[1] - h * .45];
+  const ln = (u, v, wd) => `<line x1="${u[0]}" y1="${u[1]}" x2="${v[0]}" y2="${v[1]}" stroke-width="${wd}" vector-effect="non-scaling-stroke"/>`;
+  return `<g stroke="${col}" stroke-linecap="round" pointer-events="none"><polygon points="${polyStr([p0, p1, q1, q0])}" fill="${col}" fill-opacity=".25" stroke="none"/>${ln(p0, q0, 3)}${ln(p1, q1, 3)}${ln(q0, q1, 2)}${ln(m0, m1, 2)}${ln(p0, p1, 1.5)}</g>`;
 }
 // A gate on a pen also buys the ground it fences in
 const penCost = f => GATE_COST + Math.round(newGround([f]) * COST.landPerSqM);
