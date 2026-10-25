@@ -10,7 +10,7 @@ const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="lo
 
 // Which tab is open in each department's panel
 const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"Genetics Lab", title:"Genetics Lab upgrades", color:"#4B3A8C"}, {key:"ghost", label:"Time Travel Lab", title:"Time Travel Lab upgrades", color:"#4B3A8C"}];
-let tarTab = "clone", oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic";
+let oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
@@ -270,12 +270,6 @@ function tarHtml(b){
   h += tabBar("tartab", [{key:"clone", label:"Cloning", color:"#4B3A8C"}, {key:"specimens", label:`Specimens${specimens().length ? ` (${specimens().length})` : ""}`, color:"#4B3A8C"}], tarTab);
   if(tarTab === "specimens") return h + specimensHtml();
   h += sciStaffHtml("gene");
-  h += tabBar("ttab", [{key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"crated", label:`Crated${sc.ready.length ? " " + sc.ready.length : ""}`, color:"#8A6238"}], tarTab);
-  if(tarTab === "crated"){
-    if(!sc.ready.length) return h + `<section><div class="meta">No finished clones.</div></section>`;
-    return h + `<section><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp];
-      return `<li>${crateImg()}<span><b>${esc(r.name || s.name)}</b> ${sexMark(r)} <span class="meta">${esc(s.name)} · ${r.q}% DNA</span></span><button class="btn sell" data-action="crateTool" data-id="${esc(r.id)}">Move</button></li>`; }).join("")}</ul></section>`;
-  }
   const speed = Math.round(cloneSpeed() * 100);
   h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");
   if(speed !== 100) h = h.replace(/<\/section>$/, `<div class="meta">Speed ${Math.round(10000 / speed)}%</div></section>`);
@@ -357,7 +351,6 @@ function ceresHtml(b){
 panelEl.addEventListener("click", ev => {
   const b = ev.target.closest("[data-action]"); if(!b) return;
   const a = b.dataset.action, done = () => { afterChange(); render(); };
-  if(a === "ttab"){ tarTab = b.dataset.k; ui.panel(); return; }
   if(a === "omain"){ oracleMain = b.dataset.k; ui.panel(); return; }
   if(a === "omanage"){ oracleManage = b.dataset.k; ui.panel(); return; }
   if(a === "oera"){ oracleEra = b.dataset.k; ui.panel(); return; }
