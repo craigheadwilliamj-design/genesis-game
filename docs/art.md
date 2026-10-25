@@ -42,6 +42,7 @@ Everything guests walk past (buildings, path props, paths) is being redone to ma
 
 **Views and facing**
 - Everything faces north, south, east or west (no 45° turns). A building or prop that can turn has four pictures, `<name>-front|back|left|right.png`: front is the door or front looking down the screen, back looking up, left and right the front at that end. Make the side views from the turned footprint (an 8 x 6 m building turned is 6 m across), not by reusing the front's width.
+- Every building has a footprint whose width and depth are multiples of 5 m (`w` and `d` in `BUILDINGS`, data.js). Path props (`prop:true`: bins, benches, lamps, signs) are exempt.
 - Keep the walls, eaves and base at the same rows in every view, so nothing jumps when it turns. Center each view on the same column.
 - State variants are extra pictures, not tints: `-full` (a bin's heap of litter), `-broken` (lid knocked off, planks missing).
 
