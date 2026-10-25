@@ -921,7 +921,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "galleryTool"){ setTool("gallery"); return; }
-  if(a === "paintTool"){ setTool("paint"); return; }
+  if(a === "paintTool"){ openLandList("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
   if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
@@ -942,7 +942,7 @@ panelEl.addEventListener("click", e => {
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
-  if(a === "waterTool"){ setTool("water"); return; }
+  if(a === "waterTool"){ openLandList("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
   if(a === "place"){ const why = uncrate(b.dataset.id, it); if(why) ui.toast(why, "bad"); else { afterChange(); render(); } done(); return; }

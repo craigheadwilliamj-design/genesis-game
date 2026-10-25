@@ -287,6 +287,14 @@ function showRockPicker(){
   if(sideCat !== "land") sideOpen("land");
   refreshShapes();
 }
+// The exhibit panel's Paint ground and Water buttons open the Landscaping tray with that list up as menu B, so you pick the type there
+function openLandList(name){
+  if(tool !== "select") cancelTool();
+  if(sideCat !== "land") sideOpen("land");
+  document.querySelectorAll("#sideBody .trayA .sitem.open").forEach(x => { x.classList.remove("open"); x.firstElementChild.setAttribute("aria-expanded", false); });
+  const it = document.querySelector(`#sideBody .sitem[data-open="${name}"]`);
+  if(it){ it.classList.add("open"); it.firstElementChild.setAttribute("aria-expanded", true); }
+}
 function refreshMenu(){
   if(!state) return;
   refreshShapes(); refreshPlantBiome();
