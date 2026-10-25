@@ -53,6 +53,7 @@ const BUILD_MENU = [
   ]},
   {id:"staff", label:"Staff Buildings", items:[
     {label:"Keeper Hut", tool:"station"},
+    {label:"Dive Shack", tool:"diveshack"},
     {label:"Break Room", tool:"breakroom"},
     {label:"Workshop", tool:"workshop"},
     {label:"Custodian Closet", tool:"closet"},

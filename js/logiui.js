@@ -68,10 +68,11 @@ function warehouseHtml(b){
 function zoneHtml(z){
   const m = zoneMembers(z);
   let h = "";
-  h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
+  h += `<div class="row"><span class="status ok" style="background:${z.color};color:#fff">${m.keepers.length + m.aquarists.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff</span><span class="meta">${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}, ${fmtArea(area(z.points))}</span></div>`;
 
   const issues = [];
-  if(m.exhibits.some(e => e.animals.length) && !m.keepers.length) issues.push(state.staff.keepers.some(k => !k.zone) ? "No keeper assigned (unassigned keepers cover it)." : "No keeper assigned.");
+  if(m.exhibits.some(e => e.animals.length && !aquaEx(e)) && !m.keepers.length) issues.push(state.staff.keepers.some(k => !isAqua(k) && !k.zone) ? "No keeper assigned (unassigned keepers cover it)." : "No keeper assigned.");
+  if(m.exhibits.some(e => e.animals.length && aquaEx(e)) && !m.aquarists.length) issues.push(state.staff.keepers.some(k => isAqua(k) && !k.zone) ? "No aquarist assigned (unassigned aquarists cover it)." : "No aquarist assigned.");
   if(m.exhibits.some(e => e.animals.length) && !m.stores.some(b => storeOf(b) && storeOf(b).holds.some(t => FEED_GOODS.includes(t)))) issues.push("No food store in this zone.");
   for(const e of m.exhibits) if(e.animals.length && !gateCheck(e).ok) issues.push(`${e.name}: keepers can't get in.`);
   if(issues.length) h += `<ul class="issues" style="margin-top:6px">${issues.map(i => `<li class="bad">${esc(i)}</li>`).join("")}</ul>`;
@@ -97,10 +98,18 @@ function zoneHtml(z){
   };
   h += `<section><h3>Keepers</h3>`;
   h += m.keepers.length ? `<ul class="herd">${m.keepers.map(k => row("keeper", k, k.name, esc(keeperStatus(k)))).join("")}</ul>` : `<div class="meta">None assigned.</div>`;
-  const freeK = state.staff.keepers.filter(k => !k.zone), otherK = state.staff.keepers.filter(k => k.zone && k.zone !== z.id);
+  const freeK = state.staff.keepers.filter(k => !isAqua(k) && !k.zone), otherK = state.staff.keepers.filter(k => !isAqua(k) && k.zone && k.zone !== z.id);
   h += `<div class="meta" style="margin-top:6px">${freeK.length ? `${freeK.length} unassigned keeper${freeK.length === 1 ? "" : "s"}` : "No unassigned keepers"}</div>`;
   h += addRow(z, [...freeK.map(k => ["keeper", k.id, k.name]), ...otherK.map(k => ["keeper", k.id, `${k.name} (${zoneName(k.zone)})`])], "Add a keeper…");
   h += `</section>`;
+  const aq = state.staff.keepers.filter(isAqua);
+  if(aq.length || m.aquarists.length){
+    h += `<section><h3>Aquarists</h3>`;
+    h += m.aquarists.length ? `<ul class="herd">${m.aquarists.map(k => row("keeper", k, k.name, esc(keeperStatus(k)))).join("")}</ul>` : `<div class="meta">None assigned.</div>`;
+    const freeA = aq.filter(k => !k.zone), otherA = aq.filter(k => k.zone && k.zone !== z.id);
+    h += addRow(z, [...freeA.map(k => ["keeper", k.id, k.name]), ...otherA.map(k => ["keeper", k.id, `${k.name} (${zoneName(k.zone)})`])], "Add an aquarist…");
+    h += `</section>`;
+  }
   if(state.staff.mechanics.length || m.mechanics.length) h += staffSection("Mechanics", "mechanic", state.staff.mechanics, m.mechanics, mechanicStatus);
   if(state.staff.vets.length || m.vets.length) h += staffSection("Vets", "vet", state.staff.vets, m.vets, vetStatus);
   if(state.staff.custodians.length || m.custodians.length) h += staffSection("Custodians", "custodian", state.staff.custodians, m.custodians, custodianStatus);
@@ -110,7 +119,7 @@ function zoneHtml(z){
   h += m.exhibits.length ? `<ul class="herd">${m.exhibits.map(e => row("exhibit", e, e.name, `${e.animals.length} animal${e.animals.length === 1 ? "" : "s"}`)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.exhibits.filter(e => e.zone !== z.id).map(e => ["exhibit", e.id, e.zone ? `${e.name} (${zoneName(e.zone)})` : e.name]), "Add an exhibit…");
   h += `</section><section><h3>Buildings</h3>`;
-  const zb = b => storeOf(b) || ["station", "breakroom", "workshop", "generator", "depot"].includes(b.type);
+  const zb = b => storeOf(b) || ["station", "diveshack", "breakroom", "workshop", "generator", "depot"].includes(b.type);
   h += m.stores.length ? `<ul class="herd">${m.stores.map(b => row("building", b, BUILDINGS[b.type].label)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.buildings.filter(b => zb(b) && b.zone !== z.id).map(b => ["building", b.id, b.zone ? `${BUILDINGS[b.type].label} (${zoneName(b.zone)})` : BUILDINGS[b.type].label]), "Add a building…");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="claimZone">Claim everything inside</button></div></section>`;
@@ -160,7 +169,7 @@ function logiOverviewHtml(){
 function zonesSectionHtml(){
   let h = `<section id="zonesSection">`;
   h += `<h3>Work zones</h3>`;
-  if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
+  if(zones().length) h += `<ul class="deptlist">${zones().map(z => { const m = zoneMembers(z); return `<li><button class="btn" data-action="gotoZone" data-id="${esc(z.id)}" style="padding:3px 9px;border-left:6px solid ${z.color}">${esc(z.name)}</button><span>${m.keepers.length + m.aquarists.length + m.mechanics.length + m.vets.length + m.custodians.length + m.guards.length} staff, ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"}, ${m.stores.length} building${m.stores.length === 1 ? "" : "s"}</span></li>`; }).join("")}</ul>`;
   else h += `<div class="meta">No zones.</div>`;
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="zoneTool">Draw a zone</button><button class="btn" data-action="supplyToggle">${supplyOn ? "Hide" : "Show"} supply lines</button></div></section>`;
   return h;

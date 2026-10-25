@@ -946,10 +946,14 @@ const KEEPER = {
   topUpBelow:.6,       // keepers only set out to feed an exhibit once its food drops under this share of a full store
   restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)
 };
+// Aquarists do keepers' work (same Keeper Station, same gear) but only for lagoons and aquariums; keepers leave those alone
+const AQUARIST = {hireCost:KEEPER.hireCost, wage:KEEPER.wage};
 // Staff overview: energy and morale for every hired worker (keepers tire by walking, so theirs lives in KEEPER)
 const STAFF = {
-  workDrain:.1,        // energy a mechanic, vet, custodian or guard loses per minute on a task
+  workDrain:.16,       // energy a mechanic, vet, custodian or guard loses per minute on a task
   idleDrain:.03,       // and per minute waiting around
+  restBelow:25,        // they take a break when energy drops under this
+  restPerMin:2,        // energy regained per minute in a break room (a quarter of that resting at their own building)
   moraleStep:200,      // morale closes the gap to what the job gives them over about this many minutes
   startMorale:70,
   worked:[.35, .85],   // a share of the day spent working that feels like a good day (less is boring, more is a grind)
@@ -1315,6 +1319,9 @@ const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, befor
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
 BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
 BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: custodians restock them from bigger stores.";
+// The aquarists' own station: the same building and store, for lagoons and aquariums
+BUILDINGS.diveshack = {...BUILDINGS.station, label:"Dive Shack", tag:"AQUARISTS", one:"a dive shack", glyph:"D", color:"#1F6F9F", full:"Food storage and aquarist lockers",
+  blurb:"Aquarists start here and hold a small stock of food. Zone hubs: custodians restock them from bigger stores."};
 BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:6750, upkeep:50, w:15, d:10, dept:true,
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
@@ -2780,7 +2787,7 @@ const waterWant = s => s.pool ? POOL.need : s.semi ? HAB.waterSemi : (biomesOf(s
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 // How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
-  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station"].includes(type) ? 0 : 1;
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station", "diveshack"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
@@ -2834,7 +2841,7 @@ const THEMES = {
     path:{live:"#4A1E14", dead:"#3A3436", edge:"#141113"}, bld:"#1A1719", mix:.92, edge:"#8A8488", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     // roofs by how hot a building runs: 0 storage and shops (dark basalt), 1 kitchens, hotels and work buildings (basalt with glowing seams), 2 labs, medicine and generators (steel plating, ember strips and vents)
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
-        : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "toolshed"].includes(type) ? 1 : 0,
+        : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "diveshack", "toolshed"].includes(type) ? 1 : 0,
       btex:["volcanic-basalt-dim", "volcanic-basalt", "volcanic-plate"],
       trim:[[{c:"#5C7A8C", w:1}],
         [{c:"#141113", w:3, dash:"1 1.6 1 1.6 1 1.6 1 18"}, {c:"#E0561C", w:1, dash:"6 24"}],
@@ -2957,7 +2964,7 @@ const THEMES = {
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
     // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
-        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
+        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "diveshack", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
       btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
       trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
         [{c:"#33281E", w:3.2, at:1}, {c:"#CFC9B4", w:1.6, at:.94}, {c:"#33281E", w:.6, at:.9}],
@@ -3103,7 +3110,7 @@ const GOALS = [
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:5000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
   {id:"food",     text:"Build a Food Cart",                  hint:"Pick Food, then Cart, and tap next to a path. Tap the cart and choose what it sells. Hungry guests rate the park lower.", reward:3500,  check:g=>g.state.buildings.some(b=>b.type==="kiosk" && (b.menu||[]).length)},
   {id:"restroom", text:"Build Restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:5000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
-  {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.length>0},
+  {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.some(k=>k.role!=="aqua")},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, custodians stock a station from it, and keepers carry the food out to the exhibits. Partner parks cover the first deliveries.", reward:5500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a Custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3500, check:g=>(g.state.staff.custodians || []).length>0},
   {id:"guard",    text:"Hire a Security Guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at the Research Lab, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:4000, check:g=>(g.state.staff.guards || []).length>0},

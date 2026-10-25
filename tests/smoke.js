@@ -3797,6 +3797,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.aquaWater = noFilter === "No filter." && aim0 === 0 && Math.abs(dirty1 - (100 - AQUA.rate)) < .01 && aim1 === 100 && aimOff === 0 && /power/.test(offText) && !filterText(aq)
         && repFoul.target < repClean.target && repFoul.issues.some(i => /Foul water/.test(i.text)) && illFoul.why.includes("foul water") && !illClean.why.includes("foul water") && illFoul.p > illClean.p
         && !thirsty(aq, sea) && !(aq.dirt > 0) && aquaLoad(aq) === 3 * sea.food;
+      // aquarists: keepers tend every exhibit but lagoons and aquariums, aquarists only those; each has its own staff list, call and zone panel entry, and the same pay
+      {
+        const kk = {id:"k-t1", name:"Kt"}, ak = {id:"k-t2", name:"At", role:"aqua"}, lg = {id:"e-lg", name:"Lg", points:[], animals:[], barrier:"lagoon"};
+        state.staff.keepers.push(kk, ak);
+        const pay = state.staff.keepers.reduce((n, k) => n + (isAqua(k) ? AQUARIST.wage : KEEPER.wage), 0);
+        out.aquarist = aquaEx(aq) && aquaEx(lg) && !aquaEx(ev) && tends(ak, aq) && tends(ak, lg) && !tends(kk, aq) && !tends(kk, lg) && tends(kk, ev) && !tends(ak, ev)
+          && STAFF_TYPES.aquarist.list().includes(ak) && !STAFF_TYPES.aquarist.list().includes(kk) && STAFF_TYPES.keeper.list().includes(kk) && !STAFF_TYPES.keeper.list().includes(ak)
+          && CALLS.aqua.staff().includes(ak) && !CALLS.aqua.staff().includes(kk) && !CALLS.keeper.staff().includes(ak) && staffById("k-t2").t === "aquarist" && pay >= KEEPER.wage + AQUARIST.wage;
+        // aquarists are hired at a Dive Shack, not a Keeper Station, and start from it
+        const bs = state.buildings, m1 = state.money; state.money = 1e6;
+        state.buildings = [{id:"b-ks", type:"station", points:[[400,400],[404,400],[404,404],[400,404]]}];
+        const noShack = hireKeeper("aqua") === "Build a Dive Shack first." && hireKeeper() === null;
+        state.staff.keepers.pop(); state.buildings.push({id:"b-ds", type:"diveshack", points:[[410,400],[414,400],[414,404],[410,404]]});
+        const shack = hireKeeper("aqua") === null && isAqua(state.staff.keepers.pop()) && !!BUILDINGS.diveshack.store && BUILDINGS.diveshack.label === "Dive Shack";
+        state.buildings = bs; state.money = m1;
+        out.aquaristShack = noShack && shack;
+        out.aquaristNoHunt = huntJob({id:"k-t2", role:"aqua"}) === null;
+        // a lagoon holds pool animals only
+        const dry = SPECIES.find(x => !x.viv && !x.pool);
+        out.lagoonPoolOnly = lagoonWalled(lg) && !fitsHabitat(dry, lg) && crateProblem({sp:dry.id}, lg) === "Lagoons hold pool animals only." && fitsHabitat(dry, {points:[], animals:[], barrier:"bars"});
+        state.staff.keepers = state.staff.keepers.filter(k => k !== kk && k !== ak);
+      }
       const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();
       out.aquaPowerDraw = d0 - d1 === LAND.asump.kw;
       out.aquaDrawn = (() => { const g = viv34(aq, "front", null); aq.wq = 0; const f = viv34(aq, "front", null); aq.wq = 100; const c = AQUA34.clean.toLowerCase(); return f !== g && g.includes(c) && f.includes(AQUA34.foul.toLowerCase()) && !viv34(ev, "front", null).includes(c); })();   // the water's colour follows its quality

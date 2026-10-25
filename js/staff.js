@@ -7,13 +7,14 @@
 
 // One entry per kind of walking staff. `list` is the saved records; `crew` the live walkers (not saved).
 const STAFF_TYPES = {
-  keeper:   {label:"Keeper",    plural:"Keepers",    color:"#2E6B3A", list:() => state.staff.keepers,    crew:() => crew,  hire:() => hireKeeper(),    cost:() => KEEPER.hireCost,    wage:() => KEEPER.wage,    status:k => keeperStatus(k),    zone:"keeper",    sync:() => syncCrew(),       ok:() => state.buildings.some(b => b.type === "station"),  need:"Needs a Keeper Station."},
+  keeper:   {label:"Keeper",    plural:"Keepers",    color:"#2E6B3A", list:() => state.staff.keepers.filter(k => !isAqua(k)), store:() => state.staff.keepers, crew:() => crew.filter(c => !aquaCrew(c)),  hire:() => hireKeeper(),    cost:() => KEEPER.hireCost,    wage:() => KEEPER.wage,    status:k => keeperStatus(k),    zone:"keeper",    sync:() => syncCrew(),       ok:() => state.buildings.some(b => b.type === "station"),  need:"Needs a Keeper Station."},
+  aquarist: {label:"Aquarist",  plural:"Aquarists",  color:"#1F6F9F", list:() => state.staff.keepers.filter(isAqua),          store:() => state.staff.keepers, crew:() => crew.filter(aquaCrew),            hire:() => hireKeeper("aqua"), cost:() => AQUARIST.hireCost, wage:() => AQUARIST.wage, status:k => keeperStatus(k),    zone:"keeper",    sync:() => syncCrew(),       ok:() => state.buildings.some(b => b.type === "diveshack"),  need:"Needs a Dive Shack."},
   vet:      {label:"Vet",       plural:"Vets",       color:"#B0384F", list:() => state.staff.vets,       crew:() => vcrew, hire:() => hireVet(),       cost:() => VET.hireCost,       wage:() => VET.wage,       status:v => vetStatus(v),       zone:"vet",       sync:() => syncVets(),       ok:() => hasDept("pmc"),                                     need:"Needs a Paleo-Medicine Center."},
   mechanic: {label:"Mechanic",  plural:"Mechanics",  color:"#C8642A", list:() => state.staff.mechanics,  crew:() => mcrew, hire:() => hireMechanic(),  cost:() => MAINT.hireCost,     wage:() => MAINT.wage,     status:m => mechanicStatus(m),  zone:"mechanic",  sync:() => syncMechanics(),  ok:() => state.buildings.some(b => b.type === "workshop"), need:"Needs a Workshop."},
   custodian:{label:"Custodian", plural:"Custodians", color:"#2E8B8B", list:() => state.staff.custodians, crew:() => ccrew, hire:() => hireCustodian(), cost:() => CUSTODIAN.hireCost, wage:() => CUSTODIAN.wage, status:m => custodianStatus(m), zone:"custodian", sync:() => syncCustodians(), ok:() => state.buildings.some(b => b.type === "closet"),   need:"Needs a Custodial Closet."},
   guard:    {label:"Guard",     plural:"Guards",     color:"#2B3F6B", list:() => state.staff.guards,     crew:() => gcrew, hire:() => hireGuard(),     cost:() => SECURITY.hireCost,  wage:() => SECURITY.wage,  status:m => guardStatus(m),     zone:"guard",     sync:() => syncGuards(),     ok:() => state.buildings.some(b => b.type === "security"), need:"Needs a Security Office."},
 };
-const STAFF_ORDER = ["keeper", "vet", "mechanic", "custodian", "guard"];
+const STAFF_ORDER = ["keeper", "aquarist", "vet", "mechanic", "custodian", "guard"];
 
 // Every worker with their type key, sorted by type then name
 function staffRoster(){
@@ -43,14 +44,14 @@ function fireStaff(id){
   const f = staffById(id); if(!f) return;
   const T = STAFF_TYPES[f.t], c = staffCrew(f.s, f.t);
   for(const tr of [...state.staff.transfers]) if(tr.keeper === id){ if(tr.cargo) dropOff(tr, tr.cargo); else tr.keeper = null; }   // a delivery in hand is finished off, one only claimed goes back up
-  if(f.t === "keeper"){
+  if(f.t === "keeper" || f.t === "aquarist"){
     // whatever the keeper was chasing goes back
     for(const l of state.safety.loose) if(l.keeper === id) l.keeper = null;
     if(c) returnCarry(c);
   }
   else if(f.t === "custodian" && c) returnCustCarry(c);
   if(c) resetAtv(c);
-  const list = T.list(), i = list.indexOf(f.s); if(i >= 0) list.splice(i, 1);
+  const list = (T.store || T.list)(), i = list.indexOf(f.s); if(i >= 0) list.splice(i, 1);
   T.sync(); syncAtvs();
 }
 function staffFireDialog(id){
@@ -86,6 +87,26 @@ function moraleFactors(s, t){
 }
 const moraleTarget = (s, t) => clamp(52 + moraleFactors(s, t).reduce((a, f) => a + f.w, 0), 0, 100);
 
+// Breaks for vets, mechanics, custodians and guards (keepers run their own in keepers.js).
+// `homes` is the worker's own building type's list, where they rest slowly when there's no break room.
+function staffMaybeRest(c, homes){
+  const f = staffById(c.id);
+  if(!f || c.cargo || energyOf(f.s) >= STAFF.restBelow) return false;
+  const rooms = state.buildings.filter(b => b.type === "breakroom" && kGraph.anchors[b.id]);
+  const r = nearestOf(c, rooms.length ? rooms : homes);
+  if(!r) return false;
+  if(r.n === c.at){ c.job = "resting"; c.route = []; return true; }
+  setRoute(c, r.w, r.n); c.job = "toRest"; return true;
+}
+// A minute-by-minute rest; returns the time left over (none: a break fills what's given)
+function staffRestStep(c, left){
+  const f = staffById(c.id); if(!f){ c.job = "idle"; return 0; }
+  const fast = state.buildings.some(b => b.type === "breakroom" && kGraph.anchors[b.id] === c.at);
+  f.s.stamina = Math.min(100, energyOf(f.s) + left * (fast ? STAFF.restPerMin : STAFF.restPerMin / 4));
+  if(f.s.stamina >= 95){ c.job = "idle"; c.wait = 0; }
+  return 0;
+}
+
 // Called every tick: non-keepers tire, everyone's day is logged and their morale drifts toward what the job gives them
 function staffTick(dtMin){
   for(const {s, t} of staffRoster()){
@@ -93,7 +114,7 @@ function staffTick(dtMin){
     if(!c || !c.at) continue;
     const busy = !["idle", "home", "resting", "toRest"].includes(c.job) || (c.route && c.route.length > 0);
     if(busy) s.workMin = (s.workMin || 0) + dtMin; else s.idleMin = (s.idleMin || 0) + dtMin;
-    if(t !== "keeper") s.stamina = clamp(energyOf(s) - dtMin * (busy ? STAFF.workDrain : STAFF.idleDrain), 0, 100);
+    if(t !== "keeper" && t !== "aquarist") s.stamina = clamp(energyOf(s) - dtMin * (busy ? STAFF.workDrain : STAFF.idleDrain), 0, 100);
     const m = moraleOf(s);
     s.morale = clamp(m + (moraleTarget(s, t) - m) * Math.min(1, dtMin / STAFF.moraleStep), 0, 100);
   }

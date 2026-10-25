@@ -444,6 +444,7 @@ const STAND34 = {
   campground:{wall:0,   rise:1.8, front:"camp"},
   // backstage: offices, garages, stores, sheds and barns
   station:   {wall:4.5, rise:0, front:"lab"},
+  diveshack: {wall:4.5, rise:0, front:"lab"},
   security:  {wall:4.5, rise:0, front:"lab", top:"antenna"},
   breakroom: {wall:3.2, rise:1.4, front:"plain"},
   closet:    {wall:3,   rise:1.2, front:"plain"},

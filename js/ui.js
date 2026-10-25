@@ -307,7 +307,7 @@ function exOverviewHtml(e, rep){
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? "Keepers can get in" : esc(g.text)}</span></div>${dishText(e) ? `<div class="row" style="margin-top:4px"><span class="status no">${esc(dishText(e))}</span></div>` : ""}`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
-  h += callRow(e, "keeper");
+  h += callRow(e, aquaEx(e) ? "aqua" : "keeper");
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(", ")} a day</div>`;
@@ -660,7 +660,7 @@ function openMoveDialog(e, sp, id){
   $("#moveGo").hidden = false;
   $("#moveGo").onclick = () => {
     const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = one ? 1 : clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
-    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n, one && one.id); ui.toast(`${one ? one.name || s.name : `${made} ${s.name}`} will be moved to ${to.name} by the next free keeper.${state.staff.keepers.length ? "" : " Hire a keeper first."}`); ui.panel(); saveSoon(); };
+    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n, one && one.id); ui.toast(`${one ? one.name || s.name : `${made} ${s.name}`} will be moved to ${to.name} by the next free ${aquaEx(to) ? "aquarist" : "keeper"}.${state.staff.keepers.some(k => tends(k, to)) ? "" : ` Hire ${aquaEx(to) ? "an aquarist" : "a keeper"} first.`}`); ui.panel(); saveSoon(); };
     const mix = mixWarning(s, to);
     if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
     if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
@@ -728,14 +728,15 @@ function stationHtml(b){
   let h = deptHead(b);
   h += zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
-  h += staffNote("keeper");
-  const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
-  if(cut.length) h += `<section><h3>No keeper access</h3><ul class="issues">${cut.map(e => `<li class="bad">${esc(e.name)}</li>`).join("")}</ul></section>`;
+  const aq = b.type === "diveshack";
+  h += staffNote(aq ? "aquarist" : "keeper");
+  const cut = state.exhibits.filter(e => e.animals.length && aquaEx(e) === aq && !gateCheck(e).ok);
+  if(cut.length) h += `<section><h3>No ${aq ? "aquarist" : "keeper"} access</h3><ul class="issues">${cut.map(e => `<li class="bad">${esc(e.name)}</li>`).join("")}</ul></section>`;
   return h;
 }
 function breakroomHtml(b){
   let h = deptHead(b);
-  const resting = crew.filter(c => c.job === "resting" && kGraph && kGraph.anchors[b.id] === c.at);
+  const resting = [crew, vcrew, mcrew, ccrew, gcrew].flat().filter(c => c.job === "resting" && kGraph && kGraph.anchors[b.id] === c.at);
   h += `<div class="meta">${resting.length ? `${resting.length} on break` : "Nobody on break"}</div>`;
   return h;
 }
@@ -821,14 +822,14 @@ function buildingBody(b){
   if(b.type === "dock") return dockHtml(b) + demolishRow(b);
   if(b.type === "closet") return closetHtml(b) + demolishRow(b);
   if(b.type === "security") return securityHtml(b) + demolishRow(b);
-  if(storeOf(b) && !isVendor(b) && !isHotel(b) && !["station", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
+  if(storeOf(b) && !isVendor(b) && !isHotel(b) && !["station", "diveshack", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
   if(b.type === "depot") return depotHtml(b) + demolishRow(b);
   if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);
   if(b.type === "ceres") return ceresHtml(b) + demolishRow(b);
   if(b.type === "generator") return generatorHtml(b) + demolishRow(b);
   if(b.type === "workshop") return workshopHtml(b) + demolishRow(b);
-  if(b.type === "station") return stationHtml(b) + demolishRow(b);
+  if(b.type === "station" || b.type === "diveshack") return stationHtml(b) + demolishRow(b);
   if(b.type === "breakroom") return breakroomHtml(b) + demolishRow(b);
   if(b.type === "toolshed") return toolshedHtml(b) + demolishRow(b);
   if(b.type === "oracle") return oracleHtml(b) + demolishRow(b);
