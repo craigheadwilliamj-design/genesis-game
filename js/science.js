@@ -283,9 +283,10 @@ function tripReturns(t){
   const ok = lines.length > 0;
   if(!ok) lines.push(["Came back empty handed"]);
   sc.reports.unshift({id:(sc.reports.reduce((m, r) => Math.max(m, r.id), 0)) + 1, site:t.site, kind:t.kind, drone:t.bay, day:state.day, lines});
-  sc.reports.length = Math.min(sc.reports.length, 12);
+  sc.reports.length = Math.min(sc.reports.length, 8);   // newest first, so the oldest drops off
   const msg = `Drone ${t.bay + 1} is back from ${placeName(t.site)}${t.kind === "scout" ? " (scouting)" : ""}: ${lines.map(l => l[0]).join(". ")}.`;
   logScience(msg, ok); events.toast(msg, ok ? "good" : "bad");
+  if(typeof ghostRefresh === "function" && typeof ghostU !== "undefined" && ghostU !== null) ghostRefresh();   // the open site card shows the new genome right away
 }
 function dismissReport(id){ const sc = state.science; sc.reports = sc.reports.filter(r => r.id !== id); }
 
