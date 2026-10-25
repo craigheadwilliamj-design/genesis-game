@@ -248,7 +248,7 @@ panelEl.addEventListener("change", ev => {
 const exTabs = {ex:null, tab:"main", period:null};   // which tab the exhibit panel shows
 // The exhibit panel's tabs, in order. A vivarium has no fence, and its Landscaping and Habitat Items are its scene and fittings.
 const exTabList = e => [{key:"main", label:"Overview", color:"#4E7F2E"}].concat(e.viv ? [] : [{key:"barrier", label:"Barrier", color:"#6E737A"}],
-  [{key:"land", label:"Landscaping", color:"#7A6A58"}, {key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
+  [{key:"land", label:lagoonWalled(e) ? "Aquascape" : "Landscaping", color:"#7A6A58"}, {key:"props", label:"Habitat Items", color:"#8C6A2E"}, {key:"animals", label:"Animals", color:"#4E7F2E"},
    {key:"health", label:"Health", color:"#B3261E"}, {key:"clone", label:"Cloning", color:"#1F6F73"}, {key:"behave", label:"Behavior", color:"#6A4C93"}, {key:"guests", label:"Guests", color:"#B8860B"}]);
 function exhibitHtml(e){
   const rep = derived.reports[e.id] || exhibitReport(e), reach = isReachable(e), n = e.animals.length;
@@ -261,7 +261,7 @@ function exhibitHtml(e){
   if(n) h += `<span class="status ${e.happy >= 60 ? "ok" : e.happy >= 35 ? "" : "no"}">${Math.round(e.happy)}% happy</span>`;
   h += `<span class="meta">${n ? `${n} animal${n === 1 ? "" : "s"}, ` : ""}${e.viv ? caseOf(e).label + ", " : ""}${fmtArea(rep.area)}</span></div>`;
   h += `<div class="extabs">${tabBar("extab", tabs, exTabs.tab)}</div>`;
-  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => x.aqua ? aquaSceneHtml(x) : x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
+  const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => lagoonWalled(x) ? aquascapeHtml(x) : x.aqua ? aquaSceneHtml(x) : x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
   return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
@@ -296,7 +296,7 @@ function exOverviewHtml(e, rep){
   }
   if(n){
     const hr = healthReport(e), worst = hr.sick.length ? Math.max(...hr.sick.map(a => a.sick.sev)) : 0, dirt = e.dirt || 0;
-    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% clean`}`)));
+    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% ${lagoonWalled(e) ? "water quality" : "clean"}`}`)));
     const X = exLog(e);
     rows.push(exJump("guests", "Guests", isReachable(e) ? "" : "bad", esc(isReachable(e) ? `${Math.round(X.views)} visitor${Math.round(X.views) === 1 ? "" : "s"} today, ${money(Math.round(X.gifts))} donated` : "No path")));
   }
@@ -399,6 +399,11 @@ function biomeHtml(e){
 }
 // A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
 // An aquarium's backdrop: one list of seas, and whether each animal is from that time
+// A lagoon's Aquascape tab: the water it holds. Rocks, corals and the like come later.
+function aquascapeHtml(e){
+  const cur = (waterOf(e)[0] || {}).kind, m2 = area(e.points);
+  return `<section><h3>Water</h3><div class="need-line ${cur ? "ok" : "no"}">${cur ? `<b>${esc(SEA_WATER[cur] ? waterLabel(cur) : waterLabel(cur) + " fresh water")}</b>.` : "No water."}</div><div class="row" style="margin-top:6px">${lagoonWaters().map(k => `<button class="btn" data-action="aquaWater" data-k="${k}" style="padding:3px 9px"${k === cur ? " disabled" : ""}>${esc(SEA_WATER[k] ? waterLabel(k) : waterLabel(k) + " fresh")}, ${money(m2 * waterRate(k))}</button>`).join("")}</div></section>`;
+}
 function aquaSceneHtml(e){
   const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]), pick0 = sc ? sc.sea : kinds.length ? seaSceneOf(kinds[0]) : "";
   let h = `<section><h3>Backdrop</h3><div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(AQUA_SCENES[sc.sea].label)}</b>.` : "No backdrop yet."}</div>`;
@@ -589,8 +594,8 @@ function behaviorHtml(e){
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
-  let h = `<section><h3>Sanitation</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
+  let h = `<section><h3>${lagoonWalled(e) ? "Water Quality" : "Sanitation"}</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>${lagoonWalled(e) ? "Water Quality" : "Sanitation"}</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)
@@ -935,7 +940,7 @@ panelEl.addEventListener("click", e => {
   if(a === "aviaryOff"){ it.aviary = false; done(); return; }
   if(a === "platformTool"){ setTool("platform"); return; }
   if(a === "galleryTool"){ setTool("gallery"); return; }
-  if(a === "paintTool"){ setTool("paint"); return; }
+  if(a === "paintTool"){ openLandList("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
   if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
@@ -957,7 +962,8 @@ panelEl.addEventListener("click", e => {
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
-  if(a === "waterTool"){ setTool("water"); return; }
+  if(a === "waterTool"){ openLandList("water"); return; }
+  if(a === "aquaWater"){ if(it && it.points && lagoonWalled(it)) fillLagoon(it, b.dataset.k); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
@@ -1051,11 +1057,12 @@ panelEl.addEventListener("change", ev => {
 });
 
 // A yes/no question inside the page
-function askConfirm(title, text, yes, onYes, no = "Cancel"){
+function askConfirm(title, text, yes, onYes, no = "Cancel", onNo = null){
   const d = $("#dlgConfirm");
   $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
   $("#confirmYes").onclick = () => { d.close(); onYes(); };
-  $("#confirmNo").onclick = () => d.close();
+  $("#confirmNo").onclick = () => { d.close(); if(onNo) onNo(); };
+  d.oncancel = onNo ? ev => ev.preventDefault() : null;   // a two-way choice can't be escaped out of
   d.showModal();
 }
 

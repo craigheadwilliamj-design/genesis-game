@@ -256,7 +256,7 @@ function render(){
       const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
       s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="${tileFill("b", fb)}" pointer-events="none"/>` + exhibitPaintSvg(e);
       // water lies on the floor, under the fence, so posts and rails stand over the bank
-      s += watersSvg(waterOf(e), biomeOf(e));
+      s += watersSvg(waterOf(e), biomeOf(e), lagoonWalled(e));
       // a hedge row is drawn as a real hedge, as wide as it is
       if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
       // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
@@ -298,9 +298,11 @@ function render(){
     if(dead) s += `<polygon points="${pts}" fill="url(#hatch)" pointer-events="none"/>`;
     // muck builds up visibly once an exhibit is getting dirty
     if(!tilt && (e.dirt || 0) > 25) s += `<polygon points="${pts}" fill="url(#muck)" fill-opacity="${Math.min(1, (e.dirt - 25) / 50).toFixed(2)}" pointer-events="none"/>`;
-    if(e.gate){   // a gate with its own picture only shows the marker when it has a problem
-      const ok = gateCheck(e).ok, gr = Math.max(1.6, 5*inv);
-      if(gi < 0 || !ok) s += `<rect x="${e.gate[0]-gr}" y="${e.gate[1]-gr}" width="${gr*2}" height="${gr*2}" rx="${gr*.3}" fill="${ok ? "#D8B04A" : "var(--bad)"}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+    if(e.gate && gi < 0){   // a gate with no picture of its own shows the standard gate
+      let bs = null;
+      e.points.forEach((v, i) => { const q = e.points[(i + 1) % e.points.length], r = segProj(e.gate[0], e.gate[1], v, q); if(!bs || r.d < bs.d) bs = {d:r.d, a:v, b:q}; });
+      const L = Math.hypot(bs.b[0] - bs.a[0], bs.b[1] - bs.a[1]) || 1, hw = Math.min(L, GATE_GHOST.w) / 2, ux = (bs.b[0] - bs.a[0]) / L, uy = (bs.b[1] - bs.a[1]) / L;
+      s += gateGlyphSvg([e.gate[0] - ux * hw, e.gate[1] - uy * hw], [e.gate[0] + ux * hw, e.gate[1] + uy * hw], GATE_GHOST.h / tf(), "#D8B04A");
     }
     s += `</g>`;
     if(tilt && e.viv){ tanks.push({y:centroid(e.points)[1], svg:s.slice(mark)}); s = s.slice(0, mark); }
@@ -544,14 +546,21 @@ function fenceSpriteSvg(kind, a, b, cond, gate, powered){
   if(b[0] < a[0]) [a, b] = [b, a];   // always read left to right, so the pictures are never mirrored
   const dx = (b[0] - a[0]) / L, dy = (b[1] - a[1]) / L, n3 = v => v.toFixed(3), st0 = fenceState(cond), off = !!FENCE_SPRITES[kind].power && powered === false, st = off && st0 !== "broken" ? st0 + "-off" : st0, Lp = L / ROCK_MPP;
   // w pixels of the picture, starting `at` pixels along the side; a nested svg crops it
-  const put = (at, w, pic = st, attr = "") => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP - S.h * ROCK_MPP / TILT)})"><svg width="${w}" height="${S.h}" viewBox="0 0 ${w} ${S.h}"><image ${attr}href="${spriteUrl(`sprites/fence/${kind}-${pic}.png`)}" width="${S.w}" height="${S.h}" style="image-rendering:pixelated"/></svg></g>`;
+  const put = (at, w, pic = st, attr = "", ph = S.h, iw = S.w, drop = 0) => `<g transform="matrix(${n3(dx * ROCK_MPP)} ${n3(dy * ROCK_MPP)} 0 ${n3(ROCK_MPP / TILT)} ${n3(a[0] + dx * at * ROCK_MPP)} ${n3(a[1] + dy * at * ROCK_MPP + (drop - ph) * ROCK_MPP / TILT)})"><svg width="${w}" height="${ph}" viewBox="0 0 ${w} ${ph}"><image ${attr}href="${spriteUrl(`sprites/fence/${kind}-${pic}.png`)}" width="${iw}" height="${ph}" style="image-rendering:pixelated"/></svg></g>`;
   let s = "";
   if(gate){
     // the fence runs up to the gate's left post and starts again under its right one; the gate goes on top
-    const gw = Math.min(S.w, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
-    for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
-    for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
-    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `);
+    const GW = S.gateW || S.w, gw = Math.min(GW, Math.floor(Lp)), g0 = Math.max(0, Math.min(Lp - gw, Math.round(((gate.p[0] - a[0]) * dx + (gate.p[1] - a[1]) * dy) / ROCK_MPP - gw / 2)));
+    if(S.gateW) for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));   // a catwalk stands over a whole wall
+    else {
+      for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
+      for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
+    }
+    if(S.gateW){   // a catwalk: the deck is on the exhibit's side of the wall, the ladder on the outside
+      const ex = state.exhibits.find(x => x.id === gate.id), south = !!ex && inPoly(gate.p[0] - dy * 1.5, gate.p[1] + dx * 1.5, ex.points);
+      return s + put(Lp - 3, 3) + put(g0, gw, south ? "gate-s" : "gate", `data-gate="${esc(gate.id)}" data-pic="${kind}" data-fixed="1" `, S.gateH, GW, south ? S.gateDeep : 0);
+    }
+    return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `, S.gateH || S.h, GW, S.gateDrop || 0);
   }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
   return s + put(Lp - 3, 3);   // the post at the far end (the picture's first three columns)
@@ -610,12 +619,16 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
     if(look === "degrading") posts.forEach((y, i) => { for(const [d, col] of [[.9, 0], [1.7, 2], [2.6, 1], [3.5, 0]]){ const yy = y - FENCE_SPRITES[kind].h * py + (d + i % 2 * .35) / TILT * 1; if(yy < yb) s += rect(x0 + ((col + i) % 3) * px, yy, px, 2 * py, i % 2 ? R.lo : R.mid); } s += rect(x0, y - 6 * py, 2 * px, 3 * py, R.mid) + rect(x0, y - 3 * py, px, py, R.hi); });
   }
   if(gate){
-    const y1 = Math.min(yb, Math.max(ya, gate.p[1] - S.w * px / 2) + S.w * px), y0 = Math.max(ya, y1 - S.w * px), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
+    const GW = (S.gateW || S.w) * px, y1 = Math.min(yb, Math.max(ya, gate.p[1] - GW / 2) + GW), y0 = Math.max(ya, y1 - GW), au = GATE_GOLD, h = S.h * py, ym = (y0 + y1) / 2;
     for(const y of [y0, y1]) s += rect(x0, y - h, 3 * px, py, C.hi) + rect(x0 + px, y - h - py, px, py, au.hi) + rect(x0 + px, y - h, px, py, au.mid) + rect(x0, y - 2 * py, 3 * px, py, C.mid) + rect(x0, y - py, 3 * px, py, C.deep);
     // shut: a latch on the split. Open (drawGates swaps them): a leaf swung out from each post.
-    const swung = gate.f >= 2, latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
+    const swung = gate.f >= 2 && kind !== "lagoon", latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
     const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - h * .7, 4 * px, h * .5, C.mid) + rect(x0 + 3 * px, y - h * .7, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - h * .7, px, h * .5, C.lo)).join("");
-    s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
+    if(kind === "lagoon"){   // a catwalk seen end on: the deck juts out to the exhibit's side, the ladder hangs on the outside
+      const ex = state.exhibits.find(x => x.id === gate.id), east = !ex || inPoly(gate.p[0] + 1.5, gate.p[1], ex.points), iw = (S.gateW + 3) * px, ih = S.gateH * py;
+      s += `<image href="${spriteUrl(`sprites/fence/lagoon-gate-${east ? "e" : "w"}.png`)}" x="${n2(east ? x0 - 3 * px : x0 + 3 * px - S.gateW * px)}" y="${n2(y1 - ih)}" width="${n2(iw)}" height="${n2(ih)}" style="image-rendering:pixelated"/>`;
+    }
+    else s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
   }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
   return s;
@@ -682,6 +695,7 @@ function drawGates(now){
       const goal = who.some(p => Math.hypot(p[0] - e.gate[0], p[1] - e.gate[1]) <= GATE_OPEN.reach) ? 1 : 0, v = gateOpen[id] || 0;
       gateOpen[id] = goal > v ? Math.min(1, v + GATE_OPEN.speed * dt) : Math.max(0, v - GATE_OPEN.speed * dt);
     }
+    if(el.dataset.fixed) continue;
     const f = gateFrameOf(id);
     if(el.dataset.f === String(f)) continue;
     el.dataset.f = f;
@@ -2520,8 +2534,8 @@ function bulldozePaint(d){
 }
 
 /* ---------- laying water in chunks ---------- */
-// The water types to pick from: one for each biome with a water texture, the sea water types (SEA_WATER), plus the biome's own
-const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k] || (SEA_WATER[k] && poolsOn()));
+// The water types to pick from: one for each biome with a water texture, plus the biome's own
+const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);   // sea water is not paintable: a lagoon fills when its gate goes on (fillLagoon)
 const waterLabel = k => SEA_WATER[k] ? SEA_WATER[k].label : BIOMES[k].label;
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
@@ -2538,7 +2552,7 @@ function waterBox(){
   const look = kind || (host ? biomeOf(host) : parkBiome());
   let err = same ? "That water is already there." : null;
   if(!err && !parts.length) err = "Keep it inside the fence.";
-  if(!err && SEA_WATER[kind] && !lagoonWalled(host)) err = "Only a lagoon wall holds sea water.";
+  if(!err && (SEA_WATER[kind] || lagoonWalled(host))) err = "A lagoon fills with water when its gate goes on.";
   for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true, kind);
   return {r, parts, ptsOf, host, kind, cost, same, look, m2:parts.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), err};
 }
@@ -2838,22 +2852,26 @@ function findGateSpot(clientX, clientY){
   const chk = gateCheck(host); host.gate = best.e ? old : undefined;
   return {...best, ok:chk.ok, why:chk.text};
 }
-// The gate ghost: a block the gate's width standing in line with the fence side, as tall as that fence and GATE_GHOST.d deep, inside the side's ends like the gate picture; green where a gate works, red where it doesn't
+// The gate ghost: the standard gate (posts, rails, panel) the gate's width in line with the fence side, as tall as that fence; green where a gate works, red where it doesn't
 function gateGhostSvg(g, inv){
   const [a, b] = [g.a, g.b], L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
-  const w = Math.min(L, GATE_GHOST.w), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
-  const hd = GATE_GHOST.d / 2, foot = [[-w / 2, -hd], [w / 2, -hd], [w / 2, hd], [-w / 2, hd]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
-  const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k];
+  const k = pieceType(fencePieces()[pieceNear(g.x, g.y, .5)]), F = FENCE_SPRITES[BARRIERS[k] && BARRIERS[k].hedge ? "hedge" : k], gw = F && F.gateW ? F.gateW * ROCK_MPP : GATE_GHOST.w;
+  const w = Math.min(L, gw), t = clamp((g.x - a[0]) * ux + (g.y - a[1]) * uy, w / 2, L - w / 2);
+  let v0 = -GATE_GHOST.d / 2, v1 = GATE_GHOST.d / 2;
+  if(F && F.gateW){   // a catwalk: the deck lies inside the fence, gw deep from the wall line
+    const poly = g.e ? g.e.points : g.pen ? g.pen.pts : null, mx = a[0] + ux * t, my = a[1] + uy * t, sgn = poly && inPoly(mx + uy * -1.5, my + ux * 1.5, poly) ? 1 : -1;
+    [v0, v1] = sgn > 0 ? [0, gw] : [-gw, 0];
+  }
+  const foot = [[-w / 2, v0], [w / 2, v0], [w / 2, v1], [-w / 2, v1]].map(([u, v]) => [a[0] + ux * (t + u) - uy * v, a[1] + uy * (t + u) + ux * v]);
   const h = Math.max(GATE_GHOST.h, F ? F.h * ROCK_MPP : 0) / tf();   // the fence's height, stood back up against the squashed camera
-  const col = g.ok ? "var(--good)" : "var(--bad)";
-  return `<polygon points="${polyStr(hull2d(foot.concat(foot.map(p => [p[0], p[1] - h]))))}" fill="${col}" fill-opacity=".4" stroke="${col}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
+  const mid = (v0 + v1) / 2, p0 = [a[0] + ux * (t - w / 2) - uy * mid, a[1] + uy * (t - w / 2) + ux * mid], p1 = [a[0] + ux * (t + w / 2) - uy * mid, a[1] + uy * (t + w / 2) + ux * mid];
+  return gateGlyphSvg(p0, p1, h, g.ok ? "var(--good)" : "var(--bad)");
 }
-// The convex hull of some points, in order round (monotone chain)
-function hull2d(P){
-  const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], hi = [];
-  for(const q of p){ while(lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
-  for(const q of p.reverse()){ while(hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
-  return lo.slice(0, -1).concat(hi.slice(0, -1));
+// The standard gate picture: two posts, a top and a middle rail and a faint panel between, from foot point p0 to p1 and h tall
+function gateGlyphSvg(p0, p1, h, col){
+  const up = p => [p[0], p[1] - h], q0 = up(p0), q1 = up(p1), m0 = [p0[0], p0[1] - h * .45], m1 = [p1[0], p1[1] - h * .45];
+  const ln = (u, v, wd) => `<line x1="${u[0]}" y1="${u[1]}" x2="${v[0]}" y2="${v[1]}" stroke-width="${wd}" vector-effect="non-scaling-stroke"/>`;
+  return `<g stroke="${col}" stroke-linecap="round" pointer-events="none"><polygon points="${polyStr([p0, p1, q1, q0])}" fill="${col}" fill-opacity=".25" stroke="none"/>${ln(p0, q0, 3)}${ln(p1, q1, 3)}${ln(q0, q1, 2)}${ln(m0, m1, 2)}${ln(p0, p1, 1.5)}</g>`;
 }
 // A gate on a pen also buys the ground it fences in
 const penCost = f => GATE_COST + Math.round(newGround([f]) * COST.landPerSqM);
@@ -2877,6 +2895,7 @@ function gateTap(e){
   const ex = g.pen ? adoptPen(g.pen, [g.x, g.y]) : g.e;
   if(!g.pen) ex.gate = [g.x, g.y];
   afterChange(); render();
+  if(lagoonWalled(ex) && !waterOf(ex).length) askLagoonWater(ex);
   ui.toast(`${g.pen ? `Made ${ex.name}, ${fmtArea(area(ex.points))}, with a gate` : `${cost ? "Built" : "Moved"} the gate on ${ex.name}`}. ${g.why}`, g.ok ? "" : "bad");
 }
 

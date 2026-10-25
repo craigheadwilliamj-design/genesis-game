@@ -539,7 +539,7 @@ function waterProblem(pts, e, skip, cost, over, kind){
   if(!over && waterOf(e).some(w => w !== skip && waterHit(pts, w.points))) return "It overlaps other water.";
   if(landOf(e).some(f => LAND[f.type] && !LAND[f.type].wet && rectsHitPoly(footRects(f, e), pts))) return "It overlaps a rock, grove or shelter.";
   if(state.buildings.some(b => b.exhibitId === e.id && shapesOverlap(pts, b.points))) return "It overlaps a viewing platform.";
-  if(e.gate && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";
+  if(e.gate && !lagoonWalled(e) && (inPoly(e.gate[0], e.gate[1], pts) || distToEdge(e.gate[0], e.gate[1], pts) < 3)) return "Keep clear of the gate.";   // a lagoon wall's gate is a platform over the water
   if(cost > 0 && !canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
   return null;
 }
@@ -650,6 +650,28 @@ function snapWaterToGrid(s){
     joinAll(fresh);
     if(host) host.water = fresh; else s.water = fresh;
   }
+}
+// Fill a lagoon right out to its fence line with one body of sea water (kind: a SEA_WATER key). Returns false if it can't be afforded.
+function fillLagoon(e, kind){
+  const cost = Math.round(area(e.points) * waterRate(kind));
+  if(!canAfford(cost)){ ui.toast(`Filling ${e.name} costs ${money(cost)}. You have ${money(state.money)}.`, "bad"); return false; }
+  const old = waterOf(e).reduce((n, w) => n + area(w.points) * waterRate(w.kind), 0);
+  spend(cost, "built"); if(old) earn(waterCutRefund(old), "sold");
+  e.water = [{id:uid("w-"), points:e.points.map(p => p.slice()), kind}];
+  afterChange(); render();
+  ui.toast(`Filled ${e.name} with ${waterLabel(kind).toLowerCase()} for ${money(cost)}.`, "good");
+  return true;
+}
+// Every water type a lagoon can hold: the two sea waters, then the fresh water of each biome
+const lagoonWaters = () => ["sea", "deep", ...waterTypes()];
+// The gate is on: ask which water the lagoon gets, and keep asking until it has one it can pay for
+function askLagoonWater(e){
+  const d = $("#dlgLagoon"), sel = $("#lagoonKind"), m2 = area(e.points);
+  $("#lagoonTitle").textContent = `Fill ${e.name}`;
+  sel.innerHTML = lagoonWaters().map(k => `<option value="${k}">${esc(SEA_WATER[k] ? waterLabel(k) : waterLabel(k) + " fresh water")}, ${money(m2 * waterRate(k))}</option>`).join("");
+  $("#lagoonOk").onclick = () => { d.close(); if(findItem("exhibit", e.id) && !fillLagoon(e, sel.value)) askLagoonWater(e); };
+  d.oncancel = ev => ev.preventDefault();   // it has to pick one
+  d.showModal();
 }
 function layWater(e, pts, kind){
   const r = rectOfPts(pts), cost = waterNetCost(e, pts, kind);
@@ -1105,13 +1127,14 @@ function waterMask(items){
 }
 // All the water of one exhibit (or of the park). A box's look is its own kind (the water type picked when it was laid), else the biome it sits in.
 // Textured water is drawn as ONE body: touching boxes share a shoreline. Water has no hit shape: bulldoze can't take it, painting ground over it does.
-function watersSvg(list, biome){
+function watersSvg(list, biome, plain){   // plain: a lagoon, water right to the wall with no shoreline
   if(!list.length) return "";
   const items = [], flat = [];
   for(const w of list){ const k = WATER_TEX[w.kind] ? w.kind : WATER_TEX[biome] ? biome : null; if(k) items.push({w, kind:k, points:w.points}); else flat.push(w); }
   let s = flat.map(flatWaterSvg).join("");
   if(!items.length) return s;
   const m = waterMask(items), T = WATER_TEX, layer = (part, fill) => m.kinds.map(k => fill(k) ? `<path d="${m.by[k][part]}" fill="${fill(k)}"/>` : "").join("");
+  if(plain) return s + `<g pointer-events="none" shape-rendering="crispEdges">` + layer("body", k => tileFill("w", k)) + `</g>`;
   s += `<g pointer-events="none" shape-rendering="crispEdges">` + layer("damp", k => T[k].damp) + layer("mud", k => T[k].mud) + layer("body", k => tileFill("w", k))
     + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;

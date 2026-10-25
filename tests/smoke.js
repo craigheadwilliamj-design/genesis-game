@@ -3923,7 +3923,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       Pk[ring[1]] = mkPiece("concrete"); const mixedNo = !lagoonWalled(ge);
       for(const k in Pk) delete Pk[k]; Object.assign(Pk, keepP); state.exhibits = [pe];
       out.lagoonWall = lagoonOk && barsNo && gridOk && swapNo && mixedNo && BARRIERS.lagoon.pool && FENCE_SPRITES.lagoon && FENCE34.lagoon.sprite === "lagoon" && FENCE_EDGE.lagoon
-        && ["pristine", "degrading", "broken", "gate", "gate-1", "gate-2", "gate-3"].every(k => SPRITE_PACK[`sprites/fence/lagoon-${k}.png`])
+        && ["pristine", "degrading", "broken", "gate", "gate-s", "gate-e", "gate-w"].every(k => SPRITE_PACK[`sprites/fence/lagoon-${k}.png`])
         && !/lagoon/i.test(barrierNeeded(M)) && (devMode() || /aren't open yet/.test(planPieces(pieceLine([700, 700], [710, 700]).keys, "lagoon").why || ""));
       out.seaWaterPrices = waterRate("sea") === WATER.perSqM * SEA_WATER.sea.price && waterRate("deep") === WATER.perSqM * SEA_WATER.deep.price && waterRate(undefined) === WATER.perSqM
         && SEA_WATER.deep.price > SEA_WATER.sea.price && WATER_TEX.sea && WATER_TEX.deep && WATER_TILES.sea && WATER_TILES.deep && (devMode() === waterTypes().includes("sea"));
