@@ -3805,6 +3805,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         out.aquarist = aquaEx(aq) && aquaEx(lg) && !aquaEx(ev) && tends(ak, aq) && tends(ak, lg) && !tends(kk, aq) && !tends(kk, lg) && tends(kk, ev) && !tends(ak, ev)
           && STAFF_TYPES.aquarist.list().includes(ak) && !STAFF_TYPES.aquarist.list().includes(kk) && STAFF_TYPES.keeper.list().includes(kk) && !STAFF_TYPES.keeper.list().includes(ak)
           && CALLS.aqua.staff().includes(ak) && !CALLS.aqua.staff().includes(kk) && !CALLS.keeper.staff().includes(ak) && staffById("k-t2").t === "aquarist" && pay >= KEEPER.wage + AQUARIST.wage;
+        // aquarists are hired at a Dive Shack, not a Keeper Station, and start from it
+        const bs = state.buildings, m1 = state.money; state.money = 1e6;
+        state.buildings = [{id:"b-ks", type:"station", points:[[400,400],[404,400],[404,404],[400,404]]}];
+        const noShack = hireKeeper("aqua") === "Build a Dive Shack first." && hireKeeper() === null;
+        state.staff.keepers.pop(); state.buildings.push({id:"b-ds", type:"diveshack", points:[[410,400],[414,400],[414,404],[410,404]]});
+        const shack = hireKeeper("aqua") === null && isAqua(state.staff.keepers.pop()) && !!BUILDINGS.diveshack.store && BUILDINGS.diveshack.label === "Dive Shack";
+        state.buildings = bs; state.money = m1;
+        out.aquaristShack = noShack && shack;
         state.staff.keepers = state.staff.keepers.filter(k => k !== kk && k !== ak);
       }
       const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();

@@ -1317,6 +1317,9 @@ const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, befor
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
 BUILDINGS.station.store   = {cap:80,  holds:FEED_GOODS, spoil:1};
 BUILDINGS.station.blurb   = "Keepers start here and hold a small stock of food. Zone hubs: custodians restock them from bigger stores.";
+// The aquarists' own station: the same building and store, for lagoons and aquariums
+BUILDINGS.diveshack = {...BUILDINGS.station, label:"Dive Shack", tag:"AQUARISTS", one:"a dive shack", glyph:"D", color:"#1F6F9F", full:"Food storage and aquarist lockers",
+  blurb:"Aquarists start here and hold a small stock of food. Zone hubs: custodians restock them from bigger stores."};
 BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:"W", color:"#6B5B3E", price:6750, upkeep:50, w:15, d:10, dept:true,
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
@@ -2782,7 +2785,7 @@ const waterWant = s => s.pool ? POOL.need : s.semi ? HAB.waterSemi : (biomesOf(s
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 // How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
 const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
-  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station"].includes(type) ? 0 : 1;
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station", "diveshack"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
@@ -2836,7 +2839,7 @@ const THEMES = {
     path:{live:"#4A1E14", dead:"#3A3436", edge:"#141113"}, bld:"#1A1719", mix:.92, edge:"#8A8488", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     // roofs by how hot a building runs: 0 storage and shops (dark basalt), 1 kitchens, hotels and work buildings (basalt with glowing seams), 2 labs, medicine and generators (steel plating, ember strips and vents)
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
-        : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "toolshed"].includes(type) ? 1 : 0,
+        : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "diveshack", "toolshed"].includes(type) ? 1 : 0,
       btex:["volcanic-basalt-dim", "volcanic-basalt", "volcanic-plate"],
       trim:[[{c:"#5C7A8C", w:1}],
         [{c:"#141113", w:3, dash:"1 1.6 1 1.6 1 1.6 1 18"}, {c:"#E0561C", w:1, dash:"6 24"}],
@@ -2959,7 +2962,7 @@ const THEMES = {
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
     // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
-        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
+        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "diveshack", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
       btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
       trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
         [{c:"#33281E", w:3.2, at:1}, {c:"#CFC9B4", w:1.6, at:.94}, {c:"#33281E", w:.6, at:.9}],

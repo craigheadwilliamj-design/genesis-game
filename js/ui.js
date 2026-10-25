@@ -728,9 +728,10 @@ function stationHtml(b){
   let h = deptHead(b);
   h += zoneRow("building", b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
-  h += staffNote("keeper");
-  const cut = state.exhibits.filter(e => e.animals.length && !gateCheck(e).ok);
-  if(cut.length) h += `<section><h3>No keeper access</h3><ul class="issues">${cut.map(e => `<li class="bad">${esc(e.name)}</li>`).join("")}</ul></section>`;
+  const aq = b.type === "diveshack";
+  h += staffNote(aq ? "aquarist" : "keeper");
+  const cut = state.exhibits.filter(e => e.animals.length && aquaEx(e) === aq && !gateCheck(e).ok);
+  if(cut.length) h += `<section><h3>No ${aq ? "aquarist" : "keeper"} access</h3><ul class="issues">${cut.map(e => `<li class="bad">${esc(e.name)}</li>`).join("")}</ul></section>`;
   return h;
 }
 function breakroomHtml(b){
@@ -821,14 +822,14 @@ function buildingBody(b){
   if(b.type === "dock") return dockHtml(b) + demolishRow(b);
   if(b.type === "closet") return closetHtml(b) + demolishRow(b);
   if(b.type === "security") return securityHtml(b) + demolishRow(b);
-  if(storeOf(b) && !isVendor(b) && !isHotel(b) && !["station", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
+  if(storeOf(b) && !isVendor(b) && !isHotel(b) && !["station", "diveshack", "pmc"].includes(b.type)) return warehouseHtml(b) + demolishRow(b);
   if(b.type === "depot") return depotHtml(b) + demolishRow(b);
   if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);
   if(b.type === "ceres") return ceresHtml(b) + demolishRow(b);
   if(b.type === "generator") return generatorHtml(b) + demolishRow(b);
   if(b.type === "workshop") return workshopHtml(b) + demolishRow(b);
-  if(b.type === "station") return stationHtml(b) + demolishRow(b);
+  if(b.type === "station" || b.type === "diveshack") return stationHtml(b) + demolishRow(b);
   if(b.type === "breakroom") return breakroomHtml(b) + demolishRow(b);
   if(b.type === "toolshed") return toolshedHtml(b) + demolishRow(b);
   if(b.type === "oracle") return oracleHtml(b) + demolishRow(b);

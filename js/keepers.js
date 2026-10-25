@@ -115,7 +115,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "diveshack", "breakroom", "workshop", "generator", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -245,8 +245,9 @@ const hasUpgrade = id => state.staff.upgrades.includes(id);
 const carryMax = () => KEEPER.carry * (hasUpgrade("wheelbarrow") ? 2.5 : 1);
 const tireRate = () => KEEPER.tirePerMeter * (hasUpgrade("boots") ? .6 : 1);
 
-function stations(){ return state.buildings.filter(b => b.type === "station" && kGraph && kGraph.anchors[b.id]); }
-function restSpots(){ const r = state.buildings.filter(b => b.type === "breakroom" && kGraph && kGraph.anchors[b.id]); return r.length ? r : stations(); }
+// Keepers start from Keeper Stations, aquarists from Dive Shacks (pass the walker or record)
+function stations(c){ const t = c && (c.role === "aqua") ? "diveshack" : "station"; return state.buildings.filter(b => b.type === t && kGraph && kGraph.anchors[b.id]); }
+function restSpots(c){ const r = state.buildings.filter(b => b.type === "breakroom" && kGraph && kGraph.anchors[b.id]); return r.length ? r : stations(c); }
 
 // Lagoons and aquariums are tended by aquarists, every other exhibit by keepers. An aquarist is a keeper record (and walker) with role "aqua".
 const aquaEx = e => !!e && (!!e.aqua || lagoonWalled(e));
@@ -326,13 +327,13 @@ function chase(c, l){
   if(l.status === "sedated" && l.byVet){ const n = kGraph.nodes.get(l.at); if(n && goTo(c, n, "toSedated")){ c.hunt = l; return true; } return false; }
   if(l.status === "loose"){
     if(vetsOnDuty() && !l.noVet){ l.keeper = null; return false; }
-    if(!c.gun){ const st = nearestOf(c, stations()); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
+    if(!c.gun){ const st = nearestOf(c, stations(c)); if(st){ goTo(c, st.n, "toGun"); return true; } return false; }
     const n = kGraph.nodes.get(l.next || l.at); if(n){ c.hunt = l; if(!goTo(c, n, "hunting")){ l.keeper = null; return false; } if(!c.route.length) arrive(c, null); return true; }
   }
   if(l.status === "carried"){
     const e = state.exhibits.find(x => x.id === l.from), n = e && kGraph.anchors[e.id];
     if(n && goTo(c, n, "returning")){ c.hunt = l; return true; }
-    const st = nearestOf(c, stations()); if(st){ c.hunt = l; goTo(c, st.n, "returning"); return true; }
+    const st = nearestOf(c, stations(c)); if(st){ c.hunt = l; goTo(c, st.n, "returning"); return true; }
   }
   return false;
 }
@@ -595,7 +596,7 @@ function decide(c, k){
     const w = walkFrom(c.at, c); const j = jobs.filter(j => w.dist.has(kGraph.anchors[j.e.id])).sort((a, b) => w.dist.get(kGraph.anchors[a.e.id]) - w.dist.get(kGraph.anchors[b.e.id]))[0];
     if(j){ c.plan = {exhibitId:j.e.id}; goTo(c, kGraph.anchors[j.e.id], "toExhibit"); return; }
   }
-  if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots()); if(r){ goTo(c, r.n, "toRest"); return; } }
+  if(k.stamina < KEEPER.restBelow){ const r = nearestOf(c, restSpots(c)); if(r){ goTo(c, r.n, "toRest"); return; } }
   // one map of the walk from here serves every choice below
   const w = walkFrom(c.at, c);
   const near = list => { let best = null; for(const b of list){ const n = kGraph.anchors[b.id]; if(n && w.dist.has(n) && (!best || w.dist.get(n) < best.d)) best = {b, n, d:w.dist.get(n)}; } return best; };
@@ -618,7 +619,7 @@ function decide(c, k){
   const tidy = cleanJob(c, k, CLEAN.tidyAbove + .01);
   if(tidy){ c.cleanId = tidy.id; c.cleanLow = true; if(goTo(c, kGraph.anchors[tidy.id], "toClean")) return; c.cleanId = null; }
   c.job = "idle"; c.wait = 15; c.plan = null;
-  const home = near(stations()); if(home && home.d > 1) goTo(c, home.n, "home");
+  const home = near(stations(c)); if(home && home.d > 1) goTo(c, home.n, "home");
 }
 
 function arrive(c, k){
@@ -744,7 +745,7 @@ function keepersTick(dtMin){
   callsTidy();
   for(const c of crew){
     const k = state.staff.keepers.find(x => x.id === c.id);
-    if(!c.at){ const s = stations()[0]; if(!s) continue; c.at = kGraph.anchors[s.id]; c.job = "idle"; }
+    if(!c.at){ const s = stations(c)[0]; if(!s) continue; c.at = kGraph.anchors[s.id]; c.job = "idle"; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 60){
       // a call comes before anything but an escape: drop the job as soon as the keeper is standing on a node
@@ -840,8 +841,8 @@ function keepersNight(){
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
 function hireKeeper(role){
-  const T = role === "aqua" ? AQUARIST : KEEPER;
-  if(!state.buildings.some(b => b.type === "station")) return "Build a Keeper Station first.";
+  const T = role === "aqua" ? AQUARIST : KEEPER, hq = role === "aqua" ? "diveshack" : "station";
+  if(!state.buildings.some(b => b.type === hq)) return role === "aqua" ? "Build a Dive Shack first." : "Build a Keeper Station first.";
   if(!canAfford(T.hireCost)) return `Hiring costs ${money(T.hireCost)}.`;
   spend(T.hireCost, "built");
   const used = new Set(state.staff.keepers.map(k => k.name));
