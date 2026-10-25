@@ -294,8 +294,9 @@ const POOL = {
   happy:8,         // happiness a pool with enough water (deep enough) gives
   lack:45,         // happiness lost with no pool at all, less as the water nears what they want
 };
-// Crates: animals boxed off the map wait in one until they're placed (science.js). fee: what a crate costs a day; warn: days in a crate before a reminder
-const CRATE = {fee:40, warn:3};
+// Crates: a boxed animal is a crate standing in the park until it's moved (science.js). It's drawn crate.png (14 x 17 px) scaled to the animal's size:
+// the animal's radius over perRadius, from min to max times the picture; half is the crate's half-width in meters at 1x; gap: room kept between two crates and from the entrance
+const CRATE = {min:1, max:4, perRadius:1.5, half:.95, gap:.4, entrance:9};
 const poolsOn = () => devMode();   // pools, sea water, their animals and the Viewing Gallery: dev mode only until the animals have art
 // Sea water: price is times WATER.perSqM. Pool animals swim in it; to land animals it is just water.
 const SEA_WATER = {

@@ -1170,7 +1170,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     hireScientist("gene");
     out.hireOpensBay = freeBay("gene") === 1 && orderClone(small.id, null) && sc.clones[1].bay === 1;
     out.fireClosesBay = (() => { const n = sc.clones.length; fireScientist("gene"); return sc.clones.length === n - 1 && bayCount("gene") === 1; })();
-    out.cloneFinishes = adv(base + 5, () => sc.ready.length >= 1);
+    out.cloneFinishes = adv(base + 5, () => crates().length >= 1);
     // a partial genome can fail: the clone stops where it died, keeps its bay, and waits to be discarded
     sc.dna[small.id] = {genome:CLONE_GENOME.min}; sc.rating = 5;
     out.failChanceScales = Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax) < 1e-9 && (sc.dna[small.id].genome = 80, Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax / 2) < 1e-9) && (sc.dna[small.id].genome = 100, cloneFailChance(small.id) === 0);
@@ -1180,10 +1180,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const fj = sc.clones[sc.clones.length - 1];
     out.failRolled = ordered && fj.fail > fj.start && fj.fail < fj.end;
     out.runningCardHasBar = /data-cbar/.test(cloneCard(fj, 0)) && !/CLONE FAILED/.test(cloneCard(fj, 0));
-    const readyBefore = sc.ready.length;
+    const readyBefore = crates().length;
     out.cloneFails = adv(base, () => fj.failed) && fj.stop >= CLONE_FAIL.from * 100 - 1 && fj.stop <= CLONE_FAIL.to * 100 + 1;
     adv(base * 2, () => false);
-    out.failedStaysPut = sc.clones.includes(fj) && sc.ready.length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
+    out.failedStaysPut = sc.clones.includes(fj) && crates().length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
     out.failedCardOverlay = /CLONE FAILED/.test(cloneCard(fj, 0)) && /discardClone/.test(cloneCard(fj, 0)) && cloneCard(fj, 0).includes(`width:${Math.round(fj.stop)}%`);
     out.discardFreesBay = discardClone(fj.id) && !sc.clones.includes(fj) && freeBay("gene") >= 0;
     sc.dna[small.id] = {genome:100};
@@ -2818,25 +2818,25 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = exKeep; state.safety.loose = looseKeep; events.fx = fxKeep; events.died = diedKeep; events.toast = tKeep; syncAnimals();
     }
     {   // sex: ordered clones carry the chosen sex, old saves get one, a single-sex herd is lonelier and less happy
-      const exKeep = state.exhibits, readyKeep = state.science.ready, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
+      const exKeep = state.exhibits, readyKeep = state.crates, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
       events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
       const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
       const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator && !s.viv).id;   // an open-exhibit herd: room matters there
       const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
-      state.science.clones = []; state.science.ready = [];
+      state.science.clones = []; state.crates = [];
       const dest = pen("e-sx0", []); state.exhibits = [dest];
       orderClone(herd, dest.id, "female"); orderClone(herd, null, "male"); orderClone(herd);
       const jobs = state.science.clones.slice();
       out.cloneStoresSex = jobs[0].sex === "female" && jobs[1].sex === "male" && (jobs[2].sex === "male" || jobs[2].sex === "female");
       for(const j of jobs.slice(0, 2)) finishClone(j);
-      out.cloneHatchKeepsSex = dest.animals[0].sex === "female" && state.science.ready[0].sex === "male";
+      out.cloneHatchKeepsSex = dest.animals[0].sex === "female" && state.crates[0].sex === "male";
       // old saves: animals everywhere, including holding and clones in the incubator, get a sex
       const old = JSON.parse(JSON.stringify(state)); old.exhibits = [pen("e-sx1", [herd, herd, herd, herd])];
       for(const a of old.exhibits[0].animals) delete a.sex;
-      old.science.ready = [{id:"rd", sp:herd, q:90}]; old.science.clones = [{id:"cl", sp:herd, q:90}];
+      old.science.ready = [{id:"rd", sp:herd, q:90}]; old.crates = []; old.science.clones = [{id:"cl", sp:herd, q:90}];
       const up = upgradeSave(old);
-      out.sexMigrated = up.exhibits[0].animals.every(a => a.sex === "male" || a.sex === "female") && up.science.ready[0].sex && up.science.clones[0].sex;
-      let m = 0; for(let i = 0; i < 200; i++) m += pickSex(herd, {exhibits:[{animals:[{sp:herd, sex:"male"}, {sp:herd, sex:"male"}]}], science:{ready:[]}}) === "male";
+      out.sexMigrated = up.exhibits[0].animals.every(a => a.sex === "male" || a.sex === "female") && up.crates[0].id === "rd" && up.crates[0].sex && up.crates[0].x === null && !("ready" in up.science) && up.science.clones[0].sex;
+      let m = 0; for(let i = 0; i < 200; i++) m += pickSex(herd, {exhibits:[{animals:[{sp:herd, sex:"male"}, {sp:herd, sex:"male"}]}], crates:[]}) === "male";
       out.sexBalances = m < 60;
       // social rules: sexes and species social type decide stability, fights and loner stress
       const mk = (id, sp, sexes) => { const p = pen(id, sexes.map(() => sp)); p.animals.forEach((x, i) => x.sex = sexes[i]); return p; };
@@ -2960,7 +2960,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = [one, two];
       out.fightBiasMale = fightBias({sp:"dime", sex:"male"}) > 1 && fightBias({sp:"dime", sex:"female"}) === 1;
       out.sexShown = sexSplit(two, herd).includes("2 M, 2 F") && sexMark({sex:"male"}) === "M";
-      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.science.ready = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
+      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.crates = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
     }
     localStorage.removeItem("genesis-dev");
     return out;
@@ -3167,7 +3167,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     finishClone = c => { seen.clone = nowMin(); real.fc(c); }; finishBatch = b => { seen.bed = nowMin(); real.fb(b); };
     const era = Object.keys(CERES_GROW.medicine)[0];
     const run = (startDay, startMinute, dts, reload) => {
-      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; s.ready = [];
+      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; state.crates = [];
       for(const k of Object.keys(seen)) delete seen[k];
       state.day = startDay; state.minute = startMinute; s.points = 1e6; s.tech = s.tech.filter(t => t !== "moat"); s.tech.push("medpaleo");
       state.rating = 5; startProject("tech", "moat"); delete s.dna[tsp.id]; sendDrone("dig", tsite.id, tsp.id); orderClone(sp.id, null); growBatch("med", era);
@@ -3919,31 +3919,42 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.buildings = [pb]; const platV = viewFactor(pe, {[pb.id]:true}); state.buildings = [pb, gb]; const bothV = viewFactor(pe, {[pb.id]:true, [gb.id]:true});
       out.galleryView = isPool(pe) && !isPool({points:pts, water:[], animals:[]}) && parkGround(gb) && !parkGround(pb) && bothV > platV && Math.abs(bothV / Math.max(1, barrierOf(pe).view) - GALLERY.view) < 1e-9
         && buildingHidden("gallery") === !devMode() && STAND34.gallery && building34(gb, BUILDINGS.gallery, false, false, true, 1).includes("GALLERY");
-      // crates: instant boxing keeps the animal whole, it goes back in only where it fits, a crate costs a fee a night, stranded pool animals and a bulldozed exhibit's animals are crated
+      // crates: boxing is instant and leaves a crate standing where the animal was, scaled to its size; it keeps the animal whole, moves only to free ground, opens only where it fits;
+      // stranded pool animals and a bulldozed exhibit's pool animals are crated, its other animals get out
       {
-        const keepR = state.science.ready.slice(); state.science.ready.length = 0;
+        const keepC = state.crates; state.crates = [];
         const a0 = pe.animals[0]; a0.sick = {kind:"illness", sev:10}; a0.q = 77;
         const r = crateAnimal(pe, a0), land = {id:"e-cland", name:"Land", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[], land:[], water:[]};
         state.exhibits.push(land);
-        const boxed = !!r && !pe.animals.includes(a0) && crates()[0] === r && r.crated === state.day && r.q === 77 && r.sick && r.name === a0.name && crateDays(r) === 0;
+        const boxed = !!r && !pe.animals.includes(a0) && crates()[0] === r && r.q === 77 && r.sick && r.name === a0.name && typeof r.x === "number";
+        const sizes = SPECIES.map(x => crateScale(x.id)), scaled = sizes.every(v => v >= CRATE.min && v <= CRATE.max) && Math.max(...sizes) > Math.min(...sizes);
         const refuse = crateProblem(r, land) === "Needs a lagoon wall." && crateProblem(r, {viv:"S", points:[]}) === "Too big for a case." && crateProblem(r, null) === "Tap an exhibit." && !!uncrate(r.id, land) && crates().length === 1;
+        // free ground only: a building under a crate, another crate beside it, and moving one
+        const q0 = ownedRects()[0], rc = dropCrate({id:"cr-1", sp:r.sp, q:90, sex:"female"}, (q0[0] + q0[2]) / 2, (q0[1] + q0[3]) / 2), standsFree = !crateSpotProblem(rc.x, rc.y, rc.sp, rc);
+        const bz = {id:"b-crbz", type:"bin", points:rectPts(rc.x - 3, rc.y - 3, 6, 6, 0)}; state.buildings.push(bz);
+        const onBuilding = /building/.test(crateSpotProblem(rc.x, rc.y, rc.sp) || ""); state.buildings.pop();
+        const r2 = dropCrate({id:"cr-2", sp:r.sp, q:90, sex:"male"}, rc.x, rc.y);
+        const apart = (r2.x !== rc.x || r2.y !== rc.y) && !crateSpotProblem(r2.x, r2.y, r2.sp, r2) && /crate/.test(crateSpotProblem(rc.x, rc.y, rc.sp) || "");
+        const keepX = r2.x, bad = moveCrate(r2.id, rc.x, rc.y), [fx, fy] = crateSpotNear(rc.x + 15, rc.y, r2.sp, r2);
+        const moved = !!bad && r2.x === keepX && moveCrate(r2.id, fx, fy) === null && r2.x === fx && r2.y === fy;
+        crates().splice(crates().indexOf(r2), 1); crates().splice(crates().indexOf(rc), 1);
         const back = uncrate(r.id, pe) === null && pe.animals.some(x => x.id === a0.id && x.q === 77 && x.sick) && !crates().length;
-        crateAnimal(pe, pe.animals.find(x => x.id === a0.id)); const fee0 = state.money; cratesNight();
-        const night = state.money === fee0 - CRATE.fee && crateDays({crated:state.day - CRATE.warn}) === CRATE.warn;
+        crateAnimal(pe, pe.animals.find(x => x.id === a0.id));
         const sold = sellCrate(a0.id) === Math.round(M.price * COST.animalResale) && !crates().length;
         pe.barrier = "bars"; const n0 = pe.animals.length, stranded = crateStranded() === n0 && !pe.animals.length && crates().length === n0; pe.barrier = "lagoon";
-        state.science.ready.length = 0; land.animals = [{id:"cl1", sp:SPECIES.find(x => !x.viv && !x.pool).id, q:90}]; const m1 = state.money;
+        state.crates = []; land.animals = [{id:"cl1", sp:SPECIES.find(x => !x.viv && !x.pool).id, q:90}]; const m1 = state.money;
         const loose0 = state.safety.loose.length; removeItem("exhibit", land);
         const gotOut = !crates().length && state.safety.loose.length === loose0 + 1 && state.safety.loose.at(-1).id === "cl1" && !state.exhibits.includes(land) && state.money >= m1;
         state.safety.loose.pop();
         const wet = {id:"e-cwet", name:"Wet", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[{id:"cl2", sp:M.id, q:90}], land:[], water:[]};
         state.exhibits.push(wet); removeItem("exhibit", wet);
         const bulldozed = gotOut && crates().length === 1 && crates()[0].id === "cl2" && state.safety.loose.length === loose0;
-        openParkOffice("crates"); ui.panel(); ui.hud(true);
-        const shown = /Crates/.test(officeTabs()) && /sprites\/crate\.png/.test(cratesHtml()) && /data-action="crateTool"/.test(cratesHtml()) && !document.querySelector("#crateBtn").hidden && document.querySelector("#crateN").textContent === "1";
-        const ghost = crateGhostSvg({x:10, y:10, e:pe, why:null}).includes("sprites/crate.png") && !!SPRITE_PACK["sprites/crate.png"];
-        out.crates = boxed && refuse && back && night && sold && stranded && bulldozed && shown && ghost;
-        closePanel(); state.science.ready.length = 0; state.science.ready.push(...keepR); ui.hud(true);
+        // drawn standing in the park, tappable, with its own panel; carried with the ghost
+        const c3 = crates()[0]; render(); select("crate", c3.id); ui.panel();
+        const shown = world.innerHTML.includes('data-kind="crate" data-id="cl2"') && /data-action="crateTool"/.test(panelEl.innerHTML) && /data-action="crateSell"/.test(panelEl.innerHTML) && !document.querySelector("#crateBtn");
+        const ghost = crateGhostSvg({x:10, y:10, e:pe, r:c3, open:false, why:null}).includes("sprites/crate.png") && !!SPRITE_PACK["sprites/crate.png"];
+        out.crates = boxed && scaled && refuse && standsFree && onBuilding && apart && moved && back && sold && stranded && bulldozed && shown && ghost;
+        select(null); state.crates = keepC; ui.hud(true);
       }
       state.exhibits = keepEx; state.buildings = keepB; state.money = m0; render();
     }

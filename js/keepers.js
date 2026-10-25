@@ -451,7 +451,7 @@ function dropOff(t, a){
   delete a.darted;
   const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp];
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); events.toast(`Keepers moved a ${s.name} into ${e.name}.`, "good"); }
-  else { state.science.ready.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q ?? 90}); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in a crate.`, "bad"); }
+  else { const from = state.exhibits.find(x => x.id === t.from), [x, y] = from ? centroid(from.points) : labSpot(); dropCrate(a, x, y); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in a crate.`, "bad"); }
   events.changed();
 }
 

@@ -104,7 +104,7 @@ const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
 // Random but roughly balanced: usually the sex its species has fewer of across the park
 function pickSex(sp, st){
   const s = st || state, n = {male:0, female:0};
-  for(const a of [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
+  for(const a of [...s.exhibits.flatMap(e => e.animals), ...(s.crates || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
   if(n.male !== n.female && Math.random() < SEX.balance) return n.male < n.female ? "male" : "female";
   return Math.random() < .5 ? "male" : "female";
 }
@@ -140,7 +140,6 @@ function freshScience(){
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
     reports:[],        // post-mission reports waiting at the Time Travel Lab, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
     clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and Botany Lab beds carry a `bay` too, see science.js.
-    ready:[],          // finished clones waiting for an exhibit: {id, sp, q}
     log:[]             // recent expedition results, newest first
   };
 }
@@ -162,6 +161,7 @@ function newPark(){
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{}, fenceGrid5:true,
     paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
     buildings:[],
+    crates:[],         // boxed animals standing in the park: an animal's record with x and y (science.js)
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
   };
@@ -439,6 +439,9 @@ function upgradeSave(s){
   // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
   if(!s.zones) s.zones = [];
+  // crates used to be a holding list (science.ready); now each one stands in the park, and settleCrates gives these a spot by the Genetics Lab
+  if(!s.crates) s.crates = [];
+  if(s.science && s.science.ready){ for(const r of s.science.ready) s.crates.push({...r, x:null, y:null}); delete s.science.ready; }
   if(!Array.isArray(s.biomePaint)) s.biomePaint = [];   // ground paint (js/biomepaint.js)
   if(!s.guestLog) s.guestLog = freshGuestLog();
   if(!s.guestLog.vandal) s.guestLog.vandal = freshVandalLog();
@@ -503,11 +506,11 @@ function upgradeSave(s){
   for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; delete a.gene; }   // who is indoors isn't saved: the shelters fill up again as the day goes
   // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
   if(!s.animalSeq) s.animalSeq = {};
-  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
     for(const a of all) if(a.name) { const m = /^(.*)-(\d+)$/.exec(a.name); if(m && m[1] === a.sp.toUpperCase()) s.animalSeq[a.sp] = Math.max(s.animalSeq[a.sp] || 0, +m[2]); }
     for(const a of all) if(!a.name) nameAnimal(a, s); }
   // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
-  { const all = [...s.exhibits.flatMap(e => e.animals), ...((s.science && s.science.ready) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
     for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
     for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
   snapFootprints(s);   // plants and rocks take whole-cell squares (landscape.js)
@@ -890,7 +893,6 @@ function endDay(){
   healthNight();
   vetsNight();
   behaviorNight();
-  cratesNight();
   // today's weather has done its harm; tomorrow's forecast comes true
   rollWeather();
   if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer${weatherNow().guests < .9 ? ", and fewer guests will come" : ""}.`, "bad");

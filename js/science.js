@@ -344,27 +344,62 @@ function hireScientist(kind){
   spend(k.hireCost, "science"); state.science.crew[kind]++;
   return null;
 }
-function placeReady(id, exhibitId){
-  const sc = state.science, i = sc.ready.findIndex(r => r.id === id), e = state.exhibits.find(x => x.id === exhibitId);
-  if(i < 0 || !e) return false;
-  putAnimal(e, sc.ready[i]); sc.ready.splice(i, 1);
-  return true;
+/* ---------- crates: an animal boxed off the map is a crate standing in the park (state.crates), Zoo Tycoon style ---------- */
+// A crate is the animal's record plus where it stands (x, y). It isn't in any exhibit, so nothing feeds it, nothing ages it and guests don't see it, until it's moved into one.
+// Boxed by hand (the Crate button), by a bulldozed exhibit (pool animals) or a drained lagoon, or a clone, escapee or moved animal with nowhere to go.
+const crates = () => state.crates;
+const crateScale = sp => clamp(animalRadius(sp) / CRATE.perRadius, CRATE.min, CRATE.max);
+const crateBox = (x, y, sp) => { const h = CRATE.half * crateScale(sp); return [x - h, y - h, x + h, y + h]; };
+// Why a crate of this species can't stand at (x, y), or null. `skip` is the crate being moved, which doesn't block itself.
+function crateSpotProblem(x, y, sp, skip){
+  const b = crateBox(x, y, sp), R = [b];
+  if(!insidePlot(boxPts(b), true)) return "Keep it inside the park boundary.";
+  if(state.buildings.some(o => rectsHitPoly(R, o.points))) return "It's on a building.";
+  if(state.paths.some(p => !p.d && rectsHitLine(R, p.points, halfWidth(p))) || rectsOnChunk(R)) return "It's on a path.";
+  if(state.exhibits.some(e => e.viv && rectsHitPoly(R, e.points))) return "It's in a case.";
+  if(state.exhibits.some(e => !e.viv && rectsHitPoly(R, e.points) && !boxInside(b, e.points))) return "It's on a fence.";
+  if(parkFences().some(l => rectsHitLine(R, l.points))) return "It's on a fence.";
+  if(listFor("water").some(w => rectsHitPoly(R, w.points))) return "It's in the water.";
+  if(boxPointDist(b, state.gate[0], state.gate[1]) < CRATE.entrance) return "Keep clear of the entrance.";
+  if(crates().some(c => c !== skip && c.x != null && boxesHit(crateBox(c.x, c.y, c.sp).map((v, i) => v + (i < 2 ? -CRATE.gap : CRATE.gap)), b))) return "It overlaps another crate.";
+  return null;
 }
-/* ---------- crates: animals boxed off the map (state.science.ready), Zoo Tycoon style ---------- */
-// A clone with no exhibit, a recaptured escapee with nowhere to go, an animal whose exhibit went or failed it, or one boxed by hand waits in a crate
-// until it's placed (the Crates tab, the uncrate tool in map.js, an exhibit's Cloning tab). `crated` is the day it went in (stamped by cratesNight when missing).
-const crates = () => state.science.ready;
-const crateDays = r => state.day - (r.crated ?? state.day);
-// Box an animal from its exhibit, at once
-function crateAnimal(e, a){
-  const i = e.animals.indexOf(a); if(i < 0) return null;
-  e.animals.splice(i, 1);
-  state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
-  state.health.ward = state.health.ward.filter(p => p.a.id !== a.id);
-  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, q:a.q ?? 90, cl:!!a.cl, crated:state.day};
+// The free spot nearest (x, y): the point itself, else rings outward
+function crateSpotNear(x, y, sp, skip){
+  if(!crateSpotProblem(x, y, sp, skip)) return [x, y];
+  const step = Math.max(1, CRATE.half * crateScale(sp));
+  for(let r = step; r <= 80; r += step){
+    const n = Math.max(8, Math.round(2 * Math.PI * r / step));
+    for(let i = 0; i < n; i++){
+      const t = 2 * Math.PI * i / n, px = x + Math.cos(t) * r, py = y + Math.sin(t) * r;
+      if(!crateSpotProblem(px, py, sp, skip)) return [px, py];
+    }
+  }
+  return [x, y];
+}
+// An animal's record becomes a crate standing at the free spot nearest (x, y)
+function dropCrate(a, x, y){
+  const [cx, cy] = crateSpotNear(x, y, a.sp);
+  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, q:a.q ?? 90, x:cx, y:cy};
+  if(a.cl !== undefined) r.cl = a.cl;
   if(a.sick) r.sick = a.sick;
   crates().push(r);
   return r;
+}
+// The Genetics Lab's door, or the entrance when there's no lab: where a clone or a patient with no home is set down
+const labSpot = () => { const b = state.buildings.find(o => o.type === "tar"); return b ? centroid(b.points) : [state.gate[0], state.gate[1]]; };
+// Migrated crates have no spot yet: they go by the lab
+function settleCrates(){
+  for(const c of crates()) if(c.x == null){ const [x, y] = labSpot(), [cx, cy] = crateSpotNear(x, y, c.sp); c.x = cx; c.y = cy; }
+}
+// Box an animal from its exhibit, at once, where it stands
+function crateAnimal(e, a){
+  const i = e.animals.indexOf(a); if(i < 0) return null;
+  const h = bodyPos(a), [x, y] = h ? [h.x, h.y] : centroid(e.points);
+  e.animals.splice(i, 1);
+  state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
+  state.health.ward = state.health.ward.filter(p => p.a.id !== a.id);
+  return dropCrate({...a, cl:!!a.cl}, x, y);
 }
 // Why a crated animal can't go into this exhibit, in a few words, or null
 function crateProblem(r, e){
@@ -379,10 +414,18 @@ function crateProblem(r, e){
   if(s.pool) return lagoonWalled(e) ? "No water for it." : "Needs a lagoon wall.";
   return "Can't live here.";
 }
+// Open a crate into an exhibit
 function uncrate(id, e){
-  const r = crates().find(x => x.id === id); if(!r) return "That crate is gone.";
-  const why = crateProblem(r, e); if(why) return why;
-  placeReady(id, e.id);
+  const i = crates().findIndex(x => x.id === id); if(i < 0) return "That crate is gone.";
+  const why = crateProblem(crates()[i], e); if(why) return why;
+  putAnimal(e, crates()[i]); crates().splice(i, 1);
+  return null;
+}
+// Set a crate down somewhere else
+function moveCrate(id, x, y){
+  const c = crates().find(o => o.id === id); if(!c) return "That crate is gone.";
+  const why = crateSpotProblem(x, y, c.sp, c); if(why) return why;
+  c.x = x; c.y = y;
   return null;
 }
 function sellCrate(id){
@@ -390,14 +433,6 @@ function sellCrate(id){
   const v = Math.round(SPECIES_BY_ID[crates()[i].sp].price * COST.animalResale);
   crates().splice(i, 1); earn(v, "sold");
   return v;
-}
-// Every night: a crate costs CRATE.fee a day to keep, and animals boxed CRATE.warn days or more get a reminder
-function cratesNight(){
-  const list = crates(); if(!list.length) return;
-  for(const r of list) r.crated ??= state.day;
-  spend(list.length * CRATE.fee, "upkeep");
-  const long = list.filter(r => crateDays(r) >= CRATE.warn).length;
-  if(long) events.toast(`${long} animal${long === 1 ? " has" : "s have"} been in a crate for ${CRATE.warn} days or more.`, "bad");
 }
 // Pool animals in an exhibit that has lost its lagoon wall or all its water are crated at once (afterChange). Returns how many.
 function crateStranded(){
@@ -416,7 +451,7 @@ function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
   if(e){ putAnimal(e, c); events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`The Genetics Lab finished a ${s.name} clone. It waits in a crate.`, "good"); }
+  else { const [x, y] = labSpot(); dropCrate(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q}), x, y); events.toast(`The Genetics Lab finished a ${s.name} clone. It waits in a crate.`, "good"); }
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */

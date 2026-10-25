@@ -157,12 +157,12 @@ function sellAnimalAsk(id){
   const a = animalById(id), e = a && animalHome(id); if(!a || !e) return;
   askConfirm("Sell animal?", `Sell ${a.name || SPECIES_BY_ID[a.sp].name} for ${money(sellValue(a))}?`, "Sell", () => sellAnimal(id));
 }
-// Box an animal at once: it leaves its exhibit for a crate (science.js), to be placed anywhere it fits
+// Box an animal at once: it turns into a crate right where it stands (science.js), to be moved wherever it fits
 function crateAnimalNow(id){
   const a = animalById(id), e = a && animalHome(id); if(!a || !e) return false;
-  crateAnimal(e, a);
+  const r = crateAnimal(e, a);
   const h = herd.get(id); if(h){ h.el.remove(); herd.delete(id); }
-  if(sel && sel.kind === "animal" && sel.id === id) select("exhibit", e.id);
+  if(sel && sel.kind === "animal" && sel.id === id) sel = {kind:"crate", id:r.id};
   afterChange(); render(); ui.panel();
   ui.toast(`${a.name || SPECIES_BY_ID[a.sp].name} is in a crate.`, "good");
   return true;

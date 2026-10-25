@@ -101,7 +101,7 @@ function wideJoin(p){
 }
 
 /* ---------- looking things up ---------- */
-function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "fence" ? state.fences
+function listFor(kind){ return kind === "exhibit" ? state.exhibits : kind === "path" ? state.paths : kind === "building" ? state.buildings : kind === "zone" ? state.zones : kind === "crate" ? state.crates : kind === "fence" ? state.fences
   : kind === "land" ? state.exhibits.flatMap(landOf).concat(decorOf()) : kind === "water" ? state.exhibits.flatMap(waterOf).concat(parkWater()) : null; }
 function findItem(kind, id){ const l = listFor(kind); return l ? l.find(x => x.id === id) : null; }
 function selItem(){ return !sel ? null : sel.kind === "guest" ? parties.find(p => p.id === sel.id) || null : sel.kind === "staff" ? (staffById(sel.id) || {}).s || null : sel.kind === "animal" ? animalById(sel.id) : findItem(sel.kind, sel.id); }
@@ -314,6 +314,7 @@ function render(){
   // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
   const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze" || tool === "move", isDoomed)}));
   for(const q of looseLeft) standing.push(q);
+  for(const c of state.crates) if(c.x != null) standing.push({y:c.y, o:1, svg:crateSvg(c, isSel("crate", c.id), inv)});
   standing.push({y:state.gate[1], o:2, svg:entrance34(inv)});   // the entrance building stands on the south edge, so it sorts in too
   standing.sort((p, q) => p.y - q.y || p.o - q.o);
   if(!tilt) while(standing.length) s += standing.shift().svg;   // the flat view has no depth: all of it goes under the buildings
@@ -2307,7 +2308,7 @@ function setTool(t){
   else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "gallery") showBar("Place a viewing gallery", "Tap a pool's fence beside a guest path. The gallery stands outside it, its glass against the water.", `${money(BUILDINGS.gallery.price)} each, ${money(BUILDINGS.gallery.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
+  else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there, or open ground to set it down.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(landKey(t)){
     const L = LAND[landKey(t)];
     showBar(`Place ${L.one}`, L.statue ? `Tap anywhere out in the park, clear of paths and fences. Guests stop to look${L.initials ? ", and learn a lot from the plaque" : ""}.${L.text ? " " + L.text : ""}`
@@ -3162,33 +3163,50 @@ function galleryTap(ev){
   ui.toast(isReachable(b) ? `Built a viewing gallery on ${g.e.name}.` : "Built a viewing gallery, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
 }
 
-/* ---------- placing a crate (science.js crates) ---------- */
-let crateSel = null, crateGhost = null;   // the crate being placed (an id in crates()), and the ghost under the pointer: {x, y, e, why}
+/* ---------- crates standing in the park, and carrying one (science.js crates) ---------- */
+// The crate picture for a species at (x, y): true size scaled to the animal (crateScale), never under 16 px across on screen, standing on its base
+function crateArt(sp, x, y){
+  const sc = crateScale(sp), P = ROCK_MPP * sc * Math.max(1, 16 / (14 * ROCK_MPP * sc * view.k)), vs = tilt ? 1 / TILT : 1, w = 14 * P, h = 17 * P * vs;
+  return {w, h, x:x - w / 2, y:y - h + 2 * P * vs};
+}
+function crateSvg(c, on, inv){
+  const g = crateArt(c.sp, c.x, c.y);
+  return `<g data-kind="crate" data-id="${esc(c.id)}" style="cursor:pointer">${on ? `<circle cx="${c.x}" cy="${c.y}" r="${(g.w * .7).toFixed(2)}" fill="none" stroke="var(--sel)" stroke-width="2.5" vector-effect="non-scaling-stroke"/>` : ""}`
+    + `<image href="${spriteUrl("sprites/crate.png")}" x="${g.x.toFixed(2)}" y="${g.y.toFixed(2)}" width="${g.w.toFixed(2)}" height="${g.h.toFixed(2)}" preserveAspectRatio="none" style="image-rendering:pixelated"/></g>`;
+}
+let crateSel = null, crateGhost = null;   // the crate being carried (an id in crates()), and the ghost under the pointer: {x, y, e, r, open, why}
 function startUncrate(id){ crateSel = id; crateGhost = null; closePanel(); setTool("uncrate"); }
+// Over an exhibit it fits, the crate opens there; anywhere else it's set down if the spot is free
 function crateSpot(ev){
   const p = toWorld(ev.clientX, ev.clientY), r = crates().find(x => x.id === crateSel);
   const e = state.exhibits.find(x => inPoly(p.x, p.y, x.points)) || null;
-  return {x:p.x, y:p.y, e, r, why:r ? crateProblem(r, e) : "That crate is gone."};
+  if(!r) return {x:p.x, y:p.y, e, r, open:false, why:"That crate is gone."};
+  const open = !!e && !crateProblem(r, e);
+  return {x:p.x, y:p.y, e, r, open, why:open ? null : crateSpotProblem(p.x, p.y, r.sp, r)};
 }
 function crateHover(ev){
   crateGhost = crateSpot(ev);
-  const g = crateGhost, fight = g.r && g.e && !g.why && g.e.animals.map(a => conflict(SPECIES_BY_ID[g.r.sp], SPECIES_BY_ID[a.sp])).find(x => x);
-  setStat(g.why || (fight ? `${g.e.name}. ${fight}` : `${g.e.name}.`), !!g.why);
+  const g = crateGhost, fight = g.r && g.open && g.e.animals.map(a => conflict(SPECIES_BY_ID[g.r.sp], SPECIES_BY_ID[a.sp])).find(x => x);
+  setStat(g.open ? (fight ? `Open it in ${g.e.name}. ${fight}` : `Open it in ${g.e.name}.`) : g.why || (g.e && g.r ? `${g.e.name}: ${crateProblem(g.r, g.e)} Set it down here.` : "Set it down here."), !g.open && !!g.why);
   renderOverlay();
 }
-// the crate at the pointer, standing on its base, over the exhibit it would open into (green) or can't (red)
+// the crate at the pointer: over the exhibit it would open into (green), or red where it can't stand
 function crateGhostSvg(g){
-  const P = ROCK_MPP * Math.max(1, 30 / (14 * ROCK_MPP * view.k)), w = 14 * P, h = 17 * P / TILT, col = g.why ? "var(--bad)" : "var(--good)";   // true size, but never under 30 px across on screen
-  return (g.e ? `<polygon points="${polyStr(g.e.points)}" fill="${col}" fill-opacity=".14" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "")
-    + `<image href="${spriteUrl("sprites/crate.png")}" x="${(g.x - w / 2).toFixed(2)}" y="${(g.y - h + 2 * P / TILT).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" preserveAspectRatio="none" opacity="${g.why ? .55 : .95}" style="image-rendering:pixelated" pointer-events="none"/>`;
+  if(!g.r) return "";
+  const col = g.open ? "var(--good)" : "var(--bad)", a = crateArt(g.r.sp, g.x, g.y);
+  return (g.open ? `<polygon points="${polyStr(g.e.points)}" fill="${col}" fill-opacity=".14" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "")
+    + `<image href="${spriteUrl("sprites/crate.png")}" x="${a.x.toFixed(2)}" y="${a.y.toFixed(2)}" width="${a.w.toFixed(2)}" height="${a.h.toFixed(2)}" preserveAspectRatio="none" opacity="${g.why ? .55 : .95}" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
 function crateTap(ev){
   const g = crateSpot(ev);
+  if(!g.r){ setStat(g.why, true); return; }
   if(g.why){ setStat(g.why, true); return; }
-  const s = SPECIES_BY_ID[g.r.sp], name = g.r.name || s.name;
-  uncrate(crateSel, g.e); crateSel = null; crateGhost = null; setTool(null);
+  const s = SPECIES_BY_ID[g.r.sp], name = g.r.name || s.name, id = g.r.id;
+  if(g.open){ uncrate(id, g.e); sel = null; }
+  else { moveCrate(id, g.x, g.y); sel = {kind:"crate", id}; }
+  crateSel = null; crateGhost = null; setTool(null);
   afterChange(); render();
-  ui.toast(`${name} is out of its crate in ${g.e.name}.`, "good");
+  if(g.open) ui.toast(`${name} is out of its crate in ${g.e.name}.`, "good");
 }
 
 /* ---------- rocks, groves and shelters ---------- */
@@ -3218,7 +3236,7 @@ function landTap(ev){
 function bulldozeTap(kind, id){
   if(!kind){ setStat(""); render(); return; }
   if(kind === "gate"){ const e = findItem("exhibit", id); if(e) confirmGateRemoval(e); return; }
-  if(kind === "water") return;   // water goes by painting ground over it
+  if(kind === "water" || kind === "crate") return;   // water goes by painting ground over it; a crate is sold from its panel
   const it = findItem(kind, id);
   if(!it) return;
   bulldozeItem(kind, it);
@@ -3265,7 +3283,6 @@ function removeItem(kind, it, opts = {}){
   if(kind === "exhibit" && it.grid && !opts.keepFence) releaseSides(it);   // its side of a wall it shares goes; the neighbor's stays
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
-  if(kind === "exhibit") releaseAnimals(it);
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
   else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
@@ -3274,6 +3291,7 @@ function removeItem(kind, it, opts = {}){
   // viewing platforms and galleries go with their exhibit
   if(kind === "exhibit") state.buildings = state.buildings.filter(b => b.exhibitId !== it.id);
   if(kind === "exhibit" && it.grid) for(const k of lift) delete fencePieces()[k];
+  if(kind === "exhibit") releaseAnimals(it);   // with the fence and platforms gone, crates and escapees can stand where the exhibit was
   if(sel && sel.id === it.id) sel = null;
   afterChange();
   render(); ui.panel();
@@ -3777,6 +3795,7 @@ document.addEventListener("keydown", e => {
 
 // Call after anything in the park changes shape: rework the numbers, the walkers' routes, goals, and save
 function afterChange(){
+  settleCrates();
   crateStranded();   // pool animals left without a lagoon wall or water go into crates
   refreshMenu();
   recompute();

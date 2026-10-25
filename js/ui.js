@@ -25,7 +25,6 @@ const ui = {
 
   // Update the numbers in the top bar. Cheap enough to call every frame.
   hud(force){
-    { const n = crates().length, b = $("#crateBtn"); if(b && b.hidden !== !n) b.hidden = !n; if(n && $("#crateN").textContent !== String(n)) $("#crateN").textContent = n; }   // the rail's crate button shows while anything is crated
     const set = (id, v) => { if(force || this.hudCache[id] !== v){ this.hudCache[id] = v; $("#" + id).textContent = v; } };
     set("money", money(state.money));
     $("#roMoney").classList.toggle("neg", state.money < 0);
@@ -64,6 +63,7 @@ const ui = {
     else if(sel.kind === "guest") h = guestHtml(it);
     else if(sel.kind === "staff") h = staffHtml(it);
     else if(sel.kind === "animal") h = animalHtml(it);
+    else if(sel.kind === "crate") h = crateHtml(it);
     else h = pathHtml(it);
     // keep the scroll spot and the typing cursor when the panel redraws
     const sc = panelEl.scrollTop, focusId = document.activeElement && panelEl.contains(document.activeElement) ? document.activeElement.id : null;
@@ -113,16 +113,15 @@ function grantsHtml(goal){
   h += `<section><h3>Grants <span class="num">${activeGoals().filter(g => state.goalsDone.includes(g.id)).length} of ${activeGoals().length}</span></h3><ul class="checklist">${activeGoals().map(g => { const done = state.goalsDone.includes(g.id), now = goal && g.id === goal.id; return `<li><span>${done ? "✓" : now ? "›" : ""}</span><span class="${done ? "done" : now ? "now" : ""}">${esc(g.text)}</span><span class="r">${esc(grantPrize(g))}</span></li>`; }).join("")}</ul></section>`;
   return h;
 }
-// The Crates tab: every crated animal with its days in the box, and Place (the uncrate tool) and Sell
-const crateImg = () => `<img src="${spriteUrl("sprites/crate.png")}" width="21" height="26" alt="" style="image-rendering:pixelated;flex:none">`;
-function cratesHtml(){
-  const list = crates();
-  if(!list.length) return `<section><h3>Crates</h3><div class="meta">No animals in crates.</div></section>`;
-  return `<section><h3>Crates <span class="num">${list.length}</span></h3><div class="meta">${money(CRATE.fee)} a day each</div><ul class="herd">${list.map(r => { const s = SPECIES_BY_ID[r.sp], d = crateDays(r);
-    return `<li>${crateImg()}<span><b>${esc(r.name || s.name)}</b>${r.sex ? ` <b title="${esc(r.sex)}">${esc(sexMark(r))}</b>` : ""} <span class="meta">${esc(s.name)} · ${r.q ?? 90}% DNA · ${d ? `${d} day${d === 1 ? "" : "s"}` : "today"}</span></span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="crateTool" data-id="${esc(r.id)}">Place</button><button class="btn sell" data-action="crateSell" data-id="${esc(r.id)}">Sell +${money(Math.round(s.price * COST.animalResale))}</button></span></li>`; }).join("")}</ul></section>`;
+// A crate's panel: who is inside, and Move (carry it), Open (into the exhibit it stands in, when it fits) and Sell
+function crateHtml(c){
+  const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => inPoly(c.x, c.y, x.points)), fits = !!e && !crateProblem(c, e);
+  let h = `<div class="meta">${esc(s.name)} · ${esc(s.period)}${c.cl ? " · clone" : ""} · ${c.q ?? 90}% DNA${c.sex ? ` · <b title="${esc(c.sex)}">${esc(sexMark(c))}</b> ${esc(c.sex)}` : ""}</div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ok">In a crate.</span><button class="btn sell" data-action="crateTool" data-id="${esc(c.id)}">Move</button>${fits ? `<button class="btn sell" data-action="crateOpen" data-id="${esc(c.id)}">Open in ${esc(e.name)}</button>` : ""}<button class="btn sell" data-action="crateSell" data-id="${esc(c.id)}">Sell +${money(Math.round(s.price * COST.animalResale))}</button></div>`;
+  return h;
 }
 function officeTabs(){
-  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}].concat(crates().length || officeTab === "crates" ? [{key:"crates", label:"Crates", color:"#8A6238"}] : []), officeTab);
+  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
 }
 const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
@@ -140,7 +139,6 @@ function overviewHtml(){
   h += officeTabs();
   if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
-  if(officeTab === "crates") return h + cratesHtml();
 
   if(officeTab === "money"){
   const c = dailyCosts();
@@ -170,7 +168,7 @@ function overviewHtml(){
     h += `<section><h3>Science</h3><ul class="deptlist">
       ${line("oracle", sc.projects.length ? `${sc.projects.length} project${sc.projects.length === 1 ? "" : "s"} running. Next done in ${leftText(next(sc.projects))}. ${Math.floor(sc.points)} points.` : `${Math.floor(sc.points)} research points. ${sc.unlocked.length} animal${sc.unlocked.length === 1 ? "" : "s"} discovered.`)}
       ${line("ghost", sc.trips.length ? `${sc.trips.length} of ${sc.drones} drone${sc.drones === 1 ? "" : "s"} out. Next back in ${leftText(next(sc.trips))}.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}` : `${sc.drones} drone${sc.drones === 1 ? "" : "s"} home and ready.${sc.reports.length ? ` ${sc.reports.length} report${sc.reports.length === 1 ? "" : "s"} to read.` : ""}`)}
-      ${line("tar", sc.clones.some(c => c.failed) ? `${sc.clones.filter(c => c.failed).length} failed clone${sc.clones.filter(c => c.failed).length === 1 ? "" : "s"} to discard.` : sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : sc.ready.length ? `${sc.ready.length} clone${sc.ready.length === 1 ? "" : "s"} waiting for an exhibit.` : "Incubators empty.")}
+      ${line("tar", sc.clones.some(c => c.failed) ? `${sc.clones.filter(c => c.failed).length} failed clone${sc.clones.filter(c => c.failed).length === 1 ? "" : "s"} to discard.` : sc.clones.length ? `${sc.clones.length} clone${sc.clones.length === 1 ? "" : "s"} growing. Next ready in ${leftText(next(sc.clones))}.` : crates().length ? `${crates().length} animal${crates().length === 1 ? "" : "s"} crated.` : "Incubators empty.")}
       ${line("ceres", state.ceres.beds.length ? `${state.ceres.beds.length} batch${state.ceres.beds.length === 1 ? "" : "es"} growing. Next ready in ${leftText(next(state.ceres.beds))}.` : "Beds empty.")}
     </ul></section>`;
   }
@@ -369,13 +367,10 @@ function exGuestsHtml(e){
   return h + `</section>`;
 }
 
-// Cloning tab: crated animals (a Move in here button for the ones that fit), and species with a complete genome, by period
+// Cloning tab: species with a complete genome, by period
 function cloneHtml(e, rep){
   const sc = state.science;
   let h = "";
-  if(sc.ready.length){
-    h += `<section><h3>Crated</h3><ul class="herd">${sc.ready.map(r => { const s = SPECIES_BY_ID[r.sp], why = crateProblem(r, e); return `<li>${crateImg()}<span>${esc(r.name || s.name)} <span class="meta">${esc(s.name)} ${sexMark(r)} ${r.q}% DNA</span></span>${why ? `<span class="meta">${esc(why)}</span>` : `<button class="btn sell" data-action="place" data-id="${esc(r.id)}">Move in here</button>`}</li>`; }).join("")}</ul></section>`;
-  }
   const ready = SPECIES.filter(s => speciesAvailable(s.id) && cloneOpen(s.id) && fitsHabitat(s, e));
   const forSale = SPECIES.filter(s => speciesAvailable(s.id) && isStarter(s) && fitsHabitat(s, e));
   const coming = sc.clones.filter(c => c.exhibitId === e.id);
@@ -902,16 +897,16 @@ panelEl.addEventListener("click", e => {
   // science buttons
   const sc = state.science, done = () => { afterChange(); render(); };
   // putting a flying animal somewhere it can fly out of needs a yes first
-  if((a === "buy" || a === "clone" || a === "place") && it && sel.kind === "exhibit" && !it.viv && !it.aviary && b.dataset.sure !== "1"){
-    const sp = a === "place" ? (sc.ready.find(r => r.id === b.dataset.id) || {}).sp : b.dataset.sp, s = SPECIES_BY_ID[sp];
+  if((a === "buy" || a === "clone") && it && sel.kind === "exhibit" && !it.viv && !it.aviary && b.dataset.sure !== "1"){
+    const s = SPECIES_BY_ID[b.dataset.sp];
     if(s && isFlyer(s)){
       askConfirm(`${s.name} can fly`, `${it.name} has no aviary netting, so the ${s.name} will fly out almost right away and get loose in the park. Put it here anyway?`, "Yes, put it here", () => { b.dataset.sure = "1"; b.click(); });
       return;
     }
   }
   // putting a predator in with its prey (or prey in with one) needs a yes first
-  if((a === "buy" || a === "clone" || a === "place") && it && sel.kind === "exhibit" && b.dataset.sureMix !== "1"){
-    const sp = a === "place" ? (sc.ready.find(r => r.id === b.dataset.id) || {}).sp : b.dataset.sp, s = SPECIES_BY_ID[sp], w = s && mixWarning(s, it);
+  if((a === "buy" || a === "clone") && it && sel.kind === "exhibit" && b.dataset.sureMix !== "1"){
+    const s = SPECIES_BY_ID[b.dataset.sp], w = s && mixWarning(s, it);
     if(w){ askConfirm(`Predator and prey`, w, "Yes, mix them", () => { b.dataset.sureMix = "1"; b.click(); }); return; }
   }
   if(a === "moat"){ const c = moatCost(it); if(canAfford(c)){ spend(c, "built"); it.moat = true; done(); } return; }
@@ -938,14 +933,14 @@ panelEl.addEventListener("click", e => {
   if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
   if(a === "animalCrate"){ crateAnimalNow(b.dataset.id); return; }
   if(a === "crateTool"){ startUncrate(b.dataset.id); return; }
-  if(a === "crateSell"){ const r = crates().find(x => x.id === b.dataset.id); if(r) askConfirm("Sell animal?", `Sell ${r.name || SPECIES_BY_ID[r.sp].name} for ${money(Math.round(SPECIES_BY_ID[r.sp].price * COST.animalResale))}?`, "Sell", () => { sellCrate(r.id); afterChange(); }); return; }
+  if(a === "crateOpen"){ const c = crates().find(x => x.id === b.dataset.id), e = c && state.exhibits.find(x => inPoly(c.x, c.y, x.points)); if(c && e){ const why = uncrate(c.id, e); if(why) ui.toast(why, "bad"); else { select(null); afterChange(); render(); ui.toast(`${c.name || SPECIES_BY_ID[c.sp].name} is out of its crate in ${e.name}.`, "good"); } } return; }
+  if(a === "crateSell"){ const r = crates().find(x => x.id === b.dataset.id); if(r) askConfirm("Sell animal?", `Sell ${r.name || SPECIES_BY_ID[r.sp].name} for ${money(Math.round(SPECIES_BY_ID[r.sp].price * COST.animalResale))}?`, "Sell", () => { sellCrate(r.id); if(sel && sel.kind === "crate" && sel.id === r.id) sel = null; afterChange(); render(); }); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ setTool("water"); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
-  if(a === "place"){ const why = uncrate(b.dataset.id, it); if(why) ui.toast(why, "bad"); else { afterChange(); render(); } done(); return; }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
