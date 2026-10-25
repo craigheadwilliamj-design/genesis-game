@@ -256,7 +256,7 @@ function render(){
       const fb = BIOMES[e.biome] ? e.biome : DEFAULT_BIOME;   // the unpainted floor; paint over it can tip the exhibit's biome (biomeOf)
       s += `<polygon points="${pts}" fill="${BIOMES[fb].color}" fill-opacity=".8" pointer-events="none"/><polygon points="${pts}" fill="${tileFill("b", fb)}" pointer-events="none"/>` + exhibitPaintSvg(e);
       // water lies on the floor, under the fence, so posts and rails stand over the bank
-      s += watersSvg(waterOf(e), biomeOf(e));
+      s += watersSvg(waterOf(e), biomeOf(e), lagoonWalled(e));
       // a hedge row is drawn as a real hedge, as wide as it is
       if(hedge && !tilt && !e.grid) s += hedgeSvg("polygon", pts);
       // a grid exhibit's fence is its pieces, each side in its own kind (a gap shows as loose fence, drawn later)
@@ -2533,8 +2533,8 @@ function bulldozePaint(d){
 }
 
 /* ---------- laying water in chunks ---------- */
-// The water types to pick from: one for each biome with a water texture, the sea water types (SEA_WATER), plus the biome's own
-const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k] || (SEA_WATER[k] && poolsOn()));
+// The water types to pick from: one for each biome with a water texture, plus the biome's own
+const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);   // sea water is not paintable: a lagoon fills when its gate goes on (fillLagoon)
 const waterLabel = k => SEA_WATER[k] ? SEA_WATER[k].label : BIOMES[k].label;
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
@@ -2551,7 +2551,7 @@ function waterBox(){
   const look = kind || (host ? biomeOf(host) : parkBiome());
   let err = same ? "That water is already there." : null;
   if(!err && !parts.length) err = "Keep it inside the fence.";
-  if(!err && SEA_WATER[kind] && !lagoonWalled(host)) err = "Only a lagoon wall holds sea water.";
+  if(!err && (SEA_WATER[kind] || lagoonWalled(host))) err = "A lagoon fills with water when its gate goes on.";
   for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true, kind);
   return {r, parts, ptsOf, host, kind, cost, same, look, m2:parts.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), err};
 }
@@ -2894,6 +2894,7 @@ function gateTap(e){
   const ex = g.pen ? adoptPen(g.pen, [g.x, g.y]) : g.e;
   if(!g.pen) ex.gate = [g.x, g.y];
   afterChange(); render();
+  if(lagoonWalled(ex) && !waterOf(ex).length) askLagoonWater(ex);
   ui.toast(`${g.pen ? `Made ${ex.name}, ${fmtArea(area(ex.points))}, with a gate` : `${cost ? "Built" : "Moved"} the gate on ${ex.name}`}. ${g.why}`, g.ok ? "" : "bad");
 }
 
