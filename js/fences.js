@@ -140,6 +140,21 @@ function weakestOf(pts){
   for(const {k, fwd} of loopSteps(pts)){ const t = P[k] ? pieceKind(P[k], fwd) : null; if(t && (!w || BARRIERS[t].strength < BARRIERS[w].strength)) w = t; }
   return w || "wood";
 }
+// Is an open exhibit closed in by lagoon wall all round, on its own side of every piece? Only that holds sea water and pool animals.
+function lagoonWalled(e){
+  if(!e || e.viv || e.open) return false;
+  if(!e.grid) return e.barrier === "lagoon";
+  const P = fencePieces(); return loopSteps(e.points).every(({k, fwd}) => P[k] && pieceKind(P[k], fwd) === "lagoon");
+}
+// The sea water in a grid exhibit would end up behind other fence if these pieces changed (next: piece key -> new piece): why not, or null
+function seaWallProblem(next){
+  const P = fencePieces();
+  for(const e of gridExhibits()){
+    if(e.open || !waterOf(e).some(w => SEA_WATER[w.kind])) continue;
+    if(loopSteps(e.points).some(({k, fwd}) => k in next && pieceKind(next[k], fwd) !== "lagoon" && P[k] && pieceKind(P[k], fwd) === "lagoon")) return `The sea water in ${e.name} needs its lagoon wall.`;
+  }
+  return null;
+}
 // The first step of each side of a closed grid exhibit's loop: [{k, fwd}] a side
 const sideStart = (e, i) => { const P = e.points, a = P[i], b = P[(i + 1) % P.length], k = pieceBetween(a, [a[0] + Math.sign(b[0] - a[0]) * FS, a[1] + Math.sign(b[1] - a[1]) * FS]); return {k, fwd:stepFwd(k, a)}; };
 // The kind of fence along each side of a closed grid exhibit, on the exhibit's own side of the wall
@@ -182,7 +197,7 @@ function pieceSpotProblem(k, with_ = new Set()){
     if(waterOf(e).some(w => lineThroughShape(seg, w.points))) return `It runs into the water in ${e.name}.`;
     if(landOf(e).some(f => LAND[f.type] && rectsHitLine(footRects(f, e), seg))) return `It runs into something in ${e.name}. Bulldoze it first.`;
   }
-  if(state.buildings.some(b => !b.exhibitId && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
+  if(state.buildings.some(b => parkGround(b) && (lineEntersShape(seg, b.points) || lineShapeDist(seg, b.points) < .3))) return "It runs into a building.";
   if(state.paths.some(p => !p.d && (linesCross(seg, p.points) || lineLineDist(seg, p.points) < halfWidth(p) - .3)) || pieceOnPath(k)) return "It runs into a path.";
   if(parkWater().some(w => lineThroughShape(seg, w.points))) return "It runs into water.";
   if(decorOf().some(f => LAND[f.type] && rectsHitLine(footRects(f, null), seg))) return "It runs into a plant, rock or statue.";
@@ -203,7 +218,7 @@ function faceProblem(f){
   if(!f.simple || f.nested) return "A pen inside another one has to share a wall with it.";
   const P = f.raw, inside = p => inPoly(p[0], p[1], P);
   if(state.paths.some(p => !p.d && p.points.some(inside)) || Object.keys(pathChunks()).some(k => { const [cx, cy] = chunkXY(k); return inside([(cx + .5) * CHUNK, (cy + .5) * CHUNK]); })) return "That would fence in a path.";
-  if(state.buildings.some(b => !b.exhibitId && inside(centroid(b.points)))) return "That would fence in a building.";
+  if(state.buildings.some(b => parkGround(b) && inside(centroid(b.points)))) return "That would fence in a building.";
   if(state.exhibits.some(e => !e.grid && inside(e.points[0]))) return "That would fence in another exhibit.";
   if(fenceLines().some(l => l.points.some(inside))) return "That would fence in another fence.";
   if(inside(state.gate)) return "That would fence in the entrance.";
@@ -226,6 +241,7 @@ function newGround(faces){
 function planPieces(keys, barrier, o = {}){
   const B = BARRIERS[barrier], P = fencePieces(), out = {todo:[], next:{}, cost:0, why:null, note:""};
   if(B.tech && !hasTech(B.tech)) return {...out, why:`Research ${TECH.find(x => x.id === B.tech).label.toLowerCase()} at the Research Lab first.`};
+  if(B.pool && !poolsOn()) return {...out, why:"Lagoon walls aren't open yet."};
   const dirs = o.dir && o.side && !o.meet ? faceDirs(P) : null;
   let kept = 0, swapped = 0, sided = 0;
   for(const k of keys){
@@ -246,6 +262,7 @@ function planPieces(keys, barrier, o = {}){
   if(!todo.length) return {...out, why:kept ? "Other fence is in the way. Switch the bar to Replace to change it." : keys.length ? "That fence is already there." : ""};
   const all = new Set(todo);
   for(const k of todo){ const why = pieceSpotProblem(k, all); if(why) return {...out, why}; }
+  { const why = seaWallProblem(out.next); if(why) return {...out, why}; }
   const trial = {...P}; for(const k of todo) trial[k] = out.next[k];
   // the regions it closes off must be clear; and any loop it leaves floating inside another (which leaves the outer one's shape alone) is refused too
   const was = new Set(fenceFaces(P).map(f => f.key)), after = fenceFaces(trial), made = after.filter(f => !was.has(f.key) || f.nested || !f.simple);
@@ -361,7 +378,7 @@ function rehomeContents(notes){
     for(const w of waterOf(e).slice()){
       const [x, y] = centroid(w.points); if(inPoly(x, y, e.points)) continue;
       const to = home(x, y); e.water.splice(e.water.indexOf(w), 1);
-      if(to) (to.water = to.water || []).push(w); else { earn(Math.round(waterCost(w.points) * COST.refundShare), "sold"); sold++; }
+      if(to) (to.water = to.water || []).push(w); else { earn(Math.round(waterCost(w.points, w.kind) * COST.refundShare), "sold"); sold++; }
     }
   }
   if(sold) notes.push(`${sold} thing${sold === 1 ? "" : "s"} left outside the fence ${sold === 1 ? "was" : "were"} sold back.`);
@@ -432,7 +449,7 @@ function fenceRunSvg(pts, b, themed){
   const B = BARRIERS[b] || BARRIERS.wood, p = polyStr(pts), ns = `fill="none" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
   if(tilted()) return fence34(pts, false, B.hedge ? "hedge" : b, "all");
   if(B.hedge) return hedgeSvg("polyline", p);
-  const col = themed ? B.color : "#26402F", w = {wood:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5}[b] || 2;
+  const col = themed ? B.color : "#26402F", w = {wood:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5, lagoon:3.5}[b] || 2;
   let s = `<polyline points="${p}" stroke="${col}" stroke-width="${w}" ${ns}/><polyline points="${p}" stroke="${B.color}" stroke-width="${w + 2.5}" stroke-dasharray="0 16" ${ns}/>`;
   if(b === "electric") s += `<polyline points="${p}" stroke="#1D2B22" stroke-width="1" stroke-dasharray="3 5" ${ns}/>`;
   if(b === "bars") s += `<polyline points="${p}" stroke="#C9CCD1" stroke-width="1" stroke-dasharray="1 3" ${ns}/>`;

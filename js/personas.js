@@ -67,7 +67,7 @@ function exhibitTraits(e){
     hunting:share(a => a.act === "hunt"),
     quality:e.animals.reduce((s, a) => s + (a.q ?? 90), 0) / n,
     rare:spp.some(s => s.price >= PERS.rarePrice),
-    platform:state.buildings.some(b => b.type === "platform" && b.exhibitId === e.id),
+    platform:state.buildings.some(b => (b.type === "platform" || b.type === "gallery") && b.exhibitId === e.id),
   };
   sightCache.set(e.id, t);
   return t;

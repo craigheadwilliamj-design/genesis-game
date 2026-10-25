@@ -17,7 +17,7 @@ Browser park-builder game (Jurassic Park style). Plain JS, no build step, no mod
 - `docs/ui.md`: build menu, park map, map.js rendering and tools, ui.js panels, science/logi/guest UIs, main.js.
 - `docs/art.md`: the in-game pixel editor (dev mode) and pulling its pictures into the repo, human and animal sprites, footprints, landscape sprites, flat buildings, fence pictures, full art direction and its status list, sprite pack.
 - `docs/rigs.md`: rigged animals (js/rigs.js, per-species notes) and the sprite rigger tool.
-- `tools/BIOME_ART.md`: how to finish a biome's art. `PATHS_PLAN.md`: the paths rework plan.
+- `tools/BIOME_ART.md`: how to finish a biome's art. `PATHS_PLAN.md`: the paths rework plan. `POOLS_PLAN.md`: pools and big marine animals.
 
 ## Files (script load order is in index.html)
 `spritepack.js` (generated, loads first), `data.js` (all tuning and content; balance changes go here), `geometry.js`, `sim.js`, `science.js`, `keepers.js`, `escapes.js`, `power.js`, `maintenance.js`, `medicine.js`, `landscape.js`, `fences.js`, `pathcells.js`, `themes.js`, `behavior.js`, `logistics.js`, `guests.js`, `personas.js`, `services.js`, `custodians.js`, `security.js`, `lodging.js`, `staff.js`, `staffui.js`, `animalui.js`, `pathart.js`, `biomepaint.js`, `menu.js`, `rigs.js`, `map.js` (rendering, camera, build tools; also defines `$`, `esc`, `nodeKey`), `propart.js`, `ui.js`, `scienceui.js`, `logiui.js`, `guestui.js`, `parkmap.js`, `pixeled.js` (dev-mode pixel editor, see docs/art.md), `main.js` (loop, saving).

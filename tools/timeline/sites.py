@@ -9,19 +9,23 @@ SITES = {
     "burgess":     ("Burgess Shale", "British Columbia, Canada", 51.4, -116.5, 507, 505, ["anom", "opab", "olen"]),
     # Ordovician
     "anzaldo":     ("Anzaldo Formation", "Sacabamba, Cochabamba, Bolivia", -17.8, -65.4, 467, 460, ["saca"]),
+    "trenton":     ("Trenton Group", "Mohawk Valley, New York, USA", 43.1, -75.0, 453, 450, ["came"]),
     # Silurian
     "lesmahagow":  ("Lesmahagow Inlier", "South Lanarkshire, Scotland", 55.6, -3.9, 430, 427, ["ptry"]),
     # Devonian
     "fram":        ("Fram Formation", "Ellesmere Island, Canada", 77.2, -86.0, 378, 372, ["tikt"]),
     "britta":      ("Britta Dal Formation", "East Greenland", 72.9, -23.6, 367, 360, ["icht", "both"]),
+    "cleveland":   ("Cleveland Shale", "Cleveland, Ohio, USA", 41.4, -81.7, 362, 359, ["dunk"]),
     # Carboniferous
     "ekirkton":    ("East Kirkton", "West Lothian, Scotland", 55.9, -3.6, 336, 334, ["pulm"]),
+    "burdiehouse": ("Burdiehouse Limestone", "Edinburgh, Scotland", 55.9, -3.2, 340, 337, ["rhiz"]),
     "joggins":     ("Joggins Fossil Cliffs", "Nova Scotia, Canada", 45.7, -64.4, 315, 312, ["hylo", "arth"]),
     "beargulch":   ("Bear Gulch Limestone", "Montana, USA", 47.1, -108.9, 324, 318, ["stet"]),
     "nyrany":      ("Nýřany", "Bohemia, Czechia", 49.7, 13.2, 308, 306, ["mibr"]),
     "commentry":   ("Commentry", "Allier, France", 46.3, 2.7, 302, 300, ["mega"]),
     "pennredbeds": ("Late Pennsylvanian red beds", "Texas and New Mexico, USA", 34.5, -104.0, 304, 299.5, ["dcau", "eryo"]),
     # Permian
+    "phosphoria":  ("Phosphoria Formation", "Southeastern Idaho, USA", 42.7, -111.4, 279, 272, ["heli"]),
     "elcobre":     ("El Cobre Canyon", "New Mexico, USA", 36.2, -106.6, 298, 293, ["plhy"]),
     "texasred":    ("Texas Red Beds", "Texas, USA", 33.6, -99.3, 290, 275, ["dime", "seym"]),
     "hennessey":   ("Hennessey Formation", "Oklahoma, USA", 35.4, -97.5, 276, 272, ["coty"]),
@@ -31,6 +35,8 @@ SITES = {
     "karoolate":   ("Karoo, Daptocephalus Zone", "Eastern Cape, South Africa", -32.2, 24.5, 256, 252.2, ["diic", "lyst"]),
     "dvina":       ("Sokolki, Northern Dvina", "Arkhangelsk, Russia", 62.0, 45.0, 255, 253, ["scut", "inos"]),
     # Triassic
+    "muschelkalk": ("Upper Muschelkalk", "Franconia, Germany", 49.8, 9.9, 242, 238, ["noth"]),
+    "luning":      ("Luning Formation", "Berlin-Ichthyosaur State Park, Nevada, USA", 38.9, -117.6, 229, 225, ["shon"]),
     "burgersdorp": ("Burgersdorp Formation", "Eastern Cape, South Africa", -31.0, 26.3, 247.5, 247, ["eryt"]),
     "madygen":     ("Madygen Formation", "Batken, Kyrgyzstan", 39.9, 69.7, 236, 232, ["shar", "long", "gigt"]),
     "ischigualasto": ("Ischigualasto Formation", "San Juan, Argentina", -30.0, -67.9, 231, 226, ["herr"]),
@@ -40,7 +46,7 @@ SITES = {
     "ghostranch":  ("Ghost Ranch", "New Mexico, USA", 36.3, -106.5, 212, 206, ["coel"]),
     "lisowice":    ("Lisowice", "Silesia, Poland", 50.8, 18.9, 208, 202, ["liso"]),
     # Jurassic
-    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel", "prom"]),
+    "dorset":      ("Dorset Coast", "Lyme Regis, England", 50.7, -2.9, 199, 190, ["dimo", "scel", "prom", "ichy"]),
     "elliot":      ("Elliot Formation", "Eastern Cape, South Africa", -30.7, 27.8, 200, 190, ["hete"]),
     "kayenta":     ("Kayenta Formation", "Arizona, USA", 36.5, -111.3, 196, 183, ["dilo"]),
     "hanson":      ("Hanson Formation", "Mount Kirkpatrick, Antarctica", -84.4, 165.0, 194, 188, ["cryo"]),
@@ -50,6 +56,8 @@ SITES = {
     "tendaguru":   ("Tendaguru", "Lindi, Tanzania", -9.7, 39.2, 155, 150, ["kent", "dryo"]),
     "solnhofen":   ("Solnhofen Limestone", "Bavaria, Germany", 48.9, 11.0, 151, 150, ["arch", "comp"]),
     # Cretaceous
+    "pierre":      ("Pierre Shale", "Wallace County, Kansas, USA", 38.9, -101.8, 80.5, 79.5, ["elsm"]),
+    "maastricht":  ("Maastricht Formation", "Limburg, Netherlands", 50.85, 5.7, 68, 66.1, ["mosa"]),
     "cedarmtn":    ("Cedar Mountain Formation", "Utah, USA", 39.0, -110.2, 135, 125, ["utah"]),
     "wealden":     ("Wealden Group", "Isle of Wight, England", 50.6, -1.4, 130, 125, ["hyps", "igua", "bary"]),
     "lashoyas":    ("Las Hoyas", "Cuenca, Spain", 40.2, -2.0, 127, 125, ["conc"]),
@@ -68,6 +76,7 @@ SITES = {
     "javelina":    ("Javelina Formation", "Big Bend, Texas, USA", 29.2, -103.5, 69, 66.1, ["quet"]),
     "hellcreek":   ("Hell Creek Formation", "Montana, USA", 47.6, -106.6, 67, 66.1, ["trex", "tric", "anky", "pach", "ornm"]),
     # Paleogene
+    "wadihitan":   ("Wadi Al-Hitan", "Faiyum, Egypt", 29.3, 30.0, 40, 37, ["basi"]),
     "waipara":     ("Waipara Greensand", "Canterbury, New Zealand", -43.0, 172.8, 62, 60, ["waim"]),
     "fortunion":   ("Fort Union Formation", "Montana, USA", 46.0, -104.5, 62, 57, ["ptil", "ples"]),
     "cerrejon":    ("Cerrejón Formation", "La Guajira, Colombia", 11.1, -72.6, 60, 58, ["tita"]),
@@ -82,7 +91,7 @@ SITES = {
     "bugti":       ("Dera Bugti", "Balochistan, Pakistan", 29.0, 69.1, 28, 23.1, ["pcer"]),
     # Neogene
     "pyramid":     ("Pyramid Hill", "Kern County, California, USA", 35.4, -118.9, 23, 22, ["enal"]),
-    "calvert":     ("Calvert Cliffs", "Chesapeake Bay, Maryland, USA", 38.5, -76.5, 16, 14, ["kntr"]),
+    "calvert":     ("Calvert Cliffs", "Chesapeake Bay, Maryland, USA", 38.5, -76.5, 16, 14, ["kntr", "mgdn"]),
     "agate":       ("Nebraska Miocene beds", "Agate Fossil Beds, Nebraska, USA", 42.4, -103.8, 22, 15, ["daeo", "aepy", "amph"]),
     "rusinga":     ("Rusinga Island", "Lake Victoria, Kenya", -0.4, 34.2, 18, 17, ["proc"]),
     "patagonia":   ("Santa Cruz and Collón Curá Formations", "Patagonia, Argentina", -45.0, -69.5, 18, 14, ["psil", "kele"]),
@@ -102,6 +111,7 @@ SITES = {
     "cuba":        ("Cuba", "Caribbean", 22.0, -79.5, 0.1, 0.012, ["ornw"]),
     "labrea":      ("Rancho La Brea", "Los Angeles, California, USA", 34.1, -118.4, 0.05, 0.012, ["smil", "dire", "arct", "colm", "mast"]),
     # Holocene
+    "commander":   ("Commander Islands", "Bering Sea, 1740s", 55.0, 166.5, 0.000283, 0.000256, ["stel"]),
     "madagascar":  ("Central Highlands", "Madagascar", -19.0, 47.0, 0.008, 0.002, ["aind"]),
     "mauritius":   ("Mauritius", "Indian Ocean, 1600s", -20.3, 57.6, 0.001, 0.000362, ["dodo"]),
     "eastna":      ("Eastern North America", "1800s", 40.0, -80.0, 0.0003, 0.000112, ["ppig"]),

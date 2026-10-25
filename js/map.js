@@ -249,7 +249,7 @@ function render(){
       const bb = bbox(e.points), [vx, vy] = centroid(e.points);
       if(Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k < 50) s += `<text class="glyph" x="${vx}" y="${vy}" font-size="${Math.min(VIVARIUMS[e.viv].d * .5, 13*inv)}" style="fill:#24414A">${e.aqua ? "A" : "V"}${e.viv}</text>`;
     } else {
-      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5}[e.barrier || "wood"], hedge = !!bar.hedge;
+      const bar = barrierOf(e), bw = {wood:2, hedge:2, bars:2.5, electric:2.5, acrylic:3, brick:3.5, stone:3.5, bamboo:2, palisade:3.5, iron:2.5, drystone:3, adobe:3.5, stake:2, bone:2.5, rope:1.5, concrete:4.5, lagoon:3.5}[e.barrier || "wood"], hedge = !!bar.hedge;
       // a moat is a band of water around the outside of the fence
       if(e.moat) s += `<polygon points="${pts}" fill="none" stroke="#3A7FB2" stroke-opacity=".85" stroke-width="7" stroke-linejoin="round" pointer-events="none"/>`;
       // the floor shows the biome: its color, with its texture over it
@@ -459,6 +459,7 @@ const STAND34 = {
   edcenter:  {wall:5,   rise:2.6, front:"glass", sign:"EDUCATION"},
   tramstop:  {wall:.9,  canopy:3.4, front:"tram"},
   platform:  {wall:3,   canopy:4.1, front:"deck"},
+  gallery:   {wall:4.2, rise:1.2, front:"glass", sign:"GALLERY"},
   ranch:     {wall:4,   rise:5, front:"barn", gable:"ns", wallCol:"#7A4A32", roofCol:"#6B6B66"},
 };
 const WALL34 = "#D9CFBB", DARK34 = "#2E3A33", AWNING34 = "#F4F1E8";
@@ -527,6 +528,7 @@ const FENCE34 = {
   stake:   {h:1.5, col:"#B8925C", sprite:"stake"},
   bone:    {h:2.4, col:"#E2D4B0", sprite:"bone"},
   rope:    {h:1.3, col:"#B8905A", sprite:"rope"},
+  lagoon:  {h:2.3, col:"#D6D0C0", solid:1, sprite:"lagoon"},
   hedge:   {h:1.8, hedge:true, sprite:"hedge"},
 };
 // Which picture a fence shows: broken at 0, rusted below FENCE_LOOK.worn, else pristine. No condition (loose fence) is pristine.
@@ -574,6 +576,7 @@ const FENCE_EDGE = {
   rope:{steel:{hi:"#D2AE7C", mid:"#B8905A", lo:"#8A6A40", deep:"#5E482C"}, rust:{hi:"#B3B0A2", mid:"#8C867A", lo:"#665F56", deep:"#46413A"}},   // rust is frayed grey rope
   bone:{steel:{hi:"#F2E8CC", mid:"#E2D4B0", lo:"#B4A584", deep:"#867A5E"}, rust:{hi:"#DCC884", mid:"#C4AC70", lo:"#9A8450", deep:"#6E5C34"}},   // rust is yellowed bone
   wood:{steel:{hi:"#A58A6E", mid:"#7A5A38", lo:"#5C4329", deep:"#463220"}, rust:{hi:"#B3A58F", mid:"#8E8272", lo:"#6C6256", deep:"#52493F"}},
+  lagoon:{steel:{hi:"#E2DED3", mid:"#D6D0C0", lo:"#9E9A8E", deep:"#73706A"}, rust:{hi:"#9AB57F", mid:"#587C42", lo:"#415C31", deep:"#2F4323"}},   // rust is algae
 };
 // gate: the keeper gate on this side, if it has one (as for fenceSpriteSvg): a section of it gets a post at each end with gold finials and a latch (it never wears, so it stands even when the fence is down).
 const GATE_GOLD = {hi:"#E3C67D", mid:"#D8B04A", lo:"#A48638"};   // the keeper gate's latch and finials: the gate marker's gold
@@ -1383,6 +1386,7 @@ function renderOverlay(){
       t.points.forEach((p, i) => { const on = mvCorner && mvCorner.id === t.id && mvCorner.i === i; s += `<circle cx="${p[0]}" cy="${p[1]}" r="${(on ? 8 : 6.5)*inv}" fill="${on ? col : "#fff"}" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke" pointer-events="none"/>`; });
     }
   }
+  if(tool === "uncrate" && crateGhost) s += crateGhostSvg(crateGhost);
   if(snapMark) s += `<circle cx="${snapMark[0]}" cy="${snapMark[1]}" r="${10*inv}" fill="none" stroke="var(--sel)" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
   overlay.innerHTML = s;
 }
@@ -1490,6 +1494,53 @@ function aquaSwim(h, e, dt){
     el.setAttribute("transform", `scale(${sx.toFixed(3)} 1)${Math.abs(h.pitch) > .3 ? ` rotate(${h.pitch.toFixed(1)} 0 ${sprMid(h).toFixed(2)})` : ""}`);
   }
   if(h.spr && rigOf(h.sp)) rigStep(h, h.stroke && !crawl ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
+  h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+  if(tilt) place34(h);
+}
+
+// In a pool (an open exhibit flooded with sea water, POOL) a pool animal swims like a fish in an aquarium seen from above: it steers with momentum toward a spot in
+// its water (poolSpot: in the water with room for its body, and reached in a straight line through water), hangs there a moment, then picks another.
+// h.dive (0 at the surface, 1 as deep as it goes) fades it into the water; shallow sea only lets it go halfway down. It comes up now and then, rings the
+// surface with a ripple, and a `breach` species sometimes leaps clear as it does (h.lift, an arc over `breach` seconds). Resting ones idle near the surface.
+const POOL_SWIM = {speed:1.1, rest:.25, accel:.8, near:2, hover:[.5, 2.5], dive:.6, fade:.6, shallow:.5, surface:.3, breach:[.06, 1.4, .9], turn:.35};
+// is p in the animal's water with room for its body (a third of its dot) to the north, south, east and west?
+function poolSpot(h, e, p){
+  const W = poolWater(e, SPECIES_BY_ID[h.sp]), m = (h.r || 1) * .35, wet = (x, y) => W.some(w => inPoly(x, y, w.points));
+  return wet(p[0], p[1]) && wet(p[0] - m, p[1]) && wet(p[0] + m, p[1]) && wet(p[0], p[1] - m) && wet(p[0], p[1] + m);
+}
+// can it swim straight from a to b without crossing dry ground?
+function poolClear(h, e, a, b){ const n = Math.ceil(dist(a, b)); for(let i = 1; i <= n; i++){ const t = i / n; if(!poolSpot(h, e, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])) return false; } return true; }
+// how deep it can dive where it is: all the way in deep sea, halfway elsewhere
+const poolDepth = (e, x, y) => waterOf(e).some(w => w.kind === "deep" && inPoly(x, y, w.points)) ? 1 : POOL_SWIM.shallow;
+function poolSwim(h, e, dt){
+  const s = SPECIES_BY_ID[h.sp] || {}, rest = h.act === "rest", A = POOL_SWIM, v = h.vel || (h.vel = [0, 0]);
+  if(h.hover > 0) h.hover -= dt;
+  else if(!h.goal){
+    let p = null;
+    for(let i = 0; i < 16 && !p; i++){ const q = randomInside(e.points); if(poolSpot(h, e, q) && poolClear(h, e, [h.x, h.y], q)) p = q; }
+    h.goal = p || [h.x, h.y]; h.diveTo = rest || Math.random() < A.surface ? 0 : .3 + Math.random() * .7;
+  }
+  const g = h.hover > 0 || !h.goal ? [h.x, h.y] : h.goal, dx = g[0] - h.x, dy = g[1] - h.y, d = Math.hypot(dx, dy);
+  const sp = (rest ? A.rest : A.speed) * Math.min(1, d / A.near) * Math.sqrt(h.r || 1), want = d > .01 ? [dx / d * sp, dy / d * sp] : [0, 0];
+  const ax = want[0] - v[0], ay = want[1] - v[1], am = Math.hypot(ax, ay), k = am > 0 ? Math.min(1, A.accel * Math.sqrt(h.r || 1) * dt / am) : 0;
+  v[0] += ax * k; v[1] += ay * k;
+  const nx = h.x + v[0] * dt, ny = h.y + v[1] * dt;
+  if(poolSpot(h, e, [nx, ny]) || !poolSpot(h, e, [h.x, h.y])){ h.x = nx; h.y = ny; } else { v[0] = v[1] = 0; h.goal = null; }
+  if(h.goal && !(h.hover > 0) && d < .3){ h.goal = null; h.hover = A.hover[0] + Math.random() * (A.hover[1] - A.hover[0]) * (rest ? 2 : 1); }
+  // diving and surfacing, and now and then a leap clear of the water
+  const was = h.dive ?? 0, to = Math.min(h.diveTo ?? 0, poolDepth(e, h.x, h.y));
+  h.dive = clamp(was + Math.sign(to - was) * Math.min(Math.abs(to - was), A.dive * dt), 0, 1);
+  if(s.breach && !h.breachT && was > .2 && h.dive <= .2 && to === 0 && Math.random() < A.breach[0]) h.breachT = 1e-6;
+  if(h.breachT){ h.breachT += dt / A.breach[1]; if(h.breachT >= 1){ h.breachT = 0; h.lift = 0; } else h.lift = Math.sin(Math.PI * h.breachT) * (h.r || 1) * A.breach[2]; }
+  const up = h.dive < .08 || h.breachT > 0, dv = h.el.querySelector(".dive"), rp = h.el.querySelector(".ripple");
+  if(dv) dv.setAttribute("opacity", (1 - A.fade * (h.breachT ? 0 : h.dive)).toFixed(2));
+  if(rp) rp.style.display = up ? "" : "none";
+  if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== (h.face || 1)){ h.face = face; h.turn = 0; } }
+  h.turn = Math.min(1, (h.turn ?? 1) + dt / A.turn);
+  const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
+  if(el){ const c = Math.cos(Math.PI * h.turn), sx = (h.face || 1) * (h.turn < .5 ? -1 : 1) * Math.max(.2, Math.abs(c)); el.setAttribute("transform", `scale(${sx.toFixed(3)} 1)`); }
+  const spd = Math.hypot(v[0], v[1]); h.stride = (h.stride || 0) + spd * dt;
+  if(h.spr && rigOf(h.sp)) rigStep(h, spd > .15 ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
   if(tilt) place34(h);
 }
@@ -1630,8 +1681,13 @@ function drawAnimal(h, e, a){
       + `<g fill="none" stroke="#CFE9F2" stroke-width="${(ROCK_MPP * 1.2).toFixed(2)}" pointer-events="none"><path d="M${(-w * .3).toFixed(2)} ${wl.toFixed(2)}h${(w * .6).toFixed(2)}"/></g><ellipse cx="0" cy="${(wl + r * .12).toFixed(2)}" rx="${(w * .34).toFixed(2)}" ry="${(r * .2).toFixed(2)}" fill="#3E86A8" fill-opacity=".6" pointer-events="none"/>`; };
   h.el.innerHTML = (noticed(a) ? `<circle r="${r * 1.45}" fill="none" stroke="#E5484D" stroke-width="2" stroke-dasharray="${a.darted ? "2 2" : "none"}" vector-effect="non-scaling-stroke"/>` : "") +
     (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
-    (pool ? subSvg() : body);
+    (pool ? subSvg() : h.pool ? poolBodySvg(h, body) : body);
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+}
+// A pool animal: its body in a group poolSwim fades as it dives, and a ripple ring on the surface it shows while the animal is up
+function poolBodySvg(h, body){
+  const r = h.r || 1, op = (1 - POOL_SWIM.fade * (h.dive || 0)).toFixed(2);
+  return `<ellipse class="ripple" cx="0" cy="${(r * .6).toFixed(2)}" rx="${(r * 1.3).toFixed(2)}" ry="${(r * .45).toFixed(2)}" fill="none" stroke="#DDF2F2" stroke-opacity=".8" stroke-width="${(ROCK_MPP * 1.5).toFixed(2)}" pointer-events="none" style="display:${(h.dive || 0) < .08 ? "" : "none"}"/><g class="dive" opacity="${op}">${body}</g>`;
 }
 function syncAnimals(){
   const seen = new Set(), inv = 1/view.k;
@@ -1652,12 +1708,13 @@ function syncAnimals(){
       // vivarium animals stay small enough to fit inside the glass
       const s = SPECIES_BY_ID[a.sp], r = e.viv ? (SPRITES[a.sp] ? VIVARIUMS[e.viv].d / 7 : Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
-      h.r = r; h.spr = sprite; h.viv = !!e.viv; h.swimmer = !!e.palu && paluSwims(s);
-      if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;   // the case was moved or resized, or the picture grew: find it a spot again
+      h.r = r; h.spr = sprite; h.viv = !!e.viv; h.swimmer = !!e.palu && paluSwims(s); h.pool = !e.viv && !!s.pool;
+      if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;
+      if(h.pool && h.placed && !poolSpot(h, e, [h.x, h.y]) && poolWater(e, s).length){ h.placed = false; h.goal = null; }   // its water was moved or taken away: back into what's left   // the case was moved or resized, or the picture grew: find it a spot again
       if(!h.placed){ h.placed = true; const A = walkArea(h, e), homes = e.viv ? vivHomes(e, s) : []; let ok = false;
         for(let i = 0; i < homes.length * 4 && !ok; i++){ const p = vivHomeSpot(h, e, homes[i % homes.length]); if(p){ [h.x, h.y] = p; ok = true; } }
         if(e.viv && !ok){ const p = vivMidSpot(h, e); if(p){ [h.x, h.y] = p; ok = true; } }
-        for(let i = 0; i < (e.viv ? 80 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !vivCrowd(h, p) && !vivPoolAt(e, p[0], p[1]) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
+        for(let i = 0; i < (e.viv ? 80 : h.pool ? 60 : 20) && !ok; i++){ const p = randomInside(e.points); if(e.viv ? vivSpot(h, e, p) && !vivCrowd(h, p) && !vivPoolAt(e, p[0], p[1]) : h.pool ? poolSpot(h, e, p) : standable(p, A)){ [h.x, h.y] = p; ok = true; } }   // a pool animal starts in its water   // a new animal starts somewhere it fits; in a vivarium, under its lamp or in its pool if it likes one (and out of the pool if it doesn't)
         if(!ok && e.viv){ const [cx, cy] = centroid(e.points); for(let f = 1; f >= 0 && !ok; f -= .1){ const p = [cx + (h.x - cx) * f, cy + (h.y - cy) * f]; if(vivSpot(h, e, p)){ [h.x, h.y] = p; ok = true; } } if(!ok){ const [cx2, cy2] = centroid(e.points); [h.x, h.y] = [cx2, cy2]; } } }
       drawAnimal(h, e, a);
     }
@@ -1988,7 +2045,7 @@ function animateAnimals(dt){
     const ins = !!(h.a && h.a.inside);
     if(ins !== !!h.ins){ h.ins = ins; h.el.style.display = ins ? "none" : ""; if(!ins){ h.path = null; h.wait = 0; } }
     if(ins) continue;
-    if(!e.viv) swimCheck(h, e);   // in a pond or not, even if it never moves (it may be napping where it spawned)
+    if(!e.viv && !h.pool) swimCheck(h, e);   // in a pond or not, even if it never moves (it may be napping where it spawned)
     // a clip that has started (the idle one, lying down) finishes first, whatever the animal's AI now wants, then it carries on
     if(h.rg && h.rg.lock){ if(h.spr && rigOf(h.sp) && h.el.querySelector(".rig")){ rigStep(h, h.rg.mode); continue; } h.rg.lock = false; }
     const act = h.a && h.a.act;
@@ -1996,6 +2053,7 @@ function animateAnimals(dt){
     if(act !== h.act){ h.act = act; h.path = null; h.restAt = null; h.wait = Math.min(h.wait, Math.random() * .6); if(e.viv && !e.aqua && !h.swimmer) vivJump(h, e); }
     // vivarium animals don't walk: they jump on a new act (vivJump) and play their rig, or cycle an idle strip if their picture has one (else the standing picture or dot)
     if(e.aqua || h.swimmer){ aquaSwim(h, e, dt); continue; }
+    if(h.pool){ poolSwim(h, e, dt); continue; }
     if(e.viv){
       const S = SPRITES[h.sp];
       if(h.spr && rigOf(h.sp)) rigStep(h, act === "rest" ? "rest" : "idle");   // a rig plays its stand loop and idle clips here like in the park
@@ -2066,7 +2124,7 @@ let guestClipN = 0;
 // A party up on a viewing platform is drawn at deck height, rising up the steps (the deck is outside its footprint by the steps' run)
 function deckLift(p, x, y){
   const b = p.deckB;
-  if(!b || !b.points) return 0;
+  if(!b || !b.points || b.type === "gallery") return 0;
   if(inPoly(x, y, b.points)) return DECK.h;
   return DECK.h * clamp(1 - distToEdge(x, y, b.points) / (DECK.step * DECK.steps), 0, 1);
 }
@@ -2077,6 +2135,7 @@ function drawParties(){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
     if(hidden34(x, y)) continue;
+    if(p.deckB && p.deckB.type === "gallery" && inPoly(x, y, p.deckB.points)) continue;   // inside a viewing gallery, under its roof
     const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;
     if(spr){
       let el = guestEls.get(p.id);
@@ -2228,7 +2287,7 @@ const drawType = () => draw && draw.kind === "tram" ? draw.kind : undefined;
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
-  ghost = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
+  ghost = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; crateGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
   document.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t || b.dataset.tool === fam));
@@ -2247,6 +2306,8 @@ function setTool(t){
   else if(t === "exhibit") fenceBar();
   else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "gallery") showBar("Place a viewing gallery", "Tap a pool's fence beside a guest path. The gallery stands outside it, its glass against the water.", `${money(BUILDINGS.gallery.price)} each, ${money(BUILDINGS.gallery.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
+  else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(landKey(t)){
     const L = LAND[landKey(t)];
     showBar(`Place ${L.one}`, L.statue ? `Tap anywhere out in the park, clear of paths and fences. Guests stop to look${L.initials ? ", and learn a lot from the plaque" : ""}.${L.text ? " " + L.text : ""}`
@@ -2429,8 +2490,8 @@ function paintDragStat(){
   if(!pdrag) return;
   const r = paintBox(pdrag.a, pdrag.b), w = r[2] - r[0], h = r[3] - r[1];
   const cost = w && h && paintPick !== "erase" ? exhibitPaintCost(r, paintPick) : 0;
-  const wet = w && h ? waterCutM2(r) : 0;
-  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}${wet ? ` Removes ${fmtArea(wet)} of water, ${money(waterCutRefund(wet))} back.` : ""}` : "", cost > 0 && !canAfford(cost));
+  const wet = w && h ? waterCut(r) : {m2:0};
+  setStat(w && h ? `${w} × ${h} m, ${fmtArea(w * h)}.${cost ? ` ${money(cost)} for the ground inside exhibits.` : ""}${wet.m2 ? ` Removes ${fmtArea(wet.m2)} of water, ${money(waterCutRefund(wet.worth))} back.` : ""}` : "", cost > 0 && !canAfford(cost));
 }
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
@@ -2458,11 +2519,12 @@ function bulldozePaint(d){
 }
 
 /* ---------- laying water in chunks ---------- */
-// The water types to pick from: one for each biome with a water texture, plus the biome's own
-const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k]);
+// The water types to pick from: one for each biome with a water texture, the sea water types (SEA_WATER), plus the biome's own
+const waterTypes = () => Object.keys(WATER_TEX).filter(k => BIOMES[k] || (SEA_WATER[k] && poolsOn()));
+const waterLabel = k => SEA_WATER[k] ? SEA_WATER[k].label : BIOMES[k].label;
 function waterBar(){
   if(waterPick !== "auto" && !waterTypes().includes(waterPick)) waterPick = "auto";
-  showBar(waterPick === "auto" ? "Lay water" : `Lay ${BIOMES[waterPick].label.toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Paint ground over water to remove it.", "", {undo:false, finish:false, cancel:"Done"});
+  showBar(waterPick === "auto" ? "Lay water" : SEA_WATER[waterPick] ? `Lay ${waterLabel(waterPick).toLowerCase()}` : `Lay ${waterLabel(waterPick).toLowerCase()} water`, "Drag a box to lay water in 5 m chunks, like a path. A tap lays one chunk. New water covers old water, so lay another type over a pond to change it. Touching water shares one shore. Only wooden bridges cross water. Paint ground over water to remove it.", "", {undo:false, finish:false, cancel:"Done"});
 }
 // the kind (water type) a new box is laid with: undefined means the biome of where it goes
 const waterKindPick = () => waterPick !== "auto" && WATER_TEX[waterPick] ? waterPick : undefined;
@@ -2475,7 +2537,8 @@ function waterBox(){
   const look = kind || (host ? biomeOf(host) : parkBiome());
   let err = same ? "That water is already there." : null;
   if(!err && !parts.length) err = "Keep it inside the fence.";
-  for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true);
+  if(!err && SEA_WATER[kind] && !lagoonWalled(host)) err = "Only a lagoon wall holds sea water.";
+  for(let i = 0; !err && i < ptsOf.length; i++) err = waterProblem(ptsOf[i], host, null, cost, true, kind);
   return {r, parts, ptsOf, host, kind, cost, same, look, m2:parts.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), err};
 }
 function waterDragStat(){
@@ -3051,6 +3114,83 @@ function platformTap(ev){
   ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
 }
 
+/* ---------- viewing galleries ---------- */
+// A pool: an open exhibit with sea water in it, or pool animals
+const isPool = e => !e.viv && (waterOf(e).some(w => SEA_WATER[w.kind]) || poolKinds(e).length > 0);
+// The fence side of a pool nearest the pointer, and a gallery standing outside it, its long back wall GALLERY.gap off the fence; its door (face) points away from the pool
+function findGallerySpot(clientX, clientY){
+  const t = BUILDINGS.gallery, p = toWorld(clientX, clientY); let best = null;
+  for(const e of state.exhibits){
+    if(!isPool(e)) continue;
+    for(let i = 0; i < e.points.length; i++){
+      const a = e.points[i], b = e.points[(i+1) % e.points.length], r = segProj(p.x, p.y, a, b);
+      if(r.d * view.k < 30 && (!best || r.d < best.d)) best = {e, r, a, b, d:r.d};
+    }
+  }
+  if(!best) return null;
+  const {e, r, a, b} = best, [cx, cy] = centroid(e.points);
+  const L = Math.hypot(b[0]-a[0], b[1]-a[1]) || 1, ang = Math.atan2(b[1]-a[1], b[0]-a[0]);
+  let nx = -(b[1]-a[1])/L, ny = (b[0]-a[0])/L;
+  if((cx - r.x)*nx + (cy - r.y)*ny > 0){ nx = -nx; ny = -ny; }   // point it out of the pool
+  const g = segProj(Math.round(r.x/GRID_STEP)*GRID_STEP, Math.round(r.y/GRID_STEP)*GRID_STEP, a, b), off = t.d/2 + GALLERY.gap;
+  const x = g.x + nx*off, y = g.y + ny*off, pts = rectPts(x, y, t.w, t.d, ang);
+  const face = FACE_DIR.reduce((k, d, j) => d[0]*nx + d[1]*ny > FACE_DIR[k][0]*nx + FACE_DIR[k][1]*ny ? j : k, 0);
+  let why = null;
+  if(!insidePlot(pts)) why = "Keep it inside the park boundary.";
+  else if(state.exhibits.some(o => shapesOverlap(pts, o.points) || shapesOverlap(o.points, pts))) why = "It overlaps an exhibit.";
+  else if(state.buildings.some(o => shapesOverlap(pts, o.points))) why = "It overlaps a building.";
+  else if(bldOnPath("gallery", pts)) why = "It sits on a path.";
+  else if(shapeHitsLandscape(pts)) why = shapeHitsLandscape(pts);
+  else if(!canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
+  return {e, pts, face, x, y, ok:!why, why};
+}
+let galGhost = null;
+function galleryHover(ev){
+  galGhost = findGallerySpot(ev.clientX, ev.clientY);
+  ghost = galGhost ? {pts:galGhost.pts, x:galGhost.x, y:galGhost.y, ok:galGhost.ok} : null;
+  setStat(galGhost ? (galGhost.why || `${money(BUILDINGS.gallery.price)}. Stands against ${galGhost.e.name}'s fence. Guests reach it from a path.`) : "Point at a pool's fence.", galGhost && !galGhost.ok);
+  renderOverlay();
+}
+function galleryTap(ev){
+  const g = findGallerySpot(ev.clientX, ev.clientY);
+  if(!g){ setStat("Tap a pool's fence.", true); return; }
+  if(!g.ok){ setStat(g.why, true); return; }
+  spend(BUILDINGS.gallery.price, "built");
+  const b = {id:uid("b-"), type:"gallery", exhibitId:g.e.id, points:g.pts, face:g.face, day:state.day};
+  state.buildings.push(b);
+  afterChange(); render();
+  ui.toast(isReachable(b) ? `Built a viewing gallery on ${g.e.name}.` : "Built a viewing gallery, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
+}
+
+/* ---------- placing a crate (science.js crates) ---------- */
+let crateSel = null, crateGhost = null;   // the crate being placed (an id in crates()), and the ghost under the pointer: {x, y, e, why}
+function startUncrate(id){ crateSel = id; crateGhost = null; closePanel(); setTool("uncrate"); }
+function crateSpot(ev){
+  const p = toWorld(ev.clientX, ev.clientY), r = crates().find(x => x.id === crateSel);
+  const e = state.exhibits.find(x => inPoly(p.x, p.y, x.points)) || null;
+  return {x:p.x, y:p.y, e, r, why:r ? crateProblem(r, e) : "That crate is gone."};
+}
+function crateHover(ev){
+  crateGhost = crateSpot(ev);
+  const g = crateGhost, fight = g.r && g.e && !g.why && g.e.animals.map(a => conflict(SPECIES_BY_ID[g.r.sp], SPECIES_BY_ID[a.sp])).find(x => x);
+  setStat(g.why || (fight ? `${g.e.name}. ${fight}` : `${g.e.name}.`), !!g.why);
+  renderOverlay();
+}
+// the crate at the pointer, standing on its base, over the exhibit it would open into (green) or can't (red)
+function crateGhostSvg(g){
+  const P = ROCK_MPP * Math.max(1, 30 / (14 * ROCK_MPP * view.k)), w = 14 * P, h = 17 * P / TILT, col = g.why ? "var(--bad)" : "var(--good)";   // true size, but never under 30 px across on screen
+  return (g.e ? `<polygon points="${polyStr(g.e.points)}" fill="${col}" fill-opacity=".14" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke" pointer-events="none"/>` : "")
+    + `<image href="${spriteUrl("sprites/crate.png")}" x="${(g.x - w / 2).toFixed(2)}" y="${(g.y - h + 2 * P / TILT).toFixed(2)}" width="${w.toFixed(2)}" height="${h.toFixed(2)}" preserveAspectRatio="none" opacity="${g.why ? .55 : .95}" style="image-rendering:pixelated" pointer-events="none"/>`;
+}
+function crateTap(ev){
+  const g = crateSpot(ev);
+  if(g.why){ setStat(g.why, true); return; }
+  const s = SPECIES_BY_ID[g.r.sp], name = g.r.name || s.name;
+  uncrate(crateSel, g.e); crateSel = null; crateGhost = null; setTool(null);
+  afterChange(); render();
+  ui.toast(`${name} is out of its crate in ${g.e.name}.`, "good");
+}
+
 /* ---------- rocks, groves and shelters ---------- */
 // The pointer's spot in the world; landSpot snaps it so a plant's or rock's square covers whole cells (odd sides on a cell center, even on a grid corner)
 function landPoint(ev){
@@ -3096,7 +3236,7 @@ function bulldozeItem(kind, it){
 
 // Exhibits hold animals, so bulldozing one asks first
 function confirmExhibitRemoval(e){
-  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will sell all animals in the exhibit and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
+  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will put all animals in the exhibit in crates and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e); setStat("");
   }, "No");
@@ -3104,7 +3244,7 @@ function confirmExhibitRemoval(e){
 
 // Without its gate a fenced pen stops being an exhibit: the animals and contents go, the fence stays
 function confirmGateRemoval(e){
-  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will sell all animals in it and everything inside, but the fence stays. Are you sure?`, "Yes", () => {
+  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will put all animals in it in crates and sell everything inside, but the fence stays. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e, {keepFence:true}); setStat("");
   }, "No");
@@ -3115,13 +3255,13 @@ function removeItem(kind, it, opts = {}){
   if(kind === "exhibit" && it.grid && !opts.keepFence) releaseSides(it);   // its side of a wall it shares goes; the neighbor's stays
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
-  if(kind === "exhibit") for(const a of it.animals) earn(Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale), "sold");
+  if(kind === "exhibit") for(const a of it.animals.slice()) crateAnimal(it, a);   // its animals go into crates
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
   else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
   if(kind === "zone") dropZone(it.id);
-  // viewing platforms go with their exhibit
+  // viewing platforms and galleries go with their exhibit
   if(kind === "exhibit") state.buildings = state.buildings.filter(b => b.exhibitId !== it.id);
   if(kind === "exhibit" && it.grid) for(const k of lift) delete fencePieces()[k];
   if(sel && sel.id === it.id) sel = null;
@@ -3130,12 +3270,12 @@ function removeItem(kind, it, opts = {}){
 }
 
 /* ---------- moving things ---------- */
-// What can be dragged: buildings (not platforms, which ride with their exhibit), exhibits, paths (not the entrance walk) and open fences
+// What can be dragged: buildings (not platforms or galleries, which ride with their exhibit), exhibits, paths (not the entrance walk) and open fences
 function moveTarget(hit){
   if(!hit.kind) return null;
   const it = findItem(hit.kind, hit.id);
   if(!it || !["exhibit", "path", "building", "fence", "land"].includes(hit.kind)) return null;
-  if(it.exhibitId){ setStat("A viewing platform rides with its exhibit. Move the exhibit.", true); return null; }
+  if(it.exhibitId){ setStat(`A ${BUILDINGS[it.type].label.toLowerCase()} rides with its exhibit. Move the exhibit.`, true); return null; }
   if(it.grid){ setStat("A fenced exhibit stays where its fence is. Lift the fence with Bulldoze and lay it again.", true); return null; }
   return it;
 }
@@ -3146,7 +3286,7 @@ function moveProblem(kind, it){
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(kind === "exhibit"){
     if(state.exhibits.some(e => e !== it && shapesOverlap(pts, e.points))) return "It overlaps another exhibit.";
-    if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
+    if(state.buildings.some(b => parkGround(b) && b.exhibitId !== it.id && shapesOverlap(pts, b.points))) return "It overlaps a building.";
     if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
     return shapeHitsLandscape(pts);
   } else if(kind === "building"){
@@ -3262,10 +3402,10 @@ function reshapeProblem(e, orig){
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(area(pts) < 60) return "Too small. Exhibits need at least 60 m².";
   if(state.exhibits.some(x => x !== e && shapesOverlap(pts, x.points))) return "It overlaps another exhibit.";
-  if(state.buildings.some(b => !b.exhibitId && shapesOverlap(pts, b.points))) return "It overlaps a building.";
+  if(state.buildings.some(b => parkGround(b) && b.exhibitId !== e.id && shapesOverlap(pts, b.points))) return "It overlaps a building.";
   if(state.paths.some(p => lineEntersShape(p.points, pts))) return "A path runs through it.";
   const hit = shapeHitsLandscape(pts); if(hit) return hit;
-  if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms first.";
+  if(state.buildings.some(b => b.exhibitId === e.id)) return "Take down its viewing platforms and galleries first.";
   if(landOf(e).some(f => LAND[f.type] && !rectsInside(footRects(f, e), pts))) return "A rock, grove or shelter would end up outside the fence. Bulldoze it first.";
   if(waterOf(e).some(w => !insideFence(w.points, pts, WATER.margin))) return "Some water would end up outside the fence. Reshape or bulldoze it first.";
   const diff = reshapeCost(e, orig);
@@ -3406,6 +3546,8 @@ svg.addEventListener("pointermove", e => {
     if(e.pointerType !== "mouse") return;
     if(draw){ const sn = snapAt(e.clientX, e.clientY, e); draw.hover = [sn.x, sn.y]; snapMark = sn.info ? [sn.x, sn.y] : null; updateDrawbar(); renderOverlay(); }
     else if(tool === "platform") platformHover(e);
+    else if(tool === "gallery") galleryHover(e);
+    else if(tool === "uncrate") crateHover(e);
     else if(landKey(tool)) landHover(e);
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
@@ -3522,6 +3664,8 @@ function endPointer(e){
   if(draw){ drawTap(e); return; }
   if(tool === "parcels"){ parcelTap(e); return; }
   if(tool === "platform"){ platformTap(e); return; }
+  if(tool === "gallery"){ galleryTap(e); return; }
+  if(tool === "uncrate"){ crateTap(e); return; }
   if(landKey(tool)){ landTap(e); return; }
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
@@ -3623,6 +3767,7 @@ document.addEventListener("keydown", e => {
 
 // Call after anything in the park changes shape: rework the numbers, the walkers' routes, goals, and save
 function afterChange(){
+  crateStranded();   // pool animals left without a lagoon wall or water go into crates
   refreshMenu();
   recompute();
   buildGuestGraph();

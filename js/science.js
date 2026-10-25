@@ -335,7 +335,7 @@ function orderClone(sp, exhibitId, sex){
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:true, q:a.q}));
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:a.cl ?? true, q:a.q, ...(a.sick ? {sick:a.sick} : {})}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -350,11 +350,73 @@ function placeReady(id, exhibitId){
   putAnimal(e, sc.ready[i]); sc.ready.splice(i, 1);
   return true;
 }
+/* ---------- crates: animals boxed off the map (state.science.ready), Zoo Tycoon style ---------- */
+// A clone with no exhibit, a recaptured escapee with nowhere to go, an animal whose exhibit went or failed it, or one boxed by hand waits in a crate
+// until it's placed (the Crates tab, the uncrate tool in map.js, an exhibit's Cloning tab). `crated` is the day it went in (stamped by cratesNight when missing).
+const crates = () => state.science.ready;
+const crateDays = r => state.day - (r.crated ?? state.day);
+// Box an animal from its exhibit, at once
+function crateAnimal(e, a){
+  const i = e.animals.indexOf(a); if(i < 0) return null;
+  e.animals.splice(i, 1);
+  state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
+  state.health.ward = state.health.ward.filter(p => p.a.id !== a.id);
+  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, q:a.q ?? 90, cl:!!a.cl, crated:state.day};
+  if(a.sick) r.sick = a.sick;
+  crates().push(r);
+  return r;
+}
+// Why a crated animal can't go into this exhibit, in a few words, or null
+function crateProblem(r, e){
+  const s = SPECIES_BY_ID[r.sp];
+  if(!e) return "Tap an exhibit.";
+  if(fitsHabitat(s, e)) return null;
+  if(e.viv && !s.viv) return "Too big for a case.";
+  if(e.viv && !!s.aqua !== !!e.aqua) return s.aqua ? "Needs an aquarium." : "Can't live under water.";
+  if(!e.viv && s.viv) return s.aqua ? "Needs an aquarium." : "Needs a vivarium.";
+  if(e.viv && s.palu && !e.palu) return "Needs a paludarium.";
+  if(e.viv) return `Needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.`;
+  if(s.pool) return lagoonWalled(e) ? "No water for it." : "Needs a lagoon wall.";
+  return "Can't live here.";
+}
+function uncrate(id, e){
+  const r = crates().find(x => x.id === id); if(!r) return "That crate is gone.";
+  const why = crateProblem(r, e); if(why) return why;
+  placeReady(id, e.id);
+  return null;
+}
+function sellCrate(id){
+  const i = crates().findIndex(x => x.id === id); if(i < 0) return 0;
+  const v = Math.round(SPECIES_BY_ID[crates()[i].sp].price * COST.animalResale);
+  crates().splice(i, 1); earn(v, "sold");
+  return v;
+}
+// Every night: a crate costs CRATE.fee a day to keep, and animals boxed CRATE.warn days or more get a reminder
+function cratesNight(){
+  const list = crates(); if(!list.length) return;
+  for(const r of list) r.crated ??= state.day;
+  spend(list.length * CRATE.fee, "upkeep");
+  const long = list.filter(r => crateDays(r) >= CRATE.warn).length;
+  if(long) events.toast(`${long} animal${long === 1 ? " has" : "s have"} been in a crate for ${CRATE.warn} days or more.`, "bad");
+}
+// Pool animals in an exhibit that has lost its lagoon wall or all its water are crated at once (afterChange). Returns how many.
+function crateStranded(){
+  let n = 0;
+  for(const e of state.exhibits){
+    if(e.viv) continue;
+    for(const a of e.animals.slice()){
+      const s = SPECIES_BY_ID[a.sp]; if(!s || !s.pool || (lagoonWalled(e) && poolM2(e, s) > 0)) continue;
+      crateAnimal(e, a); n++;
+      events.toast(`The ${s.name} in ${e.name} was crated: ${lagoonWalled(e) ? "no water" : "no lagoon wall"}.`, "bad");
+    }
+  }
+  return n;
+}
 function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
   if(e){ putAnimal(e, c); events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`The Genetics Lab finished a ${s.name} clone. Tap an exhibit to move it in.`, "good"); }
+  else { sc.ready.push(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q})); events.toast(`The Genetics Lab finished a ${s.name} clone. It waits in a crate.`, "good"); }
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */

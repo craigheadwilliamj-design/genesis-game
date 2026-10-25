@@ -259,7 +259,7 @@ function tarHtml(b){
   const speed = Math.round(cloneSpeed() * 100);
   h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");
   if(speed !== 100) h = h.replace(/<\/section>$/, `<div class="meta">Speed ${Math.round(10000 / speed)}%</div></section>`);
-  if(sc.ready.length) h += `<section><h3>Waiting for an exhibit</h3><ul class="herd">${sc.ready.map(r => `<li><span class="dot" style="background:${PERIOD_COLOR[SPECIES_BY_ID[r.sp].period]}"></span><span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${sexMark(r)} ${r.q}% DNA</span></li>`).join("")}</ul></section>`;
+  if(sc.ready.length) h += `<section><h3>Crated</h3><ul class="herd">${sc.ready.map(r => `<li>${crateImg()}<span>${esc(SPECIES_BY_ID[r.sp].name)}</span><span class="meta">${sexMark(r)} ${r.q}% DNA</span></li>`).join("")}</ul></section>`;
   const lib = SPECIES.filter(s => sc.dna[s.id]);
   h += `<section><h3>Genome library</h3>`;
   if(!lib.length) h += `<div class="meta">No DNA.</div>`;

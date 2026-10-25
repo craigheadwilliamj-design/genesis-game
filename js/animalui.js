@@ -44,7 +44,7 @@ function animalHtml(a){
   h += `<div class="meta">${esc(s.name)} · ${esc(s.period)}${e ? " · in " + esc(e.name) : ""}${a.cl ? " · clone" : ""} · ${a.q ?? 90}% DNA${a.sex ? ` · <b title="${a.sex}">${sexMark(a)}</b> ${a.sex}` : ""}</div>`;
   const rp = e ? rankPos(e, a) : null;
   if(rp) h += `<div class="meta">${rp.pack ? (rp.i < 2 ? "Alpha pair" : "Subordinate, rank " + (rp.i + 1)) : rp.i === 0 ? "Alpha" : "Rank " + (rp.i + 1)} of ${rp.n} in the ${traitsOf(s).social}</div>`;
-  h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? sellBtn(a) : ""}</div>`;
+  h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? crateBtn(a) + sellBtn(a) : ""}</div>`;
   h += `<section><h3>Happiness <span class="num" id="anMoodN"></span></h3><div class="meter"><i id="anMoodBar"></i></div></section>`;
   h += `<section><h3>Needs</h3>${NEED_KEYS.map(k => `<div class="need-row"><span>${NEED_TEXT[k]}</span><span id="anN-${k}"></span></div><div class="meter"><i id="anB-${k}"></i></div>`).join("")}</section>`;
   h += `<section><h3>Health <span class="num" id="anHpN"></span></h3><div class="meter"><i id="anHpBar"></i></div><div id="anHealth"></div></section>`;
@@ -138,9 +138,10 @@ panelEl.addEventListener("change", ev => {
   ev.target.value = animalSelName = renameAnimal(a, ev.target.value); saveSoon();
 });
 
-// The Animals tab: every animal by name with sex, health and its own Move and Sell buttons, then moves waiting on keepers
+// The Animals tab: every animal by name with sex, health and its own Move, Crate and Sell buttons, then moves waiting on keepers
 const sellValue = a => Math.round(SPECIES_BY_ID[a.sp].price * COST.animalResale);
 const sellBtn = a => `<button class="btn sell" data-action="animalSell" data-id="${esc(a.id)}">Sell +${money(sellValue(a))}</button>`;
+const crateBtn = a => `<button class="btn sell" data-action="animalCrate" data-id="${esc(a.id)}">Crate</button>`;
 const byName = (a, b) => String(a.name || "").toLowerCase().localeCompare(String(b.name || "").toLowerCase()) || String(a.id).localeCompare(String(b.id));
 function animalsTabHtml(e){
   if(!e.animals.length) return `<section><h3>Animals</h3><div class="meta">No animals here yet.</div>${movesHtml(e)}</section>`;
@@ -148,13 +149,23 @@ function animalsTabHtml(e){
   const rows = [...e.animals].sort(byName).map(a => {
     const s = SPECIES_BY_ID[a.sp], sk = noticed(a) && a.sick, v = Math.round(animalHp(a));
     const hp = `${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health`;
-    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${esc(a.sp)}" data-id="${esc(a.id)}"${queued.has(a.id) ? " disabled" : ""}>${queued.has(a.id) ? "Moving" : "Move"}</button>${sellBtn(a)}</span></li>`;
+    return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${esc(a.sp)}" data-id="${esc(a.id)}"${queued.has(a.id) ? " disabled" : ""}>${queued.has(a.id) ? "Moving" : "Move"}</button>${crateBtn(a)}${sellBtn(a)}</span></li>`;
   });
   return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul>${movesHtml(e)}</section>`;
 }
 function sellAnimalAsk(id){
   const a = animalById(id), e = a && animalHome(id); if(!a || !e) return;
   askConfirm("Sell animal?", `Sell ${a.name || SPECIES_BY_ID[a.sp].name} for ${money(sellValue(a))}?`, "Sell", () => sellAnimal(id));
+}
+// Box an animal at once: it leaves its exhibit for a crate (science.js), to be placed anywhere it fits
+function crateAnimalNow(id){
+  const a = animalById(id), e = a && animalHome(id); if(!a || !e) return false;
+  crateAnimal(e, a);
+  const h = herd.get(id); if(h){ h.el.remove(); herd.delete(id); }
+  if(sel && sel.kind === "animal" && sel.id === id) select("exhibit", e.id);
+  afterChange(); render(); ui.panel();
+  ui.toast(`${a.name || SPECIES_BY_ID[a.sp].name} is in a crate.`, "good");
+  return true;
 }
 function sellAnimal(id){
   const a = animalById(id), e = a && animalHome(id); if(!a || !e) return false;

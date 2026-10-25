@@ -32,7 +32,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
     PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
     window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;
-    const sp = SPECIES.find(s => !s.viv);
+    const sp = SPECIES.find(s => !s.viv && !s.pool);
 
     // old saves without staff/safety upgrade without throwing
     const old = JSON.parse(JSON.stringify(state)); delete old.staff; delete old.safety;
@@ -1407,7 +1407,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       gatePens();
       const ge = state.exhibits[0];
       out.fenceLoopExhibit = state.exhibits.length === 1 && ge.grid && area(ge.points) === 300 && ge.points.length === 4 && !ge.open;
-      const gsp = SPECIES.find(x => !x.viv); ge.animals.push({id:"a-g1", sp:gsp.id, age:1, q:1});
+      const gsp = SPECIES.find(x => !x.viv && !x.pool); ge.animals.push({id:"a-g1", sp:gsp.id, age:1, q:1});
       // a wall across splits it; the animals stay in the bigger part
       L([250,100],[250,115]); gatePens();
       out.fenceSplit = state.exhibits.length === 2 && state.exhibits.every(e => area(e.points) === 150) && ge.animals.length === 1;
@@ -1722,7 +1722,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const again2 = JSON.stringify(sv2.decor); upgradeSave(sv2); out.footOldSaveSlidesOnce = JSON.stringify(sv2.decor) === again2; }
     }
     // animals count plants from their own period in full and other periods' plants of the biome fill at most HAB.offEra of what they want, and want none where their period had no plants in the biome
-    const jurSp = SPECIES.find(s => !s.viv && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
+    const jurSp = SPECIES.find(s => !s.viv && !s.pool && s.period === "Jurassic"), px = {id:"e-pp", name:"Period test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], land:[], biome:"tropical"};
     px.land = [{id:"l-a", type:"cre-tropical-large", x:115, y:115}];
     const wrongPeriod = haveOf(px, jurSp).plants, anyPeriod = haveOf(px).plants, offEra = Math.min(Math.PI * 25, wantsOf(px, jurSp).plants * HAB.offEra);
     px.land.push({id:"l-b", type:"jur-tropical-large", x:135, y:135});
@@ -1738,7 +1738,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
 
     // biomes: every animal has one, vivarium animals too, home ground makes them happier, the wrong one is flagged, wetland counts as some water
-    out.biomesCover = SPECIES.every(s => s.aqua ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));   // sea animals have none
+    out.biomesCover = SPECIES.every(s => s.aqua || s.pool ? !biomesOf(s) : biomesOf(s) && biomesOf(s).length === 2 && biomesOf(s).every(b => BIOMES[b]));   // sea animals have none
     const bx = {id:"e-biome", name:"Biome test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[], happy:70, cond:100, land:[], water:[]};
     const desertSp = SPECIES.find(s => biomesOf(s) && biomesOf(s)[0] === "desert");
     bx.animals = desertSp.group[0] > 0 ? Array.from({length:desertSp.group[0]}, (_, i) => ({id:"a-b" + i, sp:desertSp.id, q:90})) : [];
@@ -1755,7 +1755,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // a vivarium has no ground picker: its biome is its scene's (else the biome it was built with)
     { const vb = {viv:"S", biome:"wetland", points:bx.points, animals:[], vivScene:null}; const before = biomeOf(vb); vb.vivScene = {era:"mesozoic", biome:"desert"};
       out.vivBiomeIsScene = before === "wetland" && biomeOf(vb) === "desert" && typeof regradeProblem === "undefined"; }
-    { const sp = SPECIES.find(s => !s.viv && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
+    { const sp = SPECIES.find(s => !s.viv && !s.pool && !s.diet.includes("piscivore") && !HABITAT_LIKES[s.id]), pts = bx.points, mk = (biome, water, land) => ({viv:false, biome, points:pts, land, water:water ? [{id:1, points:[[0,0],[water,0],[water,water],[0,water]]}] : []});
       const dW = wantsOf(mk("desert"), sp), tW = wantsOf(mk("tropical"), sp), fish = SPECIES.find(s => s.semi);
       out.wantsBySize = wantsOf({points:pts.map(([x,y]) => [x*2,y*2]), biome:"tropical"}, sp).plants > tW.plants;
       out.wantsByBiome = dW.rock > tW.rock && tW.plants > dW.plants && wantsOf(mk("desert"), fish).water > wantsOf(mk("desert"), sp).water;
@@ -1778,7 +1778,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.weather.from = state.day + 10; rollWeather(); Math.random = rnd;
     out.fairBeforeStart = state.weather.next === "fair";
     state.money = 1e6; state.buildings = [];
-    const wxSp = SPECIES.find(s => !s.viv && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
+    const wxSp = SPECIES.find(s => !s.viv && !s.pool && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
     const wx = {id:"e-wx", name:"Weather test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[1, 2, 3].map(i => ({id:"a-w" + i, sp:wxSp.id, q:90})), happy:70, cond:100, land:[]};
     state.exhibits = [wx];
     const at = (k, f) => { state.weather.today = k; return f(); };
@@ -3157,7 +3157,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     recompute(); buildKeeperGraph(); state.sandbox = false; state.over = false; state.money = 1e9;
     const sc = () => state.science;
     for(const k of ["paleo", "gene", "botanist"]) while(sc().crew[k] < 2) hireScientist(k);
-    const sp = SPECIES.find(s => !s.viv); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
+    const sp = SPECIES.find(s => !s.viv && !s.pool); sc().dna[sp.id] = {genome:100, quality:80}; if(!isUnlocked(sp.id)) sc().unlocked.push(sp.id); state.rating = 5;
     // an expedition goes after another animal, seen at its site
     const tsp = SPECIES.find(s => s.id !== sp.id && speciesAvailable(s.id) && sitesOf(s.id).length), tsite = sitesOf(tsp.id).find(siteShown);
     sc().seen[tsite.id] = [tsp.id]; if(!isUnlocked(tsp.id)) sc().unlocked.push(tsp.id);
@@ -3867,6 +3867,82 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     [pk, bk, rkk].forEach(x => { try{ localStorage.removeItem("genesis-pixel-d:" + x.path); }catch{} });
     spriteUrl.swap("sprites/dime-walk.png", was); px.path = ""; px.frames = []; try{ localStorage.removeItem("genesis-pixel-d:sprites/smoke/test.png"); localStorage.removeItem("genesis-pixel-last"); }catch{}
     document.querySelector("#dlgPixel").close();
+    // pools: sea water costs more, pool animals want an open exhibit mostly under sea water (deep for deep ones, any water for fresh ones), room is water,
+    // no plants, thirst, cover or escapes; they spawn in and swim only in their water; galleries stand on park ground and beat a platform's view
+    {
+      const keepEx = state.exhibits, keepB = state.buildings, m0 = state.money; state.money = 1e7;
+      const pts = [[400, 400], [460, 400], [460, 450], [400, 450]], N = SPECIES_BY_ID.noth, M = SPECIES_BY_ID.mosa, R = SPECIES_BY_ID.rhiz;
+      const pe = {id:"e-pooltest", name:"Pool test", points:pts, animals:[{id:"pn1", sp:"noth", q:90}, {id:"pn2", sp:"noth", q:90}], happy:70, cond:100, land:[], water:[], gate:[400, 425], barrier:"lagoon"};
+      state.exhibits = [pe]; state.buildings = [];
+      const fill = (kind, x1 = 460) => { pe.water = []; for(let x = 400; x < x1; x += 5) for(let y = 400; y < 450; y += 5) for(const q of waterClip(pe, [x, y, x + 5, y + 5])) layWater(pe, rectPtsOf(q), kind); };
+      const iss = re => exhibitReport(pe).issues.some(i => re.test(i.text));
+      // the lagoon wall: the only fence that holds sea water and pool animals, with its pictures; never offered as advice, and laid only with pools on
+      const box = rectPtsOf([405, 405, 415, 415]), wasBar = pe.barrier;
+      const lagoonOk = waterProblem(box, pe, null, 0, true, "sea") === null && !fitsHabitat(N, pe) && crateProblem({sp:"noth"}, pe) === "No water for it."; pe.barrier = "bars";
+      const barsNo = waterProblem(box, pe, null, 0, true, "sea") === "Only a lagoon wall holds sea water." && waterProblem(box, pe, null, 0, true) === null && !fitsHabitat(N, pe) && crateProblem({sp:"noth"}, pe) === "Needs a lagoon wall." && iss(/Nothosaurus needs a lagoon wall/)
+        && waterProblem(rectPtsOf([600, 600, 610, 610]), null, null, 0, true, "deep") === "Only a lagoon wall holds sea water.";
+      pe.barrier = wasBar;
+      const Pk = fencePieces(), keepP = {...Pk}, sq = [[500, 500], [520, 500], [520, 520], [500, 520]], ge = {id:"e-lagoongrid", name:"Lagoon grid", grid:true, points:sq, animals:[], water:[{id:"w-lg", kind:"sea", points:rectPtsOf([505, 505, 515, 515])}]};
+      const ring = sq.flatMap((p, i) => pieceLine(p, sq[(i + 1) % 4]).keys);
+      for(const k of ring) Pk[k] = mkPiece("lagoon");
+      state.exhibits = [pe, ge];
+      const gridOk = lagoonWalled(ge), swapNo = /needs its lagoon wall/.test(seaWallProblem({[ring[0]]:mkPiece("bars")}) || "") && seaWallProblem({[ring[0]]:mkPiece("lagoon")}) === null;
+      Pk[ring[1]] = mkPiece("concrete"); const mixedNo = !lagoonWalled(ge);
+      for(const k in Pk) delete Pk[k]; Object.assign(Pk, keepP); state.exhibits = [pe];
+      out.lagoonWall = lagoonOk && barsNo && gridOk && swapNo && mixedNo && BARRIERS.lagoon.pool && FENCE_SPRITES.lagoon && FENCE34.lagoon.sprite === "lagoon" && FENCE_EDGE.lagoon
+        && ["pristine", "degrading", "broken", "gate", "gate-1", "gate-2", "gate-3"].every(k => SPRITE_PACK[`sprites/fence/lagoon-${k}.png`])
+        && !/lagoon/i.test(barrierNeeded(M)) && (devMode() || /aren't open yet/.test(planPieces(pieceLine([700, 700], [710, 700]).keys, "lagoon").why || ""));
+      out.seaWaterPrices = waterRate("sea") === WATER.perSqM * SEA_WATER.sea.price && waterRate("deep") === WATER.perSqM * SEA_WATER.deep.price && waterRate(undefined) === WATER.perSqM
+        && SEA_WATER.deep.price > SEA_WATER.sea.price && WATER_TEX.sea && WATER_TEX.deep && WATER_TILES.sea && WATER_TILES.deep && (devMode() === waterTypes().includes("sea"));
+      out.poolOnlyOpen = !fitsHabitat(N, {viv:"L", aqua:true, points:[]}) && !biomesOf(N) && SPECIES.filter(x => x.pool).every(x => !x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)) && SPECIES_INFO[x.id]);
+      const dryT = exhibitReport(pe).target, dryFlag = iss(/No sea water: Nothosaurus/);
+      fill(undefined); const freshN = poolFit(pe, N).fit, freshR = poolFit(pe, R).fit;
+      fill("sea"); const seaT = exhibitReport(pe).target;
+      out.poolNeedsSea = dryFlag && fitsHabitat(N, pe) && freshN === 0 && freshR === 1 && poolFit(pe, N).fit === 1 && seaT > dryT + 30 && iss(/Open water to swim in/) && !iss(/plants from another era|No water|Wrong biome/);
+      out.poolAnimalsNeedNothingElse = !thirsty(pe, N) && escapeRisk(pe, N) === null && coverOf(pe).need === 0 && wantsOf(pe, N).plants === 0 && wantsOf(pe, N).rock === 0 && /marine/.test(dietText(N));
+      pe.animals = [{id:"pm1", sp:"mosa", q:90}, {id:"pm2", sp:"mosa", q:90}];
+      const shallow = iss(/Too shallow: Mosasaurus/), cramped = iss(/Cramped: .* of water for/);
+      fill("sea"); for(let x = 430; x < 460; x += 5) for(let y = 400; y < 450; y += 5) for(const q of waterClip(pe, [x, y, x + 5, y + 5])) layWater(pe, rectPtsOf(q), "deep");
+      out.poolDeepAndRoom = shallow && cramped && poolFit(pe, M).deep === 1 && !iss(/Too shallow/) && exhibitReport(pe).wetNeed === M.space * 2 && Math.abs(exhibitReport(pe).wet - poolM2(pe, M)) < 1e-6;
+      const before = state.money, r = cutWaterAll([440, 400, 445, 405]);
+      out.seaWaterRefund = r.m2 > 0 && state.money - before === Math.round(r.m2 * waterRate("deep") * COST.refundShare);
+      // drawn and swimming: they start in their water and never leave it
+      render();
+      const hs = [...herd.values()].filter(h => h.exhibitId === pe.id);
+      let wet = hs.length === 2 && hs.every(h => h.pool && h.el.querySelector(".dive") && poolSpot(h, pe, [h.x, h.y]));
+      for(const h of hs) h.act = null;   // a resting animal stays up at the surface
+      let dove = 0;
+      for(let i = 0; i < 400 && wet; i++) for(const h of hs){ poolSwim(h, pe, .1); dove = Math.max(dove, h.dive || 0); if(!poolSpot(h, pe, [h.x, h.y])) wet = false; }
+      out.poolSwimStaysWet = wet && dove > .2;
+      // galleries: on park ground beside the pool, a better view than a platform
+      const gb = {id:"b-galtest", type:"gallery", exhibitId:pe.id, points:rectPts(430, 454.4, 16, 8, 0), face:2}, pb = {id:"b-plattest", type:"platform", exhibitId:pe.id, points:rectPts(430, 446, 14, 7, 0), inward:true};
+      state.buildings = [pb]; const platV = viewFactor(pe, {[pb.id]:true}); state.buildings = [pb, gb]; const bothV = viewFactor(pe, {[pb.id]:true, [gb.id]:true});
+      out.galleryView = isPool(pe) && !isPool({points:pts, water:[], animals:[]}) && parkGround(gb) && !parkGround(pb) && bothV > platV && Math.abs(bothV / Math.max(1, barrierOf(pe).view) - GALLERY.view) < 1e-9
+        && buildingHidden("gallery") === !devMode() && STAND34.gallery && building34(gb, BUILDINGS.gallery, false, false, true, 1).includes("GALLERY");
+      // crates: instant boxing keeps the animal whole, it goes back in only where it fits, a crate costs a fee a night, stranded pool animals and a bulldozed exhibit's animals are crated
+      {
+        const keepR = state.science.ready.slice(); state.science.ready.length = 0;
+        const a0 = pe.animals[0]; a0.sick = {kind:"illness", sev:10}; a0.q = 77;
+        const r = crateAnimal(pe, a0), land = {id:"e-cland", name:"Land", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[], land:[], water:[]};
+        state.exhibits.push(land);
+        const boxed = !!r && !pe.animals.includes(a0) && crates()[0] === r && r.crated === state.day && r.q === 77 && r.sick && r.name === a0.name && crateDays(r) === 0;
+        const refuse = crateProblem(r, land) === "Needs a lagoon wall." && crateProblem(r, {viv:"S", points:[]}) === "Too big for a case." && crateProblem(r, null) === "Tap an exhibit." && !!uncrate(r.id, land) && crates().length === 1;
+        const back = uncrate(r.id, pe) === null && pe.animals.some(x => x.id === a0.id && x.q === 77 && x.sick) && !crates().length;
+        crateAnimal(pe, pe.animals.find(x => x.id === a0.id)); const fee0 = state.money; cratesNight();
+        const night = state.money === fee0 - CRATE.fee && crateDays({crated:state.day - CRATE.warn}) === CRATE.warn;
+        const sold = sellCrate(a0.id) === Math.round(M.price * COST.animalResale) && !crates().length;
+        pe.barrier = "bars"; const n0 = pe.animals.length, stranded = crateStranded() === n0 && !pe.animals.length && crates().length === n0; pe.barrier = "lagoon";
+        state.science.ready.length = 0; land.animals = [{id:"cl1", sp:SPECIES.find(x => !x.viv && !x.pool).id, q:90}]; const m1 = state.money;
+        removeItem("exhibit", land);
+        const bulldozed = crates().length === 1 && crates()[0].id === "cl1" && !state.exhibits.includes(land) && state.money >= m1;
+        openParkOffice("crates"); ui.panel(); ui.hud(true);
+        const shown = /Crates/.test(officeTabs()) && /sprites\/crate\.png/.test(cratesHtml()) && /data-action="crateTool"/.test(cratesHtml()) && !document.querySelector("#crateBtn").hidden && document.querySelector("#crateN").textContent === "1";
+        const ghost = crateGhostSvg({x:10, y:10, e:pe, why:null}).includes("sprites/crate.png") && !!SPRITE_PACK["sprites/crate.png"];
+        out.crates = boxed && refuse && back && night && sold && stranded && bulldozed && shown && ghost;
+        closePanel(); state.science.ready.length = 0; state.science.ready.push(...keepR); ui.hud(true);
+      }
+      state.exhibits = keepEx; state.buildings = keepB; state.money = m0; render();
+    }
     // turning dev mode on shows Pixels straight away, with no reload, even where storage is blocked
     openParkOffice("menu");   // the version label lives at the foot of the Main Menu
     const wasDev = devMode(), tap = () => { for(let i = 0; i < 5; i++) document.querySelector("#verLabel").click(); };

@@ -20,13 +20,13 @@ function isBreached(e){ return !e.viv && (condOf(e) <= 0 || !!e.open); }
 // The weakest barrier the animal needs, for advice
 function barrierNeeded(s){
   if(isFlyer(s)) return "aviary netting";
-  const ok = Object.values(BARRIERS).filter(b => b.strength >= escapeStrength(s)).sort((a, b) => a.strength - b.strength)[0];
+  const ok = Object.values(BARRIERS).filter(b => !b.pool && b.strength >= escapeStrength(s)).sort((a, b) => a.strength - b.strength)[0];
   return ok ? ok.label.toLowerCase() : "a moat";
 }
 
 // Can this animal get out of this exhibit? Returns why, or null if it's held.
 function escapeRisk(e, s){
-  if(e.viv) return null;
+  if(e.viv || s.pool) return null;   // a pool animal can't leave the water
   if(isFlyer(s)) return e.aviary ? null : `${s.name} can fly out.`;
   if(e.moat) return null;
   if(e.open) return "Gap in the fence.";
@@ -37,12 +37,14 @@ function escapeRisk(e, s){
   return null;
 }
 
-// How well guests can see into an exhibit. Viewing platforms give an aerial view over any wall.
+// How well guests can see into an exhibit. Viewing platforms give an aerial view over any wall, a pool's viewing galleries a view under the water.
 function viewFactor(e, reach){
   if(e.viv) return 1;
   let f = barrierOf(e).view;
   const n = state.buildings.filter(b => b.type === "platform" && b.exhibitId === e.id && reach[b.id]).length;
-  if(n) f = Math.max(f, 1) * Math.min(1.7, 1.4 + .15 * (n - 1));
+  const g = state.buildings.filter(b => b.type === "gallery" && b.exhibitId === e.id && reach[b.id]).length;
+  const k = Math.max(n ? Math.min(1.7, 1.4 + .15 * (n - 1)) : 1, g ? Math.min(GALLERY.most, GALLERY.view + GALLERY.more * (g - 1)) : 1);
+  if(k > 1) f = Math.max(f, 1) * k;
   return f;
 }
 
@@ -148,7 +150,7 @@ function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
   if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
-  else { state.science.ready.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in holding. Tap an exhibit to move it in.`, "good"); }
+  else { state.science.ready.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, q:l.q ?? 90}); events.toast(`Keepers put the ${s.name} in a crate.`, "good"); }
   events.changed();
 }
 
