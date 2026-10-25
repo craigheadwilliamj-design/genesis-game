@@ -72,7 +72,8 @@ const UPKEEP = {
 //   group    [fewest, most] of this species that are happy living together
 //   appeal   how much guests want to see it
 //   stars    park rating needed before you can buy or clone it
-//   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore
+//   diet     a list of one or more: herbivore, omnivore, insectivore, piscivore, carnivore, frugivore, molluscovore
+//            the first one sets its food and how it behaves with other species; frugivore and molluscovore go second (after herbivore, piscivore or carnivore) and are for labels and toys
 //   predator true means it attacks any other species, so it can only live with its own kind
 //   bug      true for insects, arachnids, and other arthropods
 //   semi     true for the semi-aquatic tag, shown after the diet; they want more water in the exhibit and wade and swim in it
@@ -92,7 +93,7 @@ const UPKEEP = {
 //   deep     a pool animal that needs deep sea water for POOL.deepNeed of its pool
 //   fresh    a pool animal from rivers and estuaries: any water counts for its pool, not just sea water
 //   breach   a pool animal that now and then leaps clear of the water as it surfaces
-const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore"};
+const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore", frugivore:"Frugivore", molluscovore:"Molluscovore"};
 
 const SPECIES = [
   // Cambrian
@@ -132,7 +133,7 @@ const SPECIES = [
   {id:"ante", name:"Anteosaurus",    period:"Permian", diet:["carnivore"], predator:true, price:15000, food:150, space:800, group:[1,3], appeal:9, stars:2},
   {id:"inos", name:"Inostrancevia",  period:"Permian", diet:["carnivore"], predator:true, price:16000, food:150, space:800,  group:[1,3],  appeal:10, stars:2.5},
   {id:"prio", name:"Prionosuchus",   period:"Permian", diet:["piscivore"], semi:true, price:18000, food:170, space:900,  group:[1,3],  appeal:10, stars:2.5},
-  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["carnivore"], price:22000, food:110, space:700, group:[1,3], appeal:12, stars:2.5, pool:true, deep:true},
+  {id:"heli", name:"Helicoprion",    period:"Permian", diet:["carnivore","molluscovore"], price:22000, food:110, space:700, group:[1,3], appeal:12, stars:2.5, pool:true, deep:true},
   // Triassic
   {id:"sile", name:"Silesaurus",     period:"Triassic", diet:["omnivore"], price:3500, food:25, space:100, group:[3,10], appeal:3, stars:0},
   {id:"shar", name:"Sharovipteryx",  period:"Triassic", diet:["insectivore"], price:3800, food:4, space:5, group:[2,8], appeal:5, stars:0.5, viv:"S"},
@@ -143,13 +144,13 @@ const SPECIES = [
   {id:"desm", name:"Desmatosuchus",  period:"Triassic", diet:["herbivore"], price:9000, food:110, space:500, group:[2,6], appeal:6, stars:1},
   {id:"plat", name:"Plateosaurus",   period:"Triassic", diet:["herbivore"], price:12000, food:160, space:900,  group:[3,8],  appeal:8,  stars:1.5},
   {id:"noth", name:"Nothosaurus",    period:"Triassic", diet:["piscivore"], price:9000, food:40, space:150, group:[2,6], appeal:7, stars:1, pool:true},
-  {id:"shon", name:"Shonisaurus",    period:"Triassic", diet:["piscivore"], price:48000, food:400, space:3000, group:[1,3], appeal:18, stars:3.5, pool:true, breach:true, deep:true},
+  {id:"shon", name:"Shonisaurus",    period:"Triassic", diet:["piscivore","molluscovore"], price:48000, food:400, space:3000, group:[1,3], appeal:18, stars:3.5, pool:true, breach:true, deep:true},
   {id:"post", name:"Postosuchus",    period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:130, space:700,  group:[1,3],  appeal:9,  stars:2},
   {id:"eryt", name:"Erythrosuchus",  period:"Triassic", diet:["carnivore"], predator:true, price:14000, food:140, space:800, group:[1,3], appeal:9, stars:2},
   {id:"liso", name:"Lisowicia",      period:"Triassic", diet:["herbivore"], price:16000, food:220, space:1300, group:[1,4], appeal:10, stars:2},
   // Jurassic
   {id:"prom", name:"Promicroceras",  period:"Jurassic", diet:["carnivore"], price:2500, food:3, space:3, group:[4,12], appeal:3, stars:0, viv:"S", aqua:true},
-  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore"], price:10000, food:30, space:120, group:[3,8], appeal:8, stars:1.5, pool:true, breach:true},
+  {id:"ichy", name:"Ichthyosaurus",  period:"Jurassic", diet:["piscivore","molluscovore"], price:10000, food:30, space:120, group:[3,8], appeal:8, stars:1.5, pool:true, breach:true},
   {id:"hete", name:"Heterodontosaurus", period:"Jurassic", diet:["herbivore"], price:3500, food:25, space:80, group:[3,10], appeal:3, stars:0},
   {id:"anch", name:"Anchiornis",     period:"Jurassic", diet:["insectivore","carnivore"], price:4500, food:5, space:6, group:[2,8], appeal:5, stars:0.5, viv:"S"},
   {id:"comp", name:"Compsognathus",  period:"Jurassic", diet:["carnivore"], price:5000,  food:12,  space:12,   group:[4,12], appeal:4,  stars:0.5, viv:"M"},
@@ -246,12 +247,12 @@ const SPECIES = [
   {id:"nura", name:"Nuralagus rex",  period:"Neogene", diet:["herbivore"], price:9000, food:16, space:20, group:[2,6], appeal:4, stars:1, viv:"L"},
   {id:"hopl", name:"Hoplitomeryx",   period:"Neogene", diet:["herbivore"], price:11000, food:22, space:26, group:[2,5], appeal:5, stars:1, viv:"L"},
   {id:"psil", name:"Psilopterus",    period:"Neogene", diet:["carnivore"], price:10000, food:20, space:26, group:[1,3], appeal:4, stars:1, viv:"L"},
-  {id:"proc", name:"Proconsul",      period:"Neogene", diet:["herbivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
+  {id:"proc", name:"Proconsul",      period:"Neogene", diet:["herbivore","frugivore"], price:6000, food:50, space:150, group:[4,12], appeal:5, stars:1},
   {id:"arge", name:"Argentavis",     period:"Neogene", diet:["carnivore"], price:22000, food:150, space:800, group:[1,3], appeal:13, stars:3},
   // Quaternary
   {id:"ornw", name:"Ornimegalonyx",  period:"Quaternary", diet:["carnivore"], price:6000, food:25, space:14, group:[1,3], appeal:7, stars:1, viv:"M"},
-  {id:"dodo", name:"Dodo",           period:"Quaternary", diet:["herbivore"], price:14000, food:24, space:30, group:[2,5], appeal:6, stars:1.5, viv:"L"},
-  {id:"ppig", name:"Passenger Pigeon", period:"Quaternary", diet:["herbivore"], price:2600, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
+  {id:"dodo", name:"Dodo",           period:"Quaternary", diet:["herbivore","frugivore"], price:14000, food:24, space:30, group:[2,5], appeal:6, stars:1.5, viv:"L"},
+  {id:"ppig", name:"Passenger Pigeon", period:"Quaternary", diet:["herbivore","frugivore"], price:2600, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
   {id:"gtod", name:"Golden Toad",    period:"Quaternary", diet:["insectivore"], price:2800, food:3, space:4, group:[3,10], appeal:2, stars:0, viv:"S"},
   {id:"rmlo", name:"Rocky Mountain Locust", period:"Quaternary", diet:["herbivore"], bug:true, price:2400, food:3, space:4, group:[4,12], appeal:2, stars:0, viv:"S"},
   {id:"sdel", name:"Sicilian Dwarf Elephant", period:"Quaternary", diet:["herbivore"], price:15000, food:28, space:40, group:[1,3], appeal:6, stars:1.5, viv:"L"},
@@ -959,7 +960,7 @@ const STORE_DAYS = 1.5;      // exhibits hold this many days of food
 const GATE_COST = 1500;
 const GATE_REACH = 4;        // a gate counts as on a road within this many meters
 
-const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E"};
+const FOOD_COLOR = {plants:"#6BAA3A", paleoflora:"#1F8A70", meat:"#B23A2E", fish:"#3A7FB2", insects:"#B28A2E", fruit:"#C8466E", shellfish:"#8A7FB8"};
 
 // Staff buildings. They go beside a path or service road.
 BUILDINGS.station   = {label:"Keeper Station", tag:"KEEPERS", one:"a keeper station", glyph:"K", color:"#3F6B2E", price:4000, upkeep:80, w:15, d:10, dept:true,
@@ -1262,13 +1263,15 @@ BUILDINGS.depot = {label:"Vehicle Depot", tag:"ATV", one:"a vehicle depot", glyp
    Food and medicine are real goods. They are bought at a Delivery Dock or made on site,
    sit in stores where they can spoil, and keepers carry them to where they're needed.
    --------------------------------------------------------------------- */
-// Goods stored in buildings. Exhibits eat plants, meat, fish, and insects. Paleoflora lives at the Botany Lab.
+// Goods stored in buildings. Exhibits eat plants, meat, fish, insects, fruit, and shellfish. Paleoflora lives at the Botany Lab.
 //   spoil   share of a store's stock lost to rot each night
 const GOODS = {
   plants: {label:"Hay",      spoil:.04},
   meat:   {label:"Meat",     spoil:.15},
   fish:   {label:"Fish",     spoil:.20},
   insects:{label:"Insects",  spoil:.10},
+  fruit:  {label:"Fruit",    spoil:.18},
+  shellfish:{label:"Shellfish", spoil:.20},
   medpal: {label:"Paleozoic medicine", spoil:.02},
   medmes: {label:"Mesozoic medicine",  spoil:.02},
   medcen: {label:"Cenozoic medicine",  spoil:.02},
@@ -1278,7 +1281,7 @@ const GOODS = {
   drinks: {label:"Drinks",      spoil:.01},
   merch:  {label:"Merchandise", spoil:0},
 };
-const FEED_GOODS = ["plants", "meat", "fish", "insects"];
+const FEED_GOODS = ["plants", "meat", "fish", "insects", "fruit", "shellfish"];
 const GUEST_GOODS = ["snacks", "drinks", "merch"];
 const CMED = "medmod";   // contemporary medicine: bought at the dock
 const ORDER_GOODS = FEED_GOODS.concat(GUEST_GOODS, [CMED]);   // what the dock buys
@@ -1306,7 +1309,7 @@ const LOGI = {
   coldPower:25,        // kW a cold store draws
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
 };
-const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1};   // multiplied by the markup and FOOD_UNIT_COST
+const DOCK_PRICE = {plants:1, meat:1, fish:1, insects:1, fruit:1, shellfish:1};   // multiplied by the markup and FOOD_UNIT_COST
 const GUEST_GOOD_PRICE = 1;   // a unit of snacks, drinks, or merchandise, before the dock's markup
 
 // Stores. cap is total units, holds says which goods fit, spoil multiplies the rot rate.
@@ -1316,8 +1319,8 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
                        store:{cap:600, holds:["plants", "insects", "drinks", "merch"], spoil:.7, bulk:true},
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:15, d:10, dept:true,
-                       store:{cap:600, holds:["meat", "fish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
-                       full:"Refrigerated store", blurb:"Keeps meat, fish, medicine, and snacks from rotting, as long as it has power from a generator."};
+                       store:{cap:600, holds:["meat", "fish", "fruit", "shellfish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops. Trucks come overnight and every two hours while the park is open. They need a service road to the entrance. Keepers and custodians carry it from here."};
@@ -1340,6 +1343,12 @@ BUILDINGS.hatchery  = {label:"Fish Hatchery", tag:"FISH", one:"a fish hatchery",
 BUILDINGS.insectary = {label:"Insectary", tag:"BUGS", one:"an insectary", glyph:"I", color:"#A8832E", price:12000, upkeep:220, w:15, d:10, dept:true, tech:"foodprod",
                        store:{cap:150, holds:["insects"], spoil:1, source:true}, makes:{insects:30},
                        full:"Insect farm", blurb:"Breeds 30 units of insects a day."};
+BUILDINGS.orchard   = {label:"Fruit Orchard", tag:"FRUIT", one:"a fruit orchard", glyph:"O", color:"#B8486A", price:13500, upkeep:260, w:20, d:15, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["fruit"], spoil:1, source:true}, makes:{fruit:40},
+                       full:"Fruit orchard", blurb:"Grows 40 units of fruit a day. It spoils fast, so keep a cold store nearby."};
+BUILDINGS.shellfarm = {label:"Shellfish Farm", tag:"SHELL", one:"a shellfish farm", glyph:"S", color:"#6F78A8", price:15000, upkeep:320, w:20, d:15, dept:true, tech:"foodprod",
+                       store:{cap:150, holds:["shellfish"], spoil:1, source:true}, makes:{shellfish:30},
+                       full:"Shellfish farm", blurb:"Raises 30 units of shellfish a day. It spoils fast, so keep a cold store nearby."};
 
 // Work zones: groups of keepers, exhibits, and stores. Keepers in a zone look after that zone's exhibits.
 const ZONE_COLORS = ["#E0A030", "#4F9BD9", "#C25B8E", "#52B788", "#9B7BE0", "#E07A5F"];
@@ -1544,7 +1553,8 @@ const LAND = {
   // hay: plant food a day herbivores eat off it, like a grove (only those that eat plain plants; older ones need Paleoflora)
   ball:   {label:"Enrichment Ball", one:"an enrichment ball", price:800,  r:1.5, color:"#C8452B", toy:2, look:"ball"},
   icefish:{label:"Frozen Fish",     one:"a frozen fish block", price:250, r:1.2, color:"#E07A3A", toyFor:{piscivore:4, carnivore:2, omnivore:2}, lasts:3, look:"ice"},
-  icefruit:{label:"Frozen Fruit",   one:"a frozen fruit block", price:200, r:1.2, color:"#C83A5A", toyFor:{herbivore:3, omnivore:4}, lasts:3, look:"ice"},
+  icefruit:{label:"Frozen Fruit",   one:"a frozen fruit block", price:200, r:1.2, color:"#C83A5A", toyFor:{herbivore:3, omnivore:4, frugivore:4}, lasts:3, look:"ice"},
+  iceshell:{label:"Frozen Shellfish", one:"a frozen shellfish block", price:300, r:1.2, color:"#6FA3B8", toyFor:{molluscovore:4, piscivore:2, carnivore:2, omnivore:2}, lasts:3, look:"ice"},
   shank:  {label:"Frozen Shank",    one:"a frozen whole shank", price:400, r:1.4, color:"#8A3A2A", toyFor:{carnivore:4, omnivore:2}, lasts:3, look:"ice"},
   buglog: {label:"Insect Log",      one:"an insect log",      price:1200, r:2.2, color:"#6E5034", toyFor:{insectivore:4, omnivore:3}, look:"buglog"},
   hay:    {label:"Hay Bale",        one:"a hay bale",         price:300,  r:1.8, color:"#D9B95A", toyFor:{carnivore:3, piscivore:2, herbivore:1, omnivore:1}, lasts:4, hay:40, look:"hay"},
@@ -2769,8 +2779,8 @@ const waterWant = s => s.pool ? POOL.need : s.semi ? HAB.waterSemi : (biomesOf(s
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 // How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
-const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery"].includes(type) || t.kind === "food" || t.rooms ? 2
-  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station"].includes(type) ? 0 : 1;
+const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
+  : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
     blurb:"A conservation campus: forest green metal roofs, pale lab membranes, poured concrete and matte gold trim. Practical, never ornate.",
@@ -2780,7 +2790,7 @@ const THEMES = {
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc"].includes(type) ? 1
-        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary"].includes(type) ? 2 : 0,
+        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary", "orchard", "shellfarm"].includes(type) ? 2 : 0,
       btex:["genesis-seam", "genesis-lab", "genesis-slate"],
       trim:[[{c:"#C9A24B", w:.9, at:.94}],
         [{c:"#1F3D2B", w:5, at:.985}, {c:"#C9A24B", w:.9, at:.92}],
@@ -2947,7 +2957,7 @@ const THEMES = {
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
     // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
-        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery"].includes(type) ? 1 : 2,
+        : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
       btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
       trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
         [{c:"#33281E", w:3.2, at:1}, {c:"#CFC9B4", w:1.6, at:.94}, {c:"#33281E", w:.6, at:.9}],

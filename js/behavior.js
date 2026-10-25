@@ -56,7 +56,7 @@ function napRoll(a, k, daily){
   return (x >>> 0) / 4294967296;
 }
 // Meat, fish and bug eaters hunt their food; plant eaters forage
-const isHunter = s => ["meat", "fish", "insects"].includes(foodType(s));
+const isHunter = s => ["meat", "fish", "insects", "shellfish"].includes(foodType(s));
 
 /* ---------- enrichment ---------- */
 // Toy points (Rubbing Posts, Log Piles, balls, treats and the like; bark hides, branches and so on in a vivarium) an exhibit's animals want: more for bigger herds and bigger animals
@@ -67,7 +67,7 @@ function enrichNeed(e){
   return n;
 }
 // Open-exhibit toy props are dev-only: players don't see them (Paleoflora bales stay, they are feed), but toys already placed keep working. Vivarium props are for everyone.
-const HIDDEN_TOYS = ["post", "logs", "wallow", "ball", "icefish", "icefruit", "shank", "buglog", "hay"];
+const HIDDEN_TOYS = ["post", "logs", "wallow", "ball", "icefish", "icefruit", "iceshell", "shank", "buglog", "hay"];
 const toyHidden = k => !devMode() && HIDDEN_TOYS.includes(k);
 // What one toy is worth to a species (its best diet counts), or its most to anyone with no species
 const toyFor = (t, s) => !t ? 0 : !t.toyFor ? t.toy || 0 : s ? Math.max(0, ...s.diet.map(d => t.toyFor[d] || 0)) : Math.max(...Object.values(t.toyFor));
