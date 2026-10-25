@@ -3236,7 +3236,7 @@ function bulldozeItem(kind, it){
 
 // Exhibits hold animals, so bulldozing one asks first
 function confirmExhibitRemoval(e){
-  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. This will put all animals in the exhibit in crates and remove it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
+  askConfirm(`Delete ${e.name}?`, `You are about to delete ${e.name}. Pool animals go into crates and the rest get out. This removes it from your park${e.grid ? ", fence included" : ""}. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e); setStat("");
   }, "No");
@@ -3244,10 +3244,20 @@ function confirmExhibitRemoval(e){
 
 // Without its gate a fenced pen stops being an exhibit: the animals and contents go, the fence stays
 function confirmGateRemoval(e){
-  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. This will put all animals in it in crates and sell everything inside, but the fence stays. Are you sure?`, "Yes", () => {
+  askConfirm(`Remove the gate on ${e.name}?`, `Without its gate ${e.name} is no longer an exhibit. Pool animals go into crates and the rest get out. Everything inside is sold, but the fence stays. Are you sure?`, "Yes", () => {
     if(!findItem("exhibit", e.id)) return;
     removeItem("exhibit", e, {keepFence:true}); setStat("");
   }, "No");
+}
+
+// An exhibit going takes its fence: pool animals are crated at once, everything else gets out
+function releaseAnimals(e){
+  let out = 0;
+  for(const a of e.animals.slice()){
+    if(SPECIES_BY_ID[a.sp]?.pool) crateAnimal(e, a);
+    else { turnLoose(e, a); out++; }
+  }
+  if(out) events.toast(`${out} animal${out === 1 ? "" : "s"} got out of ${e.name}.`, "bad");
 }
 
 function removeItem(kind, it, opts = {}){
@@ -3255,7 +3265,7 @@ function removeItem(kind, it, opts = {}){
   if(kind === "exhibit" && it.grid && !opts.keepFence) releaseSides(it);   // its side of a wall it shares goes; the neighbor's stays
   const refund = refundFor(kind, it) - (opts.keepFence && it.grid ? Math.round(ownPieceCost(it) * COST.refundShare) : 0);
   earn(refund, "sold");
-  if(kind === "exhibit") for(const a of it.animals.slice()) crateAnimal(it, a);   // its animals go into crates
+  if(kind === "exhibit") releaseAnimals(it);
   if(kind === "land"){ const o = state.exhibits.find(x => landOf(x).includes(it)), l = o ? o.land : state.decor; l.splice(l.indexOf(it), 1); }
   else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }

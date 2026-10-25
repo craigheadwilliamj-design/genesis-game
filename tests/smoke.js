@@ -3933,8 +3933,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const sold = sellCrate(a0.id) === Math.round(M.price * COST.animalResale) && !crates().length;
         pe.barrier = "bars"; const n0 = pe.animals.length, stranded = crateStranded() === n0 && !pe.animals.length && crates().length === n0; pe.barrier = "lagoon";
         state.science.ready.length = 0; land.animals = [{id:"cl1", sp:SPECIES.find(x => !x.viv && !x.pool).id, q:90}]; const m1 = state.money;
-        removeItem("exhibit", land);
-        const bulldozed = crates().length === 1 && crates()[0].id === "cl1" && !state.exhibits.includes(land) && state.money >= m1;
+        const loose0 = state.safety.loose.length; removeItem("exhibit", land);
+        const gotOut = !crates().length && state.safety.loose.length === loose0 + 1 && state.safety.loose.at(-1).id === "cl1" && !state.exhibits.includes(land) && state.money >= m1;
+        state.safety.loose.pop();
+        const wet = {id:"e-cwet", name:"Wet", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[{id:"cl2", sp:M.id, q:90}], land:[], water:[]};
+        state.exhibits.push(wet); removeItem("exhibit", wet);
+        const bulldozed = gotOut && crates().length === 1 && crates()[0].id === "cl2" && state.safety.loose.length === loose0;
         openParkOffice("crates"); ui.panel(); ui.hud(true);
         const shown = /Crates/.test(officeTabs()) && /sprites\/crate\.png/.test(cratesHtml()) && /data-action="crateTool"/.test(cratesHtml()) && !document.querySelector("#crateBtn").hidden && document.querySelector("#crateN").textContent === "1";
         const ghost = crateGhostSvg({x:10, y:10, e:pe, why:null}).includes("sprites/crate.png") && !!SPRITE_PACK["sprites/crate.png"];

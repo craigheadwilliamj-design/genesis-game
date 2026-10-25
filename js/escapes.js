@@ -83,12 +83,20 @@ function nearestNode(x, y){
   return best;
 }
 
-function breakOut(e, a){
-  const s = SPECIES_BY_ID[a.sp], [cx, cy] = centroid(e.points);
+// An animal leaves its exhibit and is loose in the park
+function turnLoose(e, a){
+  const [cx, cy] = centroid(e.points);
   e.animals.splice(e.animals.indexOf(a), 1);
-  e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
+  state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
+  state.health.ward = state.health.ward.filter(p => p.a.id !== a.id);
   const n = kGraph.anchors[e.id] || nearestNode(cx, cy);   // the gate stop is on the staff network; the nearest stop might be on a path nobody can walk to
   state.safety.loose.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
+}
+
+function breakOut(e, a){
+  const s = SPECIES_BY_ID[a.sp];
+  turnLoose(e, a);
+  e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
   state.rating = Math.max(0, state.rating - .05);
   events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} ${vetsOnDuty() ? "Vets with dart guns are on the way." : "Keepers with dart guns are on the way."}`, "bad");
   events.changed();
