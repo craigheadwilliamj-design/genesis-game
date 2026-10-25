@@ -35,10 +35,12 @@ def restyle(im, far):
             if rgb not in ROLE: continue   # the eye
             ramp, role = ROLE[rgb]
             if far and ramp is FLAP: ramp = FARF
+            if role == 0 and ramp is SHELL and solid(x, y - 1) and any(not solid(x, y - k) for k in (2, 3, 4)): role = 1   # the drawn highlight under the back's edge; the edge itself is lit now
             if role == "edge":
                 if not solid(x, y - 1) or not solid(x - 1, y): role = 0 if not far else 1
                 elif not solid(x, y + 1): role = 3
                 elif not solid(x + 1, y): role = 2
+                elif any(not solid(x, y - k) for k in (2, 3)): role = 1   # the thick outline under the back's lit edge, so the back isn't a light cap
                 else: role = 3; grooves.append((x, y, ramp))   # a segment line inside: a deep groove
             o[x, y] = (*ramp[role], 255)
     # each plate's back edge (left of a groove) faces right, so it's shaded; its front edge (right of a groove) faces left, so it's lit
