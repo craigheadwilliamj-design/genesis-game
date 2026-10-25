@@ -87,6 +87,26 @@ function moraleFactors(s, t){
 }
 const moraleTarget = (s, t) => clamp(52 + moraleFactors(s, t).reduce((a, f) => a + f.w, 0), 0, 100);
 
+// Breaks for vets, mechanics, custodians and guards (keepers run their own in keepers.js).
+// `homes` is the worker's own building type's list, where they rest slowly when there's no break room.
+function staffMaybeRest(c, homes){
+  const f = staffById(c.id);
+  if(!f || c.cargo || energyOf(f.s) >= STAFF.restBelow) return false;
+  const rooms = state.buildings.filter(b => b.type === "breakroom" && kGraph.anchors[b.id]);
+  const r = nearestOf(c, rooms.length ? rooms : homes);
+  if(!r) return false;
+  if(r.n === c.at){ c.job = "resting"; c.route = []; return true; }
+  setRoute(c, r.w, r.n); c.job = "toRest"; return true;
+}
+// A minute-by-minute rest; returns the time left over (none: a break fills what's given)
+function staffRestStep(c, left){
+  const f = staffById(c.id); if(!f){ c.job = "idle"; return 0; }
+  const fast = state.buildings.some(b => b.type === "breakroom" && kGraph.anchors[b.id] === c.at);
+  f.s.stamina = Math.min(100, energyOf(f.s) + left * (fast ? STAFF.restPerMin : STAFF.restPerMin / 4));
+  if(f.s.stamina >= 95){ c.job = "idle"; c.wait = 0; }
+  return 0;
+}
+
 // Called every tick: non-keepers tire, everyone's day is logged and their morale drifts toward what the job gives them
 function staffTick(dtMin){
   for(const {s, t} of staffRoster()){
