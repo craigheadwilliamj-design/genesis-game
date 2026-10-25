@@ -118,6 +118,10 @@ main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .trayA::-webkit-scrollbar-thumb,.tray .ssub::-webkit-scrollbar-thumb{background:#6E8F7B;border-radius:5px}
 @supports not selector(::-webkit-scrollbar){.trayA,.tray .ssub{scrollbar-color:#6E8F7B #0F2418}}
 .trayA>.sgroup{display:contents}
+.xclose{width:24px;height:24px;padding:0;border:2px solid #0F2418;border-radius:50%;background:#2A4A37;color:var(--on-forest);font:700 16px/1 var(--font-head);cursor:pointer;flex:none}
+.xclose:hover{background:#B5483A}
+.xclose.a{position:absolute;top:-4px;right:6px;z-index:1}
+.xclose.b{position:sticky;left:0;align-self:flex-start;z-index:1}
 .tray .sitem{flex-shrink:0}
 .tray .ssub{display:none;flex-direction:row;position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 248px);margin:0;border-left:2px solid #0F2418}
 .tray .sitem.open>.ssub{display:flex}

@@ -256,6 +256,9 @@ function buildMenu(){
     const prev = p.previousElementSibling, b = prev && prev.matches("button") ? prev : p.parentNode.matches(".ssub") ? p.parentNode.previousElementSibling : p.nextElementSibling && p.nextElementSibling.querySelector(".srow.head");
     if(b && !b.title) b.title = p.textContent;
   });
+  // Every tray (menu A) and every list above it (menu B) gets a close button
+  document.querySelectorAll("#sideBody .tray").forEach(t => t.insertAdjacentHTML("afterbegin", `<button class="xclose a" data-close="a" title="Close" aria-label="Close menu">×</button>`));
+  document.querySelectorAll("#sideBody .ssub").forEach(s => s.insertAdjacentHTML("afterbegin", `<button class="xclose b" data-close="b" title="Close" aria-label="Close list">×</button>`));
   if(sideCat) sideOpen(sideCat);
 }
 
