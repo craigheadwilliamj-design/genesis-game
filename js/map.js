@@ -553,6 +553,10 @@ function fenceSpriteSvg(kind, a, b, cond, gate, powered){
       for(let at = 0; at < g0 + 2.5; at += S.w) s += put(at, Math.min(S.w, Math.round(g0 + 3 - at)));
       for(let at = g0 + gw - 3; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
     }
+    if(S.gateW){   // a catwalk: the deck is on the exhibit's side of the wall, the ladder on the outside
+      const ex = state.exhibits.find(x => x.id === gate.id), south = !!ex && inPoly(gate.p[0] - dy * 1.5, gate.p[1] + dx * 1.5, ex.points);
+      return s + put(Lp - 3, 3) + put(g0, gw, south ? "gate-s" : "gate", `data-gate="${esc(gate.id)}" data-pic="${kind}" data-fixed="1" `, S.gateH, GW, south ? S.gateDeep : 0);
+    }
     return s + put(Lp - 3, 3) + put(g0, gw, "gate" + (off ? "-off" : "") + (gate.f ? "-" + gate.f : ""), `data-gate="${esc(gate.id)}" data-pic="${kind}" ${off ? 'data-off="1" ' : ""}data-f="${gate.f}" `, S.gateH || S.h, GW, S.gateDrop || 0);
   }
   for(let at = 0; at < Lp - .5; at += S.w) s += put(at, Math.min(S.w, Math.round(Lp - at)));
@@ -617,7 +621,10 @@ function fenceEdgeSvg(kind, a, b, cond, hi, gate, powered){
     // shut: a latch on the split. Open (drawGates swaps them): a leaf swung out from each post.
     const swung = gate.f >= 2 && kind !== "lagoon", latch = rect(x0 + px, ym - h * .5, px, 3 * py, au.mid) + rect(x0 + px, ym - h * .5, px, py, au.hi) + rect(x0 + px, ym - h * .5 + 2 * py, px, py, au.lo);
     const leaves = [y0, y1].map(y => rect(x0 + 3 * px, y - h * .7, 4 * px, h * .5, C.mid) + rect(x0 + 3 * px, y - h * .7, 4 * px, py, C.hi) + rect(x0 + 6 * px, y - h * .7, px, h * .5, C.lo)).join("");
-    if(kind === "lagoon") s += rect(x0 - 17 * px, y0 - h, 37 * px, y1 - y0, "#3A92A0") + rect(x0 - 17 * px, y0 - h, 37 * px, py, "#6AB0BE") + rect(x0 - 17 * px, y1 - h - py, 37 * px, py, "#2A6A76");   // a catwalk over the water, never swinging
+    if(kind === "lagoon"){   // a catwalk seen end on: the deck juts out to the exhibit's side, the ladder hangs on the outside
+      const ex = state.exhibits.find(x => x.id === gate.id), east = !ex || inPoly(gate.p[0] + 1.5, gate.p[1], ex.points), iw = (S.gateW + 3) * px, ih = S.gateH * py;
+      s += `<image href="${spriteUrl(`sprites/fence/lagoon-gate-${east ? "e" : "w"}.png`)}" x="${n2(east ? x0 - 3 * px : x0 + 3 * px - S.gateW * px)}" y="${n2(y1 - ih)}" width="${n2(iw)}" height="${n2(ih)}" style="image-rendering:pixelated"/>`;
+    }
     else s += `<g data-gate="${esc(gate.id)}" data-edge="1" data-f="${gate.f}"><g data-gc ${swung ? 'display="none"' : ""}>${latch}</g><g data-go ${swung ? "" : 'display="none"'}>${leaves}</g></g>`;
   }
   if(hi) s += `<rect x="${n2(x0)}" y="${n2(ya - S.h * py)}" width="${n2(3 * px)}" height="${n2(yb - ya + S.h * py)}" fill="none" stroke="${hi}" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
@@ -685,6 +692,7 @@ function drawGates(now){
       const goal = who.some(p => Math.hypot(p[0] - e.gate[0], p[1] - e.gate[1]) <= GATE_OPEN.reach) ? 1 : 0, v = gateOpen[id] || 0;
       gateOpen[id] = goal > v ? Math.min(1, v + GATE_OPEN.speed * dt) : Math.max(0, v - GATE_OPEN.speed * dt);
     }
+    if(el.dataset.fixed) continue;
     const f = gateFrameOf(id);
     if(el.dataset.f === String(f)) continue;
     el.dataset.f = f;
