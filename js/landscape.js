@@ -651,6 +651,22 @@ function snapWaterToGrid(s){
     if(host) host.water = fresh; else s.water = fresh;
   }
 }
+// Fill a lagoon right out to its fence line with one body of sea water (kind: a SEA_WATER key). Returns false if it can't be afforded.
+function fillLagoon(e, kind){
+  const cost = Math.round(area(e.points) * waterRate(kind));
+  if(!canAfford(cost)){ ui.toast(`Filling ${e.name} costs ${money(cost)}. You have ${money(state.money)}.`, "bad"); return false; }
+  const old = waterOf(e).reduce((n, w) => n + area(w.points) * waterRate(w.kind), 0);
+  spend(cost, "built"); if(old) earn(waterCutRefund(old), "sold");
+  e.water = [{id:uid("w-"), points:e.points.map(p => p.slice()), kind}];
+  afterChange(); render();
+  ui.toast(`Filled ${e.name} with ${SEA_WATER[kind].label.toLowerCase()} for ${money(cost)}.`, "good");
+  return true;
+}
+// The gate is on: ask which sea water the lagoon gets, and keep asking until it has one it can pay for
+function askLagoonWater(e){
+  const pick = kind => { if(!findItem("exhibit", e.id)) return; if(!fillLagoon(e, kind)) askLagoonWater(e); };
+  askConfirm(`Fill ${e.name}?`, `Pick the water for the lagoon. ${SEA_WATER.sea.label} ${money(area(e.points) * waterRate("sea"))}, ${SEA_WATER.deep.label} ${money(area(e.points) * waterRate("deep"))}.`, SEA_WATER.sea.label, () => pick("sea"), SEA_WATER.deep.label, () => pick("deep"));
+}
 function layWater(e, pts, kind){
   const r = rectOfPts(pts), cost = waterNetCost(e, pts, kind);
   if(r) cutWater(e, r);

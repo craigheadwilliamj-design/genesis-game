@@ -1034,11 +1034,12 @@ panelEl.addEventListener("change", ev => {
 });
 
 // A yes/no question inside the page
-function askConfirm(title, text, yes, onYes, no = "Cancel"){
+function askConfirm(title, text, yes, onYes, no = "Cancel", onNo = null){
   const d = $("#dlgConfirm");
   $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
   $("#confirmYes").onclick = () => { d.close(); onYes(); };
-  $("#confirmNo").onclick = () => d.close();
+  $("#confirmNo").onclick = () => { d.close(); if(onNo) onNo(); };
+  d.oncancel = onNo ? ev => ev.preventDefault() : null;   // a two-way choice can't be escaped out of
   d.showModal();
 }
 
