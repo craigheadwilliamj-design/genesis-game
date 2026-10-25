@@ -3813,6 +3813,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const shack = hireKeeper("aqua") === null && isAqua(state.staff.keepers.pop()) && !!BUILDINGS.diveshack.store && BUILDINGS.diveshack.label === "Dive Shack";
         state.buildings = bs; state.money = m1;
         out.aquaristShack = noShack && shack;
+        // a lagoon holds pool animals only
+        const dry = SPECIES.find(x => !x.viv && !x.pool);
+        out.lagoonPoolOnly = lagoonWalled(lg) && !fitsHabitat(dry, lg) && crateProblem({sp:dry.id}, lg) === "Lagoons hold pool animals only." && fitsHabitat(dry, {points:[], animals:[], barrier:"bars"});
         state.staff.keepers = state.staff.keepers.filter(k => k !== kk && k !== ak);
       }
       const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();

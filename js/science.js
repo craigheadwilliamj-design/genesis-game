@@ -436,6 +436,7 @@ function crateProblem(r, e){
   if(e.viv && s.palu && !e.palu) return "Needs a paludarium.";
   if(e.viv) return `Needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.`;
   if(s.pool) return lagoonWalled(e) ? "No water for it." : "Needs a lagoon wall.";
+  if(lagoonWalled(e)) return "Lagoons hold pool animals only.";
   return "Can't live here.";
 }
 // Open a crate into an exhibit

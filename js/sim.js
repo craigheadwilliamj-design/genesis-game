@@ -558,7 +558,7 @@ function attackReason(x, y){
 function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
-function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (!s.pool || (lagoonWalled(e) && poolM2(e, s) > 0)); }   // pool animals: only inside a lagoon wall, with their water in
+function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (lagoonWalled(e) ? !!s.pool && poolM2(e, s) > 0 : !s.pool); }   // pool animals only inside a lagoon wall, with their water in, and a lagoon holds nothing else
 
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
@@ -612,6 +612,7 @@ function exhibitReport(e){
     else if(e.viv && vivRank(e.viv) < vivRank(s.viv)){ target -= 25; issues.push({bad:true, text:`${s.name} needs a ${need.label.toLowerCase()} or bigger.`}); }
     else if(!e.viv && s.viv){ target -= s.aqua ? 60 : 20; issues.push({bad:true, text:`${s.name} needs ${s.aqua ? "an aquarium" : "a vivarium"}.`}); }
     else if(!e.viv && s.pool && !lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} needs a lagoon wall.`}); }
+    else if(!e.viv && !s.pool && lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} can't live in a lagoon.`}); }
   }
   // Clones made from poor DNA are sickly. Animals from partner parks count as healthy.
   if(e.animals.length){
