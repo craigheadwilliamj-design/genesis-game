@@ -3,8 +3,8 @@
 # (a breach smashed through the parapet, the rail snapped and hanging, a rubble heap).
 # Pixels are 0.13 m (ROCK_MPP), so a 3 m section is 23 px wide and the 2.3 m wall (FENCE34.lagoon.h) is 18 px tall, side-on, a pilaster and stanchion on the left edge so sections tile end to end.
 # Flat fills, no outline, light from the top left: a lit coping top and pilaster edge, shade under the coping, tiles in a steady rhythm of grout lines, panel seams as plain lines.
-# The keeper gate (lagoon-gate.png, same size) never wears or breaks: a pillar each end with a gold cap, and teal steel double doors with a porthole each and a gold latch plate (the gate marker's #D8B04A).
-# Frames -1, -2, -3 swing it open for a keeper going through: each leaf shortens toward its hinge pillar, and the latch goes.
+# The keeper platform (lagoon-gate.png, same size) never wears or breaks: a pillar each end with a gold cap, the wall open (see-through) between them and a teal steel deck jutting out over the water with a rail and a gold marker plate (#D8B04A).
+# It doesn't swing: frames -1, -2, -3 are the same picture.
 # Usage: python3 -I tools/pixelfence_lagoon.py [outdir] [sheet.png]   (default sprites/fence; the optional sheet is a x14 view of every picture, wall on the top row and gate under it)
 import sys, os
 from PIL import Image
@@ -101,25 +101,17 @@ def gpost(s, x0):
     s.put(x0 + 1, TOP + 3, T["mid"]); s.put(x0 + 1, TOP + 4, T["lo"])
 
 def gate(sc=1.0):
+    # a keeper platform: the wall is open between two gold-capped pillars and a teal steel deck juts out over the water (the bottom rows), with a low rail along its front edge
     s = Sec(); gpost(s, 0); gpost(s, 20)
-    fl = lambda x: 3 + round((x - 3) * sc)
-    fr = lambda x: 19 - round((19 - x) * sc)
-    for xa, xb in ((3, fl(10)), (fr(11), 19)):
-        for y in range(3, H - 1):
-            for x in range(xa, xb + 1): s.put(x, y, T["mid"])
-        for x in range(xa, xb + 1): s.put(x, 3, T["hi"]); s.put(x, H - 2, T["deep"])
-        if xb - xa >= 4:                                                                                  # a porthole in each leaf: a steel ring round dark glass, a glint top left
-            cx = (xa + xb) // 2
-            for x, y in ((cx - 1, 6), (cx, 6), (cx + 1, 6), (cx - 1, 9), (cx, 9), (cx + 1, 9), (cx - 2, 7), (cx - 2, 8), (cx + 2, 7), (cx + 2, 8)): s.put(x, y, S["mid"])
-            for x, y in ((cx - 1, 7), (cx, 7), (cx + 1, 7), (cx - 1, 8), (cx, 8), (cx + 1, 8)): s.put(x, y, mix(T["deep"], (20, 30, 40), .4))
-            s.put(cx - 1, 7, T["hi"])
-        for x in range(xa + 1, xb): s.put(x, 12, T["lo"]); s.put(x, 13, T["hi"]) if x % 2 else None     # a rib
-    for y in range(3, H - 1):
-        s.put(3, y, T["hi"]); s.put(fl(10), y, T["deep"]); s.put(fr(11), y, T["lo"]); s.put(19, y, T["deep"])
-    for x, y in ((3, 5), (3, 14), (19, 5), (19, 14)): s.put(x, y, C["deep"])                               # hinge pins
-    if sc == 1.0:
-        for x in (10, 11): s.put(x, 10, G["hi"]); s.put(x, 11, G["mid"])
-        s.put(11, 11, G["deep"])
+    for x in range(3, 20): s.put(x, H - 5, T["hi"]); s.put(x, H - 4, T["mid"]); s.put(x, H - 3, T["lo"])     # the deck's lit edge, planks, shaded underside
+    for x in range(4, 19, 3): s.put(x, H - 4, T["lo"])                                                         # plank seams
+    for x in range(3, 20): s.put(x, H - 2, T["deep"])
+    for x in (3, 19):
+        for y in range(TOP + 1, H - 5): s.put(x, y, S["hi"] if x == 3 else S["lo"])                            # rail posts at the deck's ends
+    for x in range(3, 20): s.put(x, TOP + 3, S["mid"]); s.put(x, TOP + 4, S["lo"])                             # the front rail
+    for x in (8, 14): 
+        for y in range(TOP + 3, H - 5): s.put(x, y, S["lo"])
+    for x in (10, 11): s.put(x, H - 4, G["hi"]); s.put(x, H - 3, G["mid"])                                     # the gold marker plate
     return s
 
 if __name__ == "__main__":
@@ -127,7 +119,7 @@ if __name__ == "__main__":
     sheet_path = sys.argv[2] if len(sys.argv) > 2 else None
     os.makedirs(out, exist_ok=True)
     states = {"pristine": pristine(), "degrading": degrading(), "broken": broken()}
-    gates = {"": gate(1.0), "-1": gate(.66), "-2": gate(.33), "-3": gate(.1)}
+    gates = {"": gate(1.0), "-1": gate(1.0), "-2": gate(1.0), "-3": gate(1.0)}
     z, gap = 14, 4
     sheet = Image.new("RGBA", ((max(len(states), len(gates)) * (W + gap) + gap) * z, (2 * (H + gap) + gap // 2) * z), (176, 190, 150, 255))
     for row, (pre, group) in enumerate((("lagoon-", states), ("lagoon-gate", gates))):
