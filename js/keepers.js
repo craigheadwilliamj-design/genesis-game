@@ -248,12 +248,22 @@ const tireRate = () => KEEPER.tirePerMeter * (hasUpgrade("boots") ? .6 : 1);
 function stations(){ return state.buildings.filter(b => b.type === "station" && kGraph && kGraph.anchors[b.id]); }
 function restSpots(){ const r = state.buildings.filter(b => b.type === "breakroom" && kGraph && kGraph.anchors[b.id]); return r.length ? r : stations(); }
 
+// Lagoons and aquariums are tended by aquarists, every other exhibit by keepers. An aquarist is a keeper record (and walker) with role "aqua".
+const aquaEx = e => !!e && (!!e.aqua || lagoonWalled(e));
+const isAqua = k => !!k && k.role === "aqua";
+const aquaCrew = c => c.role === "aqua";
+const tends = (k, e) => isAqua(k) === aquaEx(e);
+const exhibitById = id => state.exhibits.find(e => e.id === id);
 // Make the walking crew match the hired keepers
 function syncCrew(){
   const ids = new Set(state.staff.keepers.map(k => k.id));
   crew = crew.filter(c => ids.has(c.id));
   // carry lives on the saved keeper too, so food in hand survives a reload
-  for(const k of state.staff.keepers) if(!crew.some(c => c.id === k.id)) crew.push({id:k.id, at:null, route:[], t:0, job:"idle", carry:k.carry || null, wait:0, plan:null});
+  for(const k of state.staff.keepers){
+    let c = crew.find(c => c.id === k.id);
+    if(!c){ c = {id:k.id, at:null, route:[], t:0, job:"idle", carry:k.carry || null, wait:0, plan:null}; crew.push(c); }
+    c.role = k.role;
+  }
 }
 function setCarry(c, v){ c.carry = v; const k = state.staff.keepers.find(x => x.id === c.id); if(k) k.carry = v; }
 // Hand back anything a keeper is holding: Paleoflora returns to the Botany Lab, other goods go back into a store
@@ -274,6 +284,7 @@ function shortages(k, self){
   const out = [];
   for(const e of state.exhibits){
     if(!e.animals.length || !kGraph.anchors[e.id]) continue;
+    if(k && !tends(k, e)) continue;   // aquarists feed lagoons and aquariums, keepers everything else
     if(k && k.zone && e.zone !== k.zone) continue;   // keepers in a zone only feed that zone
     const need = dailyNeed(e); e.stock = e.stock || {};
     for(const need_t of Object.keys(need)){
@@ -332,7 +343,8 @@ function chase(c, l){
 // goes to check the exhibit. If nobody can go yet, the next free one takes it. Escapes still come first.
 // state.staff.calls: {ex: exhibit id, keeper: worker id or null (any kind), kind: "keeper" (default), "vet" or "mech"}
 const CALLS = {
-  keeper:{word:"keeper",   staff:() => state.staff.keepers,   crew:() => crew,  anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
+  keeper:{word:"keeper",   staff:() => state.staff.keepers.filter(k => !isAqua(k)), crew:() => crew.filter(c => !aquaCrew(c)),  anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
+  aqua:  {word:"aquarist", staff:() => state.staff.keepers.filter(isAqua),           crew:() => crew.filter(aquaCrew),            anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
   vet:   {word:"vet",      staff:() => state.staff.vets,      crew:() => vcrew, anchor:e => kGraph.anchors[e.id], busy:c => vetBusy(c),   take:(c, call) => takeVetCall(c, call)},
   mech:  {word:"mechanic", staff:() => state.staff.mechanics, crew:() => mcrew, anchor:e => anchorFor(e),         busy:c => mechBusy(c), take:(c, call) => takeMechCall(c, call)},
 };
@@ -425,7 +437,7 @@ function moveJob(c){
   const ts = state.staff.transfers;
   const mine = ts.find(t => t.keeper === c.id);
   if(mine) return mine;
-  const open = t => !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to];
+  const open = t => !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to] && (aquaEx(exhibitById(t.to)) || aquaEx(exhibitById(t.from))) === aquaCrew(c);
   const free = ts.find(t => t.med && open(t)) || ts.find(open);
   if(free){ free.keeper = c.id; return free; }
   return null;
@@ -471,6 +483,7 @@ function assignDelivery(t){
   const crews = [[crew, c => callBusy(c)], [vcrew, c => vetBusy(c)], [ccrew, c => c.carry && c.carry.amount > 0]];
   for(const [list, busy] of crews) for(const c of list){
     if(!c.at || c.job !== "idle" || c.route.length || c.move || busy(c) || state.staff.calls.some(x => x.keeper === c.id)) continue;
+    if(list === crew && aquaCrew(c) !== aquaEx(exhibitById(t.to))) continue;   // keepers and aquarists each carry only to their own kind of exhibit
     const w = walkFrom(c.at, c); if(!w.dist.has(lab)) continue;
     if(!best || w.dist.get(lab) < best.d) best = {c, d:w.dist.get(lab)};
   }
@@ -513,7 +526,7 @@ function dirtTick(dtMin){
 // The dirtiest exhibit keepers can reach that nobody is already cleaning
 function cleanJob(c, k, min = CLEAN.dirtyAt){
   const taken = new Set(crew.filter(x => x !== c && x.cleanId).map(x => x.cleanId));
-  return state.exhibits.filter(e => (e.dirt || 0) >= min && kGraph.anchors[e.id] && !taken.has(e.id) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
+  return state.exhibits.filter(e => (e.dirt || 0) >= min && kGraph.anchors[e.id] && !taken.has(e.id) && (!k || tends(k, e)) && !(k && k.zone && e.zone !== k.zone)).sort((a, b) => b.dirt - a.dirt)[0] || null;
 }
 
 // Leftover food goes into the exhibit's trays: the keeper walks in from the gate, visits the nearest trays with room, and walks back out
@@ -563,7 +576,7 @@ function decide(c, k){
   if(l && chase(c, l)) return;
   // can't chase it from here (no dart gun to fetch, no route): let another keeper try
   if(l && l.status === "loose" && l.keeper === c.id) l.keeper = null;
-  const call = callJob(c, "keeper");
+  const call = callJob(c, isAqua(k) ? "aqua" : "keeper");
   if(call && goTo(c, kGraph.anchors[call.ex], "toCall")) return;
   if(call){ call.keeper = null; c.job = "idle"; c.wait = 10; }
   const mv = moveJob(c);
@@ -826,13 +839,14 @@ function keepersNight(){
   for(const k of state.staff.keepers) k.stamina = 100; for(const c of crew){ if(c.carry && c.carry.type === "paleoflora") returnCarry(c); resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.plan = null; c.gun = false; c.hunt = null; c.cleanId = null; c.haul = null; c.fill = null; c.focusEx = null; } state.staff.calls = []; }
 
 const FIRST_NAMES = ["Ana","Ben","Cleo","Dev","Eli","Faye","Gus","Hana","Ivo","Jun","Kai","Lena","Milo","Nia","Omar","Pia","Quinn","Rosa","Sam","Tess","Uma","Vic","Wren","Yara","Zed"];
-function hireKeeper(){
+function hireKeeper(role){
+  const T = role === "aqua" ? AQUARIST : KEEPER;
   if(!state.buildings.some(b => b.type === "station")) return "Build a Keeper Station first.";
-  if(!canAfford(KEEPER.hireCost)) return `Hiring costs ${money(KEEPER.hireCost)}.`;
-  spend(KEEPER.hireCost, "built");
+  if(!canAfford(T.hireCost)) return `Hiring costs ${money(T.hireCost)}.`;
+  spend(T.hireCost, "built");
   const used = new Set(state.staff.keepers.map(k => k.name));
-  const name = FIRST_NAMES.find(n => !used.has(n)) || "Keeper " + (state.staff.keepers.length + 1);
-  state.staff.keepers.push({id:uid("k-"), name, stamina:100});
+  const name = FIRST_NAMES.find(n => !used.has(n)) || (role === "aqua" ? "Aquarist " : "Keeper ") + (state.staff.keepers.length + 1);
+  state.staff.keepers.push(role === "aqua" ? {id:uid("k-"), name, stamina:100, role} : {id:uid("k-"), name, stamina:100});
   return null;
 }
 function keeperStatus(k){

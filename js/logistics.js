@@ -83,7 +83,7 @@ function zoneProblem(pts){
 const STAFF_LISTS = {keeper:"keepers", mechanic:"mechanics", vet:"vets", custodian:"custodians", guard:"guards"};
 function zoneMembers(z){
   const mine = list => state.staff[list].filter(k => k.zone === z.id);
-  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:mine("keepers"), mechanics:mine("mechanics"), vets:mine("vets"), custodians:mine("custodians"), guards:mine("guards")};
+  return {exhibits:state.exhibits.filter(e => e.zone === z.id), stores:state.buildings.filter(b => b.zone === z.id), keepers:mine("keepers").filter(k => !isAqua(k)), aquarists:mine("keepers").filter(isAqua), mechanics:mine("mechanics"), vets:mine("vets"), custodians:mine("custodians"), guards:mine("guards")};
 }
 // Zones go: everything in them goes back to working anywhere
 function dropZone(id){
@@ -311,15 +311,17 @@ function logiWarnings(){
   if(!freeFeeding() || state.day + 2 >= state.staff.feedFrom){
     if(state.exhibits.some(e => e.animals.length) && !state.buildings.some(b => b.type === "dock") && !state.buildings.some(b => BUILDINGS[b.type].makes)) w.push("Nothing here buys or makes food. Build a Delivery Dock.");
   }
-  const ks = state.staff.keepers;
+  const ks = state.staff.keepers.filter(k => !isAqua(k)), aqs = state.staff.keepers.filter(isAqua);
   for(const z of zones()){
     const m = zoneMembers(z);
-    if(m.exhibits.some(e => e.animals.length) && !ks.some(k => k.zone === z.id) && ks.every(k => k.zone)) w.push(`${z.name} has animals but no keeper is assigned to it.`);
+    if(m.exhibits.some(e => e.animals.length && !aquaEx(e)) && !ks.some(k => k.zone === z.id) && ks.every(k => k.zone)) w.push(`${z.name} has animals but no keeper is assigned to it.`);
+    if(m.exhibits.some(e => e.animals.length && aquaEx(e)) && !aqs.some(k => k.zone === z.id) && aqs.every(k => k.zone)) w.push(`${z.name} has lagoon or aquarium animals but no aquarist is assigned to it.`);
   }
   // with every mechanic or vet in a zone, anything outside the zones gets nobody
   const ms = state.staff.mechanics, vs = state.staff.vets;
   if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (b.type === "generator" || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
   if(vs.length && vs.every(v => v.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every vet is in a zone, so exhibits outside the zones get no check-ups.");
-  if(ks.length && ks.every(k => k.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every keeper is in a zone, so exhibits outside the zones aren't being fed.");
+  if(ks.length && ks.every(k => k.zone) && state.exhibits.some(e => e.animals.length && !aquaEx(e) && !e.zone)) w.push("Every keeper is in a zone, so exhibits outside the zones aren't being fed.");
+  if(aqs.length && aqs.every(k => k.zone) && state.exhibits.some(e => e.animals.length && aquaEx(e) && !e.zone)) w.push("Every aquarist is in a zone, so lagoons and aquariums outside the zones aren't being fed.");
   return w;
 }

@@ -855,7 +855,7 @@ function dailyCosts(){
   for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
-  wages += state.staff.keepers.length * KEEPER.wage + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;
+  wages += state.staff.keepers.reduce((n, k) => n + (isAqua(k) ? AQUARIST.wage : KEEPER.wage), 0) + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;
   // science staff are paid as research costs
   let research = 0;
   for(const [k, n] of Object.entries(state.science.crew)) research += n * SCIENTISTS[k].wage;

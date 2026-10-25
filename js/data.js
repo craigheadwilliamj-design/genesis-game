@@ -946,6 +946,8 @@ const KEEPER = {
   topUpBelow:.6,       // keepers only set out to feed an exhibit once its food drops under this share of a full store
   restPerMin:2,        // stamina regained per minute in a break room (a quarter of that resting at a station)
 };
+// Aquarists do keepers' work (same Keeper Station, same gear) but only for lagoons and aquariums; keepers leave those alone
+const AQUARIST = {hireCost:KEEPER.hireCost, wage:KEEPER.wage};
 // Staff overview: energy and morale for every hired worker (keepers tire by walking, so theirs lives in KEEPER)
 const STAFF = {
   workDrain:.1,        // energy a mechanic, vet, custodian or guard loses per minute on a task
@@ -3103,7 +3105,7 @@ const GOALS = [
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:5000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
   {id:"food",     text:"Build a Food Cart",                  hint:"Pick Food, then Cart, and tap next to a path. Tap the cart and choose what it sells. Hungry guests rate the park lower.", reward:3500,  check:g=>g.state.buildings.some(b=>b.type==="kiosk" && (b.menu||[]).length)},
   {id:"restroom", text:"Build Restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:5000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
-  {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.length>0},
+  {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.some(k=>k.role!=="aqua")},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, custodians stock a station from it, and keepers carry the food out to the exhibits. Partner parks cover the first deliveries.", reward:5500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a Custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3500, check:g=>(g.state.staff.custodians || []).length>0},
   {id:"guard",    text:"Hire a Security Guard",              hint:"Unhappy, rowdy guests break benches and spray graffiti. Research Security offices at the Research Lab, build one beside a path, and hire a guard to patrol. Lamp posts help too.", reward:4000, check:g=>(g.state.staff.guards || []).length>0},
