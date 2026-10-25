@@ -298,7 +298,7 @@ function exOverviewHtml(e, rep){
   }
   if(n){
     const hr = healthReport(e), worst = hr.sick.length ? Math.max(...hr.sick.map(a => a.sick.sev)) : 0, dirt = e.dirt || 0;
-    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% clean`}`)));
+    rows.push(exJump("health", "Health", worst >= 40 || dirt >= 60 ? "bad" : hr.sick.length || dirt >= CLEAN.dirtyAt ? "warn" : "", esc(`${hr.sick.length ? `${hr.sick.length} sick or injured` : "Healthy"}${e.aqua ? "" : `, ${Math.round(100 - dirt)}% ${lagoonWalled(e) ? "water quality" : "clean"}`}`)));
     const X = exLog(e);
     rows.push(exJump("guests", "Guests", isReachable(e) ? "" : "bad", esc(isReachable(e) ? `${Math.round(X.views)} visitor${Math.round(X.views) === 1 ? "" : "s"} today, ${money(Math.round(X.gifts))} donated` : "No path")));
   }
@@ -599,8 +599,8 @@ function behaviorHtml(e){
 function dirtHtml(e){
   if(!e.animals.length) return "";
   const dirt = e.dirt || 0;
-  let h = `<section><h3>Sanitation</h3>`;
-    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>Sanitation</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
+  let h = `<section><h3>${lagoonWalled(e) ? "Water Quality" : "Sanitation"}</h3>`;
+    h += `<div class="factor" style="grid-template-columns:70px 1fr 74px;margin-top:8px"><span>${lagoonWalled(e) ? "Water Quality" : "Sanitation"}</span>${meter(100 - dirt, dirt < CLEAN.dirtyAt ? "var(--good)" : dirt < 60 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(100 - dirt)}%</span></div>`;
   return h + `</section>`;
 }
 // One bulleted health check: level is "ok" (green), "warn" (yellow) or "bad" (red)

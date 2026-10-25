@@ -632,7 +632,7 @@ function exhibitReport(e){
   // Dirt: a filthy exhibit makes animals miserable fast
   if(e.animals.length && (e.dirt || 0) > CLEAN.penaltyFrom){
     target -= (e.dirt - CLEAN.penaltyFrom) * CLEAN.penaltyPer;
-    issues.push({bad:true, text:`Dirty (${Math.round(e.dirt)}%).`});
+    issues.push({bad:true, text:lagoonWalled(e) ? `Poor water quality (${Math.round(100 - e.dirt)}%).` : `Dirty (${Math.round(e.dirt)}%).`});
   }
   // Barriers: say which animals could get out
   if(!e.viv && state.safety){
