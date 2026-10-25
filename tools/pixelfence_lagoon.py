@@ -95,7 +95,7 @@ def broken():
     return s
 
 # ---- the keeper gate: pillars at x 0..2 and 20..22, teal steel double doors between with a split at x 10/11
-GW, GH = 38, 45                 # the keeper catwalk: 5 m across (38 px), a 5 m deep deck seen from above (rows 0..26, half of it behind the wall line) and its 2.3 m face below (rows 27..44)
+GW, GH = 38, 45                 # the keeper catwalk: 5 m across (38 px), a 5 m deep deck seen from above (rows 0..26) and its face below (rows 27..44); it stands on the wall line with the deck behind it
 DECK = 27
 
 def gate(sc=1.0):
