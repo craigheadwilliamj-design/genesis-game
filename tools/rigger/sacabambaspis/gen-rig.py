@@ -14,8 +14,9 @@ W, H = src.size
 # cut columns, rear to front: fin | tail 2 | tail 1 | body, each joint on the body's midline at the cut
 CUTS = [17, 33, 50]
 LAP = 3   # how far a rear piece reaches under the piece in front
+FIN = ((126, 112, 46), (106, 94, 38), (88, 78, 32))   # the fin's olive and its shades (tools/pixelsaca_shade.py)
 def mid(x):   # the middle of the body (not the fin lobes) in column x
-    ys = [y for y in range(H) if src.getpixel((x, y))[3] >= 128 and src.getpixel((x, y))[:3] != (106, 94, 38)]
+    ys = [y for y in range(H) if src.getpixel((x, y))[3] >= 128 and src.getpixel((x, y))[:3] not in FIN]
     return round((min(ys) + max(ys)) / 2) if ys else 41
 def piece(x0, x1):
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
