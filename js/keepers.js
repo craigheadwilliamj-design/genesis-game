@@ -313,7 +313,7 @@ function goTo(c, n, job){ const w = walkFrom(c.at, c); if(!w.dist.has(n)){ c.job
 // With vets on duty, vets do the darting and keepers only carry darted animals home.
 const needsKeeper = l => !l.keeper && (vetsOnDuty() && !l.noVet ? l.status === "sedated" : l.status === "loose");   // noVet: no vet could get to it
 function huntJob(c){
-  if(!state.safety) return null;
+  if(!state.safety || aquaCrew(c)) return null;   // aquarists never chase escapes
   const mine = state.safety.loose.find(l => l.keeper === c.id);
   if(mine) return mine;
   const free = state.safety.loose.find(needsKeeper);
@@ -759,7 +759,7 @@ function keepersTick(dtMin){
         e.dirt = Math.max(0, (e.dirt || 0) - cleanRate(e) * w); k.stamina -= CLEAN.tirePerMin * w; left -= w;
         // light tidying gives way to real work: food that a store can supply
         const busy = c.cleanLow && shortages(k).some(j => j.ratio < KEEPER.topUpBelow && sourcesFor(j.t, k).length);   // same bar as decide(), or a tidy-up is dropped the moment it starts
-        if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || state.safety.loose.some(needsKeeper)){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
+        if(e.dirt <= 2 || busy || k.stamina < KEEPER.restBelow || (!aquaCrew(c) && state.safety.loose.some(needsKeeper))){ c.job = "idle"; c.cleanId = null; c.wait = 0; }
         continue;
       }
       if(c.job === "filling"){ left = fillStep(c, k, left); continue; }
