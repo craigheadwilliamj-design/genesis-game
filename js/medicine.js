@@ -345,6 +345,14 @@ function vetDecide(c){
   // a vet the player called looks at that exhibit's sick animals first
   const call = callJob(c, "vet");
   if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
+  // a finished specimen from the Genetics Lab goes to its exhibit before patients and check-ups
+  const dv = deliveryJob(c, walkFrom(c.at, c));
+  if(dv){
+    if(dv.cargo && !c.cargo){ c.cargo = dv.cargo; c.crate = true; }
+    c.move = dv;
+    if(vetGo(c, kGraph.anchors[c.cargo ? dv.to : dv.from], c.cargo ? "toDropoff" : "toPickup")) return;
+    dv.keeper = null; c.move = null;
+  }
   const fx = c.focusEx; c.focusEx = null;
   const p = pickPatient(c, fx) || pickPatient(c);
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
@@ -356,6 +364,8 @@ function vetDecide(c){
 }
 
 function vetArrive(c){
+  if(c.job === "toPickup"){ labPickup(c, (n, job) => vetGo(c, n, job)); return; }
+  if(c.job === "toDropoff"){ labDrop(c); return; }
   if(c.job === "hunting"){
     const l = c.loose, lp = l && loosePos(l);
     if(!l || l.status !== "loose" || !state.safety.loose.includes(l)){ c.loose = null; c.job = "idle"; return; }
@@ -475,7 +485,8 @@ function vetStatus(v){
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
-          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC"}[c.job] || "Waiting for work";
+          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC",
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the Genetics Lab`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
 }
 
 /* ---------- each night ---------- */

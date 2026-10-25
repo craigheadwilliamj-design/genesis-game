@@ -114,7 +114,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "breakroom", "workshop", "generator", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -339,7 +339,7 @@ const callKind = x => x.kind || "keeper";
 const callFor = c => state.staff.calls.find(x => x.keeper === c.id) || null;
 const callBusy = c => c.cargo || c.hunt || c.job === "filling" || c.job === "sedating" || c.job === "hunting" || c.job === "toSedated" || c.job === "returning"
   || (state.safety && state.safety.loose.some(l => l.keeper === c.id));
-const vetBusy = c => c.loose || ["darting", "treating", "checking", "hunting"].includes(c.job);
+const vetBusy = c => c.loose || c.cargo || ["darting", "treating", "checking", "hunting"].includes(c.job);
 const mechBusy = c => c.job === "inspecting" || c.job === "repairing";
 function callProblem(e, kind = "keeper"){
   const K = CALLS[kind];
@@ -435,6 +435,7 @@ function doMove(c, t){
 }
 // Take the animal out of wherever it's waiting: an exhibit, or the PMC ward
 function pickUp(t){
+  if(t.lab) return specimens().find(x => x.id === t.animalId) || null;   // it stays listed at the lab until it's delivered
   const e = state.exhibits.find(x => x.id === t.from);
   if(!e) return discharge(t.animalId);
   const a = e.animals.find(x => x.id === t.animalId);
@@ -444,6 +445,12 @@ function pickUp(t){
 // Finish a move: the animal goes into its new home, or holding if that's gone
 function dropOff(t, a){
   state.staff.transfers = state.staff.transfers.filter(x => x !== t);
+  if(t.lab){
+    const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp], list = specimens();
+    if(e && !crateProblem(a, e)){ const i = list.findIndex(x => x.id === a.id); if(i >= 0) list.splice(i, 1); putAnimal(e, a); events.toast(`A ${s.name} was delivered to ${e.name}.`, "good"); }
+    else { if(!list.some(x => x.id === a.id)) list.push(a); events.toast(`The ${s.name}'s exhibit can't take it, so it went back to the Genetics Lab.`, "bad"); }
+    events.changed(); return;
+  }
   const pmc = pmcBuilding();
   if(pmc && t.to === pmc.id){ admit(a, t); return; }
   // a sick animal whose PMC is gone goes back where it came from
@@ -453,6 +460,39 @@ function dropOff(t, a){
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); events.toast(`Keepers moved a ${s.name} into ${e.name}.`, "good"); }
   else { const from = state.exhibits.find(x => x.id === t.from), [x, y] = from ? centroid(from.points) : labSpot(); dropCrate(a, x, y); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in a crate.`, "bad"); }
   events.changed();
+}
+
+/* ---------- lab deliveries: any keeper, custodian or vet carries a finished specimen ---------- */
+// Hand a new delivery to the nearest worker who is standing idle; if nobody is, the first one to look for work takes it (deliveryJob)
+function assignDelivery(t){
+  const lab = kGraph && kGraph.anchors[t.from]; if(!lab) return;
+  let best = null;
+  const crews = [[crew, c => callBusy(c)], [vcrew, c => vetBusy(c)], [ccrew, c => c.carry && c.carry.amount > 0]];
+  for(const [list, busy] of crews) for(const c of list){
+    if(!c.at || c.job !== "idle" || c.route.length || c.move || busy(c) || state.staff.calls.some(x => x.keeper === c.id)) continue;
+    const w = walkFrom(c.at, c); if(!w.dist.has(lab)) continue;
+    if(!best || w.dist.get(lab) < best.d) best = {c, d:w.dist.get(lab)};
+  }
+  if(best){ t.keeper = best.c.id; best.c.wait = 0; }
+}
+// The delivery this worker should do next: the one it holds, else an open one it can walk to the lab for
+function deliveryJob(c, w){
+  const ts = state.staff.transfers, mine = ts.find(t => t.lab && t.keeper === c.id);
+  if(mine) return mine;
+  const free = ts.find(t => t.lab && !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to] && w.dist.has(kGraph.anchors[t.from]));
+  if(free){ free.keeper = c.id; return free; }
+  return null;
+}
+// A vet or custodian reaches the lab: the crate goes in their hands and they head for the exhibit. `go(node, job)` is their own walk.
+function labPickup(c, go){
+  const t = c.move && state.staff.transfers.includes(c.move) ? c.move : null, a = t && pickUp(t);
+  if(!a){ if(t) state.staff.transfers = state.staff.transfers.filter(x => x !== t); c.move = null; c.job = "idle"; return; }
+  c.cargo = a; t.cargo = a; c.crate = true; events.changed();
+  if(!go(kGraph.anchors[t.to] || c.at, "toDropoff")) c.job = "toDropoff";
+}
+function labDrop(c){
+  const t = c.move; if(t && c.cargo) dropOff(t, c.cargo);
+  c.cargo = null; c.crate = false; c.move = null; c.job = "idle"; c.wait = 0;
 }
 
 /* ---------- mucking out ---------- */
@@ -526,7 +566,7 @@ function decide(c, k){
   if(call && goTo(c, kGraph.anchors[call.ex], "toCall")) return;
   if(call){ call.keeper = null; c.job = "idle"; c.wait = 10; }
   const mv = moveJob(c);
-  if(mv && mv.cargo && !c.cargo) c.cargo = mv.cargo;   // picked up before a reload
+  if(mv && mv.cargo && !c.cargo){ c.cargo = mv.cargo; c.crate = !!mv.lab; }   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
   if(mv && !c.cargo){ mv.keeper = null; }
   // goods in hand for a store: finish the delivery (before any break, so food doesn't ride along to the break room)
@@ -570,9 +610,9 @@ function decide(c, k){
 function arrive(c, k){
   if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toPickup"){
-    const t = c.move, a = t && pickUp(t);
+    const t = c.move && state.staff.transfers.includes(c.move) ? c.move : null, a = t && pickUp(t);   // a call-off delivery is gone from the list
     if(!t || !a){ if(t) state.staff.transfers = state.staff.transfers.filter(x => x !== t); c.move = null; c.job = "idle"; return; }
-    c.cargo = a; t.cargo = a;   // kept on the transfer too, so a save mid-move doesn't lose the animal
+    c.cargo = a; t.cargo = a; c.crate = !!t.lab;   // kept on the transfer too, so a save mid-move doesn't lose the animal
     k.stamina -= KEEPER.tirePerDelivery; events.changed();
     if(!goTo(c, kGraph.anchors[t.to] || c.at, "toDropoff")) c.job = "toDropoff";
     return;
@@ -580,7 +620,7 @@ function arrive(c, k){
   if(c.job === "toDropoff"){
     const t = c.move;
     if(t && c.cargo) dropOff(t, c.cargo);
-    c.cargo = null; c.move = null; c.job = "idle"; c.wait = 0;
+    c.cargo = null; c.crate = false; c.move = null; c.job = "idle"; c.wait = 0;
     return;
   }
   if(c.job === "toCall"){
@@ -778,7 +818,7 @@ function packFeedStep(e, lack){
 function keepersNight(){
   // anything being carried is finished off before the keepers go home
   for(const t of [...state.staff.transfers]) if(t.cargo) dropOff(t, t.cargo);
-  for(const c of crew){ c.cargo = null; c.move = null; }
+  for(const c of [...crew, ...vcrew, ...ccrew]){ c.cargo = null; c.crate = false; c.move = null; }
   for(const t of state.staff.transfers) t.keeper = null;
   for(const a of atvs()){ a.at = null; a.by = null; }   // every ATV goes back to its depot overnight
   // food in hand stays with the keeper for tomorrow (a long trip isn't undone overnight); Paleoflora goes back to the Botany Lab
@@ -808,8 +848,8 @@ function keeperStatus(k){
           toCall:`Called to ${((state.exhibits.find(x => x.id === (callFor(c) || {}).ex)) || {name:"an exhibit"}).name}`, toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
           sedating:"Sedating an escaped animal", returning:"Bringing a sedated animal back", toSedated:`Collecting a darted ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
-          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
-          toDropoff:`${c.move && c.move.med && pmcBuilding() && c.move.to === pmcBuilding().id ? "Carrying a sick" : "Moving a"} ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "animal"}`}[c.job] || (carry ? `Waiting${carry}` : "Waiting for work");
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.lab ? "from the Genetics Lab" : c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
+          toDropoff:`${c.move && c.move.med && pmcBuilding() && c.move.to === pmcBuilding().id ? "Carrying a sick" : c.move && c.move.lab ? "Delivering a" : "Moving a"} ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "animal"}`}[c.job] || (carry ? `Waiting${carry}` : "Waiting for work");
 }
 
 /* ---------- staff vehicles ---------- */

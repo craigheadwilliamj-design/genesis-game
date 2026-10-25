@@ -74,6 +74,14 @@ function custDecide(c, r){
     if(d && custGo(c, w, kGraph.anchors[d.id], "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCustCarry(c);
   }
+  // a finished specimen from the Genetics Lab goes to its exhibit before the chores
+  const dv = deliveryJob(c, w);
+  if(dv){
+    if(dv.cargo && !c.cargo){ c.cargo = dv.cargo; c.crate = true; }
+    c.move = dv;
+    if(custGo(c, w, kGraph.anchors[c.cargo ? dv.to : dv.from], c.cargo ? "toDropoff" : "toPickup")) return;
+    dv.keeper = null; c.move = null;
+  }
   const haul = pickHaul(r, near, CUSTODIAN_GOODS, custCarry());
   const restock = () => { c.haul = {t:haul.t, src:haul.src.id, dst:haul.d.id, amount:haul.amount}; if(!custGo(c, w, kGraph.anchors[haul.src.id], "toHaulSrc")) c.haul = null; };
   // a stand or shop about to run dry comes first, then cleaning, then routine restocking.
@@ -105,6 +113,8 @@ function custArrive(c){
     returnCustCarry(c); c.job = "idle"; c.wait = 0;
     return;
   }
+  if(c.job === "toPickup"){ labPickup(c, (n, job) => custGo(c, walkFrom(c.at, c), n, job)); return; }
+  if(c.job === "toDropoff"){ labDrop(c); return; }
   if(c.job === "toScrub"){ c.job = "scrubbing"; return; }
   if(c.job === "toGraffiti"){ c.job = "degraffiti"; return; }
   if(c.job === "toBin"){ c.job = "emptying"; c.work = CUSTODIAN.emptyMin; return; }
@@ -196,5 +206,6 @@ function custodianStatus(m){
     toHaulDst:`Restocking the ${dst ? BUILDINGS[dst.type].label.toLowerCase() : "stand"}${c.carry ? ` (${Math.round(c.carry.amount)} ${goodName(c.carry.type).toLowerCase()})` : ""}`,
     toScrub:`Walking to the ${n}`, scrubbing:`Scrubbing the ${n}`, toGraffiti:"Walking to some graffiti", degraffiti:"Scrubbing off graffiti", toBin:"Walking to a full bin", emptying:"Emptying a bin",
     toSweep:"Walking to some litter", sweeping:"Sweeping up litter", home:"Heading back to the closet",
+    toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the Genetics Lab`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`,
   }[c.job] || "Waiting for work";
 }

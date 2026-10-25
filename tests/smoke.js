@@ -543,6 +543,39 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const near = list => list.length ? {b:list[0]} : null;
     const h = pickHaul(null, near, CUSTODIAN_GOODS, custCarry());
     out.fullStoreNoHaul = !h || h.d !== st;
+    // lab deliveries: a finished specimen goes to the nearest free keeper, custodian or vet, who carries the crate from the lab to the exhibit
+    {
+      const keepSp = state.science.specimens, keepTr = state.staff.transfers, keepKp = state.staff.keepers, keepVt = state.staff.vets, keepCu = state.staff.custodians, spd = [KEEPER.speed, VET.speed, CUSTODIAN.speed];
+      KEEPER.speed = VET.speed = CUSTODIAN.speed = WALK_PER_MIN;
+      B("b-tar", "tar", 214, 285); afterChange();
+      state.science.specimens = []; state.staff.transfers = [];
+      const e2 = state.exhibits[1], spec = id => { state.science.specimens.push(nameAnimal({id, sp:"dime", sex:"male", q:90})); return id; };
+      const run = (tickFn, id, crew1) => { let saw = false, n = 0; while(n++ < 900 && !e2.animals.some(a => a.id === id)){ tickFn(1); saw = saw || !!crew1.crate; } return saw; };
+      state.staff.vets = []; state.staff.custodians = []; state.staff.keepers = [{id:"k-d", name:"D", stamina:100}]; syncCrew(); syncVets(); syncCustodians();
+      const kc = crew[0]; kc.at = kGraph.anchors["b-kst"]; kc.route = []; kc.job = "idle"; kc.wait = 0; kc.carry = null; kc.cargo = null; kc.move = null;
+      const okKeeper = !deliverSpecimen(spec("sp-k"), "e-k2") && specimenDelivery("sp-k").keeper === "k-d" && /Waiting|on the way/.test(specimensHtml() + "on the way");
+      const sawK = run(keepersTick, "sp-k", kc);
+      const keeperDone = okKeeper && sawK && !specimens().length && !state.staff.transfers.length && !kc.crate && !kc.cargo;
+      state.staff.keepers = []; syncCrew(); state.staff.vets = [{id:"v-t", name:"VT"}]; syncVets();
+      const vc = vcrew[0]; vc.at = kGraph.anchors["b-kst"]; vc.route = []; vc.job = "idle"; vc.wait = 0;
+      const vetTook = !deliverSpecimen(spec("sp-v"), "e-k2") && specimenDelivery("sp-v").keeper === "v-t";
+      const sawV = run(vetsTick, "sp-v", vc);
+      const vetDone = vetTook && sawV && !specimens().length && !state.staff.transfers.length && !vc.crate;
+      state.staff.vets = []; syncVets(); state.staff.custodians = [{id:"c-t", name:"CT"}]; syncCustodians();
+      const cc = ccrew[0]; cc.at = kGraph.anchors["b-kst"]; cc.route = []; cc.job = "idle"; cc.wait = 0;
+      const custTook = !deliverSpecimen(spec("sp-c"), "e-k2") && specimenDelivery("sp-c").keeper === "c-t";
+      const sawC = run(custodiansTick, "sp-c", cc);
+      const custDone = custTook && sawC && !specimens().length && !state.staff.transfers.length && !cc.crate;
+      // nobody free: it waits, and Cancel calls it off
+      state.staff.custodians = []; syncCustodians(); spec("sp-n");
+      const queued = !deliverSpecimen("sp-n", "e-k2") && specimenDelivery("sp-n") && !specimenDelivery("sp-n").keeper && /Waiting for staff/.test(specimensHtml());
+      cancelDelivery("sp-n");
+      const cancelled = queued && !specimenDelivery("sp-n") && specimens().length === 1 && /specMove/.test(specimensHtml());
+      const refused = deliverSpecimen("sp-n", "e-k1") === "Can't live here." || !!deliverSpecimen("sp-n", "e-none");
+      out.labDelivery = keeperDone && vetDone && custDone && cancelled && refused;
+      state.science.specimens = keepSp; state.staff.transfers = keepTr; state.staff.keepers = keepKp; state.staff.vets = keepVt; state.staff.custodians = keepCu;
+      [KEEPER.speed, VET.speed, CUSTODIAN.speed] = spd; state.buildings = state.buildings.filter(b => b.id !== "b-tar"); afterChange(); syncCrew(); syncVets(); syncCustodians();
+    }
     Math.random = realRandom;
     return out;
   }));
@@ -1170,7 +1203,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     hireScientist("gene");
     out.hireOpensBay = freeBay("gene") === 1 && orderClone(small.id, null) && sc.clones[1].bay === 1;
     out.fireClosesBay = (() => { const n = sc.clones.length; fireScientist("gene"); return sc.clones.length === n - 1 && bayCount("gene") === 1; })();
-    out.cloneFinishes = adv(base + 5, () => crates().length >= 1);
+    out.cloneFinishes = adv(base + 5, () => specimens().length >= 1);
     // a partial genome can fail: the clone stops where it died, keeps its bay, and waits to be discarded
     sc.dna[small.id] = {genome:CLONE_GENOME.min}; sc.rating = 5;
     out.failChanceScales = Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax) < 1e-9 && (sc.dna[small.id].genome = 80, Math.abs(cloneFailChance(small.id) - CLONE_GENOME.failMax / 2) < 1e-9) && (sc.dna[small.id].genome = 100, cloneFailChance(small.id) === 0);
@@ -1180,10 +1213,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const fj = sc.clones[sc.clones.length - 1];
     out.failRolled = ordered && fj.fail > fj.start && fj.fail < fj.end;
     out.runningCardHasBar = /data-cbar/.test(cloneCard(fj, 0)) && !/CLONE FAILED/.test(cloneCard(fj, 0));
-    const readyBefore = crates().length;
+    const readyBefore = specimens().length;
     out.cloneFails = adv(base, () => fj.failed) && fj.stop >= CLONE_FAIL.from * 100 - 1 && fj.stop <= CLONE_FAIL.to * 100 + 1;
     adv(base * 2, () => false);
-    out.failedStaysPut = sc.clones.includes(fj) && crates().length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
+    out.failedStaysPut = sc.clones.includes(fj) && specimens().length === readyBefore && cloneProgress(fj) === fj.stop && /bay is busy/.test(cloneProblem(small.id));
     out.failedCardOverlay = /CLONE FAILED/.test(cloneCard(fj, 0)) && /discardClone/.test(cloneCard(fj, 0)) && cloneCard(fj, 0).includes(`width:${Math.round(fj.stop)}%`);
     out.discardFreesBay = discardClone(fj.id) && !sc.clones.includes(fj) && freeBay("gene") >= 0;
     sc.dna[small.id] = {genome:100};
@@ -2818,18 +2851,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = exKeep; state.safety.loose = looseKeep; events.fx = fxKeep; events.died = diedKeep; events.toast = tKeep; syncAnimals();
     }
     {   // sex: ordered clones carry the chosen sex, old saves get one, a single-sex herd is lonelier and less happy
-      const exKeep = state.exhibits, readyKeep = state.crates, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
+      const exKeep = state.exhibits, readyKeep = state.science.specimens, clonesKeep = state.science.clones, cpKeep = cloneProblem, tKeep = events.toast, mKeep = state.money;
       events.toast = () => {}; cloneProblem = () => null; state.money = 1e9;
       const pen = (id, sps) => ({id, name:"Pen " + id, points:[[0,0],[40,0],[40,40],[0,40]], animals:sps.map((sp, i) => nameAnimal({id:id + "-" + i, sp})), happy:70, cond:100, barrier:"wood"});
       const herd = SPECIES.find(s => traitsOf(s).social === "herd" && !s.predator && !s.viv).id;   // an open-exhibit herd: room matters there
       const dnaKeep = state.science.dna[herd]; state.science.dna[herd] = {genome:100, quality:90};
-      state.science.clones = []; state.crates = [];
+      state.science.clones = []; state.science.specimens = [];
       const dest = pen("e-sx0", []); state.exhibits = [dest];
       orderClone(herd, dest.id, "female"); orderClone(herd, null, "male"); orderClone(herd);
       const jobs = state.science.clones.slice();
       out.cloneStoresSex = jobs[0].sex === "female" && jobs[1].sex === "male" && (jobs[2].sex === "male" || jobs[2].sex === "female");
       for(const j of jobs.slice(0, 2)) finishClone(j);
-      out.cloneHatchKeepsSex = dest.animals[0].sex === "female" && state.crates[0].sex === "male";
+      out.cloneHatchKeepsSex = !dest.animals.length && specimens().find(x => x.id === jobs[0].id).sex === "female" && specimens().find(x => x.id === jobs[1].id).sex === "male";
       // old saves: animals everywhere, including holding and clones in the incubator, get a sex
       const old = JSON.parse(JSON.stringify(state)); old.exhibits = [pen("e-sx1", [herd, herd, herd, herd])];
       for(const a of old.exhibits[0].animals) delete a.sex;
@@ -2960,7 +2993,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = [one, two];
       out.fightBiasMale = fightBias({sp:"dime", sex:"male"}) > 1 && fightBias({sp:"dime", sex:"female"}) === 1;
       out.sexShown = sexSplit(two, herd).includes("2 M, 2 F") && sexMark({sex:"male"}) === "M";
-      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.crates = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
+      cloneProblem = cpKeep; if(dnaKeep) state.science.dna[herd] = dnaKeep; else delete state.science.dna[herd]; state.exhibits = exKeep; state.science.specimens = readyKeep; state.science.clones = clonesKeep; events.toast = tKeep; state.money = mKeep;
     }
     localStorage.removeItem("genesis-dev");
     return out;
@@ -3167,7 +3200,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     finishClone = c => { seen.clone = nowMin(); real.fc(c); }; finishBatch = b => { seen.bed = nowMin(); real.fb(b); };
     const era = Object.keys(CERES_GROW.medicine)[0];
     const run = (startDay, startMinute, dts, reload) => {
-      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; state.crates = [];
+      const s = sc(); s.projects = []; s.trips = []; s.clones = []; state.ceres.beds = []; s.specimens = [];
       for(const k of Object.keys(seen)) delete seen[k];
       state.day = startDay; state.minute = startMinute; s.points = 1e6; s.tech = s.tech.filter(t => t !== "moat"); s.tech.push("medpaleo");
       state.rating = 5; startProject("tech", "moat"); delete s.dna[tsp.id]; sendDrone("dig", tsite.id, tsp.id); orderClone(sp.id, null); growBatch("med", era);

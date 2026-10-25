@@ -42,9 +42,9 @@ function hireStaff(t){
 function fireStaff(id){
   const f = staffById(id); if(!f) return;
   const T = STAFF_TYPES[f.t], c = staffCrew(f.s, f.t);
+  for(const tr of [...state.staff.transfers]) if(tr.keeper === id){ if(tr.cargo) dropOff(tr, tr.cargo); else tr.keeper = null; }   // a delivery in hand is finished off, one only claimed goes back up
   if(f.t === "keeper"){
-    // whatever the keeper was carrying or chasing goes back
-    for(const tr of [...state.staff.transfers]) if(tr.keeper === id){ if(tr.cargo) dropOff(tr, tr.cargo); else tr.keeper = null; }
+    // whatever the keeper was chasing goes back
     for(const l of state.safety.loose) if(l.keeper === id) l.keeper = null;
     if(c) returnCarry(c);
   }

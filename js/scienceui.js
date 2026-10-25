@@ -252,9 +252,23 @@ panelEl.addEventListener("click", ev => {
 
 /* ---------- Genetics Lab ---------- */
 
+let tarTab = "clone";   // the Genetics Lab panel: "clone" (bays and genome library) or "specimens" (finished clones waiting for delivery)
+// Finished clones at the lab: each with where it's headed and who has it, and Move (pick an exhibit) or Cancel (before it's picked up)
+function specimensHtml(){
+  const list = specimens();
+  if(!list.length) return `<section><h3>Finished specimens</h3><div class="meta">None waiting.</div></section>`;
+  return `<section><h3>Finished specimens <span class="num">${list.length}</span></h3><ul class="herd">${list.map(r => {
+    const s = SPECIES_BY_ID[r.sp], t = specimenDelivery(r.id), e = t && state.exhibits.find(x => x.id === t.to), who = t && t.keeper ? ((staffById(t.keeper) || {}).s || {}).name || "Staff" : null;
+    const status = !t ? "Waiting for delivery." : t.cargo ? `${who || "Staff"} is carrying it to ${e ? e.name : "an exhibit"}.` : who ? `${who} is on the way to the lab.` : `To ${e ? e.name : "an exhibit"}. Waiting for staff.`;
+    const btn = !t ? `<button class="btn sell" data-action="specMove" data-id="${esc(r.id)}">Move</button>` : t.cargo ? "" : `<button class="btn sell" data-action="specCancel" data-id="${esc(r.id)}">Cancel</button>`;
+    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(r.name || s.name)}</b>${r.sex ? ` <b title="${esc(r.sex)}">${esc(sexMark(r))}</b>` : ""} <span class="meta">${esc(s.name)} · ${r.q ?? 90}% DNA</span><br><span class="meta">${esc(status)}</span></span>${btn}</li>`;
+  }).join("")}</ul></section>`;
+}
 function tarHtml(b){
   const sc = state.science;
   let h = deptHead(b);
+  h += tabBar("tartab", [{key:"clone", label:"Cloning", color:"#4B3A8C"}, {key:"specimens", label:`Specimens${specimens().length ? ` (${specimens().length})` : ""}`, color:"#4B3A8C"}], tarTab);
+  if(tarTab === "specimens") return h + specimensHtml();
   h += sciStaffHtml("gene");
   const speed = Math.round(cloneSpeed() * 100);
   h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");

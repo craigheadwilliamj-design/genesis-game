@@ -2888,16 +2888,18 @@ function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed
 function carryBox(col){
   return `<g class="hcb"><rect x="11" y="18" width="5" height="5" fill="${col}"/><rect x="11" y="18" width="5" height="1" fill="#fff" opacity=".35"/><rect x="11" y="18" width="1" height="5" fill="#fff" opacity=".2"/><rect x="11" y="22" width="5" height="1" fill="#000" opacity=".3"/><rect x="15" y="18" width="1" height="5" fill="#000" opacity=".25"/></g>`;
 }
-function humanSvg(kind, hm, food){
+// A finished specimen's crate in the hands instead: crate.png squeezed into the same box
+const carryCrate = () => `<image class="hcb" href="${spriteUrl("sprites/crate.png")}" x="10.5" y="17.5" width="5.5" height="6.5" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
+function humanSvg(kind, hm, food, crate){
   const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k, V = H[kind];
   const im = (cls, a) => `<image class="${cls}" href="${spriteUrl(a.src)}" width="${H.w * a.n}" height="${H.ht}" style="image-rendering:pixelated"/>`;
-  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}${V.carry ? im("hc", V.carry) : ""}${V.carry && food ? carryBox(food) : ""}</svg></g>`;
+  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}${V.carry ? im("hc", V.carry) : ""}${V.carry && crate ? carryCrate() : V.carry && food ? carryBox(food) : ""}</svg></g>`;
 }
 function humanStep(el, kind, c, x, y){
   const H = HUMAN_SPRITES, V = H[kind], dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy), now = performance.now();
   el._hx = x; el._hy = y;
   if(d > 1e-4){ el._hd = (el._hd || 0) + d; el._hmove = now; if(Math.abs(dx) > 1e-4) el._hface = dx < 0 ? -1 : 1; }
-  const moving = now - (el._hmove || 0) < 250, mode = moving ? (V.carry && c.carry ? "hc" : "hw") : V.work && V.work.jobs.includes(c.job) ? "hk" : V.wait ? "hs" : "hw";
+  const moving = now - (el._hmove || 0) < 250, mode = moving ? (V.carry && (c.carry || c.crate) ? "hc" : "hw") : V.work && V.work.jobs.includes(c.job) ? "hk" : V.wait ? "hs" : "hw";
   const A = {hw:V.walk, hk:V.work, hs:V.wait, hc:V.carry}[mode], g = el.querySelector(".hf"); if(!g) return;
   const f = moving ? Math.floor((el._hd || 0) / H.step) % A.n : mode === "hw" ? 0 : Math.floor(now / A.ms) % A.n;
   if(el._hf !== el._hface){ el._hf = el._hface; g.setAttribute("transform", el._hface < 0 ? "scale(-1 1)" : ""); }
@@ -2914,13 +2916,13 @@ function drawKeepers(){
     const nx = c.route[0];
     const fp = fillPos(c);   // filling trays: inside the fence
     const x = fp ? fp[0] : nx ? c.at.x + (nx.x - c.at.x) * c.t : c.at.x, y = fp ? fp[1] : nx ? c.at.y + (nx.y - c.at.y) * c.t : c.at.y;
-    const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
-    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${drive}|${hm.toFixed(3)}`;
+    const r = Math.max(1.3, 5*inv), food = c.carry ? FOOD_COLOR[c.carry.type] : null, cargo = c.cargo && !c.crate ? PERIOD_COLOR[SPECIES_BY_ID[c.cargo.sp].period] : null;
+    const drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `${r.toFixed(3)}|${food}|${cargo}|${!!c.crate}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
       el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
       // an animal being moved rides along beside its keeper; on a service road with an ATV, they ride it
       el.innerHTML = atvSvg(r, drive) + (cargo ? `<circle cx="${-r*1.6}" cy="${-r*.6}" r="${r*1.1}" fill="${cargo}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : "") +
-        humanSvg("keeper", hm, food);
+        humanSvg("keeper", hm, food, c.crate);
     }
     humanStep(el, "keeper", c, x, y);
     walker34(el, x, y);
@@ -2946,10 +2948,10 @@ function drawKeepers(){
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "darting", drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `v${r.toFixed(3)}|${working}|${drive}|${hm.toFixed(3)}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), working = c.job === "darting", drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `v${r.toFixed(3)}|${working}|${!!c.crate}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
       el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
-      el.innerHTML = atvSvg(r, drive) + humanSvg("vet", hm, null) +
+      el.innerHTML = atvSvg(r, drive) + humanSvg("vet", hm, null, c.crate) +
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "vet", c, x, y);
@@ -2961,10 +2963,10 @@ function drawKeepers(){
     seen.add(c.id);
     let el = keeperEls.get(c.id);
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(c.id, el); }
-    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `c${r.toFixed(3)}|${good}|${busy}|${drive}|${hm.toFixed(3)}`;
+    const [x, y] = keeperPos(c), r = Math.max(1.3, 5*inv), good = c.carry ? GOOD_COLOR[c.carry.type] : null, busy = ["scrubbing", "emptying", "sweeping"].includes(c.job), drive = onAtv(c), hm = Math.max(HUMAN_SPRITES.h, 24*inv), key = `c${r.toFixed(3)}|${good}|${!!c.crate}|${busy}|${drive}|${hm.toFixed(3)}`;
     if(el.dataset.key !== key){
       el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
-      el.innerHTML = atvSvg(r, drive) + humanSvg("custodian", hm, good) +
+      el.innerHTML = atvSvg(r, drive) + humanSvg("custodian", hm, good, c.crate) +
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "custodian", c, x, y);
@@ -3796,6 +3798,7 @@ document.addEventListener("keydown", e => {
 // Call after anything in the park changes shape: rework the numbers, the walkers' routes, goals, and save
 function afterChange(){
   settleCrates();
+  deliveryTidy();
   crateStranded();   // pool animals left without a lagoon wall or water go into crates
   refreshMenu();
   recompute();

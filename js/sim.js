@@ -104,7 +104,7 @@ const starsNeed = s => isStarter(s) || state.sandbox ? 0 : s.stars;
 // Random but roughly balanced: usually the sex its species has fewer of across the park
 function pickSex(sp, st){
   const s = st || state, n = {male:0, female:0};
-  for(const a of [...s.exhibits.flatMap(e => e.animals), ...(s.crates || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
+  for(const a of [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.science && s.science.specimens) || [])]) if(a.sp === sp && n[a.sex] !== undefined) n[a.sex]++;
   if(n.male !== n.female && Math.random() < SEX.balance) return n.male < n.female ? "male" : "female";
   return Math.random() < .5 ? "male" : "female";
 }
@@ -140,6 +140,7 @@ function freshScience(){
     trips:[],          // drones out: {kind: "scout" or "dig", site, sp (a dig's genome), bay (the drone), cost, start, end}
     reports:[],        // post-mission reports waiting at the Time Travel Lab, newest first: {id, site, kind, drone, day, lines: [[text, headline?]]}
     clones:[],         // The Genetics Lab's incubator bays: {id, sp, exhibitId, q, bay, start, end}. Projects, trips and Botany Lab beds carry a `bay` too, see science.js.
+    specimens:[],      // finished clones waiting at the Genetics Lab to be delivered: an animal's record (id, name, sex, rank, sp, q), see science.js
     log:[]             // recent expedition results, newest first
   };
 }
@@ -506,11 +507,11 @@ function upgradeSave(s){
   for(const e of s.exhibits) for(const a of e.animals){ if(!a.need) a.need = freshNeeds(); delete a.inside; delete a.gene; }   // who is indoors isn't saved: the shelters fill up again as the day goes
   // every animal gets a name (COTY-001); the counter per species is kept so numbers are never reused
   if(!s.animalSeq) s.animalSeq = {};
-  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.science && s.science.specimens) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))];
     for(const a of all) if(a.name) { const m = /^(.*)-(\d+)$/.exec(a.name); if(m && m[1] === a.sp.toUpperCase()) s.animalSeq[a.sp] = Math.max(s.animalSeq[a.sp] || 0, +m[2]); }
     for(const a of all) if(!a.name) nameAnimal(a, s); }
   // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
-  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
+  { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.science && s.science.specimens) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
     for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
     for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
   snapFootprints(s);   // plants and rocks take whole-cell squares (landscape.js)

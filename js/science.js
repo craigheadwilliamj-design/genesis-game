@@ -344,6 +344,30 @@ function hireScientist(kind){
   spend(k.hireCost, "science"); state.science.crew[kind]++;
   return null;
 }
+/* ---------- finished specimens: clones waiting at the Genetics Lab, delivered by staff (state.science.specimens) ---------- */
+// A finished clone waits here until it's sent to an exhibit. A delivery is a transfer from the lab (`lab:true`, keepers.js): the nearest free keeper, custodian or vet
+// walks to the lab, carries the crate to the exhibit and the animal goes in. The specimen stays listed until it's in.
+const specimens = () => state.science.specimens;
+const specimenDelivery = id => state.staff.transfers.find(t => t.lab && t.animalId === id) || null;
+// Queue a delivery to an exhibit; returns why not, or null
+function deliverSpecimen(id, exhibitId){
+  const r = specimens().find(x => x.id === id), e = state.exhibits.find(x => x.id === exhibitId), lab = dept("tar");
+  if(!r) return "That specimen is gone.";
+  if(!e) return "That exhibit is gone.";
+  if(specimenDelivery(id)) return "Already on its way.";
+  if(!lab || !kGraph || !kGraph.anchors[lab.id]) return "Genetics Lab not connected.";
+  const why = crateProblem(r, e) || keeperMoveProblem(e); if(why) return why;
+  const t = {id:uid("tr-"), animalId:id, sp:r.sp, from:lab.id, to:e.id, lab:true};
+  state.staff.transfers.push(t); assignDelivery(t);
+  return null;
+}
+// Call off a delivery that hasn't been picked up
+function cancelDelivery(id){ state.staff.transfers = state.staff.transfers.filter(t => !(t.lab && t.animalId === id && !t.cargo)); }
+// Deliveries to an exhibit that's gone, or from a lab that's gone, are dropped (one already on the road goes back to the lab list at dropOff)
+function deliveryTidy(){
+  state.staff.transfers = state.staff.transfers.filter(t => !t.lab || t.cargo || (state.exhibits.some(e => e.id === t.to) && state.buildings.some(b => b.id === t.from)));
+}
+
 /* ---------- crates: an animal boxed off the map is a crate standing in the park (state.crates), Zoo Tycoon style ---------- */
 // A crate is the animal's record plus where it stands (x, y). It isn't in any exhibit, so nothing feeds it, nothing ages it and guests don't see it, until it's moved into one.
 // Boxed by hand (the Crate button), by a bulldozed exhibit (pool animals) or a drained lagoon, or a clone, escapee or moved animal with nowhere to go.
@@ -450,8 +474,11 @@ function crateStranded(){
 function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
   const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
-  if(e){ putAnimal(e, c); events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It moved into ${e.name}.`, "good"); }
-  else { const [x, y] = labSpot(); dropCrate(nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q}), x, y); events.toast(`The Genetics Lab finished a ${s.name} clone. It waits in a crate.`, "good"); }
+  const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q});
+  specimens().push(r);
+  // a clone ordered for an exhibit is queued for delivery at once; any other waits at the lab
+  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It's being delivered to ${e.name}.`, "good");
+  else events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It waits for delivery.`, "good");
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */
