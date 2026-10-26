@@ -10,6 +10,7 @@ const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="lo
 
 // Which tab is open in each department's panel
 const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"Genetics Lab", title:"Genetics Lab upgrades", color:"#4B3A8C"}, {key:"ghost", label:"Time Travel Lab", title:"Time Travel Lab upgrades", color:"#4B3A8C"}];
+let ghostTab = "lab";   // the Time Travel Lab panel: "lab" (drones and timeline) or "reports" (post-mission reports)
 let oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic";
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
@@ -150,19 +151,19 @@ function targetRow(s, id){
 function ghostCardHtml(){
   const s = SITE_BY_ID[ghostSite];
   if(!s || !siteShown(s)) return `<div class="meta">Pick a site.</div>`;
-  const lit = siteLit(s), rep = state.science.reports.find(r => r.site === s.id), btn = (action, label, why) => `<button class="buy" data-action="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
+  const lit = siteLit(s), btn = (action, label, why) => `<button class="buy" data-action="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
   const note = why => why ? `<div class="meta" style="color:var(--bad);margin-top:4px">${esc(why)}</div>` : "";
   if(s.event){
     const ev = MUSEUM_BY_ID[s.event], why = lit ? expeditionProblem(s.id, s.event) : "Locked.";
     return `<b class="gt-name">${esc(ev.name)}</b><div class="meta">${esc(s.name)}, ${esc(s.where)}</div>` +
       `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${esc(ev.ago)}</dd><dt>Trip</dt><dd>${money(tripOdds(s.event, s.id).cost)} · ${tripWhen(s.id)}</dd></dl>` +
       (lit ? `<table class="gt-targets"><thead><tr><th>Record</th><th>Done</th><th>Survey Success</th></tr></thead><tbody>${targetRow(s, s.event)}</tbody></table>` : "") +
-      (rep ? reportHtml(rep) : "") + `<div class="row" style="margin-top:8px">${btn("gdig", "Send expedition", why)}</div>${note(why)}`;
+      `<div class="row" style="margin-top:8px">${btn("gdig", "Send expedition", why)}</div>${note(why)}`;
   }
   const trip = `${money(scoutCost(s.id))} · ${tripWhen(s.id)}`, swhy = scoutProblem(s.id);
   if(!lit) return `<b class="gt-name">Unscouted site</b><div class="meta">Somewhere in the ${esc(epochOf(s.from).name)}</div>` +
     `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${siteWindow(s)}</dd><dt>Animals</dt><dd>Scout Site First</dd><dt>Trip</dt><dd>${trip}</dd></dl>` +
-    (rep ? reportHtml(rep) : "") + `<div class="row" style="margin-top:8px">${btn("gscout", "Send scouting trip", swhy)}</div>${note(swhy)}`;
+    `<div class="row" style="margin-top:8px">${btn("gscout", "Send scouting trip", swhy)}</div>${note(swhy)}`;
   const targets = siteTargets(s), hidden = siteFauna(s).length - siteSeen(s).length;
   if(ghostPick && !targets.includes(ghostPick)) ghostPick = null;
   const dwhy = ghostPick ? expeditionProblem(s.id, ghostPick) : "Pick a target first.";
@@ -170,7 +171,6 @@ function ghostCardHtml(){
     `<dl class="kv" style="margin-top:6px"><dt>When</dt><dd>${siteWindow(s)}</dd><dt>Trip</dt><dd>${trip}</dd></dl>` +
     `<table class="gt-targets"><thead><tr><th>Target</th><th>Genome</th><th>Survey Success</th></tr></thead><tbody>${targets.map(id => targetRow(s, id)).join("")}` +
     `${Array.from({length:hidden}, () => `<tr class="locked"><td>Undiscovered species</td><td>?</td><td>?</td></tr>`).join("")}</tbody></table>` +
-    (rep ? reportHtml(rep) : "") +
     `<div class="row" style="margin-top:8px">${btn("gdig", ghostPick ? `Send expedition ${money(tripOdds(ghostPick, s.id).cost)}` : "Send expedition", dwhy)}${hidden ? btn("gscout", "Send scouting trip", swhy) : ""}</div>` +
     note(ghostPick ? dwhy : hidden ? swhy : null);
 }
@@ -195,12 +195,13 @@ function ghostHtml(b){
   if(ghostU === null) ghostU = ghostStart();
   let h = deptHead(b);
   if(deptProblem("ghost")) h += `<div class="meta" style="color:var(--bad)">${esc(deptProblem("ghost"))}</div>`;
+  h += tabBar("ghosttab", [{key:"lab", label:"Lab", color:"#4B3A8C"}, {key:"reports", label:`Reports${sc.reports.length ? ` (${sc.reports.length})` : ""}`, color:"#4B3A8C"}], ghostTab);
+  if(ghostTab === "reports") return h + (sc.reports.length ? `<section>${sc.reports.map(reportHtml).join("")}</section>` : `<div class="meta">No reports.</div>`);
   // the drones: where each one is, what it's after and when it's back
   const dwhy = droneProblem();
   h += `<section class="gt-drones"><h3>Drones <span class="meta">${sc.drones} of ${DRONES.max}</span></h3>${Array.from({length:sc.drones}, (_, i) => droneCard(i)).join("")}`;
   h += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">Hangar full</span>`}</div>`;
   h += `</section>`;
-  if(sc.reports.length) h += `<section><h3>Reports</h3>${sc.reports.map(reportHtml).join("")}</section>`;
   // the timeline: slide through deep time, tap a site
   const now = yearsAt(ghostU);
   h += `<section class="gt"><h3>Timeline</h3><div id="gtHead">${ghostHeadHtml(now)}</div><div id="gtMap">${ghostMapHtml(now)}</div>${ghostTrackHtml()}`;
