@@ -94,9 +94,16 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Zones stay as they are. No per-vet patient cap: beds are the only ward limit.
 - Hiring unchanged: $3,000, $200 a day, same pace and ATVs.
 
+## 7. The PMC (locked)
+- Building unchanged: unique, $6,000, $100 upkeep, 20 x 15 m, no power.
+- Beds per section 4 (2 to start, 6 at most). Each bought bed adds $20 a day upkeep.
+- It needs a path or service road for vets to get out and keepers to bring patients in or take them home. Ward timers keep running while a vet is on staff, connected or not.
+- No PMC: no vets can be hired; band 1 injuries healing on their own is the only recovery.
+- Bulldozed: recovered patients go straight home; patients mid-treatment go home with severity cut by their progress (a 60 at 50% goes home a 30) and worsen again from there; darted animals waiting for pickup wake and worsen again; bought beds are lost, no refund. The bulldoze confirm warns when the ward has patients (text to be drafted).
+
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
 ## To do
-7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
+8. UI (all text drafted for approval). 9. Old saves.
