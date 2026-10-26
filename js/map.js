@@ -2741,6 +2741,12 @@ function doorOnGrid(pts, face, type){
   const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][face], d = Math.round(e / GRID_STEP) * GRID_STEP - e, ax = face % 2;
   return pts.map(([x, y]) => [Math.round((x + (ax ? d : 0)) * 1e6) / 1e6, Math.round((y + (ax ? 0 : d)) * 1e6) / 1e6]);
 }
+// Slide a building so its box lies on the 5 m grid (the path chunks), so it never straddles a path. Props and cases keep the 1 m grid.
+const snapsToChunks = t => !t.prop && !t.viv && !t.gallery && t !== BUILDINGS.platform;
+function onChunkGrid(pts){
+  const b = bbox(pts), dx = Math.round(b.x0 / CHUNK) * CHUNK - b.x0, dy = Math.round(b.y0 / CHUNK) * CHUNK - b.y0;
+  return pts.map(([x, y]) => [Math.round((x + dx) * 1e6) / 1e6, Math.round((y + dy) * 1e6) / 1e6]);
+}
 function placeGhost(clientX, clientY){
   lastPtr = {x:clientX, y:clientY};
   const t = BUILDINGS[tool];
@@ -2767,7 +2773,8 @@ function placeGhost(clientX, clientY){
   }
   const face = t.prop ? undefined : (2 + rot / 2) % 4;   // a fresh building looks south; each quarter turn swings its door with it
   let pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
-  if(!t.prop && !t.viv) pts = doorOnGrid(pts, face, tool);
+  if(snapsToChunks(t)){ pts = onChunkGrid(pts); [x, y] = centroid(pts); }
+  else if(!t.prop && !t.viv) pts = doorOnGrid(pts, face, tool);
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
@@ -2796,7 +2803,7 @@ function rotateMoved(){
   const orig = it.points, [cx, cy] = centroid(orig), a = Math.PI/2, c = Math.cos(a), s = Math.sin(a);
   const prop = BUILDINGS[it.type].prop, face0 = it.face, face = prop ? face0 : ((face0 === undefined ? 2 : face0) + 1) % 4;   // the door turns with the walls
   it.points = orig.map(([x, y]) => [Math.round((cx + (x - cx)*c - (y - cy)*s) * 1e6) / 1e6, Math.round((cy + (x - cx)*s + (y - cy)*c) * 1e6) / 1e6]);
-  if(!prop){ it.points = doorOnGrid(it.points, face, it.type); it.face = face; }
+  if(!prop){ it.points = snapsToChunks(BUILDINGS[it.type]) ? onChunkGrid(it.points) : doorOnGrid(it.points, face, it.type); it.face = face; }
   const why = moveProblem("building", it);
   if(why){ it.points = orig; it.face = face0; setStat(`Can't turn it here. ${why}`, true); return; }
   if(prop) it.rot = ((it.rot || 0) + 2) % 8;
@@ -3398,7 +3405,8 @@ function dragMove(m, e){
     queueRender(); renderOverlay(); return;
   }
   const g = moveStep(m);
-  const dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
+  let dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
+  if(m.kind === "building" && snapsToChunks(BUILDINGS[m.it.type])){ const b = bbox(m.orig); dx = Math.round((b.x0 + w.x - m.wx) / CHUNK) * CHUNK - b.x0; dy = Math.round((b.y0 + w.y - m.wy) / CHUNK) * CHUNK - b.y0; }   // buildings land on the chunk grid even if they stood off it
   moveBy(m, dx, dy);
   const why = moveProblem(m.kind, m.it);
   m.why = why; setStat(why || "Let go to drop it here.", !!why);
