@@ -3231,7 +3231,7 @@ function crateTap(ev){
   if(!g.r){ setStat(g.why, true); return; }
   if(g.deliver){
     if(!g.open){ setStat(g.why, true); return; }
-    const r = g.r, e = g.e; crateSel = null; crateGhost = null; setTool(null);
+    const r = g.r, e = g.e; crateSel = null; crateGhost = null; setTool("select");
     sendSpecimen(r, e);
     return;
   }
@@ -3239,7 +3239,7 @@ function crateTap(ev){
   const s = SPECIES_BY_ID[g.r.sp], name = g.r.name || s.name, id = g.r.id;
   if(g.open){ uncrate(id, g.e); sel = null; }
   else { moveCrate(id, g.x, g.y); sel = {kind:"crate", id}; }
-  crateSel = null; crateGhost = null; setTool(null);
+  crateSel = null; crateGhost = null; setTool("select");
   afterChange(); render();
   if(g.open) ui.toast(`${name} is out of its crate in ${g.e.name}.`, "good");
 }
@@ -3734,7 +3734,7 @@ function endPointer(e){
   if(tool === "gate"){ gateTap(e); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
   if(d.hit.kind === "entrance" && (!tool || tool === "select")){ openParkOffice(); return; }
-  if(tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } const an = animalAt(e.clientX, e.clientY); if(an){ animalSelName = an.name; select("animal", an.id); return; } }
+  if(!tool || tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } const an = animalAt(e.clientX, e.clientY); if(an){ animalSelName = an.name; select("animal", an.id); return; } }
   if(d.hit.kind) select(d.hit.kind, d.hit.id); else if(sel) select(null);
 }
 svg.addEventListener("pointerup", endPointer);
