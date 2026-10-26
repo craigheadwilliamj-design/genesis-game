@@ -42,7 +42,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Check-ups are one flat job per exhibit, the same length however many animals it holds. An exhibit is overdue after 3 days, with no per-exhibit schedule; Call vet covers "check this one now".
 - Only vets find hidden cases. Keepers never spot them.
 - Hidden really is hidden: full health bar, no tell on the map. The exhibit shows days since its last check-up and a chip when it's overdue (wording to be drafted).
-- The Health tab's illness-risk factors stay, so the player can tell an exhibit is likely hiding something.
+- New: the Health tab shows what's raising the illness and injury chance (worked out by `healthReport` today but never shown), so the player can tell an exhibit is likely hiding something.
 
 ## 4. Treatment (locked)
 - On the spot, per kind (cutoff, time, doses are data):
@@ -101,9 +101,17 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - No PMC: no vets can be hired; band 1 injuries healing on their own is the only recovery.
 - Bulldozed: recovered patients go straight home; patients mid-treatment go home with severity cut by their progress (a 60 at 50% goes home a 30) and worsen again from there; darted animals waiting for pickup wake and worsen again; bought beds are lost, no refund. The bulldoze confirm warns when the ward has patients (text to be drafted).
 
+## 8a. UI layout (locked; wording in 8b)
+- Exhibit At a glance: Health row as now (sick count, cleanliness).
+- Exhibit Health tab, top to bottom: status chips (sick count colored by worst band, check-up age and overdue, medicated today, trash today, low food/water/sanitation); the risk line (only when something raises it); At the PMC (this exhibit's patients with progress bars or recovered and heading home); every animal worst first (name, species, condition flavor name, health bar, one-line status, tap to open); buttons: Call vet (here and in Keepers), medicated feed toggle with doses a day, genome therapy toggle with how many it would improve.
+- Animal panel Health section: health bar, condition flavor name and cause, one-line status, DNA and frail note, basics lines, medicated today, last check-up.
+- PMC panel: header and vets; Ward (n of m beds) with Buy bed (price and upkeep, until 6) and each patient with home exhibit, progress bar and status; Medicine (stock meters for Contemporary and each researched era, ward-time multipliers as plain numbers); Sick in exhibits, worst first; Check-ups, most overdue first.
+- Bulldoze confirm: a line when the ward has patients.
+- Toasts: found at a check-up, hurt or showing illness, treated on the spot, darted, admitted, recovered, band 3 warning, died (death dialog), trash thrown in (first of the day), PMC short on doses (once a day). Coaching toasts that tell the player what to build or do are dropped.
+
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
 ## To do
-8. UI (all text drafted for approval). 9. Old saves.
+8b. UI wording. 9. Old saves.
