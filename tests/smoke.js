@@ -1894,18 +1894,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const f0 = at(220.4, 270.3), m0 = mid(f0);
       out.placeGrid = f0.ok && square(f0) && Math.abs(m0[0] - 220) < 1e-6 && Math.abs(m0[1] - 270) < 1e-6 && f0.angle === 0;
       // a path beside it doesn't turn it or pull it to the path
-      out.placeNoSnap = Math.abs(at(212.2, 250.8).angle) < 1e-9 && Math.abs(mid(ghost)[0] - 212) < 1e-6;
+      out.placeNoSnap = Math.abs(at(212.2, 250.8).angle) < 1e-9 && Math.abs(mid(ghost)[0] - 210) < 1e-6;   // its box snaps to the 5 m grid
+      out.buildingsSnapToChunks = [[203.3, 251.9], [216.8, 268.4], [231.1, 290.2]].every(([x, y]) => { const g = at(x, y), b = bbox(g.pts); return Math.abs(b.x0 % CHUNK) < 1e-6 && Math.abs(b.y0 % CHUNK) < 1e-6; });
       // Rotate: four distinct quarter turns, all square
       const turns = []; for(let i = 0; i < 4; i++){ turns.push(ghost.angle.toFixed(4)); rotateTool(); }
       out.rotateQuarterTurns = new Set(turns).size === 4 && rot === 0 && square(ghost) && Math.abs(ghost.angle) < 1e-9;
       rotateTool(); const tall = ghost; out.rotateSwapsSides = Math.abs((Math.max(...tall.pts.map(q => q[1])) - Math.min(...tall.pts.map(q => q[1]))) - BUILDINGS.food.w) < 1e-6;
       rot = 0;
-      // refused on a chunk (even 1 m of it), fine flush against its edge
+      // refused on a chunk, and it can't clip one: near the edge it snaps flush against it
       const onPathG = at(204, 270), clipG = at(205 + BUILDINGS.food.w / 2 - 1, 270), flushG = at(Math.ceil(205 + BUILDINGS.food.w / 2), 270);
-      out.placeRefusesChunk = !onPathG.ok && onPathG.why === "It sits on a path." && !clipG.ok && clipG.why === "It sits on a path." && flushG.ok;
-      // the reach warning: 3.5 m from a chunk is as far as it works (food stand is 10 m wide, so its middle is 5 m + the gap from the edge)
-      at(205 + 5 + 3, 270); const nearOk = ghost.ok && !stat().includes("No path nearby");
-      at(205 + 5 + 4, 270); const farWarn = ghost.ok && stat().includes("No path nearby");
+      out.placeRefusesChunk = !onPathG.ok && onPathG.why === "It sits on a path." && clipG.ok && Math.abs(Math.min(...clipG.pts.map(q => q[0])) - 205) < 1e-6 && flushG.ok;
+      // the reach warning: flush against a chunk works, one chunk (5 m) away is too far (food stand is 10 m wide, so its middle is 5 m + the gap from the edge)
+      at(205 + 5, 270); const nearOk = ghost.ok && !stat().includes("No path nearby");
+      at(205 + 5 + 5, 270); const farWarn = ghost.ok && stat().includes("No path nearby");
       out.placeReachWarning = nearOk && farWarn;
       // path props: 1 m grid anywhere fully on a guest chunk, front toward the nearest fence or path edge
       try { const added = [], ex0 = state.exhibits;
@@ -1951,19 +1952,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // the guest walking graph still finds a building placed at the reach limit, in both turns
       setTool("restroom");
       for(const r of [0, 2]){
-        rot = r; state.buildings = []; const g = at(205 + (r ? BUILDINGS.restroom.d : BUILDINGS.restroom.w) / 2 + 2.9, 270);
+        rot = r; state.buildings = []; const g = at(205 + (r ? BUILDINGS.restroom.d : BUILDINGS.restroom.w) / 2, 270);
         state.buildings = [{id:"b-lim" + r, type:"restroom", points:g.pts}]; recompute(); buildGuestGraph();
         out["guestStopAtLimit" + r] = g.ok && isReachable(state.buildings[0]) && gGraph.anchors["b-lim" + r] !== undefined;
       }
       state.buildings = [];
       // Move: the same rules; a turn works in place and refuses (no sliding) when it can't
-      const mv = {id:"b-mv", type:"restroom", points:rectPts(209, 270, 8, 6, 0)}; state.buildings = [mv]; recompute(); setTool("move"); mvSel = mv.id;
+      const mv = {id:"b-mv", type:"restroom", points:rectPts(210, 272.5, 10, 5, 0)}; state.buildings = [mv]; recompute(); setTool("move"); mvSel = mv.id;
       out.moveFlushOk = !moveProblem("building", mv);
       const c0 = centroid(mv.points); rotateMoved(); const c1 = centroid(mv.points);
-      out.moveTurnsInPlace = Math.abs(c0[0] - c1[0]) < 1e-6 && Math.abs(c0[1] - c1[1]) < 1e-6 && Math.abs(mv.points[1][1] - mv.points[0][1]) > 5 && !moveProblem("building", mv);
+      out.moveTurnsInPlace = Math.hypot(c0[0] - c1[0], c0[1] - c1[1]) <= 2.5 * Math.SQRT2 + 1e-6 && Math.abs(bbox(mv.points).x0 % 5) < 1e-6 && Math.abs(bbox(mv.points).y0 % 5) < 1e-6 && Math.abs(mv.points[1][1] - mv.points[0][1]) > 5 && !moveProblem("building", mv);   // the turned box lands on the 5 m grid, nearest the middle
       mv.points = rectPts(207.5, 270, 9, 3, 0); out.moveRefusesChunk = moveProblem("building", mv) === "It sits on a path.";   // 2.5 m of the 3 m-high... overlaps the walk
-      mv.points = rectPts(209, 270, 8, 6, 0);
-      state.buildings.push({id:"b-wall", type:"restroom", points:rectPts(209, 273.5, 8, .6, 0)});   // a sliver the turned shape (not the original) runs into
+      mv.points = rectPts(210, 272.5, 10, 5, 0);
+      state.buildings.push({id:"b-wall", type:"restroom", points:rectPts(212, 277.5, 8, .6, 0)});   // a sliver the turned shape (not the original) runs into
       const before = JSON.stringify(mv.points); rotateMoved();
       out.moveTurnRefusedNoNudge = JSON.stringify(mv.points) === before && $("#dStat").textContent.startsWith("Can't turn it here");
       // a chunk can't be laid through a building
@@ -2019,7 +2020,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.faceGuestStopAtDoor = !!aN && !!aS && aN.y < aS.y - 3;
       // reach: a door facing away from the path still works, but the ghost says so
       state.buildings = [{id:"b-fb", type:"restroom", points:sq, face:1, day:0}]; recompute(); const awayOk = isReachable(state.buildings[0]);
-      state.buildings = []; setTool("restroom"); rot = 6; at(205 + BUILDINGS.restroom.d / 2 + 2.9, 270); const hint = stat().includes("door faces away"); rot = 2; at(205 + BUILDINGS.restroom.d / 2 + 2.9, 270);
+      state.buildings = []; setTool("restroom"); rot = 6; at(205 + BUILDINGS.restroom.d / 2, 270); const hint = stat().includes("door faces away"); rot = 2; at(205 + BUILDINGS.restroom.d / 2, 270);
       out.faceReachDoorAway = awayOk && hint && ghost.ok && !stat().includes("door faces away"); rot = 0;
       // every look draws in all four facings, with the door and the name where the camera can see them
       const types = ["restroom", "food", "restaurant", "workshop", "farm", "closet", "lodge", "oracle", "greenhouse"], bad = [];
