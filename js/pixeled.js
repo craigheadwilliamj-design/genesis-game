@@ -927,15 +927,23 @@ function pxRefBox(){
 }
 function pxDrawRef(ctx, z){
   const b = pxRefBox(); if(!b || !px.refShow) return;
-  ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload";   // a photo or sketch reads better smooth; a sprite stays pixel sharp
+  ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload"; ctx.imageSmoothingQuality = "high";   // a photo or sketch reads better smooth; a sprite stays pixel sharp
   ctx.drawImage(px.refCv, Math.round(b[0] * z), Math.round(b[1] * z), Math.round(b[2] * z), Math.round(b[3] * z)); ctx.restore();
 }
-// An uploaded picture, kept at most 512 px on its long side (plenty to trace from, small enough for the draft)
+// An uploaded picture, kept at most 1536 px on its long side. Shrunk in halving steps so a big photo doesn't alias into mush; PNG when it fits, else JPEG on white.
 async function pxRefUpload(file){
   try{
-    const im = await pxImg(URL.createObjectURL(file)), k = Math.min(1, 512 / Math.max(im.width, im.height)), cv = document.createElement("canvas");
-    cv.width = Math.max(1, Math.round(im.width * k)); cv.height = Math.max(1, Math.round(im.height * k)); const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(im, 0, 0, cv.width, cv.height);
-    px.refUrl = cv.toDataURL("image/png"); px.refShow = true; await pxSetRef("upload"); pxChanged();
+    const im = await pxImg(URL.createObjectURL(file)), k = Math.min(1, 1536 / Math.max(im.width, im.height));
+    const tw = Math.max(1, Math.round(im.width * k)), th = Math.max(1, Math.round(im.height * k));
+    let src = im, w = im.width, h = im.height;
+    while(w / 2 > tw || h / 2 > th){
+      w = Math.max(tw, Math.ceil(w / 2)); h = Math.max(th, Math.ceil(h / 2));
+      const t = document.createElement("canvas"); t.width = w; t.height = h; const c = t.getContext("2d"); c.imageSmoothingQuality = "high"; c.drawImage(src, 0, 0, w, h); src = t;
+    }
+    const cv = document.createElement("canvas"); cv.width = tw; cv.height = th; const ctx = cv.getContext("2d"); ctx.imageSmoothingQuality = "high"; ctx.drawImage(src, 0, 0, tw, th);
+    let url = cv.toDataURL("image/png");
+    if(url.length > 1500000){ ctx.globalCompositeOperation = "destination-over"; ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, tw, th); url = cv.toDataURL("image/jpeg", .92); }
+    px.refUrl = url; px.refShow = true; await pxSetRef("upload"); pxChanged();
   }catch{ ui.toast("That file isn't a picture I can read.", "bad"); }
 }
 function pxClick(e){
