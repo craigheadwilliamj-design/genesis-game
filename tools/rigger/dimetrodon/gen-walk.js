@@ -54,7 +54,7 @@ fs.mkdirSync(OUT, {recursive:true});
   return {proj:JSON.stringify(pruned())};
  }, [proj, K]);
  fs.writeFileSync(path.join(OUT, 'dimetrodon.json'), out.proj);
- execFileSync('python3', [path.join(here, '..', '..', 'pixeldime_rig_shade.py'), path.join(OUT, 'dimetrodon.json')], {stdio:'inherit'});   // the parts get their texture
+ if(!proj.shaded) execFileSync('python3', [path.join(here, '..', '..', 'pixeldime_rig_shade.py'), path.join(OUT, 'dimetrodon.json')], {stdio:'inherit'});   // the parts get their texture (unless the picture is hand-finished)
  const prev = await p.evaluate(async ([proj, K]) => {
   await openProject(proj);
   const walk = P.clips.find(c => c.name === 'walk').frames; ci = P.clips.findIndex(c => c.name === 'walk'); cur = 0; sel = null;
