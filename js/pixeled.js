@@ -927,7 +927,7 @@ function pxRefBox(){
 }
 function pxDrawRef(ctx, z){
   const b = pxRefBox(); if(!b || !px.refShow) return;
-  ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload"; ctx.imageSmoothingQuality = "high";   // a photo or sketch reads better smooth; a sprite stays pixel sharp
+  ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload" && b[2] * z < px.refCv.width; ctx.imageSmoothingQuality = "high";   // smooth only when a big photo is shrunk; enlarging (a sprite, or a canvas-sized picture) stays pixel sharp
   ctx.drawImage(px.refCv, Math.round(b[0] * z), Math.round(b[1] * z), Math.round(b[2] * z), Math.round(b[3] * z)); ctx.restore();
 }
 // An uploaded picture, kept at most 1536 px on its long side. Shrunk in halving steps so a big photo doesn't alias into mush; PNG when it fits, else JPEG on white.
