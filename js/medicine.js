@@ -5,7 +5,7 @@
    check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
    treat minor illnesses on the spot, and dart serious cases; keepers carry
    those in, and the PMC treats them with medicine from the Botany Lab once the Research Lab has
-   researched it for their era and refined it for their period.
+   researched it for their era. Refining it for their period makes it heal at full speed.
    Vets also dart escaped animals, and keepers carry those home.
    ===================================================================== */
 
@@ -14,8 +14,10 @@ let vcrew = [];   // vets walking around right now (positions aren't saved)
 function freshHealth(){ return {from:HEALTH.startDay, ward:[]}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
-// An era's medicine only cures a period's animals once it has been refined for that period
-const canTreat = s => hasTech(medTechFor(s)) && hasTech("ref-" + s.period);
+// An era's medicine cures its animals once researched; refined for the animal's period, it heals at full speed
+const canTreat = s => hasTech(medTechFor(s));
+const refined = s => canTreat(s) && hasTech("ref-" + s.period);
+const healShare = s => refined(s) ? 1 : MEDICINE.unrefined;
 const anyMedTech = () => Object.values(MED_TECH).some(hasTech);
 const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
@@ -29,7 +31,6 @@ const medGoodOf = s => MED_GOOD[eraOf(s)];
 // Why the era's own medicine can't treat this species right now, in a few words (null when it can)
 function medWhy(s, n = HEALTH.dose){
   if(!hasTech(medTechFor(s))) return `${eraMedName(s)} isn't researched.`;
-  if(!hasTech("ref-" + s.period)) return `${eraMedName(s)} isn't refined for the ${s.period}.`;
   if(medOnHand(medGoodOf(s)) < n) return `The PMC is out of ${eraMedName(s)}.`;
   return null;
 }
@@ -247,7 +248,7 @@ function patientStatus(p){
   if(!state.staff.vets.length) return "Stable. No vet.";
   const w = medWhy(s);
   if(p.med === "modern") return `Contemporary medicine. ${w || `${eraMedName(s)} is in. A vet switches it over tonight.`}`;
-  if(p.med === "era") return "Being treated.";
+  if(p.med === "era") return refined(s) ? "Being treated." : `Being treated. Unrefined for the ${s.period}, so slower.`;
   if(!w) return "Stable. Waiting for a vet.";
   return `Stable. ${w}${dept("pmc") && pmcStock(CMED) >= HEALTH.dose ? "" : " The PMC is out of contemporary medicine."}`;
 }
@@ -524,10 +525,10 @@ function healthNight(){
         const s = SPECIES_BY_ID[a.sp];
         if(a.sick){
           // a chronic case holds steady, and medicated feed with the era's own medicine slowly clears it up
-          if(a.sick.chronic){ if(medicated(e, s)){ a.sick.sev -= MEDICINE.feedHeal; if(a.sick.sev <= 0){ delete a.sick; out.healed++; } } continue; }
+          if(a.sick.chronic){ if(medicated(e, s)){ a.sick.sev -= MEDICINE.feedHeal * healShare(s); if(a.sick.sev <= 0){ delete a.sick; out.healed++; } } continue; }
           // mild cases clear up on medicated feed; everything else gets worse
           if(medicated(e, s) && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !a.darted){
-            a.sick.sev -= MEDICINE.feedHeal;
+            a.sick.sev -= MEDICINE.feedHeal * healShare(s);
             if(a.sick.sev <= 0){ delete a.sick; out.healed++; }
             continue;
           }
@@ -559,7 +560,7 @@ function healthNight(){
     if(p.med === "modern"){
       if(p.a.sick.sev - HEALTH.healPerNight * MODERN.heal[era] > fl){ p.a.sick.sev -= HEALTH.healPerNight * MODERN.heal[era]; continue; }
       ease(p.a);
-    } else p.a.sick.sev -= HEALTH.healPerNight;
+    } else p.a.sick.sev -= HEALTH.healPerNight * healShare(s);
     if(p.a.sick.chronic || p.a.sick.sev <= 0){
       const chronic = !!p.a.sick.chronic;
       if(!chronic) delete p.a.sick;

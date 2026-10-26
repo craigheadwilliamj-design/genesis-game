@@ -213,10 +213,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    // era medicine in the PMC but not refined for the period: nothing uses it, and the statuses say which refinement is missing
+    // era medicine in the PMC but not refined for the period: it still treats, a chronic case included, just at MEDICINE.unrefined speed, and the ward status says so
     state.science.tech = state.science.tech.filter(t => t !== "ref-Carboniferous"); state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
-    out.unrefinedSaysSo = !fieldTreatable(viv.animals[1]) && pickMed(SPECIES_BY_ID.arth, HEALTH.dose) !== "era" && /refined for the Carboniferous/.test(sickStatus(viv, viv.animals[1])) &&
-      /refined for the Carboniferous/.test(patientStatus({a:{id:"a-u", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:"modern"}));
+    {
+      const un = {a:{id:"a-u", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
+      state.health.ward.push(un); healthNight();
+      out.unrefinedTreatsSlower = fieldTreatable(viv.animals[1]) && pickMed(SPECIES_BY_ID.arth, HEALTH.dose) === "era" && un.med === "era" && Math.abs(un.a.sick.sev - (50 - HEALTH.healPerNight * MEDICINE.unrefined)) < 1e-9 && /Unrefined for the Carboniferous/.test(patientStatus(un));
+      state.health.ward = [];
+    }
     state.science.tech.push("ref-Carboniferous");
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
@@ -1255,12 +1259,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
 
-    // medicine only cures a period's animals once refined for it
+    // an era's medicine treats its animals once researched; refining it for a period brings that period up to full speed
     sc.tech.push("medceno");
     const jur = SPECIES.find(x => x.period === "Jurassic");
-    out.unrefinedCantTreat = !canTreat(jur);
+    out.unrefinedHalfSpeed = canTreat(jur) && !refined(jur) && healShare(jur) === MEDICINE.unrefined;
     sc.tech.push("ref-Jurassic");
-    out.refinedTreats = canTreat(jur) && !canTreat(SPECIES.find(x => x.period === "Triassic"));
+    out.refinedFullSpeed = refined(jur) && healShare(jur) === 1 && !refined(SPECIES.find(x => x.period === "Triassic"));
     sc.points = 100;
     out.refineNeedsEra = projectProblem("refine", "Permian") === "Research Paleozoic medicine first.";
     out.refineOk = projectProblem("refine", "Cretaceous") === null;

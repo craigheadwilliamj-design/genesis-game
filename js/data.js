@@ -1415,11 +1415,11 @@ const TECH = [
   {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
   {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from the Botany Lab."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
-  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
-  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Paleozoic animals, from the Cambrian to the Permian. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them faster."},
+  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them faster."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Paleozoic animals, from the Cambrian to the Permian. Needs Paleozoic plant DNA. Refine it for each period to cure them faster."},
 ];
-// Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
+// Refining an era's medicine for one period: that period's animals heal at full speed (unrefined doses heal MEDICINE.unrefined as fast). Costs by era.
 const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
@@ -1483,6 +1483,7 @@ const MEDICINE = {
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
   feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
+  unrefined:.5,        // an era's medicine not yet refined for the animal's period heals this share as fast (ward and medicated feed)
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
