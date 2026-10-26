@@ -57,7 +57,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Above the cutoff, the PMC trip:
   1. A vet darts it (8 min) only when a bed is free. Once darted it stops worsening and is off display.
   2. A keeper carries it to the PMC.
-  3. Admission takes a bed and uses the course's doses up front (2). Treatment is a park-minute timer with a progress bar, like cloning, never tied to the day counter or 4 AM. Length = severity x a per-kind rate (start at 12 park minutes a point: 50 is about 600 min, 90 about 1,080), sped up by the era booster (section 5). It pauses while the PMC has no vet on staff.
+  3. Admission takes a bed. The course's doses (2) come out of the PMC's stock up front; if the PMC is short, the animal is admitted anyway and its timer waits until the doses arrive (a darted or admitted animal never worsens). Treatment is a park-minute timer with a progress bar, like cloning, never tied to the day counter or 4 AM. Length = severity x a per-kind rate (start at 12 park minutes a point: 50 is about 600 min, 90 about 1,080), sped up by the era booster (section 5). It pauses while the PMC has no vet on staff.
   4. When the timer ends the animal is recovered and waits at the PMC like a finished clone.
   5. It's queued home automatically, delivered through the specimen delivery system (keeper, custodian or vet; Move sends it elsewhere with the usual fit check). The bed frees when the animal leaves the PMC.
 - Beds are a PMC upgrade bought like Time Travel Lab drones: 2 to start, 6 at most, rising price (first guess $4,000 then x1.5 each).
@@ -80,10 +80,23 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Medicated feed is prevention only: [infection] chance x0.35, 1 dose a day per 5 animals from whatever the PMC holds. Nothing for injuries or poisoning.
 - Storage unchanged: PMC store 150, Botany Lab 60 per era.
 
+## 6. Vets (locked)
+- Each time a vet looks for work, the first that applies:
+  1. Dart an escaped animal.
+  2. A player call.
+  3. Poisoning, worst first.
+  4. Other sick animals, worst first: band 3, band 2 (only with a free bed), band 1.
+  5. Overdue check-ups, most overdue first.
+  6. Genome therapy, a trip of its own (about 10 min per animal, same cost as now) to exhibits that have it switched on.
+  7. Deliveries (specimens and recovered patients), dead last.
+  8. Otherwise walk back to the PMC.
+- A vet darts a band 2+ animal even when the PMC is out of doses (see section 4, step 3).
+- Zones stay as they are. No per-vet patient cap: beds are the only ward limit.
+- Hiring unchanged: $3,000, $200 a day, same pace and ATVs.
+
 ## Earlier picks (to confirm in their sections)
-- Genome therapy: its own vet job with the same toggle and cost, no longer part of check-ups.
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
 ## To do
-6. Vets. 7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
+7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
