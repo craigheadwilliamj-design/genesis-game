@@ -1812,6 +1812,28 @@ const ACTS = {
 };
 // Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
 const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3, melt:2, vivBase:.2};   // melt: days a frozen treat loses in a heat wave   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
+// What each species is, for illnesses that only some bodies get. Every species has one.
+//   invert, fish, amphibian, reptile (land), marine (marine reptile), pterosaur, ornithischian, sauropod (and early sauropodomorphs),
+//   theropod, bird (Archaeopteryx onward), synapsid (not yet mammals), mammal, hooved (hooved mammals), seamammal (whales, dolphins, seals, sea cows)
+const CLADE = {
+  invert:["anom", "opab", "olen", "came", "ptry", "arth", "pulm", "mega", "gigt", "prom", "tmyr", "rmlo"],
+  fish:["saca", "both", "dunk", "stet", "rhiz", "heli", "tikt", "mgdn"],
+  amphibian:["icht", "mibr", "dcau", "eryo", "seym", "plhy", "prio", "beel", "kool", "gtod"],
+  reptile:["hylo", "scut", "sile", "shar", "long", "desm", "post", "eryt", "simo", "dsuc", "bari", "tita", "mchl", "mlan"],
+  marine:["noth", "shon", "ichy", "elsm", "mosa"],
+  pterosaur:["dimo", "pter", "quet"],
+  ornithischian:["hete", "dryo", "scel", "kent", "steg", "hyps", "mcer", "psit", "prot", "minm", "para", "pach", "igua", "styr", "anky", "tric"],
+  sauropod:["plat", "cama", "apat", "dipl", "brac", "nige", "pata"],
+  theropod:["coel", "herr", "comp", "orni", "anch", "yiqi", "scan", "dilo", "cryo", "cera", "mgal", "allo", "torv", "mono", "micr", "ornm", "ovir",
+            "gall", "velo", "conc", "utah", "bary", "ther", "yutt", "cnot", "dche", "spin", "carc", "trex"],
+  bird:["arch", "waim", "kele", "drom", "psil", "arge", "ornw", "dodo", "ppig"],
+  synapsid:["diic", "lyst", "mosc", "dime", "este", "coty", "ante", "inos", "liso"],
+  mammal:["ples", "lept", "ptil", "miac", "hyae", "paki", "ambu", "dino", "dgal", "nura", "proc", "amph", "chal", "plty", "sdel", "dire", "arct",
+          "doed", "mgth", "smil", "mast", "mamm", "colm", "thyl", "aind", "gpit"],
+  hooved:["sifr", "uint", "andr", "arsi", "pcer", "daeo", "aepy", "siva", "hopl", "macr", "mglo", "elas"],
+  seamammal:["basi", "enal", "kntr", "stel"],
+};
+const CLADE_OF = Object.fromEntries(Object.entries(CLADE).flatMap(([c, ids]) => ids.map(id => [id, c])));
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
