@@ -21,7 +21,7 @@ const PX_VIEWS = ["front", "back", "left", "right"];
 const PX_SKIP_BLD = ["vivS", "vivM", "vivL", "platform", "tramstop", "campground"];   // drawn with what's inside them or from parts, not one picture
 const PX_KEY = "genesis-pixel-", PX_UNDO = 200;
 const px = {path:"", fw:16, fh:16, frames:[], layers:[], lay:0, cur:0, fps:6, zoom:12, tool:"pencil", c1:[29,43,34,255], c2:[0,0,0,0], grid:true, onion:true, mirror:false,
-  pal:"image", ref:"", refCv:null, refUrl:"", refAlpha:.3, refShow:true, refFront:false, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
+  pal:"image", ref:"", refCv:null, refUrl:"", refAlpha:.3, refShow:true, refFront:false, refX:0, refY:0, refK:1, refMove:false, guide:null, tab:"all", sel:null, clip:null, undo:[], redo:[], stroke:null, hover:null, built:false, dime:null, db:null, queue:[], sub:null, anim:0};
 
 /* ---------- pixels ---------- */
 const pxBlank = (w, h) => new Uint8ClampedArray(w * h * 4);
@@ -181,7 +181,7 @@ function pxSaveDraft(){
   pxStore("d:" + px.path, pxDraft());
 }
 // A draft keeps every layer as its own strip, so they come back as layers
-const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront, x:px.refX, y:px.refY, k:px.refK}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
   const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
   px.fw = ims[0].width / n; px.fh = ims[0].height;
@@ -200,7 +200,7 @@ async function pxOpen(path, fresh){
     px.guide = pxGuideFor(path);
     if(path in pxBaseOrig) pxSetBase(pxBaseOrig[path]);   // back to the game's row, then the draft's
     if(dr && dr.base != null) pxSetBase(dr.base);
-    if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); }
+    if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); Object.assign(px, {refX:R.x || 0, refY:R.y || 0, refK:R.k || 1}); }
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
   }catch{ ui.toast("That picture didn't load.", "bad"); }
@@ -352,10 +352,12 @@ function pxPreview(t){
   const c = pxComp(i); ctx.drawImage(c, 0, 0, px.fw * s, px.fh * s); ctx.drawImage(c, px.fw * s + 12, px.fh * s - px.fh);
 }
 const pxXY = e => { const r = pxCv.getBoundingClientRect(); return [Math.floor((e.clientX - r.left) / r.width * px.fw), Math.floor((e.clientY - r.top) / r.height * px.fh)]; };
+const pxXYf = e => { const r = pxCv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * px.fw, (e.clientY - r.top) / r.height * px.fh]; };
 function pxDown(e){
   if(pxPans(e)) return;   // the stage pans (pxPanStart)
   if(e.button > 2 || !px.frames.length) return;
   e.preventDefault(); pxCv.setPointerCapture(e.pointerId);
+  if(px.refMove && px.refCv){ px.stroke = {ref:pxXYf(e), ox:px.refX, oy:px.refY}; return; }   // Move reference: the drag slides the guide, not the drawing
   { const h = !e.button && pxFootHit(e); if(h){ px.stroke = {foot:h}; return; } }
   const [x, y] = pxXY(e), alt = e.button === 2, c = alt ? px.c2 : px.c1, f = pxFrame();
   if(px.tool === "picker" || e.altKey){ if(pxIn(x, y)){ const p = pxGet(pxCompData(px.cur), x, y); if(alt) px.c2 = p; else px.c1 = p; pxSync(); } return; }   // the color as it shows, whatever layer it's on
@@ -392,6 +394,7 @@ function pxMove(e){
   if(px.pan) return;
   const [x, y] = pxXY(e); px.hover = [x, y];
   const st = px.stroke;
+  if(st && st.ref){ const [fx, fy] = pxXYf(e); px.refX = Math.round((st.ox + fx - st.ref[0]) * 2) / 2; px.refY = Math.round((st.oy + fy - st.ref[1]) * 2) / 2; return pxDraw(); }
   if(st && st.foot) return pxFootDrag(e, st.foot);
   const fh = !st && pxFootHit(e); if(fh !== (px.footHover || false)){ px.footHover = fh; pxCv.style.cursor = fh === "w" ? "ew-resize" : fh === "row" ? "ns-resize" : pxCursor(px.tool); }
   if(!st) return pxDraw();
@@ -407,7 +410,7 @@ function pxMove(e){
 function pxUp(){
   if(px.pan) return;
   const st = px.stroke; px.stroke = null; if(!st) return;
-  if(st.foot) return pxChanged();   // saves the footprint with the draft
+  if(st.foot || st.ref) return pxChanged();   // saves the footprint with the draft
   if(st.lasso){ px.sel = pxLassoSel(st.lasso); return pxDraw(); }
   if(pxSelTool(px.tool)){ if(st.move) pxChanged(); return; }
   pxChanged();
@@ -755,8 +758,10 @@ function pxBuild(){
         <label class="pxrow"><span>Layer opacity</span><input type="range" min="0" max="100" id="pxLAlpha"><span class="num" id="pxLAlphaN"></span></label>
         <div class="pxlrow pxrefrow"><button class="pxeye" data-px="refeye" id="pxRefEye" title="Show or hide the reference"></button><b>Reference</b><select id="pxRef" aria-label="Reference picture"></select><button class="btn" data-px="refup" title="A picture of your own, fitted whole to the canvas">Upload…</button><input type="file" accept="image/*" id="pxRefFile" hidden></div>
         <div class="pxrow"><span>Reference opacity</span><input type="range" min="5" max="100" id="pxRAlpha"><span class="num" id="pxRAlphaN"></span></div>
+        <div class="pxrow"><span>Reference size</span><input type="range" min="20" max="300" id="pxRSize"><span class="num" id="pxRSizeN"></span></div>
+        <div class="pxrow"><label><input type="checkbox" id="pxRMove"> Drag the reference</label><button class="btn" data-px="refreset" title="Back to the bottom middle at full size">Reset</button></div>
         <label class="pxrow"><input type="checkbox" id="pxRFront"> Draw the reference over the layers, to trace</label>
-        <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened. The reference is only a guide and never goes into the picture: an upload is scaled to fit the canvas whole and stands on the bottom middle.</div></section>
+        <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened. The reference is only a guide and never goes into the picture: an upload starts scaled to fit the canvas whole on the bottom middle; drag it or resize it from there.</div></section>
       <section><h3>Frames</h3><div class="pxframes" id="pxFrames"></div>
         <div class="pxrow"><button class="btn" data-px="fadd">Add</button><button class="btn" data-px="fdup">Copy</button><button class="btn" data-px="fdel">Delete</button><button class="btn" data-px="fleft" title="Move earlier">◀</button><button class="btn" data-px="fright" title="Move later">▶</button></div>
         <label class="pxrow"><span>Speed</span><input type="number" min="1" max="30" id="pxFps" class="pxnum"><span>a second</span><label><input type="checkbox" id="pxOnion"> Onion skin</label></label>
@@ -819,7 +824,7 @@ function pxSync(){
   const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
-  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxGuideNote").hidden = px.guide == null; $p("pxFootTog").hidden = px.guide == null || !pxFootType(); $p("pxFootEdit").checked = !!px.footEdit;
+  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxRMove").checked = px.refMove; $p("pxRSize").value = Math.round(px.refK * 100); $p("pxRSizeN").textContent = Math.round(px.refK * 100) + "%"; $p("pxGuideNote").hidden = px.guide == null; $p("pxFootTog").hidden = px.guide == null || !pxFootType(); $p("pxFootEdit").checked = !!px.footEdit;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;
@@ -908,6 +913,7 @@ function pxNewFill(sized){
 // The reference: a guide drawn faintly under the layers (or over them, to trace), never part of the picture. Either a game sprite at
 // its own size (an animal with art, to match size and feet against) or a picture of your own, fitted whole to the canvas.
 async function pxSetRef(path){
+  if(path !== px.ref) { px.refX = px.refY = 0; px.refK = 1; }
   px.ref = path || ""; px.refCv = null;
   const src = path === "upload" ? px.refUrl : path && SPRITE_PACK[path];
   if(src) try{ const im = await pxImg(src), cv = document.createElement("canvas"); cv.width = im.width; cv.height = im.height; cv.getContext("2d").drawImage(im, 0, 0); px.refCv = cv; }catch{}
@@ -916,8 +922,8 @@ async function pxSetRef(path){
 // Where the reference sits, in sprite pixels: an upload scaled to fit inside the canvas with nothing cut off, a sprite at its own size, both on the bottom middle
 function pxRefBox(){
   const r = px.refCv; if(!r) return null;
-  const k = px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1, w = r.width * k, h = r.height * k;
-  return [(px.fw - w) / 2, px.fh - h, w, h];
+  const k = (px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1) * px.refK, w = r.width * k, h = r.height * k;
+  return [(px.fw - w) / 2 + px.refX, px.fh - h + px.refY, w, h];
 }
 function pxDrawRef(ctx, z){
   const b = pxRefBox(); if(!b || !px.refShow) return;
@@ -964,7 +970,7 @@ function pxClick(e){
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
-    refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); },
+    refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); }, refreset:() => { px.refX = px.refY = 0; px.refK = 1; pxChanged(); },
     copy:() => pxCopy(false), cut:() => pxCopy(true), paste:pxPasteButton, selall:pxSelectAll,
     try:pxTry, send:pxSend, sendall:pxSendAll, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
@@ -984,6 +990,11 @@ function pxInput(e){
   else if(id === "pxRefFile" && t.files[0]){ pxRefUpload(t.files[0]); t.value = ""; }
   else if(id === "pxRAlpha"){ px.refAlpha = +t.value / 100; document.getElementById("pxRAlphaN").textContent = t.value + "%"; pxDraw(); if(e.type === "change") pxChanged(); }
   else if(id === "pxRFront"){ px.refFront = t.checked; pxChanged(); }
+  else if(id === "pxRMove"){ px.refMove = t.checked; pxCv.style.cursor = px.refMove ? "move" : pxCursor(px.tool); }
+  else if(id === "pxRSize"){   // scales about the picture's centre, so it stays put while it grows
+    const b = pxRefBox(), cx = b && b[0] + b[2] / 2, cy = b && b[1] + b[3] / 2; px.refK = +t.value / 100; document.getElementById("pxRSizeN").textContent = t.value + "%";
+    const n = pxRefBox(); if(b && n){ px.refX += cx - (n[0] + n[2] / 2); px.refY += cy - (n[1] + n[3] / 2); }
+    pxDraw(); if(e.type === "change") pxChanged(); }
   else if(id === "pxLAlpha"){ px.layers[px.lay].alpha = +t.value / 100; document.getElementById("pxLAlphaN").textContent = t.value + "%"; pxDraw(); if(e.type === "change") pxChanged(); }
   else if(t.dataset.lname && e.type === "change"){ px.layers[+t.dataset.lname].name = t.value.trim().slice(0, 32) || "Layer"; t.blur(); pxChanged(); }
   else if(id === "pxOnion"){ px.onion = t.checked; pxDraw(); }
