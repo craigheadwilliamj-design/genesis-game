@@ -63,12 +63,27 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Beds are a PMC upgrade bought like Time Travel Lab drones: 2 to start, 6 at most, rising price (first guess $4,000 then x1.5 each).
 - Ward full: band 2+ animals wait in their exhibit, still worsening; worst go first when a bed frees.
 
+## 5. Medicine (locked)
+- Dock medicine ("Contemporary medicine", same good, dock ordering and haul to the PMC as now) treats everything: on the spot, ward courses and medicated feed.
+- Era medicine is a booster for ward time only:
+
+| Era | Ward time, dock medicine | Ward time, era medicine |
+|---|---|---|
+| Cenozoic | x1 | x0.75 |
+| Mesozoic | x1.5 | x0.75 |
+| Paleozoic | x2 | x0.75 |
+
+- The three era research projects stay at their current points and plant DNA needs. The per-period refinements go.
+- The Botany Lab grows era medicine in batches as now ("keep stocked", hauled to the PMC). Names stay as they are in game.
+- The PMC uses the animal's era medicine when it has some, otherwise dock medicine. The player never picks.
+- On-the-spot treatment cures outright with either; era medicine has no other perk.
+- Medicated feed is prevention only: [infection] chance x0.35, 1 dose a day per 5 animals from whatever the PMC holds. Nothing for injuries or poisoning.
+- Storage unchanged: PMC store 150, Botany Lab 60 per era.
+
 ## Earlier picks (to confirm in their sections)
-- Medicine: dock medicine treats everything. Era research and Botany Lab doses are a booster (faster, better), never a gate. Per-period refinements go.
-- Medicated feed: prevention only (cuts illness chance, costs doses daily). No healing.
 - Genome therapy: its own vet job with the same toggle and cost, no longer part of check-ups.
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
 ## To do
-5. Medicine. 6. Vets. 7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
+6. Vets. 7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
