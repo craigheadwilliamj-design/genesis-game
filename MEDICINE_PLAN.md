@@ -36,6 +36,14 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Exhibit happiness hit scales by band instead of a flat amount per sick animal.
 - Natural recovery: band 1 injuries only, about 2 a day, only while the exhibit is fed, watered and clean and the animal's stress is under 60. Otherwise it worsens as normal. Infection and poisoning never heal on their own.
 
+## 3. Detection (locked)
+- Hidden means a band 1 [infection] only. The hidden line and the band 2 line are the same number (40). Injuries and poisoning always show.
+- A check-up treats the band 1 cases it finds on the spot, if there's medicine, so the vet doesn't walk away and come back.
+- Check-ups are one flat job per exhibit, the same length however many animals it holds. An exhibit is overdue after 3 days, with no per-exhibit schedule; Call vet covers "check this one now".
+- Only vets find hidden cases. Keepers never spot them.
+- Hidden really is hidden: full health bar, no tell on the map. The exhibit shows days since its last check-up and a chip when it's overdue (wording to be drafted).
+- The Health tab's illness-risk factors stay, so the player can tell an exhibit is likely hiding something.
+
 ## Earlier picks (to confirm in their sections)
 - Medicine: dock medicine treats everything. Era research and Botany Lab doses are a booster (faster, better), never a gate. Per-period refinements go.
 - Medicated feed: prevention only (cuts illness chance, costs doses daily). No healing.
@@ -45,4 +53,4 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Trash throwing moves out of medicine.js.
 
 ## To do
-3. Detection. 4. Treatment. 5. Medicine. 6. Vets. 7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
+4. Treatment. 5. Medicine. 6. Vets. 7. The PMC. 8. UI (all text drafted for approval). 9. Old saves.
