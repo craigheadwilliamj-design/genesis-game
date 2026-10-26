@@ -5,7 +5,7 @@
    check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
    treat minor illnesses on the spot, and dart serious cases; keepers carry
    those in, and the PMC treats them with medicine from the Botany Lab once the Research Lab has
-   researched it for their era.
+   researched it for their era and refined it for their period.
    Vets also dart escaped animals, and keepers carry those home.
    ===================================================================== */
 
@@ -26,6 +26,13 @@ function pickMed(s, n){
   return null;
 }
 const medGoodOf = s => MED_GOOD[eraOf(s)];
+// Why the era's own medicine can't treat this species right now, in a few words (null when it can)
+function medWhy(s, n = HEALTH.dose){
+  if(!hasTech(medTechFor(s))) return `${eraMedName(s)} isn't researched.`;
+  if(!hasTech("ref-" + s.period)) return `${eraMedName(s)} isn't refined for the ${s.period}.`;
+  if(medOnHand(medGoodOf(s)) < n) return `The PMC is out of ${eraMedName(s)}.`;
+  return null;
+}
 function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else useMeds(n, CMED); }
 // Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
 function ease(a){
@@ -218,7 +225,7 @@ function fieldTreatable(a){
 // What's happening to one sick animal, in words
 function sickStatus(e, a){
   const s = SPECIES_BY_ID[a.sp];
-  if(a.sick.chronic && !fieldTreatable(a)) return canTreat(s) ? `Chronic. A vet will cure it once the Botany Lab has ${eraMedName(s).toLowerCase()} on hand.` : `Chronic. Contemporary medicine eased it, but only ${eraMedName(s).toLowerCase()} from the Botany Lab can cure it fully.`;
+  if(a.sick.chronic && !fieldTreatable(a)) return `Chronic. ${medWhy(s, HEALTH.fieldDose) || "Waiting for a free vet."}`;
   if(a.darted){ const t = state.staff.transfers.find(x => x.animalId === a.id); return t && t.keeper ? "Darted. A keeper is coming to carry it to the PMC." : "Darted. Waiting for a keeper to carry it to the PMC."; }
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center and hire a vet to treat it.";
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
@@ -237,10 +244,12 @@ function patientStatus(p){
     const t = state.staff.transfers.find(x => x.animalId === p.a.id), done = p.a.sick && p.a.sick.chronic ? "As well as contemporary medicine can make it." : "Recovered.";
     return `${done} ${t && t.keeper ? "A keeper is taking it home." : "Waiting for a keeper to take it home."}`;
   }
-  if(!state.staff.vets.length) return "Stable. Hire a vet to treat it.";
-  if(p.med === "modern") return `Being treated with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`;
+  if(!state.staff.vets.length) return "Stable. No vet.";
+  const w = medWhy(s);
+  if(p.med === "modern") return `Contemporary medicine. ${w || `${eraMedName(s)} is in. A vet switches it over tonight.`}`;
   if(p.med === "era") return "Being treated.";
-  return "Stable. Waiting for medicine. Suppliers restock the PMC every night.";
+  if(!w) return "Stable. Waiting for a vet.";
+  return `Stable. ${w}${dept("pmc") && pmcStock(CMED) >= HEALTH.dose ? "" : " The PMC is out of contemporary medicine."}`;
 }
 
 /* ---------- the ward ---------- */
@@ -345,6 +354,7 @@ function vetDecide(c){
   // a vet the player called looks at that exhibit's sick animals first
   const call = callJob(c, "vet");
   if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
+  if(staffMaybeRest(c, pmcs())) return;
   // a finished specimen from the Genetics Lab goes to its exhibit before patients and check-ups
   const dv = deliveryJob(c, walkFrom(c.at, c));
   if(dv){
@@ -364,6 +374,7 @@ function vetDecide(c){
 }
 
 function vetArrive(c){
+  if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toPickup"){ labPickup(c, (n, job) => vetGo(c, n, job)); return; }
   if(c.job === "toDropoff"){ labDrop(c); return; }
   if(c.job === "hunting"){
@@ -454,6 +465,7 @@ function vetsTick(dtMin){
         if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone})[c.job](c);
         continue;
       }
+      if(c.job === "resting"){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = VET.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
@@ -485,7 +497,7 @@ function vetStatus(v){
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
-          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC",
+          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC", toRest:"Going on break", resting:"On break",
           toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the Genetics Lab`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
 }
 

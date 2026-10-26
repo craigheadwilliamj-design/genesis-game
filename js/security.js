@@ -158,6 +158,7 @@ function guardDecide(c, r){
   const p = c.chase;
   if(p && !p.gone && p.at){ guardGo(c, nearestNode(p.at.x, p.at.y), "chasing"); if(c.job === "chasing") return; }
   c.chase = null;
+  if(staffMaybeRest(c, offices())) return;
   const n = patrolStop(c, r);
   if(n && n !== c.at && guardGo(c, n, "patrolling")) return;
   c.job = "idle"; c.wait = SECURITY.patrolWait;
@@ -207,10 +208,11 @@ function guardsTick(dtMin){
     }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
+      if(c.job === "resting" && !c.chase){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = SECURITY.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
-        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; atNode(c); if(!c.route.length){ c.job = "idle"; c.wait = c.chase ? 0 : SECURITY.patrolWait; } }
+        else { left -= rem / sp; c.at = nx; c.route.shift(); c.t = 0; atNode(c); if(!c.route.length){ if(c.job === "toRest"){ c.job = "resting"; continue; } c.job = "idle"; c.wait = c.chase ? 0 : SECURITY.patrolWait; } }
         continue;
       }
       if(c.wait > 0){ const w = Math.min(c.wait, left); c.wait -= w; left -= w; continue; }
@@ -234,5 +236,5 @@ function hireGuard(){
 function guardStatus(m){
   const c = gcrew.find(x => x.id === m.id); if(!c) return "Clocking in";
   if(c.chase) return "Chasing a vandal caught on camera";
-  return {patrolling:"On patrol"}[c.job] || (c.at ? "Keeping watch" : "Clocking in");
+  return {patrolling:"On patrol", toRest:"Going on break", resting:"On break"}[c.job] || (c.at ? "Keeping watch" : "Clocking in");
 }

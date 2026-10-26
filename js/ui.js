@@ -780,7 +780,8 @@ function pmcHtml(b){
   h += `</section>`;
   const cm = Math.floor(pmcStock(CMED));
   h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
-  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label}: ${hasTech(id) ? "curable" : `best ${100 - MODERN.floor[era]}%`}</li>`).join("")}</ul>`;
+  // each era's medicine: researched, and refined for which periods (unrefined doses only ease an animal, like contemporary medicine)
+  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => { const ref = TIME_PERIODS.filter(p => ERA_OF[p.id] === era && hasTech("ref-" + p.id)).map(p => p.id); return `<li class="${hasTech(id) && ref.length ? "" : "bad"}">${ERA_LABEL[era]} medicine: ${!hasTech(id) ? `not researched, best ${100 - MODERN.floor[era]}%` : ref.length ? `refined for the ${ref.join(", ")}` : `not refined for any period, best ${100 - MODERN.floor[era]}%`}</li>`; }).join("")}</ul>`;
   h += `${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
   // every exhibit's check-up, most overdue first

@@ -213,7 +213,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
+    // era medicine in the PMC but not refined for the period: nothing uses it, and the statuses say which refinement is missing
+    state.science.tech = state.science.tech.filter(t => t !== "ref-Carboniferous"); state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
+    out.unrefinedSaysSo = !fieldTreatable(viv.animals[1]) && pickMed(SPECIES_BY_ID.arth, HEALTH.dose) !== "era" && /refined for the Carboniferous/.test(sickStatus(viv, viv.animals[1])) &&
+      /refined for the Carboniferous/.test(patientStatus({a:{id:"a-u", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:"modern"}));
+    state.science.tech.push("ref-Carboniferous");
     out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
     delete viv.animals[1].sick;
     // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
