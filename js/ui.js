@@ -970,6 +970,7 @@ panelEl.addEventListener("click", e => {
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
   if(a === "tartab"){ tarTab = b.dataset.k; ui.panel(); return; }
+  if(a === "ghosttab"){ ghostTab = b.dataset.k; ui.panel(); return; }
   if(a === "specMove"){ startDeliver(b.dataset.id); return; }
   if(a === "specCancel"){ cancelDelivery(b.dataset.id); ui.panel(); saveSoon(); return; }
   if(a === "howTo"){ $("#dlgIntro").showModal(); return; }
