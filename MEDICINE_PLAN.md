@@ -109,6 +109,17 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Bulldoze confirm: always asks (see 8b, 26).
 - Toasts: found at a check-up, hurt or showing illness, treated on the spot, darted, admitted, recovered, band 3 warning, died (death dialog), trash thrown in (first of the day), PMC short on doses (once a day). Coaching toasts that tell the player what to build or do are dropped.
 
+## 8c. Mockups (approved)
+Canvas: https://claude.ai/artifact/9x8XCGk9JsJXcFcqe4yNqL (exhibit Health tab, animal panel, PMC panel, toasts, demolish confirm).
+- The exhibit's animal list shows a diagnosed disorder as a small yellow "`<Disorder>` (Genetic)" line under that animal's row.
+- Animal rows: "`<sp>` · `<Name>`, `<band>` · `<n>`%", health bar, status line.
+- Ward rows: "`<sp>` · `<Name>` · from `<ex>`", progress bar, ward status.
+- Sick in exhibits: "`<sp>` in `<ex>`: `<Name>`, `<band>`. `<status>`"
+- Empty beds show only in the "n of m beds" count.
+- The animal page's summary line drops "% DNA"; Accuracy and Genome Quality sit in the Health section as two number rows.
+- Toast colors: new cases, critical and out of medicine red; treated, recovered and cured green; the rest plain.
+- Demolish confirm title: still to pick.
+
 ## 8b. Wording (locked)
 All items approved. `<vet>` vet's name, `<sp>` species, `<name>` the animal's own name, `<ex>` exhibit, `<n>` a number.
 
@@ -197,4 +208,4 @@ All items approved. `<vet>` vet's name, `<sp>` species, `<name>` the animal's ow
 - Trash throwing moves out of medicine.js.
 
 ## To do
-8b. UI wording. 9. Old saves.
+9. Old saves.
