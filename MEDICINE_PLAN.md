@@ -127,6 +127,17 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Each name gets a row: its causes and who can get it (`CLADE` in data.js, done). Names are picked at random among those that fit. Each name's causes still to be mapped.
 - Open: genetic disorders (flavor of infection, a kind cured only by genome therapy, or no illness at all); fish and invertebrate names (owner to supply); whether every name in a kind shares the kind's numbers; whether Trash poisoning and Plant poisoning stand; items 6 to 35.
 
+## Genetic disorders (in progress)
+- A trait, not an illness: no severity or bands, never fatal on its own, and an animal can be sick and have one. At most one per animal.
+- Names: Osteoporosis, Cardiac Problems, Neurological Disorder, Weakened Immune System, Muscle Fatigue.
+- Rolled when a clone is made: chance = 60% x ((95 - DNA) / 45)^1.5, capped at 60% (50%: 60, 70%: 25, 85%: 6, 90%: 2, 95%+: none).
+- It works on the animal from the start, but stays hidden until the animal's first vet check-up diagnoses it. From then it's listed in the animal's menu for good, until genome therapy cures it.
+- Draft effects: Osteoporosis, injuries 1.5x as likely and more often Fractures; Cardiac Problems, illness and injury worsen 1.3x as fast; Neurological Disorder, paces more; Weakened Immune System, illness 2x as likely; Muscle Fatigue, slower, rests more, plays less.
+- These replace the flat frail-clone illness multiplier.
+- Medicine does nothing for it. Draft cure: genome therapy that lifts DNA to 95% clears it.
+- Every place that copies an animal (crates, specimens, the PMC, escapes) carries it, like names.
+- Open: old saves (only new clones, or roll existing animals), the effects, the cure line, whether genome therapy is renamed Genome Treatment.
+
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
 - Trash throwing moves out of medicine.js.
