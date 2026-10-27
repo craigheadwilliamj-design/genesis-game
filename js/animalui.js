@@ -147,7 +147,7 @@ function animalsTabHtml(e){
   const queued = new Set(state.staff.transfers.filter(t => !t.med).map(t => t.animalId));
   const rows = [...e.animals].sort(byName).map(a => {
     const s = SPECIES_BY_ID[a.sp], sk = noticed(a) && a.sick, v = Math.round(animalHp(a));
-    const hp = `${sk ? `${sickName(a)}, ${sickBand(a).label}` : "Healthy"}, ${v}% health`;
+    const hp = `${sk ? `${sickName(a)}, ${sickBand(a).label}` : "Healthy"} · ${v}%`;
     return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${esc(a.sp)}" data-id="${esc(a.id)}"${queued.has(a.id) ? " disabled" : ""}>${queued.has(a.id) ? "Moving" : "Move"}</button>${crateBtn(a)}${sellBtn(a)}</span></li>`;
   });
   return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul>${movesHtml(e)}</section>`;

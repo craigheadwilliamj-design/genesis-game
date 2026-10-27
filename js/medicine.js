@@ -1,12 +1,13 @@
 /* =====================================================================
    PALEO-MEDICINE
-   Animals fall ill (faster when hungry, dirty, or frail) and territorial
-   animals hurt each other. Mild illness is hidden until a vet's routine
-   check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
-   treat minor illnesses on the spot, and dart serious cases; keepers carry
-   those in, and the PMC treats them with medicine from the Botany Lab once the Research Lab has
-   researched it for their era.
-   Vets also dart escaped animals, and keepers carry those home.
+   Every case is a named condition (an injury, an infection or a poisoning)
+   that fits the animal's body and what brought it on, dirt above all. Cases
+   start and worsen through the day. Mild infections stay hidden until a
+   vet's check-up. Vets treat mild cases and poisonings where they stand,
+   and dart serious ones; keepers carry those to the Paleo-Medicine Center
+   (PMC), where a course runs on a timer and the animal goes home through
+   the delivery system. Clones can carry a genetic disorder, which only
+   genome therapy cures. Vets also dart escaped animals.
    ===================================================================== */
 
 let vcrew = [];   // vets walking around right now (positions aren't saved)
@@ -191,6 +192,9 @@ const noticed = a => !!a.sick && !a.sick.hidden;
 const animalHp = a => noticed(a) ? clamp(100 - a.sick.sev, 0, 100) : 100;
 const hpColor = hp => hp >= 100 ? "var(--good)" : hp > 60 ? "var(--warn)" : "var(--bad)";
 const daysSinceCheck = e => e.vetCheck == null ? 99 : state.day - e.vetCheck;
+// The causes in a risk list, as the player reads them
+const RISK_WORD = {dirt:"dirt", water:"foul water", biome:"wrong biome", shelter:"lack of shelter", lamp:"no heat lamp", hunger:"hunger", thirst:"thirst", stress:"stress", crowd:"crowding", fight:"rivals", attack:"predators"};
+const riskWords = why => [...new Set(why.map(w => RISK_WORD[w]).filter(Boolean))];
 function healthReport(e){
   const sick = e.animals.filter(noticed), hidden = e.animals.filter(a => a.sick && a.sick.hidden).length;
   let ill = 0, hurt = 0; const why = new Set();
@@ -324,6 +328,16 @@ function sendWardHome(p){
   if(!home){ discharge(p.a.id); const [x, y] = centroid(pmc.points); dropCrate(p.a, x, y); return; }
   const t = {id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmc.id, to:home.id, lab:true, ward:true};
   state.staff.transfers.push(t); assignDelivery(t);
+}
+// Send a patient somewhere other than home once it's well (its trip changes if it hasn't been picked up yet); why not, or null
+function movePatient(id, exId){
+  const p = state.health.ward.find(x => x.a.id === id), e = state.exhibits.find(x => x.id === exId), t = p && wardTrip(p);
+  if(!p) return "That patient is gone.";
+  if(!e) return "That exhibit is gone.";
+  if(t && t.cargo) return "Already on its way.";
+  const why = crateProblem(p.a, e) || keeperMoveProblem(e); if(why) return why;
+  p.home = e.id; if(t) t.to = e.id;
+  return null;
 }
 // A recovered patient whose trip home was lost (its exhibit gone, or the transfer dropped) gets a new one, or waits in a crate
 function wardTidy(){ for(const p of [...state.health.ward]) if(p.recovered && !wardTrip(p)) sendWardHome(p); }

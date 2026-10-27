@@ -185,6 +185,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     { const rp = {a:{id:"a-rp", sp:"arth"}, home:"e-v", recovered:true, dosed:true, done:1, need:1}; state.health.ward.push(rp);
       const t = {id:"tr-rp", animalId:"a-rp", sp:"arth", from:"b-pmc", to:"e-v", lab:true, ward:true}; state.staff.transfers.push(t);
       const held = bedsFree() === wardBeds() - 1 && patientStatus(rp) === "Recovered. Waiting for pickup.";
+      t.to = "e-gone"; rp.home = "e-gone";
+      out.wardMoveRetargets = movePatient("a-rp", "e-v") === null && t.to === "e-v" && rp.home === "e-v" && movePatient("a-rp", "e-nope") === "That exhibit is gone."
+        && (t.cargo = rp.a, movePatient("a-rp", "e-v") === "Already on its way.") && (delete t.cargo, /data-action="wardMove"/.test(pmcHtml(pmcB)));
       const got = pickUp(t); out.bedFreesAtPickup = held && got === rp.a && !state.health.ward.length && bedsFree() === wardBeds();
       state.staff.transfers = state.staff.transfers.filter(x => x !== t); }
 
@@ -230,7 +233,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.health.beds = HEALTH.beds;
       // the PMC panel: the ward with each patient's progress, and a bed to buy
       const pp = {a:{id:"a-pp", name:"ARTH-099", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:40}}, home:"e-v", cond:"cordyceps", med:"era", dosed:true, done:120, need:360};
-      state.health.ward.push(pp); const ph = pmcHtml(pmcB); state.health.ward = state.health.ward.filter(x => x !== pp);
+      state.health.ward.push(pp); const ph = pmcHtml(pmcB);
+      { const tk = exTabs.tab, tx = exTabs.ex, dk = viv.dirt; viv.dirt = 90; exTabs.ex = viv.id; exTabs.tab = "health"; const eh = exhibitHtml(viv); exTabs.tab = tk; exTabs.ex = tx; viv.dirt = dk;
+        out.healthTabRiskAndWard = /Risk: [^<]*dirt/.test(eh) && eh.includes("At the PMC") && eh.includes("ARTH-099") && /Treating, .+ left\./.test(eh) && eh.includes("<h3>Animals</h3>"); }
+      state.health.ward = state.health.ward.filter(x => x !== pp);
       out.pmcPanel = ph.includes(`Ward (1 of ${HEALTH.beds} beds)`) && ph.includes(`Buy bed (${money(HEALTH.bedPrice)}, +${money(HEALTH.bedUpkeep)} a day)`) && ph.includes("Cordyceps · from Bug house") && /Treating, .+ left\./.test(ph) && ph.includes("width:33%"); }
     // medicated feed: prevention, from whatever medicine the PMC holds (contemporary will do)
     { const techKeep = [...state.science.tech]; state.science.tech = state.science.tech.filter(t => !Object.values(MED_TECH).includes(t)); pmcB.store = {medmod:10};
@@ -2893,7 +2899,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalHealthInjured = /Bite Wound, Serious\./.test(hl()) && /Bitten by a Dimetrodon\./.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
       // the exhibit's Animals and Health tabs show each animal's health too
       { const ex = animalHome(a1.id), tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex.id; exTabs.tab = "animals"; const at = exhibitHtml(ex); exTabs.tab = "health"; const ht = exhibitHtml(ex); exTabs.tab = tk; exTabs.ex = tx;
-        out.exhibitTabsHealthBar = /Bite Wound, Serious, 45% health/.test(at) && /Bite Wound, Serious, 45% health/.test(ht) && /Healthy, 100% health/.test(ht) && /width:45%/.test(ht); }
+        out.exhibitTabsHealthBar = /Bite Wound, Serious · 45%/.test(at) && /Bite Wound, Serious · 45%/.test(ht) && /Healthy · 100%/.test(ht) && /width:45%/.test(ht); }
       a1.sick = {kind:"infection", name:"pneumonia", sev:10, hidden:true}; animalLive(true);
       out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Pneumonia/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
       // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low

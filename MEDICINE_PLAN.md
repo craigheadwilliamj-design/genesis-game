@@ -222,5 +222,5 @@ All in `upgradeSave`.
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
-## To do
-Build.
+## Status
+Built in five phases on this branch (conditions, vets and treatment, medicine, genetics, UI). Not yet published.
