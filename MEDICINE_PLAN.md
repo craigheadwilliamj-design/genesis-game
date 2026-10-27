@@ -116,6 +116,9 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Illness names: Pneumonia, Tuberculosis, Gastroenteritis, Avian Influenza (avian, theropod and sauropod dinosaurs only), Aspergillosis (birds and reptiles only), Nematodes, Ticks, Lice (mammals only), Foot and Mouth Disease (hooved mammals only), Bluetongue Virus.
 - Also for land animals: Tetanus, Botulism, both from dirty exhibits.
 - Aquatic names: White Spot Disease, Flukes, Saprolegniasis, Gas Bubble Disease (aquatic fish and invertebrates only), Nitrate Toxicity (aquatic fish and invertebrates only), Chitinoclastic Bacteria (shelled aquatic invertebrates), Cordyceps (land arthropods). Aquatic means the species' existing `aqua` or `pool` flag, so Tiktaalik counts as a land animal; land arthropods are the land invertebrates.
+- Fin Tear: an injury for aquatic fish.
+- The aquatic batch (White Spot, Flukes, Saprolegniasis, Gas Bubble, Nitrate Toxicity, Chitinoclastic) is for fish and invertebrates only. Marine reptiles and sea mammals get the basic illnesses instead.
+- Tiktaalik counts as an aquatic fish for illnesses (fish batch and Fin Tear), though it lives on land in the game.
 - Dirt is the main cause: most names come from a dirty exhibit (foul water is the dirt of tanks and pools). Other factors (cold, heat, stress, crowding, hunger) add their own names to the pool when they're present.
 - Genetic disorder names (the kind itself is open, see below): Osteoporosis, Cardiac Problems, Neurological Disorder, Weakened Immune System, Muscle Fatigue.
 - Each name gets a row: its causes and who can get it (`CLADE` in data.js, done). Names are picked at random among those that fit. Each name's causes still to be mapped.
