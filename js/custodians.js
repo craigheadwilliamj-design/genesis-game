@@ -74,6 +74,7 @@ function custDecide(c, r){
     if(d && custGo(c, w, kGraph.anchors[d.id], "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCustCarry(c);
   }
+  if(staffMaybeRest(c, closets())) return;
   // a finished specimen from the Genetics Lab goes to its exhibit before the chores
   const dv = deliveryJob(c, w);
   if(dv){
@@ -97,6 +98,7 @@ function custDecide(c, r){
 /* ---------- doing it ---------- */
 
 function custArrive(c){
+  if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toHaulSrc"){
     const h = c.haul, src = h && buildingById(h.src), dst = h && buildingById(h.dst);
     const amount = src && dst ? Math.min(h.amount, supplyOf(src, h.t), Math.floor(storeRoom(dst, h.t))) : 0;
@@ -163,6 +165,7 @@ function custodiansTick(dtMin){
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
       if(["scrubbing", "degraffiti", "emptying", "sweeping"].includes(c.job)){ const used = custWork(c, left); left -= used; if(!used && c.job !== "idle") left = 0; continue; }
+      if(c.job === "resting"){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = CUSTODIAN.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
@@ -205,7 +208,7 @@ function custodianStatus(m){
     toHaulSrc:`Fetching ${goodName(c.haul ? c.haul.t : "").toLowerCase()} from the ${src ? BUILDINGS[src.type].label.toLowerCase() : "store"}`,
     toHaulDst:`Restocking the ${dst ? BUILDINGS[dst.type].label.toLowerCase() : "stand"}${c.carry ? ` (${Math.round(c.carry.amount)} ${goodName(c.carry.type).toLowerCase()})` : ""}`,
     toScrub:`Walking to the ${n}`, scrubbing:`Scrubbing the ${n}`, toGraffiti:"Walking to some graffiti", degraffiti:"Scrubbing off graffiti", toBin:"Walking to a full bin", emptying:"Emptying a bin",
-    toSweep:"Walking to some litter", sweeping:"Sweeping up litter", home:"Heading back to the closet",
+    toSweep:"Walking to some litter", sweeping:"Sweeping up litter", home:"Heading back to the closet", toRest:"Going on break", resting:"On break",
     toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`,
   }[c.job] || "Waiting for work";
 }
