@@ -109,8 +109,8 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Bulldoze confirm: always asks (see 8b, 26).
 - Toasts: found at a check-up, hurt or showing illness, treated on the spot, darted, admitted, recovered, band 3 warning, died (death dialog), trash thrown in (first of the day), PMC short on doses (once a day). Coaching toasts that tell the player what to build or do are dropped.
 
-## 8b. Wording (in progress)
-Approved items are marked (ok). `<vet>` vet's name, `<sp>` species, `<name>` the animal's own name, `<ex>` exhibit, `<n>` a number.
+## 8b. Wording (locked)
+All items approved. `<vet>` vet's name, `<sp>` species, `<name>` the animal's own name, `<ex>` exhibit, `<n>` a number.
 
 ### Names and rules (ok)
 - Kinds: Injury, Infection, Poisoning (in lists: Injured, Infected, Poisoned). Bands: Mild, Serious, Critical. Stats: Accuracy, Genome Quality.
@@ -121,7 +121,7 @@ Approved items are marked (ok). `<vet>` vet's name, `<sp>` species, `<name>` the
 - Aquatic means the species' `aqua` or `pool` flag. Tiktaalik counts as an aquatic fish for illness (fish batch and Fin Tear). The aquatic batch is for fish and invertebrates only; marine reptiles get Gastroenteritis, Nematodes and Pneumonia, sea mammals those plus Tuberculosis.
 - Body rules (lists in data.js): Goring Injury only from a `GORES` attacker; Sprain, Joint Dislocation and Torn Claw/Hoof/Nail need legs (no fish, invertebrates, marine reptiles, sea mammals or `LIMBLESS`); Chipped Tooth needs teeth (no `TOOTHLESS`, fish or invertebrates); Chitinoclastic Bacteria only for `SHELLED` (Anomalocaris and Opabinia are out). Tetanus has no link to injuries.
 - Dirt is the main cause (foul water is the dirt of tanks and pools). Other causes add their names to the pool when present. A name is picked at random among those that fit the cause and the body; if none fit the cause, any that fits the body. Every name in a kind shares the kind's numbers.
-- Weather is one cause, "lack of shelter": heat waves, cold snaps and storms only count against an exhibit's exposure, and the player sees "lack of shelter" for all three.
+- Weather is one cause, "lack of shelter": heat waves, cold snaps and storms only count against an exhibit's exposure, and the player sees "lack of shelter" for all three. A vivarium's missing basking lamp is its own cause, "no heat lamp" (Pneumonia).
 
 | Cause | Draft names |
 |---|---|
@@ -141,12 +141,12 @@ Approved items are marked (ok). `<vet>` vet's name, `<sp>` species, `<name>` the
 10. Problems: No vets. / No PMC. / PMC not connected. / Vets can't get in. / Out of medicine.
 11. In the ward: Treating, `<n>`h left. / Waiting for doses. / Paused. No vets. / Recovered. Waiting for pickup. / Recovered. On the way home.
 12. Health tab chips: Healthy. / `<n>` sick or injured. / Vet check: today. / Vet check: `<n>` days ago. / Vet check: `<n>` days ago, overdue. / Never checked by a vet. / Medicated today. / Not medicated today. / `<n>` pieces of trash thrown in today. / Illness starts `<date>`.
-13. Risk line: "Risk: dirt, hunger, rivals." Words: dirt, foul water, wrong biome, lack of shelter, hunger, thirst, stress, crowding, rivals, predators.
+13. Risk line: "Risk: dirt, hunger, rivals." Words: dirt, foul water, wrong biome, lack of shelter, no heat lamp, hunger, thirst, stress, crowding, rivals, predators.
 14. Heading: At the PMC.
 15. Buttons: Call vet; Give/Stop medicated feed, "`<n>` doses a day"; Give/Stop genome therapy, "`<n>` to treat".
 16. Genetic line, yellow, top of the list: "`<Disorder>` (Genetic)" (ok).
 17. A sickness: "`<Name>`, `<band>`." e.g. "Laceration, Serious."
-18. Cause lines: From a fight with a `<sp>`. / Gored by a `<sp>`. / Bitten by a `<sp>`. / From lack of shelter. / From a dirty exhibit. / From foul water. / From the wrong biome. / From hunger. / From stress. / From crowding. / Ate trash. / Ate plants it can't digest.
+18. Cause lines: From a fight with a `<sp>`. / Gored by a `<sp>`. / Bitten by a `<sp>`. / From lack of shelter. / From no heat lamp. / From a dirty exhibit. / From foul water. / From the wrong biome. / From hunger. / From stress. / From crowding. / Ate trash. / Ate plants it can't digest.
 19. Well: Looks healthy.
 20. Stats rows: "Accuracy: `<n>`%", "Genome Quality: `<n>`%".
 21. Check-up line as now.
@@ -154,7 +154,7 @@ Approved items are marked (ok). `<vet>` vet's name, `<sp>` species, `<name>` the
 23. Bed button: Buy bed ($`<price>`, +$20 a day); hidden at 6.
 24. No ward-time multipliers shown anywhere (ok). The Medicine section shows stock meters only.
 25. PMC sections: Sick in exhibits, Check-ups, as now.
-26. Bulldoze confirm, every time (ok, building name to settle): "Are you sure you want to demolish the Paleo-Medicine Center? All animals will be returned to their exhibits." Buttons Yes / No.
+26. Bulldoze confirm, every time (ok, the building keeps its name): "Are you sure you want to demolish the Paleo-Medicine Center? All animals will be returned to their exhibits." Buttons Yes / No.
 27. Guest thought, Serious: That animal looked sick.
 28. Guest thought, Critical: That poor animal could barely stand.
 29. Check-up finds: `<vet>` found and treated `<Name>` in a `<sp>` in `<ex>`. / `<vet>` found and treated `<n>` cases in `<ex>`. / `<vet>` found `<Name>` in a `<sp>` in `<ex>`.
