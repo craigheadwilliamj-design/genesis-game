@@ -116,7 +116,7 @@ function grantsHtml(goal){
 // A crate's panel: who is inside, and Move (carry it), Open (into the exhibit it stands in, when it fits) and Sell
 function crateHtml(c){
   const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => inPoly(c.x, c.y, x.points)), fits = !!e && !crateProblem(c, e);
-  let h = `<div class="meta">${esc(s.name)} · ${esc(s.period)}${c.cl ? " · clone" : ""} · ${c.q ?? 90}% DNA${c.sex ? ` · <b title="${esc(c.sex)}">${esc(sexMark(c))}</b> ${esc(c.sex)}` : ""}</div>`;
+  let h = `<div class="meta">${esc(s.name)} · ${esc(s.period)}${c.cl ? " · clone" : ""} · ${c.q ?? 100}% Accuracy${c.sex ? ` · <b title="${esc(c.sex)}">${esc(sexMark(c))}</b> ${esc(c.sex)}` : ""}</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok">In a crate.</span><button class="btn sell" data-action="crateTool" data-id="${esc(c.id)}">Move</button>${fits ? `<button class="btn sell" data-action="crateOpen" data-id="${esc(c.id)}">Open in ${esc(e.name)}</button>` : ""}<button class="btn sell" data-action="crateSell" data-id="${esc(c.id)}">Sell +${money(Math.round(s.price * COST.animalResale))}</button></div>`;
   return h;
 }
@@ -307,7 +307,7 @@ function exOverviewHtml(e, rep){
   h += `<section><h3>Keepers and food</h3><div class="row"><span class="status ${g.ok ? "ok" : "no"}">${g.ok ? "Keepers can get in" : esc(g.text)}</span></div>${dishText(e) ? `<div class="row" style="margin-top:4px"><span class="status no">${esc(dishText(e))}</span></div>` : ""}`;
   if(!e.viv) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="gateTool">${e.gate ? "Move the gate" : "Place a gate"}</button></div>`;
   h += zoneRow("exhibit", e);
-  h += callRow(e, aquaEx(e) ? "aqua" : "keeper");
+  h += callRow(e, aquaEx(e) ? "aqua" : "keeper") + callRow(e, "vet");
   if(n){
     h += `<div style="margin-top:8px">${Object.keys(need).map(t => { const st = stockFor(e, t), mx = e.viv ? Math.round(trayFood(e, t) + trayShare(e, t)) : storeMax(e, t), hay = t === "paleoflora" && ((e.stock || {}).paleoflora || 0) < st - .01; return `<div class="factor" style="grid-template-columns:70px 1fr 74px"><span style="text-transform:capitalize" title="${hay ? "Partly grass hay standing in for Paleoflora" : ""}">${t}${hay ? "*" : ""}</span>${meter(st / Math.max(1, mx) * 100, FOOD_COLOR[t])}<span>${Math.round(st)}/${mx}</span></div>`; }).join("")}</div>`;
     h += `<div class="meta" style="margin-top:4px">${Object.entries(need).map(([t, u]) => `${u} ${t}`).join(", ")} a day</div>`;
@@ -614,27 +614,30 @@ function healthHtml(e){
     const d = daysSinceCheck(e), late = d >= HEALTH.checkEvery;
     items.push(hli(d === 0 ? "ok" : late ? "bad" : "warn", `${d >= 99 ? "Never checked by a vet." : d === 0 ? "Vet check: today." : `Vet check: ${d} day${d === 1 ? "" : "s"} ago${late ? ", overdue" : ""}.`}`));
   }
-  if(away.length) items.push(hli("warn", `At the PMC: ${away.map(p => `${esc(SPECIES_BY_ID[p.a.sp].name)} (${esc(patientStatus(p).replace(/\..*$/, "").toLowerCase())})`).join(", ")}.`));
   if(e.animals.length && !e.viv){
     const te = trashEaten(e);
     if(e.trash) items.push(hli(te >= .25 ? "bad" : "warn", `${e.trash} piece${e.trash === 1 ? "" : "s"} of trash thrown in today.`));
   }
   if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
-  if(anyMedTech() && e.medFeed) items.push(hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today."));
+  if(e.medFeed) items.push(hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today."));
+  const risk = riskWords(hr.why); if(e.animals.length && risk.length) items.push(hli("warn", `Risk: ${risk.join(", ")}.`));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
+  h += `</section>`;
+  // this exhibit's animals at the PMC, with how far along they are
+  if(away.length) h += `<section><h3>At the PMC</h3><ul class="herd">${away.map(p => { const s = SPECIES_BY_ID[p.a.sp], c = CONDITIONS[p.cond || (p.a.sick && p.a.sick.name)];
+    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span style="min-width:0">${pctHead(p.a.name || s.name, s.name, wardProgress(p), p.recovered ? "var(--good)" : "var(--gold)")}<span class="meta">${c ? `${esc(c.name)} · ` : ""}${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul></section>`;
   // every animal's health, the worst first; tap one to open it
-  if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
-  // genome therapy: vets lift clones' DNA at each check-up
+  h += `<section>`;
+  if(e.animals.length) h += `<h3>Animals</h3><ul class="herd">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span style="min-width:0">${hpHead(a, s, v)}${sk ? `<span class="meta">${esc(hpCond(a))} · ${esc(sickStatus(e, a))}</span>` : ""}${diagnosed(a) ? `<span class="gen">${esc(disName(a))} (Genetic)</span>` : ""}</span></li>`; }).join("")}</ul>`;
+  h += `<div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">`;
+  // genome therapy: a vet's trip to cure diagnosed genetic disorders
   if(e.animals.length && hasTech("genetherapy")){
-    const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} to improve</span></div>`;
+    const low = e.animals.filter(a => diagnosed(a) && geneGain(a) > 0).length;
+    h += `<div class="row"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} to treat</span></div>`;
   }
-  // medicated feed from the Botany Lab
-  if(anyMedTech()){
-    const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} dose${feedDoses(e) === 1 ? "" : "s"} a day${treatable < e.animals.length ? `, treats ${treatable} of ${e.animals.length}` : ""}</span></div>`;
-  }
-  return h + `</section>`;
+  // medicated feed, from the PMC's medicine
+  if(hasDept("pmc")) h += `<div class="row"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
+  return h + `</div></section>`;
 }
 
 // Moves waiting on keepers, into or out of this exhibit
@@ -669,6 +672,15 @@ function openMoveDialog(e, sp, id){
   $("#dlgMove").showModal();
 }
 // Queue a finished specimen's delivery to an exhibit, after a yes to the predator/prey or flyer warning
+// A PMC patient goes to another exhibit once it's well, with the same warnings
+function sendPatient(a, to){
+  const s = SPECIES_BY_ID[a.sp];
+  const go = () => { const why = movePatient(a.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${a.name || s.name} will be delivered to ${to.name} by the next free worker.`); afterChange(); };
+  const mix = mixWarning(s, to);
+  if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
+  if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
+  go();
+}
 function sendSpecimen(r, to){
   const s = SPECIES_BY_ID[r.sp];
   const go = () => { const why = deliverSpecimen(r.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${r.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
@@ -714,7 +726,7 @@ function animalCard(s, rep, mode){
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
   let h = `<div><h2>${t.label}</h2></div>`;
-  return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep)} a day</span></div>`;
+  return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep + (b.type === "pmc" ? bedUpkeep() : 0))} a day</span></div>`;
 }
 const dnaBar = d => `<div class="factor" style="grid-template-columns:1fr 44px"><span>${meter(d ? d.genome : 0, d && d.genome >= 100 ? "var(--good)" : "var(--gold)")}</span><span>${d ? d.genome : 0}%</span></div>`;
 
@@ -773,20 +785,20 @@ function generatorHtml(b){
 
 function pmcHtml(b){
   let h = deptHead(b);
-  const ward = state.health.ward;
+  const ward = state.health.ward, beds = wardBeds();
   h += staffNote("vet");
-  h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
-  h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
+  h += `<section><h3>Ward (${ward.length} of ${beds} beds)</h3>`;
+  if(ward.length) h += `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), v = wardProgress(p);
+    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span style="min-width:0">${pctHead(p.a.name || s.name, s.name, v, p.recovered ? "var(--good)" : "var(--gold)")}<div class="meta">${[CONDITIONS[p.cond || (p.a.sick && p.a.sick.name)] ? esc(CONDITIONS[p.cond || p.a.sick.name].name) : "", home ? `from ${esc(home.name)}` : ""].filter(Boolean).join(" · ")}</div><div class="meta">${esc(patientStatus(p))}</div></span>${wardTrip(p) && wardTrip(p).cargo ? "" : `<button class="btn sell" data-action="wardMove" data-id="${esc(p.a.id)}">Move</button>`}</li>`; }).join("")}</ul>`;
+  if(beds < HEALTH.bedsMax) h += `<div class="row" style="margin-top:10px"><button class="btn" data-action="buyBed"${canAfford(bedPrice()) ? "" : " disabled"}>Buy bed (${money(bedPrice())}, +${money(HEALTH.bedUpkeep)} a day)</button></div>`;
   h += `</section>`;
-  const cm = Math.floor(pmcStock(CMED));
-  h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
-  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label}: ${hasTech(id) ? "curable" : `best ${100 - MODERN.floor[era]}%`}</li>`).join("")}</ul>`;
-  h += `${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
-  const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
+  const cm = Math.floor(pmcStock(CMED)), bar = (label, have, cap, color) => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${label}</span>${meter(have / Math.max(1, cap) * 100, color)}<span>${Math.floor(have)}/${cap}</span></div>`;
+  h += `<section><h3>Medicine</h3>${bar("Contemporary", cm, pmcShare(b), GOOD_COLOR[CMED])}${medGoodsWanted().map(t => bar(goodName(t).replace(" medicine", ""), pmcStock(t), pmcShare(b), GOOD_COLOR[t])).join("")}</section>`;
+  const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a}))).sort((x, y) => y.a.sick.sev - x.a.sick.sev);
+  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="${a.sick.sev >= SICK_BAND[1].from ? "bad" : "warn"}">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}: ${esc(sickName(a))}, ${sickBand(a).label}. ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
   if(herds.length) h += `<section><h3>Check-ups</h3><ul class="issues">${herds.map(e => { const d = daysSinceCheck(e); return `<li class="${d >= HEALTH.checkEvery ? "bad" : ""}">${esc(e.name)}: ${d >= 99 ? "never checked" : d === 0 ? "checked today" : `checked ${d} day${d === 1 ? "" : "s"} ago`}</li>`; }).join("")}</ul></section>`;
-  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="bad">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}, ${Math.round(a.sick.sev)}%: ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   return h;
 }
 
@@ -956,7 +968,11 @@ panelEl.addEventListener("click", e => {
   if(a === "waterTool"){ openLandList("water"); return; }
   if(a === "aquaWater"){ if(it && it.points && lagoonWalled(it)) fillLagoon(it, b.dataset.k); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
+  if(a === "clone"){
+    const sp = b.dataset.sp, ex = sel && sel.kind === "exhibit" ? sel.id : null, sex = b.dataset.sex, go = () => { if(orderClone(sp, ex, sex)) done(); };
+    if(cloneQuality(sp) < 100) askConfirm("", "Clones with incomplete genomes can have genetic disorders. Continue?", "Yes", go, "No"); else go();   // a partial genome: a disorder is possible
+    return;
+  }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
@@ -966,6 +982,8 @@ panelEl.addEventListener("click", e => {
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
+  if(a === "wardMove"){ startWardMove(b.dataset.id); return; }
+  if(a === "buyBed"){ const why = buyBed(); if(why) ui.toast(why, "bad"); ui.panel(); return; }
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
@@ -1051,7 +1069,7 @@ panelEl.addEventListener("change", ev => {
 // A yes/no question inside the page
 function askConfirm(title, text, yes, onYes, no = "Cancel", onNo = null){
   const d = $("#dlgConfirm");
-  $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
+  $("#confirmTitle").textContent = title; $("#confirmTitle").hidden = !title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
   $("#confirmYes").onclick = () => { d.close(); onYes(); };
   $("#confirmNo").onclick = () => { d.close(); if(onNo) onNo(); };
   d.oncancel = onNo ? ev => ev.preventDefault() : null;   // a two-way choice can't be escaped out of
@@ -1065,7 +1083,7 @@ function speciesStatus(s){
   const sc = state.science, d = sc.dna[s.id];
   const lock = state.rating + 1e-9 < starsNeed(s) ? `Needs ${starsNeed(s)}★. You have ${starTxt(state.rating)}.` : "";
   if(isStarter(s)) return {group:lock ? "progress" : "now", cls:"ok", how:`Sold by partner parks for ${money(s.price)}.`, lock};
-  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at the Genetics Lab for ${money(s.price)}${d.genome < 100 ? `, though clones are only ${cloneQuality(s.id)}% DNA quality until it is whole` : ""}.`, lock};
+  if(cloneOpen(s.id)) return {group:lock ? "progress" : "now", cls:"ok", how:`Genome ${d.genome}% complete. Clone at the Genetics Lab for ${money(s.price)}.`, lock};
   if(sc.trips.some(t => t.sp === s.id)) return {group:"progress", cls:"wait", how:`A drone is out finding it now. Genome ${d ? d.genome : 0}%.`, lock};
   if(d) return {group:"progress", cls:"wait", how:`Genome ${d.genome}% complete. The Genetics Lab needs ${CLONE_GENOME.min}% to clone it. Send an expedition for more.`, lock};
   const where = sitesOf(s.id).filter(siteShown).map(x => isScouted(x.id) ? x.name : `an unscouted ${sitePeriod(x)} site`);

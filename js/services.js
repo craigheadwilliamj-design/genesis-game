@@ -299,3 +299,36 @@ function modProblem(b, id){
 }
 function addMod(b, id){ const why = modProblem(b, id); if(why) return why; spend(EDU_MODULES[id].price, "built"); (b.mods || (b.mods = [])).push(id); return null; }
 function dropMod(b, id){ b.mods = (b.mods || []).filter(x => x !== id); }
+
+/* ---------- trash thrown into exhibits (animals that eat it: medicine.js) ---------- */
+
+// Is there a working Do Not Feed sign by this exhibit's fence?
+const hasNoFeed = e => state.buildings.some(b => b.type === "nofeed" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= THROWN.signReach);
+// Share of throws the netting stops: full at 100% fence condition, none when the fence is wrecked
+const netCatch = e => THROWN.netCatch * condOf(e) / 100;
+// Chance a minute that a party at (x, y) throws trash into exhibit e: bins, guards and the sign cut it
+function throwChance(p, e, x, y){
+  let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
+  if(!c) return 0;
+  c *= Math.pow(1 - THROWN.dayDecay, e.trash || 0);
+  if(nearBin(x, y)) c *= THROWN.binCut;
+  if(hasNoFeed(e)) c *= THROWN.signCut;
+  if(e.net || e.aviary) c *= 1 - netCatch(e);
+  if(guardNear(x, y)) c *= SECURITY.deterCut;
+  return c * (1 - EDU.vandalCut * (p.edu || 0) / 100);
+}
+// Each minute, a party out on the paths beside an open exhibit might throw trash over the fence
+function throwTick(p, dt){
+  if(p.home || p.in || !p.at || p.at.rail) return;
+  const x = p.at.x, y = p.at.y;
+  for(const e of state.exhibits){
+    if(e.viv || !e.animals.length || distToEdge(x, y, e.points) > THROWN.reach) continue;
+    if(Math.random() < 1 - Math.pow(1 - Math.min(.5, throwChance(p, e, x, y)), dt)){
+      e.trash = (e.trash || 0) + THROWN.pieces; p.trash = 0;
+      if(p.rowdy){ p.vandal = true; if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); } }
+      state.today.thrown = (state.today.thrown || 0) + 1;
+      if(state.today.thrown === 1) events.toast(`A guest threw trash into ${e.name}.`, "bad");
+    }
+    return;
+  }
+}

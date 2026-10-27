@@ -91,7 +91,6 @@ function oracleHtml(b){
   } else {
     h += tabBar("oera", ERA_ORDER.map(era => ({key:era, label:ERA_LABEL[era], color:ERA_COLOR[era], lock:!hasTech(MED_TECH[era])})), oracleEra);
     h += `<ul class="shop" style="margin-top:8px">${projectRow("tech", MED_TECH[oracleEra], esc(TECH.find(t => t.id === MED_TECH[oracleEra]).label), esc(TECH.find(t => t.id === MED_TECH[oracleEra]).text))}</ul>`;
-    h += `<h3 style="margin-top:12px">Refine</h3><ul class="shop">${TIME_PERIODS.filter(p => ERA_OF[p.id] === oracleEra).map(p => projectRow("refine", p.id, `<span class="dot" style="background:${PERIOD_COLOR[p.id]}"></span>${p.id}`, `${p.ago}.`)).join("")}</ul>`;
     h += `<h3 style="margin-top:12px">Genome therapy</h3><ul class="shop">${techRows("gene")}</ul>`;
   }
   h += `</div></section>`;
@@ -262,7 +261,7 @@ function specimensHtml(){
     const s = SPECIES_BY_ID[r.sp], t = specimenDelivery(r.id), e = t && state.exhibits.find(x => x.id === t.to), who = t && t.keeper ? ((staffById(t.keeper) || {}).s || {}).name || "Staff" : null;
     const status = !t ? "Waiting for delivery." : t.cargo ? `${who || "Staff"} is carrying it to ${e ? e.name : "an exhibit"}.` : who ? `${who} is on the way to the lab.` : `To ${e ? e.name : "an exhibit"}. Waiting for staff.`;
     const btn = !t ? `<button class="btn sell" data-action="specMove" data-id="${esc(r.id)}">Move</button>` : t.cargo ? "" : `<button class="btn sell" data-action="specCancel" data-id="${esc(r.id)}">Cancel</button>`;
-    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(r.name || s.name)}</b>${r.sex ? ` <b title="${esc(r.sex)}">${esc(sexMark(r))}</b>` : ""} <span class="meta">${esc(s.name)} · ${r.q ?? 90}% DNA</span><br><span class="meta">${esc(status)}</span></span>${btn}</li>`;
+    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(r.name || s.name)}</b>${r.sex ? ` <b title="${esc(r.sex)}">${esc(sexMark(r))}</b>` : ""} <span class="meta">${esc(s.name)} · ${r.q ?? 100}% Accuracy</span><br><span class="meta">${esc(status)}</span></span>${btn}</li>`;
   }).join("")}</ul></section>`;
 }
 function tarHtml(b){

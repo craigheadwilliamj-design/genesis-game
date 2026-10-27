@@ -2087,7 +2087,7 @@ function animateAnimals(dt){
     if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
     if(d < .3){ h.wp = h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
-    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * dt);
+    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * (h.a && h.a.sick ? sickBand(h.a).gait : 1) * disFx(h.a, "gait") * dt);
     const px = h.x, py = h.y;
     h.x += dx/d * step; h.y += dy/d * step;
     // last line of defence: a land animal never takes a step into the water (one already in it may keep wading out)
@@ -2325,7 +2325,7 @@ function setTool(t){
   else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "gallery") showBar("Place a viewing gallery", "Tap a pool's fence beside a guest path. The gallery stands outside it, its glass against the water.", `${money(BUILDINGS.gallery.price)} each, ${money(BUILDINGS.gallery.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(t === "uncrate" && crateMode === "deliver"){ const r = specimens().find(x => x.id === crateSel); showBar(r ? `Deliver the ${SPECIES_BY_ID[r.sp].name}` : "Deliver a specimen", "Tap the exhibit it goes to.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
+  else if(t === "uncrate" && (crateMode === "deliver" || crateMode === "ward")){ const r = (crateMode === "ward" ? state.health.ward.map(x => x.a) : specimens()).find(x => x.id === crateSel); showBar(r ? `Deliver the ${SPECIES_BY_ID[r.sp].name}` : "Deliver a specimen", "Tap the exhibit it goes to.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there, or open ground to set it down.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(landKey(t)){
     const L = LAND[landKey(t)];
@@ -3210,9 +3210,10 @@ let crateSel = null, crateGhost = null, crateMode = "crate";   // the crate bein
 function startUncrate(id){ crateSel = id; crateMode = "crate"; crateGhost = null; closePanel(); setTool("uncrate"); }
 // A finished specimen's crate rides the pointer; tapping an exhibit it fits queues its delivery (sendSpecimen, ui.js)
 function startDeliver(id){ crateSel = id; crateMode = "deliver"; crateGhost = null; closePanel(); setTool("uncrate"); }
+function startWardMove(id){ crateSel = id; crateMode = "ward"; crateGhost = null; closePanel(); setTool("uncrate"); }   // a PMC patient: pick where it goes once it's well
 // Over an exhibit it fits, the crate opens there; anywhere else it's set down if the spot is free
 function crateSpot(ev){
-  const deliver = crateMode === "deliver", p = toWorld(ev.clientX, ev.clientY), r = (deliver ? specimens() : crates()).find(x => x.id === crateSel);
+  const deliver = crateMode === "deliver" || crateMode === "ward", p = toWorld(ev.clientX, ev.clientY), r = (crateMode === "ward" ? state.health.ward.map(x => x.a) : deliver ? specimens() : crates()).find(x => x.id === crateSel);
   const e = state.exhibits.find(x => inPoly(p.x, p.y, x.points)) || null;
   if(!r) return {x:p.x, y:p.y, e, r, open:false, deliver, why:"That crate is gone."};
   if(deliver){ const why = e ? crateProblem(r, e) || keeperMoveProblem(e) : "Tap an exhibit."; return {x:p.x, y:p.y, e, r, open:!why, deliver, why}; }
@@ -3238,8 +3239,8 @@ function crateTap(ev){
   if(!g.r){ setStat(g.why, true); return; }
   if(g.deliver){
     if(!g.open){ setStat(g.why, true); return; }
-    const r = g.r, e = g.e; crateSel = null; crateGhost = null; setTool("select");
-    sendSpecimen(r, e);
+    const r = g.r, e = g.e, ward = crateMode === "ward"; crateSel = null; crateGhost = null; setTool("select");
+    if(ward) sendPatient(r, e); else sendSpecimen(r, e);
     return;
   }
   if(g.why){ setStat(g.why, true); return; }
@@ -3291,6 +3292,7 @@ function bulldozeItem(kind, it){
   const go = () => { if(!findItem(kind, it.id)) return; const r = refundFor(kind, it); removeItem(kind, it); setStat(`Bulldozed for ${money(r)} back.`); };
   if(!asksBulldoze(kind, it)){ go(); return; }
   const t = BUILDINGS[it.type];
+  if(it.type === "pmc"){ askConfirm("Demolish Paleo-Medicine Center?", "Are you sure you want to demolish the Paleo-Medicine Center? All animals will be returned to their exhibits.", "Yes", go, "No"); return; }
   askConfirm(`Bulldoze ${t.label}?`, `This removes the ${t.label} from your park and gives back ${money(refundFor(kind, it))}. Are you sure?`, "Bulldoze", go);
 }
 

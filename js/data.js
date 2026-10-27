@@ -589,9 +589,9 @@ const CLONE_DAYS_PER_SPACE = 1000;
 const TAR_UPGRADE = {speed:.75};
 // The Time Travel Lab upgrades, researched at the Research Lab: trip price and time multipliers per level
 const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
-// Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
-// runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
-const CLONE_GENOME = {min:60, q0:40, failMax:.35};
+// Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. A clone's Accuracy (a.q) is the genome % at its cloning,
+// fixed for life; its Genome Quality (a.gq) starts the same and genome therapy raises it. The lower its Accuracy, the likelier a genetic disorder (DISORDERS).
+const CLONE_GENOME = {min:60, failMax:.35};
 // Clones from a partial genome can die in the incubator: `failMax` chance at the minimum, none once the genome is whole. A failed clone stops
 // partway (between `failFrom` and `failTo` of its time), keeps its bay and fee, and sits there until the player discards it.
 const CLONE_FAIL = {from:.2, to:.9, causes:[
@@ -923,7 +923,8 @@ const THOUGHTS = {
   ejected:    {text:"Security threw us out!"},
   hiding:     {text:"Where are the animals? They're all hiding."},
   feeding:    {text:"It was great watching them eat.", good:true},
-  sickly:     {text:"Some of those animals looked unwell."},
+  sickly:     {text:"That animal looked sick."},
+  critical:   {text:"That poor animal could barely stand."},
 };
 
 // Each vivarium size is also a building you can place
@@ -1047,12 +1048,8 @@ const THROWN = {
   signReach:20,        // a sign this close to a fence counts for the exhibit
   dayDecay:.5,         // each throw already made into an exhibit today cuts the chance of the next by this share (crowds don't pile it up)
   pieces:1,            // pieces of trash one throw adds
-  eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
+  eat:.12,             // chance a day an animal eats trash and gets Foreign Object Ingestion, for each piece per animal in the exhibit (capped at eatMax)
   eatMax:.6,
-  deadly:.02,          // share of animals that eat trash and die at once, rather than falling ill
-  sev:50,              // how bad the illness starts when one eats trash (0 to 100)
-  worsen:25,           // and how much worse it gets each night untreated: dead in two nights
-  sevCap:70,           // an animal already sick gets worse from trash, but not past this, so a vet still has a night
 };
 // Guests learn about the animals from info signs, field guides, and the Education Center
 const EDU = {
@@ -1304,7 +1301,7 @@ const LOGI = {
   coolerCut:.6,        // cooler boxes multiply spoilage
   forklift:3,          // a forklift multiplies a restock trip's load
   urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
-  pmcDoses:150,        // doses the PMC keeps on hand
+  pmcDoses:200,        // doses the PMC holds, split evenly between contemporary medicine and each era's (pmcShare)
   dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
   rushMarkup:1.75,     // a rush order costs this much
   rushLot:50,          // units in a rush order
@@ -1329,7 +1326,7 @@ BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph
                        store:{cap:600, holds:["meat", "fish", "fruit", "shellfish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
                        full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
-                  store:{cap:1500, holds:ORDER_GOODS, spoil:1, bulk:true, dock:true},
+                  store:{cap:1500, holds:ORDER_GOODS.concat(MED_GOODS), spoil:1, bulk:true, dock:true},   // era medicine only lands here when the PMC and cold stores are full
                   full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops. Trucks come overnight and every two hours while the park is open. They need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
 for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
@@ -1408,19 +1405,17 @@ const TECH = [
   {id:"ghostmk4", group:"ghost", label:"Mk. IV drones", points:140, needs:"ghostmk3", text:"Drones come back empty handed 40% less often."},
   {id:"ghostmk5", group:"ghost", label:"Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
   // Genetics
-  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send expeditions for better samples to raise it."},
+  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets cure a clone's genetic disorder by bringing its genome up to the lab's best for its species. Only works once the lab's genome is ahead of the animal's."},
   // Paleo-Flora: plants and medicine, grown at the Botany Lab
   {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"The Botany Lab starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from the Time Travel Lab first."},
   {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
   {id:"paleoplant", group:"flora", era:"paleozoic", label:"Paleozoic flora", points:65, needs:"paleoflora", text:"Lycopod trees, horsetails, and seed ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
   {id:"sterile",    group:"flora", label:"Sterile prehistoric plants", points:30, needs:"paleoflora", text:"Seedless de-extinct plants that can't spread, so plants from any period can grow out in the park, along paths and in gardens. Mesozoic and Paleozoic ones still come from the Botany Lab."},
   {id:"greenhouse", group:"flora", label:"Greenhouses",      points:30, needs:"paleoflora", text:"Build greenhouses near the Botany Lab to grow Paleoflora faster."},
-  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. Refine it for each period to cure them fully."},
-  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. Needs Mesozoic plant DNA. Refine it for each period to cure them fully."},
-  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Paleozoic animals, from the Cambrian to the Permian. Needs Paleozoic plant DNA. Refine it for each period to cure them fully."},
+  {id:"medceno",    group:"med", era:"cenozoic",  label:"Cenozoic medicine",  points:12, text:"The Botany Lab grows medicine for Paleogene, Neogene, and Quaternary animals. They recover faster at the PMC."},
+  {id:"medmeso",    group:"med", era:"mesozoic",  label:"Mesozoic medicine",  points:45, text:"The Botany Lab grows medicine for Triassic, Jurassic, and Cretaceous animals. They recover faster at the PMC. Needs Mesozoic plant DNA."},
+  {id:"medpaleo",   group:"med", era:"paleozoic", label:"Paleozoic medicine", points:60, text:"The Botany Lab grows medicine for Paleozoic animals, from the Cambrian to the Permian. They recover faster at the PMC. Needs Paleozoic plant DNA."},
 ];
-// Refining an era's medicine for one period: a cure for that period's animals. Costs by era.
-const REFINE_POINTS = {cenozoic:8, mesozoic:14, paleozoic:20};
 const MOAT_PER_METER = 150;
 const AVIARY_PER_SQM = 4;
 const NET_PER_METER = 25;   // catch netting along the fence
@@ -1445,34 +1440,105 @@ const ESCAPE = {
 // keepers carry them in, and the PMC treats them with medicine from the Botany Lab.
 const HEALTH = {
   startDay:18,         // new parks: nobody gets sick before this day
-  illChance:.005,      // chance a well-kept animal falls ill each day
+  step:60,             // park minutes between health steps: new cases are rolled and sick animals get worse this often, through the day
+  illChance:.003,      // chance a day a well-kept animal falls ill; dirt is what mostly raises it
   hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
-  dirtPer:25,          // every this many points of dirt above the unhappy line adds 1× more risk
-  frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
-  grassSick:2,         // old plant-eaters eating only plants they never evolved for get sick this much more (less for a share of it)
+  dirtPer:12,          // every this many points of dirt above the unhappy line adds 1x more risk
+  crowdIll:1.5,        // a cramped exhibit (less room than its animals need) makes illness this much more likely
+  grassSick:.004,      // chance a day an old plant-eater eating only plants it never evolved for is poisoned by them (less for a share of it)
   territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
   attacked:.15,        // chance a day an animal is hurt by a species that preys on it
-  illStart:20, injuryStart:25,       // how bad a new case starts (0 to 100)
-  illWorsen:8, injuryWorsen:6,       // how much worse it gets each day untreated; 100 kills
-  sickHappy:8,         // happiness lost per sick animal, as a share of the herd
+  ground:.01,          // chance a day an animal that can get Bumblefoot gets it on dirty ground or in the wrong biome
+  sickHappy:8,         // happiness lost per sick animal, as a share of the herd (times its band's happy)
   dartMinutes:8,       // how long a vet takes to dart a sick animal
-  obviousAt:40,        // an illness this bad shows; milder ones stay hidden until a vet checks the exhibit (0 shows everything)
+  obviousAt:40,        // a hidden case shows once it gets this bad
   checkEvery:3,        // days between vet check-ups before an exhibit is overdue
   checkMinutes:5,      // time a vet spends looking over an exhibit's animals
-  minorBelow:40,       // illnesses under this are minor: a vet treats them on the spot, and medicated feed clears them up
-  fieldMinutes:12,     // time a vet takes to treat a minor illness on the spot
-  fieldDose:1,         // medicine doses an on-the-spot treatment uses
-  beds:6,              // patients the PMC holds at once
-  healPerNight:45,     // severity a treated patient recovers each night
-  dose:2,              // medicine doses one patient's treatment uses
+  heal:2,              // a day a mild injury heals on its own, while the exhibit is fed, watered and clean and the animal is calm
+  healStress:60,       // calm: stress under this
+  beds:2,              // patients the PMC holds at once, to start with
+  bedsMax:6,           // the most it can have
+  bedPrice:4000,       // the first bed bought costs this, each one after `bedGrowth` times the last
+  bedGrowth:1.5,
+  bedUpkeep:20,        // each bought bed adds this a day to the PMC's upkeep
+  dose:2,              // medicine doses one patient's course uses, taken when it starts
+  wardPerPoint:12,     // park minutes of treatment for each point of severity (times the medicine's era factor, MEDICINE)
+};
+// Every condition is one of three kinds, and shares its kind's numbers:
+//   start, worsen   severity a new case starts at, and how much worse it gets a day untreated (100 kills)
+//   hidden          a mild case stays hidden until a vet's check-up (or until it reaches HEALTH.obviousAt)
+//   field, fieldMin, fieldDose   a vet treats it where it stands up to this severity, taking this long and this many doses
+const SICK_KIND = {
+  injury:    {label:"Injury",    adj:"Injured",  start:25, worsen:6,  field:40,  fieldMin:12, fieldDose:1},
+  infection: {label:"Infection", adj:"Infected", start:20, worsen:8,  field:40,  fieldMin:12, fieldDose:1, hidden:true},
+  poison:    {label:"Poisoning", adj:"Poisoned", start:50, worsen:25, field:100, fieldMin:20, fieldDose:2},
+};
+// What being this sick does, from `from` severity up. rest is added to the rest score, act multiplies playing and wandering,
+// eat how fast it eats, gait how fast it walks, stress what it adds to stress, happy how much of a sick animal it counts as for its exhibit
+const SICK_BAND = [
+  {label:"Mild",     from:0,  rest:0,  act:1,  eat:1,   gait:1,  stress:6,  happy:.5},
+  {label:"Serious",  from:40, rest:30, act:.6, eat:1,   gait:.7, stress:14, happy:1},
+  {label:"Critical", from:75, rest:90, act:.2, eat:.35, gait:.5, stress:24, happy:1.5},
+];
+// The conditions. A new case picks one at random among those its body can get (who, not) and its cause brings on (from);
+// with no cause that fits, any its body can get.
+//   who   body tags (bodyTags in medicine.js): a CLADE name, or any, vert (vertebrates), landvert, tetrapod (vertebrates but fish),
+//         aqfish and aqinvert (fish and invertebrates that live in water), landbug (land invertebrates), shelled, legs, teeth, or a species id
+//   from  dirt, water (foul water, the dirt of tanks and pools), biome (the wrong one), shelter (weather with nowhere to shelter),
+//         lamp (no heat lamp), stress, crowd, hunger, thirst, trash, plants (ones it never evolved for), fight, attack, gore
+//   only  only its own cause brings it on, never as a stand-in
+const CONDITIONS = {
+  concussion:  {name:"Concussion",          kind:"injury", who:["any"], not:["aqfish"], from:["fight", "shelter"]},
+  fracture:    {name:"Fracture",            kind:"injury", who:["tetrapod"], from:["fight", "attack", "shelter"]},
+  laceration:  {name:"Laceration",          kind:"injury", who:["any"], from:["fight", "attack", "shelter"]},
+  sprain:      {name:"Sprain",              kind:"injury", who:["legs"], from:["fight", "shelter"]},
+  bite:        {name:"Bite Wound",          kind:"injury", who:["any"], from:["fight", "attack"]},
+  gore:        {name:"Goring Injury",       kind:"injury", who:["any"], from:["gore"], only:true},
+  dislocation: {name:"Joint Dislocation",   kind:"injury", who:["legs"], from:["fight"]},
+  claw:        {name:"Torn Claw/Hoof/Nail", kind:"injury", who:["legs"], from:["fight"]},
+  tooth:       {name:"Chipped Tooth",       kind:"injury", who:["teeth"], from:["fight"]},
+  bumblefoot:  {name:"Bumblefoot",          kind:"injury", who:["bird", "theropod", "reptile"], from:["dirt", "biome"]},
+  fintear:     {name:"Fin Tear",            kind:"injury", who:["aqfish"], from:["fight", "attack", "shelter"]},
+  pneumonia:   {name:"Pneumonia",           kind:"infection", who:["tetrapod"], from:["dirt", "shelter", "lamp"]},
+  tb:          {name:"Tuberculosis",        kind:"infection", who:["landvert", "seamammal"], from:["dirt", "crowd", "stress"]},
+  gastro:      {name:"Gastroenteritis",     kind:"infection", who:["vert"], from:["dirt", "water"]},
+  avianflu:    {name:"Avian Influenza",     kind:"infection", who:["bird", "theropod", "sauropod"], from:["dirt", "stress", "shelter"]},
+  aspergillosis:{name:"Aspergillosis",      kind:"infection", who:["bird", "reptile"], from:["dirt", "shelter"]},
+  nematodes:   {name:"Nematodes",           kind:"infection", who:["vert"], from:["dirt", "hunger"]},
+  ticks:       {name:"Ticks",               kind:"infection", who:["reptile", "ornithischian", "sauropod", "theropod", "pterosaur", "bird", "synapsid", "mammal", "hooved"], from:["dirt"]},
+  lice:        {name:"Lice",                kind:"infection", who:["mammal", "hooved"], from:["dirt"]},
+  fmd:         {name:"Foot and Mouth Disease", kind:"infection", who:["hooved"], from:["dirt", "crowd"]},
+  bluetongue:  {name:"Bluetongue Virus",    kind:"infection", who:["hooved"], from:["dirt", "shelter"]},
+  tetanus:     {name:"Tetanus",             kind:"infection", who:["landvert"], from:["dirt"]},
+  whitespot:   {name:"White Spot Disease",  kind:"infection", who:["aqfish", "anom", "opab"], from:["water", "stress", "shelter"]},
+  flukes:      {name:"Flukes",              kind:"infection", who:["aqfish"], from:["water"]},
+  saprolegniasis:{name:"Saprolegniasis",    kind:"infection", who:["aqfish"], from:["water", "shelter"]},
+  chitino:     {name:"Chitinoclastic Bacteria", kind:"infection", who:["shelled", "anom", "opab"], from:["water"]},
+  cordyceps:   {name:"Cordyceps",           kind:"infection", who:["landbug"], from:["dirt", "shelter"]},
+  foreign:     {name:"Foreign Object Ingestion", kind:"poison", who:["any"], from:["trash"], only:true},
+  modernplant: {name:"Modern Plant Poisoning", kind:"poison", who:["any"], from:["plants"], only:true},
+  botulism:    {name:"Botulism",            kind:"poison", who:["landvert"], from:["dirt"]},
+  nitrate:     {name:"Nitrate Toxicity",    kind:"poison", who:["aqfish", "aqinvert"], from:["water"]},
+  gasbubble:   {name:"Gas Bubble Disease",  kind:"poison", who:["aqfish", "aqinvert"], from:["water"]},
 };
 // Genome therapy (Research Lab tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
 const GENE = {
-  minutes:10,          // extra time a check-up takes for each animal treated
-  step:20,             // most DNA quality points one procedure adds
-  minGain:5,           // the lab's genome has to beat the animal by this much to be worth it
+  minutes:10,          // a vet's time per animal treated
   base:500,            // fixed price of a procedure
-  perPoint:60,         // plus this for each quality point gained
+  perPoint:60,         // plus this for each Genome Quality point gained
+};
+// Genetic disorders: a clone may be born with one, more likely the lower its Accuracy. It works on the animal from the start, a vet's
+// check-up diagnoses it, and only genome therapy cures it. The chance: `most` x ((`clear` - Accuracy) / (`clear` - CLONE_GENOME.min))^`curve`, none at `clear` or above.
+const DISORDER_ROLL = {most:.6, clear:95, curve:1.5};
+//   hurt, ill    multiply the chance of an injury or an infection     worsen   multiplies how fast any case gets worse
+//   fracture     share of its injuries that are Fractures (where it can get one)     stress   multiplies the stress the exhibit puts on it
+//   pace         added to its pacing score     gait, play, rest   walking speed, playing and wandering, and extra rest score
+const DISORDERS = {
+  osteo:   {name:"Osteoporosis",            hurt:1.5, fracture:.5},
+  cardiac: {name:"Cardiac Problems",        worsen:1.3},
+  neuro:   {name:"Neurological Disorder",   stress:1.75, pace:15},
+  immune:  {name:"Weakened Immune System",  ill:2},
+  fatigue: {name:"Muscle Fatigue",          gait:.75, play:.6, rest:20},
 };
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
@@ -1481,26 +1547,22 @@ const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "di
 const MEDICINE = {
   capacity:60,         // doses the Botany Lab holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
-  feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
-  feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
+  feedCut:.35,         // medicated feed multiplies the chance of an infection by this
+  dockWard:{cenozoic:1, mesozoic:1.5, paleozoic:2},   // a ward course on contemporary medicine takes this much longer, the further back the animal
+  eraWard:.75,         // and on the era's own medicine this long
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
-// Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
-// but can't cure prehistoric illness for good: the animal goes home with a chronic case.
+// Contemporary medicine: the dock buys it and custodians carry it to the PMC. It treats any animal (slower for older ones in the ward, MEDICINE.dockWard).
 const MODERN = {
   stock:30,            // doses the dock keeps on order (auto-ordering)
   cost:25,             // price of each dose at the dock
-  heal:{cenozoic:.9, mesozoic:.7, paleozoic:.5},     // how well it works, as a share of the era's own medicine
-  floor:{cenozoic:5, mesozoic:10, paleozoic:15},    // how sick it leaves an animal, at best
-  chronicHappy:.25,     // a chronic case counts as this much of a sick animal for happiness
 };
 const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoic"};
 const VET = {
   hireCost:3000,
   wage:200,
   speed:WALK_PER_MIN * STAFF_PACE,  // vets walk at STAFF_PACE of full walking speed
-  patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:15, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from the Botany Lab."};
@@ -1770,7 +1832,7 @@ const SEX = {
 //   two or more males with females fight, more with more males and less room. Solitary species dislike company (same sex most).
 //   Pairs: one male and one female is ideal. Stress numbers are 0 to 100 added to the animal's stress target.
 const SOCIAL = {
-  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, DNA quality (a.q), and being male
+  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, Accuracy (a.q), and being male
   bachelor:3, matriarch:3,           // happiness bonus for a stable all-male / all-female herd or pack
   soloSame:30, soloOpp:8, soloCap:60,// a loner's stress per same-sex / opposite-sex animal sharing the pen, and the most
   soloHappy:.25,                     // happiness lost per point of that stress (averaged over the loners)
@@ -1812,6 +1874,33 @@ const ACTS = {
 };
 // Enrichment: toy points a species wants, scaled by its herd and size (see enrichNeed), and how much each part counts
 const ENRICH = {per:1, toys:.35, habitat:.35, room:.3, vivScale:3, melt:2, vivBase:.2};   // melt: days a frozen treat loses in a heat wave   // vivScale: small vivarium animals are measured on this scale, so they still want a few toys
+// What each species is, for illnesses that only some bodies get. Every species has one.
+//   invert, fish, amphibian, reptile (land), marine (marine reptile), pterosaur, ornithischian, sauropod (and early sauropodomorphs),
+//   theropod, bird (Archaeopteryx onward), synapsid (not yet mammals), mammal, hooved (hooved mammals), seamammal (whales, dolphins, seals, sea cows)
+const CLADE = {
+  invert:["anom", "opab", "olen", "came", "ptry", "arth", "pulm", "mega", "gigt", "prom", "tmyr", "rmlo"],
+  fish:["saca", "both", "dunk", "stet", "rhiz", "heli", "tikt", "mgdn"],
+  amphibian:["icht", "mibr", "dcau", "eryo", "seym", "plhy", "prio", "beel", "kool", "gtod"],
+  reptile:["hylo", "scut", "sile", "shar", "long", "desm", "post", "eryt", "simo", "dsuc", "bari", "tita", "mchl", "mlan"],
+  marine:["noth", "shon", "ichy", "elsm", "mosa"],
+  pterosaur:["dimo", "pter", "quet"],
+  ornithischian:["hete", "dryo", "scel", "kent", "steg", "hyps", "mcer", "psit", "prot", "minm", "para", "pach", "igua", "styr", "anky", "tric"],
+  sauropod:["plat", "cama", "apat", "dipl", "brac", "nige", "pata"],
+  theropod:["coel", "herr", "comp", "orni", "anch", "yiqi", "scan", "dilo", "cryo", "cera", "mgal", "allo", "torv", "mono", "micr", "ornm", "ovir",
+            "gall", "velo", "conc", "utah", "bary", "ther", "yutt", "cnot", "dche", "spin", "carc", "trex"],
+  bird:["arch", "waim", "kele", "drom", "psil", "arge", "ornw", "dodo", "ppig"],
+  synapsid:["diic", "lyst", "mosc", "dime", "este", "coty", "ante", "inos", "liso"],
+  mammal:["ples", "lept", "ptil", "miac", "hyae", "paki", "ambu", "dino", "dgal", "nura", "proc", "amph", "chal", "plty", "sdel", "dire", "arct",
+          "doed", "mgth", "smil", "mast", "mamm", "colm", "thyl", "aind", "gpit"],
+  hooved:["sifr", "uint", "andr", "arsi", "pcer", "daeo", "aepy", "siva", "hopl", "macr", "mglo", "elas"],
+  seamammal:["basi", "enal", "kntr", "stel"],
+};
+const CLADE_OF = Object.fromEntries(Object.entries(CLADE).flatMap(([c, ids]) => ids.map(id => [id, c])));
+// Bodies some injuries and illnesses need. Fish, invertebrates and swimmers already have no legs to sprain; these are the rest.
+const GORES = ["tric", "styr", "cnot", "este", "arsi", "elas", "mglo", "siva", "hopl", "uint", "sdel", "mast", "mamm", "colm", "plty", "steg", "kent"];   // horns, tusks, antlers or spikes: what it hurts is gored
+const LIMBLESS = ["tita"];
+const TOOTHLESS = ["ornm", "gall", "dche", "ovir", "waim", "kele", "drom", "psil", "arge", "ornw", "dodo", "ppig", "mchl", "pter", "quet", "liso", "stel"];
+const SHELLED = ["olen", "ptry", "came", "prom"];   // shelled aquatic invertebrates
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)

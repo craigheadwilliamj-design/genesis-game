@@ -115,7 +115,9 @@ function sexSplit(e, sp){
   return l.length ? ` <span class="meta">(${m} M, ${l.length - m} F)</span>` : "";
 }
 // Status in the pecking order, 0 (alpha) to 1: luck, DNA quality and being male
-const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 90) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
+// The genetic part of an animal, for everything that copies one: Accuracy, Genome Quality, and a disorder (diagnosed or not)
+const geneFields = a => ({q:a.q ?? 100, gq:a.gq ?? a.q ?? 100, ...(a.dis ? {dis:a.dis, dx:!!a.dx} : {})});
+const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 100) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
 function nameAnimal(a, st){
   if(!a.sex) a.sex = pickSex(a.sp, st);
   if(a.rank == null) a.rank = pickRank(a);
@@ -125,13 +127,13 @@ function nameAnimal(a, st){
   seq[a.sp] = n; a.name = `${a.sp.toUpperCase()}-${String(n).padStart(3, "0")}`;
   return a;
 }
-function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, medicine:0}; }
+function freshLedger(){ return {guests:0, tickets:0, food:0, shop:0, feed:0, wages:0, upkeep:0, built:0, animals:0, science:0, sold:0, rewards:0, fines:0, repairs:0, servedFood:0, servedShop:0, moodSum:0, moodN:0, eduSum:0, eduN:0, donations:0, edfees:0, rooms:0, fares:0, supplies:0, cleaning:0, wasted:0, medicine:0}; }
 
 function freshScience(){
   return {
     points:0,          // unspent points
     crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
-    tech:["bars"],           // everything the Research Lab has researched (TECH ids, plus "ref-<Period>" for refined medicine)
+    tech:["bars"],           // everything the Research Lab has researched (TECH ids)
     projects:[],       // The Research Lab's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals discovered (the Time Travel Lab's scouting turned them up), so drones can go back for their DNA
     dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
@@ -153,7 +155,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
-    animalSeq:{},
+    animalSeq:{}, accV:1,
     version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, vivBig:1, discoV:1, parkClosed:false,
@@ -429,13 +431,37 @@ function upgradeSave(s){
   delete s.ceres.plants;
   if(!s.ceres.auto){
     s.ceres.auto = {cenozoic:false, mesozoic:false, paleozoic:false};
-    for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)){
-      s.ceres.auto[era] = true;
-      for(const p of TIME_PERIODS) if(ERA_OF[p.id] === era && !hasT("ref-" + p.id)) sc.tech.push("ref-" + p.id);
-    }
+    for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)) s.ceres.auto[era] = true;
   }
+  // DNA quality became Accuracy, the genome % at cloning (quality ran 40 to 100 over genomes 60 to 100); bought animals are 100%, and Genome Quality starts the same
+  if(!s.accV){
+    const conv = a => { if(!a) return; a.q = a.q == null ? 100 : Math.round(clamp(60 + (a.q - 40) * 40 / 60, 60, 100)); if(a.gq == null) a.gq = a.q; };
+    for(const a of [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...(sc.specimens || []), ...((s.safety && s.safety.loose) || []), ...s.health.ward.map(p => p.a), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))]) conv(a);
+    for(const c of sc.clones || []) if(c.q != null) c.q = Math.round(clamp(60 + (c.q - 40) * 40 / 60, 60, 100));
+    s.accV = 1;
+  }
+  // medicine is no longer refined per period: the points spent on refinements, finished or under way, come back
+  { const pts = {cenozoic:8, mesozoic:14, paleozoic:20};
+    for(const t of sc.tech.filter(t => t.startsWith("ref-"))) sc.points = (sc.points || 0) + (pts[ERA_OF[t.slice(4)]] || 0);
+    sc.tech = sc.tech.filter(t => !t.startsWith("ref-"));
+    for(const p of sc.projects.filter(p => p.kind === "refine")){ sc.points = (sc.points || 0) + (p.cost ?? pts[ERA_OF[p.id]] ?? 0); sc.projects.splice(sc.projects.indexOf(p), 1); } }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
+  // the ward runs on timers: a patient being treated starts a fresh course from how sick it is now, a cured one waits to go home (wardTidy sends it), and there's a bed for everyone in it
+  if(s.health.beds == null){
+    for(const p of s.health.ward){
+      if(p.cured){ p.recovered = true; delete p.cured; delete p.a.sick; }
+      p.dosed = !!(p.med || p.recovered); p.done = 0; p.need = p.dosed && !p.recovered ? wardMinutes(p.a, p.med) : 0;
+    }
+    const pmc = s.buildings.find(b => b.type === "pmc");
+    if(pmc && s.staff && s.staff.transfers) s.staff.transfers = s.staff.transfers.filter(t => !(t.med && t.from === pmc.id && !t.cargo));
+    s.health.beds = clamp(s.health.ward.length, HEALTH.beds, HEALTH.bedsMax);
+  }
+  // the PMC's shelves are split per medicine: what's over a medicine's share is sold back at what it's worth
+  for(const b of s.buildings) if(b.type === "pmc" && b.store){
+    const share = Math.floor(Math.round(LOGI.pmcDoses * ((s.staff.upgrades || []).includes("crates") ? LOGI.crateBoost : 1)) / (MED_GOODS.length + 1));
+    for(const t of Object.keys(b.store)) if(b.store[t] > share){ s.money += Math.round((b.store[t] - share) * (t === CMED ? MODERN.cost : MED_UNIT_VALUE)); b.store[t] = share; }
+  }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
@@ -513,7 +539,16 @@ function upgradeSave(s){
   // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
   { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.science && s.science.specimens) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
     for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
-    for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
+    for(const a of all) if(a.rank == null) a.rank = pickRank(a);
+    // old illnesses and injuries become a condition (CONDITIONS): an illness an infection its body can get, trash Foreign Object Ingestion, an injury one its cause brings on
+    for(const a of all){
+      const k = a.sick, sp = SPECIES_BY_ID[a.sp]; if(!k || k.name || !sp) continue;
+      delete k.chronic;
+      if(k.cause === "trash"){ k.kind = "poison"; k.name = "foreign"; }
+      else if(k.kind === "injury"){ const how = k.hit && k.hit.how; k.name = pickCondition(sp, ["injury"], how === "fight" ? ["fight"] : how ? ["attack"] : ["shelter"]); }
+      else { k.name = pickCondition(sp, ["infection"], []) || pickCondition(sp, ["poison"], []); k.kind = k.name ? CONDITIONS[k.name].kind : "infection"; }
+      if(!k.name){ k.kind = "injury"; k.name = "laceration"; }
+    } }
   snapFootprints(s);   // plants and rocks take whole-cell squares (landscape.js)
   return s;
 }
@@ -614,12 +649,6 @@ function exhibitReport(e){
     else if(!e.viv && s.pool && !lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} needs a lagoon wall.`}); }
     else if(!e.viv && !s.pool && lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} can't live in a lagoon.`}); }
   }
-  // Clones made from poor DNA are sickly. Animals from partner parks count as healthy.
-  if(e.animals.length){
-    const avgQ = e.animals.reduce((s, x) => s + (x.q ?? 90), 0) / e.animals.length;
-    if(avgQ < 50){ target -= 12; issues.push({bad:true, text:`Frail clones (${Math.round(avgQ)}% DNA).`}); }
-    else if(avgQ < 70){ target -= 5; issues.push({bad:true, text:`Sickly clones (${Math.round(avgQ)}% DNA).`}); }
-  }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
   const landKinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]).filter(s => !s.pool);
   if(landKinds.length && !e.aqua){   // an aquarium has no plants to speak of, and pool animals don't care
@@ -667,14 +696,11 @@ function exhibitReport(e){
     const sh = themeFitShare(e);
     if(sh > 0){ target += THEME.fitHappy * sh; issues.push({bad:false, text:`${themeOf(e).label} suits ${sh === 1 ? "these animals" : "some of these animals"}.`}); }
   }
-  // Sick and hurt animals drag the whole herd down
+  // Sick and hurt animals drag the whole herd down, the worse off the more
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
-  // (a chronic case, eased by contemporary medicine, counts for less)
-  const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : 1) : 0), 0);
-  const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
+  const sick = e.animals.reduce((n, a) => n + (a.sick ? sickBand(a).happy : 0), 0), known = e.animals.filter(noticed).length;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt.`});
-  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness.`});
   else if(sick) issues.push({bad:true, text:"Something seems off."});
   return {area:a, need, wet, wetNeed, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
@@ -824,6 +850,7 @@ function tickStep(dtMin){
   keepersTick(m1 - m0);
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
+  healthTick(m1 - m0);
   vetsTick(m1 - m0);
   custodiansTick(m1 - m0);
   guardsTick(m1 - m0);
@@ -853,7 +880,7 @@ function dailyCosts(){
   }
   for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
   for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
-  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
+  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b) + (b.type === "pmc" ? bedUpkeep() : 0);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
   wages += state.staff.keepers.reduce((n, k) => n + (isAqua(k) ? AQUARIST.wage : KEEPER.wage), 0) + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;

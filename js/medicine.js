@@ -1,22 +1,22 @@
 /* =====================================================================
    PALEO-MEDICINE
-   Animals fall ill (faster when hungry, dirty, or frail) and territorial
-   animals hurt each other. Mild illness is hidden until a vet's routine
-   check-up finds it. Vets walk out from the Paleo-Medicine Center (PMC),
-   treat minor illnesses on the spot, and dart serious cases; keepers carry
-   those in, and the PMC treats them with medicine from the Botany Lab once the Research Lab has
-   researched it for their era.
-   Vets also dart escaped animals, and keepers carry those home.
+   Every case is a named condition (an injury, an infection or a poisoning)
+   that fits the animal's body and what brought it on, dirt above all. Cases
+   start and worsen through the day. Mild infections stay hidden until a
+   vet's check-up. Vets treat mild cases and poisonings where they stand,
+   and dart serious ones; keepers carry those to the Paleo-Medicine Center
+   (PMC), where a course runs on a timer and the animal goes home through
+   the delivery system. Clones can carry a genetic disorder, which only
+   genome therapy cures. Vets also dart escaped animals.
    ===================================================================== */
 
 let vcrew = [];   // vets walking around right now (positions aren't saved)
 
-function freshHealth(){ return {from:HEALTH.startDay, ward:[]}; }
+function freshHealth(){ return {from:HEALTH.startDay, ward:[], beds:HEALTH.beds}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
-// An era's medicine only cures a period's animals once it has been refined for that period
-const canTreat = s => hasTech(medTechFor(s)) && hasTech("ref-" + s.period);
-const anyMedTech = () => Object.values(MED_TECH).some(hasTech);
+// The era's own medicine, once the Research Lab has researched it, speeds up its animals' ward courses
+const canTreat = s => hasTech(medTechFor(s));
 const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
 // Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
@@ -27,11 +27,6 @@ function pickMed(s, n){
 }
 const medGoodOf = s => MED_GOOD[eraOf(s)];
 function takeMed(kind, n, s){ if(kind === "era") useMeds(n, medGoodOf(s)); else useMeds(n, CMED); }
-// Contemporary medicine only gets a case down to the era's floor, and the animal stays chronically ill
-function ease(a){
-  const fl = MODERN.floor[eraOf(SPECIES_BY_ID[a.sp])];
-  a.sick = {kind:a.sick.kind, sev:Math.min(a.sick.sev, fl), chronic:true};
-}
 const pmcs = () => state.buildings.filter(b => b.type === "pmc" && kGraph && kGraph.anchors[b.id]);
 const pmcBuilding = () => state.buildings.find(b => b.type === "pmc") || null;
 // Vets handle escapes whenever there's a vet and a connected PMC for them to work from
@@ -42,67 +37,31 @@ const vetsOnDuty = () => state.staff.vets.length > 0 && pmcs().length > 0;
 function medCap(){ return MEDICINE.capacity; }
 const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 
-/* ---------- trash thrown into exhibits ---------- */
+/* ---------- trash thrown into exhibits (the throwing is in services.js) ---------- */
 
-// Is there a working Do Not Feed sign by this exhibit's fence?
-const hasNoFeed = e => state.buildings.some(b => b.type === "nofeed" && !isBroken(b) && distToEdge(...centroid(b.points), e.points) <= THROWN.signReach);
-// Share of throws the netting stops: full at 100% fence condition, none when the fence is wrecked
-const netCatch = e => THROWN.netCatch * condOf(e) / 100;
-// Chance a minute that a party at (x, y) throws trash into exhibit e: bins, guards and the sign cut it
-function throwChance(p, e, x, y){
-  let c = p.rowdy ? THROWN.rowdy * (1 + Math.min(2.5, Math.max(0, VANDAL.moodBelow - p.mood) / 30)) : p.trash ? THROWN.normal : 0;
-  if(!c) return 0;
-  c *= Math.pow(1 - THROWN.dayDecay, e.trash || 0);
-  if(nearBin(x, y)) c *= THROWN.binCut;
-  if(hasNoFeed(e)) c *= THROWN.signCut;
-  if(e.net || e.aviary) c *= 1 - netCatch(e);
-  if(guardNear(x, y)) c *= SECURITY.deterCut;
-  return c * (1 - EDU.vandalCut * (p.edu || 0) / 100);
-}
-// Each minute, a party out on the paths beside an open exhibit might throw trash over the fence
-function throwTick(p, dt){
-  if(p.home || p.in || !p.at || p.at.rail) return;
-  const x = p.at.x, y = p.at.y;
-  for(const e of state.exhibits){
-    if(e.viv || !e.animals.length || distToEdge(x, y, e.points) > THROWN.reach) continue;
-    if(Math.random() < 1 - Math.pow(1 - Math.min(.5, throwChance(p, e, x, y)), dt)){
-      e.trash = (e.trash || 0) + THROWN.pieces; p.trash = 0;
-      if(p.rowdy){ p.vandal = true; if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); } }
-      state.today.thrown = (state.today.thrown || 0) + 1;
-      if(state.today.thrown === 1) events.toast(`A guest threw trash into ${e.name}. Animals that eat it fall ill. Bins, guards and Do Not Feed signs by the fence cut down on it.`, "bad");
-    }
-    return;
-  }
-}
-// Chance a night that an animal in e eats some of the trash thrown in today
+// Chance a day that an animal in e eats some of the trash thrown in today
 const trashEaten = e => e.trash && e.animals.length ? Math.min(THROWN.eatMax, THROWN.eat * e.trash / e.animals.length) : 0;
-// Run each night: animals that ate trash fall ill or die, then the keepers clear the rest
-function trashNight(out){
-  for(const e of state.exhibits){
-    const p = trashEaten(e);
-    if(p && healthActive()) for(const a of [...e.animals]){
-      if(Math.random() >= p) continue;
-      if(Math.random() < THROWN.deadly){ a.sick = {kind:"illness", sev:100, cause:"trash"}; animalDies(e, a); out.poisoned++; continue; }
-      if(a.sick){
-        // already sick: it gets worse, but never past what a vet can still reach in time, and it can't stay hidden
-        a.sick.sev = Math.max(a.sick.sev, Math.min(THROWN.sevCap, a.sick.sev + THROWN.sev));
-        delete a.sick.chronic;
-        a.sick.cause = "trash"; delete a.sick.hidden; out.fed++;
-        events.toast(`A sick ${SPECIES_BY_ID[a.sp].name} in ${e.name} ate trash too. It is much worse and needs a vet now.`, "bad"); continue;
-      }
-      fallSick(a, "illness", THROWN.sev); a.sick.cause = "trash"; delete a.sick.hidden; out.fed++;   // it shows at once, so a vet sees it today
-      events.toast(`A ${SPECIES_BY_ID[a.sp].name} in ${e.name} ate trash thrown in by guests. It will die in about two days unless a vet treats it.`, "bad");
-    }
-    e.trash = 0;
-  }
-}
 
-/* ---------- genome therapy ---------- */
-// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which the Time Travel Lab raises by finding more of it.
-const labQuality = sp => cloneQuality(sp);
-const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
+/* ---------- genetics: disorders and genome therapy ---------- */
+
+// A new clone's disorder (a DISORDERS id), or null: likelier the lower its Accuracy
+function rollDisorder(acc){
+  const R = DISORDER_ROLL; if(!(acc < R.clear)) return null;
+  const p = Math.min(R.most, R.most * Math.pow((R.clear - acc) / (R.clear - CLONE_GENOME.min), R.curve));
+  if(Math.random() >= p) return null;
+  const ids = Object.keys(DISORDERS); return ids[Math.floor(Math.random() * ids.length)];
+}
+// One of its disorder's numbers (DISORDERS), or `none` without one. It works whether or not a vet has diagnosed it.
+const disFx = (a, k, none = 1) => a && a.dis && DISORDERS[a.dis] && DISORDERS[a.dis][k] != null ? DISORDERS[a.dis][k] : none;
+const diagnosed = a => !!a.dis && !!a.dx;
+const disName = a => DISORDERS[a.dis].name;
+// Genome therapy (Research Lab tech "genetherapy"): brings an animal's Genome Quality (a.gq) up to the lab's genome for its species today, which cures its disorder.
+// Its Accuracy (a.q, the genome at its cloning) never changes. It's only possible while the lab's genome is ahead of the animal's.
+const labGenome = sp => cloneQuality(sp);
+const geneGain = a => hasTech("genetherapy") ? Math.max(0, labGenome(a.sp) - (a.gq ?? a.q ?? 100)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
-const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && geneGain(a) >= GENE.minGain) : [];
+// The animals in an exhibit with it switched on that it can cure: a diagnosed disorder, and a lab genome ahead of theirs
+const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && diagnosed(a) && geneGain(a) > 0) : [];
 // Why it can't be switched on, or null
 function geneProblem(){
   if(!hasTech("genetherapy")) return "Research Genome therapy at the Research Lab first.";
@@ -110,19 +69,63 @@ function geneProblem(){
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
   return null;
 }
-// How long a vet's check-up of an exhibit takes, with the genome therapy it will do
-const checkWork = e => HEALTH.checkMinutes + GENE.minutes * geneTargets(e).length;
-// Done in the check-up: each clone the lab can improve gets a procedure while the money lasts
+const checkWork = e => HEALTH.checkMinutes;
+// A vet's genome therapy trip: each animal it can cure gets a procedure while the money lasts
 function geneTherapy(e, who){
-  let n = 0, short = false;
+  let n = 0;
   for(const a of geneTargets(e)){
-    const gain = geneGain(a), cost = geneCost(gain);
-    if(!canAfford(cost)){ short = true; break; }
-    spend(cost, "medicine"); a.q = (a.q ?? 90) + gain; n++;
+    const cost = geneCost(geneGain(a));
+    if(!canAfford(cost)){ events.toast(`Not enough money for genome therapy on ${a.name}.`, "bad"); break; }
+    spend(cost, "medicine"); const was = disName(a);
+    a.gq = labGenome(a.sp); delete a.dis; delete a.dx; n++;
+    events.toast(`${who} cured ${a.name}'s ${was} with genome therapy.`, "good");
   }
-  if(n) events.toast(`${who} gave genome therapy to ${n} clone${n === 1 ? "" : "s"} in ${e.name}.`, "good");
-  if(short) events.toast(`${who} couldn't afford genome therapy for every clone in ${e.name}.`, "bad");
   return n;
+}
+
+/* ---------- conditions ---------- */
+
+// Tiktaalik lives on land in the game but falls ill like a fish
+const aquatic = s => !!(s.aqua || s.pool) || s.id === "tikt";
+// What a body is, for who can get which condition (CONDITIONS' who and not)
+function bodyTags(s){
+  const c = CLADE_OF[s.id], wet = aquatic(s), t = new Set(["any", c, s.id]);
+  if(c !== "invert") t.add("vert");
+  if(c !== "invert" && c !== "fish") t.add("tetrapod");
+  if(c !== "invert" && !wet) t.add("landvert");
+  if(c === "fish" && wet) t.add("aqfish");
+  if(c === "invert") t.add(wet ? "aqinvert" : "landbug");
+  if(SHELLED.includes(s.id)) t.add("shelled");
+  if(!["fish", "invert", "marine", "seamammal"].includes(c) && !LIMBLESS.includes(s.id)) t.add("legs");
+  if(!["fish", "invert"].includes(c) && !TOOTHLESS.includes(s.id)) t.add("teeth");
+  return t;
+}
+const BODIES = new Map();
+const bodyOf = s => { if(!BODIES.has(s.id)) BODIES.set(s.id, bodyTags(s)); return BODIES.get(s.id); };
+const canGet = (s, c) => c.who.some(w => bodyOf(s).has(w)) && !(c.not || []).some(w => bodyOf(s).has(w));
+// A condition of these kinds that one of these causes brings on; with none that fits, any its body can get (but not one only its own cause brings). null if its body gets none.
+function pickCondition(s, kinds, causes, a){
+  const all = Object.keys(CONDITIONS).filter(id => kinds.includes(CONDITIONS[id].kind) && canGet(s, CONDITIONS[id]));
+  const fit = all.filter(id => CONDITIONS[id].from.some(f => causes.includes(f))), list = fit.length ? fit : all.filter(id => !CONDITIONS[id].only);
+  if(list.includes("fracture") && Math.random() < disFx(a, "fracture", 0)) return "fracture";   // brittle bones
+  return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+}
+const sickName = a => (CONDITIONS[a.sick.name] || {}).name || SICK_KIND[a.sick.kind].label;
+// Where it came from, in words, or ""
+const CAUSE_TEXT = {shelter:"From lack of shelter.", lamp:"From no heat lamp.", dirt:"From a dirty exhibit.", water:"From foul water.", biome:"From the wrong biome.",
+                    hunger:"From hunger.", stress:"From stress.", crowd:"From crowding.", trash:"Ate trash.", plants:"Ate plants it can't digest."};
+function sickCause(a){
+  const sk = a.sick, hit = sk.hit;
+  if(hit){ const who = hit.who || `a ${hit.by}`; return hit.how === "fight" ? `From fight with ${who}.` : sk.name === "gore" ? `Gored by ${who}.` : `Bitten by ${who}.`; }
+  return CAUSE_TEXT[sk.cause] || "";
+}
+// How bad it is: its SICK_BAND entry
+const sickBand = a => a.sick ? SICK_BAND.reduce((b, x) => a.sick.sev >= x.from ? x : b, SICK_BAND[0]) : null;
+// A weighted pick among the causes raising a chance ({cause: weight}), or null
+function pickCause(w){
+  let t = 0; for(const k in w) t += w[k];
+  let r = Math.random() * t; for(const k in w){ r -= w[k]; if(r <= 0) return k; }
+  return null;
 }
 
 /* ---------- who gets sick ---------- */
@@ -130,43 +133,56 @@ function geneTherapy(e, who){
 // Old plant-eaters eating plants they never evolved for (see grassShare), 0 to 1
 const grassSick = (e, s) => GRASS_INTOLERANT.includes(s.period) ? grassShare(e, s) : 0;
 const hungerShare = e => clamp((e.hungryMin || 0) / DAY_MIN, 0, 1);
-const medicated = (e, s) => !!e.medFedOk && canTreat(s);
+const medicated = (e, s) => !!e.medFedOk;
+const crowded = e => { const rep = derived && derived.reports[e.id]; return rep && rep.need ? rep.area / rep.need : 1; };
 
-// Chance a day this animal falls ill, and what's raising it
+// Chance a day this animal gets an infection (or a poisoning from dirt or foul water), and what's raising it: why lists the causes, w weighs them
 function illChance(e, a){
-  const s = SPECIES_BY_ID[a.sp], why = [];
+  const s = SPECIES_BY_ID[a.sp], wet = aquatic(s), why = [], w = {};
   let p = HEALTH.illChance;
-  const hg = hungerShare(e); if(hg > .02){ p *= 1 + HEALTH.hungerMult * hg; why.push("hunger"); }
-  const d = e.dirt || 0; if(d > CLEAN.penaltyFrom){ p *= 1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer; why.push("dirt"); }
-  const q = a.q ?? 90; if(q < 50){ p *= HEALTH.frail.below50; why.push("frail clones"); } else if(q < 70){ p *= HEALTH.frail.below70; why.push("sickly clones"); }
-  const gs = grassSick(e, s); if(gs > 0){ p *= 1 + (HEALTH.grassSick - 1) * gs; why.push("eating grass"); }
-  if(thirsty(e, s)){ p *= HAB.dryIll; why.push(e.viv ? "no pool" : "no water"); }
-  if((e.aqua || e.palu && paluSwims(s)) && wqOf(e) < AQUA.foul){ p *= 1 + (AQUA.ill - 1) * (1 - wqOf(e) / AQUA.foul); why.push("foul water"); }
+  const raise = (m, cause) => { if(!(m > 1)) return; p *= m; if(!w[cause]) why.push(cause); w[cause] = (w[cause] || 0) + m - 1; };
+  const hg = hungerShare(e); if(hg > .02) raise(1 + HEALTH.hungerMult * hg, "hunger");
+  const d = e.dirt || 0; if(d > CLEAN.penaltyFrom) raise(1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer, wet ? "water" : "dirt");
+  if(thirsty(e, s)) raise(HAB.dryIll, "thirst");
+  if((e.aqua || e.palu && paluSwims(s)) && wqOf(e) < AQUA.foul) raise(1 + (AQUA.ill - 1) * (1 - wqOf(e) / AQUA.foul), "water");
   if(e.viv && !e.aqua && wantsHeat(s)){   // a basking lamp keeps the cold-blooded well; without one a cold snap makes them ill
     const hs = heatShare(e);
     if(hs > 0) p *= 1 + (VIV_LAMP.ill - 1) * hs;
-    if(hs < 1 && state.weather && state.weather.today === "cold"){ p *= 1 + (VIV_LAMP.cold - 1) * (1 - hs); why.push("the cold"); }
+    if(hs < 1){ if(!w.lamp) why.push("lamp"); w.lamp = (w.lamp || 0) + (1 - VIV_LAMP.ill) * (1 - hs); }
+    if(hs < 1 && state.weather && state.weather.today === "cold") raise(1 + (VIV_LAMP.cold - 1) * (1 - hs), "lamp");
   }
   const wx = weatherNow(), x = exposure(e);
-  if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))){ p *= 1 + wx.ill * x; why.push("weather"); }
-  if(a.need && a.need.stress > 60){ p *= BEHAVIOR.stressIll; why.push("stress"); }
+  if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))) raise(1 + wx.ill * x, "shelter");
+  if(a.need && a.need.stress > 60) raise(BEHAVIOR.stressIll, "stress");
+  if(crowded(e) < 1) raise(HEALTH.crowdIll, "crowd");
   if(medicated(e, s)) p *= MEDICINE.feedCut;
-  return {p, why};
+  p *= disFx(a, "ill");
+  return {p, why, w};
 }
-// Chance a day this animal is hurt by rivals or by a species that preys on it
+// Chance a day this animal is hurt by rivals, a species that preys on it, the weather or the ground
 function injuryChance(e, a){
-  const s = SPECIES_BY_ID[a.sp], counts = speciesCounts(e), why = [];
+  const s = SPECIES_BY_ID[a.sp], counts = speciesCounts(e), why = [], w = {};
   let p = 0;
+  const add = (v, cause) => { if(!(v > 0)) return; p += v; if(!w[cause]) why.push(cause); w[cause] = (w[cause] || 0) + v; };
   const n = counts.get(s.id) || 0;
-  if(TERRITORIAL.includes(s.id) && n > 1){
-    const rep = derived && derived.reports[e.id], ratio = rep && rep.need ? rep.area / rep.need : 1;
-    p += HEALTH.territorial * (n - 1) * (ratio < 1 ? 3 : ratio < 1.5 ? 1.5 : 1); why.push("rivals");
-  }
-  for(const sp of counts.keys()) if(sp !== s.id && attackReason(SPECIES_BY_ID[sp], s)){ p += HEALTH.attacked; why.push("attacks"); break; }
+  if(TERRITORIAL.includes(s.id) && n > 1){ const r = crowded(e); add(HEALTH.territorial * (n - 1) * (r < 1 ? 3 : r < 1.5 ? 1.5 : 1), "fight"); }
+  for(const sp of counts.keys()) if(sp !== s.id && attackReason(SPECIES_BY_ID[sp], s)){ add(HEALTH.attacked, "attack"); break; }
   // storms hurt animals caught out in them
   const wx = weatherNow(), x = wx.hurt ? exposure(e) : 0;
-  if(x > 0){ p += wx.hurt * x; why.push("weather"); }
-  return {p, why};
+  if(x > 0) add(wx.hurt * x, "shelter");
+  // Bumblefoot: sore feet from dirty ground or the wrong ground
+  if(canGet(s, CONDITIONS.bumblefoot)){
+    if((e.dirt || 0) > CLEAN.penaltyFrom) add(HEALTH.ground, "dirt");
+    if(biomeFit(s, biomeOf(e)) === "away") add(HEALTH.ground, "biome");
+  }
+  p *= disFx(a, "hurt");
+  return {p, why, w};
+}
+// The causes behind an injury: a fight with (or attack by) a species with horns or tusks can gore
+function injuryCauses(e, s, cause){
+  if(cause === "fight" && GORES.includes(s.id)) return ["fight", "gore"];
+  if(cause === "attack" && [...speciesCounts(e).keys()].some(sp => GORES.includes(sp) && attackReason(SPECIES_BY_ID[sp], s))) return ["attack", "gore"];
+  return [cause];
 }
 
 // Everything the exhibit panel says about health
@@ -176,12 +192,15 @@ const noticed = a => !!a.sick && !a.sick.hidden;
 const animalHp = a => noticed(a) ? clamp(100 - a.sick.sev, 0, 100) : 100;
 const hpColor = hp => hp >= 100 ? "var(--good)" : hp > 60 ? "var(--warn)" : "var(--bad)";
 const daysSinceCheck = e => e.vetCheck == null ? 99 : state.day - e.vetCheck;
+// The causes in a risk list, as the player reads them
+const RISK_WORD = {dirt:"dirt", water:"foul water", biome:"wrong biome", shelter:"lack of shelter", lamp:"no heat lamp", hunger:"hunger", thirst:"thirst", stress:"stress", crowd:"crowding", fight:"rivals", attack:"predators"};
+const riskWords = why => [...new Set(why.map(w => RISK_WORD[w]).filter(Boolean))];
 function healthReport(e){
   const sick = e.animals.filter(noticed), hidden = e.animals.filter(a => a.sick && a.sick.hidden).length;
   let ill = 0, hurt = 0; const why = new Set();
   for(const a of e.animals){ if(a.sick) continue; const i = illChance(e, a), j = injuryChance(e, a); ill += i.p; hurt += j.p; i.why.concat(j.why).forEach(w => why.add(w)); }
   const well = e.animals.length - sick.length;
-  return {sick, hidden, ill:well ? ill / well : 0, hurt:well ? hurt / well : 0, why:[...why]};
+  return {sick, hidden, ill:well ? ill / well : 0, hurt:well ? hurt / well : 0, why:[...why]};   // why: the causes raising either
 }
 
 // Low hunger, water and sanitation for some of an exhibit's animals, as health list items [level, text]. Only what is low shows.
@@ -203,79 +222,147 @@ function basicsLow(e, list){
 }
 
 
-// Injuries are obvious at once; illness shows only once it's bad
-function fallSick(a, kind, sev){ a.sick = {kind, sev}; if(kind === "illness" && sev < HEALTH.obviousAt) a.sick.hidden = true; }
-// Can a vet cure this one where it stands?
-// A chronic case only comes back for a real cure, with the era's own medicine.
+// A new case of a condition (a CONDITIONS id). A mild infection stays hidden until it gets bad or a vet checks.
+function fallSick(a, id, cause, sev){
+  const c = CONDITIONS[id], k = SICK_KIND[c.kind];
+  a.sick = {kind:c.kind, name:id, sev:sev ?? k.start};
+  if(cause) a.sick.cause = cause;
+  if(k.hidden && a.sick.sev < HEALTH.obviousAt) a.sick.hidden = true;
+  return a.sick;
+}
+// Can a vet cure this one where it stands? Mild cases, and poisonings however bad, if there's medicine
 function fieldTreatable(a){
   if(!noticed(a) || a.darted) return false;
-  // a chronic case (illness or injury) is already eased, so only the era's own medicine matters
-  if(a.sick.chronic) return pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose) === "era";
-  if(a.sick.kind !== "illness" || (a.sick.sev >= HEALTH.minorBelow && a.sick.cause !== "trash")) return false;   // trash cases are severe, but a vet can flush them out on the spot
-  return !!pickMed(SPECIES_BY_ID[a.sp], HEALTH.fieldDose);
+  const k = SICK_KIND[a.sick.kind];
+  return a.sick.sev < k.field && !!pickMed(SPECIES_BY_ID[a.sp], k.fieldDose);
 }
+// A mild injury in a fed, watered, clean exhibit, on a calm animal, mends by itself (sickStep)
+const mending = (e, a) => a.sick.kind === "injury" && a.sick.sev < SICK_BAND[1].from && (e.dirt || 0) <= CLEAN.penaltyFrom && hungerShare(e) < .1 && !thirsty(e, SPECIES_BY_ID[a.sp]) && ((a.need || {}).stress || 0) < HEALTH.healStress;
 
-// What's happening to one sick animal, in words
+// What's happening to one sick animal, in a few words
 function sickStatus(e, a){
-  const s = SPECIES_BY_ID[a.sp];
-  if(a.sick.chronic && !fieldTreatable(a)) return canTreat(s) ? `Chronic. A vet will cure it once the Botany Lab has ${eraMedName(s).toLowerCase()} on hand.` : `Chronic. Contemporary medicine eased it, but only ${eraMedName(s).toLowerCase()} from the Botany Lab can cure it fully.`;
-  if(a.darted){ const t = state.staff.transfers.find(x => x.animalId === a.id); return t && t.keeper ? "Darted. A keeper is coming to carry it to the PMC." : "Darted. Waiting for a keeper to carry it to the PMC."; }
-  if(!hasDept("pmc")) return "Build a Paleo-Medicine Center and hire a vet to treat it.";
-  if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
-  if(!dept("pmc")) return "The PMC isn't connected. Run a path or service road to it.";
-  if(!kGraph || !kGraph.anchors[e.id]) return "Vets can't get in.";
+  if(a.darted) return "Darted. Waiting for a keeper.";
   const mine = vcrew.find(c => c.patient && c.patient.a === a.id);
-  if(mine) return mine.patient.field ? (mine.job === "treating" ? "A vet is treating it here." : "A vet is on the way to treat it here.") : "A vet is on the way to dart it.";
-  if(a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !fieldTreatable(a) && bedsFree() > 0) return "Minor, but the PMC is out of medicine, so it goes to the PMC. Waiting for a free vet.";
-  if(fieldTreatable(a)) return a.sick.cause === "trash" ? "Ate trash. A vet can flush it out here. Waiting for a free vet." : "Minor. A vet can treat it here. Waiting for a free vet.";
-  if(bedsFree() <= 0) return "The PMC is full. It waits for a free bed.";
-  return "Waiting for a free vet.";
+  if(mine) return mine.job === "treating" ? "Being treated." : "Vet on the way.";
+  if(mending(e, a)) return "Healing on its own.";
+  if(!hasDept("pmc")) return "No PMC.";
+  if(!state.staff.vets.length) return "No vets.";
+  if(!dept("pmc")) return "PMC not connected.";
+  if(!kGraph || !kGraph.anchors[e.id]) return "Vets can't get in.";
+  const k = SICK_KIND[a.sick.kind];
+  if(a.sick.sev < k.field) return fieldTreatable(a) ? "Waiting for a vet." : "Out of medicine.";
+  return bedsFree() > 0 ? "Waiting for a vet." : "Waiting for a bed.";
 }
+// What's happening to one patient at the PMC
 function patientStatus(p){
-  const s = SPECIES_BY_ID[p.a.sp];
-  if(p.cured){
-    const t = state.staff.transfers.find(x => x.animalId === p.a.id), done = p.a.sick && p.a.sick.chronic ? "As well as contemporary medicine can make it." : "Recovered.";
-    return `${done} ${t && t.keeper ? "A keeper is taking it home." : "Waiting for a keeper to take it home."}`;
-  }
-  if(!state.staff.vets.length) return "Stable. Hire a vet to treat it.";
-  if(p.med === "modern") return `Being treated with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`;
-  if(p.med === "era") return "Being treated.";
-  return "Stable. Waiting for medicine. Suppliers restock the PMC every night.";
+  if(p.recovered){ const t = wardTrip(p); return t && t.cargo ? "Recovered. On the way home." : "Recovered. Waiting for pickup."; }
+  if(!p.dosed) return "Waiting for doses.";
+  if(!state.staff.vets.length) return "Paused. No vets.";
+  return `Treating, ${spanText(p.need - p.done)} left.`;
 }
+// How far along a patient's treatment is, 0 to 100
+const wardProgress = p => p.recovered ? 100 : p.dosed && p.need ? clamp(p.done / p.need * 100, 0, 100) : 0;
 
 /* ---------- the ward ---------- */
 
+// Beds: the PMC starts with HEALTH.beds and buys more up to HEALTH.bedsMax, each one costing more than the last and adding to the upkeep
+const wardBeds = () => state.health.beds || HEALTH.beds;
+const bedPrice = () => Math.round(HEALTH.bedPrice * Math.pow(HEALTH.bedGrowth, wardBeds() - HEALTH.beds));
+const bedUpkeep = () => (wardBeds() - HEALTH.beds) * HEALTH.bedUpkeep;
+function buyBed(){
+  if(wardBeds() >= HEALTH.bedsMax) return "The ward is full size.";
+  if(!canAfford(bedPrice())) return `A bed costs ${money(bedPrice())}.`;
+  spend(bedPrice(), "built"); state.health.beds = wardBeds() + 1; events.changed();
+  return null;
+}
+// Free beds: patients in the ward (recovered ones hold theirs until they leave), and the ones darted or on their way
 function bedsFree(){
-  const h = state.health, pmc = pmcBuilding(); if(!pmc) return 0;
+  const pmc = pmcBuilding(); if(!pmc) return 0;
   const coming = state.staff.transfers.filter(t => t.to === pmc.id).length;
   const darting = vcrew.filter(c => c.patient && !c.patient.field).length;
-  return HEALTH.beds - h.ward.length - coming - darting;
+  return wardBeds() - state.health.ward.length - coming - darting;
 }
+// How long a course takes, in park minutes: severity times the kind's rate, slower for older animals on contemporary medicine
+function wardMinutes(a, med){
+  const s = SPECIES_BY_ID[a.sp];
+  return Math.max(HEALTH.step, (a.sick ? a.sick.sev : 0) * HEALTH.wardPerPoint * (med === "era" ? MEDICINE.eraWard : MEDICINE.dockWard[eraOf(s)]));
+}
+// Start a patient's course if the PMC has the doses for it
+function dosePatient(p){
+  const s = SPECIES_BY_ID[p.a.sp], k = pickMed(s, HEALTH.dose);
+  if(!k){ outOfMedicine(); return false; }
+  takeMed(k, HEALTH.dose, s); p.med = k; p.dosed = true; p.done = 0; p.need = wardMinutes(p.a, k);
+  return true;
+}
+// Once a day at most
+function outOfMedicine(){ if(state.health.outDay !== state.day){ state.health.outDay = state.day; events.toast("The PMC is out of medicine.", "bad"); } }
 // A keeper brings an animal in
 function admit(a, t){
   delete a.darted;
-  state.health.ward.push({a, home:t.from, med:null, since:state.day});
-  events.toast(`A sick ${SPECIES_BY_ID[a.sp].name} was admitted to the PMC.`);
+  const p = {a, home:t.from, since:state.day, cond:a.sick && a.sick.name, med:null, dosed:false, done:0, need:0};
+  state.health.ward.push(p); dosePatient(p);
+  events.toast(`A ${SPECIES_BY_ID[a.sp].name} was admitted to the PMC.`);
   events.changed();
 }
-// A keeper takes a recovered animal out
+// The ward's clock: patients with their doses get better while there's a vet on staff, and go home when they're done
+function wardTick(dtMin){
+  const h = state.health; if(!h.ward.length || !pmcBuilding()) return;
+  for(const p of [...h.ward]){
+    if(p.recovered) continue;
+    if(!p.dosed && !dosePatient(p)) continue;
+    if(!state.staff.vets.length) continue;
+    p.done += dtMin;
+    if(p.done >= p.need) recover(p);
+  }
+}
+// Treatment done: the animal is well, and is sent home through the delivery system (its bed frees when it's picked up)
+function recover(p){
+  delete p.a.sick; p.recovered = true;
+  events.toast(`A ${SPECIES_BY_ID[p.a.sp].name} recovered at the PMC.`, "good");
+  sendWardHome(p); events.changed();
+}
+const wardTrip = p => state.staff.transfers.find(t => t.ward && t.animalId === p.a.id) || null;
+function sendWardHome(p){
+  const pmc = pmcBuilding(), home = state.exhibits.find(x => x.id === p.home);
+  if(!pmc || wardTrip(p)) return;
+  if(!home){ discharge(p.a.id); const [x, y] = centroid(pmc.points); dropCrate(p.a, x, y); return; }
+  const t = {id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmc.id, to:home.id, lab:true, ward:true};
+  state.staff.transfers.push(t); assignDelivery(t);
+}
+// Send a patient somewhere other than home once it's well (its trip changes if it hasn't been picked up yet); why not, or null
+function movePatient(id, exId){
+  const p = state.health.ward.find(x => x.a.id === id), e = state.exhibits.find(x => x.id === exId), t = p && wardTrip(p);
+  if(!p) return "That patient is gone.";
+  if(!e) return "That exhibit is gone.";
+  if(t && t.cargo) return "Already on its way.";
+  const why = crateProblem(p.a, e) || keeperMoveProblem(e); if(why) return why;
+  p.home = e.id; if(t) t.to = e.id;
+  return null;
+}
+// A recovered patient whose trip home was lost (its exhibit gone, or the transfer dropped) gets a new one, or waits in a crate
+function wardTidy(){ for(const p of [...state.health.ward]) if(p.recovered && !wardTrip(p)) sendWardHome(p); }
+// The patient leaves the ward
 function discharge(id){
   const h = state.health, i = h.ward.findIndex(p => p.a.id === id);
   if(i < 0) return null;
   return h.ward.splice(i, 1)[0].a;
 }
-// Send an animal back to an exhibit (or holding) without a keeper
+// Send an animal back to an exhibit (or a crate) without a keeper
 function sendHome(a, homeId){
   delete a.darted;
   const e = state.exhibits.find(x => x.id === homeId);
   if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); }
   else { const pmc = pmcBuilding(), [x, y] = pmc ? centroid(pmc.points) : labSpot(); dropCrate(a, x, y); }
 }
-// The PMC was bulldozed: patients go home as they are, and nobody is carried there any more
+// The PMC was bulldozed: every patient goes home, mid-treatment ones as much better as their progress, darted ones wake up, and the bought beds are lost
 function pmcRemoved(b){
   const h = state.health;
-  for(const p of h.ward) sendHome(p.a, p.home);
-  h.ward = [];
+  for(const p of h.ward){
+    if(p.a.sick && p.dosed) p.a.sick.sev *= 1 - wardProgress(p) / 100;
+    if(p.a.sick && p.a.sick.sev <= 0) delete p.a.sick;
+    sendHome(p.a, p.home);
+  }
+  h.ward = []; h.beds = HEALTH.beds;
   state.staff.transfers = state.staff.transfers.filter(t => t.to !== b.id && t.from !== b.id);
   for(const e of state.exhibits) for(const a of e.animals) delete a.darted;
   for(const c of vcrew){ if(c.patient && !c.patient.field){ c.patient = null; c.job = "idle"; c.route = []; } }
@@ -288,7 +375,7 @@ function syncVets(){
   // a vet who was let go drops whatever they were chasing
   for(const c of vcrew) if(!ids.has(c.id) && c.loose){ c.loose.vet = null; if(c.loose.status === "darting") c.loose.status = "loose"; }
   vcrew = vcrew.filter(c => ids.has(c.id));
-  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null});
+  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null, gene:null});
 }
 
 function vetGo(c, n, job){
@@ -315,10 +402,10 @@ function pickPatient(c, only){
     if(!kGraph.anchors[e.id] || (vz && e.zone !== vz) || (only && e.id !== only)) continue;
     for(const a of e.animals){
       if(!noticed(a) || a.darted || taken.has(a.id)) continue;
-      const field = fieldTreatable(a);
-      if(a.sick.chronic && !field) continue;
-      const urgent = a.sick.cause === "trash" ? 1000 : 0;
-      if((field || beds) && (!best || a.sick.sev + urgent > best.score)) best = {e, a, field, score:a.sick.sev + urgent};
+      // poisonings first, then the worst: critical, serious (only with a bed for it), mild (only with medicine to treat it here)
+      const field = fieldTreatable(a), ward = a.sick.sev >= SICK_KIND[a.sick.kind].field;
+      const score = a.sick.sev + (a.sick.kind === "poison" ? 1000 : 0);
+      if((field || ward && beds) && (!best || score > best.score)) best = {e, a, field, score};
     }
   }
   return best;
@@ -335,6 +422,12 @@ function pickCheck(c){
   return best;
 }
 
+// An exhibit with genome therapy switched on and someone to cure, that no other vet is heading to
+function pickGene(c){
+  if(!hasTech("genetherapy") || !dept("pmc")) return null;
+  const taken = new Set(vcrew.filter(x => x !== c && x.gene).map(x => x.gene)), vz = vetZone(c);
+  return state.exhibits.find(e => kGraph.anchors[e.id] && !taken.has(e.id) && !(vz && e.zone !== vz) && geneTargets(e).length) || null;
+}
 function vetDecide(c){
   const l = vetHuntJob(c);
   if(l){
@@ -345,25 +438,35 @@ function vetDecide(c){
   // a vet the player called looks at that exhibit's sick animals first
   const call = callJob(c, "vet");
   if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
-  // a finished specimen from the Genetics Lab goes to its exhibit before patients and check-ups
-  const dv = deliveryJob(c, walkFrom(c.at, c));
-  if(dv){
-    if(dv.cargo && !c.cargo){ c.cargo = dv.cargo; c.crate = true; }
-    c.move = dv;
-    if(vetGo(c, kGraph.anchors[c.cargo ? dv.to : dv.from], c.cargo ? "toDropoff" : "toPickup")) return;
-    dv.keeper = null; c.move = null;
-  }
+  if(staffMaybeRest(c, pmcs())) return;
+  // a delivery already in hand gets finished
+  const held = state.staff.transfers.find(t => t.lab && t.keeper === c.id && t.cargo);
+  if(held && vetDeliver(c, held)) return;
   const fx = c.focusEx; c.focusEx = null;
   const p = pickPatient(c, fx) || pickPatient(c);
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
   const ex = pickCheck(c);
   if(ex){ c.check = ex.id; if(vetGo(c, kGraph.anchors[ex.id], "toCheck")) return; c.check = null; }
+  const ge = pickGene(c);
+  if(ge){ c.gene = ge.id; if(vetGo(c, kGraph.anchors[ge.id], "toGene")) return; c.gene = null; }
+  // last of all: a specimen from the Genetics Lab or a patient going home from the PMC
+  const dv = deliveryJob(c, walkFrom(c.at, c));
+  if(dv && vetDeliver(c, dv)) return;
   c.wait = 15;
   const home = pmcs()[0];
   if(home && kGraph.anchors[home.id] !== c.at) vetGo(c, kGraph.anchors[home.id], "home");
 }
 
+// Carry a delivery: walk to its pickup, or on to its drop-off once it's in hand
+function vetDeliver(c, dv){
+  if(dv.cargo && !c.cargo){ c.cargo = dv.cargo; c.crate = true; }
+  c.move = dv;
+  if(vetGo(c, kGraph.anchors[c.cargo ? dv.to : dv.from], c.cargo ? "toDropoff" : "toPickup")) return true;
+  if(!c.cargo){ dv.keeper = null; c.move = null; }
+  return false;
+}
 function vetArrive(c){
+  if(c.job === "toRest"){ c.job = "resting"; return; }
   if(c.job === "toPickup"){ labPickup(c, (n, job) => vetGo(c, n, job)); return; }
   if(c.job === "toDropoff"){ labDrop(c); return; }
   if(c.job === "hunting"){
@@ -382,12 +485,17 @@ function vetArrive(c){
   if(c.job === "toPatient"){
     const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a);
     if(a && noticed(a) && !a.darted && kGraph.anchors[e.id] === c.at){
-      // things may have changed on the way: treat it here if we still can, otherwise dart it if there's a bed
-      if(fieldTreatable(a)){ c.patient.field = true; c.job = "treating"; c.work = HEALTH.fieldMinutes; return; }
+      // things may have changed on the way: treat it here if we still can, otherwise dart a bad case if there's a bed
+      if(fieldTreatable(a)){ c.patient.field = true; c.job = "treating"; c.work = SICK_KIND[a.sick.kind].fieldMin; return; }
       c.patient.field = false;   // now this vet is holding a bed, so there has to be one
-      if(bedsFree() >= 0){ c.job = "darting"; c.work = HEALTH.dartMinutes; return; }
+      if(a.sick.sev >= SICK_KIND[a.sick.kind].field && bedsFree() >= 0){ c.job = "darting"; c.work = HEALTH.dartMinutes; return; }
     }
     c.patient = null; c.job = "idle"; return;
+  }
+  if(c.job === "toGene"){
+    const e = state.exhibits.find(x => x.id === c.gene), n = e ? geneTargets(e).length : 0;
+    if(n && kGraph.anchors[e.id] === c.at){ c.job = "gene"; c.work = GENE.minutes * n; return; }
+    c.gene = null; c.job = "idle"; return;
   }
   if(c.job === "toCheck"){
     const e = state.exhibits.find(x => x.id === c.check);
@@ -403,21 +511,37 @@ function checkDone(c){
   c.check = null; c.job = "idle"; c.wait = 0;
   if(!e) return;
   e.vetCheck = state.day;
-  if(geneTherapy(e, v ? v.name : "A vet")) events.changed();
-  const found = e.animals.filter(a => a.sick && a.sick.hidden);
+  const who = v ? v.name : "A vet";
+  // genetic disorders are diagnosed, and stay on the animal's record until genome therapy cures them
+  for(const a of e.animals.filter(a => a.dis && !a.dx)){ a.dx = true; events.toast(`${who} diagnosed ${a.name} (${SPECIES_BY_ID[a.sp].name}) with ${disName(a)}.`); events.changed(); }
+  // hidden cases come to light, and the vet treats the ones that can be treated here and then
+  const found = e.animals.filter(a => a.sick && a.sick.hidden), taken = new Set(vcrew.filter(x => x !== c && x.patient).map(x => x.patient.a));
   for(const a of found) delete a.sick.hidden;
-  if(found.length){ events.toast(`${v ? v.name : "A vet"} found ${found.length === 1 ? `an early illness in a ${SPECIES_BY_ID[found[0].sp].name}` : `${found.length} animals with early illness`} in ${e.name}.`); events.changed(); }
+  const names = new Map(found.map(a => [a, sickName(a)])), one = a => `${names.get(a)} in a ${SPECIES_BY_ID[a.sp].name} in ${e.name}`;
+  const fixed = found.filter(a => !taken.has(a.id) && fieldTreatable(a) && treatHere(a)), left = found.filter(a => !fixed.includes(a));
+  if(fixed.length) events.toast(fixed.length === 1 ? `${who} found and treated ${one(fixed[0])}.` : `${who} found and treated ${fixed.length} cases in ${e.name}.`, "good");
+  for(const a of left) events.toast(`${who} found ${one(a)}.`);
+  if(found.length) events.changed();
+}
+// Use the doses and cure it, if there's medicine for it
+function treatHere(a){
+  const s = SPECIES_BY_ID[a.sp], dose = SICK_KIND[a.sick.kind].fieldDose, k = pickMed(s, dose);
+  if(!k){ outOfMedicine(); return false; }
+  takeMed(k, dose, s); delete a.sick;
+  return true;
+}
+// Genome therapy done
+function geneDone(c){
+  const e = state.exhibits.find(x => x.id === c.gene), v = state.staff.vets.find(x => x.id === c.id);
+  c.gene = null; c.job = "idle"; c.wait = 0;
+  if(e && geneTherapy(e, v ? v.name : "A vet")) events.changed();
 }
 // A minor illness treated where the animal stands: no dart, no trip to the PMC
 function treatDone(c){
   const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a), v = state.staff.vets.find(x => x.id === c.id);
   c.patient = null; c.job = "idle"; c.wait = 0;
-  if(!a || !a.sick) return;
-  const s = SPECIES_BY_ID[a.sp], k = pickMed(s, HEALTH.fieldDose);
-  if(!k || (a.sick.chronic && k !== "era")){ events.toast(`${v ? v.name : "A vet"} ran out of medicine before treating a ${s.name} in ${e.name}.`, "bad"); return; }
-  takeMed(k, HEALTH.fieldDose, s);
-  if(k === "era"){ delete a.sick; events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} on the spot.`, "good"); }
-  else { ease(a); events.toast(`${v ? v.name : "A vet"} treated a ${s.name} in ${e.name} with contemporary medicine. It won't fully recover without ${eraMedName(s).toLowerCase()}.`); }
+  if(!a || !a.sick || !treatHere(a)) return;
+  events.toast(`${v ? v.name : "A vet"} treated a ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`, "good");
   events.changed();
 }
 
@@ -433,7 +557,7 @@ function dartDone(c){
     if(a && pmc){
       a.darted = true;
       state.staff.transfers.push({id:uid("tr-"), animalId:a.id, sp:a.sp, from:e.id, to:pmc.id, med:true});
-      events.toast(`${who} darted a sick ${SPECIES_BY_ID[a.sp].name} in ${e.name}. A keeper will carry it to the PMC.`);
+      events.toast(`${who} darted a sick ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`);
       events.changed();
     }
   }
@@ -449,11 +573,12 @@ function vetsTick(dtMin){
     while(left > 0 && steps++ < 40){
       const call = c.job !== "toCall" ? callFor(c) : null;
       if(call && !vetBusy(c) && c.t === 0){ takeVetCall(c, call); if(c.job === "toCall") continue; }
-      if(c.job === "darting" || c.job === "treating" || c.job === "checking"){
+      if(c.job === "darting" || c.job === "treating" || c.job === "checking" || c.job === "gene"){
         const w = Math.min(c.work, left); c.work -= w; left -= w;
-        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone})[c.job](c);
+        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone, gene:geneDone})[c.job](c);
         continue;
       }
+      if(c.job === "resting"){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
         const nx = c.route[0], d = Math.hypot(nx.x - c.at.x, nx.y - c.at.y), sp = VET.speed * (onAtv(c) ? VEHICLES.speedMult : 1), go = sp * left, rem = d * (1 - c.t);
         if(go < rem){ c.t += go / (d || 1); left = 0; }
@@ -468,7 +593,7 @@ function vetsTick(dtMin){
   }
 }
 
-function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.focusEx = null; } }
+function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.gene = null; c.focusEx = null; } }
 
 function hireVet(){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center first.";
@@ -481,97 +606,100 @@ function hireVet(){
 }
 function vetStatus(v){
   const c = vcrew.find(x => x.id === v.id); if(!c) return "Clocking in";
-  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.check)), n = e ? e.name : "an exhibit";
+  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.gene || c.check)), n = e ? e.name : "an exhibit";
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
-          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC",
-          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the Genetics Lab`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
+          toGene:`Heading to ${n} for genome therapy`, gene:`Giving genome therapy in ${n}`,
+          darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC", toRest:"Going on break", resting:"On break",
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
+}
+
+/* ---------- through the day ---------- */
+
+let healthAcc = 0;
+function healthTick(dtMin){
+  wardTick(dtMin);
+  healthAcc += dtMin;
+  while(healthAcc >= HEALTH.step){ healthAcc -= HEALTH.step; healthStep(HEALTH.step / DAY_MIN); }
+}
+// A sick animal whose case the player can see: one toast
+const caseToast = (e, a, text, kind) => events.toast(`A ${SPECIES_BY_ID[a.sp].name} in ${e.name} ${text}`, kind ?? "bad");
+// A new case in an exhibit
+function newCase(e, a, id, cause){
+  if(!id) return;
+  const sk = fallSick(a, id, cause);
+  if(!sk.hidden) caseToast(e, a, `has ${sickName(a)}.`);
+  if((cause === "fight" || cause === "attack") && typeof herd !== "undefined" && herd.has(a.id)) events.fx("dust", herd.get(a.id).x, herd.get(a.id).y);
+  events.changed();
+}
+// One health step, a share f of a day: sick animals get worse (or a mild injury heals), and the well ones may fall ill or get hurt
+function healthStep(f){
+  const roll = p => p > 0 && Math.random() < 1 - Math.pow(1 - Math.min(1, p), f);
+  for(const e of state.exhibits){
+    const dirty = (e.dirt || 0) > CLEAN.penaltyFrom, hungry = hungerShare(e) > .5, te = trashEaten(e);
+    for(const a of [...e.animals]){
+      const s = SPECIES_BY_ID[a.sp];
+      if(a.sick){ sickStep(e, a, s, f, dirty, hungry); continue; }
+      if(!healthActive()) continue;
+      if(roll(te)){ newCase(e, a, "foreign", "trash"); continue; }
+      const j = injuryChance(e, a);
+      if(roll(j.p)){
+        const c = pickCause(j.w); newCase(e, a, pickCondition(s, ["injury"], injuryCauses(e, s, c), a), c);
+        // who did it: a rival of its own kind, or one of the species that preys on it
+        const others = e.animals.filter(o => o !== a && (c === "fight" ? o.sp === a.sp : c === "attack" && attackReason(SPECIES_BY_ID[o.sp], s)));
+        const who = others[Math.floor(Math.random() * others.length)];
+        if(who && a.sick) a.sick.hit = {by:SPECIES_BY_ID[who.sp].name, how:c === "fight" ? "fight" : "hunt", who:who.name};
+        continue;
+      }
+      const gs = grassSick(e, s);
+      if(roll(HEALTH.grassSick * gs)){ newCase(e, a, "modernplant", "plants"); continue; }
+      const i = illChance(e, a);
+      if(roll(i.p)){ const c = pickCause(i.w); newCase(e, a, c ? pickCondition(s, ["infection", "poison"], [c]) : pickCondition(s, ["infection"], []), c); }
+    }
+  }
+}
+// A sick animal for part of a day: worse, or a mild injury mending on its own when it's well looked after
+function sickStep(e, a, s, f, dirty, hungry){
+  if(a.darted) return;   // stable until it reaches the PMC
+  const k = SICK_KIND[a.sick.kind], n = a.need || {};
+  if(a.sick.kind === "injury" && a.sick.sev < SICK_BAND[1].from && !dirty && hungerShare(e) < .1 && !thirsty(e, s) && (n.stress || 0) < HEALTH.healStress){
+    a.sick.sev -= HEALTH.heal * f;
+    if(a.sick.sev <= 0){ delete a.sick; events.changed(); }
+    return;
+  }
+  a.sick.sev += k.worsen * f * (hungry ? 1.5 : 1) * (dirty ? 1.3 : 1) * (medicated(e, s) ? .5 : 1) * disFx(a, "worsen");
+  if(a.sick.sev >= 100){ animalDies(e, a); return; }
+  if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; caseToast(e, a, `is showing signs of ${sickName(a)}.`); events.changed(); }
+  if(!a.sick.warned && a.sick.sev >= SICK_BAND[2].from){ a.sick.warned = true; caseToast(e, a, "is critical."); }
 }
 
 /* ---------- each night ---------- */
 
 function healthNight(){
-  const h = state.health, out = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0};
-  // medicated feed: Botany Lab doses go out to exhibits that asked for it and were fed
+  const h = state.health;
+  // medicated feed: doses from the PMC go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
-    if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;
+    if(!e.medFeed || !e.animals.length || !pmcBuilding()) continue;
     const need = feedDoses(e);
-    // the feed is mixed from the era medicines of the animals it can help; take it from whichever the PMC holds
-    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))];
+    // the feed is mixed from whatever the PMC holds: its animals' era medicines first, then contemporary
+    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))].concat(CMED);
     if(hungerShare(e) < .5 && goods.reduce((s, g) => s + pmcStock(g), 0) >= need){
       let left = need; for(const g of goods){ const t = Math.min(left, pmcStock(g)); useMeds(t, g); left -= t; }
       e.medFedOk = true;
     }
   }
-  if(healthActive()){
-    for(const e of state.exhibits){
-      const dirty = (e.dirt || 0) > CLEAN.penaltyFrom, hungry = hungerShare(e) > .5;
-      for(const a of [...e.animals]){
-        const s = SPECIES_BY_ID[a.sp];
-        if(a.sick){
-          // a chronic case holds steady, and medicated feed with the era's own medicine slowly clears it up
-          if(a.sick.chronic){ if(medicated(e, s)){ a.sick.sev -= MEDICINE.feedHeal; if(a.sick.sev <= 0){ delete a.sick; out.healed++; } } continue; }
-          // mild cases clear up on medicated feed; everything else gets worse
-          if(medicated(e, s) && a.sick.kind === "illness" && a.sick.sev < HEALTH.minorBelow && !a.darted){
-            a.sick.sev -= MEDICINE.feedHeal;
-            if(a.sick.sev <= 0){ delete a.sick; out.healed++; }
-            continue;
-          }
-          let w = a.sick.cause === "trash" ? THROWN.worsen : a.sick.kind === "injury" ? HEALTH.injuryWorsen : HEALTH.illWorsen;
-          w *= (hungry ? 1.5 : 1) * (dirty ? 1.3 : 1) * (medicated(e, s) ? .5 : 1);
-          a.sick.sev += w;
-          if(a.sick.sev >= 100){ animalDies(e, a); continue; }
-          if(a.sick.cause === "trash" && a.sick.sev + w >= 100) events.toast(`Final warning: the ${s.name} in ${e.name} that ate trash will die tonight unless a vet treats it.`, "bad");
-          if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; out.showing.push({e, a}); }
-          continue;
-        }
-        if(Math.random() < injuryChance(e, a).p){ fallSick(a, "injury", HEALTH.injuryStart); out.hurt++; if(typeof herd !== "undefined" && herd.has(a.id) && injuryChance(e, a).why.includes("attacks")) events.fx("dust", herd.get(a.id).x, herd.get(a.id).y); }
-        else if(Math.random() < illChance(e, a).p){ fallSick(a, "illness", HEALTH.illStart); if(!a.sick.hidden) out.ill++; }
-      }
-    }
-  }
-  trashNight(out);
-  // the ward: patients don't get worse here, and vets treat as many as they can
-  const pmc = dept("pmc");
-  let cap = pmc ? state.staff.vets.length * VET.patients : 0;
-  for(const p of [...h.ward].sort((x, y) => (y.a.sick ? y.a.sick.sev : 0) - (x.a.sick ? x.a.sick.sev : 0))){
-    if(p.cured || cap <= 0) continue;
-    const s = SPECIES_BY_ID[p.a.sp];
-    // start a course of medicine, or switch to the era's own once it's available
-    if(p.med !== "era"){ const k = pickMed(s, HEALTH.dose); if(k && (k === "era" || !p.med)){ takeMed(k, HEALTH.dose, s); p.med = k; } }
-    if(!p.med) continue;
-    cap--;
-    const era = eraOf(s), fl = MODERN.floor[era];
-    if(p.med === "modern"){
-      if(p.a.sick.sev - HEALTH.healPerNight * MODERN.heal[era] > fl){ p.a.sick.sev -= HEALTH.healPerNight * MODERN.heal[era]; continue; }
-      ease(p.a);
-    } else p.a.sick.sev -= HEALTH.healPerNight;
-    if(p.a.sick.chronic || p.a.sick.sev <= 0){
-      const chronic = !!p.a.sick.chronic;
-      if(!chronic) delete p.a.sick;
-      p.cured = true;
-      const home = state.exhibits.find(x => x.id === p.home);
-      if(home) state.staff.transfers.push({id:uid("tr-"), animalId:p.a.id, sp:p.a.sp, from:pmcBuilding().id, to:home.id, med:true});
-      else { discharge(p.a.id); const [x, y] = centroid(pmcBuilding().points); dropCrate(p.a, x, y); }
-      events.toast(`${chronic ? `Contemporary medicine got a ${s.name} as well as it can. It still has a chronic illness only ${eraMedName(s).toLowerCase()} can cure.` : `The PMC cured a ${s.name}.`}${home ? ` A keeper will take it back to ${home.name}.` : " Its exhibit is gone, so it waits in a crate."}`, chronic ? "" : "good");
-    }
-  }
+  // the keepers clear out the day's trash
+  for(const e of state.exhibits) e.trash = 0;
   for(const e of state.exhibits) e.hungryMin = 0;
-  // mild illness starts out hidden, so only injuries and cases that now show get a warning
-  const ill = out.ill + out.showing.length;
-  if(ill || out.hurt){
-    const bits = [ill && `${ill} animal${ill === 1 ? " is" : "s are"} showing signs of illness`, out.hurt && `${out.hurt} ${out.hurt === 1 ? "was" : "were"} hurt fighting`].filter(Boolean);
-    events.toast(`Overnight, ${bits.join(" and ")}. ${state.staff.vets.length ? "Vets will see to them." : "Build a Paleo-Medicine Center and hire vets to treat them."}`, "bad");
-  }
-  if(state.day + 1 === h.from) events.toast("Animals can start falling ill tomorrow. Keep them fed and clean, and build a Paleo-Medicine Center.", "bad");
+  if(state.day + 1 === h.from) events.toast("Animals can start falling ill tomorrow.", "bad");
 }
 
 function animalDies(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.rating = Math.max(0, state.rating - .05);
-  const hit = a.sick.hit, cause = a.sick.cause === "trash" ? "Ate trash thrown in by guests" : hit ? (hit.how === "fight" ? `Wounds from a fight with a ${hit.by}` : `Killed by a ${hit.by}`) : a.sick.kind === "injury" ? "Injuries" : "Illness";
+  const hit = a.sick.hit, cause = a.sick.killed && hit ? `Killed by a ${hit.by}` : sickName(a);
   events.died({animal:SPECIES_BY_ID[a.sp].name, exhibit:e.name, cause});
 }

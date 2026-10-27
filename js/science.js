@@ -43,7 +43,7 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 
 // What a job cost, so cancelling it can give it back: {points} of research or {money}
 function jobRefund(kind, j){
-  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : 0};
+  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : 0};
   if(kind === "temporal") return {money:j.cost || 0};
   if(kind === "gene") return {money:j.failed ? 0 : SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
@@ -67,10 +67,9 @@ const researching = (kind, id) => state.science.projects.some(p => p.kind === ki
 // Discovered: The Time Travel Lab's scouting turned it up (or, in old saves, the Research Lab unlocked it)
 const isUnlocked = id => state.science.unlocked.includes(id);
 
-// A project is {kind, id}: "tech" (anything in TECH) or "refine" (an era's medicine, for one period)
+// A project is {kind:"tech", id}: anything in TECH
 function projectInfo(kind, id){
   if(kind === "tech"){ const t = TECH.find(x => x.id === id); return t ? {label:t.label, points:t.points, needs:t.needs, done:hasTech(id)} : null; }
-  if(kind === "refine"){ const era = ERA_OF[id]; return era ? {label:`${id} medicine`, points:REFINE_POINTS[era], needs:MED_TECH[era], done:hasTech("ref-" + id)} : null; }
   return null;
 }
 const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);
@@ -104,8 +103,7 @@ function stopProject(p){
 }
 function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
-  const tech = p.kind === "refine" ? "ref-" + p.id : p.id;
-  if(!hasTech(tech)) sc.tech.push(tech);
+  if(!hasTech(p.id)) sc.tech.push(p.id);
   events.toast(`The Research Lab finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 
@@ -271,7 +269,7 @@ function tripReturns(t){
       const d = sc.dna[t.sp];
       lines.push([g.event ? `${g.name} Recording Made` : `${g.name} Sample Found`, true]);
       if(d.genome >= 100 && was < 100) lines.push([g.event ? `${g.name} Record Complete` : `${g.name} Genome Complete`, true]);
-      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push(["The Genetics Lab can clone it now, though the clones will be frail until the genome is more complete."]);
+      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push([`${g.name} now available at Genetics Lab.`]);
       // sometimes the drone also turns up traces of another animal seen at the same site
       const others = g.event ? [] : siteSeen(s).filter(x => x !== t.sp && !genomeDone(x));
       if(others.length && Math.random() < TRIP.bonus.chance){
@@ -297,9 +295,9 @@ const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fa
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
-// The Genetics Lab can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
+// The Genetics Lab can clone from CLONE_GENOME.min % of a genome. A clone's Accuracy (a.q) is how complete the genome is when it's cloned.
 const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
-const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
+const cloneQuality = sp => { const d = state.science.dna[sp]; return !d || d.genome < CLONE_GENOME.min ? 0 : Math.round(Math.min(100, d.genome)); };
 // The chance a clone dies in the incubator: CLONE_GENOME.failMax at the minimum genome, nothing at 100%
 const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
 function failClone(j){
@@ -327,7 +325,7 @@ function orderClone(sp, exhibitId, sex){
   const s = SPECIES_BY_ID[sp], cq = cloneQuality(sp);
   spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end};
+  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq, bay:freeBay("gene"), start, end};
   // a partial genome can fail partway (never in sandbox)
   if(!state.sandbox && Math.random() < cloneFailChance(sp)){ job.fail = start + rand(CLONE_FAIL.from, CLONE_FAIL.to) * (end - start); job.why = CLONE_FAIL.causes[Math.floor(Math.random() * CLONE_FAIL.causes.length)]; }
   state.science.clones.push(job);
@@ -336,7 +334,7 @@ function orderClone(sp, exhibitId, sex){
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:a.cl ?? true, q:a.q, ...(a.sick ? {sick:a.sick} : {})}));
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:a.cl ?? true, ...geneFields(a), ...(a.sick ? {sick:a.sick} : {})}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -367,6 +365,7 @@ function cancelDelivery(id){ state.staff.transfers = state.staff.transfers.filte
 // Deliveries to an exhibit that's gone, or from a lab that's gone, are dropped (one already on the road goes back to the lab list at dropOff)
 function deliveryTidy(){
   state.staff.transfers = state.staff.transfers.filter(t => !t.lab || t.cargo || (state.exhibits.some(e => e.id === t.to) && state.buildings.some(b => b.id === t.from)));
+  wardTidy();   // a recovered patient whose trip was dropped gets a new one, or a crate
 }
 
 /* ---------- crates: an animal boxed off the map is a crate standing in the park (state.crates), Zoo Tycoon style ---------- */
@@ -405,7 +404,7 @@ function crateSpotNear(x, y, sp, skip){
 // An animal's record becomes a crate standing at the free spot nearest (x, y)
 function dropCrate(a, x, y){
   const [cx, cy] = crateSpotNear(x, y, a.sp);
-  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, q:a.q ?? 90, x:cx, y:cy};
+  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, ...geneFields(a), x:cx, y:cy};
   if(a.cl !== undefined) r.cl = a.cl;
   if(a.sick) r.sick = a.sick;
   crates().push(r);
@@ -475,12 +474,12 @@ function crateStranded(){
 }
 function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
-  const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
-  const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q});
+  const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q, gq:c.q});
+  const dis = rollDisorder(c.q); if(dis) r.dis = dis;   // undiagnosed until a vet's check-up
   specimens().push(r);
   // a clone ordered for an exhibit is queued for delivery at once; any other waits at the lab
-  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It's being delivered to ${e.name}.`, "good");
-  else events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It waits for delivery.`, "good");
+  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It's being delivered to ${e.name}.`, "good");
+  else events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It waits for delivery.`, "good");
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */
