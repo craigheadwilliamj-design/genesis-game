@@ -134,9 +134,13 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - It works on the animal from the start, but stays hidden until the animal's first vet check-up diagnoses it. From then it's listed in the animal's menu for good, until genome therapy cures it.
 - Draft effects: Osteoporosis, injuries 1.5x as likely and more often Fractures; Cardiac Problems, illness and injury worsen 1.3x as fast; Neurological Disorder, paces more; Weakened Immune System, illness 2x as likely; Muscle Fatigue, slower, rests more, plays less.
 - These replace the flat frail-clone illness multiplier.
-- Medicine does nothing for it. Draft cure: genome therapy that lifts DNA to 95% clears it.
+- Medicine does nothing for it.
 - Every place that copies an animal (crates, specimens, the PMC, escapes) carries it, like names.
-- Open: old saves (only new clones, or roll existing animals), the effects, the cure line, whether genome therapy is renamed Genome Treatment.
+- Neurological Disorder also takes stressors much harder (first guess x1.75).
+- Old saves: only new clones roll one.
+- Shown in the animal's Health list once diagnosed: yellow text, always at the top, with "(Genetic)" after the name, e.g. "Osteoporosis (Genetic)". Curing it takes it off the list.
+- Genome therapy cures it whenever the lab's genome is more complete than the animal's. It does not change the animal's Accuracy (the genome % at its cloning).
+- Open: what therapy raises on the animal, and what rank and guests read (see chat).
 
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
