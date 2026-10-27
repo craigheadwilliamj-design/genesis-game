@@ -53,6 +53,14 @@ function stashGood(t, n, first){
   for(const b of order){ if(left <= 0.01) break; left -= addGood(b, t, left); }
   return n - Math.max(0, left);
 }
+// Medicine a worker is left holding goes to the PMC first, then a cold store, then a dock; what still doesn't fit is wasted
+const isMedGood = t => t === CMED || MED_GOODS.includes(t);
+function stashMed(t, n){
+  let left = n;
+  const order = [...storesBuilt().filter(b => b.type === "pmc"), ...storesBuilt().filter(b => storeOf(b).cold), ...storesBuilt().filter(b => storeOf(b).dock)];
+  for(const b of order){ if(left <= .01) break; left -= addGood(b, t, left); }
+  return n - Math.max(0, left);
+}
 // The Botany Lab keeps a stock per medicine (state.ceres.meds is {medpal, medmes, medcen})
 function cerMeds(){ const c = state.ceres; if(!c.meds || typeof c.meds !== "object") c.meds = {medpal:0, medmes:0, medcen:0}; return c.meds; }
 const cerMedTotal = () => MED_GOODS.reduce((s, t) => s + (cerMeds()[t] || 0), 0);

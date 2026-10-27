@@ -23,10 +23,10 @@ function syncCustodians(){
     ccrew.push({id:m.id, at:null, route:[], t:0, job:"idle", wait:0, target:null, work:0, carry:m.carry || null, haul:null});
 }
 function setCustCarry(c, v){ c.carry = v; const r = custRec(c); if(r) r.carry = v; }
-// Put back whatever a custodian is holding: into the store it came from, or anywhere it fits
+// Put back whatever a custodian is holding: into the store it came from, or anywhere it fits (medicine: the PMC, a cold store, a dock, or it's wasted)
 function returnCustCarry(c){
   const h = c.carry;
-  if(h && h.amount > 0) stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : null));
+  if(h && h.amount > 0){ if(isMedGood(h.type)) stashMed(h.type, h.amount); else stashGood(h.type, h.amount, buildingById(c.haul ? c.haul.src : null)); }
   c.haul = null; setCustCarry(c, null);
 }
 

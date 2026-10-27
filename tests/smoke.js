@@ -250,6 +250,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const o3 = JSON.parse(JSON.stringify(state)); o3.buildings.find(x => x.id === "b-pmc").store = {medmod:sh + 10}; const m3 = o3.money;
       const u3 = upgradeSave(o3); out.oldPmcOverflowSoldBack = u3.buildings.find(x => x.id === "b-pmc").store.medmod === sh && u3.money === m3 + 10 * MODERN.cost;
       pmcB.store = {medpal:10}; }
+    // medicine a worker is left holding: the PMC, then a cold store, then a dock, else it's wasted
+    { const cold = {id:"b-cs", type:"coldstore", points:rectPts(100, 100, 10, 10, 0)}, dock = {id:"b-dk", type:"dock", points:rectPts(130, 100, 10, 10, 0)};
+      state.buildings.push(cold, dock); const sh = pmcShare(pmcB);
+      pmcB.store = {medpal:sh - 5}; cold.store = {}; dock.store = {};
+      const put = stashMed("medpal", 10);
+      const order = stockOf(pmcB, "medpal") === sh && stockOf(cold, "medpal") === 5 && stockOf(dock, "medpal") === 0 && put === 10;
+      pmcB.store = {medpal:sh}; cold.store = {meat:storeCap(cold)}; const put2 = stashMed("medpal", 4);
+      const toDock = stockOf(dock, "medpal") === 4 && put2 === 4;
+      dock.store.meat = storeCap(dock) - 4; const put3 = stashMed("medpal", 3);
+      out.medStashOrder = order && toDock && put3 === 0 && stockOf(dock, "medpal") === 4;
+      state.buildings = state.buildings.filter(x => x !== cold && x !== dock); pmcB.store = {medpal:10}; }
     // vets: a poisoning comes first, deliveries come last
     { vetsNight(); keepersNight();
       const c = vcrew[0]; c.at = kGraph.anchors["b-pmc"];
