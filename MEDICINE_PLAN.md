@@ -203,9 +203,19 @@ All items approved. `<vet>` vet's name, `<sp>` species, `<name>` the animal's ow
 - Disorder roll, refit to Accuracy: 60% x ((95 - Accuracy) / 35)^1.5 (60%: 60, 70%: 36, 80%: 17, 85%: 9, 90%: 3, 95%+: none).
 - The exhibit's therapy toggle only treats animals with a diagnosed disorder. One procedure goes all the way, priced per Genome Quality point gained as now; the 20-point cap goes.
 
+## 9. Old saves (locked)
+All in `upgradeSave`.
+- Sick animals: an illness becomes an [infection] at the same severity with a random name that fits its body; a trash case becomes Foreign Object Ingestion; a chronic case becomes a plain infection at its severity (chronic dropped); an injury keeps its severity and takes a name from `hit.how` (fight: a fight injury, predator: Bite Wound, else a storm injury). Hidden cases stay hidden.
+- Darted animals stay darted (no longer worsening); their trip to the PMC is kept.
+- Ward: a patient in treatment gets a fresh timer from its current severity, starting at load; one marked cured becomes recovered and is queued home. Beds start at 2, or the number of patients if more (up to 6), free.
+- Medicine stock (contemporary and era) carries over as is.
+- DNA quality becomes Accuracy, back to the genome % it came from (quality 40 is 60%, 70 is 80%, 100 is 100%); bought animals are 100%. Genome Quality starts equal to it. No existing animal gets a disorder.
+- Refinement projects go: points spent on finished ones are refunded to the Research Lab, and queued ones are cancelled with their progress refunded.
+- Exhibit settings carry over: medicated feed, genome therapy, last check-up.
+
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
 - Trash throwing moves out of medicine.js.
 
 ## To do
-9. Old saves.
+Build.
