@@ -118,7 +118,7 @@ Canvas: https://claude.ai/artifact/9x8XCGk9JsJXcFcqe4yNqL (exhibit Health tab, a
 - Empty beds show only in the "n of m beds" count.
 - The animal page's summary line drops "% DNA"; Accuracy and Genome Quality sit in the Health section as two number rows.
 - Toast colors: new cases, critical and out of medicine red; treated, recovered and cured green; the rest plain.
-- Demolish confirm title: still to pick.
+- Demolish confirm title: "Demolish Paleo-Medicine Center?"
 
 ## 8b. Wording (locked)
 All items approved. `<vet>` vet's name, `<sp>` species, `<name>` the animal's own name, `<ex>` exhibit, `<n>` a number.
