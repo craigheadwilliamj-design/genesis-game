@@ -1136,6 +1136,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.timelineRoundTrips = [0.05, .37, .5, .91, .999].every(u => Math.abs(uAt(yearsAt(u).years) - u) < 1e-9);
     out.timelineLabels = fmtYearsAgo(352) === "350 years ago" && fmtYearsAgo(126000) === "130,000 years ago" && fmtYearsAgo(2.58e6) === "2.6 million years ago" && fmtYearsAgo(251.9e6) === "252 million years ago";
     out.everySpeciesHasAClade = SPECIES.every(x => CLADE_OF[x.id]) && Object.keys(CLADE_OF).every(id => SPECIES_BY_ID[id]) && Object.values(CLADE).flat().length === Object.keys(CLADE_OF).length;
+    out.bodyListsNameSpecies = [GORES, LIMBLESS, TOOTHLESS, SHELLED].every(l => l.every(id => SPECIES_BY_ID[id])) && SHELLED.every(id => CLADE_OF[id] === "invert");
     out.everySpeciesHasASite = SPECIES.every(x => TIME_SITES.some(t => (t.fauna || []).includes(x.id) && epochOf(t.from).period === x.period));
     out.sitesHaveMaps = TIME_SITES.every(t => t.from > EPOCHS[0].from || Object.keys(t.at).length > 0) && Object.values(TIMELINE_MAPS).every(m => SPRITE_PACK[`sprites/timeline/${m}.png`]);
 

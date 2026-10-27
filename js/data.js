@@ -1834,6 +1834,11 @@ const CLADE = {
   seamammal:["basi", "enal", "kntr", "stel"],
 };
 const CLADE_OF = Object.fromEntries(Object.entries(CLADE).flatMap(([c, ids]) => ids.map(id => [id, c])));
+// Bodies some injuries and illnesses need. Fish, invertebrates and swimmers already have no legs to sprain; these are the rest.
+const GORES = ["tric", "styr", "cnot", "este", "arsi", "elas", "mglo", "siva", "hopl", "uint", "sdel", "mast", "mamm", "colm", "plty", "steg", "kent"];   // horns, tusks, antlers or spikes: what it hurts is gored
+const LIMBLESS = ["tita"];
+const TOOTHLESS = ["ornm", "gall", "dche", "ovir", "waim", "kele", "drom", "psil", "arge", "ornw", "dodo", "ppig", "mchl", "pter", "quet", "liso", "stel"];
+const SHELLED = ["olen", "ptry", "came", "prom"];   // shelled aquatic invertebrates
 // Species traits. Anything not listed is worked out from its data (traitsOf in behavior.js):
 //   active   diurnal (up all day), nocturnal (sleeps through most of opening hours), crepuscular (busy at dawn and dusk)
 //   social   solitary (wants no company), pair, herd, pack (pack and herd animals left alone pace or hide)
