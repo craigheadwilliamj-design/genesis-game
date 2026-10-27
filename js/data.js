@@ -1482,7 +1482,7 @@ const SICK_BAND = [
 // The conditions. A new case picks one at random among those its body can get (who, not) and its cause brings on (from);
 // with no cause that fits, any its body can get.
 //   who   body tags (bodyTags in medicine.js): a CLADE name, or any, vert (vertebrates), landvert, tetrapod (vertebrates but fish),
-//         aqfish and aqinvert (fish and invertebrates that live in water), landbug (land invertebrates), shelled, legs, teeth
+//         aqfish and aqinvert (fish and invertebrates that live in water), landbug (land invertebrates), shelled, legs, teeth, or a species id
 //   from  dirt, water (foul water, the dirt of tanks and pools), biome (the wrong one), shelter (weather with nowhere to shelter),
 //         lamp (no heat lamp), stress, crowd, hunger, thirst, trash, plants (ones it never evolved for), fight, attack, gore
 //   only  only its own cause brings it on, never as a stand-in
@@ -1509,10 +1509,10 @@ const CONDITIONS = {
   fmd:         {name:"Foot and Mouth Disease", kind:"infection", who:["hooved"], from:["dirt", "crowd"]},
   bluetongue:  {name:"Bluetongue Virus",    kind:"infection", who:["hooved"], from:["dirt", "shelter"]},
   tetanus:     {name:"Tetanus",             kind:"infection", who:["landvert"], from:["dirt"]},
-  whitespot:   {name:"White Spot Disease",  kind:"infection", who:["aqfish"], from:["water", "stress", "shelter"]},
+  whitespot:   {name:"White Spot Disease",  kind:"infection", who:["aqfish", "anom", "opab"], from:["water", "stress", "shelter"]},
   flukes:      {name:"Flukes",              kind:"infection", who:["aqfish"], from:["water"]},
   saprolegniasis:{name:"Saprolegniasis",    kind:"infection", who:["aqfish"], from:["water", "shelter"]},
-  chitino:     {name:"Chitinoclastic Bacteria", kind:"infection", who:["shelled"], from:["water"]},
+  chitino:     {name:"Chitinoclastic Bacteria", kind:"infection", who:["shelled", "anom", "opab"], from:["water"]},
   cordyceps:   {name:"Cordyceps",           kind:"infection", who:["landbug"], from:["dirt", "shelter"]},
   foreign:     {name:"Foreign Object Ingestion", kind:"poison", who:["any"], from:["trash"], only:true},
   modernplant: {name:"Modern Plant Poisoning", kind:"poison", who:["any"], from:["plants"], only:true},

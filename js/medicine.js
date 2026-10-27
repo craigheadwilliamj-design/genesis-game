@@ -81,7 +81,7 @@ function geneTherapy(e, who){
 const aquatic = s => !!(s.aqua || s.pool) || s.id === "tikt";
 // What a body is, for who can get which condition (CONDITIONS' who and not)
 function bodyTags(s){
-  const c = CLADE_OF[s.id], wet = aquatic(s), t = new Set(["any", c]);
+  const c = CLADE_OF[s.id], wet = aquatic(s), t = new Set(["any", c, s.id]);
   if(c !== "invert") t.add("vert");
   if(c !== "invert" && c !== "fish") t.add("tetrapod");
   if(c !== "invert" && !wet) t.add("landvert");

@@ -271,13 +271,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.tiktaalikIsAFish = can("tikt", "whitespot") && can("tikt", "fintear") && !can("tikt", "tetanus") && !can("tikt", "pneumonia");
       out.swimmersGetBasics = can("mosa", "gastro") && can("mosa", "pneumonia") && !can("mosa", "whitespot") && !can("mosa", "tb") && can("basi", "tb") && !can("basi", "lice");
       out.restrictedIllnesses = can("trex", "avianflu") && can("dipl", "avianflu") && !can("tric", "avianflu") && can("mglo", "fmd") && !can("mamm", "fmd") && can("smil", "lice") && !can("trex", "lice")
-        && can("came", "chitino") && !can("anom", "chitino") && can("arth", "cordyceps") && !can("ptry", "cordyceps") && can("dunk", "nitrate") && !can("mosa", "nitrate");
+        && can("came", "chitino") && can("anom", "chitino") && can("opab", "whitespot") && !can("olen", "whitespot") && can("arth", "cordyceps") && !can("ptry", "cordyceps") && can("dunk", "nitrate") && !can("mosa", "nitrate");
       out.bodyRules = !can("tita", "sprain") && can("mosa", "fracture") && !can("mosa", "sprain") && !can("dodo", "tooth") && can("trex", "tooth") && !can("dunk", "concussion") && can("dunk", "fintear") && !can("olen", "fracture");
       let gores = 0, dodoGore = 0;
       for(let i = 0; i < 300; i++){ if(pickCondition(S.trex, ["injury"], ["fight"]) === "gore") gores++; if(pickCondition(S.tric, ["injury"], ["fight", "gore"]) === "gore") dodoGore++; }
       out.goringNeedsAGorer = gores === 0 && dodoGore > 0 && pickCondition(S.trex, ["injury"], ["fight"]) !== null;
       out.causePicksName = ["water", "water", "water"].every(c => ["gastro", "whitespot", "flukes", "saprolegniasis", "nitrate", "gasbubble"].includes(pickCondition(S.dunk, ["infection", "poison"], [c])))
-        && pickCondition(S.anom, ["infection"], []) === null && pickCondition(S.trex, ["infection"], ["trash"]) !== "foreign";
+        && ["whitespot", "chitino"].includes(pickCondition(S.anom, ["infection"], [])) && pickCondition(S.trex, ["infection"], ["trash"]) !== "foreign";
       out.fallSickShape = (() => { const t = {sp:"trex"}; fallSick(t, "pneumonia", "dirt"); const ok1 = t.sick.kind === "infection" && t.sick.sev === SICK_KIND.infection.start && t.sick.hidden && sickName(t) === "Pneumonia";
         fallSick(t, "laceration"); return ok1 && !t.sick.hidden && t.sick.kind === "injury" && sickBand(t).label === "Mild" && (t.sick.sev = 50, sickBand(t).label === "Serious") && (t.sick.sev = 80, sickBand(t).label === "Critical"); })(); }
 
