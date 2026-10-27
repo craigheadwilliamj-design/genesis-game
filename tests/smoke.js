@@ -1987,12 +1987,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
     out.oldGetsWeather = upgradeSave(oldW).weather.from === 23 && oldW.weather.today === "fair";
 
-    // the animal move dialog opens and lists where they can go (it once called map.js's moveProblem and threw)
+    // moving an animal works like a lab delivery: the pointer carries it, and the move is a worker-carried transfer
     const mvA = {...wx, id:"e-mvA", land:[]}, mvB = {...wx, id:"e-mvB", name:"Move test B", animals:[], land:[]};
     state.exhibits = [mvA, mvB];
-    try { openMoveDialog(mvA, wxSp.id); out.moveDialogOpens = $("#dlgMove").open && !!$("#moveTo") && $("#moveTo").options.length === 1; }
-    catch { out.moveDialogOpens = false; }
-    if($("#dlgMove").open) $("#dlgMove").close();
+    try {
+      const mvAn = mvA.animals[0], trBefore = state.staff.transfers.length;
+      crateSel = mvAn.id; crateMode = "move";
+      const rec = crateRecord();
+      requestMove(mvA, mvAn.sp, mvB, 1, mvAn.id);
+      const tr = state.staff.transfers.find(t => t.animalId === mvAn.id);
+      out.moveIsDelivery = rec === mvAn && !!tr && tr.any === true && tr.to === mvB.id && state.staff.transfers.length === trBefore + 1;
+      state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== mvAn.id);
+    } catch { out.moveIsDelivery = false; }
+    crateSel = null; crateMode = "crate";
     state.exhibits = keepEx; recompute();
 
     // a wide path holds twice the crowd before guests feel packed
