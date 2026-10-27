@@ -2610,7 +2610,7 @@ const LAUNCH_ROSTER = [
   "icht","tikt",   // Devonian
   "arth","pulm","mega","dcau","eryo",   // Carboniferous
   "diic","lyst","plhy","mosc","dime","scut","este","coty","inos","prio",   // Permian
-  "sile","long","coel","desm","plat","eryt",   // Triassic
+  "sile","long","coel","desm","plat","post","eryt",   // Triassic
   "hete","comp","orni","dryo","scel","kent","cryo","allo","apat","dipl",   // Jurassic
   "hyps","beel","psit","simo","ovir","gall","para","pach","igua","velo","pter","tric","spin","carc","trex",   // Cretaceous
   "paki","ambu","andr",   // Paleogene
