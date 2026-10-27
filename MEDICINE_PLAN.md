@@ -104,7 +104,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 ## 8a. UI layout (locked; wording in 8b)
 - Exhibit At a glance: Health row as now (sick count, cleanliness).
 - Exhibit Health tab, top to bottom: status chips (sick count colored by worst band, check-up age and overdue, medicated today, trash today, low food/water/sanitation); the risk line (only when something raises it); At the PMC (this exhibit's patients with progress bars or recovered and heading home); every animal worst first (name, species, condition flavor name, health bar, one-line status, tap to open); buttons: Call vet (here and in Keepers), medicated feed toggle with doses a day, genome therapy toggle with how many it would improve.
-- Animal panel Health section: health bar, condition flavor name and cause, one-line status, DNA and frail note, basics lines, medicated today, last check-up.
+- Animal panel Health section: health bar, condition flavor name and cause, one-line status, Accuracy and Genome Quality, a diagnosed genetic disorder (yellow, top of the list), basics lines, medicated today, last check-up.
 - PMC panel: header and vets; Ward (n of m beds) with Buy bed (price and upkeep, until 6) and each patient with home exhibit, progress bar and status; Medicine (stock meters for Contemporary and each researched era, ward-time multipliers as plain numbers); Sick in exhibits, worst first; Check-ups, most overdue first.
 - Bulldoze confirm: a line when the ward has patients.
 - Toasts: found at a check-up, hurt or showing illness, treated on the spot, darted, admitted, recovered, band 3 warning, died (death dialog), trash thrown in (first of the day), PMC short on doses (once a day). Coaching toasts that tell the player what to build or do are dropped.
@@ -127,12 +127,12 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Each name gets a row: its causes and who can get it (`CLADE` in data.js, done). Names are picked at random among those that fit. Each name's causes still to be mapped.
 - Open: genetic disorders (flavor of infection, a kind cured only by genome therapy, or no illness at all); fish and invertebrate names (owner to supply); whether every name in a kind shares the kind's numbers; whether Trash poisoning and Plant poisoning stand; items 6 to 35.
 
-## Genetic disorders (in progress)
+## Genetic disorders (locked)
 - A trait, not an illness: no severity or bands, never fatal on its own, and an animal can be sick and have one. At most one per animal.
 - Names: Osteoporosis, Cardiac Problems, Neurological Disorder, Weakened Immune System, Muscle Fatigue.
 - Rolled when a clone is made (see the roll below).
 - It works on the animal from the start, but stays hidden until the animal's first vet check-up diagnoses it. From then it's listed in the animal's menu for good, until genome therapy cures it.
-- Draft effects: Osteoporosis, injuries 1.5x as likely and more often Fractures; Cardiac Problems, illness and injury worsen 1.3x as fast; Neurological Disorder, paces more; Weakened Immune System, illness 2x as likely; Muscle Fatigue, slower, rests more, plays less.
+- Effects: Osteoporosis, injuries 1.5x as likely and more often Fractures; Cardiac Problems, illness and injury worsen 1.3x as fast; Neurological Disorder, paces more; Weakened Immune System, illness 2x as likely; Muscle Fatigue, slower, rests more, plays less.
 - These replace the flat frail-clone illness multiplier.
 - Medicine does nothing for it.
 - Every place that copies an animal (crates, specimens, the PMC, escapes) carries it, like names.
