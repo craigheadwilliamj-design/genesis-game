@@ -244,6 +244,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       healthNight();
       out.medFeedAnyMedicine = viv.medFedOk && pmcStock(CMED) === 10 - feedDoses(viv) && Math.abs(illChance(viv, a0).p - p0 * MEDICINE.feedCut) < 1e-12;
       viv.medFeed = false; viv.medFedOk = false; state.science.tech = techKeep; pmcB.store = {medpal:10}; }
+    // the PMC's shelves: each medicine has its own share, and stock never goes over it
+    { pmcB.store = {}; const sh = pmcShare(pmcB), put = addGood(pmcB, CMED, 999);
+      out.pmcShareCaps = sh === Math.floor(storeCap(pmcB) / (MED_GOODS.length + 1)) && put === sh && addGood(pmcB, CMED, 5) === 0 && addGood(pmcB, "medpal", 3) === 3 && storeTarget(pmcB, CMED) === Math.ceil(sh * .8) && storeTarget(pmcB, CMED) <= sh;
+      const o3 = JSON.parse(JSON.stringify(state)); o3.buildings.find(x => x.id === "b-pmc").store = {medmod:sh + 10}; const m3 = o3.money;
+      const u3 = upgradeSave(o3); out.oldPmcOverflowSoldBack = u3.buildings.find(x => x.id === "b-pmc").store.medmod === sh && u3.money === m3 + 10 * MODERN.cost;
+      pmcB.store = {medpal:10}; }
     // vets: a poisoning comes first, deliveries come last
     { vetsNight(); keepersNight();
       const c = vcrew[0]; c.at = kGraph.anchors["b-pmc"];
@@ -2899,7 +2905,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalHealthInjured = /Bite Wound, Serious\./.test(hl()) && /Bitten by a Dimetrodon\./.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
       // the exhibit's Animals and Health tabs show each animal's health too
       { const ex = animalHome(a1.id), tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex.id; exTabs.tab = "animals"; const at = exhibitHtml(ex); exTabs.tab = "health"; const ht = exhibitHtml(ex); exTabs.tab = tk; exTabs.ex = tx;
-        out.exhibitTabsHealthBar = /Bite Wound, Serious · 45%/.test(at) && /Bite Wound, Serious · 45%/.test(ht) && /Healthy · 100%/.test(ht) && /width:45%/.test(ht); }
+        out.exhibitTabsHealthBar = /Bite Wound, Serious/.test(at) && /class="pct">45%/.test(at) && /Bite Wound, Serious · /.test(ht) && /class="pct">45%/.test(ht) && /class="pct">100%/.test(ht) && /width:45%/.test(ht); }
+      a1.sick = {kind:"injury", name:"bite", sev:30, hit:{by:"Velociraptor", how:"fight", who:"VELO-005"}}; animalLive(true);
+      out.causeNamesAttacker = /From fight with VELO-005\./.test(hl()) && !!document.querySelector("#anHealth li.sub") && /VELO-005/.test(document.querySelector("#anHealth li.sub").textContent);
       a1.sick = {kind:"infection", name:"pneumonia", sev:10, hidden:true}; animalLive(true);
       out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Pneumonia/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
       // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low

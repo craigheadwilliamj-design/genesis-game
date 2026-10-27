@@ -23,7 +23,9 @@ const buildingById = id => state.buildings.find(b => b.id === id) || null;
 const storeCap = b => Math.round(storeOf(b).cap * (hasUpgrade("crates") ? LOGI.crateBoost : 1));
 const stockOf = (b, t) => (b.store && b.store[t]) || 0;
 const storeTotal = b => b.store ? Object.values(b.store).reduce((s, n) => s + n, 0) : 0;
-function storeRoom(b, t){ const d = storeOf(b); return d && d.holds.includes(t) ? Math.max(0, storeCap(b) - storeTotal(b)) : 0; }
+function storeRoom(b, t){ const d = storeOf(b); return d && d.holds.includes(t) ? Math.max(0, Math.min(storeCap(b) - storeTotal(b), b.type === "pmc" ? pmcShare(b) - stockOf(b, t) : Infinity)) : 0; }
+// The PMC's shelves are split evenly and for good between contemporary medicine and each era's, so no one medicine can crowd out the rest
+const pmcShare = b => Math.floor(storeCap(b) / (MED_GOODS.length + 1));
 function addGood(b, t, n){
   const r = Math.min(n, storeRoom(b, t));
   if(r > 0){ b.store = b.store || {}; b.store[t] = (b.store[t] || 0) + r; }
@@ -122,7 +124,7 @@ function storeTarget(b, t){
   const d = storeOf(b);
   if(!d || d.source || d.dock || !d.holds.includes(t)) return 0;
   const cap = storeCap(b);
-  if(b.type === "pmc"){ const want = medGoodsWanted().concat(CMED); return want.includes(t) ? Math.ceil(cap * .8 / want.length) : 0; }
+  if(b.type === "pmc") return medGoodsWanted().concat(CMED).includes(t) ? Math.ceil(pmcShare(b) * .8) : 0;
   if(t === CMED) return d.bulk && hasDept("pmc") ? Math.min(Math.round(cap * .1), 60) : 0;   // a cold store keeps a buffer for the PMC
   if(MED_GOODS.includes(t)) return d.bulk && cereses().length && medGoodsWanted().includes(t) ? Math.min(Math.round(cap * .1), 60) : 0;
   if(BUILDINGS[b.type].rooms) return t === "merch" ? Math.round(cap * .8) : 0;

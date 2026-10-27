@@ -194,7 +194,7 @@ function rivalFight(e, i, now){
   const low = i.low.get(l.id) || 0;
   w.hitAt = l.hitAt = now;
   const hurt = SOCIAL.hurt.map(v => v * (1 + low * SOCIAL.lowHurt));
-  if(hurtAnimal(e, l, i.name, "fight", hurt, 0, `The males are fighting over the females in ${e.name}.`) === "hurt"){
+  if(hurtAnimal(e, l, i.name, "fight", hurt, 0, `The males are fighting over the females in ${e.name}.`, w) === "hurt"){
     const n = needsOf(l); n.stress = Math.min(100, n.stress + SOCIAL.loseStress * (.5 + .5 * low));
   }
 }
@@ -216,7 +216,7 @@ function packChallenge(e, i, ctx, now){
   const [w, l] = win ? [c, t] : [t, c];
   c.hitAt = t.hitAt = now;
   if(win){ const r = c.rank; c.rank = t.rank; t.rank = r; }
-  if(hurtAnimal(e, l, SPECIES_BY_ID[l.sp].name, "fight", P.hurt, 0, `A ${SPECIES_BY_ID[l.sp].name} challenged the pack leaders in ${e.name}.`) === "hurt"){
+  if(hurtAnimal(e, l, SPECIES_BY_ID[l.sp].name, "fight", P.hurt, 0, `A ${SPECIES_BY_ID[l.sp].name} challenged the pack leaders in ${e.name}.`, w) === "hurt"){
     const n = needsOf(l); n.stress = Math.min(100, n.stress + P.loseStress);
   }
   return true;
@@ -597,10 +597,10 @@ const bodyPos = a => { const h = typeof herd !== "undefined" ? herd.get(a.id) : 
 // A puff of dust where an animal is hit, or at the middle of its exhibit when it isn't drawn
 function attackFx(e, a){ const h = bodyPos(a), c = h ? [h.x, h.y] : centroid(e.points); events.fx("dust", c[0], c[1]); }
 
-// Hurt one animal. A hit adds to an injury (or to an illness it already had); 100 kills. Returns "killed" or "hurt".
-function hurtAnimal(e, v, by, how, range, killP, msg){
+// Hurt one animal. A hit adds to an injury (or to an illness it already had); 100 kills. Returns "killed" or "hurt". `who` is the animal that did it.
+function hurtAnimal(e, v, by, how, range, killP, msg, who){
   const s = SPECIES_BY_ID[v.sp], sev = range[0] + Math.random() * (range[1] - range[0]);
-  const hit = {by, how}, cause = how === "fight" ? "fight" : "attack", att = SPECIES.find(x => x.name === by);
+  const hit = {by, how, ...(who && who.name ? {who:who.name} : {})}, cause = how === "fight" ? "fight" : "attack", att = SPECIES.find(x => x.name === by);
   if(v.sick){ v.sick.sev += sev; delete v.sick.hidden; v.sick.hit = hit; }
   else { fallSick(v, pickCondition(s, ["injury"], att && GORES.includes(att.id) ? [cause, "gore"] : [cause], v), cause, Math.round(sev)); v.sick.hit = hit; }
   if(killP && Math.random() < killP){ v.sick.sev = 100; v.sick.killed = true; }
@@ -636,7 +636,7 @@ function attackStep(e, ctx){
         if(d < bd){ bd = d; prey = v; }
       }
       if(prey && bd <= A.strike && Math.random() < (me ? A.huntChance : A.huntChance * .66) * packHuntBoost(e, a, ctx)){
-        a.hitAt = now; hurtAnimal(e, prey, s.name, "hunt", A.bite, A.kill);
+        a.hitAt = now; hurtAnimal(e, prey, s.name, "hunt", A.bite, A.kill, null, a);
         continue;
       }
     }
@@ -649,7 +649,7 @@ function attackStep(e, ctx){
     const others = list.filter(v => v !== a && !v.darted && !v.inside);
     if(!others.length) continue;
     a.hitAt = now;
-    hurtAnimal(e, others[Math.floor(Math.random() * others.length)], s.name, "fight", A.fightHurt, 0);
+    hurtAnimal(e, others[Math.floor(Math.random() * others.length)], s.name, "fight", A.fightHurt, 0, null, a);
   }
 }
 
@@ -679,7 +679,7 @@ function looseAttacks(dtMin){
       const prey = e.animals.filter(v => !v.darted && !v.inside && attackReason(s, SPECIES_BY_ID[v.sp]));
       if(!prey.length || Math.random() >= 1 - Math.pow(1 - A.looseRate, dtMin)) continue;
       l.biteAt = now;
-      hurtAnimal(e, prey[Math.floor(Math.random() * prey.length)], s.name, "loose", A.bite, A.kill);
+      hurtAnimal(e, prey[Math.floor(Math.random() * prey.length)], s.name, "loose", A.bite, A.kill, null, l);
       break;
     }
   }

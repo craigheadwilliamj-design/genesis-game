@@ -457,6 +457,11 @@ function upgradeSave(s){
     if(pmc && s.staff && s.staff.transfers) s.staff.transfers = s.staff.transfers.filter(t => !(t.med && t.from === pmc.id && !t.cargo));
     s.health.beds = clamp(s.health.ward.length, HEALTH.beds, HEALTH.bedsMax);
   }
+  // the PMC's shelves are split per medicine: what's over a medicine's share is sold back at what it's worth
+  for(const b of s.buildings) if(b.type === "pmc" && b.store){
+    const share = Math.floor(Math.round(LOGI.pmcDoses * ((s.staff.upgrades || []).includes("crates") ? LOGI.crateBoost : 1)) / (MED_GOODS.length + 1));
+    for(const t of Object.keys(b.store)) if(b.store[t] > share){ s.money += Math.round((b.store[t] - share) * (t === CMED ? MODERN.cost : MED_UNIT_VALUE)); b.store[t] = share; }
+  }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set

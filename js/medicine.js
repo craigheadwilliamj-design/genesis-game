@@ -116,7 +116,7 @@ const CAUSE_TEXT = {shelter:"From lack of shelter.", lamp:"From no heat lamp.", 
                     hunger:"From hunger.", stress:"From stress.", crowd:"From crowding.", trash:"Ate trash.", plants:"Ate plants it can't digest."};
 function sickCause(a){
   const sk = a.sick, hit = sk.hit;
-  if(hit) return hit.how === "fight" ? `From a fight with a ${hit.by}.` : sk.name === "gore" ? `Gored by a ${hit.by}.` : `Bitten by a ${hit.by}.`;
+  if(hit){ const who = hit.who || `a ${hit.by}`; return hit.how === "fight" ? `From fight with ${who}.` : sk.name === "gore" ? `Gored by ${who}.` : `Bitten by ${who}.`; }
   return CAUSE_TEXT[sk.cause] || "";
 }
 // How bad it is: its SICK_BAND entry
@@ -643,8 +643,10 @@ function healthStep(f){
       const j = injuryChance(e, a);
       if(roll(j.p)){
         const c = pickCause(j.w); newCase(e, a, pickCondition(s, ["injury"], injuryCauses(e, s, c), a), c);
-        const by = c === "fight" ? s : c === "attack" ? [...speciesCounts(e).keys()].map(sp => SPECIES_BY_ID[sp]).find(o => attackReason(o, s)) : null;
-        if(by && a.sick) a.sick.hit = {by:by.name, how:c === "fight" ? "fight" : "hunt"};
+        // who did it: a rival of its own kind, or one of the species that preys on it
+        const others = e.animals.filter(o => o !== a && (c === "fight" ? o.sp === a.sp : c === "attack" && attackReason(SPECIES_BY_ID[o.sp], s)));
+        const who = others[Math.floor(Math.random() * others.length)];
+        if(who && a.sick) a.sick.hit = {by:SPECIES_BY_ID[who.sp].name, how:c === "fight" ? "fight" : "hunt", who:who.name};
         continue;
       }
       const gs = grassSick(e, s);

@@ -1301,7 +1301,7 @@ const LOGI = {
   coolerCut:.6,        // cooler boxes multiply spoilage
   forklift:3,          // a forklift multiplies a restock trip's load
   urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
-  pmcDoses:150,        // doses the PMC keeps on hand
+  pmcDoses:200,        // doses the PMC holds, split evenly between contemporary medicine and each era's (pmcShare)
   dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
   rushMarkup:1.75,     // a rush order costs this much
   rushLot:50,          // units in a rush order
