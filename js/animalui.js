@@ -32,7 +32,7 @@ function animalHealthItems(a, e, s){
   const q = a.q ?? 90;
   out.push([q < 50 ? "bad" : q < 70 ? "warn" : "ok", q < 50 ? `Frail clone, ${q}% DNA. It falls ill ${HEALTH.frail.below50} times as often.` : q < 70 ? `Sickly clone, ${q}% DNA. It falls ill ${HEALTH.frail.below70} times as often.` : `${q}% DNA.`]);
   out.push(...basicsLow(e, [a]));
-  if(anyMedTech() && e.medFeed) out.push(e.medFedOk ? ["ok", "Medicated today."] : ["bad", "Not medicated today."]);
+  if(e.medFeed) out.push(e.medFedOk ? ["ok", "Medicated today."] : ["bad", "Not medicated today."]);
   const d = daysSinceCheck(e);
   out.push([d === 0 ? "ok" : d >= HEALTH.checkEvery ? "bad" : "warn", d >= 99 ? "No vet check-up on this exhibit yet." : d === 0 ? "A vet checked the exhibit today." : `The exhibit's last vet check-up was ${d} day${d === 1 ? "" : "s"} ago.`]);
   return {items:out, sev:sk ? sk.sev : null};

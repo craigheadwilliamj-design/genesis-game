@@ -131,7 +131,7 @@ function freshScience(){
   return {
     points:0,          // unspent points
     crew:{paleo:0, gene:0, botanist:0},  // science staff hired at each department
-    tech:["bars"],           // everything the Research Lab has researched (TECH ids, plus "ref-<Period>" for refined medicine)
+    tech:["bars"],           // everything the Research Lab has researched (TECH ids)
     projects:[],       // The Research Lab's research in progress: {kind, id, start, end}. Times are park minutes, see nowMin().
     unlocked:[],       // animals discovered (the Time Travel Lab's scouting turned them up), so drones can go back for their DNA
     dna:{},            // species, plant DNA or museum event id -> {genome: 0-100}
@@ -429,11 +429,13 @@ function upgradeSave(s){
   delete s.ceres.plants;
   if(!s.ceres.auto){
     s.ceres.auto = {cenozoic:false, mesozoic:false, paleozoic:false};
-    for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)){
-      s.ceres.auto[era] = true;
-      for(const p of TIME_PERIODS) if(ERA_OF[p.id] === era && !hasT("ref-" + p.id)) sc.tech.push("ref-" + p.id);
-    }
+    for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)) s.ceres.auto[era] = true;
   }
+  // medicine is no longer refined per period: the points spent on refinements, finished or under way, come back
+  { const pts = {cenozoic:8, mesozoic:14, paleozoic:20};
+    for(const t of sc.tech.filter(t => t.startsWith("ref-"))) sc.points = (sc.points || 0) + (pts[ERA_OF[t.slice(4)]] || 0);
+    sc.tech = sc.tech.filter(t => !t.startsWith("ref-"));
+    for(const p of sc.projects.filter(p => p.kind === "refine")){ sc.points = (sc.points || 0) + (p.cost ?? pts[ERA_OF[p.id]] ?? 0); sc.projects.splice(sc.projects.indexOf(p), 1); } }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
   // the ward runs on timers: a patient being treated starts a fresh course from how sick it is now, a cured one waits to go home (wardTidy sends it), and there's a bed for everyone in it

@@ -14,9 +14,8 @@ let vcrew = [];   // vets walking around right now (positions aren't saved)
 function freshHealth(){ return {from:HEALTH.startDay, ward:[], beds:HEALTH.beds}; }
 const healthActive = () => state.day >= state.health.from;
 const medTechFor = s => MED_TECH[ERA_OF[s.period]];
-// An era's medicine only cures a period's animals once it has been refined for that period
-const canTreat = s => hasTech(medTechFor(s)) && hasTech("ref-" + s.period);
-const anyMedTech = () => Object.values(MED_TECH).some(hasTech);
+// The era's own medicine, once the Research Lab has researched it, speeds up its animals' ward courses
+const canTreat = s => hasTech(medTechFor(s));
 const eraOf = s => ERA_OF[s.period];
 const eraMedName = s => `${ERA_LABEL[eraOf(s)]} medicine`;
 // Which medicine a treatment uses: the era's own if it's been researched and there's some on hand, otherwise contemporary
@@ -119,7 +118,7 @@ function pickCause(w){
 // Old plant-eaters eating plants they never evolved for (see grassShare), 0 to 1
 const grassSick = (e, s) => GRASS_INTOLERANT.includes(s.period) ? grassShare(e, s) : 0;
 const hungerShare = e => clamp((e.hungryMin || 0) / DAY_MIN, 0, 1);
-const medicated = (e, s) => !!e.medFedOk && canTreat(s);
+const medicated = (e, s) => !!e.medFedOk;
 const crowded = e => { const rep = derived && derived.reports[e.id]; return rep && rep.need ? rep.area / rep.need : 1; };
 
 // Chance a day this animal gets an infection (or a poisoning from dirt or foul water), and what's raising it: why lists the causes, w weighs them
@@ -624,13 +623,13 @@ function sickStep(e, a, s, f, dirty, hungry){
 
 function healthNight(){
   const h = state.health;
-  // medicated feed: Botany Lab doses go out to exhibits that asked for it and were fed
+  // medicated feed: doses from the PMC go out to exhibits that asked for it and were fed
   for(const e of state.exhibits){
     e.medFedOk = false;
-    if(!e.medFeed || !e.animals.length || !anyMedTech()) continue;
+    if(!e.medFeed || !e.animals.length || !pmcBuilding()) continue;
     const need = feedDoses(e);
-    // the feed is mixed from the era medicines of the animals it can help; take it from whichever the PMC holds
-    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))];
+    // the feed is mixed from whatever the PMC holds: its animals' era medicines first, then contemporary
+    const goods = [...new Set(e.animals.map(a => SPECIES_BY_ID[a.sp]).filter(canTreat).map(medGoodOf))].concat(CMED);
     if(hungerShare(e) < .5 && goods.reduce((s, g) => s + pmcStock(g), 0) >= need){
       let left = need; for(const g of goods){ const t = Math.min(left, pmcStock(g)); useMeds(t, g); left -= t; }
       e.medFedOk = true;

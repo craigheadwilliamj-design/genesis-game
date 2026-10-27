@@ -620,7 +620,7 @@ function healthHtml(e){
     if(e.trash) items.push(hli(te >= .25 ? "bad" : "warn", `${e.trash} piece${e.trash === 1 ? "" : "s"} of trash thrown in today.`));
   }
   if(e.animals.length) for(const [l, t] of basicsLow(e, e.animals)) items.push(hli(l, esc(t)));
-  if(anyMedTech() && e.medFeed) items.push(hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today."));
+  if(e.medFeed) items.push(hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   // every animal's health, the worst first; tap one to open it
   if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? `${esc(sickName(a))}, ${sickBand(a).label}` : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
@@ -629,11 +629,8 @@ function healthHtml(e){
     const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
     h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} to improve</span></div>`;
   }
-  // medicated feed from the Botany Lab
-  if(anyMedTech()){
-    const treatable = e.animals.filter(a => canTreat(SPECIES_BY_ID[a.sp])).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} dose${feedDoses(e) === 1 ? "" : "s"} a day${treatable < e.animals.length ? `, treats ${treatable} of ${e.animals.length}` : ""}</span></div>`;
-  }
+  // medicated feed, from the PMC's medicine
+  if(hasDept("pmc")) h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;
   return h + `</section>`;
 }
 

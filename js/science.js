@@ -43,7 +43,7 @@ const bayFull = (kind, who) => `${bayCount(kind) === 1 ? "The only bay is" : "Ev
 
 // What a job cost, so cancelling it can give it back: {points} of research or {money}
 function jobRefund(kind, j){
-  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : j.kind === "refine" ? REFINE_POINTS[ERA_OF[j.id]] || 0 : 0};
+  if(kind === "paleo") return {points:j.cost !== undefined ? j.cost : j.kind === "tech" ? (TECH.find(x => x.id === j.id) || {}).points || 0 : 0};
   if(kind === "temporal") return {money:j.cost || 0};
   if(kind === "gene") return {money:j.failed ? 0 : SPECIES_BY_ID[j.sp].price};
   return {money:growInfo(j.kind, j.era, j.size).cost};
@@ -67,10 +67,9 @@ const researching = (kind, id) => state.science.projects.some(p => p.kind === ki
 // Discovered: The Time Travel Lab's scouting turned it up (or, in old saves, the Research Lab unlocked it)
 const isUnlocked = id => state.science.unlocked.includes(id);
 
-// A project is {kind, id}: "tech" (anything in TECH) or "refine" (an era's medicine, for one period)
+// A project is {kind:"tech", id}: anything in TECH
 function projectInfo(kind, id){
   if(kind === "tech"){ const t = TECH.find(x => x.id === id); return t ? {label:t.label, points:t.points, needs:t.needs, done:hasTech(id)} : null; }
-  if(kind === "refine"){ const era = ERA_OF[id]; return era ? {label:`${id} medicine`, points:REFINE_POINTS[era], needs:MED_TECH[era], done:hasTech("ref-" + id)} : null; }
   return null;
 }
 const projectMinutes = points => Math.round(points * RESEARCH_MIN_PER_POINT);
@@ -104,8 +103,7 @@ function stopProject(p){
 }
 function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
-  const tech = p.kind === "refine" ? "ref-" + p.id : p.id;
-  if(!hasTech(tech)) sc.tech.push(tech);
+  if(!hasTech(p.id)) sc.tech.push(p.id);
   events.toast(`The Research Lab finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 

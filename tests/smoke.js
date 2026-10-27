@@ -170,7 +170,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.pmcOnGraph = !!kGraph.anchors["b-pmc"] && !!kGraph.anchors["e-v"];
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
+    state.science.tech.push("medpaleo"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     viv.animals[0].sick = {kind:"infection", name:"cordyceps", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     const pmcB = state.buildings.find(b => b.id === "b-pmc");
@@ -232,6 +232,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const pp = {a:{id:"a-pp", name:"ARTH-099", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:40}}, home:"e-v", cond:"cordyceps", med:"era", dosed:true, done:120, need:360};
       state.health.ward.push(pp); const ph = pmcHtml(pmcB); state.health.ward = state.health.ward.filter(x => x !== pp);
       out.pmcPanel = ph.includes(`Ward (1 of ${HEALTH.beds} beds)`) && ph.includes(`Buy bed (${money(HEALTH.bedPrice)}, +${money(HEALTH.bedUpkeep)} a day)`) && ph.includes("Cordyceps · from Bug house") && /Treating, .+ left\./.test(ph) && ph.includes("width:33%"); }
+    // medicated feed: prevention, from whatever medicine the PMC holds (contemporary will do)
+    { const techKeep = [...state.science.tech]; state.science.tech = state.science.tech.filter(t => !Object.values(MED_TECH).includes(t)); pmcB.store = {medmod:10};
+      viv.medFeed = true; viv.hungryMin = 0; const a0 = viv.animals[0]; delete a0.sick; const p0 = illChance(viv, a0).p;
+      healthNight();
+      out.medFeedAnyMedicine = viv.medFedOk && pmcStock(CMED) === 10 - feedDoses(viv) && Math.abs(illChance(viv, a0).p - p0 * MEDICINE.feedCut) < 1e-12;
+      viv.medFeed = false; viv.medFedOk = false; state.science.tech = techKeep; pmcB.store = {medpal:10}; }
     // vets: a poisoning comes first, deliveries come last
     { vetsNight(); keepersNight();
       const c = vcrew[0]; c.at = kGraph.anchors["b-pmc"];
@@ -1337,15 +1343,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.autoNotBlockedByOtherEra = adv(growMinutes("med", "mesozoic") * 2 + 10, () => cerMeds().medmes >= 20) && cerMeds().medcen === medCap();
     state.ceres.auto.mesozoic = false;
 
-    // medicine only cures a period's animals once refined for it
-    sc.tech.push("medceno");
-    const jur = SPECIES.find(x => x.period === "Jurassic");
-    out.unrefinedCantTreat = !canTreat(jur);
-    sc.tech.push("ref-Jurassic");
-    out.refinedTreats = canTreat(jur) && !canTreat(SPECIES.find(x => x.period === "Triassic"));
-    sc.points = 100;
-    out.refineNeedsEra = projectProblem("refine", "Permian") === "Research Paleozoic medicine first.";
-    out.refineOk = projectProblem("refine", "Cretaceous") === null;
+    // an era's medicine works for all its periods once researched; there's nothing to refine
+    sc.tech.push("medceno", "medmeso");
+    out.eraMedicineWholeEra = canTreat(SPECIES.find(x => x.period === "Jurassic")) && canTreat(SPECIES.find(x => x.period === "Triassic")) && !canTreat(SPECIES.find(x => x.period === "Permian"));
+    out.noRefining = projectProblem("refine", "Cretaceous") === "That can't be researched.";
+    sc.tech = sc.tech.filter(t => t !== "medmeso");
 
     // saves from before timed science keep their unlocked periods, trips, and clones
     const oldS = JSON.parse(JSON.stringify(newPark())); delete oldS.discoV; delete oldS.science.drones; delete oldS.science.seen; delete oldS.science.reports;
@@ -1366,7 +1368,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.oldTripEnds = up.science.trips[0].end === 7 * DAY_MIN && up.science.trips[0].back === undefined;
     out.oldCloneEnds = up.science.clones[0].end === 8 * DAY_MIN && up.science.clones[0].done === undefined;
     out.oldPlantsSplit = !up.science.dna["flora-mesozoic"] && up.science.dna[PLANT_DNA.Triassic.id].genome === 100 && !("plants" in up.ceres);
-    out.oldKeepsFlora = up.science.dna[PLANT_DNA.Jurassic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && up.science.tech.includes("ref-Jurassic");
+    out.oldKeepsFlora = up.science.dna[PLANT_DNA.Jurassic.id].genome === 100 && up.science.crew.botanist === 1 && up.ceres.auto.mesozoic === true && !up.science.tech.some(t => t.startsWith("ref-"));
+    // old refinements, finished or under way, are paid back
+    { const o2 = JSON.parse(JSON.stringify(state)); o2.science.tech.push("ref-Jurassic", "ref-Permian"); o2.science.projects.push({kind:"refine", id:"Paleogene", bay:0, cost:8, start:0, end:10});
+      const p0 = o2.science.points || 0, u2 = upgradeSave(o2);
+      out.oldRefinementsRefunded = Math.abs(u2.science.points - (p0 + 14 + 20 + 8)) < 1e-9 && !u2.science.tech.some(t => t.startsWith("ref-")) && !u2.science.projects.some(p => p.kind === "refine"); }
 
     // landscaping: water drawn inside open exhibits, and rocks placed in them
     const keepEx = state.exhibits, keepBld = state.buildings, keepMoney = state.money; state.money = 1e6; state.buildings = [];
