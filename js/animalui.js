@@ -23,10 +23,10 @@ function animalStressors(a, e, s){
 }
 // One animal's health as bulleted checks: [level, text]. Mild illness nobody has spotted yet doesn't show.
 function animalHealthItems(a, e, s){
-  const out = [], sk = noticed(a) ? a.sick : null, hit = sk && sk.hit;
+  const out = [], sk = noticed(a) ? a.sick : null;
   if(sk){
-    const what = sk.kind === "injury" ? "Injured" : "Ill", cause = sk.cause === "trash" ? " from eating trash" : hit ? (hit.how === "fight" ? `, wounded in a fight with a ${hit.by}` : `, bitten by a ${hit.by}`) : "";
-    out.push([sk.sev >= 40 ? "bad" : "warn", `${what}${cause}${sk.chronic ? " (chronic)" : ""}.`]);
+    out.push([sk.sev >= SICK_BAND[1].from ? "bad" : "warn", `${sickName(a)}, ${sickBand(a).label}${sk.chronic ? " (chronic)" : ""}.`]);
+    if(sickCause(a)) out.push(["warn", sickCause(a)]);
     out.push(["warn", sickStatus(e, a)]);
   } else out.push(["ok", "Looks healthy."]);
   const q = a.q ?? 90;
@@ -148,7 +148,7 @@ function animalsTabHtml(e){
   const queued = new Set(state.staff.transfers.filter(t => !t.med).map(t => t.animalId));
   const rows = [...e.animals].sort(byName).map(a => {
     const s = SPECIES_BY_ID[a.sp], sk = noticed(a) && a.sick, v = Math.round(animalHp(a));
-    const hp = `${sk ? (sk.kind === "injury" ? "Injured" : "Ill") : "Healthy"}, ${v}% health`;
+    const hp = `${sk ? `${sickName(a)}, ${sickBand(a).label}` : "Healthy"}, ${v}% health`;
     return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b>${a.sex ? ` <b title="${esc(a.sex)}">${esc(sexMark(a))}</b>` : ""} <span class="meta">${esc(s.name)} · ${esc(hp)}</span>${meter(v, hpColor(v))}</span><span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="moveDlg" data-sp="${esc(a.sp)}" data-id="${esc(a.id)}"${queued.has(a.id) ? " disabled" : ""}>${queued.has(a.id) ? "Moving" : "Move"}</button>${crateBtn(a)}${sellBtn(a)}</span></li>`;
   });
   return `<section><h3>Animals (${e.animals.length})</h3><ul class="herd">${rows.join("")}</ul>${movesHtml(e)}</section>`;

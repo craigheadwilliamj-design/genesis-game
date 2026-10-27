@@ -923,7 +923,8 @@ const THOUGHTS = {
   ejected:    {text:"Security threw us out!"},
   hiding:     {text:"Where are the animals? They're all hiding."},
   feeding:    {text:"It was great watching them eat.", good:true},
-  sickly:     {text:"Some of those animals looked unwell."},
+  sickly:     {text:"That animal looked sick."},
+  critical:   {text:"That poor animal could barely stand."},
 };
 
 // Each vivarium size is also a building you can place
@@ -1047,12 +1048,8 @@ const THROWN = {
   signReach:20,        // a sign this close to a fence counts for the exhibit
   dayDecay:.5,         // each throw already made into an exhibit today cuts the chance of the next by this share (crowds don't pile it up)
   pieces:1,            // pieces of trash one throw adds
-  eat:.12,             // chance a night an animal eats trash, for each piece per animal in the exhibit (capped at eatMax)
+  eat:.12,             // chance a day an animal eats trash and gets Foreign Object Ingestion, for each piece per animal in the exhibit (capped at eatMax)
   eatMax:.6,
-  deadly:.02,          // share of animals that eat trash and die at once, rather than falling ill
-  sev:50,              // how bad the illness starts when one eats trash (0 to 100)
-  worsen:25,           // and how much worse it gets each night untreated: dead in two nights
-  sevCap:70,           // an animal already sick gets worse from trash, but not past this, so a vet still has a night
 };
 // Guests learn about the animals from info signs, field guides, and the Education Center
 const EDU = {
@@ -1445,26 +1442,83 @@ const ESCAPE = {
 // keepers carry them in, and the PMC treats them with medicine from the Botany Lab.
 const HEALTH = {
   startDay:18,         // new parks: nobody gets sick before this day
-  illChance:.005,      // chance a well-kept animal falls ill each day
+  step:60,             // park minutes between health steps: new cases are rolled and sick animals get worse this often, through the day
+  illChance:.003,      // chance a day a well-kept animal falls ill; dirt is what mostly raises it
   hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
-  dirtPer:25,          // every this many points of dirt above the unhappy line adds 1× more risk
+  dirtPer:12,          // every this many points of dirt above the unhappy line adds 1x more risk
+  crowdIll:1.5,        // a cramped exhibit (less room than its animals need) makes illness this much more likely
   frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
-  grassSick:2,         // old plant-eaters eating only plants they never evolved for get sick this much more (less for a share of it)
+  grassSick:.004,      // chance a day an old plant-eater eating only plants it never evolved for is poisoned by them (less for a share of it)
   territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
   attacked:.15,        // chance a day an animal is hurt by a species that preys on it
-  illStart:20, injuryStart:25,       // how bad a new case starts (0 to 100)
-  illWorsen:8, injuryWorsen:6,       // how much worse it gets each day untreated; 100 kills
-  sickHappy:8,         // happiness lost per sick animal, as a share of the herd
+  ground:.01,          // chance a day an animal that can get Bumblefoot gets it on dirty ground or in the wrong biome
+  sickHappy:8,         // happiness lost per sick animal, as a share of the herd (times its band's happy)
   dartMinutes:8,       // how long a vet takes to dart a sick animal
-  obviousAt:40,        // an illness this bad shows; milder ones stay hidden until a vet checks the exhibit (0 shows everything)
+  obviousAt:40,        // a hidden case shows once it gets this bad
   checkEvery:3,        // days between vet check-ups before an exhibit is overdue
   checkMinutes:5,      // time a vet spends looking over an exhibit's animals
-  minorBelow:40,       // illnesses under this are minor: a vet treats them on the spot, and medicated feed clears them up
-  fieldMinutes:12,     // time a vet takes to treat a minor illness on the spot
-  fieldDose:1,         // medicine doses an on-the-spot treatment uses
+  heal:2,              // a day a mild injury heals on its own, while the exhibit is fed, watered and clean and the animal is calm
+  healStress:60,       // calm: stress under this
   beds:6,              // patients the PMC holds at once
   healPerNight:45,     // severity a treated patient recovers each night
   dose:2,              // medicine doses one patient's treatment uses
+};
+// Every condition is one of three kinds, and shares its kind's numbers:
+//   start, worsen   severity a new case starts at, and how much worse it gets a day untreated (100 kills)
+//   hidden          a mild case stays hidden until a vet's check-up (or until it reaches HEALTH.obviousAt)
+//   field, fieldMin, fieldDose   a vet treats it where it stands up to this severity, taking this long and this many doses
+const SICK_KIND = {
+  injury:    {label:"Injury",    adj:"Injured",  start:25, worsen:6,  field:40,  fieldMin:12, fieldDose:1},
+  infection: {label:"Infection", adj:"Infected", start:20, worsen:8,  field:40,  fieldMin:12, fieldDose:1, hidden:true},
+  poison:    {label:"Poisoning", adj:"Poisoned", start:50, worsen:25, field:100, fieldMin:20, fieldDose:2},
+};
+// What being this sick does, from `from` severity up. rest is added to the rest score, act multiplies playing and wandering,
+// eat how fast it eats, gait how fast it walks, stress what it adds to stress, happy how much of a sick animal it counts as for its exhibit
+const SICK_BAND = [
+  {label:"Mild",     from:0,  rest:0,  act:1,  eat:1,   gait:1,  stress:6,  happy:.5},
+  {label:"Serious",  from:40, rest:30, act:.6, eat:1,   gait:.7, stress:14, happy:1},
+  {label:"Critical", from:75, rest:90, act:.2, eat:.35, gait:.5, stress:24, happy:1.5},
+];
+// The conditions. A new case picks one at random among those its body can get (who, not) and its cause brings on (from);
+// with no cause that fits, any its body can get.
+//   who   body tags (bodyTags in medicine.js): a CLADE name, or any, vert (vertebrates), landvert, tetrapod (vertebrates but fish),
+//         aqfish and aqinvert (fish and invertebrates that live in water), landbug (land invertebrates), shelled, legs, teeth
+//   from  dirt, water (foul water, the dirt of tanks and pools), biome (the wrong one), shelter (weather with nowhere to shelter),
+//         lamp (no heat lamp), stress, crowd, hunger, thirst, trash, plants (ones it never evolved for), fight, attack, gore
+//   only  only its own cause brings it on, never as a stand-in
+const CONDITIONS = {
+  concussion:  {name:"Concussion",          kind:"injury", who:["any"], not:["aqfish"], from:["fight", "shelter"]},
+  fracture:    {name:"Fracture",            kind:"injury", who:["tetrapod"], from:["fight", "attack", "shelter"]},
+  laceration:  {name:"Laceration",          kind:"injury", who:["any"], from:["fight", "attack", "shelter"]},
+  sprain:      {name:"Sprain",              kind:"injury", who:["legs"], from:["fight", "shelter"]},
+  bite:        {name:"Bite Wound",          kind:"injury", who:["any"], from:["fight", "attack"]},
+  gore:        {name:"Goring Injury",       kind:"injury", who:["any"], from:["gore"], only:true},
+  dislocation: {name:"Joint Dislocation",   kind:"injury", who:["legs"], from:["fight"]},
+  claw:        {name:"Torn Claw/Hoof/Nail", kind:"injury", who:["legs"], from:["fight"]},
+  tooth:       {name:"Chipped Tooth",       kind:"injury", who:["teeth"], from:["fight"]},
+  bumblefoot:  {name:"Bumblefoot",          kind:"injury", who:["bird", "theropod", "reptile"], from:["dirt", "biome"]},
+  fintear:     {name:"Fin Tear",            kind:"injury", who:["aqfish"], from:["fight", "attack", "shelter"]},
+  pneumonia:   {name:"Pneumonia",           kind:"infection", who:["tetrapod"], from:["dirt", "shelter", "lamp"]},
+  tb:          {name:"Tuberculosis",        kind:"infection", who:["landvert", "seamammal"], from:["dirt", "crowd", "stress"]},
+  gastro:      {name:"Gastroenteritis",     kind:"infection", who:["vert"], from:["dirt", "water"]},
+  avianflu:    {name:"Avian Influenza",     kind:"infection", who:["bird", "theropod", "sauropod"], from:["dirt", "stress", "shelter"]},
+  aspergillosis:{name:"Aspergillosis",      kind:"infection", who:["bird", "reptile"], from:["dirt", "shelter"]},
+  nematodes:   {name:"Nematodes",           kind:"infection", who:["vert"], from:["dirt", "hunger"]},
+  ticks:       {name:"Ticks",               kind:"infection", who:["reptile", "ornithischian", "sauropod", "theropod", "pterosaur", "bird", "synapsid", "mammal", "hooved"], from:["dirt"]},
+  lice:        {name:"Lice",                kind:"infection", who:["mammal", "hooved"], from:["dirt"]},
+  fmd:         {name:"Foot and Mouth Disease", kind:"infection", who:["hooved"], from:["dirt", "crowd"]},
+  bluetongue:  {name:"Bluetongue Virus",    kind:"infection", who:["hooved"], from:["dirt", "shelter"]},
+  tetanus:     {name:"Tetanus",             kind:"infection", who:["landvert"], from:["dirt"]},
+  whitespot:   {name:"White Spot Disease",  kind:"infection", who:["aqfish"], from:["water", "stress", "shelter"]},
+  flukes:      {name:"Flukes",              kind:"infection", who:["aqfish"], from:["water"]},
+  saprolegniasis:{name:"Saprolegniasis",    kind:"infection", who:["aqfish"], from:["water", "shelter"]},
+  chitino:     {name:"Chitinoclastic Bacteria", kind:"infection", who:["shelled"], from:["water"]},
+  cordyceps:   {name:"Cordyceps",           kind:"infection", who:["landbug"], from:["dirt", "shelter"]},
+  foreign:     {name:"Foreign Object Ingestion", kind:"poison", who:["any"], from:["trash"], only:true},
+  modernplant: {name:"Modern Plant Poisoning", kind:"poison", who:["any"], from:["plants"], only:true},
+  botulism:    {name:"Botulism",            kind:"poison", who:["landvert"], from:["dirt"]},
+  nitrate:     {name:"Nitrate Toxicity",    kind:"poison", who:["aqfish", "aqinvert"], from:["water"]},
+  gasbubble:   {name:"Gas Bubble Disease",  kind:"poison", who:["aqfish", "aqinvert"], from:["water"]},
 };
 // Genome therapy (Research Lab tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
 const GENE = {
@@ -1481,8 +1535,7 @@ const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "di
 const MEDICINE = {
   capacity:60,         // doses the Botany Lab holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
-  feedCut:.35,         // medicated feed multiplies the chance of falling ill by this
-  feedHeal:10,         // and heals minor cases (under HEALTH.minorBelow) this much a day in the exhibit
+  feedCut:.35,         // medicated feed multiplies the chance of an infection by this
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};

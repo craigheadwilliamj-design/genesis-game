@@ -426,7 +426,8 @@ function observe(p, e){
     if(e.happy >= 75){ note("They look really well looked after.", 1, true); return; }
   }
   const a = seen[Math.floor(Math.random() * seen.length)], sp = SPECIES_BY_ID[a.sp], n = sp.name;
-  if(a.sick){ note(`${a.name} the ${n} looks unwell.`, -2); thinks(p, "sickly"); return; }
+  const band = sickBand(a);   // guests notice a seriously sick animal
+  if(band && band !== SICK_BAND[0]){ const crit = band === SICK_BAND[2]; note(`${a.name} the ${n} looks unwell.`, crit ? -3 : -2); thinks(p, crit ? "critical" : "sickly"); return; }
   learn(p, EDU.see * OBS.learn * (hasSign(e) ? 1 + EDU.sign : 1));
   switch(a.act){
     case "eat": note(`The ${n} is tucking into a meal.`, 1, true); thinks(p, "feeding"); break;

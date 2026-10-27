@@ -268,7 +268,7 @@ function stressTarget(e, a, s, ctx, why){
   if(T.social === "pack" && c < lo && !ctx.soc.has(s.id)) add(10, "its pack is too small");   // an open exhibit's pack is handled by socialStress
   if(!a.inside) add(ctx.x * 25, "it's out in the weather");
   if(ctx.dirt > CLEAN.penaltyFrom) add((ctx.dirt - CLEAN.penaltyFrom) * .5, "the exhibit is dirty");
-  if(a.sick && !a.sick.chronic) add(12, "it's sick or hurt");
+  if(a.sick && !a.sick.chronic) add(sickBand(a).stress, "it's sick or hurt");
   if(T.temper === "skittish" && !a.inside) add(BEHAVIOR.shyGuests * ctx.seen * (ctx.cover ? .5 : 1), ctx.cover ? "guests crowd the fence" : "guests crowd the fence and there's no cover to retreat to");
   if(why && e.teasedAt != null && nowMin() - e.teasedAt < BEHAVIOR.teaseMemory) why.push("guests have been banging on the glass (still wearing off)");   // a one-off spike, so it isn't in t
   if(n.hunger > 70) add((n.hunger - 70) * .6, "it's hungry");
@@ -304,12 +304,14 @@ function pickAct(e, a, s, ctx){
   const pk = T.social === "pack" && ctx.soc.get(s.id) ? (ctx.hunting.get(s.id) || 0) - (cur === "hunt" ? 1 : 0) : 0;   // pack mates already hunting: join in
   if(pk > 0 && huntDriven(a) && preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5 + PACK.huntJoin * Math.min(pk, 3));
   if(n.thirst > floor + 5) sc.drink = n.thirst * 1.15;
-  sc.rest = (1 - aw) * 80 + n.discomfort * .25;
+  const band = sickBand(a);   // a sick animal rests more and does less, the worse off the more
+  sc.rest = (1 - aw) * 80 + n.discomfort * .25 + (band ? band.rest : 0);
   if(n.stress > 30) sc.hide = (n.stress - 15) * {skittish:1.4, curious:.8, aggressive:.5}[T.temper] * (ctx.cover ? 1 : .7);
   if(mates > 0 && want > 0) sc.social = n.lonely;
   if(ctx.enrich >= .15) sc.play = n.bored * (T.temper === "curious" ? 1.25 : 1) * (.5 + ctx.enrich) * aw;
   const idle = s.predator || T.temper === "aggressive" || T.social === "pack" ? "patrol" : "forage";
   sc[idle] = Math.max(sc[idle] || 0, 22 * aw);
+  if(band) for(const k of ["play", "patrol", "forage", "social", "hunt"]) if(sc[k] != null) sc[k] *= band.act;
   // stuck: a need nothing here can fix
   const stuck = [
     ["bored", n.bored * (ctx.enrich < .15 ? 1.1 : .55)],
@@ -339,7 +341,7 @@ function needsStep(e, a, s, ctx, dt){
   const lack = pk && packFeed.get(e.id); const mine = lack ? (pk.top.has(a.id) ? lack.top : lack.sub) : 0;
   if(mine > 0) n.hunger += B.hunger * dt * (.5 + .5 * aw) * PACK.lackHunger * mine;   // the alphas eat first, so a shortage reaches the rest sooner
   switch(a.act){
-    case "eat": if(food) n.hunger -= B.eat * dt * (1 - PACK.lackBlock * mine); break;
+    case "eat": if(food) n.hunger -= B.eat * dt * (1 - PACK.lackBlock * mine) * (a.sick ? sickBand(a).eat : 1); break;
     case "hunt": n.bored -= B.forage * dt; break;   // the stalk is the best part
     case "forage": n.bored -= (ctx.browse ? B.forage : B.graze) * dt; if(ctx.browse && !isHunter(s)) n.hunger -= B.browse * dt; break;
     case "drink": if(n.thirst > floor) n.thirst = Math.max(floor, n.thirst - B.drink * dt); break;
@@ -596,13 +598,14 @@ function attackFx(e, a){ const h = bodyPos(a), c = h ? [h.x, h.y] : centroid(e.p
 // Hurt one animal. A hit adds to an injury (or to an illness it already had); 100 kills. Returns "killed" or "hurt".
 function hurtAnimal(e, v, by, how, range, killP, msg){
   const s = SPECIES_BY_ID[v.sp], sev = range[0] + Math.random() * (range[1] - range[0]);
-  const hit = {by, how};
+  const hit = {by, how}, cause = how === "fight" ? "fight" : "attack", att = SPECIES.find(x => x.name === by);
   if(v.sick){ v.sick.sev += sev; delete v.sick.hidden; v.sick.hit = hit; }
-  else v.sick = {kind:"injury", sev:Math.round(sev), cause:"attack", hit};
-  if(killP && Math.random() < killP) v.sick.sev = 100;
+  else { fallSick(v, pickCondition(s, ["injury"], att && GORES.includes(att.id) ? [cause, "gore"] : [cause]), cause, Math.round(sev)); v.sick.hit = hit; }
+  if(killP && Math.random() < killP){ v.sick.sev = 100; v.sick.killed = true; }
   const n = needsOf(v); n.stress = Math.min(100, n.stress + ATTACK.scare);
   attackFx(e, v);
   if(v.sick.sev >= 100){
+    v.sick.killed = true;
     animalDies(e, v);
     events.toast(`${how === "fight" ? `A ${s.name} was killed in a fight` : `A ${by} killed a ${s.name}`} in ${e.name}.`, "bad");
     return "killed";

@@ -171,7 +171,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.staff.keepers.push({id:"k-1", name:"K", stamina:100});
     hireVet();
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
-    viv.animals[0].sick = {kind:"illness", sev:60};   // serious: has to go to the PMC
+    viv.animals[0].sick = {kind:"infection", name:"cordyceps", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
     out.sickToWard = run(600, () => state.health.ward.length === 1);
     healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
@@ -182,14 +182,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // a check-up finds a hidden mild illness, and the vet treats it on the spot (no dart, no PMC)
     vetsNight(); keepersNight();
     viv.vetCheck = state.day - HEALTH.checkEvery;
-    fallSick(viv.animals[1], "illness", HEALTH.illStart);
+    fallSick(viv.animals[1], "cordyceps");
     out.mildStartsHidden = !!viv.animals[1].sick.hidden;
     const meds0 = pmcStock("medpal");
-    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock("medpal") === meds0 - HEALTH.fieldDose &&
+    out.checkupTreatsOnSpot = run(300, () => !viv.animals[1].sick) && viv.vetCheck === state.day && pmcStock("medpal") === meds0 - SICK_KIND.infection.fieldDose &&
       !state.health.ward.length && !state.staff.transfers.length && viv.animals.length === 2;
-    // injuries always go to the PMC
+    // serious injuries go to the PMC
     vetsNight(); keepersNight();
-    viv.animals[1].sick = {kind:"injury", sev:20};
+    viv.animals[1].sick = {kind:"injury", name:"laceration", sev:50};
     out.injuryGoesToWard = run(600, () => state.health.ward.length === 1);
     state.health.ward = []; viv.animals.push({id:"a-t", sp:"arth"}); vetsNight(); keepersNight();
 
@@ -197,7 +197,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
     state.buildings.find(b => b.id === "b-pmc").store = {medpal:0, medmod:MODERN.stock};
     const fakeDock = {type:"dock", auto:true};
-    const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"illness", sev:50}}, home:"e-v", med:null};
+    const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:50}}, home:"e-v", med:null};
     state.health.ward.push(pal);
     healthNight();
     out.modernRestock = dockOrders(fakeDock).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
@@ -208,8 +208,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.modernByEra = MODERN.heal.cenozoic > MODERN.heal.mesozoic && MODERN.heal.mesozoic > MODERN.heal.paleozoic && MODERN.floor.cenozoic < MODERN.floor.paleozoic;
     // a chronic case holds steady overnight instead of getting worse
     state.health.ward = []; state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== "a-w");
-    viv.animals[1].sick = {kind:"illness", sev:MODERN.floor.paleozoic, chronic:true};
-    healthNight();
+    viv.animals[1].sick = {kind:"infection", name:"cordyceps", sev:MODERN.floor.paleozoic, chronic:true};
+    healthStep(1);
     out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
     // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
     out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
@@ -263,6 +263,55 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.territorialInjury = injuryChance(pen, pen.animals[0]).p > HEALTH.territorial;
     state.exhibits.pop(); recompute();
     Math.random = realRandom;
+
+    // conditions: every species can be hurt, and bodies decide who gets what
+    { const S = SPECIES_BY_ID, can = (sp, id) => canGet(S[sp], CONDITIONS[id]);
+      out.everyoneCanBeHurt = SPECIES.every(s => Object.values(CONDITIONS).some(c => c.kind === "injury" && !c.only && canGet(s, c)));
+      out.everyConditionHasABody = Object.values(CONDITIONS).every(c => SPECIES.some(s => canGet(s, c)) && SICK_KIND[c.kind]);
+      out.tiktaalikIsAFish = can("tikt", "whitespot") && can("tikt", "fintear") && !can("tikt", "tetanus") && !can("tikt", "pneumonia");
+      out.swimmersGetBasics = can("mosa", "gastro") && can("mosa", "pneumonia") && !can("mosa", "whitespot") && !can("mosa", "tb") && can("basi", "tb") && !can("basi", "lice");
+      out.restrictedIllnesses = can("trex", "avianflu") && can("dipl", "avianflu") && !can("tric", "avianflu") && can("mglo", "fmd") && !can("mamm", "fmd") && can("smil", "lice") && !can("trex", "lice")
+        && can("came", "chitino") && !can("anom", "chitino") && can("arth", "cordyceps") && !can("ptry", "cordyceps") && can("dunk", "nitrate") && !can("mosa", "nitrate");
+      out.bodyRules = !can("tita", "sprain") && can("mosa", "fracture") && !can("mosa", "sprain") && !can("dodo", "tooth") && can("trex", "tooth") && !can("dunk", "concussion") && can("dunk", "fintear") && !can("olen", "fracture");
+      let gores = 0, dodoGore = 0;
+      for(let i = 0; i < 300; i++){ if(pickCondition(S.trex, ["injury"], ["fight"]) === "gore") gores++; if(pickCondition(S.tric, ["injury"], ["fight", "gore"]) === "gore") dodoGore++; }
+      out.goringNeedsAGorer = gores === 0 && dodoGore > 0 && pickCondition(S.trex, ["injury"], ["fight"]) !== null;
+      out.causePicksName = ["water", "water", "water"].every(c => ["gastro", "whitespot", "flukes", "saprolegniasis", "nitrate", "gasbubble"].includes(pickCondition(S.dunk, ["infection", "poison"], [c])))
+        && pickCondition(S.anom, ["infection"], []) === null && pickCondition(S.trex, ["infection"], ["trash"]) !== "foreign";
+      out.fallSickShape = (() => { const t = {sp:"trex"}; fallSick(t, "pneumonia", "dirt"); const ok1 = t.sick.kind === "infection" && t.sick.sev === SICK_KIND.infection.start && t.sick.hidden && sickName(t) === "Pneumonia";
+        fallSick(t, "laceration"); return ok1 && !t.sick.hidden && t.sick.kind === "injury" && sickBand(t).label === "Mild" && (t.sick.sev = 50, sickBand(t).label === "Serious") && (t.sick.sev = 80, sickBand(t).label === "Critical"); })(); }
+
+    // through the day: sick animals worsen a little each step, a darted one holds, a mild injury mends in a well-kept exhibit, a hidden case shows once it's bad
+    { const realR = Math.random; Math.random = () => .99;
+      const toasts = [], died = [], tK = events.toast, dK = events.died; events.toast = text => toasts.push({text}); events.died = d => died.push(d);
+      const pe = {id:"e-hs", name:"Step", points:[[0,0],[40,0],[40,40],[0,40]], animals:[{id:"h1", sp:"tric"}, {id:"h2", sp:"tric"}, {id:"h3", sp:"tric", need:{...freshNeeds(), stress:0}}, {id:"h4", sp:"tric"}], dirt:0};
+      state.exhibits.push(pe); recompute();
+      const [h1, h2, h3, h4] = pe.animals;
+      fallSick(h1, "pneumonia", null, 30); fallSick(h2, "pneumonia", null, 30); h2.darted = true; fallSick(h3, "sprain", null, 20); fallSick(h4, "pneumonia", null, 39);
+      const t0 = toasts.length; healthStep(.25);
+      out.stepWorsens = Math.abs(h1.sick.sev - (30 + SICK_KIND.infection.worsen * .25)) < 1e-9 && h2.sick.sev === 30;
+      out.mildInjuryMends = Math.abs(h3.sick.sev - (20 - HEALTH.heal * .25)) < 1e-9;
+      out.hiddenShowsWhenBad = !h4.sick.hidden && toasts.slice(t0).some(t => /is showing signs of Pneumonia/.test(t.text));
+      pe.dirt = 90; const s3 = h3.sick.sev; healthStep(.25); out.dirtyInjuryWorsens = h3.sick.sev > s3;
+      h1.sick.sev = 74.9; healthStep(.25); out.criticalWarnsOnce = h1.sick.warned && toasts.filter(t => /is critical/.test(t.text)).length === 1 && (healthStep(.01), toasts.filter(t => /is critical/.test(t.text)).length === 1);
+      h1.sick.sev = 99.99; died.length = 0; healthStep(.25); out.deathNamesCondition = !pe.animals.includes(h1) && died.length === 1 && died[0].cause === "Pneumonia";
+      // dirt is what mostly makes animals ill, and the risk says so
+      pe.dirt = 0; const clean = illChance(pe, h2).p; pe.dirt = 90; const dirty = illChance(pe, h2);
+      out.dirtDrivesIllness = dirty.p > clean * 4 && dirty.why.includes("dirt") && pickCause({dirt:1}) === "dirt";
+      // bumblefoot: dirty ground or the wrong biome, for the bodies that get it
+      const pf = {id:"e-bf", name:"Feet", points:[[0,0],[40,0],[40,40],[0,40]], animals:[{id:"f1", sp:"velo"}, {id:"f2", sp:"tric"}], dirt:90};
+      out.bumblefootGround = injuryChance(pf, pf.animals[0]).why.includes("dirt") && !injuryChance(pf, pf.animals[1]).why.includes("dirt");
+      Math.random = realR; events.toast = tK; events.died = dK;
+      state.exhibits = state.exhibits.filter(x => x !== pe); recompute(); }
+
+    // old saves: illnesses, trash cases and injuries all become a condition, and a chronic case is just a case
+    { const old = JSON.parse(JSON.stringify(state));
+      old.exhibits.push({id:"e-old", name:"Old", points:[[0,0],[20,0],[20,20],[0,20]], animals:[
+        {id:"o1", sp:"trex", sick:{kind:"illness", sev:30}}, {id:"o2", sp:"trex", sick:{kind:"illness", sev:50, cause:"trash"}},
+        {id:"o3", sp:"trex", sick:{kind:"injury", sev:20, hit:{by:"Allosaurus", how:"fight"}}}, {id:"o4", sp:"anom", sick:{kind:"illness", sev:10, chronic:true}}]});
+      const up = upgradeSave(old), oa = up.exhibits.find(x => x.id === "e-old").animals;
+      out.oldSicknessConverts = CONDITIONS[oa[0].sick.name].kind === "infection" && oa[0].sick.sev === 30 && oa[1].sick.name === "foreign" && oa[1].sick.kind === "poison"
+        && CONDITIONS[oa[2].sick.name].from.includes("fight") && oa[2].sick.kind === "injury" && !oa[3].sick.chronic && !!CONDITIONS[oa[3].sick.name] && oa[3].sick.kind === CONDITIONS[oa[3].sick.name].kind; }
     { const was = localStorage.getItem("genesis-dev"); localStorage.removeItem("genesis-dev");
       out.rosterHidesHerr = !speciesAvailable("herr") && speciesAvailable("trex") && !siteShown(SITE_BY_ID.ischigualasto) && siteShown(SITE_BY_ID.hellcreek);
       out.rosterHidesStatue = !document.getElementById("sideMenu") || (buildMenu(), !document.querySelector('#sideMenu [data-tool="land-st-prot"]'));
@@ -939,8 +988,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.noFeedCuts = hasNoFeed(tx) && throwChance(tq, tx, tcx, tcy) <= base * THROWN.signCut + 1e-9;
       state.buildings = state.buildings.filter(b => b !== nf);
       tx.trash = 1000; const saved = [...tx.animals], rt = state.rating, n0 = tx.animals.length, hp = state.health.from; state.health.from = 0;
-      const rr5 = Math.random; Math.random = () => 0; const tout = {ill:0, hurt:0, healed:0, showing:[], fed:0, poisoned:0}; trashNight(tout); Math.random = rr5; state.health.from = hp;
-      out.trashKills = tx.trash === 0 && tout.poisoned === n0 && tx.animals.length === 0;
+      tx.animals.forEach(a => delete a.sick);
+      const rr5 = Math.random; Math.random = () => 0; healthStep(.1); Math.random = rr5; state.health.from = hp;
+      out.trashPoisons = tx.animals.length === n0 && tx.animals.every(a => a.sick && a.sick.name === "foreign" && a.sick.kind === "poison" && !a.sick.hidden);
+      tx.animals.forEach(a => delete a.sick); tx.trash = 0;
       tx.animals = saved; state.rating = rt;
     }
 
@@ -1296,7 +1347,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // out in the park, rocks are fine but habitat props aren't, and water outside the fence isn't this exhibit's
     out.landRejectsOutside = waterHost(sq(10, 10, 4)) === null && !!waterProblem(sq(102, 130, 4), lx, null, 0) && landSpot(10, 10, "rock").ok && /inside an open exhibit/.test(landSpot(10, 10, "shelter").why || "");
     const dryTarget = exhibitReport(lx).target, dryIll = illChance(lx, lx.animals[0]).p;
-    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /No water/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("no water");
+    out.landDryFlagged = thirsty(lx, fish) && exhibitReport(lx).issues.some(i => i.bad && /No water/.test(i.text)) && illChance(lx, lx.animals[0]).why.includes("thirst");
     const pool = sq(130, 130, 6);
     out.landAcceptsInside = waterHost(pool) === lx && waterProblem(pool, lx, null, waterCost(pool)) === null;
     addWater(lx, pool);
@@ -2764,13 +2815,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
       const hl = () => document.getElementById("anHealth").textContent;
       out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && !/chance a day/.test(hl());
-      a1.sick = {kind:"injury", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
-      out.animalHealthInjured = /Injured, bitten by a Dimetrodon\./.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
+      a1.sick = {kind:"injury", name:"bite", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
+      out.animalHealthInjured = /Bite Wound, Serious\./.test(hl()) && /Bitten by a Dimetrodon\./.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
       // the exhibit's Animals and Health tabs show each animal's health too
       { const ex = animalHome(a1.id), tk = exTabs.tab, tx = exTabs.ex; exTabs.ex = ex.id; exTabs.tab = "animals"; const at = exhibitHtml(ex); exTabs.tab = "health"; const ht = exhibitHtml(ex); exTabs.tab = tk; exTabs.ex = tx;
-        out.exhibitTabsHealthBar = /Injured, 45% health/.test(at) && /Injured, 45% health/.test(ht) && /Healthy, 100% health/.test(ht) && /width:45%/.test(ht); }
-      a1.sick = {kind:"illness", sev:10, hidden:true}; animalLive(true);
-      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Ill/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
+        out.exhibitTabsHealthBar = /Bite Wound, Serious, 45% health/.test(at) && /Bite Wound, Serious, 45% health/.test(ht) && /Healthy, 100% health/.test(ht) && /width:45%/.test(ht); }
+      a1.sick = {kind:"infection", name:"pneumonia", sev:10, hidden:true}; animalLive(true);
+      out.animalHealthHidden = /Looks healthy/.test(hl()) && !/Pneumonia/.test(hl()) && document.getElementById("anHpN").textContent === "100%";
       // low hunger, thirst and sanitation show on the animal's Health section and the exhibit's Health tab, and only when low
       const ex0 = animalHome(a1.id), dirtKeep = ex0.dirt, needKeep = {...a1.need};
       ex0.dirt = 0; a1.need.hunger = 0; a1.need.thirst = 0; animalLive(true);
@@ -2810,7 +2861,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       looseAttacks(60); state.safety.loose[0].x = 200; state.safety.loose[0].biteAt = undefined; looseAttacks(60);
       out.looseNeedsReach = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0) === before;
       // a bite can kill outright, and the death dialog names the attacker
-      const vic = e.animals[0]; died.length = 0; vic.sick = {kind:"injury", sev:90}; hurtAnimal(e, vic, dm.name, "loose", [30, 30], 0);
+      const vic = e.animals[0]; died.length = 0; vic.sick = {kind:"injury", name:"bite", sev:90}; hurtAnimal(e, vic, dm.name, "loose", [30, 30], 0);
       out.attackKills = !e.animals.includes(vic) && died.length === 1 && died[0].cause === "Killed by a Dimetrodon" && died[0].exhibit === e.name;
       // 2. fights: a stressed, crowded herd hurts itself; a calm one doesn't
       e = pen("e-at2", ["coel", "coel", "coel", "coel"]); state.exhibits = [e];
@@ -2823,8 +2874,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const fought = e.animals.find(a => a.sick && a.sick.hit);
       out.fightsInjure = !!fought && fought.sick.hit.how === "fight" && fought.sick.kind === "injury" && needsOf(fought).stress >= 100 - 1;
       // an aggressive animal that is not crowded still fights at high stress, and the cause reads right if it dies
-      const f2 = e.animals.find(a => a !== fought); died.length = 0; f2.sick = {kind:"injury", sev:95}; hurtAnimal(e, f2, "Coelophysis", "fight", [10, 10], 0);
-      out.fightDeathCause = died.length === 1 && /fight/.test(died[0].cause);
+      const f2 = e.animals.find(a => a !== fought); died.length = 0; f2.sick = {kind:"injury", name:"laceration", sev:95}; hurtAnimal(e, f2, "Coelophysis", "fight", [10, 10], 0);
+      out.fightDeathCause = died.length === 1 && died[0].cause === "Killed by a Coelophysis";
       // 3. a predator housed with prey stalks it (the hunt act) and strikes
       e = pen("e-at3", ["dime", "coty", "coty"]); state.exhibits = [e];
       const pred = e.animals[0], ctx3 = behaviorCtx(e);
@@ -3755,7 +3806,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const cm0 = comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0});
       const m0 = state.money; addVivToy(ev, "vlamp"); const lamp = landOf(ev).find(f => f.type === "vlamp");
       state.weather.today = "cold"; const coldYes = illChance(ev, ev.animals[0]); state.weather.today = w0;
-      out.vivLampEffects = ok && state.money === m0 - LAND.vlamp.price && heatShare(ev) === 1 && exhibitReport(ev).target > tNo && illChance(ev, ev.animals[0]).p < ill0 && coldNo.why.includes("the cold") && !coldYes.why.includes("the cold") && coldYes.p < coldNo.p
+      out.vivLampEffects = ok && state.money === m0 - LAND.vlamp.price && heatShare(ev) === 1 && exhibitReport(ev).target > tNo && illChance(ev, ev.animals[0]).p < ill0 && coldNo.why.includes("lamp") && !coldYes.why.includes("lamp") && coldYes.p < coldNo.p
         && comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0}) > cm0 && dailyCosts().upkeep === up0 + LAND.vlamp.upkeep && noteBad(ev, /basking lamp|Cold/) === false;
       // one lamp warms VIV_LAMP.per animals: a bigger group is only partly warmed
       const ev8 = mk("e-pv3", 8, 260); state.exhibits.push(ev8); addVivToy(ev8, "vlamp");
@@ -3771,7 +3822,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const dryNo = thirsty(pv, wantHeat), tDry = exhibitReport(pv).target, wat0 = haveOf(pv, wantHeat).water, ill1 = illChance(pv, pv.animals[0]);
       addVivToy(pv, "vpool"); const pool = landOf(pv).find(f => f.type === "vpool");
       const arthLike = likesOf(SPECIES_BY_ID.arth).water < HAB.wantsWater;
-      out.vivPoolEffects = dryNo && !thirsty(pv, wantHeat) && haveOf(pv, wantHeat).water > wat0 && wat0 === 0 && exhibitReport(pv).target > tDry && !noteBad(pv, /Dry/) && ill1.why.includes("no pool") && !illChance(pv, pv.animals[0]).why.includes("no pool")
+      out.vivPoolEffects = dryNo && !thirsty(pv, wantHeat) && haveOf(pv, wantHeat).water > wat0 && wat0 === 0 && exhibitReport(pv).target > tDry && !noteBad(pv, /Dry/) && ill1.why.includes("thirst") && !illChance(pv, pv.animals[0]).why.includes("thirst")
         && vivPoolM2(pv) === LAND.vpool.poolM2 && arthLike && !thirsty(pv, SPECIES_BY_ID.arth) && LAND.vpool.pool && !LAND.vmist.pool;
       let sunk = 0; for(let t = 0; t < 8 && sunk < 1; t++){ regatherViv(pv); render(); sunk = [...herd.values()].filter(h => h.exhibitId === pv.id && h.sub && /clip-path/.test(h.el.innerHTML)).length; }
       out.vivPoolSubmerged = sunk >= 1 && !!vivPoolAt(pv, pool.x, pool.y) && !vivPoolAt(pv, pool.x + 5, pool.y);
@@ -3798,7 +3849,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       aq.wq = 10; const repFoul = exhibitReport(aq), illFoul = illChance(aq, aq.animals[0]);
       aq.wq = 100; const repClean = exhibitReport(aq), illClean = illChance(aq, aq.animals[0]);
       out.aquaWater = noFilter === "No filter." && aim0 === 0 && Math.abs(dirty1 - (100 - AQUA.rate)) < .01 && aim1 === 100 && aimOff === 0 && /power/.test(offText) && !filterText(aq)
-        && repFoul.target < repClean.target && repFoul.issues.some(i => /Foul water/.test(i.text)) && illFoul.why.includes("foul water") && !illClean.why.includes("foul water") && illFoul.p > illClean.p
+        && repFoul.target < repClean.target && repFoul.issues.some(i => /Foul water/.test(i.text)) && illFoul.why.includes("water") && !illClean.why.includes("water") && illFoul.p > illClean.p
         && !thirsty(aq, sea) && !(aq.dirt > 0) && aquaLoad(aq) === 3 * sea.food;
       // aquarists: keepers tend every exhibit but lagoons and aquariums, aquarists only those; each has its own staff list, call and zone panel entry, and the same pay
       {
@@ -3853,7 +3904,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const blockF = !!paluProblem(pa, false);
         const L = {viv:"L", palu:true, points:[]}, Ld = {viv:"L", points:[]};
         out.paludarium = okOn && pa.palu && state.money < m0 && paluSwims(tk) && !paluSwims(SPECIES_BY_ID.arth) && load === 4 * tk.food * PALU.load && noF === "No filter."
-          && wetHappy > dry && foul < wetHappy && ill.why.includes("foul water") && drawn && paluFloor && placed && blockF && !thirsty(pa, tk)
+          && wetHappy > dry && foul < wetHappy && ill.why.includes("water") && drawn && paluFloor && placed && blockF && !thirsty(pa, tk)
           && !vivToyProblem(pa, "afilter") && !!vivToyProblem(pa, "vpool") && !!vivToyProblem(pa, "acoral") && !!vivToyProblem(ev, "afilter")
           && fitsHabitat(enal, L) && !fitsHabitat(enal, Ld) && !fitsHabitat(enal, aq) && paluWet(pa, 351, paluY(pa) + .1) && !paluWet(pa, 351, paluY(pa) - .1) && !paluWet(ev, 201, 309);
         pa.land = pa.land.filter(f => !LAND[f.type].filter); pa.animals.push({id:"pa-e", sp:"enal", q:90});
@@ -3983,7 +4034,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // stranded pool animals and a bulldozed exhibit's pool animals are crated, its other animals get out
       {
         const keepC = state.crates; state.crates = [];
-        const a0 = pe.animals[0]; a0.sick = {kind:"illness", sev:10}; a0.q = 77;
+        const a0 = pe.animals[0]; a0.sick = {kind:"infection", name:"pneumonia", sev:10}; a0.q = 77;
         const r = crateAnimal(pe, a0), land = {id:"e-cland", name:"Land", points:[[300, 300], [340, 300], [340, 340], [300, 340]], animals:[], land:[], water:[]};
         state.exhibits.push(land);
         const boxed = !!r && !pe.animals.includes(a0) && crates()[0] === r && r.q === 77 && r.sick && r.name === a0.name && typeof r.x === "number";

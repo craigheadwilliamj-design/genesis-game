@@ -513,7 +513,16 @@ function upgradeSave(s){
   // every animal gets a sex (balanced per species), including ones in holding, loose, in the ward, on a transfer or still cloning
   { const all = [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...((s.science && s.science.specimens) || []), ...((s.safety && s.safety.loose) || []), ...(((s.health && s.health.ward) || []).map(p => p.a)), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean)), ...((s.science && s.science.clones) || [])];
     for(const a of all) if(!a.sex) a.sex = pickSex(a.sp, s);
-    for(const a of all) if(a.rank == null) a.rank = pickRank(a); }
+    for(const a of all) if(a.rank == null) a.rank = pickRank(a);
+    // old illnesses and injuries become a condition (CONDITIONS): an illness an infection its body can get, trash Foreign Object Ingestion, an injury one its cause brings on
+    for(const a of all){
+      const k = a.sick, sp = SPECIES_BY_ID[a.sp]; if(!k || k.name || !sp) continue;
+      delete k.chronic;
+      if(k.cause === "trash"){ k.kind = "poison"; k.name = "foreign"; }
+      else if(k.kind === "injury"){ const how = k.hit && k.hit.how; k.name = pickCondition(sp, ["injury"], how === "fight" ? ["fight"] : how ? ["attack"] : ["shelter"]); }
+      else { k.name = pickCondition(sp, ["infection"], []) || pickCondition(sp, ["poison"], []); k.kind = k.name ? CONDITIONS[k.name].kind : "infection"; }
+      if(!k.name){ k.kind = "injury"; k.name = "laceration"; }
+    } }
   snapFootprints(s);   // plants and rocks take whole-cell squares (landscape.js)
   return s;
 }
@@ -667,10 +676,10 @@ function exhibitReport(e){
     const sh = themeFitShare(e);
     if(sh > 0){ target += THEME.fitHappy * sh; issues.push({bad:false, text:`${themeOf(e).label} suits ${sh === 1 ? "these animals" : "some of these animals"}.`}); }
   }
-  // Sick and hurt animals drag the whole herd down
+  // Sick and hurt animals drag the whole herd down, the worse off the more
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
   // (a chronic case, eased by contemporary medicine, counts for less)
-  const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : 1) : 0), 0);
+  const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : sickBand(a).happy) : 0), 0);
   const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt.`});
@@ -824,6 +833,7 @@ function tickStep(dtMin){
   keepersTick(m1 - m0);
   wearTick(m1 - m0);
   mechanicsTick(m1 - m0);
+  healthTick(m1 - m0);
   vetsTick(m1 - m0);
   custodiansTick(m1 - m0);
   guardsTick(m1 - m0);
