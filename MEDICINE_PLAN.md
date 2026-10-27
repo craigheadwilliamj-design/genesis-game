@@ -130,7 +130,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 ## Genetic disorders (in progress)
 - A trait, not an illness: no severity or bands, never fatal on its own, and an animal can be sick and have one. At most one per animal.
 - Names: Osteoporosis, Cardiac Problems, Neurological Disorder, Weakened Immune System, Muscle Fatigue.
-- Rolled when a clone is made: chance = 60% x ((95 - DNA) / 45)^1.5, capped at 60% (50%: 60, 70%: 25, 85%: 6, 90%: 2, 95%+: none).
+- Rolled when a clone is made (see the roll below).
 - It works on the animal from the start, but stays hidden until the animal's first vet check-up diagnoses it. From then it's listed in the animal's menu for good, until genome therapy cures it.
 - Draft effects: Osteoporosis, injuries 1.5x as likely and more often Fractures; Cardiac Problems, illness and injury worsen 1.3x as fast; Neurological Disorder, paces more; Weakened Immune System, illness 2x as likely; Muscle Fatigue, slower, rests more, plays less.
 - These replace the flat frail-clone illness multiplier.
@@ -140,7 +140,11 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Old saves: only new clones roll one.
 - Shown in the animal's Health list once diagnosed: yellow text, always at the top, with "(Genetic)" after the name, e.g. "Osteoporosis (Genetic)". Curing it takes it off the list.
 - Genome therapy cures it whenever the lab's genome is more complete than the animal's. It does not change the animal's Accuracy (the genome % at its cloning).
-- Open: what therapy raises on the animal, and what rank and guests read (see chat).
+- Two numbers on every animal, both shown on its page:
+  - Accuracy: the genome % at its cloning (60 to 100), fixed for life. Replaces DNA quality (`a.q`). Bought animals are 100%. Rank, the quality-minded guests and the disorder roll read it.
+  - Genome Quality: starts equal to Accuracy. Genome therapy raises it to the lab's current genome % and cures the disorder. Therapy is possible only while the lab's genome is ahead of the animal's Genome Quality.
+- Disorder roll, refit to Accuracy: 60% x ((95 - Accuracy) / 35)^1.5 (60%: 60, 70%: 36, 80%: 17, 85%: 9, 90%: 3, 95%+: none).
+- The exhibit's therapy toggle only treats animals with a diagnosed disorder. One procedure goes all the way, priced per Genome Quality point gained as now; the 20-point cap goes.
 
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
