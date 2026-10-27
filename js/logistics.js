@@ -59,6 +59,7 @@ function stashMed(t, n){
   let left = n;
   const order = [...storesBuilt().filter(b => b.type === "pmc"), ...storesBuilt().filter(b => storeOf(b).cold), ...storesBuilt().filter(b => storeOf(b).dock)];
   for(const b of order){ if(left <= .01) break; left -= addGood(b, t, left); }
+  if(left > .01) state.today.wasted = (state.today.wasted || 0) + left * (t === CMED ? MODERN.cost : MED_UNIT_VALUE);   // what it was worth, for the end-of-day report
   return n - Math.max(0, left);
 }
 // The Botany Lab keeps a stock per medicine (state.ceres.meds is {medpal, medmes, medcen})

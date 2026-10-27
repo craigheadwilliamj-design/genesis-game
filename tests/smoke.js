@@ -258,8 +258,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const order = stockOf(pmcB, "medpal") === sh && stockOf(cold, "medpal") === 5 && stockOf(dock, "medpal") === 0 && put === 10;
       pmcB.store = {medpal:sh}; cold.store = {meat:storeCap(cold)}; const put2 = stashMed("medpal", 4);
       const toDock = stockOf(dock, "medpal") === 4 && put2 === 4;
-      dock.store.meat = storeCap(dock) - 4; const put3 = stashMed("medpal", 3);
+      dock.store.meat = storeCap(dock) - 4; const w0 = state.today.wasted || 0, put3 = stashMed("medpal", 3);
       out.medStashOrder = order && toDock && put3 === 0 && stockOf(dock, "medpal") === 4;
+      out.wasteInDayReport = Math.abs(state.today.wasted - w0 - 3 * MED_UNIT_VALUE) < 1e-9 && "wasted" in freshLedger();
       state.buildings = state.buildings.filter(x => x !== cold && x !== dock); pmcB.store = {medpal:10}; }
     // vets: a poisoning comes first, deliveries come last
     { vetsNight(); keepersNight();
