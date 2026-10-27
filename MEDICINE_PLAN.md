@@ -78,7 +78,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - The PMC uses the animal's era medicine when it has some, otherwise dock medicine. The player never picks.
 - On-the-spot treatment cures outright with either; era medicine has no other perk.
 - Medicated feed is prevention only: [infection] chance x0.35, 1 dose a day per 5 animals from whatever the PMC holds. Nothing for injuries or poisoning.
-- Storage unchanged: PMC store 150, Botany Lab 60 per era.
+- Storage: the PMC holds 200 doses split evenly between contemporary medicine and each era's (50 each, restocked to 40), and no medicine goes over its share. Botany Lab 60 per era. Medicine a worker is left holding goes to the PMC, then a cold store, then a dock, else it's wasted (shown as Goods Wasted in the end-of-day report).
 
 ## 6. Vets (locked)
 - Each time a vet looks for work, the first that applies:
@@ -223,4 +223,4 @@ All in `upgradeSave`.
 - Trash throwing moves out of medicine.js.
 
 ## Status
-Built in five phases on this branch (conditions, vets and treatment, medicine, genetics, UI). Not yet published.
+Built in five phases (conditions, vets and treatment, medicine, genetics, UI) and published.
