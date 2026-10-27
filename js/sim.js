@@ -115,7 +115,9 @@ function sexSplit(e, sp){
   return l.length ? ` <span class="meta">(${m} M, ${l.length - m} F)</span>` : "";
 }
 // Status in the pecking order, 0 (alpha) to 1: luck, DNA quality and being male
-const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 90) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
+// The genetic part of an animal, for everything that copies one: Accuracy, Genome Quality, and a disorder (diagnosed or not)
+const geneFields = a => ({q:a.q ?? 100, gq:a.gq ?? a.q ?? 100, ...(a.dis ? {dis:a.dis, dx:!!a.dx} : {})});
+const pickRank = a => 1 - (Math.random() * SOCIAL.rank.rand + (a.q ?? 100) / 100 * SOCIAL.rank.q + (a.sex === "male" ? SOCIAL.rank.male : 0)) / (SOCIAL.rank.rand + SOCIAL.rank.q + SOCIAL.rank.male);
 function nameAnimal(a, st){
   if(!a.sex) a.sex = pickSex(a.sp, st);
   if(a.rank == null) a.rank = pickRank(a);
@@ -153,7 +155,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 
 function newPark(){
   return {
-    animalSeq:{},
+    animalSeq:{}, accV:1,
     version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, vivBig:1, discoV:1, parkClosed:false,
@@ -431,6 +433,13 @@ function upgradeSave(s){
     s.ceres.auto = {cenozoic:false, mesozoic:false, paleozoic:false};
     for(const [era, id] of Object.entries(MED_TECH)) if(hasT(id)) s.ceres.auto[era] = true;
   }
+  // DNA quality became Accuracy, the genome % at cloning (quality ran 40 to 100 over genomes 60 to 100); bought animals are 100%, and Genome Quality starts the same
+  if(!s.accV){
+    const conv = a => { if(!a) return; a.q = a.q == null ? 100 : Math.round(clamp(60 + (a.q - 40) * 40 / 60, 60, 100)); if(a.gq == null) a.gq = a.q; };
+    for(const a of [...s.exhibits.flatMap(e => e.animals), ...(s.crates || []), ...(sc.specimens || []), ...((s.safety && s.safety.loose) || []), ...s.health.ward.map(p => p.a), ...(((s.staff && s.staff.transfers) || []).map(t => t.cargo).filter(Boolean))]) conv(a);
+    for(const c of sc.clones || []) if(c.q != null) c.q = Math.round(clamp(60 + (c.q - 40) * 40 / 60, 60, 100));
+    s.accV = 1;
+  }
   // medicine is no longer refined per period: the points spent on refinements, finished or under way, come back
   { const pts = {cenozoic:8, mesozoic:14, paleozoic:20};
     for(const t of sc.tech.filter(t => t.startsWith("ref-"))) sc.points = (sc.points || 0) + (pts[ERA_OF[t.slice(4)]] || 0);
@@ -634,12 +643,6 @@ function exhibitReport(e){
     else if(!e.viv && s.viv){ target -= s.aqua ? 60 : 20; issues.push({bad:true, text:`${s.name} needs ${s.aqua ? "an aquarium" : "a vivarium"}.`}); }
     else if(!e.viv && s.pool && !lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} needs a lagoon wall.`}); }
     else if(!e.viv && !s.pool && lagoonWalled(e)){ target -= 60; issues.push({bad:true, text:`${s.name} can't live in a lagoon.`}); }
-  }
-  // Clones made from poor DNA are sickly. Animals from partner parks count as healthy.
-  if(e.animals.length){
-    const avgQ = e.animals.reduce((s, x) => s + (x.q ?? 90), 0) / e.animals.length;
-    if(avgQ < 50){ target -= 12; issues.push({bad:true, text:`Frail clones (${Math.round(avgQ)}% DNA).`}); }
-    else if(avgQ < 70){ target -= 5; issues.push({bad:true, text:`Sickly clones (${Math.round(avgQ)}% DNA).`}); }
   }
   // Plants: animals like living among plants from their own era. Older plant-eaters get sick on grass.
   const landKinds = [...counts.keys()].map(sp => SPECIES_BY_ID[sp]).filter(s => !s.pool);

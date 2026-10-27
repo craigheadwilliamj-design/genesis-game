@@ -90,7 +90,7 @@ function turnLoose(e, a){
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.health.ward = state.health.ward.filter(p => p.a.id !== a.id);
   const n = kGraph.anchors[e.id] || nearestNode(cx, cy);   // the gate stop is on the staff network; the nearest stop might be on a path nobody can walk to
-  state.safety.loose.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, q:a.q, cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
+  state.safety.loose.push({id:a.id, name:a.name, sex:a.sex, rank:a.rank, sp:a.sp, ...geneFields(a), cl:a.cl, sick:a.sick, from:e.id, at:n ? n.k : null, x:cx, y:cy, next:null, t:0, status:"loose"});
 }
 
 function breakOut(e, a){
@@ -157,7 +157,7 @@ function fearFactor(){
 function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
-  if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, q:l.q, ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
+  if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, ...geneFields(l), ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
   else { const [x, y] = loosePos(l) || labSpot(); dropCrate(l, x, y); events.toast(`Keepers put the ${s.name} in a crate.`, "good"); }
   events.changed();
 }

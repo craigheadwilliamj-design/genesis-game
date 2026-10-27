@@ -65,7 +65,7 @@ function exhibitTraits(e){
     kids:share((a, s) => s && !isDangerous(s) && s.diet.length === 1 && s.diet[0] === "herbivore"),
     active:share(a => PERS.activeActs.includes(a.act)),
     hunting:share(a => a.act === "hunt"),
-    quality:e.animals.reduce((s, a) => s + (a.q ?? 90), 0) / n,
+    quality:e.animals.reduce((s, a) => s + (a.q ?? 100), 0) / n,
     rare:spp.some(s => s.price >= PERS.rarePrice),
     platform:state.buildings.some(b => (b.type === "platform" || b.type === "gallery") && b.exhibitId === e.id),
   };

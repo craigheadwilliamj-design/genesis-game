@@ -2087,7 +2087,7 @@ function animateAnimals(dt){
     if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; continue; }
     const [tx, ty] = h.path[0], dx = tx - h.x, dy = ty - h.y, d = Math.hypot(dx, dy);
     if(d < .3){ h.wp = h.path.shift(); if(!h.path.length){ h.wait = stay ? 4 + Math.random() * 4 : idle; if(!stay) h.path = null; } continue; }
-    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * (h.a && h.a.sick ? sickBand(h.a).gait : 1) * dt);
+    const step = Math.min(d, h.spd * 3 * (ACT_GAIT[act] || 1) * ((SPRITES[h.sp] || {}).pace || 1) * (h.a && h.a.sick ? sickBand(h.a).gait : 1) * disFx(h.a, "gait") * dt);
     const px = h.x, py = h.y;
     h.x += dx/d * step; h.y += dy/d * step;
     // last line of defence: a land animal never takes a step into the water (one already in it may keep wading out)

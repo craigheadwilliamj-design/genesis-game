@@ -255,20 +255,40 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const up = upgradeSave(old), uw = up.health.ward;
       out.oldWardConverts = up.health.beds === 3 && uw[0].dosed && uw[0].done === 0 && Math.abs(uw[0].need - 40 * HEALTH.wardPerPoint * MEDICINE.dockWard.paleozoic) < 1e-9
         && uw[2].recovered && !uw[2].cured && !up.staff.transfers.some(t => t.id === "tr-old"); }
-    // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
+    // genetic disorders: a clone may be born with one, likelier the lower its Accuracy, and none at 95% or more
+    { const rr = Math.random; Math.random = () => 0;
+      out.disorderRoll = rollDisorder(60) && rollDisorder(94) && !rollDisorder(95) && !rollDisorder(100);
+      Math.random = () => .59; const lowGets = !!rollDisorder(60), midGets = !!rollDisorder(80); Math.random = rr;
+      out.disorderLikelierLow = lowGets && !midGets && Math.abs(DISORDER_ROLL.most * Math.pow((95 - 80) / 35, 1.5) - .1683) < .001; }
+    // each disorder does its thing, diagnosed or not
+    { const ga = viv.animals[0]; delete ga.sick; const base = illChance(viv, ga).p, hurt0 = injuryChance(viv, ga).p;
+      ga.dis = "immune"; out.immuneIllMore = Math.abs(illChance(viv, ga).p - base * 2) < 1e-12;
+      ga.dis = "osteo"; out.osteoHurtMore = Math.abs(injuryChance(viv, ga).p - hurt0 * 1.5) < 1e-12;
+      delete ga.dis; }
+    // genome therapy: a vet's own trip to an exhibit that has it switched on; it cures a diagnosed disorder by bringing Genome Quality up to the lab's genome, and Accuracy stays
     vetsNight(); keepersNight();
-    const ga = viv.animals[0]; delete ga.sick; ga.q = 60;
-    state.science.dna.arth = {genome:80};   // clones from it are 70% DNA quality
+    const ga = viv.animals[0]; delete ga.sick; ga.q = 70; ga.gq = 70; ga.dis = "cardiac";
+    state.science.dna.arth = {genome:80};
     out.geneNeedsTech = !!geneProblem();
     state.science.tech.push("genetherapy");
-    out.geneGainCapped = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
-    out.geneOffDoesNothing = !viv.geneTherapy && geneTargets(viv).length === 0;
-    state.science.dna.arth.genome = 65;
-    viv.geneTherapy = true; out.geneNoBetterGenome = geneTargets(viv).length === 0;
+    out.geneGain = geneGain(ga) === 10 && geneCost(10) === GENE.base + 10 * GENE.perPoint;
+    viv.geneTherapy = true;
+    out.geneNeedsDiagnosis = geneTargets(viv).length === 0;
+    viv.vetCheck = state.day - HEALTH.checkEvery;
+    out.checkupDiagnoses = run(300, () => ga.dx) && diagnosed(ga) && checkWork(viv) === HEALTH.checkMinutes;
+    state.science.dna.arth.genome = 70; out.geneNoBetterGenome = geneTargets(viv).length === 0;
     state.science.dna.arth.genome = 80;
-    out.geneQueues = !geneProblem() && geneTargets(viv).includes(ga) && checkWork(viv) === HEALTH.checkMinutes + GENE.minutes * geneTargets(viv).length; delete viv.vetCheck;
-    const med0 = state.today.medicine, illBefore = illChance(viv, ga).p;
-    out.geneVetDoesIt = run(600, () => ga.q === 70) && state.today.medicine - med0 >= geneCost(10) && illChance(viv, ga).p < illBefore;
+    out.geneQueues = !geneProblem() && geneTargets(viv).includes(ga);
+    const med0 = state.today.medicine;
+    out.geneVetDoesIt = run(600, () => !ga.dis) && ga.gq === 80 && ga.q === 70 && !ga.dx && state.today.medicine - med0 >= geneCost(10);
+    viv.geneTherapy = false;
+    // the genetic record travels with the animal, and old saves turn DNA quality into Accuracy
+    { const g = geneFields({q:70, gq:75, dis:"neuro", dx:true}), g2 = geneFields({});
+      out.geneFieldsCopy = g.q === 70 && g.gq === 75 && g.dis === "neuro" && g.dx === true && g2.q === 100 && g2.gq === 100 && !("dis" in g2);
+      const old = JSON.parse(JSON.stringify(state)); delete old.accV;
+      old.exhibits.push({id:"e-acc", name:"Acc", points:[[0,0],[9,0],[9,9],[0,9]], animals:[{id:"q1", sp:"arth", q:70, cl:true}, {id:"q2", sp:"arth"}, {id:"q3", sp:"arth", q:40, cl:true}]});
+      const ua = upgradeSave(old).exhibits.find(x => x.id === "e-acc").animals;
+      out.oldDnaToAccuracy = ua[0].q === 80 && ua[0].gq === 80 && ua[1].q === 100 && ua[2].q === 60 && !ua.some(x => x.dis); }
     // science buildings got cheaper
     out.cheaperScience = BUILDINGS.oracle.price === 9000 && BUILDINGS.ghost.price === 15000 && BUILDINGS.tar.price === 12000 && BUILDINGS.ceres.price === 10000 && BUILDINGS.pmc.price === 6000;
 
@@ -2853,7 +2873,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.animalPanelOpens = !!inp && inp.value === a1.name && !!document.getElementById("anMoodBar") && document.querySelectorAll("#anStress li").length > 0;
       // the panel's Health section: healthy, then injured (cause and status shown), and mild illness nobody has spotted stays hidden
       const hl = () => document.getElementById("anHealth").textContent;
-      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /DNA/.test(hl()) && !/chance a day/.test(hl());
+      out.animalHealthHealthy = /Looks healthy/.test(hl()) && /Accuracy/.test(hl()) && /Genome Quality/.test(hl()) && !/chance a day/.test(hl());
       a1.sick = {kind:"injury", name:"bite", sev:55, hit:{by:"Dimetrodon", how:"bite"}}; animalLive(true);
       out.animalHealthInjured = /Bite Wound, Serious\./.test(hl()) && /Bitten by a Dimetrodon\./.test(hl()) && document.getElementById("anHpN").textContent === "45%" && document.getElementById("anHpBar").style.width === "45%";
       // the exhibit's Animals and Health tabs show each animal's health too
@@ -3503,7 +3523,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     sc.dna = {[sp.id]:{genome:CLONE_GENOME.min - 1}};
     out.cloneNeedsMinGenome = !cloneOpen(sp.id) && /needs 60%/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === 0;
     sc.dna[sp.id].genome = CLONE_GENOME.min;
-    out.cloneOpensAtMin = cloneOpen(sp.id) && !/genome is/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === CLONE_GENOME.q0 && CLONE_GENOME.q0 < 50;
+    out.cloneOpensAtMin = cloneOpen(sp.id) && !/genome is/.test(cloneProblem(sp.id) || "") && cloneQuality(sp.id) === CLONE_GENOME.min;
     const qs = [60, 70, 80, 90, 100].map(g => { sc.dna[sp.id].genome = g; return cloneQuality(sp.id); });
     out.cloneHealthRisesWithGenome = qs.every((q, i) => !i || q > qs[i - 1]) && qs[4] === 100 && qs[2] >= 70;
     state.sandbox = true; state.money = 1e8; state.rating = 5; sc.clones = [];

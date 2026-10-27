@@ -275,7 +275,7 @@ function stressTarget(e, a, s, ctx, why){
   if(n.thirst > 70) add((n.thirst - 70) * .6, "it's thirsty");
   if(n.lonely > 60) add((n.lonely - 60) * .3, "it's lonely");
   if(agg && n.bored > 70) add((n.bored - 70) * .4, "it's bored");
-  return clamp(t, 0, 100);
+  return clamp(8 + (t - 8) * disFx(a, "stress"), 0, 100);   // a Neurological Disorder takes it all harder
 }
 
 // What it does now: the most urgent need wins, and nothing to fix one means pacing
@@ -305,13 +305,14 @@ function pickAct(e, a, s, ctx){
   if(pk > 0 && huntDriven(a) && preyIn(e, s, ctx.counts).length && aw > .5) sc.hunt = Math.max(sc.hunt || 0, ATTACK.drive + n.hunger * .5 + PACK.huntJoin * Math.min(pk, 3));
   if(n.thirst > floor + 5) sc.drink = n.thirst * 1.15;
   const band = sickBand(a);   // a sick animal rests more and does less, the worse off the more
-  sc.rest = (1 - aw) * 80 + n.discomfort * .25 + (band ? band.rest : 0);
+  sc.rest = (1 - aw) * 80 + n.discomfort * .25 + (band ? band.rest : 0) + disFx(a, "rest", 0);
   if(n.stress > 30) sc.hide = (n.stress - 15) * {skittish:1.4, curious:.8, aggressive:.5}[T.temper] * (ctx.cover ? 1 : .7);
   if(mates > 0 && want > 0) sc.social = n.lonely;
   if(ctx.enrich >= .15) sc.play = n.bored * (T.temper === "curious" ? 1.25 : 1) * (.5 + ctx.enrich) * aw;
   const idle = s.predator || T.temper === "aggressive" || T.social === "pack" ? "patrol" : "forage";
   sc[idle] = Math.max(sc[idle] || 0, 22 * aw);
-  if(band) for(const k of ["play", "patrol", "forage", "social", "hunt"]) if(sc[k] != null) sc[k] *= band.act;
+  const slow = (band ? band.act : 1) * disFx(a, "play");   // sick or weak muscles: it does less
+  if(slow !== 1) for(const k of ["play", "patrol", "forage", "social", "hunt"]) if(sc[k] != null) sc[k] *= slow;
   // stuck: a need nothing here can fix
   const stuck = [
     ["bored", n.bored * (ctx.enrich < .15 ? 1.1 : .55)],
@@ -321,6 +322,7 @@ function pickAct(e, a, s, ctx){
     ["thirsty", floor ? n.thirst : 0],
   ].sort((x, y) => y[1] - x[1])[0];
   if(stuck[1] > 40) sc.pace = (stuck[1] - 20) * (.4 + .6 * aw);
+  if(disFx(a, "pace", 0)) sc.pace = (sc.pace || 0) + disFx(a, "pace", 0) * aw;   // a Neurological Disorder: it paces more
   if(sc[cur] != null) sc[cur] += B.stick;
   let best = idle; for(const k in sc) if(sc[k] > sc[best]) best = k;
   a.why = best === "pace" ? stuck[0] : null;
@@ -600,7 +602,7 @@ function hurtAnimal(e, v, by, how, range, killP, msg){
   const s = SPECIES_BY_ID[v.sp], sev = range[0] + Math.random() * (range[1] - range[0]);
   const hit = {by, how}, cause = how === "fight" ? "fight" : "attack", att = SPECIES.find(x => x.name === by);
   if(v.sick){ v.sick.sev += sev; delete v.sick.hidden; v.sick.hit = hit; }
-  else { fallSick(v, pickCondition(s, ["injury"], att && GORES.includes(att.id) ? [cause, "gore"] : [cause]), cause, Math.round(sev)); v.sick.hit = hit; }
+  else { fallSick(v, pickCondition(s, ["injury"], att && GORES.includes(att.id) ? [cause, "gore"] : [cause], v), cause, Math.round(sev)); v.sick.hit = hit; }
   if(killP && Math.random() < killP){ v.sick.sev = 100; v.sick.killed = true; }
   const n = needsOf(v); n.stress = Math.min(100, n.stress + ATTACK.scare);
   attackFx(e, v);

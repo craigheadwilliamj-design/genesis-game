@@ -24,13 +24,12 @@ function animalStressors(a, e, s){
 // One animal's health as bulleted checks: [level, text]. Mild illness nobody has spotted yet doesn't show.
 function animalHealthItems(a, e, s){
   const out = [], sk = noticed(a) ? a.sick : null;
+  if(diagnosed(a)) out.push(["warn", `${disName(a)} (Genetic)`]);   // always on top until genome therapy cures it
   if(sk){
     out.push([sk.sev >= SICK_BAND[1].from ? "bad" : "warn", `${sickName(a)}, ${sickBand(a).label}.`]);
     if(sickCause(a)) out.push(["warn", sickCause(a)]);
     out.push(["warn", sickStatus(e, a)]);
   } else out.push(["ok", "Looks healthy."]);
-  const q = a.q ?? 90;
-  out.push([q < 50 ? "bad" : q < 70 ? "warn" : "ok", q < 50 ? `Frail clone, ${q}% DNA. It falls ill ${HEALTH.frail.below50} times as often.` : q < 70 ? `Sickly clone, ${q}% DNA. It falls ill ${HEALTH.frail.below70} times as often.` : `${q}% DNA.`]);
   out.push(...basicsLow(e, [a]));
   if(e.medFeed) out.push(e.medFedOk ? ["ok", "Medicated today."] : ["bad", "Not medicated today."]);
   const d = daysSinceCheck(e);
@@ -41,7 +40,7 @@ function animalHtml(a){
   const e = animalHome(a.id), s = SPECIES_BY_ID[a.sp];
   let h = `${e ? `<button class="back" data-action="animalBack" data-id="${esc(e.id)}">‹ ${esc(e.name)}</button>` : ""}`;
   h += `<label class="field"><span>Name</span><input id="aName" data-field="aname" value="${esc(a.name || "")}" maxlength="${ANIMAL_NAME_MAX}"></label>`;
-  h += `<div class="meta">${esc(s.name)} · ${esc(s.period)}${e ? " · in " + esc(e.name) : ""}${a.cl ? " · clone" : ""} · ${a.q ?? 90}% DNA${a.sex ? ` · <b title="${a.sex}">${sexMark(a)}</b> ${a.sex}` : ""}</div>`;
+  h += `<div class="meta">${esc(s.name)} · ${esc(s.period)}${e ? " · in " + esc(e.name) : ""}${a.cl ? " · clone" : ""}${a.sex ? ` · <b title="${a.sex}">${sexMark(a)}</b> ${a.sex}` : ""}</div>`;
   const rp = e ? rankPos(e, a) : null;
   if(rp) h += `<div class="meta">${rp.pack ? (rp.i < 2 ? "Alpha pair" : "Subordinate, rank " + (rp.i + 1)) : rp.i === 0 ? "Alpha" : "Rank " + (rp.i + 1)} of ${rp.n} in the ${traitsOf(s).social}</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok" id="anStatus"></span>${e ? crateBtn(a) + sellBtn(a) : ""}</div>`;
@@ -73,8 +72,8 @@ function animalLive(force){
   { const v = Math.round(animalHp(a)), hb = document.getElementById("anHpBar");
     if(hb){ hb.style.width = v + "%"; hb.style.background = hpColor(v); }
     set("anHpN", `${v}%`); }
-  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items);
-    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul>`; } }
+  { const hp = animalHealthItems(a, e, s), el = document.getElementById("anHealth"), key = JSON.stringify(hp.items) + (a.q ?? 100) + "/" + (a.gq ?? a.q ?? 100);
+    if(el && el.dataset.v !== key){ el.dataset.v = key; el.innerHTML = `<ul class="issues hl-list">${hp.items.map(([l, t]) => hli(l, esc(t))).join("")}</ul><dl class="kv" style="margin-top:8px"><dt>Accuracy</dt><dd>${a.q ?? 100}%</dd><dt>Genome Quality</dt><dd>${a.gq ?? a.q ?? 100}%</dd></dl>`; } }
   const fill = (id, list, none, bad) => {
     const ul = document.getElementById(id), key = list.join("|");
     if(ul && ul.dataset.v !== key){ ul.dataset.v = key; ul.innerHTML = list.length ? list.map(t => `<li class="${bad ? "bad" : ""}"><span>${esc(t)}</span></li>`).join("") : `<li><span class="meta">${none}</span></li>`; }

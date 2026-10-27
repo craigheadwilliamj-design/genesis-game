@@ -116,7 +116,7 @@ function grantsHtml(goal){
 // A crate's panel: who is inside, and Move (carry it), Open (into the exhibit it stands in, when it fits) and Sell
 function crateHtml(c){
   const s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => inPoly(c.x, c.y, x.points)), fits = !!e && !crateProblem(c, e);
-  let h = `<div class="meta">${esc(s.name)} · ${esc(s.period)}${c.cl ? " · clone" : ""} · ${c.q ?? 90}% DNA${c.sex ? ` · <b title="${esc(c.sex)}">${esc(sexMark(c))}</b> ${esc(c.sex)}` : ""}</div>`;
+  let h = `<div class="meta">${esc(s.name)} · ${esc(s.period)}${c.cl ? " · clone" : ""} · ${c.q ?? 100}% Accuracy${c.sex ? ` · <b title="${esc(c.sex)}">${esc(sexMark(c))}</b> ${esc(c.sex)}` : ""}</div>`;
   h += `<div class="row" style="margin-top:6px"><span class="status ok">In a crate.</span><button class="btn sell" data-action="crateTool" data-id="${esc(c.id)}">Move</button>${fits ? `<button class="btn sell" data-action="crateOpen" data-id="${esc(c.id)}">Open in ${esc(e.name)}</button>` : ""}<button class="btn sell" data-action="crateSell" data-id="${esc(c.id)}">Sell +${money(Math.round(s.price * COST.animalResale))}</button></div>`;
   return h;
 }
@@ -623,11 +623,11 @@ function healthHtml(e){
   if(e.medFeed) items.push(hli(e.medFedOk ? "ok" : "bad", e.medFedOk ? "Medicated today." : "Not medicated today."));
   if(items.length) h += `<ul class="issues hl-list">${items.join("")}</ul>`;
   // every animal's health, the worst first; tap one to open it
-  if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? `${esc(sickName(a))}, ${sickBand(a).label}` : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}</span></li>`; }).join("")}</ul>`;
-  // genome therapy: vets lift clones' DNA at each check-up
+  if(e.animals.length) h += `<ul class="herd" style="margin-top:8px">${[...e.animals].sort((a, b) => animalHp(a) - animalHp(b) || byName(a, b)).map(a => { const s = SPECIES_BY_ID[a.sp], v = Math.round(animalHp(a)), sk = noticed(a) && a.sick; return `<li class="animal-row" data-action="animalOpen" data-id="${esc(a.id)}" style="cursor:pointer"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(a.name || s.name)}</b> <span class="meta">${esc(s.name)} · ${sk ? `${esc(sickName(a))}, ${sickBand(a).label}` : "Healthy"}, ${v}% health</span>${meter(v, hpColor(v))}${sk ? `<span class="meta">${esc(sickStatus(e, a))}</span>` : ""}${diagnosed(a) ? `<span class="gen">${esc(disName(a))} (Genetic)</span>` : ""}</span></li>`; }).join("")}</ul>`;
+  // genome therapy: a vet's trip to cure diagnosed genetic disorders
   if(e.animals.length && hasTech("genetherapy")){
-    const low = e.animals.filter(a => geneGain(a) >= GENE.minGain).length;
-    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} to improve</span></div>`;
+    const low = e.animals.filter(a => diagnosed(a) && geneGain(a) > 0).length;
+    h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="gene">${e.geneTherapy ? "Stop genome therapy" : "Give genome therapy"}</button><span class="meta">${low} to treat</span></div>`;
   }
   // medicated feed, from the PMC's medicine
   if(hasDept("pmc")) h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="medFeed">${e.medFeed ? "Stop medicated feed" : "Give medicated feed"}</button><span class="meta">${feedDoses(e)} dose${feedDoses(e) === 1 ? "" : "s"} a day</span></div>`;

@@ -41,12 +41,26 @@ const feedDoses = e => Math.ceil(e.animals.length / MEDICINE.feedPer);
 // Chance a day that an animal in e eats some of the trash thrown in today
 const trashEaten = e => e.trash && e.animals.length ? Math.min(THROWN.eatMax, THROWN.eat * e.trash / e.animals.length) : 0;
 
-/* ---------- genome therapy ---------- */
-// An exhibit with e.geneTherapy on has each vet check-up lift its clones' DNA quality (a.q) toward what the lab's genome for their species (sc.dna) would give a clone today, which the Time Travel Lab raises by finding more of it.
-const labQuality = sp => cloneQuality(sp);
-const geneGain = a => hasTech("genetherapy") ? Math.min(GENE.step, labQuality(a.sp) - (a.q ?? 90)) : 0;
+/* ---------- genetics: disorders and genome therapy ---------- */
+
+// A new clone's disorder (a DISORDERS id), or null: likelier the lower its Accuracy
+function rollDisorder(acc){
+  const R = DISORDER_ROLL; if(!(acc < R.clear)) return null;
+  const p = Math.min(R.most, R.most * Math.pow((R.clear - acc) / (R.clear - CLONE_GENOME.min), R.curve));
+  if(Math.random() >= p) return null;
+  const ids = Object.keys(DISORDERS); return ids[Math.floor(Math.random() * ids.length)];
+}
+// One of its disorder's numbers (DISORDERS), or `none` without one. It works whether or not a vet has diagnosed it.
+const disFx = (a, k, none = 1) => a && a.dis && DISORDERS[a.dis] && DISORDERS[a.dis][k] != null ? DISORDERS[a.dis][k] : none;
+const diagnosed = a => !!a.dis && !!a.dx;
+const disName = a => DISORDERS[a.dis].name;
+// Genome therapy (Research Lab tech "genetherapy"): brings an animal's Genome Quality (a.gq) up to the lab's genome for its species today, which cures its disorder.
+// Its Accuracy (a.q, the genome at its cloning) never changes. It's only possible while the lab's genome is ahead of the animal's.
+const labGenome = sp => cloneQuality(sp);
+const geneGain = a => hasTech("genetherapy") ? Math.max(0, labGenome(a.sp) - (a.gq ?? a.q ?? 100)) : 0;
 const geneCost = gain => GENE.base + Math.round(gain * GENE.perPoint);
-const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && geneGain(a) >= GENE.minGain) : [];
+// The animals in an exhibit with it switched on that it can cure: a diagnosed disorder, and a lab genome ahead of theirs
+const geneTargets = e => e.geneTherapy && hasTech("genetherapy") ? e.animals.filter(a => !a.darted && diagnosed(a) && geneGain(a) > 0) : [];
 // Why it can't be switched on, or null
 function geneProblem(){
   if(!hasTech("genetherapy")) return "Research Genome therapy at the Research Lab first.";
@@ -54,18 +68,17 @@ function geneProblem(){
   if(!state.staff.vets.length) return "Hire a vet at the Paleo-Medicine Center.";
   return null;
 }
-// How long a vet's check-up of an exhibit takes, with the genome therapy it will do
-const checkWork = e => HEALTH.checkMinutes + GENE.minutes * geneTargets(e).length;
-// Done in the check-up: each clone the lab can improve gets a procedure while the money lasts
+const checkWork = e => HEALTH.checkMinutes;
+// A vet's genome therapy trip: each animal it can cure gets a procedure while the money lasts
 function geneTherapy(e, who){
-  let n = 0, short = false;
+  let n = 0;
   for(const a of geneTargets(e)){
-    const gain = geneGain(a), cost = geneCost(gain);
-    if(!canAfford(cost)){ short = true; break; }
-    spend(cost, "medicine"); a.q = (a.q ?? 90) + gain; n++;
+    const cost = geneCost(geneGain(a));
+    if(!canAfford(cost)){ events.toast(`Not enough money for genome therapy on ${a.name}.`, "bad"); break; }
+    spend(cost, "medicine"); const was = disName(a);
+    a.gq = labGenome(a.sp); delete a.dis; delete a.dx; n++;
+    events.toast(`${who} cured ${a.name}'s ${was} with genome therapy.`, "good");
   }
-  if(n) events.toast(`${who} gave genome therapy to ${n} clone${n === 1 ? "" : "s"} in ${e.name}.`, "good");
-  if(short) events.toast(`${who} couldn't afford genome therapy for every clone in ${e.name}.`, "bad");
   return n;
 }
 
@@ -90,9 +103,10 @@ const BODIES = new Map();
 const bodyOf = s => { if(!BODIES.has(s.id)) BODIES.set(s.id, bodyTags(s)); return BODIES.get(s.id); };
 const canGet = (s, c) => c.who.some(w => bodyOf(s).has(w)) && !(c.not || []).some(w => bodyOf(s).has(w));
 // A condition of these kinds that one of these causes brings on; with none that fits, any its body can get (but not one only its own cause brings). null if its body gets none.
-function pickCondition(s, kinds, causes){
+function pickCondition(s, kinds, causes, a){
   const all = Object.keys(CONDITIONS).filter(id => kinds.includes(CONDITIONS[id].kind) && canGet(s, CONDITIONS[id]));
   const fit = all.filter(id => CONDITIONS[id].from.some(f => causes.includes(f))), list = fit.length ? fit : all.filter(id => !CONDITIONS[id].only);
+  if(list.includes("fracture") && Math.random() < disFx(a, "fracture", 0)) return "fracture";   // brittle bones
   return list.length ? list[Math.floor(Math.random() * list.length)] : null;
 }
 const sickName = a => (CONDITIONS[a.sick.name] || {}).name || SICK_KIND[a.sick.kind].label;
@@ -128,7 +142,6 @@ function illChance(e, a){
   const raise = (m, cause) => { if(!(m > 1)) return; p *= m; if(!w[cause]) why.push(cause); w[cause] = (w[cause] || 0) + m - 1; };
   const hg = hungerShare(e); if(hg > .02) raise(1 + HEALTH.hungerMult * hg, "hunger");
   const d = e.dirt || 0; if(d > CLEAN.penaltyFrom) raise(1 + (d - CLEAN.penaltyFrom) / HEALTH.dirtPer, wet ? "water" : "dirt");
-  const q = a.q ?? 90; if(q < 50) p *= HEALTH.frail.below50; else if(q < 70) p *= HEALTH.frail.below70;
   if(thirsty(e, s)) raise(HAB.dryIll, "thirst");
   if((e.aqua || e.palu && paluSwims(s)) && wqOf(e) < AQUA.foul) raise(1 + (AQUA.ill - 1) * (1 - wqOf(e) / AQUA.foul), "water");
   if(e.viv && !e.aqua && wantsHeat(s)){   // a basking lamp keeps the cold-blooded well; without one a cold snap makes them ill
@@ -142,6 +155,7 @@ function illChance(e, a){
   if(a.need && a.need.stress > 60) raise(BEHAVIOR.stressIll, "stress");
   if(crowded(e) < 1) raise(HEALTH.crowdIll, "crowd");
   if(medicated(e, s)) p *= MEDICINE.feedCut;
+  p *= disFx(a, "ill");
   return {p, why, w};
 }
 // Chance a day this animal is hurt by rivals, a species that preys on it, the weather or the ground
@@ -160,6 +174,7 @@ function injuryChance(e, a){
     if((e.dirt || 0) > CLEAN.penaltyFrom) add(HEALTH.ground, "dirt");
     if(biomeFit(s, biomeOf(e)) === "away") add(HEALTH.ground, "biome");
   }
+  p *= disFx(a, "hurt");
   return {p, why, w};
 }
 // The causes behind an injury: a fight with (or attack by) a species with horns or tusks can gore
@@ -346,7 +361,7 @@ function syncVets(){
   // a vet who was let go drops whatever they were chasing
   for(const c of vcrew) if(!ids.has(c.id) && c.loose){ c.loose.vet = null; if(c.loose.status === "darting") c.loose.status = "loose"; }
   vcrew = vcrew.filter(c => ids.has(c.id));
-  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null});
+  for(const v of state.staff.vets) if(!vcrew.some(c => c.id === v.id)) vcrew.push({id:v.id, at:null, route:[], t:0, job:"idle", wait:0, work:0, loose:null, patient:null, check:null, gene:null});
 }
 
 function vetGo(c, n, job){
@@ -393,6 +408,12 @@ function pickCheck(c){
   return best;
 }
 
+// An exhibit with genome therapy switched on and someone to cure, that no other vet is heading to
+function pickGene(c){
+  if(!hasTech("genetherapy") || !dept("pmc")) return null;
+  const taken = new Set(vcrew.filter(x => x !== c && x.gene).map(x => x.gene)), vz = vetZone(c);
+  return state.exhibits.find(e => kGraph.anchors[e.id] && !taken.has(e.id) && !(vz && e.zone !== vz) && geneTargets(e).length) || null;
+}
 function vetDecide(c){
   const l = vetHuntJob(c);
   if(l){
@@ -411,6 +432,8 @@ function vetDecide(c){
   if(p){ c.patient = {e:p.e.id, a:p.a.id, field:p.field}; if(vetGo(c, kGraph.anchors[p.e.id], "toPatient")) return; c.patient = null; }
   const ex = pickCheck(c);
   if(ex){ c.check = ex.id; if(vetGo(c, kGraph.anchors[ex.id], "toCheck")) return; c.check = null; }
+  const ge = pickGene(c);
+  if(ge){ c.gene = ge.id; if(vetGo(c, kGraph.anchors[ge.id], "toGene")) return; c.gene = null; }
   // last of all: a specimen from the Genetics Lab or a patient going home from the PMC
   const dv = deliveryJob(c, walkFrom(c.at, c));
   if(dv && vetDeliver(c, dv)) return;
@@ -453,6 +476,11 @@ function vetArrive(c){
     }
     c.patient = null; c.job = "idle"; return;
   }
+  if(c.job === "toGene"){
+    const e = state.exhibits.find(x => x.id === c.gene), n = e ? geneTargets(e).length : 0;
+    if(n && kGraph.anchors[e.id] === c.at){ c.job = "gene"; c.work = GENE.minutes * n; return; }
+    c.gene = null; c.job = "idle"; return;
+  }
   if(c.job === "toCheck"){
     const e = state.exhibits.find(x => x.id === c.check);
     if(e && kGraph.anchors[e.id] === c.at){ c.job = "checking"; c.work = checkWork(e); return; }
@@ -468,7 +496,8 @@ function checkDone(c){
   if(!e) return;
   e.vetCheck = state.day;
   const who = v ? v.name : "A vet";
-  if(geneTherapy(e, who)) events.changed();
+  // genetic disorders are diagnosed, and stay on the animal's record until genome therapy cures them
+  for(const a of e.animals.filter(a => a.dis && !a.dx)){ a.dx = true; events.toast(`${who} diagnosed ${a.name} (${SPECIES_BY_ID[a.sp].name}) with ${disName(a)}.`); events.changed(); }
   // hidden cases come to light, and the vet treats the ones that can be treated here and then
   const found = e.animals.filter(a => a.sick && a.sick.hidden), taken = new Set(vcrew.filter(x => x !== c && x.patient).map(x => x.patient.a));
   for(const a of found) delete a.sick.hidden;
@@ -484,6 +513,12 @@ function treatHere(a){
   if(!k){ outOfMedicine(); return false; }
   takeMed(k, dose, s); delete a.sick;
   return true;
+}
+// Genome therapy done
+function geneDone(c){
+  const e = state.exhibits.find(x => x.id === c.gene), v = state.staff.vets.find(x => x.id === c.id);
+  c.gene = null; c.job = "idle"; c.wait = 0;
+  if(e && geneTherapy(e, v ? v.name : "A vet")) events.changed();
 }
 // A minor illness treated where the animal stands: no dart, no trip to the PMC
 function treatDone(c){
@@ -522,9 +557,9 @@ function vetsTick(dtMin){
     while(left > 0 && steps++ < 40){
       const call = c.job !== "toCall" ? callFor(c) : null;
       if(call && !vetBusy(c) && c.t === 0){ takeVetCall(c, call); if(c.job === "toCall") continue; }
-      if(c.job === "darting" || c.job === "treating" || c.job === "checking"){
+      if(c.job === "darting" || c.job === "treating" || c.job === "checking" || c.job === "gene"){
         const w = Math.min(c.work, left); c.work -= w; left -= w;
-        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone})[c.job](c);
+        if(c.work <= 0) ({darting:dartDone, treating:treatDone, checking:checkDone, gene:geneDone})[c.job](c);
         continue;
       }
       if(c.route.length){
@@ -541,7 +576,7 @@ function vetsTick(dtMin){
   }
 }
 
-function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.focusEx = null; } }
+function vetsNight(){ for(const c of vcrew){ resetAtv(c); c.at = null; c.route = []; c.job = "idle"; c.loose = null; c.patient = null; c.check = null; c.gene = null; c.focusEx = null; } }
 
 function hireVet(){
   if(!hasDept("pmc")) return "Build a Paleo-Medicine Center first.";
@@ -554,10 +589,11 @@ function hireVet(){
 }
 function vetStatus(v){
   const c = vcrew.find(x => x.id === v.id); if(!c) return "Clocking in";
-  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.check)), n = e ? e.name : "an exhibit";
+  const e = state.exhibits.find(x => x.id === (c.patient ? c.patient.e : c.gene || c.check)), n = e ? e.name : "an exhibit";
   const sp = c.loose ? SPECIES_BY_ID[c.loose.sp].name : "";
   return {hunting:`Tracking the escaped ${sp}`, toPatient:`Heading to a sick animal in ${n}`, treating:`Treating a sick animal in ${n}`,
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
+          toGene:`Heading to ${n} for genome therapy`, gene:`Giving genome therapy in ${n}`,
           darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC",
           toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
 }
@@ -592,7 +628,7 @@ function healthStep(f){
       if(roll(te)){ newCase(e, a, "foreign", "trash"); continue; }
       const j = injuryChance(e, a);
       if(roll(j.p)){
-        const c = pickCause(j.w); newCase(e, a, pickCondition(s, ["injury"], injuryCauses(e, s, c)), c);
+        const c = pickCause(j.w); newCase(e, a, pickCondition(s, ["injury"], injuryCauses(e, s, c), a), c);
         const by = c === "fight" ? s : c === "attack" ? [...speciesCounts(e).keys()].map(sp => SPECIES_BY_ID[sp]).find(o => attackReason(o, s)) : null;
         if(by && a.sick) a.sick.hit = {by:by.name, how:c === "fight" ? "fight" : "hunt"};
         continue;
@@ -613,7 +649,7 @@ function sickStep(e, a, s, f, dirty, hungry){
     if(a.sick.sev <= 0){ delete a.sick; events.changed(); }
     return;
   }
-  a.sick.sev += k.worsen * f * (hungry ? 1.5 : 1) * (dirty ? 1.3 : 1) * (medicated(e, s) ? .5 : 1);
+  a.sick.sev += k.worsen * f * (hungry ? 1.5 : 1) * (dirty ? 1.3 : 1) * (medicated(e, s) ? .5 : 1) * disFx(a, "worsen");
   if(a.sick.sev >= 100){ animalDies(e, a); return; }
   if(a.sick.hidden && a.sick.sev >= HEALTH.obviousAt){ delete a.sick.hidden; caseToast(e, a, `is showing signs of ${sickName(a)}.`); events.changed(); }
   if(!a.sick.warned && a.sick.sev >= SICK_BAND[2].from){ a.sick.warned = true; caseToast(e, a, "is critical."); }

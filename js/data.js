@@ -589,9 +589,9 @@ const CLONE_DAYS_PER_SPACE = 1000;
 const TAR_UPGRADE = {speed:.75};
 // The Time Travel Lab upgrades, researched at the Research Lab: trip price and time multipliers per level
 const GHOST_UPGRADE = {cost:[1, .8, .65], speed:[1, .75, .5]};
-// Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. The closer to 100%, the healthier the clone: its DNA quality (a.q)
-// runs from `q0` at the minimum to 100 when complete (sickly under 70, frail under 50, see HEALTH)
-const CLONE_GENOME = {min:60, q0:40, failMax:.35};
+// Cloning from a partial genome: The Genetics Lab clones at `min` % complete or more. A clone's Accuracy (a.q) is the genome % at its cloning,
+// fixed for life; its Genome Quality (a.gq) starts the same and genome therapy raises it. The lower its Accuracy, the likelier a genetic disorder (DISORDERS).
+const CLONE_GENOME = {min:60, failMax:.35};
 // Clones from a partial genome can die in the incubator: `failMax` chance at the minimum, none once the genome is whole. A failed clone stops
 // partway (between `failFrom` and `failTo` of its time), keeps its bay and fee, and sits there until the player discards it.
 const CLONE_FAIL = {from:.2, to:.9, causes:[
@@ -1405,7 +1405,7 @@ const TECH = [
   {id:"ghostmk4", group:"ghost", label:"Mk. IV drones", points:140, needs:"ghostmk3", text:"Drones come back empty handed 40% less often."},
   {id:"ghostmk5", group:"ghost", label:"Mk. V drones", points:220, needs:"ghostmk4", text:"Drones come back empty handed half as often."},
   // Genetics
-  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets can rewrite a sickly clone's DNA to match the lab's best genome for its species, making it healthier. Needs a Paleo-Medicine Center, and only goes as far as the lab's own DNA quality, so send expeditions for better samples to raise it."},
+  {id:"genetherapy", group:"gene", label:"Genome therapy", points:70, text:"Vets cure a clone's genetic disorder by bringing its genome up to the lab's best for its species. Only works once the lab's genome is ahead of the animal's."},
   // Paleo-Flora: plants and medicine, grown at the Botany Lab
   {id:"paleoflora", group:"flora", label:"Paleoflora cultivation", points:30, text:"The Botany Lab starts growing Paleoflora, the food prehistoric plant-eaters need instead of grass. It needs plant DNA from the Time Travel Lab first."},
   {id:"mesoplant",  group:"flora", era:"mesozoic",  label:"Mesozoic flora",  points:50, needs:"paleoflora", text:"Cycads, conifers, ginkgos, and ferns. Once researched, the Time Travel Lab can collect each period's plant DNA, then the Botany Lab grows its plants for exhibits."},
@@ -1445,7 +1445,6 @@ const HEALTH = {
   hungerMult:4,        // a whole day without food makes illness this much more likely (on top of 1)
   dirtPer:12,          // every this many points of dirt above the unhappy line adds 1x more risk
   crowdIll:1.5,        // a cramped exhibit (less room than its animals need) makes illness this much more likely
-  frail:{below50:2, below70:1.4},   // clones from poor DNA get sick more
   grassSick:.004,      // chance a day an old plant-eater eating only plants it never evolved for is poisoned by them (less for a share of it)
   territorial:.04,     // chance a day a territorial animal is hurt by each rival of its own kind
   attacked:.15,        // chance a day an animal is hurt by a species that preys on it
@@ -1524,11 +1523,22 @@ const CONDITIONS = {
 };
 // Genome therapy (Research Lab tech "genetherapy"): an exhibit with it switched on has its vet check-ups lift each clone's DNA quality toward the lab's genome for its species
 const GENE = {
-  minutes:10,          // extra time a check-up takes for each animal treated
-  step:20,             // most DNA quality points one procedure adds
-  minGain:5,           // the lab's genome has to beat the animal by this much to be worth it
+  minutes:10,          // a vet's time per animal treated
   base:500,            // fixed price of a procedure
-  perPoint:60,         // plus this for each quality point gained
+  perPoint:60,         // plus this for each Genome Quality point gained
+};
+// Genetic disorders: a clone may be born with one, more likely the lower its Accuracy. It works on the animal from the start, a vet's
+// check-up diagnoses it, and only genome therapy cures it. The chance: `most` x ((`clear` - Accuracy) / (`clear` - CLONE_GENOME.min))^`curve`, none at `clear` or above.
+const DISORDER_ROLL = {most:.6, clear:95, curve:1.5};
+//   hurt, ill    multiply the chance of an injury or an infection     worsen   multiplies how fast any case gets worse
+//   fracture     share of its injuries that are Fractures (where it can get one)     stress   multiplies the stress the exhibit puts on it
+//   pace         added to its pacing score     gait, play, rest   walking speed, playing and wandering, and extra rest score
+const DISORDERS = {
+  osteo:   {name:"Osteoporosis",            hurt:1.5, fracture:.5},
+  cardiac: {name:"Cardiac Problems",        worsen:1.3},
+  neuro:   {name:"Neurological Disorder",   stress:1.75, pace:15},
+  immune:  {name:"Weakened Immune System",  ill:2},
+  fatigue: {name:"Muscle Fatigue",          gait:.75, play:.6, rest:20},
 };
 // Territorial species fight rivals of their own kind, more so when cramped
 const TERRITORIAL = ["trex", "carc", "torv", "allo", "cnot", "spin", "bary", "dime", "inos", "post", "dsuc", "tita", "bari", "mlan", "andr", "arct", "kele",
@@ -1822,7 +1832,7 @@ const SEX = {
 //   two or more males with females fight, more with more males and less room. Solitary species dislike company (same sex most).
 //   Pairs: one male and one female is ideal. Stress numbers are 0 to 100 added to the animal's stress target.
 const SOCIAL = {
-  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, DNA quality (a.q), and being male
+  rank:{rand:.6, q:.25, male:.15},   // what sets status: luck, Accuracy (a.q), and being male
   bachelor:3, matriarch:3,           // happiness bonus for a stable all-male / all-female herd or pack
   soloSame:30, soloOpp:8, soloCap:60,// a loner's stress per same-sex / opposite-sex animal sharing the pen, and the most
   soloHappy:.25,                     // happiness lost per point of that stress (averaged over the loners)

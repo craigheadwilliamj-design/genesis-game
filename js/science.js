@@ -295,9 +295,9 @@ const cloneSpeed = () => hasTech("fast2") ? TAR_UPGRADE.speed ** 2 : hasTech("fa
 function cloneMinutes(sp){ return Math.round((1 + SPECIES_BY_ID[sp].space / CLONE_DAYS_PER_SPACE) * DAY_MIN * cloneSpeed()); }
 const tarWorking = () => !!dept("tar") && state.science.crew.gene > 0;
 
-// The Genetics Lab can clone from CLONE_GENOME.min % of a genome. A clone's DNA quality (a.q) follows how complete the genome is: q0 at the minimum, 100 when whole.
+// The Genetics Lab can clone from CLONE_GENOME.min % of a genome. A clone's Accuracy (a.q) is how complete the genome is when it's cloned.
 const cloneOpen = sp => { const d = state.science.dna[sp]; return !!d && d.genome >= CLONE_GENOME.min; };
-const cloneQuality = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome < C.min ? 0 : Math.round(C.q0 + (100 - C.q0) * (Math.min(100, d.genome) - C.min) / (100 - C.min)); };
+const cloneQuality = sp => { const d = state.science.dna[sp]; return !d || d.genome < CLONE_GENOME.min ? 0 : Math.round(Math.min(100, d.genome)); };
 // The chance a clone dies in the incubator: CLONE_GENOME.failMax at the minimum genome, nothing at 100%
 const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
 function failClone(j){
@@ -325,7 +325,7 @@ function orderClone(sp, exhibitId, sex){
   const s = SPECIES_BY_ID[sp], cq = cloneQuality(sp);
   spend(s.price, "animals");
   const start = nowMin(), end = start + cloneMinutes(sp);
-  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq >= 100 ? 100 : clamp(Math.round(cq + rand(-3, 3)), 5, 100), bay:freeBay("gene"), start, end};
+  const job = {id:uid("a-"), sp, sex, exhibitId:exhibitId || null, q:cq, bay:freeBay("gene"), start, end};
   // a partial genome can fail partway (never in sandbox)
   if(!state.sandbox && Math.random() < cloneFailChance(sp)){ job.fail = start + rand(CLONE_FAIL.from, CLONE_FAIL.to) * (end - start); job.why = CLONE_FAIL.causes[Math.floor(Math.random() * CLONE_FAIL.causes.length)]; }
   state.science.clones.push(job);
@@ -334,7 +334,7 @@ function orderClone(sp, exhibitId, sex){
 }
 function putAnimal(e, a){
   if(!e.animals.length) e.happy = 70;
-  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:a.cl ?? true, q:a.q, ...(a.sick ? {sick:a.sick} : {})}));
+  e.animals.push(nameAnimal({id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, cl:a.cl ?? true, ...geneFields(a), ...(a.sick ? {sick:a.sick} : {})}));
 }
 function hireScientist(kind){
   const k = SCIENTISTS[kind];
@@ -404,7 +404,7 @@ function crateSpotNear(x, y, sp, skip){
 // An animal's record becomes a crate standing at the free spot nearest (x, y)
 function dropCrate(a, x, y){
   const [cx, cy] = crateSpotNear(x, y, a.sp);
-  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, q:a.q ?? 90, x:cx, y:cy};
+  const r = {id:a.id, name:a.name, sex:a.sex, rank:a.rank, face:a.face, sp:a.sp, ...geneFields(a), x:cx, y:cy};
   if(a.cl !== undefined) r.cl = a.cl;
   if(a.sick) r.sick = a.sick;
   crates().push(r);
@@ -474,12 +474,12 @@ function crateStranded(){
 }
 function finishClone(c){
   const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
-  const health = c.q >= 70 ? "healthy" : c.q >= 50 ? "a little sickly" : "frail";
-  const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q});
+  const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q, gq:c.q});
+  const dis = rollDisorder(c.q); if(dis) r.dis = dis;   // undiagnosed until a vet's check-up
   specimens().push(r);
   // a clone ordered for an exhibit is queued for delivery at once; any other waits at the lab
-  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It's being delivered to ${e.name}.`, "good");
-  else events.toast(`The Genetics Lab finished a ${s.name} clone (${health}, ${c.q}% DNA quality). It waits for delivery.`, "good");
+  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It's being delivered to ${e.name}.`, "good");
+  else events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It waits for delivery.`, "good");
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */
