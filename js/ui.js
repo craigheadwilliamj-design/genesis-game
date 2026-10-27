@@ -649,33 +649,20 @@ function movesHtml(e){
   return `<div class="meta" style="margin-top:6px">Moving: ${ts.map(t => `${esc(SPECIES_BY_ID[t.sp].name)} ${t.from === e.id ? `to ${esc(name(t.to))}` : `from ${esc(name(t.from))}`}${t.keeper ? " (on the way)" : ""}`).join(", ")}. <button class="btn" data-action="cancelMoves" style="padding:2px 8px">Cancel</button></div>`;
 }
 
-// The move dialog: where to, and how many (with id, just that one animal)
-function openMoveDialog(e, sp, id){
-  const s = SPECIES_BY_ID[sp], have = e.animals.filter(a => a.sp === sp).length, one = id && e.animals.find(a => a.id === id);
-  const dests = state.exhibits.filter(x => x !== e && fitsHabitat(s, x));
-  $("#moveTitle").textContent = `Move ${one ? one.name || s.name : s.name}`;
-  if(!dests.length){ $("#moveBody").innerHTML = `<p>No other exhibit can hold a ${esc(s.name)}. ${s.viv ? `It needs a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger.` : "Build another exhibit first."}</p>`; $("#moveGo").hidden = true; $("#dlgMove").showModal(); return; }
-  const fromWhy = keeperMoveProblem(e);
-  $("#moveBody").innerHTML = `<label class="field"><span>To</span><select id="moveTo">${dests.map(x => { const why = keeperMoveProblem(x); return `<option value="${x.id}">${esc(x.name)}${why ? " (keepers can't get in)" : ""}${isFlyer(s) && !x.viv && !x.aviary ? " (no aviary netting)" : ""}</option>`; }).join("")}</select></label>
-    ${one ? "" : `<label class="field" style="margin-top:10px"><span>How many (you have ${have})</span><input id="moveCount" type="number" min="1" max="${have}" value="${have}"></label>`}
-    <p style="margin-top:10px">A keeper collects each one through this exhibit's gate and carries it to the new one. Both need a working keeper gate, or be a vivarium.</p>
-    ${fromWhy ? `<p style="color:var(--bad)">Keepers can't get into ${esc(e.name)} yet: ${esc(fromWhy)}</p>` : ""}`;
-  $("#moveGo").hidden = false;
-  $("#moveGo").onclick = () => {
-    const to = state.exhibits.find(x => x.id === $("#moveTo").value), n = one ? 1 : clamp(parseInt($("#moveCount").value, 10) || 1, 1, have);
-    const go = () => { $("#dlgMove").close(); const made = requestMove(e, sp, to, n, one && one.id); ui.toast(`${one ? one.name || s.name : `${made} ${s.name}`} will be moved to ${to.name} by the next free ${aquaEx(to) ? "aquarist" : "keeper"}.${state.staff.keepers.some(k => tends(k, to)) ? "" : ` Hire ${aquaEx(to) ? "an aquarist" : "a keeper"} first.`}`); ui.panel(); saveSoon(); };
-    const mix = mixWarning(s, to);
-    if(mix){ $("#dlgMove").close(); askConfirm("Predator and prey", mix, "Yes, move it", go); return; }
-    if(isFlyer(s) && !to.viv && !to.aviary){ $("#dlgMove").close(); askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Move it there anyway?`, "Yes, move it", go); }
-    else go();
-  };
-  $("#dlgMove").showModal();
-}
 // Queue a finished specimen's delivery to an exhibit, after a yes to the predator/prey or flyer warning
 // A PMC patient goes to another exhibit once it's well, with the same warnings
 function sendPatient(a, to){
   const s = SPECIES_BY_ID[a.sp];
   const go = () => { const why = movePatient(a.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${a.name || s.name} will be delivered to ${to.name} by the next free worker.`); afterChange(); };
+  const mix = mixWarning(s, to);
+  if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
+  if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
+  go();
+}
+// Move an animal to another exhibit: queued like a lab delivery, carried by the next free worker
+function sendMove(a, to){
+  const s = SPECIES_BY_ID[a.sp], from = animalHome(a.id);
+  const go = () => { if(!from || requestMove(from, a.sp, to, 1, a.id) < 1) ui.toast("It's already on its way.", "bad"); else ui.toast(`${a.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
   const mix = mixWarning(s, to);
   if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
   if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
@@ -689,7 +676,6 @@ function sendSpecimen(r, to){
   if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
   go();
 }
-$("#moveCancel").onclick = () => $("#dlgMove").close();
 
 // A species name with its [V] tag if it lives in a vivarium
 function speciesName(s){ return esc(s.name) + (s.viv ? ` <span class="vtag" title="Lives in a ${(s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv].label.toLowerCase()} or bigger">${s.aqua ? "A" : "V"}</span>` : ""); }
@@ -973,10 +959,10 @@ panelEl.addEventListener("click", e => {
     if(cloneQuality(sp) < 100) askConfirm("", "Clones with incomplete genomes can have genetic disorders. Continue?", "Yes", go, "No"); else go();   // a partial genome: a disorder is possible
     return;
   }
-  if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
+  if(a === "moveDlg" && it){ startAnimalMove(b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
-  if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.keeper || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
+  if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.cargo || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
     if(it.geneTherapy) it.geneTherapy = false; else { const why = geneProblem(); if(why) ui.toast(why, "bad"); else it.geneTherapy = true; }
     done(); return;

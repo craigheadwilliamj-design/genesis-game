@@ -209,6 +209,6 @@ function custodianStatus(m){
     toHaulDst:`Restocking the ${dst ? BUILDINGS[dst.type].label.toLowerCase() : "stand"}${c.carry ? ` (${Math.round(c.carry.amount)} ${goodName(c.carry.type).toLowerCase()})` : ""}`,
     toScrub:`Walking to the ${n}`, scrubbing:`Scrubbing the ${n}`, toGraffiti:"Walking to some graffiti", degraffiti:"Scrubbing off graffiti", toBin:"Walking to a full bin", emptying:"Emptying a bin",
     toSweep:"Walking to some litter", sweeping:"Sweeping up litter", home:"Heading back to the closet", toRest:"Going on break", resting:"On break",
-    toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`,
+    toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} ${c.move && c.move.any ? "to move" : `from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`,
   }[c.job] || "Waiting for work";
 }

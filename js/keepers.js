@@ -427,7 +427,8 @@ function requestMove(from, sp, to, count, id){
   for(const a of from.animals){
     if(n >= count) break;
     if(a.sp !== sp || queued.has(a.id) || (id && a.id !== id)) continue;
-    state.staff.transfers.push({id:uid("tr-"), animalId:a.id, sp, from:from.id, to:to.id}); n++;
+    const t = {id:uid("tr-"), animalId:a.id, sp, from:from.id, to:to.id, any:true};   // like a lab delivery: any free keeper, vet or custodian carries it
+    state.staff.transfers.push(t); assignDelivery(t); n++;
   }
   return n;
 }
@@ -490,7 +491,7 @@ function assignDelivery(t){
   let best = null;
   const crews = [[crew, c => callBusy(c)], [vcrew, c => vetBusy(c)], [ccrew, c => c.carry && c.carry.amount > 0]];
   for(const [list, busy] of crews) for(const c of list){
-    if(!c.at || c.job !== "idle" || c.route.length || c.move || busy(c) || state.staff.calls.some(x => x.keeper === c.id)) continue;
+    if(!c.at || c.job !== "idle" || c.route.length || c.move || busy(c) || state.staff.calls.some(x => x.keeper === c.id) || state.staff.transfers.some(x => x.keeper === c.id)) continue;
     if(list === crew && aquaCrew(c) !== aquaEx(exhibitById(t.to))) continue;   // keepers and aquarists each carry only to their own kind of exhibit
     const w = walkFrom(c.at, c); if(!w.dist.has(lab)) continue;
     if(!best || w.dist.get(lab) < best.d) best = {c, d:w.dist.get(lab)};
@@ -499,9 +500,9 @@ function assignDelivery(t){
 }
 // The delivery this worker should do next: the one it holds, else an open one it can walk to the lab for
 function deliveryJob(c, w){
-  const ts = state.staff.transfers, mine = ts.find(t => t.lab && t.keeper === c.id);
+  const ts = state.staff.transfers, mine = ts.find(t => (t.lab || t.any) && t.keeper === c.id);
   if(mine) return mine;
-  const free = ts.find(t => t.lab && !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to] && w.dist.has(kGraph.anchors[t.from]));
+  const free = ts.find(t => (t.lab || t.any) && !t.keeper && kGraph.anchors[t.from] && kGraph.anchors[t.to] && w.dist.has(kGraph.anchors[t.from]));
   if(free){ free.keeper = c.id; return free; }
   return null;
 }
@@ -588,7 +589,7 @@ function decide(c, k){
   if(call && goTo(c, kGraph.anchors[call.ex], "toCall")) return;
   if(call){ call.keeper = null; c.job = "idle"; c.wait = 10; }
   const mv = moveJob(c);
-  if(mv && mv.cargo && !c.cargo){ c.cargo = mv.cargo; c.crate = !!mv.lab; }   // picked up before a reload
+  if(mv && mv.cargo && !c.cargo){ c.cargo = mv.cargo; c.crate = !!(mv.lab || mv.any); }   // picked up before a reload
   if(mv && doMove(c, mv)){ c.move = mv; return; }
   if(mv && !c.cargo){ mv.keeper = null; }
   // goods in hand for a store: finish the delivery (before any break, so food doesn't ride along to the break room)
@@ -634,7 +635,7 @@ function arrive(c, k){
   if(c.job === "toPickup"){
     const t = c.move && state.staff.transfers.includes(c.move) ? c.move : null, a = t && pickUp(t);   // a call-off delivery is gone from the list
     if(!t || !a){ if(t) state.staff.transfers = state.staff.transfers.filter(x => x !== t); c.move = null; c.job = "idle"; return; }
-    c.cargo = a; t.cargo = a; c.crate = !!t.lab;   // kept on the transfer too, so a save mid-move doesn't lose the animal
+    c.cargo = a; t.cargo = a; c.crate = !!(t.lab || t.any);   // kept on the transfer too, so a save mid-move doesn't lose the animal
     k.stamina -= KEEPER.tirePerDelivery; events.changed();
     if(!goTo(c, kGraph.anchors[t.to] || c.at, "toDropoff")) c.job = "toDropoff";
     return;

@@ -440,7 +440,7 @@ function vetDecide(c){
   if(call){ if(vetGo(c, kGraph.anchors[call.ex], "toCall")) return; call.keeper = null; }
   if(staffMaybeRest(c, pmcs())) return;
   // a delivery already in hand gets finished
-  const held = state.staff.transfers.find(t => t.lab && t.keeper === c.id && t.cargo);
+  const held = state.staff.transfers.find(t => (t.lab || t.any) && t.keeper === c.id && t.cargo);
   if(held && vetDeliver(c, held)) return;
   const fx = c.focusEx; c.focusEx = null;
   const p = pickPatient(c, fx) || pickPatient(c);
@@ -612,7 +612,7 @@ function vetStatus(v){
           toCall:`Called to ${(state.exhibits.find(x => x.id === (callFor(c) || {}).ex) || {name:"an exhibit"}).name}`, toCheck:`Heading to check on ${n}`, checking:`Checking the animals in ${n}`,
           toGene:`Heading to ${n} for genome therapy`, gene:`Giving genome therapy in ${n}`,
           darting:c.loose ? `Darting the escaped ${sp}` : `Darting a sick animal in ${e ? e.name : "an exhibit"}`, home:"Heading back to the PMC", toRest:"Going on break", resting:"On break",
-          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "specimen"} ${c.move && c.move.any ? "to move" : `from the ${c.move && c.move.ward ? "PMC" : "Genetics Lab"}`}`, toDropoff:`Delivering a ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "specimen"}`}[c.job] || "Waiting for work";
 }
 
 /* ---------- through the day ---------- */

@@ -2325,7 +2325,7 @@ function setTool(t){
   else if(isPathTool(t)) pathBar();
   else if(t === "platform") showBar("Place a viewing platform", "Tap an exhibit's fence beside a guest path. The deck snaps to the edge and juts out over the animals.", `${money(BUILDINGS.platform.price)} each, ${money(BUILDINGS.platform.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
   else if(t === "gallery") showBar("Place a viewing gallery", "Tap a pool's fence beside a guest path. The gallery stands outside it, its glass against the water.", `${money(BUILDINGS.gallery.price)} each, ${money(BUILDINGS.gallery.upkeep)} a day`, {undo:false, finish:false, cancel:"Done"});
-  else if(t === "uncrate" && (crateMode === "deliver" || crateMode === "ward")){ const r = (crateMode === "ward" ? state.health.ward.map(x => x.a) : specimens()).find(x => x.id === crateSel); showBar(r ? `Deliver the ${SPECIES_BY_ID[r.sp].name}` : "Deliver a specimen", "Tap the exhibit it goes to.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
+  else if(t === "uncrate" && (crateMode === "deliver" || crateMode === "ward" || crateMode === "move")){ const r = crateRecord(); showBar(r ? `${crateMode === "move" ? "Move" : "Deliver"} the ${SPECIES_BY_ID[r.sp].name}` : "Deliver a specimen", "Tap the exhibit it goes to.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(t === "uncrate"){ const r = crates().find(x => x.id === crateSel); showBar(r ? `Place the ${SPECIES_BY_ID[r.sp].name}` : "Place a crate", "Tap an exhibit to open the crate there, or open ground to set it down.", r ? esc(r.name || "") : "", {undo:false, finish:false, cancel:"Cancel"}); }
   else if(landKey(t)){
     const L = LAND[landKey(t)];
@@ -3210,13 +3210,16 @@ let crateSel = null, crateGhost = null, crateMode = "crate";   // the crate bein
 function startUncrate(id){ crateSel = id; crateMode = "crate"; crateGhost = null; closePanel(); setTool("uncrate"); }
 // A finished specimen's crate rides the pointer; tapping an exhibit it fits queues its delivery (sendSpecimen, ui.js)
 function startDeliver(id){ crateSel = id; crateMode = "deliver"; crateGhost = null; closePanel(); setTool("uncrate"); }
+function startAnimalMove(id){ crateSel = id; crateMode = "move"; crateGhost = null; closePanel(); setTool("uncrate"); }   // an animal in an exhibit: pick where it goes
+// The animal record the pointer is carrying, by mode
+function crateRecord(){ return (crateMode === "ward" ? state.health.ward.map(x => x.a) : crateMode === "deliver" ? specimens() : crateMode === "move" ? state.exhibits.flatMap(e => e.animals) : crates()).find(x => x.id === crateSel); }
 function startWardMove(id){ crateSel = id; crateMode = "ward"; crateGhost = null; closePanel(); setTool("uncrate"); }   // a PMC patient: pick where it goes once it's well
 // Over an exhibit it fits, the crate opens there; anywhere else it's set down if the spot is free
 function crateSpot(ev){
-  const deliver = crateMode === "deliver" || crateMode === "ward", p = toWorld(ev.clientX, ev.clientY), r = (crateMode === "ward" ? state.health.ward.map(x => x.a) : deliver ? specimens() : crates()).find(x => x.id === crateSel);
+  const deliver = crateMode === "deliver" || crateMode === "ward" || crateMode === "move", p = toWorld(ev.clientX, ev.clientY), r = crateRecord();
   const e = state.exhibits.find(x => inPoly(p.x, p.y, x.points)) || null;
   if(!r) return {x:p.x, y:p.y, e, r, open:false, deliver, why:"That crate is gone."};
-  if(deliver){ const why = e ? crateProblem(r, e) || keeperMoveProblem(e) : "Tap an exhibit."; return {x:p.x, y:p.y, e, r, open:!why, deliver, why}; }
+  if(deliver){ const why = e ? (crateMode === "move" && e === animalHome(r.id) ? "Already here." : crateProblem(r, e) || keeperMoveProblem(e)) : "Tap an exhibit."; return {x:p.x, y:p.y, e, r, open:!why, deliver, why}; }
   const open = !!e && !crateProblem(r, e);
   return {x:p.x, y:p.y, e, r, open, why:open ? null : crateSpotProblem(p.x, p.y, r.sp, r)};
 }
@@ -3239,8 +3242,8 @@ function crateTap(ev){
   if(!g.r){ setStat(g.why, true); return; }
   if(g.deliver){
     if(!g.open){ setStat(g.why, true); return; }
-    const r = g.r, e = g.e, ward = crateMode === "ward"; crateSel = null; crateGhost = null; setTool("select");
-    if(ward) sendPatient(r, e); else sendSpecimen(r, e);
+    const r = g.r, e = g.e, mode = crateMode; crateSel = null; crateGhost = null; setTool("select");
+    if(mode === "ward") sendPatient(r, e); else if(mode === "move") sendMove(r, e); else sendSpecimen(r, e);
     return;
   }
   if(g.why){ setStat(g.why, true); return; }
