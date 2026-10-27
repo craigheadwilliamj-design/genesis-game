@@ -449,6 +449,7 @@ function doMove(c, t){
 }
 // Take the animal out of wherever it's waiting: an exhibit, or the PMC ward
 function pickUp(t){
+  if(t.ward) return discharge(t.animalId);   // a recovered patient leaves the ward, freeing its bed
   if(t.lab) return specimens().find(x => x.id === t.animalId) || null;   // it stays listed at the lab until it's delivered
   const e = state.exhibits.find(x => x.id === t.from);
   if(!e) return discharge(t.animalId);
@@ -459,6 +460,12 @@ function pickUp(t){
 // Finish a move: the animal goes into its new home, or holding if that's gone
 function dropOff(t, a){
   state.staff.transfers = state.staff.transfers.filter(x => x !== t);
+  if(t.ward){   // a recovered patient going home: into its exhibit, or a crate by it if it can't go in
+    const e = state.exhibits.find(x => x.id === t.to);
+    if(e && !crateProblem(a, e)){ putAnimal(e, a); events.toast(`A ${SPECIES_BY_ID[a.sp].name} was delivered to ${e.name}.`, "good"); }
+    else { const pmc = pmcBuilding(), [x, y] = e ? centroid(e.points) : pmc ? centroid(pmc.points) : labSpot(); dropCrate(a, x, y); }
+    events.changed(); return;
+  }
   if(t.lab){
     const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp], list = specimens();
     if(e && !crateProblem(a, e)){ const i = list.findIndex(x => x.id === a.id); if(i >= 0) list.splice(i, 1); putAnimal(e, a); events.toast(`A ${s.name} was delivered to ${e.name}.`, "good"); }
@@ -864,7 +871,7 @@ function keeperStatus(k){
           toCall:`Called to ${((state.exhibits.find(x => x.id === (callFor(c) || {}).ex)) || {name:"an exhibit"}).name}`, toRest:"Going on break", resting:"On break", home:"Walking back to a station",
           toGun:"Fetching a dart gun", hunting:`Tracking the escaped ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
           sedating:"Sedating an escaped animal", returning:"Bringing a sedated animal back", toSedated:`Collecting a darted ${c.hunt ? SPECIES_BY_ID[c.hunt.sp].name : "animal"}`,
-          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.lab ? "from the Genetics Lab" : c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
+          toPickup:`Collecting a ${c.move ? SPECIES_BY_ID[c.move.sp].name : "animal"} ${c.move && c.move.ward ? "from the PMC" : c.move && c.move.lab ? "from the Genetics Lab" : c.move && c.move.med ? (pmcBuilding() && c.move.to === pmcBuilding().id ? "for the PMC" : "from the PMC") : "to move"}`,
           toDropoff:`${c.move && c.move.med && pmcBuilding() && c.move.to === pmcBuilding().id ? "Carrying a sick" : c.move && c.move.lab ? "Delivering a" : "Moving a"} ${c.cargo ? SPECIES_BY_ID[c.cargo.sp].name : "animal"}`}[c.job] || (carry ? `Waiting${carry}` : "Waiting for work");
 }
 

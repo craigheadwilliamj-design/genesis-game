@@ -436,6 +436,16 @@ function upgradeSave(s){
   }
   // contemporary medicine: the PMC starts empty and suppliers fill it overnight; patients already dosed were on the era's own medicine
   for(const p of s.health.ward) if(p.med === undefined){ p.med = p.dosed ? "era" : null; delete p.dosed; }
+  // the ward runs on timers: a patient being treated starts a fresh course from how sick it is now, a cured one waits to go home (wardTidy sends it), and there's a bed for everyone in it
+  if(s.health.beds == null){
+    for(const p of s.health.ward){
+      if(p.cured){ p.recovered = true; delete p.cured; delete p.a.sick; }
+      p.dosed = !!(p.med || p.recovered); p.done = 0; p.need = p.dosed && !p.recovered ? wardMinutes(p.a, p.med) : 0;
+    }
+    const pmc = s.buildings.find(b => b.type === "pmc");
+    if(pmc && s.staff && s.staff.transfers) s.staff.transfers = s.staff.transfers.filter(t => !(t.med && t.from === pmc.id && !t.cargo));
+    s.health.beds = clamp(s.health.ward.length, HEALTH.beds, HEALTH.bedsMax);
+  }
   // before logistics: food was unlimited at stations. Parks already past partner feeding get two more days to build a dock,
   // and any medicine waiting at the Botany Lab moves to the PMC
   if(!s.starters) s.starters = ["arth", "lyst", "hyps"];   // the old fixed set
@@ -678,12 +688,9 @@ function exhibitReport(e){
   }
   // Sick and hurt animals drag the whole herd down, the worse off the more
   // (mild illness nobody has spotted yet still hurts, but only shows as a vague hint)
-  // (a chronic case, eased by contemporary medicine, counts for less)
-  const sick = e.animals.reduce((n, a) => n + (a.sick ? (a.sick.chronic ? MODERN.chronicHappy : sickBand(a).happy) : 0), 0);
-  const chronic = e.animals.filter(a => a.sick && a.sick.chronic).length, known = e.animals.filter(noticed).length - chronic;
+  const sick = e.animals.reduce((n, a) => n + (a.sick ? sickBand(a).happy : 0), 0), known = e.animals.filter(noticed).length;
   if(sick) target -= Math.min(30, HEALTH.sickHappy * sick * Math.max(1, 4 / e.animals.length));
   if(known) issues.push({bad:true, text:`${known} sick or hurt.`});
-  if(chronic) issues.push({bad:true, text:`${chronic} with a chronic illness.`});
   else if(sick) issues.push({bad:true, text:"Something seems off."});
   return {area:a, need, wet, wetNeed, target:clamp(target, 0, 100), issues, counts, exhibit:e};
 }
@@ -863,7 +870,7 @@ function dailyCosts(){
   }
   for(const k of Object.values(pathChunks())) upkeep += pathChunkUpkeep(k);
   for(const p of state.paths) if(!p.d) upkeep += lineLength(p.points) * (isService(p) ? SERVICE_ROAD.upkeepPerMeter : isWide(p) ? WIDE_PATH.upkeepPerMeter : isTram(p) ? TRAM.upkeepPerMeter : isBridge(p) ? BRIDGE.upkeepPerMeter : UPKEEP.pathPerMeter);
-  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b);
+  for(const b of state.buildings) upkeep += BUILDINGS[b.type].upkeep + eduUpkeep(b) + (b.type === "pmc" ? bedUpkeep() : 0);
   for(const [i, j] of PARCEL_CELLS) if(!parcelHome(i, j) && ownsParcel(i, j)) upkeep += parcelArea(i, j) * UPKEEP.landPerSqM;
   for(const p of state.health.ward) feed += SPECIES_BY_ID[p.a.sp].food;
   wages += state.staff.keepers.reduce((n, k) => n + (isAqua(k) ? AQUARIST.wage : KEEPER.wage), 0) + state.staff.mechanics.length * MAINT.wage + state.staff.vets.length * VET.wage + state.staff.custodians.length * CUSTODIAN.wage + state.staff.guards.length * SECURITY.wage;

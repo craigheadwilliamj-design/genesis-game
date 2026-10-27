@@ -367,6 +367,7 @@ function cancelDelivery(id){ state.staff.transfers = state.staff.transfers.filte
 // Deliveries to an exhibit that's gone, or from a lab that's gone, are dropped (one already on the road goes back to the lab list at dropOff)
 function deliveryTidy(){
   state.staff.transfers = state.staff.transfers.filter(t => !t.lab || t.cargo || (state.exhibits.some(e => e.id === t.to) && state.buildings.some(b => b.id === t.from)));
+  wardTidy();   // a recovered patient whose trip was dropped gets a new one, or a crate
 }
 
 /* ---------- crates: an animal boxed off the map is a crate standing in the park (state.crates), Zoo Tycoon style ---------- */

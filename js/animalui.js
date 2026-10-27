@@ -25,7 +25,7 @@ function animalStressors(a, e, s){
 function animalHealthItems(a, e, s){
   const out = [], sk = noticed(a) ? a.sick : null;
   if(sk){
-    out.push([sk.sev >= SICK_BAND[1].from ? "bad" : "warn", `${sickName(a)}, ${sickBand(a).label}${sk.chronic ? " (chronic)" : ""}.`]);
+    out.push([sk.sev >= SICK_BAND[1].from ? "bad" : "warn", `${sickName(a)}, ${sickBand(a).label}.`]);
     if(sickCause(a)) out.push(["warn", sickCause(a)]);
     out.push(["warn", sickStatus(e, a)]);
   } else out.push(["ok", "Looks healthy."]);

@@ -3291,6 +3291,7 @@ function bulldozeItem(kind, it){
   const go = () => { if(!findItem(kind, it.id)) return; const r = refundFor(kind, it); removeItem(kind, it); setStat(`Bulldozed for ${money(r)} back.`); };
   if(!asksBulldoze(kind, it)){ go(); return; }
   const t = BUILDINGS[it.type];
+  if(it.type === "pmc"){ askConfirm("Demolish Paleo-Medicine Center?", "Are you sure you want to demolish the Paleo-Medicine Center? All animals will be returned to their exhibits.", "Yes", go, "No"); return; }
   askConfirm(`Bulldoze ${t.label}?`, `This removes the ${t.label} from your park and gives back ${money(refundFor(kind, it))}. Are you sure?`, "Bulldoze", go);
 }
 

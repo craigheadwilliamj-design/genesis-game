@@ -173,11 +173,20 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
     viv.animals[0].sick = {kind:"infection", name:"cordyceps", sev:60};   // serious: has to go to the PMC
     const run = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; tick(1); if(until()) return true; } return false; };
+    const pmcB = state.buildings.find(b => b.id === "b-pmc");
     out.sickToWard = run(600, () => state.health.ward.length === 1);
-    healthNight(); healthNight(); vetsNight(); keepersNight();   // two nights of treatment for a serious case
-    const cured = state.health.ward[0] && state.health.ward[0].cured;
-    out.treated = !!cured && pmcStock("medpal") === 10 - HEALTH.dose;
+    // admitted with its course paid up front, on a timer: severity times the rate, faster on the era's own medicine
+    const pt = state.health.ward[0];
+    out.wardDosesUpFront = !!pt && pt.dosed && pt.med === "era" && pmcStock("medpal") === 10 - HEALTH.dose && Math.abs(pt.need - 60 * HEALTH.wardPerPoint * MEDICINE.eraWard) < 1e-9 && !viv.animals.includes(pt.a);
+    out.wardTimerRuns = run(Math.ceil(pt.need) + 5, () => pt.recovered) && !pt.a.sick;
+    // recovered, it goes home like a delivery
     out.curedGoesHome = run(600, () => viv.animals.length === 2 && !state.health.ward.length) && !viv.animals.some(a => a.sick);
+    // a recovered patient holds its bed until it's picked up
+    { const rp = {a:{id:"a-rp", sp:"arth"}, home:"e-v", recovered:true, dosed:true, done:1, need:1}; state.health.ward.push(rp);
+      const t = {id:"tr-rp", animalId:"a-rp", sp:"arth", from:"b-pmc", to:"e-v", lab:true, ward:true}; state.staff.transfers.push(t);
+      const held = bedsFree() === wardBeds() - 1 && patientStatus(rp) === "Recovered. Waiting for pickup.";
+      const got = pickUp(t); out.bedFreesAtPickup = held && got === rp.a && !state.health.ward.length && bedsFree() === wardBeds();
+      state.staff.transfers = state.staff.transfers.filter(x => x !== t); }
 
     // a check-up finds a hidden mild illness, and the vet treats it on the spot (no dart, no PMC)
     vetsNight(); keepersNight();
@@ -193,29 +202,53 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.injuryGoesToWard = run(600, () => state.health.ward.length === 1);
     state.health.ward = []; viv.animals.push({id:"a-t", sp:"arth"}); vetsNight(); keepersNight();
 
-    // without the era's medicine, contemporary medicine eases a patient down to its era's floor, and it goes home chronic
-    state.science.tech = state.science.tech.filter(t => t !== "medpaleo");
-    state.buildings.find(b => b.id === "b-pmc").store = {medpal:0, medmod:MODERN.stock};
-    const fakeDock = {type:"dock", auto:true};
-    const pal = {a:{id:"a-w", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:50}}, home:"e-v", med:null};
-    state.health.ward.push(pal);
-    healthNight();
-    out.modernRestock = dockOrders(fakeDock).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
-    out.modernEases = pal.med === "modern" && Math.abs(pal.a.sick.sev - (50 - HEALTH.healPerNight * MODERN.heal.paleozoic)) < 1e-9 && !pal.cured;
-    for(let i = 0; i < 5 && !pal.cured; i++) healthNight();
-    out.modernLeavesChronic = pal.cured && pal.a.sick && pal.a.sick.chronic && pal.a.sick.sev === MODERN.floor.paleozoic;
-    // Cenozoic animals respond better and are left less ill
-    out.modernByEra = MODERN.heal.cenozoic > MODERN.heal.mesozoic && MODERN.heal.mesozoic > MODERN.heal.paleozoic && MODERN.floor.cenozoic < MODERN.floor.paleozoic;
-    // a chronic case holds steady overnight instead of getting worse
-    state.health.ward = []; state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== "a-w");
-    viv.animals[1].sick = {kind:"infection", name:"cordyceps", sev:MODERN.floor.paleozoic, chronic:true};
-    healthStep(1);
-    out.chronicHolds = viv.animals[1].sick && viv.animals[1].sick.sev === MODERN.floor.paleozoic;
-    // a vet won't dart a chronic case for more contemporary medicine, but cures it once the era's medicine is in
-    out.chronicNotRetreated = !fieldTreatable(viv.animals[1]);
-    state.science.tech.push("medpaleo", "ref-Carboniferous"); state.buildings.find(b => b.id === "b-pmc").store = {medpal:10};
-    out.chronicCuredWithEraMeds = fieldTreatable(viv.animals[1]);
-    delete viv.animals[1].sick;
+    // no doses: admitted anyway and waits; the course starts when medicine comes in, on contemporary medicine slower the older the animal; no vet on staff pauses it
+    { pmcB.store = {medpal:0, medmod:0};
+      const toastKeep = events.toast, said = []; events.toast = t => said.push(t);
+      const w = {id:"a-w", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:50}};
+      admit(w, {from:"e-v"}); const wp = state.health.ward.find(p => p.a === w);
+      out.wardWaitsForDoses = !wp.dosed && patientStatus(wp) === "Waiting for doses." && said.includes("The PMC is out of medicine.");
+      wardTick(30); out.wardNoProgressUndosed = wp.done === 0 && said.filter(t => t === "The PMC is out of medicine.").length === 1;
+      state.science.tech = state.science.tech.filter(t => t !== "medpaleo"); pmcB.store = {medpal:0, medmod:MODERN.stock};
+      wardTick(1); out.dockMedSlower = wp.dosed && wp.med === "modern" && Math.abs(wp.need - 50 * HEALTH.wardPerPoint * MEDICINE.dockWard.paleozoic) < 1e-9 && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
+      const vets = state.staff.vets; state.staff.vets = []; const d0 = wp.done; wardTick(60);
+      out.wardPausesNoVets = wp.done === d0 && patientStatus(wp) === "Paused. No vets."; state.staff.vets = vets;
+      out.modernRestock = dockOrders({type:"dock", auto:true}).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost;
+      // the PMC is bulldozed mid-course: the patient goes home as much better as it got, and the bought beds are lost
+      wp.done = wp.need / 2; state.health.beds = 4; const sevNow = w.sick.sev;
+      const inv = viv.animals.length; pmcRemoved(pmcB);
+      out.pmcRemovedPartialCredit = viv.animals.length === inv + 1 && Math.abs(w.sick.sev - sevNow / 2) < 1e-9 && !state.health.ward.length && wardBeds() === HEALTH.beds;
+      viv.animals = viv.animals.filter(a => a !== w);
+      events.toast = toastKeep;
+      state.science.tech.push("medpaleo"); pmcB.store = {medpal:10}; }
+    // beds: start at 2, each bought one costs more and adds upkeep, at most 6
+    { const m0 = state.money, p0 = bedPrice();
+      out.bedsStart = wardBeds() === HEALTH.beds && p0 === HEALTH.bedPrice && bedUpkeep() === 0;
+      out.bedsBuy = buyBed() === null && wardBeds() === 3 && state.money === m0 - p0 && bedPrice() === Math.round(HEALTH.bedPrice * HEALTH.bedGrowth) && bedUpkeep() === HEALTH.bedUpkeep;
+      while(wardBeds() < HEALTH.bedsMax) buyBed();
+      out.bedsMax = !!buyBed() && wardBeds() === HEALTH.bedsMax;
+      state.health.beds = HEALTH.beds;
+      // the PMC panel: the ward with each patient's progress, and a bed to buy
+      const pp = {a:{id:"a-pp", name:"ARTH-099", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:40}}, home:"e-v", cond:"cordyceps", med:"era", dosed:true, done:120, need:360};
+      state.health.ward.push(pp); const ph = pmcHtml(pmcB); state.health.ward = state.health.ward.filter(x => x !== pp);
+      out.pmcPanel = ph.includes(`Ward (1 of ${HEALTH.beds} beds)`) && ph.includes(`Buy bed (${money(HEALTH.bedPrice)}, +${money(HEALTH.bedUpkeep)} a day)`) && ph.includes("Cordyceps · from Bug house") && /Treating, .+ left\./.test(ph) && ph.includes("width:33%"); }
+    // vets: a poisoning comes first, deliveries come last
+    { vetsNight(); keepersNight();
+      const c = vcrew[0]; c.at = kGraph.anchors["b-pmc"];
+      viv.animals[0].sick = {kind:"infection", name:"cordyceps", sev:30}; viv.animals[1].sick = {kind:"poison", name:"gasbubble", sev:20};
+      out.poisonFirst = pickPatient(c).a === viv.animals[1];
+      const lab = {id:"tr-lab", animalId:"sp-x", sp:"arth", from:"b-pmc", to:"e-v", lab:true};
+      state.staff.transfers.push(lab); vetDecide(c);
+      out.deliveriesLast = !!c.patient && !c.move;
+      state.staff.transfers = state.staff.transfers.filter(t => t !== lab); delete viv.animals[0].sick; delete viv.animals[1].sick; vetsNight(); }
+    // old saves: a patient being treated starts a fresh course, a cured one waits to go home, and the ward has a bed for everyone
+    { const old = JSON.parse(JSON.stringify(state)); delete old.health.beds;
+      old.health.ward = [0, 1, 2].map(i => ({a:{id:"ow" + i, sp:"arth", sick:{kind:"illness", sev:40}}, home:"e-v", med:"modern", since:1}));
+      old.health.ward[2].cured = true; delete old.health.ward[2].a.sick;
+      old.staff.transfers.push({id:"tr-old", animalId:"ow2", sp:"arth", from:"b-pmc", to:"e-v", med:true});
+      const up = upgradeSave(old), uw = up.health.ward;
+      out.oldWardConverts = up.health.beds === 3 && uw[0].dosed && uw[0].done === 0 && Math.abs(uw[0].need - 40 * HEALTH.wardPerPoint * MEDICINE.dockWard.paleozoic) < 1e-9
+        && uw[2].recovered && !uw[2].cured && !up.staff.transfers.some(t => t.id === "tr-old"); }
     // genome therapy: switched on for an exhibit, a vet's check-up lifts its sickly clones toward the lab's DNA quality, never past it, and it costs money
     vetsNight(); keepersNight();
     const ga = viv.animals[0]; delete ga.sick; ga.q = 60;

@@ -1459,9 +1459,13 @@ const HEALTH = {
   checkMinutes:5,      // time a vet spends looking over an exhibit's animals
   heal:2,              // a day a mild injury heals on its own, while the exhibit is fed, watered and clean and the animal is calm
   healStress:60,       // calm: stress under this
-  beds:6,              // patients the PMC holds at once
-  healPerNight:45,     // severity a treated patient recovers each night
-  dose:2,              // medicine doses one patient's treatment uses
+  beds:2,              // patients the PMC holds at once, to start with
+  bedsMax:6,           // the most it can have
+  bedPrice:4000,       // the first bed bought costs this, each one after `bedGrowth` times the last
+  bedGrowth:1.5,
+  bedUpkeep:20,        // each bought bed adds this a day to the PMC's upkeep
+  dose:2,              // medicine doses one patient's course uses, taken when it starts
+  wardPerPoint:12,     // park minutes of treatment for each point of severity (times the medicine's era factor, MEDICINE)
 };
 // Every condition is one of three kinds, and shares its kind's numbers:
 //   start, worsen   severity a new case starts at, and how much worse it gets a day untreated (100 kills)
@@ -1536,24 +1540,21 @@ const MEDICINE = {
   capacity:60,         // doses the Botany Lab holds of each era's medicine
   feedPer:5,           // medicated feed uses 1 dose a day for every this many animals
   feedCut:.35,         // medicated feed multiplies the chance of an infection by this
+  dockWard:{cenozoic:1, mesozoic:1.5, paleozoic:2},   // a ward course on contemporary medicine takes this much longer, the further back the animal
+  eraWard:.75,         // and on the era's own medicine this long
 };
 // The medicine each era's animals need
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
-// Contemporary medicine: suppliers restock the PMC every night. It treats any animal,
-// but can't cure prehistoric illness for good: the animal goes home with a chronic case.
+// Contemporary medicine: the dock buys it and custodians carry it to the PMC. It treats any animal (slower for older ones in the ward, MEDICINE.dockWard).
 const MODERN = {
   stock:30,            // doses the dock keeps on order (auto-ordering)
   cost:25,             // price of each dose at the dock
-  heal:{cenozoic:.9, mesozoic:.7, paleozoic:.5},     // how well it works, as a share of the era's own medicine
-  floor:{cenozoic:5, mesozoic:10, paleozoic:15},    // how sick it leaves an animal, at best
-  chronicHappy:.25,     // a chronic case counts as this much of a sick animal for happiness
 };
 const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoic"};
 const VET = {
   hireCost:3000,
   wage:200,
   speed:WALK_PER_MIN * STAFF_PACE,  // vets walk at STAFF_PACE of full walking speed
-  patients:3,          // patients each vet can treat each night
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:15, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from the Botany Lab."};

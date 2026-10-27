@@ -714,7 +714,7 @@ function animalCard(s, rep, mode){
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
   let h = `<div><h2>${t.label}</h2></div>`;
-  return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep)} a day</span></div>`;
+  return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep + (b.type === "pmc" ? bedUpkeep() : 0))} a day</span></div>`;
 }
 const dnaBar = d => `<div class="factor" style="grid-template-columns:1fr 44px"><span>${meter(d ? d.genome : 0, d && d.genome >= 100 ? "var(--good)" : "var(--gold)")}</span><span>${d ? d.genome : 0}%</span></div>`;
 
@@ -773,20 +773,20 @@ function generatorHtml(b){
 
 function pmcHtml(b){
   let h = deptHead(b);
-  const ward = state.health.ward;
+  const ward = state.health.ward, beds = wardBeds();
   h += staffNote("vet");
-  h += `<section><h3>Ward (${ward.length} of ${HEALTH.beds} beds)</h3>`;
-  h += ward.length ? `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), sev = p.a.sick ? p.a.sick.sev : 0; return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(s.name)}</b> <span class="meta">from ${home ? esc(home.name) : "a removed exhibit"}</span>${meter(sev, sev < 40 ? "var(--warn)" : "var(--bad)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>` : `<div class="meta">No patients.</div>`;
+  h += `<section><h3>Ward (${ward.length} of ${beds} beds)</h3>`;
+  if(ward.length) h += `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), v = wardProgress(p);
+    return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span><b>${esc(p.a.name || s.name)}</b> <span class="meta">${esc(s.name)}${CONDITIONS[p.cond || (p.a.sick && p.a.sick.name)] ? ` · ${esc(CONDITIONS[p.cond || p.a.sick.name].name)}` : ""}${home ? ` · from ${esc(home.name)}` : ""}</span>${meter(v, p.recovered ? "var(--good)" : "var(--gold)")}<span class="meta">${esc(patientStatus(p))}</span></span></li>`; }).join("")}</ul>`;
+  if(beds < HEALTH.bedsMax) h += `<div class="row" style="margin-top:10px"><button class="btn" data-action="buyBed"${canAfford(bedPrice()) ? "" : " disabled"}>Buy bed (${money(bedPrice())}, +${money(HEALTH.bedUpkeep)} a day)</button></div>`;
   h += `</section>`;
-  const cm = Math.floor(pmcStock(CMED));
-  h += `<section><h3>Medicine</h3><div class="factor" style="grid-template-columns:110px 1fr 54px"><span>Contemporary</span>${meter(cm / Math.max(1, storeTarget(b, CMED)) * 100, GOOD_COLOR[CMED])}<span>${cm}/${storeTarget(b, CMED)}</span></div>`;
-  h += `<ul class="issues" style="margin-top:8px">${Object.entries(MED_TECH).map(([era, id]) => `<li class="${hasTech(id) ? "" : "bad"}">${FLORA[era].label}: ${hasTech(id) ? "curable" : `best ${100 - MODERN.floor[era]}%`}</li>`).join("")}</ul>`;
-  h += `${hasDept("ceres") && anyMedTech() ? `${MED_GOODS.map(t => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${goodName(t).replace(" medicine", "")}</span>${meter(pmcStock(t) / storeCap(b) * 100, GOOD_COLOR[t])}<span>${Math.floor(pmcStock(t))}/${medGoodsWanted().includes(t) ? storeTarget(b, t) : 0}</span></div>`).join("")}` : ""}</section>`;
-  const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a})));
+  const cm = Math.floor(pmcStock(CMED)), bar = (label, have, cap, color) => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${label}</span>${meter(have / Math.max(1, cap) * 100, color)}<span>${Math.floor(have)}/${cap}</span></div>`;
+  h += `<section><h3>Medicine</h3>${bar("Contemporary", cm, storeTarget(b, CMED), GOOD_COLOR[CMED])}${medGoodsWanted().map(t => bar(goodName(t).replace(" medicine", ""), pmcStock(t), storeTarget(b, t), GOOD_COLOR[t])).join("")}</section>`;
+  const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a}))).sort((x, y) => y.a.sick.sev - x.a.sick.sev);
+  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="${a.sick.sev >= SICK_BAND[1].from ? "bad" : "warn"}">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}: ${esc(sickName(a))}, ${sickBand(a).label}. ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
   if(herds.length) h += `<section><h3>Check-ups</h3><ul class="issues">${herds.map(e => { const d = daysSinceCheck(e); return `<li class="${d >= HEALTH.checkEvery ? "bad" : ""}">${esc(e.name)}: ${d >= 99 ? "never checked" : d === 0 ? "checked today" : `checked ${d} day${d === 1 ? "" : "s"} ago`}</li>`; }).join("")}</ul></section>`;
-  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="bad">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}, ${Math.round(a.sick.sev)}%: ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   return h;
 }
 
@@ -966,6 +966,7 @@ panelEl.addEventListener("click", e => {
     done(); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
+  if(a === "buyBed"){ const why = buyBed(); if(why) ui.toast(why, "bad"); ui.panel(); return; }
   if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
