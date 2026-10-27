@@ -1610,6 +1610,21 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           bulldozeTap("building", id); $("#confirmYes").click();
           asks = asks && asked && kept && !has(id);
         }
+        // demolishing the PMC asks in its own words
+        add("b-bzp", "pmc", 90); bulldozeTap("building", "b-bzp");
+        out.pmcDemolishAsks = dlg.open && $("#confirmTitle").textContent === "Demolish Paleo-Medicine Center?" && $("#confirmText").textContent === "Are you sure you want to demolish the Paleo-Medicine Center? All animals will be returned to their exhibits."
+          && $("#confirmYes").textContent === "Yes" && $("#confirmNo").textContent === "No" && ($("#confirmNo").click(), !dlg.open && has("b-bzp"));
+        state.buildings = state.buildings.filter(x => x.id !== "b-bzp");
+        // cloning from an incomplete genome asks first; a complete one doesn't
+        { const csp = SPECIES.find(x => !x.viv && !x.pool), dk = state.science.dna[csp.id], fake = document.createElement("button");
+          fake.dataset.action = "clone"; fake.dataset.sp = csp.id; fake.dataset.sex = "male"; panelEl.appendChild(fake);
+          const oc = orderClone; let ordered = 0; orderClone = () => { ordered++; return false; };
+          state.science.dna[csp.id] = {genome:80}; fake.click();
+          const asked = dlg.open && $("#confirmText").textContent === "Clones with incomplete genomes can have genetic disorders. Continue?" && $("#confirmTitle").hidden && ordered === 0;
+          $("#confirmYes").click(); const went = ordered === 1;
+          state.science.dna[csp.id] = {genome:100}; fake.click();
+          out.cloneAsksIfIncomplete = asked && went && !dlg.open && ordered === 2;
+          orderClone = oc; fake.remove(); if(dk) state.science.dna[csp.id] = dk; else delete state.science.dna[csp.id]; }
         out.bulldozeAsks = asks && ["lodge", "resort", "campground", "restaurant", "edcenter"].every(t => BUILDINGS[t].confirm === true) && !BUILDINGS.bench.confirm;
       }
       // the move tool leaves grid exhibits alone; saves keep the pieces

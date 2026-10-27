@@ -953,7 +953,11 @@ panelEl.addEventListener("click", e => {
   if(a === "waterTool"){ openLandList("water"); return; }
   if(a === "aquaWater"){ if(it && it.points && lagoonWalled(it)) fillLagoon(it, b.dataset.k); return; }
   if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
-  if(a === "clone"){ if(orderClone(b.dataset.sp, sel && sel.kind === "exhibit" ? sel.id : null, b.dataset.sex)) done(); return; }
+  if(a === "clone"){
+    const sp = b.dataset.sp, ex = sel && sel.kind === "exhibit" ? sel.id : null, sex = b.dataset.sex, go = () => { if(orderClone(sp, ex, sex)) done(); };
+    if(cloneQuality(sp) < 100) askConfirm("", "Clones with incomplete genomes can have genetic disorders. Continue?", "Yes", go, "No"); else go();   // a partial genome: a disorder is possible
+    return;
+  }
   if(a === "moveDlg" && it){ openMoveDialog(it, b.dataset.sp, b.dataset.id); return; }
   if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
@@ -1049,7 +1053,7 @@ panelEl.addEventListener("change", ev => {
 // A yes/no question inside the page
 function askConfirm(title, text, yes, onYes, no = "Cancel", onNo = null){
   const d = $("#dlgConfirm");
-  $("#confirmTitle").textContent = title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
+  $("#confirmTitle").textContent = title; $("#confirmTitle").hidden = !title; $("#confirmText").textContent = text; $("#confirmYes").textContent = yes; $("#confirmNo").textContent = no;
   $("#confirmYes").onclick = () => { d.close(); onYes(); };
   $("#confirmNo").onclick = () => { d.close(); if(onNo) onNo(); };
   d.oncancel = onNo ? ev => ev.preventDefault() : null;   // a two-way choice can't be escaped out of

@@ -269,7 +269,7 @@ function tripReturns(t){
       const d = sc.dna[t.sp];
       lines.push([g.event ? `${g.name} Recording Made` : `${g.name} Sample Found`, true]);
       if(d.genome >= 100 && was < 100) lines.push([g.event ? `${g.name} Record Complete` : `${g.name} Genome Complete`, true]);
-      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push(["The Genetics Lab can clone it now, though the clones will be frail until the genome is more complete."]);
+      else if(g.animal && was < CLONE_GENOME.min && d.genome >= CLONE_GENOME.min) lines.push([`${g.name} now available at Genetics Lab.`]);
       // sometimes the drone also turns up traces of another animal seen at the same site
       const others = g.event ? [] : siteSeen(s).filter(x => x !== t.sp && !genomeDone(x));
       if(others.length && Math.random() < TRIP.bonus.chance){

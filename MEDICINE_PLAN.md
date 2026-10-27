@@ -213,6 +213,11 @@ All in `upgradeSave`.
 - Refinement projects go: points spent on finished ones are refunded to the Research Lab, and queued ones are cancelled with their progress refunded.
 - Exhibit settings carry over: medicated feed, genome therapy, last check-up.
 
+## Genetics wording (approved)
+- Genome reaches the cloning minimum: "`<Animal>` now available at Genetics Lab."
+- Cloning from an incomplete genome asks first, with no heading: "Clones with incomplete genomes can have genetic disorders. Continue?" Yes / No.
+- Clone finished: "(`<n>`% Accuracy)"; specimens and crates show "`<n>`% Accuracy"; vets: "Heading to `<ex>` for genome therapy", "Giving genome therapy in `<ex>`".
+
 ## Earlier picks (to confirm in their sections)
 - No chronic state.
 - Trash throwing moves out of medicine.js.
