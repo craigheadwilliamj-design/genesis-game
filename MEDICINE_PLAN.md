@@ -119,7 +119,7 @@ A top to bottom rework of `js/medicine.js` and the medicine parts of science, lo
 - Fin Tear: an injury for aquatic fish.
 - The aquatic batch (White Spot, Flukes, Saprolegniasis, Gas Bubble, Nitrate Toxicity, Chitinoclastic) is for fish and invertebrates only. Marine reptiles and sea mammals get the basic illnesses instead.
 - Tiktaalik counts as an aquatic fish for illnesses (fish batch and Fin Tear), though it lives on land in the game.
-- Nitrate Toxicity, Gas Bubble Disease and Botulism are the Poisoning kind.
+- Poisonings: Foreign Object Ingestion (thrown trash), Modern Plant Poisoning (plants the animal never evolved for), Botulism, Nitrate Toxicity, Gas Bubble Disease.
 - Body rules (lists in data.js): Goring Injury only from a `GORES` attacker; Sprain, Joint Dislocation and Torn Claw/Hoof/Nail need legs (no fish, invertebrates, marine reptiles, sea mammals or `LIMBLESS`); Chipped Tooth needs teeth (no `TOOTHLESS`, fish or invertebrates); Chitinoclastic Bacteria only for `SHELLED` (Anomalocaris and Opabinia are out).
 - Tetanus has no link to injuries: it's a plain dirt illness.
 - Dirt is the main cause: most names come from a dirty exhibit (foul water is the dirt of tanks and pools). Other factors (cold, heat, stress, crowding, hunger) add their own names to the pool when they're present.
