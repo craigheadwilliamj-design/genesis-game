@@ -1737,8 +1737,8 @@ function syncAnimals(){
         animalLayer.appendChild(el);
       }
       h.a = a;
-      // vivarium animals stay small enough to fit inside the glass
-      const s = SPECIES_BY_ID[a.sp], r = e.viv ? (SPRITES[a.sp] ? VIVARIUMS[e.viv].d / 7 : Math.min(VIVARIUMS[e.viv].d / 7, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
+      // vivarium animals stay small enough to fit inside the glass, sized by the smallest case their species fits (not the case they're in)
+      const s = SPECIES_BY_ID[a.sp], vd = e.viv ? VIVARIUMS[VIVARIUMS[s.viv] ? s.viv : e.viv].d / 7 : 0, r = e.viv ? (SPRITES[a.sp] ? vd : Math.min(vd, Math.max(.4, 3*inv))) : Math.max(animalRadius(a.sp), 4*inv);
       const showLetter = r * view.k >= 8, sprite = SPRITES[a.sp] && r * view.k >= (e.viv ? 2 : 6);   // tank animals are small, so their picture shows sooner and a bit larger
       h.r = r; h.spr = sprite; h.viv = !!e.viv; h.swimmer = !!e.palu && paluSwims(s); h.pool = !e.viv && !!s.pool;
       if(e.viv && h.placed && !vivSpot(h, e, [h.x, h.y])) h.placed = false;
