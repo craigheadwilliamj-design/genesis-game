@@ -1509,7 +1509,7 @@ function aquaSwim(h, e, dt){
   const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
   if(el){
     const c = Math.cos(Math.PI * h.turn), sx = (h.face || 1) * (h.turn < .5 ? -1 : 1) * Math.max(.2, Math.abs(c));
-    el.setAttribute("transform", `scale(${sx.toFixed(3)} 1)${Math.abs(h.pitch) > .3 ? ` rotate(${h.pitch.toFixed(1)} 0 ${sprMid(h).toFixed(2)})` : ""}`);
+    el.setAttribute("transform", h.sprTf = `scale(${sx.toFixed(3)} 1)${Math.abs(h.pitch) > .3 ? ` rotate(${h.pitch.toFixed(1)} 0 ${sprMid(h).toFixed(2)})` : ""}`);
   }
   if(h.spr && rigOf(h.sp)) rigStep(h, h.stroke && !crawl ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
@@ -1556,7 +1556,7 @@ function poolSwim(h, e, dt){
   if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== (h.face || 1)){ h.face = face; h.turn = 0; } }
   h.turn = Math.min(1, (h.turn ?? 1) + dt / A.turn);
   const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
-  if(el){ const c = Math.cos(Math.PI * h.turn), sx = (h.face || 1) * (h.turn < .5 ? -1 : 1) * Math.max(.2, Math.abs(c)); el.setAttribute("transform", `scale(${sx.toFixed(3)} 1)`); }
+  if(el){ const c = Math.cos(Math.PI * h.turn), sx = (h.face || 1) * (h.turn < .5 ? -1 : 1) * Math.max(.2, Math.abs(c)); el.setAttribute("transform", h.sprTf = `scale(${sx.toFixed(3)} 1)`); }
   const spd = Math.hypot(v[0], v[1]); h.stride = (h.stride || 0) + spd * dt;
   if(h.spr && rigOf(h.sp)) rigStep(h, spd > .15 ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
@@ -1565,10 +1565,12 @@ function poolSwim(h, e, dt){
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
 // The walk strip sits in a window one frame wide, hidden while it stands; setPose shows a frame.
+// the picture's flip, or a swimmer's squash through a turn and its pitch as aquaSwim and poolSwim last set them, so a redraw (render, once a second) doesn't pop it flat for a frame
+const sprTf = h => h.sprTf || `scale(${h.face || 1} 1)`;
 function spriteSvg(sp, h){
   if(rigOf(sp) && !(h.swim && SPRITES[sp].swim && !rigSwims(sp))) return rigSvg(sp, h);   // drawn from parts, not a strip (rigs.js), a vivarium too; a swimmer in a pond keeps its swim strip unless its rig has a swim clip
   const S = SPRITES[sp], swm = !h.viv && h.swim && S.swim, idl = !swm && (h.viv || (!S.walk && S.idle)), n = swm ? S.swim : idl ? S.idle : S.walk, kind = swm ? "swim" : idl ? "idle" : "walk", r = h.r, w = r * (h.viv ? 4 : 2.5) * (S.size || 1), ht = w / S.ratio, box = `x="${(-w/2).toFixed(2)}" y="${(r*.5 - ht * (S.foot || 1)).toFixed(2)}" width="${w.toFixed(2)}" height="${ht.toFixed(2)}"`, f = h.pose ?? -1;
-  return `<g class="spr" transform="scale(${h.face || 1} 1)"><image class="st" href="${spriteUrl(`sprites/${sp}.png`)}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
+  return `<g class="spr" transform="${sprTf(h)}"><image class="st" href="${spriteUrl(`sprites/${sp}.png`)}" style="image-rendering:pixelated" ${box}${(f >= 0 || f <= -2) && n ? ` display="none"` : ""}/>`
     + (n ? `<svg class="wk" ${box} viewBox="${Math.max(f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f < 0 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-${kind}.png`)}" style="image-rendering:pixelated" width="${n}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
     + (!idl && !swm && S.walk && S.idle ? `<svg class="id" ${box} viewBox="${Math.max(-2 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -2 || f <= -100 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-idle.png`)}" style="image-rendering:pixelated" width="${S.idle}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "")
     + (!idl && !swm && S.walk && S.rest ? `<svg class="rs" ${box} viewBox="${Math.max(-100 - f, 0)} 0 1 ${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"${f > -100 ? ` display="none"` : ""}><image href="${spriteUrl(`sprites/${sp}-rest.png`)}" style="image-rendering:pixelated" width="${S.rest}" height="${(1/S.ratio).toFixed(4)}" preserveAspectRatio="none"/></svg>` : "") + `</g>`;
