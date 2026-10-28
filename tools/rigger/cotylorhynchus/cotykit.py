@@ -5,7 +5,7 @@ import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lystrosaurus'))
 from lystkit import *
 BODY, HEAD, JAW, TAIL = 'n8', 'n22', 'n24', 'n6'
-NEAR_BACK, NEAR_FRONT, FAR_BACK, FAR_FRONT = ('n16', 'n18', 'n20'), ('n10', 'n12', 'n14'), ('n43', 'n45', 'n47'), ('n37', 'n39', 'n41')
+NEAR_BACK, NEAR_FRONT, FAR_BACK, FAR_FRONT = ('n16', 'n18', 'n20'), ('n10', 'n12', 'n14'), ('n139', 'n141', 'n143'), ('n37', 'n39', 'n41')
 LIMBS = (NEAR_BACK, NEAR_FRONT, FAR_BACK, FAR_FRONT)
 FRONT = (NEAR_FRONT, FAR_FRONT)
 
@@ -13,9 +13,10 @@ def rests(V):
   """each limb's ankle (the foot's joint) standing, in the world"""
   W = V.worlds({}); return {l: (W[l[2]][4], W[l[2]][5]) for l in LIMBS}
 
-def stiff(V, pose, limb, x=None, y=None, r=None, foot=0.0, give=None):
+def stiff(V, pose, limb, x=None, y=None, r=None, foot=0.0, give=None, floor=None):
   """turns the limb as one piece (r, or the turn that puts the ankle at world x) and shifts its hip so the ankle sits at world y
-  (the shift clamped to `give`), the foot turned `foot` degrees in the world (0 is flat). Returns the ankle as posed."""
+  (the shift clamped to `give`), the foot turned `foot` degrees in the world (0 is flat). With `floor` (a ground row), a turned foot that
+  dips below it lifts the hip till it doesn't. Returns the ankle as posed."""
   th, lg, ft = limb
   pose[lg] = {'r': 0, 'dx': 0, 'dy': 0}
   if r is None:
@@ -33,6 +34,10 @@ def stiff(V, pose, limb, x=None, y=None, r=None, foot=0.0, give=None):
     pose[th]['dx'], pose[th]['dy'] = rd(dx), rd(dy)
   W = V.worlds(pose); pb = math.degrees(math.atan2(W[lg][1], W[lg][0]))
   pose[ft] = {'r': rd(wrap(foot - pb)), 'dx': 0, 'dy': 0}
+  for _ in range(4 if floor is not None and foot else 0):
+    deep = V.lowest(pose)[ft] - floor
+    if deep <= .05: break
+    stiff(V, pose, limb, r=pose[th]['r'], y=V.worlds(pose)[ft][5] - deep, foot=foot)
   W = V.worlds(pose); return W[ft][4], W[ft][5]
 
 def save(P, clip, path, after=None):

@@ -6,11 +6,13 @@
 import json, math, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cotykit import *
-K = dict(N=14, fps=4, drop=4.9, front=-30, back=34, head=14, name='rest')
+K = dict(N=14, fps=4, drop=None, front=-30, back=34, head=14, name='rest')
 if len(sys.argv) > 3: K.update(json.loads(sys.argv[3]))
 P = json.load(open(sys.argv[1])); V = View(P); rest = rests(V)
+GROUND = max(V.lowest({})[l[2]] for l in LIMBS)
+if K['drop'] is None: K['drop'] = rd(GROUND - V.lowest({})[BODY] - .1)   # the belly down to the ground row
 lying = {BODY: {'r': .6, 'dx': 0, 'dy': K['drop']}}
-TAIL_DOWN = next(r/10 for r in range(-100, 101) if V.lowest({**lying, TAIL: {'r': r/10}})[TAIL] <= 75.05)   # the tail laid on the ground, not into it
+TAIL_DOWN = next(r/10 for r in range(-100, 101) if V.lowest({**lying, TAIL: {'r': r/10}})[TAIL] <= GROUND + .05)   # the tail laid on the ground, not into it
 frames = []
 for i in range(K['N']):
   t = i/(K['N'] - 1); pose = {}
