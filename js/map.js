@@ -1530,18 +1530,22 @@ function poolSpot(h, e, p){
 // can it swim straight from a to b without crossing dry ground?
 function poolClear(h, e, a, b){ const n = Math.ceil(dist(a, b)); for(let i = 1; i <= n; i++){ const t = i / n; if(!poolSpot(h, e, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])) return false; } return true; }
 // how deep it can dive where it is: all the way in deep sea, halfway elsewhere
-// looking down through water: the picture's colors pulled toward the water's blue (outlines go navy, not black), more the deeper it is; none mid-leap
-function poolTint(dive, leap){
-  if(leap) return "none";
-  if(!document.getElementById("pool-tints")){
-    let f = "";
-    for(let k = 0; k <= 4; k++){
-      const keep = 1 - (.5 + .3 * k / 4), o = [.07, .2, .46].map(w => (w * (1 - keep)).toFixed(3));   // blend toward the sea's blue
-      f += `<filter id="pool-tint${k}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${keep.toFixed(2)} 0 0 0 ${o[0]}  0 ${(keep * 1.05).toFixed(2)} 0 0 ${o[1]}  0 0 ${(keep * 1.1).toFixed(2)} 0 ${o[2]}  0 0 0 .92 0"/></filter>`;
-    }
-    document.body.insertAdjacentHTML("beforeend", `<svg id="pool-tints" width="0" height="0" style="position:absolute">${f}</svg>`);
-  }
-  return `url(#pool-tint${Math.round(clamp(dive, 0, 1) * 4)})`;
+// looking down through water: the picture's colors pulled toward the water's blue (outlines go navy, not black), more the deeper it is, with ripple streaks
+// drifting over it (a per-animal filter in its group, streaks only where the animal is); none mid-leap
+function poolTintValues(dive){
+  const keep = 1 - (.5 + .3 * dive), o = [.07, .2, .46].map(w => (w * (1 - keep)).toFixed(3));   // blend toward the sea's blue
+  return `${keep.toFixed(2)} 0 0 0 ${o[0]}  0 ${(keep * 1.05).toFixed(2)} 0 0 ${o[1]}  0 0 ${(keep * 1.1).toFixed(2)} 0 ${o[2]}  0 0 0 .92 0`;
+}
+function poolFilterSvg(h){
+  const r = h.r || 1, id = "ptf" + (h.a ? h.a.id : 0), fx = (1.7 / r).toFixed(3), fy = (16 / r).toFixed(3), d = (r * .6).toFixed(2);
+  return `<defs><filter id="${id}" x="-30%" y="-40%" width="160%" height="180%" color-interpolation-filters="sRGB"><feColorMatrix class="ptint" in="SourceGraphic" type="matrix" values="${poolTintValues(h.dive || 0)}" result="c"/>`
+    + `<feTurbulence type="fractalNoise" baseFrequency="${fx} ${fy}" numOctaves="1" seed="7" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 .78  0 0 0 0 .9  0 0 0 0 1  0 0 0 10 -5.4" result="l"/>`
+    + `<feOffset in="l" dx="0" dy="0" result="lo"><animate attributeName="dx" values="0;${d};0" dur="9s" repeatCount="indefinite"/></feOffset>`
+    + `<feComposite in="lo" in2="c" operator="in" result="li"/><feComponentTransfer in="li" result="lf"><feFuncA type="linear" slope=".5"/></feComponentTransfer><feMerge><feMergeNode in="c"/><feMergeNode in="lf"/></feMerge></filter></defs>`;
+}
+function poolTint(h, leap){
+  const cm = h.el.querySelector(".ptint"); if(cm) cm.setAttribute("values", poolTintValues(h.dive || 0));
+  return leap ? "none" : `url(#ptf${h.a ? h.a.id : 0})`;
 }
 const poolDepth = (e, x, y) => waterOf(e).some(w => w.kind === "deep" && inPoly(x, y, w.points)) ? 1 : POOL_SWIM.shallow;
 function poolSwim(h, e, dt){
@@ -1564,9 +1568,8 @@ function poolSwim(h, e, dt){
   h.dive = clamp(was + Math.sign(to - was) * Math.min(Math.abs(to - was), A.dive * dt), 0, 1);
   if(s.breach && !h.breachT && was > .2 && h.dive <= .2 && to === 0 && Math.random() < A.breach[0]) h.breachT = 1e-6;
   if(h.breachT){ h.breachT += dt / A.breach[1]; if(h.breachT >= 1){ h.breachT = 0; h.lift = 0; } else h.lift = Math.sin(Math.PI * h.breachT) * (h.r || 1) * A.breach[2]; }
-  const up = h.dive < .08 || h.breachT > 0, dv = h.el.querySelector(".dive"), rp = h.el.querySelector(".ripple");
-  if(dv){ dv.setAttribute("opacity", (1 - A.fade * (h.breachT ? 0 : h.dive)).toFixed(2)); dv.style.filter = poolTint(h.dive, h.breachT); }
-  if(rp) rp.style.display = up ? "" : "none";
+  const dv = h.el.querySelector(".dive");
+  if(dv){ dv.setAttribute("opacity", (1 - A.fade * (h.breachT ? 0 : h.dive)).toFixed(2)); dv.style.filter = poolTint(h, h.breachT); }
   if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== (h.face || 1)){ h.face = face; h.turn = 0; } }
   h.turn = Math.min(1, (h.turn ?? 1) + dt / A.turn);
   const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
@@ -1718,10 +1721,10 @@ function drawAnimal(h, e, a){
     (pool ? subSvg() : h.pool ? poolBodySvg(h, body) : body);
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
 }
-// A pool animal: its body in a group poolSwim fades as it dives, and a ripple ring on the surface it shows while the animal is up
+// A pool animal: its body in a group poolSwim fades as it dives in the blue-water filter (ripple streaks drift over it)
 function poolBodySvg(h, body){
-  const r = h.r || 1, op = (1 - POOL_SWIM.fade * (h.dive || 0)).toFixed(2);
-  return `<ellipse class="ripple" cx="0" cy="${(r * .6).toFixed(2)}" rx="${(r * 1.3).toFixed(2)}" ry="${(r * .45).toFixed(2)}" fill="none" stroke="#DDF2F2" stroke-opacity=".8" stroke-width="${(ROCK_MPP * 1.5).toFixed(2)}" pointer-events="none" style="display:${(h.dive || 0) < .08 ? "" : "none"}"/><g class="dive" opacity="${op}" style="filter:${poolTint(h.dive || 0, h.breachT)}">${body}</g>`;
+  const op = (1 - POOL_SWIM.fade * (h.dive || 0)).toFixed(2);
+  return `${poolFilterSvg(h)}<g class="dive" opacity="${op}" style="filter:${poolTint(h, h.breachT)}">${body}</g>`;
 }
 function syncAnimals(){
   const seen = new Set(), inv = 1/view.k;
