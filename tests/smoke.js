@@ -2799,14 +2799,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const f4 = {r:3, sp:"plat", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f4.el.innerHTML = rigSvg("plat", f4);
       const rs = () => { f4.rg.last = performance.now() - 100; rigStep(f4, "rest"); }; rs(); const lockedRest = f4.rg.lock; for(let i = 0; i < 80; i++) rs();
       out.rigRestLock = lockedRest && !f4.rg.lock;
-      // swapped parts (o:1, a frame's v): the Cotylorhynchus shows one of its three heads, open while it walks, shut once it has lain down to sleep
+      // swapped parts (o:1, a frame's v): a rig (a stand-in in the coty slot) shows its open head while it walks and a shut one once it has lain down to sleep
+      const realCoty = RIGS.coty, hp = {img:"sprites/coty/head.png", ix:0, iy:0, iw:10, ih:10, p:-1, x:20, y:20, f:0};
+      RIGS.coty = {w:100, h:75, parts:[{...hp, n:"COTY_HEAD"}, {...hp, n:"COTY_HEAD_CLOSED", o:1}], clips:{walk:{frames:[{}, {}]}, rest:{fps:4, frames:[{}, {}, {v:{0:0, 1:1}}, {v:{0:0, 1:1}}]}}};
       const shownHeads = f => [...f.el.querySelector(".rig").children].map((im, i) => [RIGS.coty.parts[i].n, im.style.display !== "none"]).filter(([n, on]) => /HEAD/.test(n) && on).map(([n]) => n).join();
       const f6 = {r:3, sp:"coty", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f6.el.innerHTML = rigSvg("coty", f6);
       const openAtFirst = shownHeads(f6) === "COTY_HEAD";
       for(let i = 0; i < 200; i++){ f6.rg.last = performance.now() - 100; rigStep(f6, "rest"); }
       const asleep = shownHeads(f6) === "COTY_HEAD_CLOSED";
       f6.stride = 1; f6.rg.last = performance.now() - 100; rigStep(f6, "walk");
-      out.rigSwap = openAtFirst && asleep && shownHeads(f6) === "COTY_HEAD";
+      out.rigSwap = openAtFirst && asleep && shownHeads(f6) === "COTY_HEAD"; RIGS.coty = realCoty;
       // switching rigs off draws the strips (and a vivarium draws strips then too), and back on restores them
       setRigs(false); const strips = spriteSvg("plat", {r:3, face:1}), offOk = !rigOf("plat") && strips.includes("plat-walk.png") && !strips.includes('class="rig"');
       const vivOff = (setRigs(false), spriteSvg("plat", {r:3, face:1, viv:true})); setRigs(true); const viv = spriteSvg("plat", {r:3, face:1, viv:true});
