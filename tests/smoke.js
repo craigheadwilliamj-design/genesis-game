@@ -1236,6 +1236,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     state.paths.push({id:"p-t", name:"t", points:[[207.5,262],[222,262]]}, {id:"p-t2", name:"t2", points:[[207.5,262],[193,262]]}, {id:"p-t3", name:"t3", points:[[207.5,290],[217,290]]}, {id:"p-t4", name:"t4", points:[[207.5,290],[193,290]]});
     recompute(); buildKeeperGraph();
     out.sciReachable = ["oracle", "ghost", "tar", "ceres"].every(t => !!dept(t));
+    // the labs open full size and fixed; anything else gets the normal floating panel
+    { const full = id => { select("building", id); ui.panel(); return aside.classList.contains("full"); };
+      out.labPanelsFull = ["b-or", "b-gh", "b-ta", "b-ce"].every(full) && (select(null), openParkOffice(), ui.panel(), !aside.classList.contains("full")); closePanel(); ui.panel(); }
     const sc = state.science, adv = (mins, fn) => { for(let i = 0; i < mins; i++){ if(state.minute >= DAY_MIN - 2){ state.day++; state.minute = 0; } tick(1); if(fn && fn()) return true; } return false; };
     sc.tech = sc.tech.filter(t => t !== "bars");   // bars are free in every park, so research is tested from scratch
     state.minute = 10;

@@ -319,6 +319,12 @@ aside .panel{flex:1;min-height:0;overflow:auto}
 .rsz[data-rsz="ne"]{top:-3px;right:-3px;cursor:nesw-resize}.rsz[data-rsz="sw"]{bottom:-3px;left:-3px;cursor:nesw-resize}
 .rsz[data-rsz="se"]::after{content:"";position:absolute;right:6px;bottom:6px;width:8px;height:8px;border-right:2px solid var(--ink-2);border-bottom:2px solid var(--ink-2);opacity:.55}
 aside.dragging,aside.resizing{user-select:none;-webkit-user-select:none}
+/* The labs and the PMC fill the map area beside the right column, fixed in place */
+aside.full{top:12px;left:12px;right:64px;bottom:12px;width:auto;height:auto;max-width:none;max-height:none;z-index:9}
+aside.full .rsz{display:none}
+aside.full .sheet-head{cursor:default}
+aside.full .sheet-toggle{font-size:14px}
+aside.full .gt-map{width:min(100%,80vh);margin:8px auto 4px}
 aside.dragging .sheet-head{cursor:grabbing}
 .sheet-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
 .sheet-toggle{flex:1;min-width:0;font:600 12px/1 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -555,6 +561,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .rsz{display:none}
   .sheet-head{cursor:default}
   aside{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:55%;border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.2);z-index:10}
+  aside.full{top:0;left:0;right:0;bottom:0;max-height:none;border-radius:0}
   .tools{top:8px;left:8px}
   .lefttools{gap:8px}
   .smallrow{flex-direction:column}

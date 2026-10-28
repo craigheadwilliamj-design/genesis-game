@@ -51,6 +51,7 @@ const ui = {
     if(sel && !it) sel = null;
     const open = !!sel || officeOpen;
     aside.classList.toggle("open", open);
+    if(aside.classList.contains("full") !== panelFull()){ aside.classList.toggle("full"); placePanel(); }
     document.querySelectorAll("#rtools [data-dept]").forEach(b => b.setAttribute("aria-pressed", !!(sel && sel.kind === "building" && it && it.type === b.dataset.dept)));
     $("#officeBtn").setAttribute("aria-pressed", !sel && officeOpen);
     if(!open) return;
@@ -1006,12 +1007,15 @@ $("#panelClose").onclick = closePanel;
 /* ---------- moving and resizing the panel like a window ---------- */
 // Where it sits is a per-browser convenience (localStorage), never saved in the game. null is the default spot by the right column.
 const PANEL_MIN = {w:300, h:200}, PANEL_KEY = "genesis-panel";
+// The labs and the PMC open full size, over the map, and don't move
+const FULL_PANELS = ["oracle", "ghost", "tar", "ceres", "pmc"];
+const panelFull = () => !!(sel && sel.kind === "building" && FULL_PANELS.includes(selItem()?.type));
 const panelNarrow = () => matchMedia("(max-width:760px)").matches;   // phones: a fixed bottom sheet
 let panelBox = null;   // {x, y, w, h} in px inside <main>
 try { const b = JSON.parse(localStorage.getItem(PANEL_KEY)); if(b && [b.x, b.y, b.w, b.h].every(Number.isFinite)) panelBox = b; } catch {}
 function placePanel(){
   const s = aside.style;
-  if(!panelBox || panelNarrow()){ s.left = s.top = s.width = s.height = s.right = s.maxWidth = s.maxHeight = ""; return; }
+  if(!panelBox || panelNarrow() || aside.classList.contains("full")){ s.left = s.top = s.width = s.height = s.right = s.maxWidth = s.maxHeight = ""; return; }
   const m = aside.parentElement.getBoundingClientRect(), b = panelBox;
   b.w = Math.min(Math.max(b.w, PANEL_MIN.w), m.width); b.h = Math.min(Math.max(b.h, PANEL_MIN.h), m.height);
   b.x = clamp(b.x, 0, m.width - b.w); b.y = clamp(b.y, 0, m.height - b.h);
@@ -1019,7 +1023,7 @@ function placePanel(){
 }
 function savePanelBox(){ try { if(panelBox) localStorage.setItem(PANEL_KEY, JSON.stringify(panelBox)); else localStorage.removeItem(PANEL_KEY); } catch {} }
 aside.addEventListener("pointerdown", e => {
-  if(panelNarrow() || e.button) return;
+  if(panelNarrow() || e.button || aside.classList.contains("full")) return;
   const grip = e.target.closest("[data-rsz]"), head = !grip && e.target.closest(".sheet-head") && !e.target.closest("button, input");
   if(!grip && !head) return;
   e.preventDefault();
@@ -1040,7 +1044,7 @@ aside.addEventListener("pointerdown", e => {
   addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
 });
 // Double-click the top bar to put the panel back by the right column
-aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button, input") || panelNarrow()) return; panelBox = null; placePanel(); savePanelBox(); });
+aside.querySelector(".sheet-head").addEventListener("dblclick", e => { if(e.target.closest("button, input") || panelNarrow() || aside.classList.contains("full")) return; panelBox = null; placePanel(); savePanelBox(); });
 addEventListener("resize", placePanel);
 placePanel();
 
