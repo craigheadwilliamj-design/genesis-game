@@ -715,6 +715,8 @@ function deptHead(b){
   let h = `<div><h2>${t.label}</h2></div>`;
   return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep + (b.type === "pmc" ? bedUpkeep() : 0))} a day</span></div>`;
 }
+// Two columns side by side when the panel is full size (aside.full), one under the other otherwise
+const fullCols = (left, right, wide) => `<div class="fcols${wide ? " wide" : ""}"><div class="fcol">${left}</div><div class="fcol">${right}</div></div>`;
 const dnaBar = d => `<div class="factor" style="grid-template-columns:1fr 44px"><span>${meter(d ? d.genome : 0, d && d.genome >= 100 ? "var(--good)" : "var(--gold)")}</span><span>${d ? d.genome : 0}%</span></div>`;
 
 // Science staff are hired from the Staff tab; the department just says how many it has
@@ -771,9 +773,8 @@ function generatorHtml(b){
 }
 
 function pmcHtml(b){
-  let h = deptHead(b);
+  let h = staffNote("vet");
   const ward = state.health.ward, beds = wardBeds();
-  h += staffNote("vet");
   h += `<section><h3>Ward (${ward.length} of ${beds} beds)</h3>`;
   if(ward.length) h += `<ul class="herd">${ward.map(p => { const s = SPECIES_BY_ID[p.a.sp], home = state.exhibits.find(x => x.id === p.home), v = wardProgress(p);
     return `<li><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span><span style="min-width:0">${pctHead(p.a.name || s.name, s.name, v, p.recovered ? "var(--good)" : "var(--gold)")}<div class="meta">${[CONDITIONS[p.cond || (p.a.sick && p.a.sick.name)] ? esc(CONDITIONS[p.cond || p.a.sick.name].name) : "", home ? `from ${esc(home.name)}` : ""].filter(Boolean).join(" · ")}</div><div class="meta">${esc(patientStatus(p))}</div></span>${wardTrip(p) && wardTrip(p).cargo ? "" : `<button class="btn sell" data-action="wardMove" data-id="${esc(p.a.id)}">Move</button>`}</li>`; }).join("")}</ul>`;
@@ -781,12 +782,13 @@ function pmcHtml(b){
   h += `</section>`;
   const cm = Math.floor(pmcStock(CMED)), bar = (label, have, cap, color) => `<div class="factor" style="grid-template-columns:110px 1fr 54px;margin-top:4px"><span>${label}</span>${meter(have / Math.max(1, cap) * 100, color)}<span>${Math.floor(have)}/${cap}</span></div>`;
   h += `<section><h3>Medicine</h3>${bar("Contemporary", cm, pmcShare(b), GOOD_COLOR[CMED])}${medGoodsWanted().map(t => bar(goodName(t).replace(" medicine", ""), pmcStock(t), pmcShare(b), GOOD_COLOR[t])).join("")}</section>`;
+  let r = "";
   const sick = state.exhibits.flatMap(e => e.animals.filter(noticed).map(a => ({e, a}))).sort((x, y) => y.a.sick.sev - x.a.sick.sev);
-  if(sick.length) h += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="${a.sick.sev >= SICK_BAND[1].from ? "bad" : "warn"}">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}: ${esc(sickName(a))}, ${sickBand(a).label}. ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
+  if(sick.length) r += `<section><h3>Sick in exhibits</h3><ul class="issues">${sick.map(({e, a}) => `<li class="${a.sick.sev >= SICK_BAND[1].from ? "bad" : "warn"}">${esc(SPECIES_BY_ID[a.sp].name)} in ${esc(e.name)}: ${esc(sickName(a))}, ${sickBand(a).label}. ${esc(sickStatus(e, a))}</li>`).join("")}</ul></section>`;
   // every exhibit's check-up, most overdue first
   const herds = state.exhibits.filter(e => e.animals.length).sort((a, b) => daysSinceCheck(b) - daysSinceCheck(a));
-  if(herds.length) h += `<section><h3>Check-ups</h3><ul class="issues">${herds.map(e => { const d = daysSinceCheck(e); return `<li class="${d >= HEALTH.checkEvery ? "bad" : ""}">${esc(e.name)}: ${d >= 99 ? "never checked" : d === 0 ? "checked today" : `checked ${d} day${d === 1 ? "" : "s"} ago`}</li>`; }).join("")}</ul></section>`;
-  return h;
+  if(herds.length) r += `<section><h3>Check-ups</h3><ul class="issues">${herds.map(e => { const d = daysSinceCheck(e); return `<li class="${d >= HEALTH.checkEvery ? "bad" : ""}">${esc(e.name)}: ${d >= 99 ? "never checked" : d === 0 ? "checked today" : `checked ${d} day${d === 1 ? "" : "s"} ago`}</li>`; }).join("")}</ul></section>`;
+  return deptHead(b) + fullCols(h, r || `<section><h3>Check-ups</h3><div class="meta">No animals.</div></section>`);
 }
 
 function greenhouseHtml(b){
