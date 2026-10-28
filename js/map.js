@@ -1530,13 +1530,15 @@ function poolSpot(h, e, p){
 // can it swim straight from a to b without crossing dry ground?
 function poolClear(h, e, a, b){ const n = Math.ceil(dist(a, b)); for(let i = 1; i <= n; i++){ const t = i / n; if(!poolSpot(h, e, [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])) return false; } return true; }
 // how deep it can dive where it is: all the way in deep sea, halfway elsewhere
-// the blue of looking down through water: faint at the surface, full when deep (none mid-leap)
-// the blue of looking down through water, as five SVG filters in the page (faint at the surface, full when deep); none mid-leap
+// looking down through water: the picture's colors pulled toward the water's blue (outlines go navy, not black), more the deeper it is; none mid-leap
 function poolTint(dive, leap){
   if(leap) return "none";
   if(!document.getElementById("pool-tints")){
     let f = "";
-    for(let k = 0; k <= 4; k++){ const t = .3 + .7 * k / 4; f += `<filter id="pool-tint${k}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${(1 - .45 * t).toFixed(2)} 0 0 0 0  0 ${(1 - .22 * t).toFixed(2)} 0 0 0  0 0 ${(1 + .1 * t).toFixed(2)} 0 ${(.08 * t).toFixed(2)}  0 0 0 1 0"/></filter>`; }
+    for(let k = 0; k <= 4; k++){
+      const keep = 1 - (.5 + .3 * k / 4), o = [.07, .2, .46].map(w => (w * (1 - keep)).toFixed(3));   // blend toward the sea's blue
+      f += `<filter id="pool-tint${k}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${keep.toFixed(2)} 0 0 0 ${o[0]}  0 ${(keep * 1.05).toFixed(2)} 0 0 ${o[1]}  0 0 ${(keep * 1.1).toFixed(2)} 0 ${o[2]}  0 0 0 .92 0"/></filter>`;
+    }
     document.body.insertAdjacentHTML("beforeend", `<svg id="pool-tints" width="0" height="0" style="position:absolute">${f}</svg>`);
   }
   return `url(#pool-tint${Math.round(clamp(dive, 0, 1) * 4)})`;
