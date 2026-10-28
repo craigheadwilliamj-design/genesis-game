@@ -526,6 +526,12 @@ dialog.catalog .cat-head .btn{background:transparent;color:var(--on-forest);bord
 .deptlist .btn{font-weight:600;font-size:13px}
 
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--chrome);color:var(--ink);padding:20px;width:min(520px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+dialog.vivview{width:calc(100vw - 24px);height:calc(100vh - 24px);max-width:none;max-height:none;padding:0;display:none;flex-direction:column;overflow:hidden;background:#141C1F;color:#F3EFD9}
+dialog.vivview[open]{display:flex}
+dialog.vivview .cat-head{padding:12px 18px}
+dialog.vivview .cat-head .meta{color:#BCC9B6}
+dialog.vivview .cat-head .btn{background:transparent;color:#F3EFD9;border:1px solid rgba(243,239,217,.28)}
+#vvSvg{flex:1;min-height:0;width:100%;padding:0 12px 12px;box-sizing:border-box}
 dialog.parkmap{width:fit-content;max-width:94vw;padding:14px}
 dialog.parkmap .cat-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 dialog.parkmap .cat-head h2{margin:0}
@@ -1063,6 +1069,11 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <canvas id="parkMapCv" aria-label="Map of the whole park. Click to look there."></canvas>
 </dialog>
 
+<dialog id="dlgVivView" class="vivview" aria-label="Guest view">
+  <div class="cat-head"><div><h2 id="vvTitle"></h2><div class="meta" id="vvMeta"></div></div><button class="btn" id="closeVivView">Close</button></div>
+  <svg id="vvSvg" preserveAspectRatio="xMidYMid meet"></svg>
+</dialog>
+
 <dialog id="dlgPixel" class="pixed" aria-label="Pixel editor"></dialog>
 
 <dialog id="dlgConfirm">
@@ -1125,6 +1136,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
 <script src="js/staffui.js"></script>
 <script src="js/animalui.js"></script>
 <script src="js/parkmap.js"></script>
+<script src="js/vivview.js"></script>
 <script src="js/pixeled.js"></script>
 <script src="js/main.js"></script>
 
