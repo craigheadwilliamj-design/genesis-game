@@ -72,13 +72,13 @@ const techRows = group => TECH.filter(t => t.group === group && !techHidden(t.id
 
 function oracleHtml(b){
   const sc = state.science, n = sc.crew.paleo, idle = Math.max(0, n - sc.projects.length);
-  let h = deptHead(b);
-  h += `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 var(--font-head)">${Math.floor(sc.points)}</b> <span class="meta">points${n ? ` · +${idle * RESEARCH_PER_PALEO} a day` : ""}</span></div></section>`;
+  let h = `<section><h3>Research</h3><div class="card"><b class="num" style="font:600 26px/1 var(--font-head)">${Math.floor(sc.points)}</b> <span class="meta">points${n ? ` · +${idle * RESEARCH_PER_PALEO} a day` : ""}</span></div></section>`;
   h += sciStaffHtml("paleo");
   h += baysHtml("Research bays", "paleo", (p, i) => progressCard(esc(projectInfo(p.kind, p.id).label), "", p, i).replace(/<\/div>$/, `<button class="buy" data-action="stopResearch" data-i="${sc.projects.indexOf(p)}" style="margin-top:6px" title="The points come back.">Back to general research</button></div>`), `General research, +${RESEARCH_PER_PALEO} a day`);
   const block = labBlocker();
   if(block) h = h.replace(/<\/section>$/, `<div class="meta" style="color:var(--bad);margin-top:6px">${esc(block)}</div></section>`);
 
+  let l = h; h = "";
   h += `<section>${tabBar("omain", [{key:"manage", label:"Park management", color:"#4B3A8C"}, {key:"flora", label:"Paleo-Flora", color:"#4E7F2E"}, {key:"medicine", label:"Paleo-Medicine", color:"#B5483A"}], oracleMain)}<div class="ptab-body">`;
   if(oracleMain === "manage"){
     const secs = MANAGE_TABS.find(t => t.key === oracleManage) || MANAGE_TABS[0];
@@ -94,7 +94,7 @@ function oracleHtml(b){
     h += `<h3 style="margin-top:12px">Genome therapy</h3><ul class="shop">${techRows("gene")}</ul>`;
   }
   h += `</div></section>`;
-  return h;
+  return deptHead(b) + fullCols(l, h, true);
 }
 
 /* ---------- the Time Travel Lab ---------- */
@@ -198,22 +198,24 @@ function ghostHtml(b){
   if(ghostTab === "reports") return h + (sc.reports.length ? `<section>${sc.reports.map(reportHtml).join("")}</section>` : `<div class="meta">No reports.</div>`);
   // the drones: where each one is, what it's after and when it's back
   const dwhy = droneProblem();
-  h += `<section class="gt-drones"><h3>Drones <span class="meta">${sc.drones} of ${DRONES.max}</span></h3>${Array.from({length:sc.drones}, (_, i) => droneCard(i)).join("")}`;
-  h += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">Hangar full</span>`}</div>`;
-  h += `</section>`;
+  let l = `<section class="gt-drones"><h3>Drones <span class="meta">${sc.drones} of ${DRONES.max}</span></h3>${Array.from({length:sc.drones}, (_, i) => droneCard(i)).join("")}`;
+  l += `<div class="row">${sc.drones < DRONES.max ? `<button class="buy" data-action="gbuy"${dwhy ? ` disabled title="${esc(dwhy)}"` : ""}>Buy a drone ${money(dronePrice())}</button>` : `<span class="meta">Hangar full</span>`}</div>`;
+  l += `</section>`;
   // the timeline: slide through deep time, tap a site
   const now = yearsAt(ghostU);
-  h += `<section class="gt"><h3>Timeline</h3><div id="gtHead">${ghostHeadHtml(now)}</div><div id="gtMap">${ghostMapHtml(now)}</div>${ghostTrackHtml()}`;
-  h += `<div id="gtChips" class="gt-chips">${ghostChipsHtml(now)}</div><div id="gtCard" class="card">${ghostCardHtml()}</div>`;
-  h += `<div class="meta" style="margin-top:6px">Maps from the PALEOMAP PaleoDEMs: Scotese and Wright (2018), CC BY 4.0.</div></section>`;
+  let r = `<section class="gt"><h3>Timeline</h3><div id="gtHead">${ghostHeadHtml(now)}</div><div id="gtMap">${ghostMapHtml(now)}</div>${ghostTrackHtml()}`;
+  r += `<div id="gtChips" class="gt-chips">${ghostChipsHtml(now)}</div>`;
+  r += `<div class="meta" style="margin-top:6px">Maps from the PALEOMAP PaleoDEMs: Scotese and Wright (2018), CC BY 4.0.</div></section>`;
+  // the open site's card: under the drones when full size, under the timeline otherwise
+  let c = `<section><div id="gtCard" class="card">${ghostCardHtml()}</div></section>`;
   // events older than the slider
   const deep = TIME_SITES.filter(s => s.event && !Object.keys(s.at).length && siteShown(s));
-  if(deep.length) h += `<section><h3>Deep time</h3><ul class="shop">${deep.map(s => {
+  if(deep.length) c += `<section><h3>Deep time</h3><ul class="shop">${deep.map(s => {
     const ev = MUSEUM_BY_ID[s.event], d = sc.dna[s.event], why = siteLit(s) ? expeditionProblem(s.id, s.event) : "Locked.";
     return `<li class="${siteLit(s) ? "" : "locked"}"><span class="nm">${esc(ev.name)} <span class="per">${esc(ev.ago)}</span></span><button class="buy" data-action="gdeep" data-site="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Record ${money(tripOdds(s.event, s.id).cost)}</button><span class="need" style="grid-column:1/-1">${dnaBar(d)}${esc(s.name)}, ${esc(s.where)}. Survey Success ${Math.round((1 - tripOdds(s.event, s.id).fail) * 100)}%.</span></li>`; }).join("")}</ul></section>`;
-  if(hasDept("oracle")) h += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open the Research Lab</button></div>`;
-  if(sc.log.length) h += `<section><h3>Recent trips</h3><ul class="issues">${sc.log.map(l => `<li class="${l.ok ? "" : "bad"}">${fmtDate(l.day)}. ${esc(l.text)}</li>`).join("")}</ul></section>`;
-  return h;
+  if(hasDept("oracle")) c += `<div class="row"><button class="btn" data-action="gotoDept" data-t="oracle">Open the Research Lab</button></div>`;
+  if(sc.log.length) c += `<section><h3>Recent trips</h3><ul class="issues">${sc.log.map(x => `<li class="${x.ok ? "" : "bad"}">${fmtDate(x.day)}. ${esc(x.text)}</li>`).join("")}</ul></section>`;
+  return h + `<div class="fcols wide gt-cols"><div class="fcol">${l}</div><div class="fcol">${r}</div><div class="fcol">${c}</div></div>`;
 }
 // Redraw the timeline's parts in place (dragging the slider or picking a site), so the slider keeps hold of the pointer
 function ghostRefresh(){
@@ -269,12 +271,12 @@ function tarHtml(b){
   let h = deptHead(b);
   h += tabBar("tartab", [{key:"clone", label:"Cloning", color:"#4B3A8C"}, {key:"specimens", label:`Specimens${specimens().length ? ` (${specimens().length})` : ""}`, color:"#4B3A8C"}], tarTab);
   if(tarTab === "specimens") return h + specimensHtml();
-  h += sciStaffHtml("gene");
+  let l = sciStaffHtml("gene");
   const speed = Math.round(cloneSpeed() * 100);
-  h += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");
-  if(speed !== 100) h = h.replace(/<\/section>$/, `<div class="meta">Speed ${Math.round(10000 / speed)}%</div></section>`);
-  const lib = SPECIES.filter(s => sc.dna[s.id]);
-  h += `<section><h3>Genome library</h3>`;
+  l += baysHtml("Incubator bays", "gene", (c, i) => cloneCard(c, i), "Empty");
+  if(speed !== 100) l = l.replace(/<\/section>$/, `<div class="meta">Speed ${Math.round(10000 / speed)}%</div></section>`);
+  const lib = SPECIES.filter(s => sc.dna[s.id]), head = h;
+  h = `<section><h3>Genome library</h3>`;
   if(!lib.length) h += `<div class="meta">No DNA.</div>`;
   else {
     h += `<ul class="shop">`;
@@ -287,7 +289,7 @@ function tarHtml(b){
     h += `</ul>`;
   }
   h += `</section>`;
-  return h;
+  return head + fullCols(l, h, true);
 }
 
 /* ---------- Botany Lab ---------- */
@@ -312,8 +314,7 @@ function growRow(kind, era, size){
 
 function ceresHtml(b){
   const sc = state.science, c = state.ceres;
-  let h = deptHead(b);
-  h += sciStaffHtml("botanist");
+  let h = sciStaffHtml("botanist");
   const pe = state.exhibits.filter(e => e.animals.some(a => foodType(SPECIES_BY_ID[a.sp]) === "paleoflora"));
   h += `<section><h3>Paleoflora food</h3>`;
   if(!hasTech("paleoflora")) h += `<div class="meta">Locked</div>`;
@@ -330,6 +331,7 @@ function ceresHtml(b){
 
   h += baysHtml("Growing bays", "botanist", (j, i) => progressCard(growName(j.kind, j.era, j.size), "", j, i), "Empty");
 
+  const l = h; h = "";
   const planted = period => state.exhibits.reduce((n, e) => n + landOf(e).filter(f => LAND[f.type] && LAND[f.type].period === period && LAND[f.type].flora !== "cenozoic").length, 0);
   h += `<section><h3>Plants for exhibits</h3>`;
   h += `<div style="margin-top:8px">${tabBar("cperiod", Object.keys(PLANT_DNA).map(p => ({key:p, label:p, color:PERIOD_COLOR[p], lock:!hasTech(FLORA[PLANT_DNA[p].era].tech)})), cerePeriod)}</div>`;
@@ -343,7 +345,7 @@ function ceresHtml(b){
   if(use) h += `<div class="meta">Medicated feed: ${use} a day</div>`;
   h += `<ul class="shop" style="margin-top:8px">${ERA_ORDER.map(era => growRow("med", era)).join("")}</ul></section>`;
 
-  return h;
+  return deptHead(b) + fullCols(l, h);
 }
 
 /* ---------- clicks ---------- */
