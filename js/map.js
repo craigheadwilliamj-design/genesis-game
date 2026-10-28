@@ -1544,13 +1544,38 @@ function poolLook(h, e){
   const w = e && waterOf(e).find(w => inPoly(h.x, h.y, w.points)), k = w && w.kind || (e && biomeOf(e));
   return WATER_TEX[k] ? k : null;
 }
-// undoes animalUp, so the water layer inside an animal's group sits back on the map's ground
-function animalUpInv(h){ const up = (h.lift || 0) + (h.bob || 0); return tilt ? `translate(0 ${((h.r || 0) * (h.spr ? .5 : .85)).toFixed(2)}) scale(1 ${TILT.toFixed(4)})${up ? ` translate(0 ${up.toFixed(2)})` : ""}` : ""; }
+// The water over a pool animal is a sibling right after its group, in the map's own coordinates like the water itself (inside the animal's moving group,
+// the water pattern would be redrawn whole every frame): the water's pictures over the picture's box, masked by a <use> of the animal's body
+// placed with the animal's own transform. Removing the animal empties the mask, and syncAnimals clears layers left behind.
+// the picture's box on the map's ground ([x, y, w, h]): rigSvg draws it 2.5r wide from 1.875r above the dot's foot row (r * .5) down to it, raised by animalUp
+function poolWetBox(h){
+  const r = h.r || 1, up = (h.lift || 0) + (h.bob || 0), k = tilt ? 1 / TILT : 1, foot = tilt ? h.y - up : h.y;
+  return [h.x - r * 1.3, foot - r * 1.9 * k, r * 2.6, r * 2 * k];
+}
 const poolWetOp = (dive, leap) => leap ? 0 : .35 + .3 * dive;
-function poolWetPlace(h){
-  const g = h.el.querySelector(".pwet"), r = h.r || 1; if(!g) return;
-  g.setAttribute("transform", `${animalUpInv(h)} translate(${(-h.x).toFixed(2)} ${(-h.y).toFixed(2)})`);
-  const q = g.firstChild; q.setAttribute("x", (h.x - r * 1.6).toFixed(2)); q.setAttribute("y", (h.y - r * 3).toFixed(2));
+function poolWetPlace(h, e){
+  const look = h.spr ? poolLook(h, e) : null, id = h.a ? h.a.id : 0;
+  if(!look){ if(h.wetEl){ h.wetEl.remove(); h.wetEl = null; } return; }
+  if(!h.wetEl){
+    h.wetEl = document.createElementNS("http://www.w3.org/2000/svg", "g"); h.wetEl.dataset.wet = id; h.wetEl.setAttribute("pointer-events", "none");
+    h.wetEl.innerHTML = `<defs><mask id="pwm${id}" maskUnits="userSpaceOnUse" style="mask-type:alpha"><use href="#pwb${id}"/></mask></defs><g mask="url(#pwm${id})">`
+      + `<rect shape-rendering="crispEdges"/>${"<image style=\"image-rendering:pixelated\"/>".repeat(4)}</g>`;
+  }
+  if(h.el.nextSibling !== h.wetEl) h.el.after(h.wetEl);
+  const m = h.wetEl.firstChild.firstChild, g = h.wetEl.lastChild, q = g.firstChild, b = poolWetBox(h);
+  [["x", b[0]], ["y", b[1]], ["width", b[2]], ["height", b[3]]].forEach(([k, v]) => { m.setAttribute(k, v.toFixed(2)); q.setAttribute(k, v.toFixed(2)); });
+  m.firstChild.setAttribute("transform", h.el.getAttribute("transform") || "");
+  h.wetEl.setAttribute("opacity", poolWetOp(h.dive || 0, h.breachT).toFixed(2));
+  // the water's current frame, drawn as plain pictures on the pattern's own grid (a rect filled with the big pattern costs a full redraw of it every frame);
+  // until the tiles are built the pattern is one small tile, cheap to fill a rect with
+  const fill = tileFill("w", look), pat = document.getElementById(`w-${look}`), img = pat && pat.querySelector("image"), span = pat ? +pat.getAttribute("width") : 0, big = span > 4 && img;
+  q.setAttribute("fill", big ? "none" : fill);
+  const href = big ? img.getAttribute("href") : "", tx = Math.floor(b[0] / span) * span, ty = Math.floor(b[1] / span) * span;
+  [...g.querySelectorAll("image")].forEach((im, i) => {
+    if(!big){ im.style.display = "none"; return; }
+    im.style.display = ""; if(im.getAttribute("href") !== href) im.setAttribute("href", href);
+    im.setAttribute("x", tx + (i & 1) * span); im.setAttribute("y", ty + (i >> 1) * span); im.setAttribute("width", span); im.setAttribute("height", span);
+  });
 }
 // how deep it can dive where it is: all the way in deep sea, halfway elsewhere
 const poolDepth = (e, x, y) => waterOf(e).some(w => w.kind === "deep" && inPoly(x, y, w.points)) ? 1 : POOL_SWIM.shallow;
@@ -1576,7 +1601,6 @@ function poolSwim(h, e, dt){
   if(h.breachT){ h.breachT += dt / A.breach[1]; if(h.breachT >= 1){ h.breachT = 0; h.lift = 0; } else h.lift = Math.sin(Math.PI * h.breachT) * (h.r || 1) * A.breach[2]; }
   const dv = h.el.querySelector(".dive");
   if(dv){ dv.setAttribute("opacity", (1 - A.fade * (h.breachT ? 0 : h.dive)).toFixed(2)); dv.style.filter = poolTint(h, h.breachT); }
-  const wg = h.el.querySelector(".pwetg"); if(wg){ wg.setAttribute("opacity", poolWetOp(h.dive, h.breachT).toFixed(2)); const lk = poolLook(h, e); if(lk && lk !== h.wetLook){ h.wetLook = lk; wg.querySelector("rect").setAttribute("fill", tileFill("w", lk)); } }
   if(Math.abs(v[0]) > .08){ const face = v[0] > 0 ? 1 : -1; if(face !== (h.face || 1)){ h.face = face; h.turn = 0; } }
   h.turn = Math.min(1, (h.turn ?? 1) + dt / A.turn);
   const S = SPRITES[h.sp], el = h.spr && h.el.querySelector(".spr");
@@ -1584,8 +1608,8 @@ function poolSwim(h, e, dt){
   const spd = Math.hypot(v[0], v[1]); h.stride = (h.stride || 0) + spd * dt;
   if(h.spr && rigOf(h.sp)) rigStep(h, spd > .15 ? "walk" : rest ? "rest" : "idle"); else if(h.spr && S && S.idle) setPose(h, idleFrame(h, S));
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
-  poolWetPlace(h);
   if(tilt) place34(h);
+  poolWetPlace(h, e);
 }
 
 // A species picture, about as wide as two and a half dots, its feet a little below the dot's middle; face -1 turns it to the left.
@@ -1728,14 +1752,13 @@ function drawAnimal(h, e, a){
     (a.act === "pace" ? `<circle r="${r * (noticed(a) ? 1.8 : 1.45)}" fill="none" stroke="#E0A030" stroke-width="2" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>` : "") +
     (pool ? subSvg() : h.pool ? poolBodySvg(h, body) : body);
   h.el.setAttribute("transform", `translate(${h.x.toFixed(2)} ${h.y.toFixed(2)})${animalUp(h)}`);
+  if(h.pool) poolWetPlace(h, e);
 }
-// A pool animal: its body in a group poolSwim fades as it dives in the blue-water filter (ripple streaks drift over it)
+// A pool animal: its body in a group poolSwim fades and tints as it dives; the water laid over it is its own layer (poolWetPlace)
 function poolBodySvg(h, body){
-  const r = h.r || 1, id = h.a ? h.a.id : 0, e = state.exhibits.find(x => x.id === h.exhibitId), look = h.wetLook = poolLook(h, e), op = (1 - POOL_SWIM.fade * (h.dive || 0)).toFixed(2);
-  const wet = look ? `<g mask="url(#pwm${id})" opacity="${poolWetOp(h.dive || 0, h.breachT).toFixed(2)}" class="pwetg" pointer-events="none"><g class="pwet" shape-rendering="crispEdges" transform="${animalUpInv(h)} translate(${(-h.x).toFixed(2)} ${(-h.y).toFixed(2)})"><rect x="${(h.x - r * 1.6).toFixed(2)}" y="${(h.y - r * 3).toFixed(2)}" width="${(r * 3.2).toFixed(2)}" height="${(r * 4.5).toFixed(2)}" fill="${tileFill("w", look)}"/></g></g>` : "";
-  return `<defs><filter id="ptf${id}" color-interpolation-filters="sRGB"><feColorMatrix class="ptint" type="matrix" values="${poolTintValues(h.dive || 0)}"/></filter>`
-    + `<mask id="pwm${id}" maskUnits="userSpaceOnUse" x="${-r * 3}" y="${-r * 4}" width="${r * 6}" height="${r * 8}" style="mask-type:alpha"><use href="#pwb${id}"/></mask></defs>`
-    + `<g class="dive" opacity="${op}" style="filter:${poolTint(h, h.breachT)}"><g id="pwb${id}">${body}</g></g>${wet}`;
+  const id = h.a ? h.a.id : 0, op = (1 - POOL_SWIM.fade * (h.dive || 0)).toFixed(2);
+  return `<defs><filter id="ptf${id}" color-interpolation-filters="sRGB"><feColorMatrix class="ptint" type="matrix" values="${poolTintValues(h.dive || 0)}"/></filter></defs>`
+    + `<g class="dive" opacity="${op}" style="filter:${poolTint(h, h.breachT)}"><g id="pwb${id}">${body}</g></g>`;
 }
 function syncAnimals(){
   const seen = new Set(), inv = 1/view.k;
@@ -1768,7 +1791,8 @@ function syncAnimals(){
     }
   }
   for(const [id, h] of herd) if(!seen.has(id)){ h.el.remove(); herd.delete(id); }
-  indexDepth34(); for(const h of herd.values()) place34(h);
+  indexDepth34(); for(const h of herd.values()){ place34(h); if(h.pool) poolWetPlace(h, state.exhibits.find(x => x.id === h.exhibitId)); }
+  for(const w of document.querySelectorAll("[data-wet]")){ const h = herd.get(w.dataset.wet); if(!h || h.wetEl !== w || !h.el.isConnected) w.remove(); }
 }
 
 // What an animal walks around: its fence, kept half a body's length off so it doesn't poke through, and the rocks, trees, caves and barns
