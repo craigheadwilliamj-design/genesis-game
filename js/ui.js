@@ -265,7 +265,7 @@ function exhibitHtml(e){
   const body = {main:exOverviewHtml, barrier:exBarrierHtml, land:x => lagoonWalled(x) ? aquascapeHtml(x) : x.aqua ? aquaSceneHtml(x) : x.viv ? vivSceneHtml(x) : landHtml(x), props:x => x.viv ? vivToysHtml(x) : propsHtml(x),
     animals:animalsTabHtml, health:exHealthHtml, clone:x => cloneHtml(x, rep), behave:behaviorHtml, guests:exGuestsHtml}[exTabs.tab](e, rep);
   h += body;
-  return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
+  return h + `<div class="row"><button class="btn" data-action="center">Center on map</button>${e.viv ? `<button class="btn" data-action="vivView">View</button>` : ""}${exTabs.tab === "main" ? `<button class="btn danger" data-action="demolish">Bulldoze exhibit</button>` : ""}</div>`;
 }
 // A link in the Overview that opens another tab
 const exJump = (k, label, level, text) => `<li class="${level}"><button class="exjump" data-action="extab" data-k="${k}"><b>${label}</b><span>${text}</span><span class="meta">›</span></button></li>`;
@@ -985,6 +985,7 @@ panelEl.addEventListener("click", e => {
   if(a === "gotoDept"){ const d = state.buildings.find(x => x.type === b.dataset.t); if(d) select("building", d.id); return; }
   if(!it) return;
   if(a === "center") centerOn(it);
+  if(a === "vivView") openVivView(it);
   if(a === "buy"){
     const s = SPECIES_BY_ID[b.dataset.sp];
     if(!canAfford(s.price) || state.rating + 1e-9 < starsNeed(s)) return;

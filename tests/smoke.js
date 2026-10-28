@@ -3952,6 +3952,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const aq = {id:"e-aq", name:"Aq", viv:"L", aqua:true, wq:100, points:rectPts(320, 300, V.w, V.d, 0), animals:[0, 1, 2].map(i => ({id:"aq" + i, sp:"stet", q:90})), happy:70};
       state.exhibits.push(aq); recompute();
       const sea = SPECIES_BY_ID.stet, land = SPECIES_BY_ID.tikt;
+      // the guest view: a fullscreen look through the front glass, the case's animals mirrored from the map
+      syncAnimals(); openVivView(aq); vvFrame();
+      const q = x => document.querySelector(x);
+      out.vivGuestView = q("#dlgVivView").open && q("#vvAnimals use, #vvAnimals circle") && q("#vvAnimals").children.length === [...herd.values()].filter(h => h.exhibitId === aq.id && h.placed && !h.ins).length && /Aq/.test(q("#vvTitle").textContent);
+      closeVivView(); out.vivGuestView = out.vivGuestView && !q("#dlgVivView").open;
       out.aquaFits = fitsHabitat(sea, aq) && !fitsHabitat(land, aq) && !fitsHabitat(sea, ev) && !fitsHabitat(sea, {points:[]}) && fitsHabitat(land, ev) && SPECIES.filter(x => x.aqua).every(x => x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)));
       out.aquaFittings = !vivToyProblem(aq, "afilter") && !vivToyProblem(aq, "vdish") && !!vivToyProblem(aq, "vlamp") && !!vivToyProblem(aq, "vpool") && !!vivToyProblem(ev, "afilter") && !vivToyProblem(ev, "vlamp");
       const noFilter = filterText(aq), aim0 = wqAim(aq);
