@@ -64,8 +64,8 @@ def walk(N=8, fps=8, ds=.6, S=6.0, SF=5.0, backF=-.5, lift=1.8, liftF=1.6, bob=.
         feet[th] = (c - st/2 + st*sm(t), (liftF if fr else lift)*s, toe*s)
     out.append(pose((rb, 0, crouch + bob*math.sin(4*math.pi*f + .6)), head=-.7*rb + 1.2*math.sin(4*math.pi*(f + .25)),
                     tail=-1.5*rb + 3*math.sin(2*math.pi*(f + .1)), feet=feet))
-  # one cycle covers S/ds px; the rig is drawn 2.5 * rsize (1.1) dot radii across its 100 px cell
-  print('walk:', N, 'frames; rstep', round(S/ds/(100/2.75)/N, 4))
+  # one cycle covers S/ds px; the rig is drawn 2.5 * rsize (1.8) dot radii across its 100 px cell
+  print('walk:', N, 'frames; rstep', round(S/ds/(100/4.5)/N, 4))
   return {'name': 'walk', 'fps': fps, 'frames': unwrap(out)}
 
 def stand(N=12, fps=6):
