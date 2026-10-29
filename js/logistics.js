@@ -6,7 +6,7 @@
    Nobody draws supply lines. They appear from what keepers actually haul.
    ===================================================================== */
 
-function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, hist:[], orders:{}, auto:false, guestFrom:GUEST_GOODS_FROM}; }
+function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, hist:[], orders:{}, auto:false, truckDay:0, guestFrom:GUEST_GOODS_FROM}; }
 // Keepers carry food from stations to exhibits; custodians stock every store (animal food, medicine, stand and shop goods)
 const KEEPER_GOODS = FEED_GOODS.concat(MED_GOODS, [CMED]);
 const isGuestGood = t => GUEST_GOODS.includes(t);
@@ -156,7 +156,7 @@ function haulSources(j){
   const out = [];
   for(const b of stores()){
     const d = storeOf(b); if(b === j.d || supplyOf(b, j.t) < 1) continue;
-    if(j.cls === 1 ? (d.bulk || d.source) : (d.dock || d.source)) out.push(b);
+    if(j.cls <= 1 ? (d.bulk || d.source) : (d.dock || d.source)) out.push(b);
   }
   if(MED_GOODS.includes(j.t)) for(const b of cereses()) if(supplyOf(b, j.t) >= 1) out.push(b);
   return out;
@@ -164,20 +164,22 @@ function haulSources(j){
 // The least worth a trip: food moves in lots of 5, but medicine is used a dose or two at a time and the PMC only holds a few, so it can't wait for 5 to be missing
 const restockLot = t => MED_GOODS.includes(t) || t === CMED ? HEALTH.dose : 5;
 // The most run-down store this worker can restock, with the nearest place to get what it needs. `near` finds the closest of a list.
-// Only custodians restock stores: they pass the goods and a carry limit of their own.
-function pickHaul(k, near, goods, most){
-  const kz = k && k.zone, cands = [];
-  for(const d of stores()){
-    const dd = storeOf(d); if(dd.source || dd.dock) continue;
-    if(kz && d.zone && d.zone !== kz) continue;
+// Only custodians restock stores: they pass the goods and a carry limit of their own. `only` is a building a custodian was called to: fill it to its target.
+// Stands, shops and hotels are filled in the evening restock; through the day they're only topped up once they drop under LOGI.lowMark.
+function pickHaul(k, near, goods, most, only){
+  const kz = k && k.zone, cands = [], eve = restockEvening();
+  for(const d of only ? [only] : stores()){
+    const dd = storeOf(d); if(!dd || dd.source || dd.dock) continue;
+    if(!only && kz && d.zone && d.zone !== kz) continue;
+    const gate = only ? 1 : dd.vendor ? (eve ? .9 : LOGI.lowMark) : .6;
     for(const t of dd.holds){
       if(!goods.includes(t)) continue;
       const tgt = storeTarget(d, t); if(tgt <= 0) continue;
       // a store only takes what fits: every good shares its room
       const have = stockOf(d, t) + inbound(d.id, t), room = storeRoom(d, t) - dd.holds.reduce((s, x) => s + inbound(d.id, x), 0);
       const need = Math.min(tgt - have, room);
-      if(have >= tgt * .6 || need < Math.min(restockLot(t), tgt)) continue;
-      cands.push({d, t, need, cls:dd.bulk ? 2 : 1, ratio:have / tgt});
+      if(have >= tgt * gate || need < (only ? 1 : Math.min(restockLot(t), tgt))) continue;
+      cands.push({d, t, need, cls:eve && dd.vendor ? 0 : dd.bulk ? 2 : 1, ratio:have / tgt});
     }
   }
   cands.sort((a, b) => a.cls - b.cls || a.ratio - b.ratio);
@@ -206,7 +208,9 @@ function supplyLines(){
 /* ---------- through the day and night ---------- */
 
 // Farms and ranches fill their own stores through the day. A full store stops production.
+// The supply trucks come at 7 PM, as the evening restock starts.
 function logiTick(dtMin){
+  if(state.logi.truckDay !== state.day && state.minute >= minuteAtClock(LOGI.truckClock)){ state.logi.truckDay = state.day; dockDelivery(); }
   if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until ${fmtDate(state.logi.guestFrom)}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
   const share = dtMin / DAY_MIN;
@@ -262,7 +266,7 @@ const forecasting = () => hasTech("forecast") && state.logi.auto;
 function setOrder(t, n){ if(ORDER_GOODS.includes(t)) state.logi.orders[t] = roundOrder(t, clamp(+n || 0, 0, orderMax(t))); }
 const orderMax = t => t === CMED ? 60 : Math.max(500, Math.ceil(dockCap() / 50) * 50);
 
-// The night's delivery: every standing order, spread over the docks with the most room. Animal food and medicine unload first,
+// The evening delivery: every standing order, spread over the docks with the most room. Animal food and medicine unload first,
 // then stands and shops share whatever room is left. What doesn't fit or can't be paid for isn't delivered or charged.
 function dockDelivery(){
   const L = state.logi, ds = docks();
@@ -329,7 +333,32 @@ function logiNight(){
   state.logi.last = state.logi.flow; state.logi.flow = {};
   state.logi.usedLast = state.logi.used || {}; state.logi.used = {};
   state.logi.hist = (state.logi.hist || []).concat([state.logi.usedLast]).slice(-LOGI.histDays);
-  dockDelivery();
+}
+
+/* ---------- the evening restock ---------- */
+
+// From 7 PM to the end of the day, custodians fill every stand, shop and hotel before their other chores
+const restockEvening = () => state.minute >= minuteAtClock(LOGI.truckClock);
+const restocked = b => !!(storeOf(b) && storeOf(b).vendor);   // stands, shops and hotels
+// Goods a stand, shop or hotel is short of: under `share` of its target
+const shortGoods = (b, share = 1) => guestGoodsFree() || !restocked(b) ? [] : storeOf(b).holds.filter(t => { const g = storeTarget(b, t); return g > 0 && stockOf(b, t) < g * share - (share === 1 ? 1 : 0); });
+const lowStock = b => shortGoods(b, LOGI.lowMark).length > 0;
+// Something to restock it from: a dock, warehouse, cold store or farm holding the good
+const inStorage = t => stores().some(b => { const d = storeOf(b); return (d.bulk || d.source) && supplyOf(b, t) >= 1; });
+// When the day ends, any stand, shop or hotel left short missed its restock. Short because storage ran dry, or because nobody got there.
+function restockCheck(){
+  const missed = [], dry = new Set();
+  for(const b of state.buildings){
+    if(!restocked(b)) continue;
+    const short = shortGoods(b, LOGI.restockedAt);
+    b.missed = short.length > 0;
+    if(!b.missed) continue;
+    const out = short.filter(t => !inStorage(t));
+    out.forEach(t => dry.add(t));
+    if(out.length < short.length) missed.push(b);
+  }
+  if(dry.size) events.toast(`Storage ran out of ${[...dry].map(t => goodName(t).toLowerCase()).join(" and ")} during the restock.`, "bad");
+  if(missed.length) events.toast(`${missed.length} stand${missed.length === 1 ? "" : "s"}, shop${missed.length === 1 ? "" : "s"} or hotel${missed.length === 1 ? "" : "s"} weren't restocked by ${fmtClock(ROLLOVER_CLOCK + DAY_CLOCK)}.`, "bad");
 }
 
 // Everything the park holds right now, for the park office

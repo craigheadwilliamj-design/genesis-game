@@ -342,13 +342,15 @@ function chase(c, l){
 
 // The Call keeper / vet / mechanic buttons: the nearest worker of that kind who isn't mid-emergency drops their job and
 // goes to check the exhibit. If nobody can go yet, the next free one takes it. Escapes still come first.
-// state.staff.calls: {ex: exhibit id, keeper: worker id or null (any kind), kind: "keeper" (default), "vet" or "mech"}
+// state.staff.calls: {ex: exhibit id (a building's for "cust"), keeper: worker id or null (any kind), kind: "keeper" (default), "vet", "mech" or "cust"}
 const CALLS = {
   keeper:{word:"keeper",   staff:() => state.staff.keepers.filter(k => !isAqua(k)), crew:() => crew.filter(c => !aquaCrew(c)),  anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
   aqua:  {word:"aquarist", staff:() => state.staff.keepers.filter(isAqua),           crew:() => crew.filter(aquaCrew),            anchor:e => kGraph.anchors[e.id], busy:c => callBusy(c),  take:(c, call) => takeCall(c, call)},
   vet:   {word:"vet",      staff:() => state.staff.vets,      crew:() => vcrew, anchor:e => kGraph.anchors[e.id], busy:c => vetBusy(c),   take:(c, call) => takeVetCall(c, call)},
   mech:  {word:"mechanic", staff:() => state.staff.mechanics, crew:() => mcrew, anchor:e => anchorFor(e),         busy:c => mechBusy(c), take:(c, call) => takeMechCall(c, call)},
+  cust:  {word:"custodian", staff:() => state.staff.custodians, crew:() => ccrew, anchor:b => kGraph.anchors[b.id], busy:c => !!(c.carry || c.cargo), take:c => takeCustCall(c)},
 };
+const callName = x => x.name || "the " + BUILDINGS[x.type].label.toLowerCase();   // an exhibit's name, or "the food cart"
 const callKind = x => x.kind || "keeper";
 const callFor = c => state.staff.calls.find(x => x.keeper === c.id) || null;
 const callBusy = c => c.cargo || c.hunt || c.job === "filling" || c.job === "sedating" || c.job === "hunting" || c.job === "toSedated" || c.job === "returning"
@@ -358,6 +360,11 @@ const mechBusy = c => c.job === "inspecting" || c.job === "repairing";
 function callProblem(e, kind = "keeper"){
   const K = CALLS[kind];
   if(!K.staff().length) return `Hire a ${K.word} first.`;
+  if(kind === "cust"){
+    if(!kGraph || !K.anchor(e)) return "Custodians can't reach it.";
+    const short = shortGoods(e); if(!short.length) return "Fully stocked.";
+    return short.some(inStorage) ? null : `No ${goodName(short[0]).toLowerCase()} in storage.`;
+  }
   if(kind === "mech"){ if(e.viv) return "Vivariums have no fence to inspect."; return anchorFor(e) ? null : "Mechanics can't reach the fence."; }
   if(keeperMoveProblem(e)) return keeperMoveProblem(e);
   if(kind === "vet" && !e.animals.length) return "No animals here to check.";
@@ -378,7 +385,7 @@ function callKeeper(e, kind = "keeper"){
   if(best) call.keeper = best.c.id;
   calls.push(call);
   const k = best && K.staff().find(x => x.id === best.c.id);
-  events.toast(k ? `${k.name} is on the way to ${e.name}.` : `Every ${K.word} is tied up. The next one free will go to ${e.name}.`, k ? "good" : "");
+  events.toast(k ? `${k.name} is on the way to ${callName(e)}.` : `Every ${K.word} is tied up. The next one free will go to ${callName(e)}.`, k ? "good" : "");
   return null;
 }
 function cancelCall(e, kind = "keeper"){ state.staff.calls = state.staff.calls.filter(x => !(x.ex === e.id && callKind(x) === kind)); }
@@ -413,7 +420,7 @@ function callJob(c, kind = "keeper"){
   return null;
 }
 function callsTidy(){
-  state.staff.calls = state.staff.calls.filter(x => state.exhibits.some(e => e.id === x.ex) && CALLS[callKind(x)].anchor({id:x.ex}));
+  state.staff.calls = state.staff.calls.filter(x => (callKind(x) === "cust" ? state.buildings : state.exhibits).some(e => e.id === x.ex) && CALLS[callKind(x)].anchor({id:x.ex}));
   for(const x of state.staff.calls) if(x.keeper && !CALLS[callKind(x)].crew().some(c => c.id === x.keeper)) x.keeper = null;
 }
 

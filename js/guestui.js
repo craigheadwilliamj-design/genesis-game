@@ -149,7 +149,7 @@ function hotelHtml(b){
   h += `<dl class="kv"><dt>Rooms</dt><dd>${t.rooms}, for ${LODGING.perRoom} guests each</dd><dt>Booked last night</dt><dd>${bk ? `${bk.rooms} room${bk.rooms === 1 ? "" : "s"}, ${money(bk.money || 0)}` : "Not open a night yet"}</dd><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   h += `<section><h3>Cleanliness</h3><div class="factor" style="grid-template-columns:1fr 48px"><span>${meter(100 - dirt, dirt >= 50 ? "var(--bad)" : dirt >= LODGING.cleanAt ? "var(--warn)" : "var(--good)")}</span><span>${Math.round(100 - dirt)}%</span></div>`;
   h += `</section>`;
-  h += `<section><h3>Toiletries</h3>${stockRows(b)}${!guestGoodsFree() && roomsStocked(b) < t.rooms ? `<div class="meta" style="margin-top:6px;color:var(--bad)">Running low.</div>` : ""}</section>`;
+  h += `<section><h3>Toiletries</h3>${stockRows(b)}${restockRows(b)}</section>`;
   return h;
 }
 // The Education Center: its entry fee, and what guests get from it
@@ -192,10 +192,15 @@ function museumHtml(b){
 const cents = n => Number.isInteger(n) ? money(n) : "$" + n.toFixed(2);
 // What's on the shelves, and who fills them
 function vendorStockHtml(b){
-  let h = `<section><h3>Stock</h3>${stockRows(b)}`;
-  if(guestGoodsFree()) h += `<div class="meta" style="margin-top:6px">Free supply until ${fmtDate(state.logi.guestFrom)}</div>`;
-  else if(!state.staff.custodians.length) h += `<div class="meta" style="margin-top:6px;color:var(--bad)">No custodians.</div>`;
-  return h + `</section>`;
+  return `<section><h3>Stock</h3>${stockRows(b)}${restockRows(b)}</section>`;
+}
+// Under a stand, shop or hotel's stock: free supply, or how its restock went and a call button
+function restockRows(b){
+  if(guestGoodsFree()) return `<div class="meta" style="margin-top:6px">Free supply until ${fmtDate(state.logi.guestFrom)}</div>`;
+  let h = "";
+  if(lowStock(b)) h += `<span class="status no">Running low.</span> `;
+  if(b.missed) h += `<span class="status no">Not restocked last night.</span>`;
+  return (h ? `<div class="row" style="margin-top:6px">${h}</div>` : "") + callRow(b, "cust");
 }
 // The Security Office: its guards, and today's trouble
 function securityHtml(b){
@@ -214,9 +219,9 @@ function closetHtml(b){
   h += staffNote("custodian");
   const dirty = state.buildings.filter(x => x.type === "restroom" && (x.dirt || 0) >= CUSTODIAN.restroomAt).length;
   const full = state.buildings.filter(x => x.type === "bin" && (x.fill || 0) >= LITTER.binCap * CUSTODIAN.binAt).length;
-  const low = state.buildings.filter(x => isVendor(x) && storeOf(x).holds.some(t => storeTarget(x, t) && stockOf(x, t) < storeTarget(x, t) * .35)).length;
+  const low = state.buildings.filter(lowStock).length;
   h += `<section><h3>Right now</h3><ul class="issues">
-    <li class="${low ? "bad" : ""}">${low ? `${low} stand${low === 1 ? "" : "s"} or shop${low === 1 ? "" : "s"} running low` : "Stands and shops are stocked"}</li>
+    <li class="${low ? "bad" : ""}">${low ? `${low} stand${low === 1 ? "" : "s"}, shop${low === 1 ? "" : "s"} or hotel${low === 1 ? "" : "s"} running low` : "Stands, shops and hotels are stocked"}</li>
     <li class="${dirty ? "bad" : ""}">${dirty ? `${dirty} restroom${dirty === 1 ? "" : "s"} need scrubbing` : "Restrooms are clean"}</li>
     <li class="${full ? "bad" : ""}">${full ? `${full} bin${full === 1 ? "" : "s"} need emptying` : "Bins have room"}</li>
     <li class="${litterTotal() >= 10 ? "bad" : ""}">${Math.round(litterTotal())} pieces of litter on the paths</li>

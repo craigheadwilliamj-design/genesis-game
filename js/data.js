@@ -1310,6 +1310,9 @@ const LOGI = {
   bulk:[[500, .2], [200, .1]],   // a standing order of at least this many units a night gets this much off
   autoDays:2,          // Supply forecasting sets orders that keep this many days of each good in the park
   histDays:7,          // nights of use kept for the Logistics tab's average
+  truckClock:19 * 60,  // supply trucks arrive at 7 PM, when custodians start the evening restock
+  lowMark:.25,         // through the day, custodians only restock a stand, shop or hotel under this share of its target (and it shows a "!")
+  restockedAt:.8,      // a stand, shop or hotel under this share of its target when the day ends missed its restock
   cmedSeed:5,          // doses a night of contemporary medicine first ordered once a PMC is built
   coldPower:25,        // kW a cold store draws
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
@@ -1331,11 +1334,11 @@ BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph
                        full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS.concat(MED_GOODS), spoil:1, bulk:true, dock:true},   // era medicine only lands here when the PMC and cold stores are full
-                  full:"Supplier deliveries", blurb:"Standing orders from the Park Office land here overnight. More docks hold more. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
+                  full:"Supplier deliveries", blurb:"Standing orders from the Park Office land here at 7 PM. More docks hold more. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
 for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
-// Food stands and gift shops keep their own stock
-for(const [t, cap] of Object.entries({kiosk:60, food:150, restaurant:400, cart:60, shop:150, megastore:400}))
+// Food stands and gift shops keep their own stock: shelves plus a back room, so a big one gets through a normal day on its evening restock
+for(const [t, cap] of Object.entries({kiosk:200, food:400, restaurant:1000, cart:200, shop:400, megastore:1000}))
   BUILDINGS[t].store = {cap, holds:BUILDINGS[t].kind === "food" ? ["snacks", "drinks"] : ["merch"], spoil:1, vendor:true};
 // Production. Needs the food production research. Output goes into the building's own store.
 //   makes   units a day

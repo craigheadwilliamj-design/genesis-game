@@ -74,6 +74,13 @@ function custDecide(c, r){
     if(d && custGo(c, w, kGraph.anchors[d.id], "toHaulDst")){ c.haul = c.haul || {t:c.carry.type, src:null, dst:d.id, amount:c.carry.amount}; return; }
     returnCustCarry(c);
   }
+  // called to a stand, shop or hotel: fill it, a good at a time, before anything else
+  const call = callJob(c, "cust");
+  if(call){
+    const b = buildingById(call.ex), h = b && pickHaul(r, near, CUSTODIAN_GOODS, custCarry(), b);
+    if(h){ c.haul = {t:h.t, src:h.src.id, dst:b.id, amount:h.amount}; if(custGo(c, w, kGraph.anchors[h.src.id], "toHaulSrc")) return; c.haul = null; call.keeper = null; }
+    else state.staff.calls = state.staff.calls.filter(x => x !== call);
+  }
   if(staffMaybeRest(c, closets())) return;
   // a finished specimen from the Genetics Lab goes to its exhibit before the chores
   const dv = deliveryJob(c, w);
@@ -85,9 +92,10 @@ function custDecide(c, r){
   }
   const haul = pickHaul(r, near, CUSTODIAN_GOODS, custCarry());
   const restock = () => { c.haul = {t:haul.t, src:haul.src.id, dst:haul.d.id, amount:haul.amount}; if(!custGo(c, w, kGraph.anchors[haul.src.id], "toHaulSrc")) c.haul = null; };
-  // a stand or shop about to run dry comes first, then cleaning, then routine restocking.
-  // After a delivery, one waiting chore gets done before the next haul, so the cleaning never stops completely.
+  // the evening restock and a store about to run dry come first, then cleaning, then routine restocking.
+  // Through the day, one waiting chore gets done after each delivery, so the cleaning never stops completely.
   const ch = pickChore(c, r, w);
+  if(haul && haul.cls === 0){ restock(); if(c.haul) return; }
   if(haul && haul.ratio < LOGI.urgentBelow && !(c.hauled && ch)){ restock(); if(c.haul){ c.hauled = true; return; } }
   if(ch){ c.target = ch.target; c.hauled = false; if(custGo(c, w, ch.node, ch.job)) return; }
   if(haul){ restock(); if(c.haul){ c.hauled = true; return; } }
@@ -164,6 +172,9 @@ function custodiansTick(dtMin){
     if(!c.at){ const h = closets()[0]; if(!h) continue; c.at = kGraph.anchors[h.id]; c.job = "idle"; }
     let left = dtMin, steps = 0;
     while(left > 0 && steps++ < 40){
+      // a call comes first, once they're standing on a node with nothing in hand
+      const call = callFor(c);
+      if(call && !c.carry && !c.cargo && c.t === 0 && !(c.haul && c.haul.dst === call.ex)){ takeCustCall(c); custDecide(c, r); continue; }
       if(["scrubbing", "degraffiti", "emptying", "sweeping"].includes(c.job)){ const used = custWork(c, left); left -= used; if(!used && c.job !== "idle") left = 0; continue; }
       if(c.job === "resting"){ left = staffRestStep(c, left); continue; }
       if(c.route.length){
@@ -178,6 +189,11 @@ function custodiansTick(dtMin){
       if(c.job === "idle" && !c.route.length && c.wait <= 0) c.wait = 5;
     }
   }
+}
+// A called custodian drops a chore or a haul not yet picked up (never stock in hand or an animal) and goes to restock
+function takeCustCall(c){
+  const t = c.move; if(t && !t.cargo){ t.keeper = null; c.move = null; }
+  c.target = null; c.haul = null; c.job = "idle"; c.route = []; c.t = 0; c.wait = 0;
 }
 // Each night custodians finish any delivery in hand, then go home
 function custodiansNight(){

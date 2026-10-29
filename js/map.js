@@ -380,6 +380,14 @@ function render(){
     s += `<circle cx="${ox}" cy="${oy}" r="${o.type === "camera" ? SECURITY.postRadius : SECURITY.cameraRadius}" fill="#2B3F6B" fill-opacity=".08" stroke="#2B3F6B" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke" pointer-events="none"/>`;
   }
 
+  // a red "!" over a stand, shop or hotel running low
+  for(const bl of state.buildings){
+    if(!restocked(bl) || !lowStock(bl)) continue;
+    const S = tilt && STAND34[bl.type], [mx, cy0] = centroid(bl.points), top = Math.min(...bl.points.map(p => p[1]));
+    const y = S ? top - (S.canopy || S.wall + S.rise) / TILT + 2*inv : cy0 - BUILDINGS[bl.type].d * .7 - 12*inv;   // over the roof's top edge, or over a flat sprite
+    s += `<g class="lowmark" pointer-events="none" transform="translate(${mx.toFixed(2)} ${y.toFixed(2)})${upright()}"><circle r="${10*inv}" fill="#E5484D" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" font-size="${15*inv}" style="fill:#fff">!</text></g>`;
+  }
+
   // exhibit names and happiness
   for(const e of state.exhibits){
     const bb = bbox(e.points), dim = Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k;
