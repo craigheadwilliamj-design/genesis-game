@@ -177,25 +177,30 @@ function groundPicks(plain, detail, share, salt = 0){
   }
   return out;
 }
-// A tile pattern's fill: `kind` is "p" (park ground), "b" (exhibit floor) or "w" (water). The first time a biome's pattern is drawn its tiles are queued to build (buildTiles);
+// A tile pattern's fill: `kind` is "p" (park ground), "b" (exhibit floor), "w" (water) or "r" (a water's ripples alone: its marks on clear ground, from the
+// same frames, for drawing over what swims under it; only the kinds index.html gives an #r- pattern). The first time a biome's pattern is drawn its tiles are queued to build (buildTiles);
 // until then, and while it builds, the pattern shows the single tile index.html gives it. Every place that fills with a tile pattern goes through this.
 const tileAsked = {};
 function tileFill(kind, biome){
-  const water = kind === "w", key = (water ? "w-" : "g-") + biome;
+  const water = kind === "w" || kind === "r", key = (water ? "w-" : "g-") + biome;
   if(!tileAsked[key]){ tileAsked[key] = 1; const T = (water ? WATER_TILES : GROUND_TILES)[biome]; if(T) buildTiles(biome, T, water); }
   return `url(#${kind}-${biome})`;
 }
 // Frames are drawn one at a time in idle time (every biome's first frame before anyone's later ones) and saved with toBlob, which encodes off the main thread, so building never stalls a load or a draw.
 const tileQueue = {first:[], rest:[]}; let tilePumping = false;
-const tileIdle = fn => window.requestIdleCallback ? requestIdleCallback(fn, {timeout:400}) : setTimeout(fn, 30);
-function tilePump(){
-  const job = tileQueue.first.shift() || tileQueue.rest.shift(); if(!job){ tilePumping = false; return; }
-  job(); tileIdle(tilePump);
+// A page that never goes idle (a busy park) still gets a job every TILE_WAIT ms, so animated water never sits on its first frame.
+const TILE_WAIT = 120;
+const tileIdle = fn => window.requestIdleCallback ? requestIdleCallback(fn, {timeout:TILE_WAIT}) : setTimeout(fn, 30);
+function tilePump(d){
+  do { const job = tileQueue.first.shift() || tileQueue.rest.shift(); if(!job){ tilePumping = false; return; } job(); }
+  while(d && !d.didTimeout && d.timeRemaining() > 12);
+  tileIdle(tilePump);
 }
 function tileQueueAdd(job, first){ tileQueue[first ? "first" : "rest"].push(job); if(!tilePumping){ tilePumping = true; tileIdle(tilePump); } }
 // builds one biome's ground (#p-<biome> and #b-<biome>) or water (#w-<biome>, from sprites/water/ with its own salt, so marks in the water don't land on the ground's)
 function buildTiles(biome, T, water){
   const imgs = document.querySelectorAll(water ? `#w-${biome} image` : `#p-${biome} image, #b-${biome} image`); if(!imgs.length) return;
+  const rimgs = water ? document.querySelectorAll(`#r-${biome} image`) : [];   // ripples alone: tile 1 is the plain water, its one color is keyed out of every tile
   const dir = water ? "water" : "ground", salt = water ? 4000 : 0;
   const gl = T.glint || 0, n = T.plain + T.detail + gl; let left = n; const tiles = [];
   for(let i = 0; i < n; i++){
@@ -207,7 +212,18 @@ function buildTiles(biome, T, water){
       // `sub` splits every frame into that many steps (fps and periods times `sub`, each glint tile held `sub` steps), so a band moves in smaller steps at the same speed
       const S = T.sub || 1, lcm = (a, b) => { let x = a, y = b; while(y) [x, y] = [y, x % y]; return a * b / x; }, F = !gl ? 1 : T.waves ? T.waves.reduce((n, w) => lcm(n, w[0] * S), 1) : T.frames * S;
       let done = 0, dead = false;
-      const show = u => imgs.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
+      const show = (u, list = imgs) => list.forEach(img => { img.setAttribute("href", u); [img, img.parentNode].forEach(el => { el.setAttribute("width", GROUND_SPAN); el.setAttribute("height", GROUND_SPAN); }); });
+      let base = null, keyed = tiles;
+      if(rimgs.length){
+        const c0 = document.createElement("canvas"); c0.width = c0.height = GROUND_TILE_PX; const g0 = c0.getContext("2d"); g0.drawImage(tiles[0], 0, 0);
+        try {
+          const b = g0.getImageData(0, 0, 1, 1).data; base = `rgb(${b[0]},${b[1]},${b[2]})`;
+          keyed = tiles.map(t => { const c = document.createElement("canvas"); c.width = c.height = GROUND_TILE_PX; const g = c.getContext("2d"); g.drawImage(t, 0, 0);
+            const d = g.getImageData(0, 0, c.width, c.height); for(let i = 0; i < d.data.length; i += 4) if(d.data[i] === b[0] && d.data[i + 1] === b[1] && d.data[i + 2] === b[2]) d.data[i + 3] = 0;
+            g.putImageData(d, 0, 0); return c; });
+        } catch(e){ base = null; keyed = tiles; }   // a tainted canvas: no ripple layer
+      }
+      const rurls = [];
       const frame = f => {
         if(dead) return;
         const c = document.createElement("canvas"); c.width = c.height = px;
@@ -220,14 +236,21 @@ function buildTiles(biome, T, water){
             if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
           const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
           g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
-          g.drawImage(tiles[t], -h, -h);
+          g.drawImage(keyed[t], -h, -h);
         }
-        try { c.toBlob(b => {
-          if(!b){ dead = true; return; }
-          urls[f] = URL.createObjectURL(b);
-          if(f === 0) show(urls[0]);
-          if(++done === F && F > 1){ let fr = 0; setInterval(() => show(urls[fr = (fr + 1) % F]), 1000 / (T.fps * S)); }
-        }); } catch(e){ dead = true; }   // a tainted canvas: keep the single tile
+        // with ripples: the canvas so far is the marks alone; the water is its base color with them on top
+        const rc = base && c; let wc = c;
+        if(rc){ wc = document.createElement("canvas"); wc.width = wc.height = px; const w = wc.getContext("2d"); w.fillStyle = base; w.fillRect(0, 0, px, px); w.drawImage(rc, 0, 0); }
+        let need = rc ? 2 : 1;
+        const ready = () => {
+          if(--need) return;
+          if(f === 0){ show(urls[0]); if(rc) show(rurls[0], rimgs); }
+          if(++done === F && F > 1){ let fr = 0; setInterval(() => { fr = (fr + 1) % F; show(urls[fr]); if(rc) show(rurls[fr], rimgs); }, 1000 / (T.fps * S)); }
+        };
+        try {
+          wc.toBlob(b => { if(!b){ dead = true; return; } urls[f] = URL.createObjectURL(b); ready(); });
+          if(rc) rc.toBlob(b => { if(!b){ dead = true; return; } rurls[f] = URL.createObjectURL(b); ready(); });
+        } catch(e){ dead = true; }   // a tainted canvas: keep the single tile
       };
       for(let f = 0; f < F; f++) tileQueueAdd(() => frame(f), f === 0);
     };

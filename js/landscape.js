@@ -1139,6 +1139,14 @@ function watersSvg(list, biome, plain){   // plain: a lagoon, water right to the
     + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;
 }
+// A pool's ripples alone (the #r- pattern: its water's marks on clear ground), drawn over its animals so they swim under the surface. Only water kinds
+// with an #r- pattern in index.html have one. In the 3/4 view it is the last thing in the exhibit's depth group (data-y past every feature), so place34 slots the animals under it.
+function ripplesSvg(e){
+  const items = waterOf(e).filter(w => document.getElementById(`r-${w.kind}`)).map(w => ({w, kind:w.kind, points:w.points}));
+  if(!items.length || !e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool)) return "";
+  const m = waterMask(items);
+  return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}</g>`;
+}
 function flatWaterSvg(w){
   const pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
   return `<g pointer-events="none"><polygon points="${pts}" fill="#4C93C9" fill-opacity=".85" stroke="#2F6F9F" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
@@ -1443,7 +1451,7 @@ function landSvg(e, pick, isDead){
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
   const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
-  return `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}</g>`;
+  return `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}${ripplesSvg(e)}</g>`;
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = () => watersSvg(parkWater(), parkBiome());

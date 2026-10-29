@@ -11,7 +11,7 @@ const LOCK_SVG = `<svg width="10" height="11" viewBox="0 0 10 11" aria-label="lo
 // Which tab is open in each department's panel
 const MANAGE_TABS = [{key:"barrier", label:"Fences", title:"Fences and barriers", color:"#4B3A8C"}, {key:"build", label:"Buildings", title:"Buildings and systems", color:"#4B3A8C"}, {key:"tar", label:"Genetics Lab", title:"Genetics Lab upgrades", color:"#4B3A8C"}, {key:"ghost", label:"Time Travel Lab", title:"Time Travel Lab upgrades", color:"#4B3A8C"}];
 let ghostTab = "lab";   // the Time Travel Lab panel: "lab" (drones and timeline) or "reports" (post-mission reports)
-let oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic";
+let oracleMain = "manage", oracleManage = "barrier", oracleEra = "mesozoic", cerePeriod = "Jurassic", genePeriod = null;
 
 const tabBar = (action, items, cur) => `<div class="ptabs" role="tablist">${items.map(t =>
   `<button role="tab" class="ptab" data-action="${action}" data-k="${t.key}" aria-selected="${t.key === cur}" style="--pc:${t.color}">${t.lock ? LOCK_SVG : ""}${esc(t.label)}</button>`).join("")}</div>`;
@@ -279,8 +279,11 @@ function tarHtml(b){
   h = `<section><h3>Genome library</h3>`;
   if(!lib.length) h += `<div class="meta">No DNA.</div>`;
   else {
-    h += `<ul class="shop">`;
-    for(const s of lib){
+    const has = p => lib.some(s => s.period === p);
+    if(!genePeriod || !has(genePeriod)) genePeriod = PERIOD_ORDER.find(has);
+    h += tabBar("gperiod", PERIOD_ORDER.map(p => ({key:p, label:p, color:PERIOD_COLOR[p], lock:!has(p)})), genePeriod);
+    h += `<ul class="shop" style="margin-top:8px">`;
+    for(const s of lib.filter(s => s.period === genePeriod)){
       const d = sc.dna[s.id], open = cloneOpen(s.id), why = open ? cloneProblem(s.id) : `Needs ${CLONE_GENOME.min}% genome.`;
       h += `<li><span class="nm"><span class="dot" style="background:${PERIOD_COLOR[s.period]}"></span>${speciesName(s)}</span>`;
       h += open ? `<button class="buy" data-action="clone" data-sex="male" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone M ${money(s.price)}</button><button class="buy" data-action="clone" data-sex="female" data-sp="${s.id}"${why ? ` disabled title="${esc(why)}"` : ""}>Clone F ${money(s.price)}</button>` : `<span class="meta">${d.genome}%</span>`;
@@ -356,6 +359,7 @@ panelEl.addEventListener("click", ev => {
   if(a === "omain"){ oracleMain = b.dataset.k; ui.panel(); return; }
   if(a === "omanage"){ oracleManage = b.dataset.k; ui.panel(); return; }
   if(a === "oera"){ oracleEra = b.dataset.k; ui.panel(); return; }
+  if(a === "gperiod"){ genePeriod = b.dataset.k; ui.panel(); return; }
   if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
   if(a === "gsite"){ if(b.dataset.site !== ghostSite) ghostPick = null; ghostSite = b.dataset.site; ghostRefresh(); return; }
   if(a === "gpick"){ ghostPick = b.dataset.sp; ghostRefresh(); return; }
