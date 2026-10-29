@@ -145,10 +145,25 @@ function orderChip(t){
   if(have > use * 6 && orderOf(t)) return `<span class="status">Piling up.</span>`;
   return `<span class="status ok">OK</span>`;
 }
+// Park storage (docks, warehouses, cold stores) against what's in it and what the truck brings tonight
+function storageHtml(){
+  const bs = storesBuilt().filter(b => storeOf(b).bulk);
+  const total = bs.reduce((s, b) => s + storeCap(b), 0), used = Math.floor(bs.reduce((s, b) => s + storeTotal(b), 0)), free = total - used;
+  const incoming = docks().length ? ORDER_GOODS.reduce((s, t) => s + orderOf(t), 0) : 0, after = free - incoming;
+  const dockFree = Math.floor(docks().reduce((s, b) => s + storeRoom(b, ORDER_GOODS[0]), 0)), dockAfter = dockFree - incoming;
+  const use = Math.round(ORDER_GOODS.reduce((s, t) => s + goodUse(t), 0));
+  const sign = n => n > 0 ? `+${n}` : `${n}`, red = n => n < 0 ? ` style="color:var(--bad)"` : "";
+  let h = `<section><h3>Storage</h3>${bar3("Used", total ? used / total * 100 : 0, "var(--gold)", `${used}/${total}`)}`;
+  h += `<dl class="kv" style="margin-top:6px"><dt>Total space</dt><dd>${total}</dd><dt>In use</dt><dd>${used}</dd><dt>Free now</dt><dd>${free}</dd>`;
+  h += `<dt>Incoming at ${fmtClock(LOGI.truckClock)}</dt><dd>${incoming}</dd><dt>Park use a day</dt><dd>${use}</dd>`;
+  h += `<dt class="sum">Free after delivery</dt><dd class="sum"${red(after)}>${sign(after)}</dd>`;
+  h += `<dt>Dock space after delivery</dt><dd${red(dockAfter)}>${sign(dockAfter)} of ${dockCap()}</dd></dl></section>`;
+  return h;
+}
 function logisticsHtml(){
   seedOrders();
   const L = state.logi, auto = forecasting(), ds = state.buildings.filter(b => b.type === "dock");
-  let h = `<section><h3>Standing orders</h3>`;
+  let h = storageHtml() + `<section><h3>Standing orders</h3>`;
   const warns = (ds.length ? [] : ["No delivery dock."]).concat(ds.length && !docks().length ? ["Trucks can't reach the docks."] : [], logiWarnings());
   if(warns.length) h += `<ul class="issues">${warns.map(w => `<li class="bad">${esc(w)}</li>`).join("")}</ul>`;
   if(hasTech("forecast")) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="forecast" aria-pressed="${auto}">Supply forecasting</button></div>`;
@@ -161,8 +176,7 @@ function logisticsHtml(){
       <span class="need" id="ordC-${t}" style="grid-column:1/-1">${orderCost(t, n)}</span>
       <span class="need" style="grid-column:1/-1"><button class="buy" data-action="rush" data-t="${t}"${canAfford(rushPrice(t)) ? "" : " disabled"} title="Delivered now">Rush ${rushLot(t)}, ${money(rushPrice(t))}</button></span></li>`;
   }).join("")}</ul>`;
-  const room = docks().reduce((s, b) => s + storeRoom(b, ORDER_GOODS[0]), 0);
-  h += `<dl class="kv" style="margin-top:6px"><dt>Delivery at ${fmtClock(LOGI.truckClock)}</dt><dd>${money(Math.round(nightBill()))}</dd><dt>Dock space</dt><dd>${Math.floor(room)} free of ${dockCap()}</dd></dl>`;
+  h += `<dl class="kv" style="margin-top:6px"><dt>Delivery at ${fmtClock(LOGI.truckClock)}</dt><dd>${money(Math.round(nightBill()))}</dd></dl>`;
   if(L.noRoom >= 1 || L.noCash >= 1) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Last delivery: ${[L.noRoom >= 1 ? `${Math.round(L.noRoom)} units didn't fit` : "", L.noCash >= 1 ? `${Math.round(L.noCash)} weren't paid for` : ""].filter(Boolean).join(", ")}.</div>`;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:4px">Spoiled last night: ${Math.round(L.lost)} units, ${money(Math.round(L.lostCost))}</div>`;
   h += `</section>`;
