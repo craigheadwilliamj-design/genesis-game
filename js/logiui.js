@@ -35,19 +35,8 @@ function zoneRow(kind, b){
 
 function dockHtml(b){
   let h = deptHead(b) + zoneRow("building", b);
-  const auto = b.auto !== false, orders = dockOrders(b);
   h += `<section><h3>Stock</h3>${stockRows(b)}${spoilLine(b)}</section>`;
-  h += `<section><h3>Overnight orders</h3><div class="row"><button class="btn" data-action="dockAuto">${auto ? "Auto-ordering is on" : "Ordering by hand"}</button></div>`;
-  let cost = 0;
-  h += `<ul class="shop" style="margin-top:6px">${ORDER_GOODS.filter(t => !isGuestGood(t) || orders[t] || stockOf(b, t) || b.auto === false).map(t => {
-    const stock = stockOf(b, t), want = orders[t], n = Math.max(0, Math.min(Math.floor(want - stock), Math.floor(storeRoom(b, t)))), price = freeFeeding() && !isGuestGood(t) ? 0 : unitPrice(t);
-    cost += n * price;
-    return `<li><span class="nm">${goodName(t)}</span>${auto ? `<span class="status ok">${want} wanted</span>` : `<span class="row" style="gap:4px;flex-wrap:nowrap"><button class="btn sell" data-action="dockOrd" data-t="${t}" data-d="-25">−25</button><b>${want}</b><button class="btn sell" data-action="dockOrd" data-t="${t}" data-d="25">+25</button></span>`}
-      <button class="buy" data-action="rush" data-t="${t}"${canAfford(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup)) ? "" : " disabled"} title="Delivered now">Rush ${LOGI.rushLot}, ${money(Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup))}</button>
-      <span class="need">${isGuestGood(t) ? `$${unitPrice(t).toFixed(2)}` : money(Math.round(unitPrice(t)))} a unit. Tonight: ${n} units${n && price ? ` (${money(Math.round(n * price))})` : ""}.</span></li>`;
-  }).join("")}</ul>`;
-  h += `${freeFeeding() ? "" : `<dl class="kv" style="margin-top:6px"><dt>Tonight's delivery</dt><dd>${money(Math.round(cost))}</dd></dl>`}</section>`;
-  return h;
+  return h + `<div class="row"><button class="btn" data-action="gotoLogi">Standing orders</button></div>`;
 }
 
 function warehouseHtml(b){
@@ -135,34 +124,62 @@ function addRow(z, items, label){
 
 /* ---------- the park office ---------- */
 
-function logiOverviewHtml(){
-  const any = state.exhibits.some(e => e.animals.length), hasStores = storesBuilt().length;
-  if(!any && !hasStores) return "";
-  const sum = stockSummary();
-  let h = `<section><h3>Supplies</h3>`;
-  const warns = logiWarnings();
+/* ---------- the park office Logistics tab ---------- */
+
+// Goods worth a row: anything ordered, used, needed or held, and contemporary medicine once there's a PMC
+function orderGoods(){
+  return ORDER_GOODS.filter(t => orderOf(t) || usedAvg(t) || orderNeed(t) || parkStock(t) >= 1 || (t === CMED && hasDept("pmc")));
+}
+const goodUse = t => Math.max(usedAvg(t), orderNeed(t));
+// The price and night's cost of a standing order of n units
+function orderCost(t, n){
+  const free = freeFeeding() && FEED_GOODS.includes(t), off = bulkOff(n), p = basePrice(t) * (1 - off);
+  const each = t === CMED || p >= 10 ? money(Math.round(p)) : `$${p.toFixed(2)}`;
+  return free ? "Free from the partner parks." : `${each} a unit${off ? ` (${Math.round(off * 100)}% off)` : ""}. ${money(Math.round(n * p))} a night.`;
+}
+function orderChip(t){
+  const use = goodUse(t), have = parkStock(t), make = FEED_GOODS.includes(t) ? parkProduction(t) : 0;
+  if(!use) return orderOf(t) ? `<span class="status">Not used.</span>` : "";
+  if(have < use) return `<span class="status no">Low.</span>`;
+  if(orderOf(t) + make < use * .9) return `<span class="status no">Below use.</span>`;
+  if(have > use * 6 && orderOf(t)) return `<span class="status">Piling up.</span>`;
+  return `<span class="status ok">OK</span>`;
+}
+function logisticsHtml(){
+  seedOrders();
+  const L = state.logi, auto = forecasting(), ds = state.buildings.filter(b => b.type === "dock");
+  let h = `<section><h3>Standing orders</h3>`;
+  const warns = (ds.length ? [] : ["No delivery dock."]).concat(ds.length && !docks().length ? ["Trucks can't reach the docks."] : [], logiWarnings());
   if(warns.length) h += `<ul class="issues">${warns.map(w => `<li class="bad">${esc(w)}</li>`).join("")}</ul>`;
-  const rows = FEED_GOODS.filter(t => sum[t].need > 0 || sum[t].have > 0);
-  for(const t of rows){
-    const x = sum[t], days = x.need ? x.have / x.need : 99;
-    h += bar3(goodName(t), x.cap ? x.have / x.cap * 100 : 0, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
-    h += `<div class="meta fnote">${Math.round(x.need)} a day${x.make ? `, farms ${x.make}` : ""}${x.need ? (days < 1 ? ` · <b style="color:var(--bad)">under a day left</b>` : ` · ${days >= 10 ? "10+" : days.toFixed(1)} days left`) : ""}</div>`;
-  }
+  if(hasTech("forecast")) h += `<div class="row" style="margin-top:6px"><button class="btn" data-action="forecast" aria-pressed="${auto}">Supply forecasting</button></div>`;
+  h += `<ul class="shop" style="margin-top:6px">${orderGoods().map(t => {
+    const n = orderOf(t), use = goodUse(t), have = parkStock(t), yday = (L.usedLast || {})[t] || 0, make = FEED_GOODS.includes(t) ? parkProduction(t) : 0;
+    const days = use ? have / use : 0;
+    return `<li><span class="nm">${goodName(t)}</span>${orderChip(t)}
+      <span class="need" style="grid-column:1/-1;display:flex;gap:8px;align-items:center"><input type="range" data-order="${t}" min="0" max="${orderMax(t)}" step="${orderStep(t)}" value="${n}" aria-label="${goodName(t)} a night"${auto ? " disabled" : ""} style="flex:1"><b id="ordN-${t}" style="min-width:84px;text-align:right">${n} a night</b></span>
+      <span class="need" style="grid-column:1/-1">Used ${Math.round(yday)} yesterday, ${Math.round(usedAvg(t))} a night this week${make ? `. Farms ${make}` : ""}. ${Math.floor(have)} on hand${use ? `, ${days >= 10 ? "10+" : days.toFixed(1)} days` : ""}.</span>
+      <span class="need" id="ordC-${t}" style="grid-column:1/-1">${orderCost(t, n)}</span>
+      <span class="need" style="grid-column:1/-1"><button class="buy" data-action="rush" data-t="${t}"${canAfford(rushPrice(t)) ? "" : " disabled"} title="Delivered now">Rush ${rushLot(t)}, ${money(rushPrice(t))}</button></span></li>`;
+  }).join("")}</ul>`;
+  const room = docks().reduce((s, b) => s + storeRoom(b, ORDER_GOODS[0]), 0);
+  h += `<dl class="kv" style="margin-top:6px"><dt>Tonight's delivery</dt><dd>${money(Math.round(nightBill()))}</dd><dt>Dock space</dt><dd>${Math.floor(room)} free of ${dockCap()}</dd></dl>`;
+  if(L.noRoom >= 1 || L.noCash >= 1) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Last night: ${[L.noRoom >= 1 ? `${Math.round(L.noRoom)} units didn't fit` : "", L.noCash >= 1 ? `${Math.round(L.noCash)} weren't paid for` : ""].filter(Boolean).join(", ")}.</div>`;
+  if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:4px">Spoiled last night: ${Math.round(L.lost)} units, ${money(Math.round(L.lostCost))}</div>`;
+  h += `</section>`;
+  return h + madeHereHtml();
+}
+// What the park makes itself: Paleoflora and each era's medicine from the Botany Lab
+function madeHereHtml(){
+  const sum = stockSummary();
+  let h = "";
   if(sum.paleoflora.need && hasDept("ceres")) h += bar3("Paleoflora", sum.paleoflora.have / Math.max(1, ceresCap()) * 100, FOOD_COLOR.paleoflora, `${sum.paleoflora.have} at the Botany Lab`);
-  // medicine: one row an era (PMC, stores and the Botany Lab) and the contemporary doses the suppliers keep topped up
-  if(hasDept("pmc") || hasDept("ceres")){
-    for(const t of MED_GOODS){
-      const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
-      if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
-      h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
-      h += `<div class="meta fnote">PMC ${Math.floor(x.pmc)}, Botany Lab ${x.ceres}${hasTech(MED_TECH[era]) ? "" : " · locked"}</div>`;
-    }
-    h += bar3(goodName(CMED), sum.cmed.have / sum.cmed.want * 100, GOOD_COLOR[CMED], `${Math.floor(sum.cmed.have)} stored`);
-    h += `<div class="meta fnote">PMC ${Math.floor(sum.cmed.pmc)}</div>`;
+  if(hasDept("pmc") || hasDept("ceres")) for(const t of MED_GOODS){
+    const x = sum[t], era = Object.keys(MED_GOOD).find(k => MED_GOOD[k] === t);
+    if(!x.have && !x.ceres && !hasTech(MED_TECH[era])) continue;
+    h += bar3(goodName(t), x.have / Math.max(1, medCap()) * 100, GOOD_COLOR[t], `${Math.floor(x.have)} stored`);
+    h += `<div class="meta fnote">PMC ${Math.floor(x.pmc)}, Botany Lab ${x.ceres}${hasTech(MED_TECH[era]) ? "" : " · locked"}</div>`;
   }
-  const L = state.logi;
-  if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:6px">Spoiled last night: ${Math.round(L.lost)} units, ${money(Math.round(L.lostCost))}</div>`;
-  return h + `</section>`;
+  return h ? `<section><h3>Made in the park</h3>${h}</section>` : "";
 }
 
 // The work zones section, shown in the park office Staff tab
@@ -195,18 +212,20 @@ panelEl.addEventListener("click", ev => {
     for(const x of state.buildings) if(!x.zone && !x.exhibitId && inPoly(...centroid(x.points), it.points)) x.zone = it.id;
     done(); return;
   }
-  if(!it || sel.kind !== "building" || it.type !== "dock") return;
-  if(a === "dockAuto"){
-    if(it.auto === false) it.auto = true;
-    else { it.orders = dockOrders(it); it.auto = false; }
-    done(); return;
-  }
-  if(a === "dockOrd"){ it.orders = it.orders || dockOrders(it); it.orders[b.dataset.t] = clamp((it.orders[b.dataset.t] || 0) + (+b.dataset.d), 0, storeCap(it)); done(); return; }
-  if(a === "rush"){ const why = rushOrder(it, b.dataset.t); if(why) ui.toast(why, "bad"); else ui.toast(`Rush delivery of ${LOGI.rushLot} ${goodName(b.dataset.t).toLowerCase()} arrived at the dock.`); done(); return; }
+  if(a === "gotoLogi"){ openParkOffice("logi"); return; }
+  if(a === "forecast"){ state.logi.auto = !state.logi.auto; if(forecasting()) for(const t of ORDER_GOODS) state.logi.orders[t] = forecastOrder(t); done(); return; }
+  if(a === "rush"){ const t = b.dataset.t, why = rushOrder(t); if(why) ui.toast(why, "bad"); else ui.toast(`Rush delivery of ${rushLot(t)} ${goodName(t).toLowerCase()} arrived at the dock.`); done(); return; }
 });
 
+// Standing order sliders: the number and price follow the drag, and the order is set when it's let go
+panelEl.addEventListener("input", ev => {
+  const t = ev.target.dataset && ev.target.dataset.order; if(!t) return;
+  const n = +ev.target.value, a = $("#ordN-" + t), c = $("#ordC-" + t);
+  if(a) a.textContent = `${n} a night`; if(c) c.textContent = orderCost(t, n);
+});
 panelEl.addEventListener("change", ev => {
   const t = ev.target;
+  if(t.dataset.order){ setOrder(t.dataset.order, t.value); afterChange(); render(); return; }
   if(t.id === "zoneThemeSel"){
     const it = selItem(); if(!it || sel.kind !== "zone") return;
     if(!themeHave(t.value)){ ui.toast("That theme is locked.", "bad"); ui.panel(); return; }

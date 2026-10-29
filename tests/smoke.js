@@ -216,7 +216,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       wardTick(1); out.dockMedSlower = wp.dosed && wp.med === "modern" && Math.abs(wp.need - 50 * HEALTH.wardPerPoint * MEDICINE.dockWard.paleozoic) < 1e-9 && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
       const vets = state.staff.vets; state.staff.vets = []; const d0 = wp.done; wardTick(60);
       out.wardPausesNoVets = wp.done === d0 && patientStatus(wp) === "Paused. No vets."; state.staff.vets = vets;
-      out.modernRestock = dockOrders({type:"dock", auto:true}).medmod === MODERN.stock && unitPrice(CMED) === MODERN.cost;
+      delete state.logi.orders.medmod; seedOrders();
+      out.modernRestock = orderOf(CMED) === LOGI.cmedSeed && basePrice(CMED) === MODERN.cost;
       // the PMC is bulldozed mid-course: the patient goes home as much better as it got, and the bought beds are lost
       wp.done = wp.need / 2; state.health.beds = 4; const sevNow = w.sick.sev;
       const inv = viv.animals.length; pmcRemoved(pmcB);
@@ -466,13 +467,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.hayDemand = parkDemand("plants") === 6;
 
     // the dock orders overnight and charges for it
+    state.logi.orders = {}; seedOrders();
+    out.ordersSeedFromNeed = orderOf("plants") === roundOrder("plants", 6);
+    for(const t of ORDER_GOODS) state.logi.orders[t] = t === "plants" ? 12 : 0;
     const m0 = state.money; dockDelivery();
-    out.dockDelivers = Math.round(stockOf(dock, "plants")) === 6 * LOGI.autoDays && state.money === m0 - Math.round(12 * unitPrice("plants"));
+    out.dockDelivers = Math.round(stockOf(dock, "plants")) === 12 && state.money === m0 - Math.round(12 * unitPrice("plants"));
+    // big standing orders come cheaper
+    out.bulkDiscount = (setOrder("plants", 200), Math.abs(unitPrice("plants") - basePrice("plants") * .9) < 1e-9) && (setOrder("plants", 500), Math.abs(unitPrice("plants") - basePrice("plants") * .8) < 1e-9);
+    setOrder("plants", 12); out.ordersRoundToStep = orderOf("plants") === 15;
+    // an order that doesn't fit at the docks isn't delivered or charged
+    dock.store = {meat:storeCap(dock) - 5}; const mf = state.money; dockDelivery();
+    out.dockFullNotCharged = Math.round(stockOf(dock, "plants")) === 5 && state.logi.noRoom === 10 && state.money === mf - Math.round(5 * unitPrice("plants"));
     // partner parks pay while still feeding
     state.logi.flow = {}; dock.store = {}; state.staff.feedFrom = 99; const m1 = state.money; dockDelivery(); state.staff.feedFrom = 0;
     out.partnerPays = state.money === m1 && stockOf(dock, "plants") > 0;
     // a rush order lands now at a markup
-    dock.store = {}; const m2 = state.money; out.rushOrder = !rushOrder(dock, "meat") && stockOf(dock, "meat") === LOGI.rushLot && state.money < m2;
+    dock.store = {}; const m2 = state.money; out.rushOrder = !rushOrder("meat") && stockOf(dock, "meat") === LOGI.rushLot && state.money === m2 - rushPrice("meat");
+    const rp = rushPrice("meat"); state.science.tech.push("express");
+    out.expressCheaper = rushPrice("meat") < rp; state.science.tech = state.science.tech.filter(t => t !== "express");
     dock.store = {plants:12};
 
     // a keeper feeds the exhibit from the dock's stock, then a custodian restocks the station
@@ -583,7 +595,16 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.farmStops = stockOf(farm, "plants") <= storeCap(farm);
     // farms cut what the dock orders
     dock.store = {};
-    out.farmCutsOrders = dockOrders(dock).plants === Math.max(0, Math.ceil((6 - BUILDINGS.farm.makes.plants) * LOGI.autoDays));
+    out.farmCutsOrders = orderNeed("plants") === Math.max(0, 6 - BUILDINGS.farm.makes.plants);
+    // what the animals eat is counted as used, and a night rolls it into the week's history
+    state.logi.used = {}; state.logi.hist = []; viv.stock = {plants:50}; eatTick(DAY_MIN / 4);
+    out.eatingCountsUse = state.logi.used.plants > 0;
+    const ate = state.logi.used.plants; logiNight();
+    out.useHistory = state.logi.hist.length === 1 && Math.abs(usedAvg("plants") - ate) < 1e-9 && !state.logi.used.plants;
+    // old saves: per-dock orders and daytime trucks go, the park-wide order starts empty and fills from need
+    const od = JSON.parse(JSON.stringify(state)); delete od.logi.orders; od.logi.trucks = 3; od.buildings.find(b => b.type === "dock").auto = false;
+    const ou = upgradeSave(od);
+    out.oldDockOrdersMigrate = ou.logi.orders && !Object.keys(ou.logi.orders).length && ou.logi.trucks === undefined && ou.buildings.find(b => b.type === "dock").auto === undefined;
 
     // old parks get a grace period and keep their medicine
     const oldPark = JSON.parse(JSON.stringify(state)); delete oldPark.logi; delete oldPark.zones; oldPark.staff.feedFrom = 3; oldPark.day = 10;
@@ -882,15 +903,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const lk = litterKey(100, 200); state.litter = {[lk]:10};
     out.custodianSweeps = work(900, () => !state.litter[lk]);
     // the dock orders stock for stands and shops too
-    out.dockOrdersStock = dockOrders({type:"dock"}).drinks > 0;
+    out.dockOrdersStock = orderNeed("drinks") > 0;
+    // Supply forecasting sets the orders itself, only once researched
+    state.logi.auto = true; out.forecastNeedsTech = !forecasting();
+    state.science.tech.push("forecast"); out.forecastOrders = forecasting() && forecastOrder("drinks") === roundOrder("drinks", orderNeed("drinks") + (orderNeed("drinks") * LOGI.autoDays - parkStock("drinks")) / 2);
+    state.logi.auto = false; state.science.tech = state.science.tech.filter(t => t !== "forecast");
     // a day of empty shelves sells little, but the order still covers the crowd
     const ul = state.logi.usedLast; state.logi.usedLast = {drinks:1};
     out.demandNotStarved = guestDemand("drinks") >= Math.ceil(derived.demand * GUEST_USE.drinks) && guestDemand("drinks") > 1;
     state.logi.usedLast = ul;
-    // supply trucks top up the dock while the park is open
+    // deliveries only come overnight: no trucks through the day
     const tdk = {id:"b-tdk", type:"dock", points:rectPts(198, 268, 16, 10, 0)}; state.buildings.push(tdk); afterChange();
-    const tm = state.minute; state.minute = DAWN_MIN + LOGI.truckMin + 1; state.logi.trucks = 0; logiTick(0);
-    out.daytimeTruck = stockOf(tdk, "drinks") > 0 && state.logi.trucks === 1;
+    const tm = state.minute; state.minute = DAWN_MIN + 241; logiTick(0);
+    out.noDaytimeTruck = stockOf(tdk, "drinks") === 0;
     state.minute = tm; state.buildings = state.buildings.filter(b => b !== tdk); afterChange();
     state.staff.custodians = []; syncCustodians();
 
