@@ -472,6 +472,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const t of ORDER_GOODS) state.logi.orders[t] = t === "plants" ? 12 : 0;
     const m0 = state.money; dockDelivery();
     out.dockDelivers = Math.round(stockOf(dock, "plants")) === 12 && state.money === m0 - Math.round(12 * unitPrice("plants"));
+    // the supply truck comes once a day, at 7 PM
+    dock.store = {}; const mt = state.minute; state.logi.truckDay = state.day - 1;
+    state.minute = minuteAtClock(LOGI.truckClock) - 1; logiTick(0); const before7 = stockOf(dock, "plants");
+    state.minute += 2; logiTick(0); const at7 = stockOf(dock, "plants"); logiTick(0);
+    out.truckAt7 = before7 === 0 && at7 === 12 && stockOf(dock, "plants") === 12 && state.logi.truckDay === state.day;
+    state.minute = mt; dock.store = {plants:12};
     // big standing orders come cheaper
     out.bulkDiscount = (setOrder("plants", 200), Math.abs(unitPrice("plants") - basePrice("plants") * .9) < 1e-9) && (setOrder("plants", 500), Math.abs(unitPrice("plants") - basePrice("plants") * .8) < 1e-9);
     setOrder("plants", 12); out.ordersRoundToStep = orderOf("plants") === 15;
@@ -889,6 +895,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     addToMenu(kio, "soda");
     out.noStockNoSale = !servesOf(kio).length && !!kGraph.anchors["b-kio"] && !!kGraph.anchors["b-wh"] && !!kGraph.anchors["b-cl"];
     wh.store = {drinks:100};
+    for(const x of state.buildings) if(x !== kio && restocked(x)){ x.store = {}; for(const t of storeOf(x).holds) x.store[t] = storeTarget(x, t); }   // only the kiosk is short
     hireCustodian(); syncCustodians();
     const work = (mins, until) => { for(let i = 0; i < mins; i++){ state.minute = DAWN_MIN + 60; custodiansTick(1); if(until()) return true; } return false; };
     out.custodianRestocks = work(600, () => stockOf(kio, "drinks") > 0) && stockOf(wh, "drinks") < 100 && servesOf(kio).includes("thirst");
@@ -896,6 +903,31 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const sb = stockOf(kio, "drinks"), sp2 = newParty(2); sp2.needs = {hunger:0, thirst:80, bladder:0, energy:0}; sp2.cash = 100;
     serveAt(sp2, kio, "thirst");
     out.saleUsesStock = Math.abs(sb - stockOf(kio, "drinks") - MENU.soda.cost * 2) < 1e-9 && state.logi.used.drinks >= MENU.soda.cost * 2;
+    // through the day a stand is only restocked once it's under the low mark (and shows a "!"); from 7 PM it's filled before anything else
+    const kt = storeTarget(kio, "drinks"), m7 = state.minute, kNear = list => list.length ? {b:list[0]} : null, cr = state.staff.custodians[0];
+    wh.store = {drinks:300}; kio.store = {drinks:kt * .5}; state.minute = DAWN_MIN + 60;
+    out.dayWaitsForLow = !pickHaul(cr, kNear, CUSTODIAN_GOODS, 100) && !lowStock(kio);
+    kio.store = {drinks:kt * .2}; render();
+    out.lowShowsMark = lowStock(kio) && !!pickHaul(cr, kNear, CUSTODIAN_GOODS, 100) && !!document.querySelector("#world .lowmark");
+    kio.store = {drinks:kt * .5}; state.minute = minuteAtClock(LOGI.truckClock) + 1;
+    const eh = pickHaul(cr, kNear, CUSTODIAN_GOODS, 100);
+    out.eveningFillsFirst = restockEvening() && eh && eh.d === kio && eh.cls === 0;
+    // the day ends: a stand left short missed its restock, and the toast says whether storage ran dry
+    const said3 = [], tk3 = events.toast; events.toast = t => said3.push(t);
+    kio.store = {drinks:0}; restockCheck();
+    out.missedRestock = kio.missed && said3.some(t => /weren't restocked by 11/.test(t)) && !said3.some(t => /ran out/.test(t));
+    said3.length = 0; wh.store = {}; restockCheck();
+    out.missedStorageDry = kio.missed && said3.some(t => /ran out of drinks/.test(t)) && !said3.some(t => /weren't restocked/.test(t));
+    kio.store = {drinks:kt}; restockCheck(); out.restockedClears = !kio.missed;
+    // Call custodian: refused when full or with nothing in storage, otherwise the nearest one fills it a load at a time
+    out.callFullRefused = callProblem(kio, "cust") === "Fully stocked.";
+    kio.store = {drinks:0};
+    out.callDryRefused = callProblem(kio, "cust") === "No drinks in storage.";
+    wh.store = {drinks:kt * .5}; state.minute = DAWN_MIN + 60;
+    for(const c of ccrew){ c.haul = null; setCustCarry(c, null); c.route = []; c.job = "idle"; c.wait = 0; }
+    out.custCalled = !callKeeper(kio, "cust") && state.staff.calls.some(x => x.ex === kio.id && x.kind === "cust" && x.keeper === cr.id);
+    out.custCallRestocks = work(600, () => !state.staff.calls.some(x => x.ex === kio.id)) && Math.round(stockOf(kio, "drinks")) === Math.round(kt * .5);
+    events.toast = tk3; state.minute = m7;
     // custodians scrub dirty restrooms and sweep litter
     for(const c of ccrew){ c.haul = null; setCustCarry(c, null); c.route = []; c.job = "idle"; c.wait = 0; }
     wh.store = {}; rest.dirt = 60;

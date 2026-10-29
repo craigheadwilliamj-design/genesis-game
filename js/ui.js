@@ -151,8 +151,8 @@ function overviewHtml(){
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Research and expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
     ${t.supplies ? `<dt>Food and gift stock</dt><dd>−${money(t.supplies)}</dd>` : ""}
-    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill() + Math.round(nightBill()))}</dd>
-  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${nightBill() >= 1 ? `, standing orders ${money(Math.round(nightBill()))}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
+    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
+  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
   const expected = Math.round(d.demand);
   h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>

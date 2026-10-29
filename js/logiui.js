@@ -162,8 +162,8 @@ function logisticsHtml(){
       <span class="need" style="grid-column:1/-1"><button class="buy" data-action="rush" data-t="${t}"${canAfford(rushPrice(t)) ? "" : " disabled"} title="Delivered now">Rush ${rushLot(t)}, ${money(rushPrice(t))}</button></span></li>`;
   }).join("")}</ul>`;
   const room = docks().reduce((s, b) => s + storeRoom(b, ORDER_GOODS[0]), 0);
-  h += `<dl class="kv" style="margin-top:6px"><dt>Tonight's delivery</dt><dd>${money(Math.round(nightBill()))}</dd><dt>Dock space</dt><dd>${Math.floor(room)} free of ${dockCap()}</dd></dl>`;
-  if(L.noRoom >= 1 || L.noCash >= 1) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Last night: ${[L.noRoom >= 1 ? `${Math.round(L.noRoom)} units didn't fit` : "", L.noCash >= 1 ? `${Math.round(L.noCash)} weren't paid for` : ""].filter(Boolean).join(", ")}.</div>`;
+  h += `<dl class="kv" style="margin-top:6px"><dt>Delivery at ${fmtClock(LOGI.truckClock)}</dt><dd>${money(Math.round(nightBill()))}</dd><dt>Dock space</dt><dd>${Math.floor(room)} free of ${dockCap()}</dd></dl>`;
+  if(L.noRoom >= 1 || L.noCash >= 1) h += `<div class="meta" style="margin-top:4px;color:var(--bad)">Last delivery: ${[L.noRoom >= 1 ? `${Math.round(L.noRoom)} units didn't fit` : "", L.noCash >= 1 ? `${Math.round(L.noCash)} weren't paid for` : ""].filter(Boolean).join(", ")}.</div>`;
   if(L.lostDay === state.day - 1 && L.lost >= 1) h += `<div class="meta" style="margin-top:4px">Spoiled last night: ${Math.round(L.lost)} units, ${money(Math.round(L.lostCost))}</div>`;
   h += `</section>`;
   return h + madeHereHtml();
