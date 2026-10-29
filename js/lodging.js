@@ -8,7 +8,7 @@
    ===================================================================== */
 
 const isHotel = b => !!BUILDINGS[b.type].rooms;
-const hotels = () => state.buildings.filter(b => isHotel(b) && isReachable(b));
+const hotels = () => state.buildings.filter(b => isHotel(b) && isReachable(b) && !unpowered(b));
 const roomRate = b => b.rate ?? BUILDINGS[b.type].roomPrice;
 // Share of guests who'll pay this rate: everyone at the usual price or less, nobody at double
 const roomWill = b => clamp(1 - PRICE_SENSE * (roomRate(b) - BUILDINGS[b.type].roomPrice) / BUILDINGS[b.type].roomPrice, 0, 1);

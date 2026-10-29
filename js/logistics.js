@@ -215,7 +215,7 @@ function logiTick(dtMin){
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until ${fmtDate(state.logi.guestFrom)}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
   const share = dtMin / DAY_MIN;
   for(const b of state.buildings){
-    const make = BUILDINGS[b.type].makes; if(!make || !isReachable(b)) continue;
+    const make = BUILDINGS[b.type].makes; if(!make || !isReachable(b) || unpowered(b)) continue;
     for(const [t, n] of Object.entries(make)) addGood(b, t, n * share);
   }
 }
@@ -389,7 +389,7 @@ function logiWarnings(){
   }
   // with every mechanic or vet in a zone, anything outside the zones gets nobody
   const ms = state.staff.mechanics, vs = state.staff.vets;
-  if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (b.type === "generator" || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
+  if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (isStation(b) || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
   if(vs.length && vs.every(v => v.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every vet is in a zone, so exhibits outside the zones get no check-ups.");
   if(ks.length && ks.every(k => k.zone) && state.exhibits.some(e => e.animals.length && !aquaEx(e) && !e.zone)) w.push("Every keeper is in a zone, so exhibits outside the zones aren't being fed.");
   if(aqs.length && aqs.every(k => k.zone) && state.exhibits.some(e => e.animals.length && aquaEx(e) && !e.zone)) w.push("Every aquarist is in a zone, so lagoons and aquariums outside the zones aren't being fed.");

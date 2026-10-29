@@ -77,8 +77,9 @@ function moraleFactors(s, t){
     else if(share > STAFF.worked[1]) add(false, "I haven't had a minute to myself.", -8);
     else add(true, "A good day's work.", 10);
   }
-  if(state.buildings.some(b => b.type === "breakroom")) add(true, "Nice to have a break room.", 5);
+  if(state.buildings.some(b => b.type === "breakroom" && !unpowered(b))) add(true, "Nice to have a break room.", 5);
   else add(false, "Where are we meant to take a break?", -6);
+  if(state.buildings.some(b => BUILDINGS[b.type].dept && unpowered(b))) add(false, "We're working in the dark back here.", -6);
   if(s.zone) add(true, "I know my patch.", 3);
   if(state.rating >= 4) add(true, "Proud to work at a park like this.", 8);
   else if(state.rating < 2) add(false, "I'm a bit embarrassed to work here.", -8);
@@ -92,7 +93,7 @@ const moraleTarget = (s, t) => clamp(52 + moraleFactors(s, t).reduce((a, f) => a
 function staffMaybeRest(c, homes){
   const f = staffById(c.id);
   if(!f || c.cargo || energyOf(f.s) >= STAFF.restBelow) return false;
-  const rooms = state.buildings.filter(b => b.type === "breakroom" && kGraph.anchors[b.id]);
+  const rooms = state.buildings.filter(b => b.type === "breakroom" && kGraph.anchors[b.id] && !unpowered(b));
   const r = nearestOf(c, rooms.length ? rooms : homes);
   if(!r) return false;
   if(r.n === c.at){ c.job = "resting"; c.route = []; return true; }

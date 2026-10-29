@@ -23,6 +23,7 @@ let sel = null;                     // what's picked: {kind:"exhibit"|"path"|"bu
 let draw = null;                    // shape being drawn: {kind, pts, snaps, hover}
 let ghost = null;                   // building being placed: {pts, x, y, angle, ok, why}
 let rockBiome = null;               // biome tab a rock was picked from, so it's placed in that stone color (null: the exhibit's biome)
+let cableFrom = null, cableHover = null;   // the power building a cable starts at, and the pointer (world) while laying one
 let landGhost = null;               // rock, grove or shelter being placed: {key, x, y, ok, why}
 let hoverItem = null;               // thing under the mouse while bulldozing
 let snapMark = null;
@@ -388,6 +389,15 @@ function render(){
     s += `<g class="lowmark" pointer-events="none" transform="translate(${mx.toFixed(2)} ${y.toFixed(2)})${upright()}"><circle r="${10*inv}" fill="#E5484D" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" font-size="${15*inv}" style="fill:#fff">!</text></g>`;
   }
 
+  // a power mark over every building that has none, and every electric fence or filter without it
+  const bolt = (x, y) => `<g class="lowmark" pointer-events="none" transform="translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}"><circle r="${10*inv}" fill="#3A3F44" stroke="#E5484D" stroke-width="2" vector-effect="non-scaling-stroke"/><text class="glyph" font-size="${13*inv}" style="fill:#E8C34A">⚡</text></g>`;
+  for(const bl of state.buildings){
+    if(!unpowered(bl)) continue;
+    const S = tilt && STAND34[bl.type], [mx, cy0] = centroid(bl.points), top = Math.min(...bl.points.map(p => p[1]));
+    s += bolt(mx + (restocked(bl) && lowStock(bl) ? 22*inv : 0), S ? top - (S.canopy || S.wall + S.rise) / TILT + 2*inv : cy0 - BUILDINGS[bl.type].d * .7 - 12*inv);
+  }
+  for(const e of state.exhibits) if(e.powered === false || e.filterPowered === false){ const bb = bbox(e.points); s += bolt((bb.x0 + bb.x1) / 2, bb.y0); }
+
   // exhibit names and happiness
   for(const e of state.exhibits){
     const bb = bbox(e.points), dim = Math.min(bb.x1-bb.x0, bb.y1-bb.y0) * k;
@@ -459,6 +469,11 @@ const STAND34 = {
   toolshed:  {wall:3,   rise:1.6, front:"plain", gable:"ns"},
   workshop:  {wall:5,   rise:0, front:"lab", doors:2, top:"stacks"},
   generator: {wall:4.5, rise:0, front:"lab", doors:1, top:"stacks"},
+  gasplant:  {wall:7,   rise:0, front:"lab", doors:2, top:"stacks"},
+  geothermal:{wall:5,   rise:0, front:"lab", doors:1, top:"tanks"},
+  solar:     {wall:1.6, rise:0, front:"solar"},
+  wind:      {wall:26,  rise:0, front:"wind"},
+  transformer:{wall:2.2, rise:0, front:"xfmr"},
   depot:     {wall:5,   rise:0, front:"lab", doors:3},
   warehouse: {wall:7,   rise:0, front:"lab", doors:2},
   coldstore: {wall:5.5, rise:0, front:"lab", doors:1},
@@ -1214,6 +1229,7 @@ function building34(bl, t, on, dead, reach, inv){
     return s;
   }
   if(S.front === "deck") return deckArt(bl, inv, on, dead, reach);   // flat pixel style, propart.js
+  if(S.front === "solar" || S.front === "wind" || S.front === "xfmr") return (S.front === "wind" ? "" : s) + powerArt34(bl, S, P, col, line, inv);   // a turbine's shadow would be the tower's, not a block's
   if(S.front === "camp") return s.replace(/fill="#8E8778"/, `fill="#C9B98E"`) + camp34(bl, P, col, line);
   if(S.front === "lab" || S.front === "resort") return s + block34(bl, t, S, P, col, line, inv);
   const flat = S.front === "wc" && T === THEMES.genesis, ln = on || dead || !reach ? line : "";   // the flat pixel style, for now just the Genesis restroom
@@ -1269,6 +1285,40 @@ function building34(bl, t, on, dead, reach, inv){
   return s + (S.roofCol ? hipRoof34(P, S.wall, S.rise, S.roofCol, null, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34)) : hipRoof34(P, S.wall, S.rise, col, tex, line, S.gable, S.gable === "ns" && (S.wallCol || WALL34))) + mark;
 }
 
+// Solar arrays, wind turbines and transformers: no walls to speak of, so drawn on their own
+function powerArt34(bl, S, P, col, line, inv){
+  const [cx, cy] = centroid(P), bb = bbox(P), off = !genOnline(bl) && isStation(bl), n2 = v => v.toFixed(2);
+  let s = "";
+  if(S.front === "solar"){
+    // rows of panels on short legs, tilted to the sun (south), on gravel
+    s += `<polygon points="${polyStr(P)}" fill="#A8A08E" ${line}/>`;
+    const rows = Math.max(2, Math.round((bb.y1 - bb.y0) / 3.5)), dy = (bb.y1 - bb.y0) / rows;
+    for(let r = 0; r < rows; r++){
+      const y0 = bb.y0 + r * dy + dy * .2, y1 = y0 + dy * .6, x0 = bb.x0 + .6, x1 = bb.x1 - .6;
+      const q = [lift34(S.wall)([x0, y0]), lift34(S.wall)([x1, y0]), lift34(.6)([x1, y1]), lift34(.6)([x0, y1])];
+      s += `<polygon points="${polyStr(q)}" fill="${off ? "#3A3F44" : "#2E4A7A"}" stroke="#C9D2DA" stroke-width="1" vector-effect="non-scaling-stroke"/>` + shade34(q, .35);
+      for(let k = 1; k < Math.round((x1 - x0) / 2); k++){ const x = x0 + (x1 - x0) * k / Math.round((x1 - x0) / 2), a = lift34(S.wall)([x, y0]), b = lift34(.6)([x, y1]); s += `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#7FA0C8" stroke-width="1" vector-effect="non-scaling-stroke"/>`; }
+    }
+    return s;
+  }
+  if(S.front === "wind"){
+    // a white tower on a concrete pad, three blades on the hub (turning while it runs)
+    s += `<polygon points="${polyStr(insetRect(P, .8))}" fill="#B8B1A2" ${line}/>`;
+    const base = [cx, cy], top = lift34(S.wall)(base), w0 = .9, w1 = .45;
+    s += `<polygon points="${n2(base[0] - w0)},${n2(base[1])} ${n2(base[0] + w0)},${n2(base[1])} ${n2(top[0] + w1)},${n2(top[1])} ${n2(top[0] - w1)},${n2(top[1])}" fill="#ECEEEA" stroke="#9AA09A" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    const spin = off ? 0 : 20, L = 11;
+    s += `<g transform="translate(${n2(top[0])} ${n2(top[1])})"><g transform="rotate(${spin.toFixed(1)})">`;
+    for(const a of [0, 120, 240]) s += `<path d="M0 0L${n2(L * Math.cos(a * Math.PI / 180) - 1.1 * Math.sin(a * Math.PI / 180))} ${n2(L * Math.sin(a * Math.PI / 180) + 1.1 * Math.cos(a * Math.PI / 180))}L${n2(L * Math.cos(a * Math.PI / 180))} ${n2(L * Math.sin(a * Math.PI / 180))}z" fill="#F4F5F2" stroke="#9AA09A" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    return s + `</g><circle r=".7" fill="#D8DCD6" stroke="#9AA09A" stroke-width="1" vector-effect="non-scaling-stroke"/></g>`;
+  }
+  // a transformer: a gray box with cooling fins inside a chain-link fence
+  const box = insetRect(P, .55), w = walls34(box, 0, S.wall, "#7C848A", line);
+  s += `<polygon points="${polyStr(P)}" fill="#A8A08E" ${line}/>` + w.s + `<polygon points="${polyStr(box.map(lift34(S.wall)))}" fill="#9AA2A8" ${line}/>`;
+  if(w.main >= 0) for(const f of [.2, .4, .6, .8]) s += quad34(box, w.main, f - .04, f + .04, .3, S.wall - .3, "#5E666C");
+  s += walls34(P, 0, 1.6, "none", `stroke="#5E666C" stroke-width="1" stroke-dasharray="1.5 1.5" vector-effect="non-scaling-stroke"`).s;
+  const [x, y] = lift34(S.wall + .6)([cx, cy]);
+  return s + `<text class="glyph" x="${n2(x)}" y="${n2(y)}" font-size="1.6" style="fill:#E8C34A" pointer-events="none">⚡</text>`;
+}
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
 function parcelOverlay(){
@@ -1390,6 +1440,7 @@ function renderOverlay(){
     }
   }
   if(gateGhost) s += gateGhostSvg(gateGhost, inv);   // red on fence that isn't closed yet, too
+  if(gridShown()) s += gridSvg(inv);
   if(tool === "zoneedit" && zedit){
     const z = zoneById(zedit.id);
     if(z){
@@ -2328,6 +2379,7 @@ const drawType = () => draw && draw.kind === "tram" ? draw.kind : undefined;
 function setTool(t){
   if(tool === "zoneedit" && zedit){ const z = zoneById(zedit.id); if(z && !zedit.done) z.points = zedit.orig; zedit = null; }
   if(draw) endDraw();
+  cableFrom = null; cableHover = null;
   ghost = null; hoverItem = null; snapMark = null; pdrag = null; wdrag = null; fdrag = null; cdrag = null; chover = null; fhover = null; gateGhost = null; landGhost = null; crateGhost = null; rockBiome = null; rot = 0; lastPtr = null; mvSel = null;
   tool = t;
   const fam = familyOf(t);
@@ -2361,7 +2413,9 @@ function setTool(t){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && !!s.aqua === !!b.aqua && vivRank(s.viv) <= vivRank(b.viv) && speciesAvailable(s.id)).map(s => s.name) : [];
     const free = " Place it anywhere clear of paths, but it only works once a path reaches it.", spin = " Rotate turns it 90° (R).";
-    showBar(`Place ${b.one}`, b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Tap beside a ${b.serviceOnly ? "service road" : "path or service road"}. It snaps to the 1 m grid.${free}${spin}`
+    showBar(`Place ${b.one}`, b.grid ? `Tap anywhere. Feeds everything within ${b.reach} m once a cable joins it to a power station.${spin}`
+      : b.power ? `Tap beside a path or service road, for the mechanics. ${b.green ? "Clean power" : "Guests don't like the look of it"}. Feeds everything within ${b.reach} m.${spin}`
+      : b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Tap beside a ${b.serviceOnly ? "service road" : "path or service road"}. It snaps to the 1 m grid.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m.${b.aqua ? " Needs a filter, which runs on power." : ""} Fits ${fits.join(", ")}.${free}${spin}`
       : b.tram ? `Tap beside a footpath, with tram track running alongside the far side. Guests walk to it from the path and ride from here.${spin}`
       : b.kind ? `Tap it after placing to choose what it sells. Room for ${b.menuSlots} item${b.menuSlots === 1 ? "" : "s"}.${free}${spin}`
@@ -2383,6 +2437,7 @@ function setTool(t){
     updateMoveBar();
   }
   else if(t === "bulldoze") showBar("Bulldoze", "", "", {undo:false, finish:false, cancel:"Done"});
+  else if(t === "cable") showBar("Lay power cable", "Tap a power station or transformer, then another. Tap a cable to lift it.", `${money(POWER.cablePerMeter)} a meter`, {undo:false, finish:false, cancel:"Done"});
   else hideBar();
   render();
 }
@@ -2807,7 +2862,7 @@ function placeGhost(clientX, clientY){
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why, face};
   // does it work where it stands? Same reach test as recompute: guests walk to it by footpath, staff by any path (depots by staff path)
-  const reached = t.onPath ? nearCells(pts, 0, true) : nearCells(pts, REACH - PATH_HALF_WIDTH, !t.dept) && (!t.serviceOnly || nearCells(pts, REACH - PATH_HALF_WIDTH, false, false, "s"));
+  const reached = t.noPath ? true : t.onPath ? nearCells(pts, 0, true) : nearCells(pts, REACH - PATH_HALF_WIDTH, !t.dept) && (!t.serviceOnly || nearCells(pts, REACH - PATH_HALF_WIDTH, false, false, "s"));
   const doorAway = !t.onPath && reached && !doorNear({points:pts, face}, !t.dept) ? " Its door faces away from the path." : "";
   const noTrack = t.tram && !why && !tramNear(pts) ? " No tram track beside it yet, so it won't work until one runs alongside." : "";
   setStat(why || `${money(t.price)}. Tap to build.${reached ? doorAway : " No path nearby, so it won't work until one reaches it."}${noTrack}`, !!why);
@@ -2862,6 +2917,55 @@ function placeBuilding(e){
   render();
   ui.toast(isReachable(b) ? `Built ${t.one} for ${money(t.price)}.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(b) ? "" : "bad");
   if(t.dept || t.kind){ toolDone({kind:"building", id:b.id}); }
+}
+
+/* ---------- power cables ---------- */
+// The grid shows while laying cable or placing a power building, or with one selected
+const gridShown = () => tool === "cable" || (isBuildTool(tool) && isGridNode({type:tool})) || (sel && sel.kind === "building" && isGridNode(findItem("building", sel.id)));
+const gridNodeAt = hit => { const b = hit && hit.kind === "building" ? findItem("building", hit.id) : null; return b && isGridNode(b) ? b : null; };
+function cableHoverAt(e){
+  cableHover = toWorld(e.clientX, e.clientY);
+  const a = cableFrom && buildingById(cableFrom), b = gridNodeAt(itemAt(e.target));
+  if(a && b && b !== a){ const why = cableProblem(a, b); setStat(why || `${Math.round(dist(centroid(a.points), centroid(b.points)))} m. ${money(cableCost(a, b))}. Tap to lay it.`, !!why); }
+  else if(a) setStat("Tap another power station or transformer.");
+  else { const c = cableAt(cableHover.x, cableHover.y, Math.max(1.5, 10 / view.k)); setStat(c ? `Tap to lift this cable for ${money(Math.round(cableLen(c) * POWER.cablePerMeter * COST.refundShare))} back.` : `${money(POWER.cablePerMeter)} a meter`, !!c); }
+  renderOverlay();
+}
+function cableTap(e, hit){
+  const b = gridNodeAt(hit), a = cableFrom && buildingById(cableFrom);
+  if(!b){
+    const w = toWorld(e.clientX, e.clientY), c = !a && cableAt(w.x, w.y, Math.max(1.5, 10 / view.k));
+    if(c){ liftCable(c); afterChange(); render(); setStat("Cable lifted."); return; }
+    cableFrom = null; setStat("Tap a power station or transformer."); renderOverlay(); return;
+  }
+  if(!a || a === b){ cableFrom = a === b ? null : b.id; setStat(cableFrom ? "Tap another power station or transformer." : ""); renderOverlay(); return; }
+  const why = layCable(a, b);
+  if(why){ setStat(why, true); return; }
+  cableFrom = b.id;   // carry on from here, so a run of transformers goes down in a row of taps
+  afterChange(); render(); setStat("Cable laid. Tap another to carry on.");
+}
+// Cables, and the reach of every station and transformer, tinted by network (an orange ring where a network is short)
+function gridSvg(inv){
+  let s = `<g pointer-events="none">`;
+  const cols = ["#E8C34A", "#5FB0E8", "#E8708A", "#7AD07A", "#C08AE8", "#E89A4A"];
+  gridInfo.nets.forEach((n, i) => {
+    const col = cols[i % cols.length], bad = n.short > 0 || n.supply <= 0;
+    for(const b of n.nodes){ const [x, y] = centroid(b.points); s += `<circle cx="${x}" cy="${y}" r="${BUILDINGS[b.type].reach}" fill="${col}" fill-opacity=".08" stroke="${bad ? "var(--bad)" : col}" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`; }
+  });
+  for(const c of cablesOf()){
+    const a = buildingById(c.a), b = buildingById(c.b); if(!a || !b) continue;
+    const [x1, y1] = centroid(a.points), [x2, y2] = centroid(b.points);
+    s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1D2B22" stroke-opacity=".5" stroke-width="5" stroke-linecap="round" vector-effect="non-scaling-stroke"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#E8C34A" stroke-width="2.5" stroke-dasharray="7 4" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
+  }
+  const a = tool === "cable" && cableFrom && buildingById(cableFrom);
+  if(a){
+    const [x1, y1] = centroid(a.points);
+    s += `<circle cx="${x1}" cy="${y1}" r="${7*inv}" fill="var(--sel)" stroke="#fff" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    if(cableHover) s += `<line x1="${x1}" y1="${y1}" x2="${cableHover.x}" y2="${cableHover.y}" stroke="var(--sel)" stroke-width="2.5" stroke-dasharray="7 4" vector-effect="non-scaling-stroke"/>`;
+  }
+  // a ghost power building shows the reach it will have
+  if(ghost && isBuildTool(tool) && isGridNode({type:tool})) s += `<circle cx="${ghost.x}" cy="${ghost.y}" r="${BUILDINGS[tool].reach}" fill="var(--sel)" fill-opacity=".1" stroke="var(--sel)" stroke-width="1.5" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`;
+  return s + `</g>`;
 }
 
 /* ---------- keeper gates ---------- */
@@ -3357,6 +3461,7 @@ function removeItem(kind, it, opts = {}){
   else if(kind === "water"){ const o = state.exhibits.find(x => waterOf(x).includes(it)), l = o ? o.water : state.water; l.splice(l.indexOf(it), 1); if(mvCorner && mvCorner.id === it.id) mvCorner = null; }
   else { const l = listFor(kind); l.splice(l.indexOf(it), 1); }
   if(kind === "building" && it.type === "pmc") pmcRemoved(it);
+  if(kind === "building" && isGridNode(it)) dropCables(it.id);
   if(kind === "zone") dropZone(it.id);
   // viewing platforms and galleries go with their exhibit
   if(kind === "exhibit") state.buildings = state.buildings.filter(b => b.exhibitId !== it.id);
@@ -3650,6 +3755,7 @@ svg.addEventListener("pointermove", e => {
     else if(landKey(tool)) landHover(e);
     else if(isBuildTool(tool)){ placeGhost(e.clientX, e.clientY); renderOverlay(); }
     else if(tool === "gate") gateHover(e);
+    else if(tool === "cable") cableHoverAt(e);
     else if(tool === "exhibit"){ snapMark = gridAt(e); renderOverlay(); }
     else if(isPathTool(tool)){ chover = chunkAtEv(e); renderOverlay(); }
     else if(tool === "bulldoze"){
@@ -3768,6 +3874,7 @@ function endPointer(e){
   if(landKey(tool)){ landTap(e); return; }
   if(isBuildTool(tool)){ placeBuilding(e); return; }
   if(tool === "gate"){ gateTap(e); return; }
+  if(tool === "cable"){ cableTap(e, d.hit); return; }
   if(tool === "bulldoze"){ bulldozeTap(d.hit.kind, d.hit.id); return; }
   if(d.hit.kind === "entrance" && (!tool || tool === "select")){ openParkOffice(); return; }
   if(!tool || tool === "select"){ const w = staffAt(e.clientX, e.clientY); if(w){ staffSelName = w.name; select("staff", w.id); return; } const g = guestAt(e.clientX, e.clientY); if(g){ guestSelName = g.name; select("guest", g.id); return; } const an = animalAt(e.clientX, e.clientY); if(an){ animalSelName = an.name; select("animal", an.id); return; } }

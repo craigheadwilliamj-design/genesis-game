@@ -10,7 +10,7 @@
 
 let gcrew = [];   // guards walking around right now (positions aren't saved)
 
-const offices = () => state.buildings.filter(b => b.type === "security" && kGraph && kGraph.anchors[b.id]);
+const offices = () => state.buildings.filter(b => b.type === "security" && kGraph && kGraph.anchors[b.id] && !unpowered(b));
 const guardRec = c => state.staff.guards.find(x => x.id === c.id) || null;
 const propCond = b => b.cond ?? 100;
 const isBroken = b => !!BUILDINGS[b.type].prop && propCond(b) < VANDAL.brokenBelow;

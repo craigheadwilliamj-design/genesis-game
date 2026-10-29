@@ -61,7 +61,7 @@ function buildGuestGraph(){
   // tram stations: one stop on the footpath beside it, one on the track beside it
   const tc = state.paths.filter(isTram).map(p => ({pts:p.points, adds:[]})), stations = [];
   if(tc.length) for(const b of state.buildings){
-    const t = BUILDINGS[b.type]; if(!t.tram || !isReachable(b) || condOf(b) < TRAM.offlineBelow) continue;
+    const t = BUILDINGS[b.type]; if(!t.tram || !isReachable(b) || condOf(b) < TRAM.offlineBelow || unpowered(b)) continue;
     const [cx, cy] = centroid(b.points), foot = nearest(cx, cy, Math.hypot(t.w, t.d) / 2 + REACH);
     let rail = null;
     for(const c of tc) for(let i = 1; i < c.pts.length; i++){
@@ -130,6 +130,7 @@ function buildGuestGraph(){
   gFields = new Map(); gFieldsWalk = new Map();
   indexLitterSpots(nodes);
   indexDecor(nodes);
+  indexGrid(nodes);
   indexLight(nodes);
   // everyone carries on from the same spot on the new map
   for(const p of parties){
@@ -285,7 +286,7 @@ function pickSight(p){
   // the Education Center, once, if there's time left for the walk and the visit (and they didn't just give up on its line)
   if(!p.learnt && (p.cool.see || 0) <= state.minute)
     for(const b of state.buildings){
-      if(b.type !== "edcenter" || !gGraph.anchors[b.id]) continue;
+      if(b.type !== "edcenter" || !gGraph.anchors[b.id] || unpowered(b)) continue;
       const home = (fieldFor(p, "gate").dist.get(gGraph.anchors[b.id]) ?? Infinity) / (WALK_PER_MIN * p.spd);
       if(state.minute + walkMins(p, b.id) + BUILDINGS.edcenter.serveMin + home + 15 < p.until) add(b, EDU.centerAppeal + eduAppeal(b), centerTaste(p, b));
     }
@@ -312,7 +313,7 @@ function planParty(p){
   const need = urgentNeed(p), onTrip = p.why in NEEDS;
   if(need && p.why !== need && (!onTrip || (p.needs[need] >= GUEST.desperate && p.needs[p.why] < GUEST.desperate))){
     const s = bestStop(p, need);
-    if(!s){ thinks(p, NO_THOUGHT[need]); if(need === "energy" && state.buildings.some(b => BUILDINGS[b.type].seats && isBroken(b))) thinks(p, "broken"); p.cool[need] = state.minute + 60; }
+    if(!s){ thinks(p, NO_THOUGHT[need]); if(need === "energy" && state.buildings.some(b => BUILDINGS[b.type].seats && isBroken(b))) thinks(p, "broken"); if(state.buildings.some(b => unpowered(b) && guestBuilding(b))) thinks(p, "noPower"); p.cool[need] = state.minute + 60; }
     else if(s.b.id !== p.dest){ p.dest = s.b.id; p.why = need; if(s.d > GUEST.farWalk && !p.map) thinks(p, "far"); return; }
   }
   if(p.dest) return;
@@ -686,6 +687,7 @@ function guestsTick(m0, m1){
     // gardens, water and statues along the way cheer them up, and they stop to read each statue's plaque
     if(p.at && p.at.decor){ hurt -= DECOR.joy * pm(p, "decor") * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
     if(p.at && p.at.statues) for(const id of p.at.statues) statueSeen(p, id);
+    hurt += gridMood(p);   // power plants in view (and green power, for conservationists)
     p.mood = clamp(p.mood - hurt * gdt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }
     if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange * pm(p, "flee"))){ p.fled = true; thinks(p, "scared"); p.mood -= 15 * pm(p, "fleeHurt"); goHome(p); }

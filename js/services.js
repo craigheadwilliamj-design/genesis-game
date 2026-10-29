@@ -20,7 +20,7 @@ const onSale = b => menuOf(b).filter(m => inStock(b, m.id));
 // The needs a building takes care of. A stand's come from what it has in stock; a gift shop with anything to sell serves shoppers.
 function servesOf(b){
   const t = BUILDINGS[b.type];
-  if(isBroken(b)) return [];
+  if(isBroken(b) || unpowered(b)) return [];
   if(!t.kind) return t.serves || [];
   const out = new Set();
   if(t.kind === "merch"){ if(onSale(b).length) out.add("shop"); }

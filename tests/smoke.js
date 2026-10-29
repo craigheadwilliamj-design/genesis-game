@@ -32,6 +32,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // guests get a neutral personality unless a test says otherwise (real ones are random), and nobody sneaks in
     PERSONALITIES.neutral = {label:"Neutral", color:"#888", weight:0, text:"", fx:{}, n:{}};
     window.realRollPers = rollPers; rollPers = () => ["neutral", "neutral"]; PERS.hooligan.sneak = 0;
+    // buildings run on free power unless a check wires up a grid (the power checks clear state.powerFree themselves)
+    window.realUpgradeSave = upgradeSave; upgradeSave = s => { s = realUpgradeSave(s); if(s.powerFree === undefined) s.powerFree = 1e9; return s; };
+    state.powerFree = 1e9; recompute();
     const sp = SPECIES.find(s => !s.viv && !s.pool);
 
     // old saves without staff/safety upgrade without throwing
@@ -4251,6 +4254,75 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     devFlag = null; try{ if(wasDev) localStorage.setItem("genesis-dev", "1"); }catch{}
     return out;
   }, coelRig));
+
+  // The power grid: stations and transformers feed what they reach, cables join them, shortages cut the least important first, and guests notice
+  Object.assign(checks, await page.evaluate(() => {
+    const out = {};
+    startWith(newPark(), false); setSpeed(0);
+    state.powerFree = 0; state.money = 1e6; state.minute = DAWN_MIN + 200; state.weather = {today:"fair", next:"fair"};
+    const H = 0, B = (id, type, x, y) => { const t = BUILDINGS[type], b = {id, type, points:rectPts(x, y, t.w, t.d, H), cond:100}; state.buildings.push(b); return b; };
+    const wc = B("p-wc", "restroom", 100, 100);
+    recompute();
+    out.powerNeeded = unpowered(wc) && servesOf(wc).length === 0 && /No power/.test(powerRow(wc));
+    const gen = B("p-gen", "generator", 100, 115);
+    recompute();
+    out.powerInReach = !unpowered(wc) && servesOf(wc).includes("bladder") && !needsPower(gen) && gen.powered === undefined;
+    // far away: a transformer alone does nothing until a cable joins it to the station
+    const far = B("p-wc2", "restroom", 200, 100), tr = B("p-tr", "transformer", 200, 120);
+    recompute();
+    const before = unpowered(far);
+    out.cableTooFar = !!cableProblem(gen, B("p-tr2", "transformer", 100 + POWER.cableMax + 50, 300)) && !!cableProblem(gen, gen) && !!cableProblem(gen, wc);
+    const m0 = state.money, why = layCable(gen, tr); recompute();
+    out.cableJoins = before && !why && !unpowered(far) && state.money === m0 - cableCost(gen, tr) && gridInfo.netOf.get("p-gen") === gridInfo.netOf.get("p-tr") && !!cableProblem(gen, tr);
+    // bulldozing the transformer takes its cable, and the far restroom goes dark
+    removeItem("building", tr); recompute();
+    out.cableGoesWithIt = !state.cables.some(c => c.a === "p-tr" || c.b === "p-tr") && unpowered(far);
+    // an electrified fence needs only one stretch in reach
+    state.science.tech.push("electric");
+    const ex = {id:"p-ex", name:"Pen", points:[[115, 95], [185, 95], [185, 150], [115, 150]], animals:[], happy:70, cond:100, barrier:"electric"};
+    state.exhibits.push(ex); recompute();
+    out.fenceOneStretch = ex.powered === true && baseStrength(ex) === barrierOf(ex).strength;
+    state.buildings = state.buildings.filter(b => b.id !== "p-gen"); state.cables = []; recompute();
+    out.fenceUnpowered = ex.powered === false && baseStrength(ex) === POWER.unpoweredStrength;
+    state.exhibits = [];
+    // short supply: the cold store and the labs come before the shops
+    state.buildings = [];
+    B("q-gen", "generator", 300, 300); const cs = B("q-cs", "coldstore", 300, 280), shops = [0, 1, 2, 3].map(i => B("q-s" + i, "resort", 300, 300));
+    shops.forEach((b, i) => { b.points = rectPts(288 + i * 8, 312, 6, 6, H); });
+    BUILDINGS.resort.kw = 200; recompute();
+    out.shortPriority = !unpowered(cs) && shops.some(unpowered) && gridInfo.nets[0].short > 0;
+    BUILDINGS.resort.kw = 90;
+    // solar follows the sun; wind the weather
+    const sol = B("q-sol", "solar", 400, 400), wnd = B("q-wnd", "wind", 430, 400);
+    const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
+    state.weather.today = "storm"; const storm = stationOutput(wnd), stormSun = stationOutput(sol); state.weather.today = "fair";
+    out.solarWind = day === BUILDINGS.solar.power && night < day * .2 && storm > BUILDINGS.wind.power && stormSun < day;
+    // guests: an eyesore hurts, green power cheers conservationists and nobody else
+    buildGuestGraph();
+    const party = pers => ({pers, thought:new Set(), at:{eyesore:1, green:0}});
+    const ugly = party(["neutral", "neutral"]); const hurt = gridMood(ugly);
+    const cons = party(["conserv", "neutral"]); cons.at = {eyesore:0, green:1}; const joy = gridMood(cons);
+    const plain = party(["neutral", "neutral"]); plain.at = {eyesore:0, green:1};
+    const consUgly = party(["conserv", "neutral"]);
+    out.guestsSeePower = hurt > 0 && ugly.thought.has("eyesore") && joy < 0 && cons.thought.has("greenPower") && gridMood(plain) === 0 && gridMood(consUgly) > hurt;
+    const n = {x:300, y:330, adj:new Map(), k:"t"}; indexGrid(new Map([["t", n]]));
+    const ns = {x:400, y:420, adj:new Map(), k:"s"}; indexGrid(new Map([["s", ns]]));
+    out.gridIndexed = n.eyesore > 0 && ns.green > 0 && ns.eyesore === 0;
+    // a lab with no power doesn't work, and says so
+    state.buildings = []; B("q-or", "oracle", 600, 600);
+    recompute(); derived.reach["q-or"] = true;
+    out.labNeedsPower = !dept("oracle") && /no power/.test(deptProblem("oracle"));
+    // older parks get a few days of free power, and the points they spent on generators back
+    const old = JSON.parse(JSON.stringify(state)); delete old.cables; delete old.powerFree; old.science.tech.push("generator"); const pts = old.science.points || 0;
+    const up = realUpgradeSave(old);
+    out.oldParkGrace = up.powerFree === up.day + POWER.grace && !up.science.tech.includes("generator") && up.science.points === pts + 15 && Array.isArray(up.cables);
+    // panels draw
+    state.buildings = [B("r-gen", "generator", 100, 100), B("r-tr", "transformer", 130, 100)]; layCable(state.buildings[0], state.buildings[1]); recompute();
+    select("building", "r-tr"); ui.panel();
+    out.gridPanel = /Network/.test(document.querySelector("#panel").innerHTML) && gridSvg(1).includes("stroke-dasharray");
+    select(null);
+    return out;
+  }));
 
   await page.waitForTimeout(800);
   let ok = true;

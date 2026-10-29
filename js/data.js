@@ -752,7 +752,7 @@ const SIGHT = {
    secondary PERS.second as hard. Each personality has:
      weight  odds of being picked (primary, then secondary from what's left)
      fx      multipliers on how the party behaves (1 is neutral; read through pm() in personas.js):
-             food, shop, museum (will buy), donate, learn, infra (mood lost to needs, litter, crowds),
+             food, shop, museum (will buy), donate, learn, infra (mood lost to needs, litter, crowds), eyesore (power plants in view),
              ticket (how dear a ticket can be before they grumble), price (price sensitivity), patience,
              walk (mood lost to being on their feet), decor, broken, toilet (filthy restrooms), litter,
              flee / fleeHurt (how they take a loose predator), need {energy, bladder} (how fast they build),
@@ -775,7 +775,7 @@ const PERSONALITIES = {
     n:{danger:7, active:4, platform:3, tame:3, slow:2, tasteDanger:1.5, tasteActive:.5, tasteTame:.5, center:1, spectacle:1.6}},
   conserv:{label:"Conservationist", color:"#3E9B4F", weight:.12,
     text:"Cares how the animals are treated: roomy, well-kept exhibits, rare species, research and education. Gives to conservation. Hates a park that feels like pure entertainment.",
-    fx:{donate:3, learn:1.3, shop:.9, hideTol:2},
+    fx:{donate:3, learn:1.3, shop:.9, hideTol:2, eyesore:1.5},
     n:{well:5, poor:8, rare:5, stress:4, showy:6, showyBelow:15, tasteWelfare:.8, tasteRare:.5, center:1.8}},
   paleo:{label:"Paleo-Nerd", color:"#8A5CC2", weight:.14,
     text:"Wants variety and accuracy: many species across the eras, complete genomes, signs and museum shows. Bored by repeats and by low-genome clones.",
@@ -925,6 +925,9 @@ const THOUGHTS = {
   feeding:    {text:"It was great watching them eat.", good:true},
   sickly:     {text:"That animal looked sick."},
   critical:   {text:"That poor animal could barely stand."},
+  eyesore:    {text:"Those power plants are an eyesore."},
+  greenPower: {text:"Love that this park runs on clean power.", good:true},
+  noPower:    {text:"Half the place had no power."},
 };
 
 // Each vivarium size is also a building you can place
@@ -1235,16 +1238,49 @@ BUILDINGS.greenhouse = {label:"Greenhouse", tag:"GROW", one:"a greenhouse", glyp
                         tech:"greenhouse", needsDept:"ceres",
                         full:"Paleoflora greenhouse", blurb:"Adds 40 units of Paleoflora a day to the Botany Lab."};
 
-// Power for electrified fences
+// The power grid. Power stations make it, underground cables join stations and transformers into networks,
+// and every station and transformer feeds whatever lies within its reach. Every building, electrified fence,
+// aquarium filter and cold store draws from the network that reaches it; a building with no power shuts.
 const POWER = {
   perMeter:.5,            // kW each meter of electrified fence draws
   unpoweredStrength:20,   // an electric fence with no power is just wire
-  genWear:4,              // generator condition lost per day
-  offlineBelow:25,        // generators cut out below this condition
-  repairPerPercent:60,    // materials to restore 1% of a generator's condition
+  perSqM:.12,             // kW a building draws for each m² of floor, unless it sets its own kw
+  genWear:4,              // a power station's condition lost per day (times its own wear)
+  offlineBelow:25,        // power stations cut out below this condition
+  repairPerPercent:60,    // materials to restore 1% of a power station's condition
+  cablePerMeter:12,       // underground cable, laid straight between two power buildings
+  cableMax:200,           // longest single run of cable, in meters
+  grace:3,                // days an older park keeps free power to wire itself up
+  sightReach:30,          // guests notice power buildings this close to the path they're on
+  eyesoreHurt:.03,        // mood lost a minute beside a full eyesore (a diesel generator is 1; being on their feet costs .03)
+  eyesoreFull:2,          // eyesore points within reach that make a stretch as ugly as it gets
+  ugly:.4,                // a stretch this ugly gets guests talking
+  greenJoy:.03,           // mood a minute conservationists gain walking past green power (full at greenFull)
+  greenFull:2,            // green stations within reach that make it as good as it gets
+  sun:{storm:.35},        // solar arrays: this share of their power in this weather; none after dark
+  wind:{storm:1.5, hot:.6},   // wind turbines: this share of their power in this weather
 };
-BUILDINGS.generator = {label:"Generator", tag:"POWER", one:"a generator", glyph:"P", color:"#A88A1E", price:7500, upkeep:150, tech:"generator", w:10, d:10, dept:true, power:600,
-                       full:"Diesel generator", blurb:"Powers every electrified fence in the park. Mechanics keep it running."};
+// Power stations: power (kW), reach (m they feed around themselves), eyesore (how much guests mind them, 0 is none),
+// green (conservationists like seeing them), wear (times POWER.genWear), sun/wind (output follows the sky).
+BUILDINGS.generator = {label:"Diesel Generator", tag:"POWER", one:"a diesel generator", glyph:"P", color:"#A88A1E", price:7500, upkeep:150, w:10, d:10, dept:true,
+                       power:600, reach:20, eyesore:1, wear:1,
+                       full:"Diesel generator", blurb:"Noisy, smoky, and cheap. Powers the buildings and fences on its network. Mechanics keep it running."};
+BUILDINGS.gasplant  = {label:"Gas Power Plant", tag:"GAS", one:"a gas power plant", glyph:"G", color:"#8A5A2E", price:32000, upkeep:520, tech:"gasplant", w:20, d:15, dept:true,
+                       power:2500, reach:30, eyesore:1.8, wear:1.2,
+                       full:"Gas power plant", blurb:"Four generators' worth of power from one big, ugly plant."};
+BUILDINGS.solar     = {label:"Solar Array", tag:"SOLAR", one:"a solar array", glyph:"S", color:"#2E4A7A", price:14000, upkeep:40, tech:"solar", w:20, d:15, dept:true,
+                       power:350, reach:22, eyesore:0, green:true, sun:true, wear:.3,
+                       full:"Solar array", blurb:"Clean power by day. None after dark, and less in a storm."};
+BUILDINGS.wind      = {label:"Wind Turbine", tag:"WIND", one:"a wind turbine", glyph:"W", color:"#D8DCD6", price:11000, upkeep:60, tech:"wind", w:5, d:5, dept:true,
+                       power:250, reach:12, eyesore:0, green:true, wind:true, wear:.6,
+                       full:"Wind turbine", blurb:"Clean power day and night. More in a storm, less in a heat wave."};
+BUILDINGS.geothermal= {label:"Geothermal Plant", tag:"GEO", one:"a geothermal plant", glyph:"H", color:"#3E7F6A", price:65000, upkeep:600, tech:"geothermal", w:20, d:20, dept:true,
+                       power:3500, reach:30, eyesore:0, green:true, wear:.5,
+                       full:"Geothermal plant", blurb:"Steady, clean power from deep underground."};
+// Transformers carry a network's power out to the buildings around them. They need no path.
+BUILDINGS.transformer = {label:"Transformer", tag:"POWER", one:"a transformer", glyph:"T", color:"#5B6470", price:1500, upkeep:10, w:5, d:5, dept:true, noPath:true,
+                       reach:35, eyesore:.35, grid:true,
+                       full:"Transformer", blurb:"Feeds power to everything within reach. Joined to a power station by cable."};
 
 // Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk, and the ATV stays parked where they got off for the next person.
 const VEHICLES = {
@@ -1331,7 +1367,7 @@ BUILDINGS.warehouse = {label:"Warehouse", tag:"STORE", one:"a warehouse", glyph:
                        full:"Dry goods warehouse", blurb:"Stores hay, insect feed, drinks, and merchandise, and keeps them better than a station does. Custodians restock stations, stands and shops from here."};
 BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph:"❄", color:"#4A7FA0", price:12000, upkeep:120, tech:"coldstore", w:15, d:10, dept:true,
                        store:{cap:600, holds:["meat", "fish", "fruit", "shellfish", ...MED_GOODS, CMED, "snacks"], spoil:1, cold:true, bulk:true},
-                       full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
+                       full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS.concat(MED_GOODS), spoil:1, bulk:true, dock:true},   // era medicine only lands here when the PMC and cold stores are full
                   full:"Supplier deliveries", blurb:"Standing orders from the Park Office land here at 7 PM. More docks hold more. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
@@ -1372,7 +1408,7 @@ const ZONE_MIN_AREA = 200;
 //   era     (flora, med) the era it belongs to
 const TECH = [
   {id:"bars",     group:"barrier", label:"Metal bars",        points:15, text:"Strength 45. Holds mid-size herbivores."},
-  {id:"electric", group:"barrier", label:"Electrified fence", points:18, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs generators."},
+  {id:"electric", group:"barrier", label:"Electrified fence", points:18, text:"Strength 65 while powered. Holds most herbivores and smaller predators. Needs power."},
   {id:"concrete", group:"barrier", label:"Concrete walls",    points:20, text:"Strength 140. Holds anything, but guests can barely see in."},
   {id:"masonry",  group:"barrier", label:"Masonry walls",     points:12, text:"Brick (strength 100) and stone (strength 115) walls. Tough, only moderately tall, and guests can still see over them. Mostly a good look."},
   {id:"acrylic",  group:"barrier", label:"Acrylic walls",     points:40, text:"Strength 85. Clear walls that guests love looking through."},
@@ -1394,7 +1430,10 @@ const TECH = [
   {id:"hotels",  group:"build", label:"Hotels",           points:35, text:"Build campgrounds, safari lodges, and resort hotels. Guests stay the night and spend the next day in the park."},
   {id:"coldstore", group:"build", label:"Cold stores",      points:15, text:"Refrigerated stores that keep meat, fish, medicine, and snacks from rotting. Needs power."},
   {id:"security", group:"build", label:"Security offices",  points:15, text:"Build a Security Office and hire guards to patrol, deter vandals, and steer guests out during escapes."},
-  {id:"generator", group:"build", label:"Power generators", points:15, text:"Diesel generators that power electrified fences and cold stores."},
+  {id:"solar",      group:"build", label:"Solar power",       points:25, text:"Solar arrays. Clean power by day, none after dark. Guests don't mind them, and conservationists love them."},
+  {id:"wind",       group:"build", label:"Wind power",        points:30, text:"Wind turbines. Clean power day and night, more in a storm. Conservationists love them."},
+  {id:"gasplant",   group:"build", label:"Gas power plants",  points:40, text:"A gas-fired plant with four times a diesel generator's power. Guests hate the sight of it."},
+  {id:"geothermal", group:"build", label:"Geothermal power",  points:90, needs:"solar", text:"Big, steady, clean power from deep underground. Conservationists love it."},
   {id:"cameras",  group:"build", label:"Security cameras",  points:25, text:"Each Security Office watches the paths around it, and you can put camera posts on paths to watch more. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   group:"build", label:"Staff vehicles",   points:70, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"transit",   group:"build", label:"Guest tram",       points:60, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
@@ -1575,6 +1614,8 @@ const VET = {
 };
 BUILDINGS.pmc = {label:"Paleo-Medicine Center", tag:"PMC", one:"a Paleo-Medicine Center", glyph:"+", color:"#B0384F", price:6000, upkeep:100, w:20, d:15, dept:true, unique:true,
                  full:"Veterinary hospital and dart team", blurb:"Vets are based here. They give exhibits routine check-ups, treat minor illnesses on the spot, dart serious cases and escaped animals, and treat patients with medicine from the Botany Lab."};
+// Big power users (everything else draws POWER.perSqM a m²)
+for(const [k, kw] of Object.entries({oracle:80, ghost:160, tar:120, ceres:70, pmc:60, coldstore:LOGI.coldPower, edcenter:60, resort:90})) BUILDINGS[k].kw = kw;
 
 BUILDINGS.pmc.store = {cap:LOGI.pmcDoses, holds:MED_GOODS.concat(CMED), spoil:1, sink:true};
 
@@ -2894,7 +2935,7 @@ const waterWant = s => s.pool ? POOL.need : s.semi ? HAB.waterSemi : (biomesOf(s
 //   fits     species that look right here
 //   unlock   how it's earned, and what to tell the player until then (check() runs in checkThemes)
 // How warm a building runs, for snow on cold-theme roofs: 0 unheated storage and sheds (buried), 1 most buildings (patchy), 2 heated labs, kitchens, hotels and restrooms (melted)
-const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
+const SNOW_HEAT = (t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "edcenter", "restroom", "breakroom", "greenhouse", "hatchery", "shellfarm"].includes(type) || t.kind === "food" || t.rooms ? 2
   : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "orchard", "station", "diveshack"].includes(type) ? 0 : 1;
 const THEMES = {
   genesis: {label:"Default", tex:"genesis", ptex:"genesis-concrete", btex:"genesis-seam",
@@ -2905,7 +2946,7 @@ const THEMES = {
     // roofs by what a building does: 0 public (green standing seam, slim gold ridge cap), 1 labs (pale flat membrane, dark green parapet, rooftop units), 2 utilities and power (dark slate)
     // every roof gets a thin matte gold edge line. Gold is only ever a line or a dot.
     roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc"].includes(type) ? 1
-        : ["generator", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary", "orchard", "shellfarm"].includes(type) ? 2 : 0,
+        : ["generator", "gasplant", "geothermal", "depot", "workshop", "toolshed", "warehouse", "coldstore", "dock", "closet", "security", "farm", "ranch", "hatchery", "insectary", "orchard", "shellfarm"].includes(type) ? 2 : 0,
       btex:["genesis-seam", "genesis-lab", "genesis-slate"],
       trim:[[{c:"#C9A24B", w:.9, at:.94}],
         [{c:"#1F3D2B", w:5, at:.985}, {c:"#C9A24B", w:.9, at:.92}],
@@ -2948,7 +2989,7 @@ const THEMES = {
   volcanic: {label:"Volcanic", ground:"#1E1B1D", tex:"volcanic-rock", gtex:"volcanic-ground", ptex:"volcanic-flow", btex:"volcanic-basalt-dim", blurb:"Black basalt, steel and ash, with heat glowing through the cracks.",
     path:{live:"#4A1E14", dead:"#3A3436", edge:"#141113"}, bld:"#1A1719", mix:.92, edge:"#8A8488", accent:"#FF5A1F", fee:.25, fits:["cnot", "velo", "utah", "dilo", "carc"],
     // roofs by how hot a building runs: 0 storage and shops (dark basalt), 1 kitchens, hotels and work buildings (basalt with glowing seams), 2 labs, medicine and generators (steel plating, ember strips and vents)
-    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "edcenter"].includes(type) ? 2
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "edcenter"].includes(type) ? 2
         : t.kind === "food" || t.rooms || ["breakroom", "workshop", "security", "insectary", "depot", "greenhouse", "hatchery", "station", "diveshack", "toolshed"].includes(type) ? 1 : 0,
       btex:["volcanic-basalt-dim", "volcanic-basalt", "volcanic-plate"],
       trim:[[{c:"#5C7A8C", w:1}],
@@ -3013,7 +3054,7 @@ const THEMES = {
     path:{live:"#E3CBA4", dead:"#C9AE88", edge:"#9A5A3A"}, bld:"#C4683F", mix:.85, edge:"#7A3E26", accent:"#3FA7A0", fee:.15, fits:["coel", "dilo", "prot", "ovir", "velo"],
     // flat adobe roofs: 0 work buildings (terracotta or deep clay), 1 guest buildings (sand or cream), 2 labs (cream). Guest buildings and labs get a turquoise door.
     // A pale parapet runs round the top, with dark viga log ends poking out along the edge
-    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 2
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "greenhouse"].includes(type) ? 2
         : t.kind === "food" || t.kind === "merch" || t.rooms || ["edcenter", "campground", "platform"].includes(type) ? 1 : 0,
       btex:[["mesa-terra", "mesa-clay"], ["mesa-sand-roof", "mesa-cream"], "mesa-cream"],
       trim:[[{c:"#E8A882", w:4, at:.97}, {c:"#7A3E26", w:.8, at:.93}, {c:"#3E2A1C", w:3.4, dash:"0 15", cap:"round", at:1}],
@@ -3071,7 +3112,7 @@ const THEMES = {
     path:{live:"#6A5240", dead:"#54402F", edge:"#2E2118", kerb:{c:"#CFCBBE", dash:"2.4 1.6"}}, bld:"#3C4146", mix:.85, edge:"#1F1A16", accent:"#C8442E", fee:.2, fits:["tric", "steg", "dipl", "para", "anky"],
     // roofs by building: 0 labs and medicine (charcoal tile), 1 work and storage (weathered green-gray tile), 2 guest buildings (charcoal tile with ochre accents).
     // Small buildings (restrooms, shops, keeper huts) get rounded golden thatch instead. Every roof has a dark timber edge round a pale plaster band, and a raised ridge cap down the middle.
-    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 0
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "greenhouse"].includes(type) ? 0
         : ["warehouse", "coldstore", "toolshed", "dock", "depot", "closet", "farm", "ranch", "station", "diveshack", "workshop", "breakroom", "security", "insectary", "hatchery", "orchard", "shellfarm"].includes(type) ? 1 : 2,
       btex:["japanese-tile", "japanese-tile-green", "japanese-tile"],
       trim:[[{c:"#2A1E16", w:3.2, at:1}, {c:"#E6E0CE", w:1.6, at:.94}, {c:"#2A1E16", w:.6, at:.9}],
@@ -3109,7 +3150,7 @@ const THEMES = {
     // small buildings: round thatch huts, fresh gold to sun-faded gray (each keeps one); bigger ones: split bamboo, or dark teak planks on the labs.
     // Trim is a lashed bamboo edge with a shell band, and a bright teal, coral or yellow stripe along the ridge. Dark brown eaves keep roofs readable on green.
     eave:{c:"#4A2E14", w:2.6}, sod:{tex:["tropical-thatch-gold", "tropical-thatch-tan", "tropical-thatch-faded"], max:90, shade:["dome"]},
-    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 1 : 0,
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "greenhouse"].includes(type) ? 1 : 0,
       btex:[["tropical-bamboo", "tropical-bamboo", "tropical-bamboo-dry"], "tropical-teak"],
       trim:[[{c:"#4A2E14", w:3.4, at:.97}, {c:"#E0B65A", w:2.2, dash:"0 6", cap:"round", at:.97}, {c:"#FFF3DC", w:1, dash:"1 8", at:.9}],
         [{c:"#2A140A", w:3.4, at:.97}, {c:"#C9803A", w:1.6, dash:"6 3", at:.97}, {c:"#1FA7A0", w:1.2, dash:"10 5", at:.9}]]},
@@ -3160,7 +3201,7 @@ const THEMES = {
   homestead: {label:"Homestead", ground:"#CDB06A", tex:"homestead", gtex:"homestead-prairie", ptex:"homestead-road", btex:"homestead-plank", blurb:"Wyoming ranch country: wind-combed prairie, dirt roads, rusty tin barns and split-rail fences.",
     path:{live:"#C4A574", dead:"#A88E66", edge:"#7A5E3C", ruts:{c:"#8A6A42", o:.45}}, bld:"#8E8B84", mix:.85, edge:"#3E352C", accent:"#A9C8DA", fee:.15, fits:["tric", "para", "gall", "ornm", "styr"],
     // roofs: 0 barns and sheds (rusty corrugated tin in barn red, weathered gray or rust, each building keeps one), 1 guest buildings (ranch-house wood shake), 2 labs (newer, clean tin)
-    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "greenhouse"].includes(type) ? 2
+    roofs:{of:(t, type) => ["oracle", "ghost", "tar", "ceres", "pmc", "generator", "gasplant", "geothermal", "greenhouse"].includes(type) ? 2
         : t.kind === "food" || t.kind === "merch" || t.rooms || ["edcenter", "campground", "platform"].includes(type) ? 1 : 0,
       btex:[["homestead-tin-red", "homestead-tin-gray", "homestead-tin-rust"], "homestead-shake", "homestead-tin-clean"],
       trim:[[{c:"#3E352C", w:2.6}, {c:"#7A6A56", w:.8, dash:"9 2 5 2"}],
@@ -3218,6 +3259,7 @@ const GOALS = [
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:5000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
   {id:"food",     text:"Build a Food Cart",                  hint:"Pick Food, then Cart, and tap next to a path. Tap the cart and choose what it sells. Hungry guests rate the park lower.", reward:3500,  check:g=>g.state.buildings.some(b=>b.type==="kiosk" && (b.menu||[]).length)},
   {id:"restroom", text:"Build Restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:5000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
+  {id:"power",    text:"Power your buildings",               hint:"Every building needs power. Build a Diesel Generator from Power, put Transformers near your other buildings, and join them to it with Power Cable.", reward:5000, check:g=>g.state.buildings.some(isStation) && (g.state.cables || []).length > 0 && g.state.buildings.some(b=>needsPower(b) && b.powered === true)},
   {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.some(k=>k.role!=="aqua")},
   {id:"dock",     text:"Build a Delivery Dock",              hint:"Animal food has to be bought now. Build a Delivery Dock beside a service road. It orders overnight, custodians stock a station from it, and keepers carry the food out to the exhibits. Partner parks cover the first deliveries.", reward:5500, check:g=>g.state.buildings.some(b=>b.type==="dock")},
   {id:"custodian",text:"Hire a Custodian",                   hint:"Stands and shops sell from their own stock, and someone has to carry it from the dock. Build a Custodial Closet beside a path or service road and hire a custodian. They also clean restrooms and sweep litter.", reward:3500, check:g=>(g.state.staff.custodians || []).length>0},
