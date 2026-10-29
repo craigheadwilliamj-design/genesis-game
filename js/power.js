@@ -31,12 +31,12 @@ const unpowered = b => b.powered === false;
 // Older parks get a few days of free power to wire themselves up
 const powerFree = () => !!state.powerFree && state.day < state.powerFree;
 
-// The share of its power a station makes right now: solar follows daylight and clouds, wind the weather
+// The share of its power a station makes right now: solar follows daylight and the sky, wind the weather
 function stationShare(b){
   if(!genOnline(b)) return 0;
-  const t = BUILDINGS[b.type], wk = state.weather ? state.weather.today : "fair";
-  if(t.sun) return (1 - darkLevel()) * (POWER.sun[wk] ?? 1);
-  if(t.wind) return POWER.wind[wk] ?? 1;
+  const t = BUILDINGS[b.type], w = wxNow();
+  if(t.sun) return (1 - darkLevel()) * (POWER.sun[w.ev || w.sky] ?? 1);
+  if(t.wind) return POWER.wind[w.ev] ?? 1;
   return 1;
 }
 const stationOutput = b => BUILDINGS[b.type].power * stationShare(b);

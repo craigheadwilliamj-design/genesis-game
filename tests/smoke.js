@@ -2019,11 +2019,28 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const keepW = {...state.weather}, rnd = Math.random;
     const nw = newPark().weather;
     out.weatherStartsFair = nw.today === "fair" && nw.next === "fair" && nw.from === WEATHER.startDay;
-    state.weather = {today:"fair", next:"storm", from:0};
-    Math.random = () => .999; rollWeather();
-    out.forecastComesTrue = state.weather.today === "storm" && state.weather.next === "storm";
-    state.weather.from = state.day + 10; rollWeather(); Math.random = rnd;
-    out.fairBeforeStart = state.weather.next === "fair";
+    state.weather = {today:"fair", next:"storm", from:0}; wxDays();
+    state.weather.tm = {hi:70, lo:50, sky:"cloudy", ev:"storm"}; rollWeather();
+    out.forecastComesTrue = state.weather.today === "storm" && state.weather.t.ev === "storm" && !!state.weather.fc;
+    state.weather.from = state.day + 10; rollWeather();
+    out.fairBeforeStart = state.weather.next === "fair" && state.weather.tm.ev === null;
+    // climate: each biome's months, temperatures that drift, no snow in the desert, a forecast right about 3 days in 4
+    const keepBiome = state.biome, roll = (b, n) => { state.biome = b; const l = []; let d = null; for(let i = 1; i <= n; i++){ d = rollWxDay(i, d, false); l.push(d); } return l; };
+    out.climateTables = Object.keys(BIOMES).every(b => { const c = CLIMATE[b]; return c && c.t.length === 12 && ["cloud", "precip", "storm", "wind"].every(k => c[k].length === 12) && c.t.every(([lo, hi]) => lo + c.drop < hi); });
+    const desert = roll("desert", 3600), tundra = roll("tundra", 3600), tropic = roll("tropical", 3600), temper = roll("temperate", 3600);
+    out.desertNoSnow = !desert.some(d => d.ev === "snow" || d.ev === "wind") && desert.some(d => d.ev === "sandstorm") && !temper.some(d => d.ev === "sandstorm");
+    out.tropicsNoSnow = !tropic.some(d => d.ev === "snow" || d.lo <= WX.freeze) && tundra.some(d => d.ev === "snow") && !tundra.some(d => d.hi > 72);
+    out.noRainInHeat = [desert, tropic, temper].every(l => !l.some(d => d.ev === "rain" && d.hi > WX.rainMax));
+    out.tempsInRange = [["desert", desert], ["tundra", tundra], ["temperate", temper]].every(([b, l]) => l.every((d, i) => { const [lo, hi] = CLIMATE[b].t[dateOf(i + 1).m - 1]; return d.lo >= lo && d.hi <= hi && d.lo <= d.hi; }));
+    out.tempsDrift = temper.every((d, i) => !i || Math.abs(d.hi - temper[i - 1].hi) <= 35) && new Set(temper.map(d => d.hi)).size > 40;
+    state.biome = "temperate";
+    let fcRight = 0; for(let i = 0; i < 2000; i++){ const d = temper[i], f = forecastOf(i + 1, d, false); if(wxShown(f) === wxShown(d)) fcRight++; }
+    out.forecastMostlyRight = fcRight > 1300 && fcRight < 1700;
+    state.weather.t = {hi:40, lo:28, sky:"cloudy", ev:"rain"};
+    const keepMin = state.minute; state.minute = DAY_MIN - 1;
+    out.rainTurnsToSnowAtNight = wxNow().ev === "snow" && wxNow().temp === 28;
+    state.minute = minuteAtClock(13 * 60); out.rainByDay = wxNow().ev === "rain" && wxNow().temp === 40;
+    state.minute = keepMin; state.biome = keepBiome; Math.random = rnd;
     state.money = 1e6; state.buildings = [];
     const wxSp = SPECIES.find(s => !s.viv && !s.pool && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
     const wx = {id:"e-wx", name:"Weather test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[1, 2, 3].map(i => ({id:"a-w" + i, sp:wxSp.id, q:90})), happy:70, cond:100, land:[]};
@@ -2949,11 +2966,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
-    {   // weather overlay: exists, ignores clicks, follows state.weather.today
-      const cv = document.getElementById("wxfx"), keep = state.weather.today, seen = {};
-      for(const k of ["fair", "hot", "cold", "storm"]){ state.weather.today = k; drawWeather(performance.now()); const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = d.some(v => v) ; seen[k + "k"] = cv.dataset.kind; }
-      state.weather.today = keep; drawWeather(performance.now());
-      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.stormk === "storm" && seen.fairk === "fair";
+    {   // weather overlay: exists, ignores clicks, follows today's weather as it is now (wxNow)
+      const cv = document.getElementById("wxfx"), keep = wxDays().t, keepMin = state.minute, seen = {};
+      state.minute = minuteAtClock(13 * 60);
+      const days = {fair:{hi:70, lo:50, sky:"clear", ev:null}, hot:{hi:98, lo:70, sky:"clear", ev:null}, cold:{hi:20, lo:5, sky:"partly", ev:null}, storm:{hi:70, lo:60, sky:"cloudy", ev:"storm"}, snow:{hi:25, lo:15, sky:"cloudy", ev:"snow"}, sand:{hi:95, lo:70, sky:"cloudy", ev:"sandstorm"}};
+      for(const [k, d] of Object.entries(days)){ state.weather.t = d; drawWeather(performance.now()); drawWeather(performance.now() + 50); const px = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = px.some(v => v); seen[k + "k"] = cv.dataset.kind; }
+      state.weather.t = keep; state.minute = keepMin; drawWeather(performance.now());
+      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.snow && seen.sand && seen.stormk === "storm" && seen.fairk === "clear" && seen.coldk === "cold" && seen.sandk === "sandstorm";
     }
     // dust puff: the hook adds squares that don't take clicks, then they clear and nothing lands in state
     {
@@ -4299,8 +4318,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     BUILDINGS.resort.kw = 90;
     // solar follows the sun; wind the weather
     const sol = B("q-sol", "solar", 400, 400), wnd = B("q-wnd", "wind", 430, 400);
-    const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
-    state.weather.today = "storm"; const storm = stationOutput(wnd), stormSun = stationOutput(sol); state.weather.today = "fair";
+    wxDays().t = {hi:70, lo:50, sky:"clear", ev:null}; const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
+    const keepT = state.weather.t; state.weather.t = {hi:70, lo:60, sky:"cloudy", ev:"storm"}; const storm = stationOutput(wnd), stormSun = stationOutput(sol);
+    state.weather.t = {hi:30, lo:20, sky:"cloudy", ev:"snow"}; out.snowNoSolar = stationOutput(sol) === 0; state.weather.t = keepT;
     out.solarWind = day === BUILDINGS.solar.power && night < day * .2 && storm > BUILDINGS.wind.power && stormSun < day;
     // guests: an eyesore hurts, green power cheers conservationists and nobody else
     buildGuestGraph();

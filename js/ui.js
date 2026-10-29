@@ -12,13 +12,22 @@ function closePanel(){
   if(menuPaused && !speed) setSpeed(menuPaused);
   menuPaused = 0;
 }
-// Placeholder weather icons for the HUD until the pixel ones are drawn
+// Placeholder weather icons for the HUD until the pixel ones are drawn (keys: wxShown, plus moon for a clear night)
+const WX_CLOUD = '<path d="M6 17a4 4 0 0 1 1-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 17 17z" fill="#B9C2C8"/>', WX_DARK = '<path d="M6 15a4 4 0 0 1 1-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 17 15z" fill="#8E99A1"/>';
 const WX_ICON = {
-  fair:'<circle cx="12" cy="12" r="5" fill="#F4CE3C"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" stroke="#F4CE3C" stroke-width="2" stroke-linecap="round"/>',
-  hot:'<circle cx="12" cy="12" r="6" fill="#F08A3C"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2" stroke="#F08A3C" stroke-width="2" stroke-linecap="round"/>',
-  cold:'<path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7" stroke="#A9D8F5" stroke-width="2" stroke-linecap="round"/>',
-  storm:'<path d="M6 15a4 4 0 0 1 1-8 5 5 0 0 1 9.5 1.5A3.5 3.5 0 0 1 17 15z" fill="#B9C2C8"/><path d="M12 14l-2 4h3l-2 4" fill="none" stroke="#F4CE3C" stroke-width="1.8" stroke-linejoin="round"/>',
+  clear:'<circle cx="12" cy="12" r="5" fill="#F4CE3C"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" stroke="#F4CE3C" stroke-width="2" stroke-linecap="round"/>',
+  moon:'<path d="M15 3a9 9 0 1 0 6 13A7 7 0 0 1 15 3z" fill="#E6E1C3"/>',
+  partly:'<circle cx="9" cy="9" r="4" fill="#F4CE3C"/><path d="M9 2v2M2 9h2M4 4l1.4 1.4M14 4l-1.4 1.4" stroke="#F4CE3C" stroke-width="2" stroke-linecap="round"/><path d="M8 20a3.5 3.5 0 0 1 .8-6.9 4.5 4.5 0 0 1 8.5 1.4A3 3 0 0 1 18 20z" fill="#D5DCE0"/>',
+  cloudy:WX_CLOUD,
+  rain:WX_DARK + '<path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3" stroke="#7FB6F0" stroke-width="2" stroke-linecap="round"/>',
+  snow:WX_DARK.replace("#8E99A1", "#D5DCE0") + '<path d="M8 18v3M6.6 19.5h2.8M12 18v3M10.6 19.5h2.8M16 18v3M14.6 19.5h2.8" stroke="#F2F6FA" stroke-width="1.4" stroke-linecap="round"/>',
+  storm:WX_DARK + '<path d="M12 14l-2 4h3l-2 4" fill="none" stroke="#F4CE3C" stroke-width="1.8" stroke-linejoin="round"/>',
+  wind:'<path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7" fill="none" stroke="#D5DCE0" stroke-width="2" stroke-linecap="round"/>',
+  sandstorm:'<path d="M3 7h13M6 11h15M3 15h12M7 19h11" stroke="#D9B26A" stroke-width="2.4" stroke-linecap="round"/><circle cx="19" cy="7" r="1.3" fill="#D9B26A"/><circle cx="18" cy="15" r="1.3" fill="#D9B26A"/>',
 };
+const wxIconSvg = (k, night) => `<svg viewBox="0 0 24 24">${WX_ICON[k === "clear" && night ? "moon" : k] || WX_ICON.clear}</svg>`;
+const fmtTemp = t => `${t}\u00b0F`;
+const degHtml = t => `${t}<i class="deg"></i>`;   // the HUD font has no degree sign: a small drawn ring
 
 const ui = {
   hudCache: {},
@@ -35,11 +44,15 @@ const ui = {
     $("#closedTag").hidden = !state.parkClosed;
     const dk = nightDark(); if(force || this.hudCache.dark !== dk){ this.hudCache.dark = dk; $("#nightWash").style.opacity = dk; drawLights(); }
     set("dayLabel", fmtDate(state.day));
-    set("wxLabel", weatherNow().label);
-    const wk = state.weather ? state.weather.today : "fair";
-    if(force || this.hudCache.wx !== wk){ this.hudCache.wx = wk; $("#wxIcon").dataset.kind = wk; $("#wxIcon").innerHTML = `<svg viewBox="0 0 24 24">${WX_ICON[wk] || WX_ICON.fair}</svg>`; }
-    const fc = `Today: ${weatherNow().label}. Tomorrow: ${weatherNext().label}.`;
-    if(force || this.hudCache.forecast !== fc){ this.hudCache.forecast = fc; $("#roWeather").title = fc; }
+    const wn = wxNow(), wk = (wn.ev || wn.sky) + (wn.night ? "-n" : ""), fd = state.weather.fc;
+    if(force || this.hudCache.temp !== wn.temp){ this.hudCache.temp = wn.temp; $("#wxTemp").innerHTML = degHtml(wn.temp) + "F"; } set("wxLabel", wn.label);
+    if(force || this.hudCache.wx !== wk){ this.hudCache.wx = wk; $("#wxIcon").dataset.kind = wn.ev || wn.sky; $("#wxIcon").innerHTML = wxIconSvg(wn.ev || wn.sky, wn.night); }
+    const fk = `${fd.hi}/${fd.lo}/${wxShown(fd)}`;
+    if(force || this.hudCache.fcst !== fk){
+      this.hudCache.fcst = fk;
+      $("#fcTemps").innerHTML = `${degHtml(fd.hi)} / ${degHtml(fd.lo)}`; $("#fcIcon").innerHTML = wxIconSvg(wxShown(fd));
+      $("#roWeather").title = `${WX.phases.find(p => p.id === wn.phase).label}: ${fmtTemp(wn.temp)}, ${wn.label.toLowerCase()}. Tomorrow: high ${fmtTemp(fd.hi)}, low ${fmtTemp(fd.lo)}, ${(fd.ev ? WX.events[fd.ev] : WX.sky[fd.sky]).toLowerCase()}. Forecasts are right about three days in four.`;
+    }
     $("#dayFill").style.width = (state.minute / DAY_MIN * 100).toFixed(1) + "%";
     const r = Math.round(state.rating * 2) / 2;
     if(force || this.hudCache.rating !== r){ this.hudCache.rating = r; $("#rating").innerHTML = starsSvg(state.rating, 28); $("#rating").setAttribute("aria-label", `${r} stars`); }

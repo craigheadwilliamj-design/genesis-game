@@ -82,7 +82,7 @@ function serveAt(p, b, why){
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price, p);
-      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && weatherNow().wet ? WEATHER.umbrella : 1);
+      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && wxWet() ? WEATHER.umbrella : 1);
       if(will < .6) thinks(p, "priceyGift");
       if(Math.random() < Math.min(.95, keen * boost * pm(p, "shop")) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
     }

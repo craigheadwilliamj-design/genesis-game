@@ -59,6 +59,16 @@ button:disabled{cursor:default}
 #roWeather{margin-left:auto}
 .wxicon{display:flex;width:24px;height:24px}
 .wxicon svg{width:100%;height:100%}
+.wxicon.sm{width:14px;height:14px}
+#roWeather{padding:3px 12px 3px 10px;width:262px;box-sizing:border-box}   /* fixed, so the top bar doesn't jump as the weather changes */
+.wxtext{display:flex;flex-direction:column;gap:1px;min-width:0}
+.wxnow{overflow:hidden;text-overflow:ellipsis}
+.wxnow{font-size:16px}
+#wxTemp{font-size:18px;font-variant-numeric:tabular-nums}
+.fcst{display:flex;align-items:center;gap:4px;font-size:11px;letter-spacing:.04em;opacity:.8}
+.fcst b{font-variant-numeric:tabular-nums}
+.deg{display:inline-block;width:.32em;height:.32em;border:2px solid currentColor;margin:0 1px 0 2px;vertical-align:.55em}
+.fcst .deg{border-width:1px}
 .clockbox{flex-direction:column;align-items:stretch;gap:2px;padding:3px 14px;min-width:140px;text-align:center}
 .clockbox b{font-size:14px;letter-spacing:.06em;text-transform:uppercase}
 .clockbox #clock{font-size:17px;font-variant-numeric:tabular-nums}
@@ -569,6 +579,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   #roGuests{min-width:0;font-size:14px}
   #roWeather{margin-left:0}
   #wxLabel{display:none}
+  #roWeather{width:auto}
   .clockbox{min-width:110px}
   .speed button{min-height:32px;min-width:32px;padding:4px 7px}
   .hmenu{width:42px;padding:0 10px}
@@ -604,7 +615,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     <div class="hbox money" id="roMoney" title="Money in the bank"><span id="money" class="num">$0</span></div>
     <div class="hstars" id="rating" title="Park rating"></div>
     <div class="hbox" id="roGuests">Guests: <span id="inpark" class="num">0</span></div>
-    <div class="hbox wx" id="roWeather"><span id="wxLabel">Fair</span><i id="wxIcon" class="wxicon" data-kind="fair" aria-hidden="true"></i></div>
+    <div class="hbox wx" id="roWeather"><i id="wxIcon" class="wxicon" data-kind="clear" aria-hidden="true"></i><div class="wxtext"><span class="wxnow"><b id="wxTemp" class="num"></b> <span id="wxLabel">Clear</span></span><span class="fcst">Forecast <b id="fcTemps" class="num"></b><i id="fcIcon" class="wxicon sm" aria-hidden="true"></i></span></div></div>
     <div class="hbox clockbox"><b id="dayLabel">1 Jan Y1</b><div class="daybar"><i id="dayFill"></i></div><span id="clock" class="num">8:00 AM</span><b id="closedTag" class="closed" hidden>Closed</b></div>
     <div class="speed" role="group" aria-label="Game speed">
       <button id="sp0" data-speed="0" aria-pressed="false" aria-label="Pause">❚❚</button>

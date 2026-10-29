@@ -355,18 +355,62 @@ const thirsty = (e, s) => !s.aqua && !s.pool && likesOf(s).water >= HAB.wantsWat
 /* ---------- weather and shelter ---------- */
 function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
 const weatherNow = () => WEATHER.kinds[state.weather ? state.weather.today : "fair"];
-const weatherNext = () => WEATHER.kinds[state.weather ? state.weather.next : "fair"];
-function pickWeather(){
-  let r = Math.random();
-  for(const [k, w] of Object.entries(WEATHER.kinds)){ r -= w.odds; if(r < 0) return k; }
-  return "fair";
+// The park's climate in the month of this day
+function climateOf(day = state.day){ const c = CLIMATE[parkBiome()] || CLIMATE[DEFAULT_PARK_BIOME], m = dateOf(day).m - 1; return {c, m, t:c.t[m]}; }
+const wxGauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 2;   // a bell curve from -3 to 3, mostly -1 to 1
+// One day's weather {hi, lo, sky, ev}, following on from the day before (prev). A calm day has no event.
+function rollWxDay(day, prev, calm){
+  const {c, m, t:[tlo, thi]} = climateOf(day), lo = tlo + c.drop, mid = (lo + thi) / 2;
+  const hi = clamp(prev ? prev.hi + (mid - prev.hi) * WX.pull + wxGauss() * WX.swing : mid + wxGauss() * WX.swing * 2, lo, thi);
+  let ev = null;
+  const r = calm ? 1 : Math.random(), freezing = hi <= WX.freeze;
+  if(r < c.storm[m]) ev = freezing ? "snow" : "storm";
+  else if(r < c.storm[m] + c.precip[m]) ev = freezing ? "snow" : hi > WX.rainMax ? null : "rain";
+  else if(r < c.storm[m] + c.precip[m] + c.wind[m]) ev = parkBiome() === "desert" ? "sandstorm" : "wind";
+  const cl = c.cloud[m], q = Math.random();
+  const sky = ev && ev !== "wind" ? "cloudy" : q < (1 - cl) ** 2 ? "clear" : q < 1 - cl * cl ? "partly" : "cloudy";
+  const drop = c.drop * (.8 + Math.random() * .4) * (sky === "cloudy" ? 1 - WX.overcast : 1);
+  return {hi:Math.round(hi), lo:Math.round(Math.max(tlo, hi - drop)), sky, ev};
 }
-// At night: tomorrow's forecast comes true, and a new one is made for the day after
-function rollWeather(){
+// What the top bar shows of a day: its event, else its sky
+const wxShown = d => d.ev || d.sky;
+// Tomorrow's forecast: right about the sky or event WX.accuracy of the time, the temperatures always a little off
+function forecastOf(day, d, calm){
+  const right = Math.random() < WX.accuracy, off = right ? WX.nearOff : WX.farOff, nudge = () => Math.round((Math.random() * 2 - 1) * off);
+  let f = {sky:d.sky, ev:d.ev};
+  for(let i = 0; !right && i < 12 && wxShown(f) === wxShown(d); i++) f = rollWxDay(day, d, calm);
+  const hi = d.hi + nudge();
+  return {hi, lo:Math.min(hi, d.lo + nudge()), sky:f.sky, ev:f.ev};
+}
+// What a day's weather does to the park (WEATHER.kinds)
+const wxKindOf = d => d && (d.ev === "storm" || d.ev === "sandstorm") ? d.ev : "fair";
+// state.weather: today's kind and tomorrow's (what the park feels), t today's weather, tm tomorrow's, fc the forecast of tomorrow. Made on first use.
+function wxDays(){
   const w = state.weather;
-  w.today = w.next;
-  w.next = state.day + 2 >= w.from ? pickWeather() : "fair";
+  if(!w.t){
+    w.t = rollWxDay(state.day, null, state.day < w.from);
+    w.tm = rollWxDay(state.day + 1, w.t, state.day + 1 < w.from);
+    w.fc = forecastOf(state.day + 1, w.tm, state.day + 1 < w.from);
+    w.today = wxKindOf(w.t); w.next = wxKindOf(w.tm);
+  }
+  return w;
 }
+// At night: tomorrow's weather comes, and the day after is made and forecast
+function rollWeather(){
+  const w = wxDays(), d = state.day + 2, calm = d < w.from;
+  w.t = w.tm; w.tm = rollWxDay(d, w.t, calm); w.fc = forecastOf(d, w.tm, calm);
+  w.today = wxKindOf(w.t); w.next = wxKindOf(w.tm);
+}
+// The part of the day it is (WX.phases) and the weather right now: the temperature, the sky, and the event (rain falls as snow at or under freezing)
+const wxPhase = (c = clockMin()) => WX.phases.find(p => c / 60 < p.to) || WX.phases[WX.phases.length - 1];
+function wxNow(){
+  const d = wxDays().t, ph = wxPhase().id;
+  const temp = ph === "day" ? d.hi : ph === "night" ? d.lo : Math.round((d.hi + d.lo) / 2);
+  const ev = d.ev === "rain" && temp <= WX.freeze ? "snow" : d.ev;
+  const label = ev ? WX.events[ev] : temp >= WX.heatWave ? "Heat wave" : temp <= WX.freeze ? "Cold snap" : WX.sky[d.sky];
+  return {temp, phase:ph, sky:d.sky, ev, label, night:ph === "night"};
+}
+const wxWet = () => ["rain", "storm"].includes(wxDays().t.ev);
 // Shelter slots an exhibit's animals need today, and what it has. Ice age animals don't need cover from the cold.
 // A shelter only takes animals up to its `fits` size (coverSlots), so a pile of small shelters never houses a T. rex. A burrow ignores size and takes only the species in its `only` list.
 // Biggest animals go first, into the snuggest shelter they fit. `shelter` is what animals actually get, `idle` is room nobody here can use.
@@ -391,7 +435,7 @@ function exposure(e){
   const c = coverOf(e);
   return c.need ? clamp(1 - c.have / c.need, 0, 1) : 0;
 }
-const WEATHER_TEXT = {hot:"no shade", cold:"nowhere warm", storm:"nowhere to shelter"};
+const WEATHER_TEXT = {hot:"no shade", cold:"nowhere warm", storm:"nowhere to shelter", sandstorm:"nowhere to shelter"};
 
 // What the exhibit's biome does to happiness: each animal is either on one of its two biomes or not
 function biomeScore(e, out, n){

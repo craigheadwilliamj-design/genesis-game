@@ -1257,8 +1257,8 @@ const POWER = {
   ugly:.4,                // a stretch this ugly gets guests talking
   greenJoy:.03,           // mood a minute conservationists gain walking past green power (full at greenFull)
   greenFull:2,            // green stations within reach that make it as good as it gets
-  sun:{storm:.35},        // solar arrays: this share of their power in this weather; none after dark
-  wind:{storm:1.5, hot:.6},   // wind turbines: this share of their power in this weather
+  sun:{partly:.85, cloudy:.6, rain:.4, storm:.2, snow:0, sandstorm:0},   // solar arrays: this share of their power under this sky or event (wxNow); none after dark
+  wind:{wind:1.6, storm:1.5, sandstorm:1.3},   // wind turbines: this share of their power in this event
 };
 // Power stations: power (kW), reach (m they feed around themselves), eyesore (how much guests mind them, 0 is none),
 // green (conservationists like seeing them), wear (times POWER.genWear), sun/wind (output follows the sky).
@@ -1768,9 +1768,9 @@ const HAB = {
   meatPlants:.5,   // meat eaters want this share of the plants that plant eaters do
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
 };
-// Weather. Each night rolls the day after tomorrow, so the top bar always has tomorrow's forecast.
+// Weather's effects. Each day's weather comes from the park's climate (CLIMATE below); today's kind here is what it does to the park:
+// a storm or sandstorm day is that kind, any other day is fair. (Heat waves and cold snaps are kept for when temperature drives them.)
 // Animals with no cover in bad weather are unhappy, fall ill more, and in storms get hurt.
-//   odds    chance of this weather on any day
 //   happy   happiness an exhibit loses if none of its animals have cover
 //   ill     extra illness for animals without cover (1 means twice as likely)
 //   hurt    chance a day an animal without cover is hurt
@@ -1779,13 +1779,66 @@ const HAB = {
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
   umbrella:2.5,     // umbrellas sell this many times as well on a wet day
-  startDay:4,       // new parks get fair weather until this day
+  startDay:4,       // new parks get no weather events until this day
   kinds:{
-    fair: {label:"Fair",      odds:.55, happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
-    hot:  {label:"Heat wave", odds:.17, happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
-    cold: {label:"Cold snap", odds:.15, happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
-    storm:{label:"Storm",     wet:true, odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+    fair:     {label:"Fair",      happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
+    hot:      {label:"Heat wave", happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
+    cold:     {label:"Cold snap", happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
+    storm:    {label:"Storm",     wet:true, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+    sandstorm:{label:"Sandstorm", happy:15, ill:.6,  hurt:.03, wear:3,   guests:.55, grove:.3},
   },
+};
+// The park's climate: the biome it's set in (state.biome) decides each day's temperature, sky and event. One entry per month, Jan to Dec.
+//   t       the coldest night and hottest afternoon the month can show (°F)
+//   drop    how far night falls below the day on a clear day (dawn and dusk sit halfway; clouds hold some heat in)
+//   cloud   how cloudy the sky runs, 0 to 1: clear (1-c)², partly cloudy 2c(1-c), cloudy c²
+//   precip  chance of a day of rain (snow if the day is at or under freezing, none over WX.rainMax)
+//   storm   chance of a storm (snow instead on a freezing day)
+//   wind    chance of a windy day (a sandstorm in the desert)
+const CLIMATE = {
+  desert:   {drop:30, t:[[25,75],[30,82],[38,90],[45,98],[55,106],[65,114],[72,118],[70,116],[62,110],[48,98],[35,85],[25,76]],
+    cloud:[.2,.2,.15,.1,.08,.05,.12,.15,.08,.1,.15,.2], precip:[.06,.05,.04,.02,.01,0,.03,.04,.02,.03,.04,.06],
+    storm:[0,0,0,0,0,.02,.06,.06,.02,0,0,0], wind:[.06,.08,.14,.14,.1,.06,.04,.04,.04,.06,.06,.06]},
+  scrubland:{drop:26, t:[[30,68],[32,72],[38,80],[45,88],[52,96],[60,104],[65,108],[64,106],[58,100],[48,90],[38,78],[30,68]],
+    cloud:[.4,.38,.32,.25,.18,.1,.08,.08,.12,.2,.32,.4], precip:[.16,.14,.12,.08,.04,.01,0,0,.02,.06,.12,.16],
+    storm:[.02,.02,.03,.04,.03,.01,.01,.01,.02,.03,.02,.02], wind:[.08,.1,.12,.12,.1,.08,.08,.08,.08,.08,.08,.08]},
+  grassland:{drop:24, t:[[-15,55],[-10,60],[5,72],[25,84],[38,92],[50,100],[56,106],[54,104],[40,96],[25,85],[8,70],[-10,58]],
+    cloud:[.45,.45,.45,.42,.4,.32,.25,.25,.28,.32,.42,.45], precip:[.08,.09,.12,.14,.14,.12,.09,.08,.08,.08,.08,.08],
+    storm:[.01,.02,.05,.1,.14,.13,.1,.08,.05,.03,.01,.01], wind:[.1,.12,.16,.16,.12,.08,.06,.06,.08,.1,.12,.1]},
+  fern:     {drop:20, t:[[45,80],[46,82],[52,86],[58,90],[64,94],[70,98],[72,100],[72,100],[66,96],[58,90],[50,84],[46,80]],
+    cloud:[.4,.4,.42,.42,.4,.35,.32,.32,.35,.4,.42,.4], precip:[.16,.16,.18,.18,.15,.1,.08,.08,.1,.14,.16,.16],
+    storm:[.03,.03,.05,.08,.1,.12,.12,.12,.1,.06,.04,.03], wind:[.06,.06,.08,.08,.06,.05,.05,.05,.05,.06,.06,.06]},
+  tropical: {drop:13, t:[[68,92],[68,93],[70,95],[72,96],[73,96],[72,94],[72,93],[72,93],[72,94],[72,94],[70,93],[68,92]],
+    cloud:[.4,.38,.4,.45,.55,.65,.7,.7,.65,.6,.5,.42], precip:[.1,.08,.1,.15,.25,.32,.35,.35,.32,.28,.18,.12],
+    storm:[.03,.03,.04,.06,.1,.14,.16,.16,.14,.12,.06,.04], wind:[.04,.04,.04,.04,.04,.05,.05,.05,.05,.05,.04,.04]},
+  wetland:  {drop:16, t:[[32,75],[35,78],[42,84],[50,88],[60,93],[68,97],[71,99],[71,99],[65,96],[52,90],[42,82],[34,76]],
+    cloud:[.55,.55,.52,.5,.5,.5,.5,.5,.5,.5,.52,.55], precip:[.2,.2,.22,.22,.2,.2,.2,.2,.18,.16,.18,.2],
+    storm:[.02,.03,.05,.07,.09,.12,.12,.12,.1,.05,.03,.02], wind:[.06,.06,.08,.08,.06,.05,.05,.05,.06,.06,.06,.06]},
+  temperate:{drop:20, t:[[-10,55],[-5,60],[10,75],[28,85],[40,90],[52,98],[58,104],[56,102],[42,95],[28,85],[12,70],[-5,60]],
+    cloud:[.55,.52,.5,.48,.45,.38,.32,.32,.35,.42,.52,.55], precip:[.14,.14,.16,.18,.16,.12,.1,.1,.1,.12,.14,.14],
+    storm:[.01,.02,.05,.1,.12,.1,.08,.07,.06,.04,.02,.01], wind:[.1,.1,.14,.12,.08,.05,.04,.04,.06,.1,.12,.1]},
+  boreal:   {drop:18, t:[[-35,35],[-30,40],[-15,50],[5,65],[25,78],[38,88],[45,92],[42,88],[30,75],[15,60],[-10,45],[-30,38]],
+    cloud:[.6,.55,.5,.48,.45,.45,.45,.48,.52,.58,.62,.62], precip:[.16,.14,.14,.14,.14,.14,.14,.15,.16,.18,.18,.17],
+    storm:[0,0,.01,.02,.04,.06,.06,.05,.03,.01,0,0], wind:[.08,.08,.1,.1,.08,.06,.06,.06,.08,.1,.1,.08]},
+  tundra:   {drop:12, t:[[-45,15],[-45,18],[-35,25],[-20,38],[0,50],[25,65],[33,72],[30,68],[18,52],[-5,35],[-25,25],[-40,18]],
+    cloud:[.5,.48,.48,.5,.55,.6,.62,.65,.65,.6,.55,.5], precip:[.1,.1,.1,.1,.1,.12,.14,.15,.15,.14,.12,.1],
+    storm:[0,0,0,0,.01,.02,.03,.03,.01,0,0,0], wind:[.14,.14,.12,.1,.08,.06,.06,.06,.08,.1,.12,.14]},
+};
+// How the climate plays out from day to day
+const WX = {
+  pull:.25,          // each day the temperature moves this share of the way back to the month's middle
+  swing:7,           // and wanders about this many °F a day on top (rare days twice that)
+  overcast:.6,       // cloudy, rainy and snowy days lose this share of the usual night drop
+  freeze:32,         // at or under this precipitation falls as snow; the top bar calls it a cold snap
+  rainMax:95,        // no rain on a day hotter than this
+  heatWave:90,       // the top bar calls this or hotter a heat wave
+  accuracy:.75,      // chance tomorrow's forecast gets the sky or event right
+  nearOff:3,         // a forecast's temperatures are off by up to this many °F
+  farOff:10,         // and up to this many when it gets the day wrong
+  // parts of the day on the clock (hours): dawn and dusk sit halfway between the day's high and the night's low
+  phases:[{id:"dawn", label:"Dawn", to:9}, {id:"day", label:"Day", to:18}, {id:"dusk", label:"Dusk", to:21}, {id:"night", label:"Night", to:30}],
+  sky:{clear:"Clear", partly:"Partly cloudy", cloudy:"Cloudy"},
+  events:{rain:"Rain", snow:"Snow", storm:"Storm", wind:"Windy", sandstorm:"Sandstorm"},
 };
 // Ice age animals shrug off the cold
 const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast", "mglo"];
@@ -1827,13 +1880,13 @@ const SHELTER = {
   sleepBelow:.5,       // an animal this drowsy (awake() at or under it) that is resting goes in to sleep; so does a napper
   needLine:70,         // hunger or thirst over this and a weather-sheltering animal comes out to eat or drink
   giveUp:90,           // park minutes of walking before an animal that can't find its way to its shelter just goes in
-  weather:{storm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
+  weather:{storm:1, sandstorm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
   hideCalm:4,          // hiding behind walls sheds stress this many times as fast as hiding in the open
   restCalm:.8,         // stress shed a minute resting or sleeping inside (in the open it's .1)
   stressLine:55,       // a stressed animal (any temper) heads straight for a shelter over this much stress, and stays in until it is down to calmLine
   calmLine:25,
   hurry:2.2,           // how fast it walks there, as a multiple of its usual pace
-  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
+  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", sandstorm:"Sheltering from the sand", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
 };
 // Guests who come to see animals that are all indoors are let down (seeExhibit in guests.js; hideBother in behavior.js)
 const HIDING = {
