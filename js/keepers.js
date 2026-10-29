@@ -812,15 +812,17 @@ function eatTick(dtMin){
     else if(!free && e.viv && vivServed(e) < 1) e.hungryMin = (e.hungryMin || 0) + dtMin * (1 - vivServed(e));   // too few dishes: the ones that can't reach one go without
     const served = free ? 1 : vivServed(e);
     for(const t of Object.keys(need)){
-      if(free){ e.stock[t] = storeMax(e, t); continue; }
+      if(free){ e.stock[t] = storeMax(e, t); noteUse(t, need[t] * dtMin / DAY_MIN); continue; }
       // groves in the exhibit feed part of it; keepers bring the rest
       let eat = need[t] * dtMin / DAY_MIN * (1 - browseShare(e, t, need[t])) * served;   // only the animals a dish reaches eat from it
+      const eat0 = eat;
       eat = eatFromTrays(e, t, eat);
       const has = e.stock[t] || 0;
+      noteUse(t, eat0 - eat + Math.min(has, eat));
       want += eat; cover = Math.min(cover, clamp(has / ((need[t] || 1) * PACK.pile), 0, 1));
       e.stock[t] = Math.max(0, has - eat); eat -= Math.min(has, eat); unmet += Math.max(0, eat);
       // out of Paleoflora: they eat the grass hay instead
-      if(t === "paleoflora" && eat > 0 && (e.stock.plants || 0) > 0 && !need.plants){ e.stock.plants = Math.max(0, e.stock.plants - eat); e.grassFed = true; }
+      if(t === "paleoflora" && eat > 0 && (e.stock.plants || 0) > 0 && !need.plants){ noteUse("plants", Math.min(eat, e.stock.plants)); e.stock.plants = Math.max(0, e.stock.plants - eat); e.grassFed = true; }
       else if(t === "paleoflora" && (e.stock.paleoflora || 0) <= 0 && (e.stock.plants || 0) > 0) e.grassFed = true;
     }
     packFeedStep(e, free ? 0 : Math.max(want ? unmet / want : 0, 1 - cover));

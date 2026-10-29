@@ -497,7 +497,9 @@ function upgradeSave(s){
     for(const r of s.staff.keepers.concat(s.staff.custodians || [])) if(r.carry && r.carry.type === "meds") r.carry.type = into[0];
   }
   // stock for stands and shops became physical: older parks get a few more days of direct deliveries
-  if(s.logi.trucks === undefined) s.logi.trucks = Math.max(0, Math.floor(s.minute / LOGI.truckMin));
+  // per-dock orders became one park-wide standing order a night; each good starts at what the park needs of it
+  if(!s.logi.orders){ s.logi.orders = {}; s.logi.hist = []; s.logi.auto = false; for(const b of s.buildings) if(b.type === "dock"){ delete b.auto; delete b.orders; } }
+  delete s.logi.trucks;
   if(s.logi.guestFrom === undefined){ s.logi.guestFrom = Math.max(GUEST_GOODS_FROM, s.day + 3); s.logi.used = {}; s.logi.usedLast = {}; if(s.buildings.some(b => BUILDINGS[b.type].kind)) s.logi.guestNotice = true; }
   for(const e of s.exhibits) if(e.zone && !s.zones.some(z => z.id === e.zone)) delete e.zone;
   for(const b of s.buildings) if(b.zone && !s.zones.some(z => z.id === b.zone)) delete b.zone;

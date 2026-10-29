@@ -122,7 +122,7 @@ function crateHtml(c){
   return h;
 }
 function officeTabs(){
-  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
+  return tabBar("otab2", [{key:"office", label:"Park", color:"#4B3A8C"}, {key:"money", label:"Finances", color:"#B8860B"}, {key:"logi", label:"Logistics", color:"#3E5C7A"}, {key:"science", label:"Science", color:"#1F6F73"}, {key:"guests", label:"Guests", color:"#C2563A"}, {key:"staff", label:"Staff", color:"#2E6B3A"}, {key:"grants", label:"Grants", color:"#8C6A2E"}], officeTab);
 }
 const GAME_VERSION = "v0.9";   // shown at the foot of the Main Menu; five quick taps on it flip dev mode (main.js)
 function mainMenuHtml(){
@@ -140,6 +140,7 @@ function overviewHtml(){
   h += officeTabs();
   if(officeTab === "staff") return h + staffTabHtml();
   if(officeTab === "grants") return h + grantsHtml(goal);
+  if(officeTab === "logi") return h + logisticsHtml();
 
   if(officeTab === "money"){
   const c = dailyCosts();
@@ -150,10 +151,9 @@ function overviewHtml(){
     <dt>Built and bought</dt><dd>${t.built + t.animals ? "−" + money(t.built + t.animals) : money(0)}</dd>
     ${t.science ? `<dt>Research and expeditions</dt><dd>−${money(t.science)}</dd>` : ""}
     ${t.supplies ? `<dt>Food and gift stock</dt><dd>−${money(t.supplies)}</dd>` : ""}
-    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill())}</dd>
-  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
+    <dt class="sum">Bills at ${fmtClock(ROLLOVER_CLOCK)}</dt><dd class="sum">−${money(c.feed + c.wages + c.upkeep + c.research + cleaningBill() + Math.round(nightBill()))}</dd>
+  </dl><div class="meta" style="margin-top:4px">Animal food ${money(c.feed)}, staff ${money(c.wages)}, upkeep ${money(c.upkeep)}${c.research ? `, research ${money(c.research)}` : ""}${nightBill() >= 1 ? `, standing orders ${money(Math.round(nightBill()))}` : ""}${cleaningBill() ? `, night cleaning ${money(cleaningBill())} so far` : ""}.</div></section>`;
 
-  h += logiOverviewHtml();
   const expected = Math.round(d.demand);
   h += `<section><h3>Ticket price</h3><div class="ticket"><button data-action="ticket" data-d="-1" aria-label="Lower the price">−</button><output id="ticketOut">${money(state.ticket)}</output><button data-action="ticket" data-d="1" aria-label="Raise the price">+</button></div>
     <dl class="kv" style="margin-top:6px"><dt>Fair price</dt><dd>${money(Math.round(d.fair))}</dd><dt>Guests a day</dt><dd>${expected.toLocaleString()}</dd></dl></section>`;

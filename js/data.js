@@ -1303,10 +1303,14 @@ const LOGI = {
   urgentBelow:.35,     // a hub under this share of its target gets restocked before routine cleaning
   pmcDoses:200,        // doses the PMC holds, split evenly between contemporary medicine and each era's (pmcShare)
   dockMarkup:1.25,     // the dock charges this much over a food unit's base cost
-  rushMarkup:1.75,     // a rush order costs this much
-  rushLot:50,          // units in a rush order
-  autoDays:2,          // auto-ordering keeps the dock stocked with this many days of the park's food
-  truckMin:120,        // while the park is open, a supply truck tops up each dock this often
+  rushMarkup:2.5,      // a rush order costs this much
+  expressMarkup:1.5,   // a rush order costs this much once Express freight is researched
+  rushLot:50,          // units in a rush order (contemporary medicine comes in lots of rushDoses)
+  rushDoses:10,
+  bulk:[[500, .2], [200, .1]],   // a standing order of at least this many units a night gets this much off
+  autoDays:2,          // Supply forecasting sets orders that keep this many days of each good in the park
+  histDays:7,          // nights of use kept for the Logistics tab's average
+  cmedSeed:5,          // doses a night of contemporary medicine first ordered once a PMC is built
   coldPower:25,        // kW a cold store draws
   coldSpoil:.2,        // a powered cold store multiplies spoilage by this
 };
@@ -1327,7 +1331,7 @@ BUILDINGS.coldstore = {label:"Cold Store", tag:"COLD", one:"a cold store", glyph
                        full:"Refrigerated store", blurb:"Keeps meat, fish, fruit, shellfish, medicine, and snacks from rotting, as long as it has power from a generator."};
 BUILDINGS.dock = {label:"Delivery Dock", tag:"DOCK", one:"a delivery dock", glyph:"D", color:"#3E5C7A", price:4500, upkeep:50, w:15, d:10, dept:true, serviceOnly:true,
                   store:{cap:1500, holds:ORDER_GOODS.concat(MED_GOODS), spoil:1, bulk:true, dock:true},   // era medicine only lands here when the PMC and cold stores are full
-                  full:"Supplier deliveries", blurb:"Order animal food and stock for your stands and shops. Trucks come overnight and every two hours while the park is open. They need a service road to the entrance. Keepers and custodians carry it from here."};
+                  full:"Supplier deliveries", blurb:"Standing orders from the Park Office land here overnight. More docks hold more. Trucks need a service road to the entrance. Keepers and custodians carry it from here."};
 // Hotels keep toiletries, which custodians bring from the dock or a warehouse
 for(const t of ["campground", "lodge", "resort"]) BUILDINGS[t].store = {cap:BUILDINGS[t].rooms * LODGING.toiletries * 2, holds:["merch"], spoil:1, vendor:true};
 // Food stands and gift shops keep their own stock
@@ -1391,6 +1395,8 @@ const TECH = [
   {id:"cameras",  group:"build", label:"Security cameras",  points:25, text:"Each Security Office watches the paths around it, and you can put camera posts on paths to watch more. Guards are sent straight to vandals the cameras see."},
   {id:"vehicles",   group:"build", label:"Staff vehicles",   points:70, text:"Vehicle depots with ATVs. Staff drive five times faster, but only on service roads."},
   {id:"transit",   group:"build", label:"Guest tram",       points:60, text:"Draw tram track and build tram stations beside it. Guests ride between stations instead of walking, and pay a fare."},
+  {id:"express",   group:"build", label:"Express freight",  points:20, text:"Rush deliveries cost 40% less."},
+  {id:"forecast",  group:"build", label:"Supply forecasting", points:30, text:"The Park Office can set standing orders itself, from what the park uses and holds."},
   {id:"foodprod",  group:"build", label:"Food production",  points:18, text:"Build farms, ranches, hatcheries, and insectaries to make animal food. Cheaper than the dock, but it spoils if nobody collects it."},
   // Genetics Lab upgrades
   {id:"fast1",    group:"tar", label:"Faster incubators",   points:35, text:"Clones finish in three quarters of the time."},
@@ -1555,7 +1561,7 @@ const MEDICINE = {
 const MED_TECH = {paleozoic:"medpaleo", mesozoic:"medmeso", cenozoic:"medceno"};
 // Contemporary medicine: the dock buys it and custodians carry it to the PMC. It treats any animal (slower for older ones in the ward, MEDICINE.dockWard).
 const MODERN = {
-  stock:30,            // doses the dock keeps on order (auto-ordering)
+  stock:30,            // doses Supply forecasting keeps in the park
   cost:25,             // price of each dose at the dock
 };
 const ERA_LABEL = {paleozoic:"Paleozoic", mesozoic:"Mesozoic", cenozoic:"Cenozoic"};

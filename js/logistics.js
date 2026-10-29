@@ -6,7 +6,7 @@
    Nobody draws supply lines. They appear from what keepers actually haul.
    ===================================================================== */
 
-function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, guestFrom:GUEST_GOODS_FROM, trucks:0}; }
+function freshLogi(){ return {flow:{}, last:{}, lost:0, lostCost:0, lostDay:0, notice:false, used:{}, usedLast:{}, hist:[], orders:{}, auto:false, guestFrom:GUEST_GOODS_FROM}; }
 // Keepers carry food from stations to exhibits; custodians stock every store (animal food, medicine, stand and shop goods)
 const KEEPER_GOODS = FEED_GOODS.concat(MED_GOODS, [CMED]);
 const isGuestGood = t => GUEST_GOODS.includes(t);
@@ -68,7 +68,7 @@ const cerMedTotal = () => MED_GOODS.reduce((s, t) => s + (cerMeds()[t] || 0), 0)
 // a good's number for the PMC (all three together when none is named)
 const pmcStock = g => { const p = pmcBuilding(); return p ? (g ? stockOf(p, g) : MED_GOODS.reduce((s, t) => s + stockOf(p, t), 0)) : 0; };   // no good named: the era medicines together
 const medOnHand = pmcStock;
-function useMeds(n, g){ const p = pmcBuilding(); if(p) takeGood(p, g, n); }
+function useMeds(n, g){ const p = pmcBuilding(); if(p) noteUse(g, takeGood(p, g, n)); }
 // the eras whose medicine the Research Lab has researched, so the PMC only reserves room for those
 const medGoodsWanted = () => MED_GOODS.filter(g => hasTech(MED_TECH[Object.keys(MED_GOOD).find(k => MED_GOOD[k] === g)]));
 
@@ -206,10 +206,7 @@ function supplyLines(){
 /* ---------- through the day and night ---------- */
 
 // Farms and ranches fill their own stores through the day. A full store stops production.
-// Supply trucks also top up the docks every couple of hours while the park is open.
 function logiTick(dtMin){
-  const due = Math.floor(state.minute / LOGI.truckMin);
-  if(due > (state.logi.trucks || 0)){ state.logi.trucks = due; dockDelivery(true); }
   if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
   if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until ${fmtDate(state.logi.guestFrom)}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
   const share = dtMin / DAY_MIN;
@@ -219,57 +216,89 @@ function logiTick(dtMin){
   }
 }
 
-const unitPrice = t => t === CMED ? MODERN.cost : LOGI.dockMarkup * (isGuestGood(t) ? GUEST_GOOD_PRICE : FOOD_UNIT_COST * (DOCK_PRICE[t] || 1));
-// What a dock should hold: the park's food for a couple of days, less what farms already make
-function dockOrders(b){
-  const out = {};
+/* ---------- standing orders ---------- */
+
+// What the park got through today, kept per good for the Logistics tab and Supply forecasting
+function noteUse(t, n){ if(n > 0) state.logi.used[t] = (state.logi.used[t] || 0) + n; }
+// A good's average use a night over the last LOGI.histDays nights
+function usedAvg(t){
+  const h = state.logi.hist || [];
+  return h.length ? h.reduce((s, d) => s + (d[t] || 0), 0) / h.length : (state.logi.usedLast || {})[t] || 0;
+}
+const parkStock = t => storesBuilt().reduce((s, b) => s + stockOf(b, t), 0);
+const orderStep = t => t === CMED ? 1 : 5;
+const roundOrder = (t, n) => Math.max(0, Math.ceil(n / orderStep(t)) * orderStep(t));
+const docks = () => state.buildings.filter(b => b.type === "dock" && isReachable(b));
+const dockCap = () => docks().reduce((s, b) => s + storeCap(b), 0);
+const bulkOff = n => (LOGI.bulk.find(([min]) => n >= min) || [0, 0])[1];
+const basePrice = t => t === CMED ? MODERN.cost : LOGI.dockMarkup * (isGuestGood(t) ? GUEST_GOOD_PRICE : FOOD_UNIT_COST * (DOCK_PRICE[t] || 1));
+// A unit on the standing order: big orders come cheaper. Partner parks pay for animal food while they're still feeding.
+const orderPrice = t => freeFeeding() && FEED_GOODS.includes(t) ? 0 : basePrice(t) * (1 - bulkOff(orderOf(t)));
+const unitPrice = t => basePrice(t) * (1 - bulkOff(orderOf(t)));
+const orderOf = t => (state.logi.orders || {})[t] || 0;
+const nightBill = () => docks().length ? ORDER_GOODS.reduce((s, t) => s + orderOf(t) * orderPrice(t), 0) : 0;
+// What a good needs a day from outside the park: animal food less what farms make, the crowd's guest goods, and contemporary medicine as used
+function orderNeed(t){
+  if(t === CMED) return usedAvg(t);
+  if(isGuestGood(t)) return guestDemand(t);
+  return Math.max(0, parkDemand(t) - parkProduction(t));
+}
+// A good nobody has ordered yet starts at what the park needs of it, the first time it needs any
+function seedOrders(){
+  const o = state.logi.orders;
   for(const t of ORDER_GOODS){
-    out[t] = b.auto === false ? ((b.orders || {})[t] || 0)
-      : t === CMED ? (hasDept("pmc") ? MODERN.stock : 0)
-      : Math.max(0, Math.ceil((demandOf(t) - parkProduction(t)) * LOGI.autoDays));
+    if(o[t] !== undefined) continue;
+    const n = t === CMED ? (hasDept("pmc") ? LOGI.cmedSeed : 0) : isGuestGood(t) && state.day + 1 < (state.logi.guestFrom || 0) ? 0 : orderNeed(t);
+    if(n > 0) o[t] = roundOrder(t, n);
   }
-  return out;
 }
-function dockTotals(){ const o = {}; for(const b of state.buildings) if(b.type === "dock") for(const [t, n] of Object.entries(dockOrders(b))) o[t] = (o[t] || 0) + n; return o; }
-// A delivery: top up each dock to its order. Partner parks pay while they're still feeding. Daytime trucks don't announce themselves.
-// Animal food comes first, in whole units. If it won't fit, the truck takes back guest goods the dock holds beyond their order.
-function dockDelivery(quiet){
+// Supply forecasting: a night's use, plus half of what's missing from LOGI.autoDays of stock (less half of any extra)
+function forecastOrder(t){
+  const need = Math.max(orderNeed(t), t === CMED ? 0 : usedAvg(t) - (FEED_GOODS.includes(t) ? parkProduction(t) : 0));
+  const want = t === CMED ? (hasDept("pmc") ? MODERN.stock : 0) : need * LOGI.autoDays;
+  return roundOrder(t, need + (want - parkStock(t)) / 2);
+}
+const forecasting = () => hasTech("forecast") && state.logi.auto;
+function setOrder(t, n){ if(ORDER_GOODS.includes(t)) state.logi.orders[t] = roundOrder(t, clamp(+n || 0, 0, orderMax(t))); }
+const orderMax = t => t === CMED ? 60 : Math.max(500, Math.ceil(dockCap() / 50) * 50);
+
+// The night's delivery: every standing order, spread over the docks with the most room. Animal food and medicine unload first,
+// then stands and shops share whatever room is left. What doesn't fit or can't be paid for isn't delivered or charged.
+function dockDelivery(){
+  const L = state.logi, ds = docks();
+  L.noRoom = 0; L.noCash = 0;
+  if(!ds.length) return;
+  seedOrders();
+  if(forecasting()) for(const t of ORDER_GOODS) L.orders[t] = forecastOrder(t);
   let spent = 0, units = 0;
-  for(const b of state.buildings){
-    if(b.type !== "dock" || !isReachable(b)) continue;
-    const orders = dockOrders(b), short = {};
-    for(const t of ORDER_GOODS) short[t] = Math.max(0, orders[t] - stockOf(b, t));
-    let over = FEED_GOODS.concat(CMED).reduce((s, t) => s + Math.ceil(short[t]), 0) - storeRoom(b, ORDER_GOODS[0]);
-    for(const t of GUEST_GOODS){
-      const back = over > 0 ? Math.min(Math.floor(stockOf(b, t) - orders[t]), Math.ceil(over)) : 0;
-      if(back < 1) continue;
-      takeGood(b, t, back); over -= back; short[t] = 0;
-      if(!freeFeeding()) spend(-Math.round(back * GUEST_GOOD_PRICE), "supplies");
-    }
-    const buy = (t, n) => {
-      // partner parks only pay for animal food; stock for stands and shops goes on the supplies bill
-      const price = freeFeeding() && !isGuestGood(t) && t !== CMED ? 0 : unitPrice(t);
-      n = Math.min(n, Math.floor(storeRoom(b, t)));
-      if(price) n = Math.min(n, Math.floor(Math.max(0, state.money) / price));
-      if(n < 1) return;
-      addGood(b, t, n); units += n;
-      if(price){ spend(Math.round(n * price), isGuestGood(t) ? "supplies" : t === CMED ? "medicine" : "feed"); spent += n * price; }
-    };
-    for(const t of FEED_GOODS.concat(CMED)) buy(t, Math.floor(short[t]));
-    // stands and shops share whatever room is left, so the last on the list isn't left out
-    const total = GUEST_GOODS.reduce((s, t) => s + short[t], 0), fit = total > 0 ? Math.min(1, storeRoom(b, ORDER_GOODS[0]) / total) : 1;
-    for(const t of GUEST_GOODS) buy(t, Math.floor(short[t] * fit));
-  }
-  if(units && !quiet) events.toast(`The dock took in ${units} units of food and stock${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
+  const room = () => ds.reduce((s, b) => s + storeRoom(b, ORDER_GOODS[0]), 0);
+  const buy = (t, n) => {
+    const price = orderPrice(t), want = n;
+    if(price) n = Math.min(n, Math.floor(Math.max(0, state.money) / price));
+    L.noCash += want - n;
+    let got = 0;
+    for(const b of ds.slice().sort((x, y) => storeRoom(y, t) - storeRoom(x, t))){ if(got >= n) break; got += addGood(b, t, Math.floor(n - got)); }
+    L.noRoom += n - got; units += got;
+    if(got && price){ spend(Math.round(got * price), isGuestGood(t) ? "supplies" : t === CMED ? "medicine" : "feed"); spent += got * price; }
+  };
+  for(const t of FEED_GOODS.concat(CMED)) buy(t, orderOf(t));
+  const total = GUEST_GOODS.reduce((s, t) => s + orderOf(t), 0), fit = total > 0 ? Math.min(1, room() / total) : 1;
+  for(const t of GUEST_GOODS){ L.noRoom += orderOf(t) - Math.floor(orderOf(t) * fit); buy(t, Math.floor(orderOf(t) * fit)); }
+  if(units) events.toast(`The docks took in ${units} units${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
+  if(L.noRoom >= 1) events.toast(`${Math.round(L.noRoom)} units didn't fit at the docks.`, "bad");
+  if(L.noCash >= 1) events.toast(`${Math.round(L.noCash)} units weren't delivered. Not enough money.`, "bad");
 }
-function rushOrder(b, t){
-  const price = Math.round(LOGI.rushLot * unitPrice(t) * LOGI.rushMarkup);
-  if(b.type !== "dock") return "Only a dock takes orders.";
-  if(!isReachable(b)) return "Trucks can't reach the dock.";
-  if(!canAfford(price)) return `A rush order costs ${money(price)}.`;
-  const n = Math.min(LOGI.rushLot, Math.floor(storeRoom(b, t)));
-  if(n < 1) return "The dock is full.";
-  spend(Math.round(price * n / LOGI.rushLot), isGuestGood(t) ? "supplies" : t === CMED ? "medicine" : "feed"); addGood(b, t, n);
+// A rush delivery lands now, at the dock with the most room, for a steep markup
+const rushLot = t => t === CMED ? LOGI.rushDoses : LOGI.rushLot;
+const rushPrice = t => Math.round(rushLot(t) * basePrice(t) * (hasTech("express") ? LOGI.expressMarkup : LOGI.rushMarkup));
+function rushOrder(t){
+  const b = docks().sort((x, y) => storeRoom(y, t) - storeRoom(x, t))[0], price = rushPrice(t);
+  if(!state.buildings.some(x => x.type === "dock")) return "No delivery dock.";
+  if(!b) return "Trucks can't reach the docks.";
+  if(!canAfford(price)) return `A rush delivery costs ${money(price)}.`;
+  const n = Math.min(rushLot(t), Math.floor(storeRoom(b, t)));
+  if(n < 1) return "The docks are full.";
+  spend(Math.round(price * n / rushLot(t)), isGuestGood(t) ? "supplies" : t === CMED ? "medicine" : "feed"); addGood(b, t, n);
   return null;
 }
 
@@ -297,9 +326,10 @@ const MED_UNIT_VALUE = 60;
 
 function logiNight(){
   spoilNight();
-  dockDelivery();
-  state.logi.last = state.logi.flow; state.logi.flow = {}; state.logi.trucks = 0;
+  state.logi.last = state.logi.flow; state.logi.flow = {};
   state.logi.usedLast = state.logi.used || {}; state.logi.used = {};
+  state.logi.hist = (state.logi.hist || []).concat([state.logi.usedLast]).slice(-LOGI.histDays);
+  dockDelivery();
 }
 
 // Everything the park holds right now, for the park office
