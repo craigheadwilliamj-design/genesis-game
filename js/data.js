@@ -1245,9 +1245,9 @@ const POWER = {
   perMeter:.5,            // kW each meter of electrified fence draws
   unpoweredStrength:20,   // an electric fence with no power is just wire
   perSqM:.12,             // kW a building draws for each m² of floor, unless it sets its own kw
-  genWear:4,              // a power station's condition lost per day (times its own wear)
-  offlineBelow:25,        // power stations cut out below this condition
-  repairPerPercent:60,    // materials to restore 1% of a power station's condition
+  genWear:4,              // a power station's or transformer's condition lost per day (times its own wear); cables never wear
+  offlineBelow:25,        // power stations and transformers cut out below this condition
+  repairPerPercent:60,    // materials to restore 1% of a power station's or transformer's condition
   cablePerMeter:12,       // underground cable, laid straight between two power buildings
   cableMax:200,           // longest single run of cable, in meters
   grace:3,                // days an older park keeps free power to wire itself up
@@ -1279,8 +1279,8 @@ BUILDINGS.geothermal= {label:"Geothermal Plant", tag:"GEO", one:"a geothermal pl
                        full:"Geothermal plant", blurb:"Steady, clean power from deep underground."};
 // Transformers carry a network's power out to the buildings around them. They need no path.
 BUILDINGS.transformer = {label:"Transformer", tag:"POWER", one:"a transformer", glyph:"T", color:"#5B6470", price:1500, upkeep:10, w:5, d:5, dept:true, noPath:true,
-                       reach:35, eyesore:.35, grid:true,
-                       full:"Transformer", blurb:"Feeds power to everything within reach. Joined to a power station by cable."};
+                       reach:35, eyesore:.35, grid:true, wear:.8,
+                       full:"Transformer", blurb:"Feeds power to everything within reach. Joined to a power station by cable. Mechanics keep it running."};
 
 // Staff vehicles. ATVs only drive on service roads; on guest paths staff get off and walk, and the ATV stays parked where they got off for the next person.
 const VEHICLES = {

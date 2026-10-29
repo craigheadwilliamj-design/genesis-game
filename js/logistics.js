@@ -389,7 +389,7 @@ function logiWarnings(){
   }
   // with every mechanic or vet in a zone, anything outside the zones gets nobody
   const ms = state.staff.mechanics, vs = state.staff.vets;
-  if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (isStation(b) || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
+  if(ms.length && ms.every(m => m.zone) && (state.exhibits.some(e => !e.viv && !e.zone) || state.buildings.some(b => (isGridNode(b) || b.type === "depot") && !b.zone))) w.push("Every mechanic is in a zone, so fences and machines outside the zones aren't being checked.");
   if(vs.length && vs.every(v => v.zone) && state.exhibits.some(e => e.animals.length && !e.zone)) w.push("Every vet is in a zone, so exhibits outside the zones get no check-ups.");
   if(ks.length && ks.every(k => k.zone) && state.exhibits.some(e => e.animals.length && !aquaEx(e) && !e.zone)) w.push("Every keeper is in a zone, so exhibits outside the zones aren't being fed.");
   if(aqs.length && aqs.every(k => k.zone) && state.exhibits.some(e => e.animals.length && aquaEx(e) && !e.zone)) w.push("Every aquarist is in a zone, so lagoons and aquariums outside the zones aren't being fed.");

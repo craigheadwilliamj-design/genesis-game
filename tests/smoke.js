@@ -4274,6 +4274,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.cableTooFar = !!cableProblem(gen, B("p-tr2", "transformer", 100 + POWER.cableMax + 50, 300)) && !!cableProblem(gen, gen) && !!cableProblem(gen, wc);
     const m0 = state.money, why = layCable(gen, tr); recompute();
     out.cableJoins = before && !why && !unpowered(far) && state.money === m0 - cableCost(gen, tr) && gridInfo.netOf.get("p-gen") === gridInfo.netOf.get("p-tr") && !!cableProblem(gen, tr);
+    // a worn-out transformer carries nothing (cables never wear), and mechanics treat it as a broken machine
+    tr.cond = POWER.offlineBelow - 1; recompute();
+    out.transformerWears = unpowered(far) && isMachine(tr) && isDown(tr) && gridMachines().includes(tr) && repairCost(tr, 10) === POWER.repairPerPercent * 10;
+    wearTick(DAY_MIN); out.transformerWearsDaily = condOf(tr) < POWER.offlineBelow - 1 - POWER.genWear * BUILDINGS.transformer.wear * .99;
+    tr.cond = 100; recompute();
     // bulldozing the transformer takes its cable, and the far restroom goes dark
     removeItem("building", tr); recompute();
     out.cableGoesWithIt = !state.cables.some(c => c.a === "p-tr" || c.b === "p-tr") && unpowered(far);

@@ -20,6 +20,7 @@ let gridStale = false, tramDark = "";   // tram stations that lost or got power 
 const isStation = b => !!(b && b.type && BUILDINGS[b.type] && BUILDINGS[b.type].power);
 const isGridNode = b => isStation(b) || !!(b && b.type && BUILDINGS[b.type] && BUILDINGS[b.type].grid);
 const generators = () => state.buildings.filter(isStation);
+const gridMachines = () => state.buildings.filter(isGridNode);   // what wears: stations and transformers (cables never do)
 const genOnline = b => condOf(b) >= POWER.offlineBelow;
 const cablesOf = () => state.cables || (state.cables = []);
 // Buildings that draw power: everything but path props, decks and galleries, and the grid itself
@@ -49,9 +50,10 @@ function reaches(n, pts){
   const [x, y] = centroid(n.points);
   return inPoly(x, y, pts) || distToEdge(x, y, pts) <= BUILDINGS[n.type].reach;
 }
-// The networks: power buildings joined by cable, each with what it makes now and could make at best
+// The networks: power buildings joined by cable, each with what it makes now and could make at best.
+// A broken-down transformer carries nothing, so it can split a network in two; a broken station still passes power along.
 function gridNets(){
-  const nodes = state.buildings.filter(isGridNode), up = new Map(nodes.map(b => [b.id, b.id]));
+  const nodes = state.buildings.filter(b => isStation(b) || (isGridNode(b) && genOnline(b))), up = new Map(nodes.map(b => [b.id, b.id]));
   const find = k => { while(up.get(k) !== k){ up.set(k, up.get(up.get(k))); k = up.get(k); } return k; };
   for(const c of cablesOf()) if(up.has(c.a) && up.has(c.b)) up.set(find(c.a), find(c.b));
   const nets = new Map();

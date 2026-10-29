@@ -1287,7 +1287,7 @@ function building34(bl, t, on, dead, reach, inv){
 
 // Solar arrays, wind turbines and transformers: no walls to speak of, so drawn on their own
 function powerArt34(bl, S, P, col, line, inv){
-  const [cx, cy] = centroid(P), bb = bbox(P), off = !genOnline(bl) && isStation(bl), n2 = v => v.toFixed(2);
+  const [cx, cy] = centroid(P), bb = bbox(P), off = !genOnline(bl), n2 = v => v.toFixed(2);
   let s = "";
   if(S.front === "solar"){
     // rows of panels on short legs, tilted to the sun (south), on gravel
@@ -1312,12 +1312,12 @@ function powerArt34(bl, S, P, col, line, inv){
     return s + `</g><circle r=".7" fill="#D8DCD6" stroke="#9AA09A" stroke-width="1" vector-effect="non-scaling-stroke"/></g>`;
   }
   // a transformer: a gray box with cooling fins inside a chain-link fence
-  const box = insetRect(P, .55), w = walls34(box, 0, S.wall, "#7C848A", line);
+  const box = insetRect(P, .55), w = walls34(box, 0, S.wall, off ? "#5A4A44" : "#7C848A", line);
   s += `<polygon points="${polyStr(P)}" fill="#A8A08E" ${line}/>` + w.s + `<polygon points="${polyStr(box.map(lift34(S.wall)))}" fill="#9AA2A8" ${line}/>`;
   if(w.main >= 0) for(const f of [.2, .4, .6, .8]) s += quad34(box, w.main, f - .04, f + .04, .3, S.wall - .3, "#5E666C");
   s += walls34(P, 0, 1.6, "none", `stroke="#5E666C" stroke-width="1" stroke-dasharray="1.5 1.5" vector-effect="non-scaling-stroke"`).s;
   const [x, y] = lift34(S.wall + .6)([cx, cy]);
-  return s + `<text class="glyph" x="${n2(x)}" y="${n2(y)}" font-size="1.6" style="fill:#E8C34A" pointer-events="none">⚡</text>`;
+  return s + `<text class="glyph" x="${n2(x)}" y="${n2(y)}" font-size="1.6" style="fill:${off ? "#E5484D" : "#E8C34A"}" pointer-events="none">${off ? "✕" : "⚡"}</text>`;
 }
 function insetRect(pts, f){ const [cx, cy] = centroid(pts); return pts.map(([x, y]) => [cx + (x - cx)*f, cy + (y - cy)*f]); }
 
@@ -2413,7 +2413,7 @@ function setTool(t){
     const b = BUILDINGS[t];
     const fits = b.viv ? SPECIES.filter(s => s.viv && !!s.aqua === !!b.aqua && vivRank(s.viv) <= vivRank(b.viv) && speciesAvailable(s.id)).map(s => s.name) : [];
     const free = " Place it anywhere clear of paths, but it only works once a path reaches it.", spin = " Rotate turns it 90° (R).";
-    showBar(`Place ${b.one}`, b.grid ? `Tap anywhere. Feeds everything within ${b.reach} m once a cable joins it to a power station.${spin}`
+    showBar(`Place ${b.one}`, b.grid ? `Tap anywhere. Feeds everything within ${b.reach} m once a cable joins it to a power station. Mechanics need a path or service road beside it to repair it.${spin}`
       : b.power ? `Tap beside a path or service road, for the mechanics. ${b.green ? "Clean power" : "Guests don't like the look of it"}. Feeds everything within ${b.reach} m.${spin}`
       : b.dept ? `Backstage building${b.unique ? ", one per park" : ""}. Tap beside a ${b.serviceOnly ? "service road" : "path or service road"}. It snaps to the 1 m grid.${free}${spin}`
       : b.viv ? `${VIVARIUMS[b.viv].w} × ${VIVARIUMS[b.viv].d} m.${b.aqua ? " Needs a filter, which runs on power." : ""} Fits ${fits.join(", ")}.${free}${spin}`

@@ -115,7 +115,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "diveshack", "breakroom", "workshop", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || isStation(b) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "diveshack", "breakroom", "workshop", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || isGridNode(b) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road

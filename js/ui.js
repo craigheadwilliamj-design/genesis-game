@@ -764,12 +764,12 @@ function workshopHtml(b){
 // Power stations and transformers: this building, then the network it's on
 function gridNodeHtml(b){
   const t = BUILDINGS[b.type], st = isStation(b), net = gridInfo.netOf.get(b.id);
-  let h = deptHead(b) + (st ? zoneRow("building", b) : "");
-  if(st){
-    const online = genOnline(b), k = knownCond(b), now = stationOutput(b);
-    h += `<div class="row"><span class="status ${!online ? "no" : now > 0 ? "ok" : "warn"}">${!online ? "Broken down" : now > 0 ? `Running, ${Math.round(now)} of ${t.power} kW` : t.sun ? "No sun" : "Idle"}</span>${t.green ? `<span class="status ok">Clean</span>` : ""}</div>`;
-    h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
-  }
+  let h = deptHead(b) + zoneRow("building", b);
+  const online = genOnline(b), k = knownCond(b), now = st ? stationOutput(b) : 0;
+  if(st) h += `<div class="row"><span class="status ${!online ? "no" : now > 0 ? "ok" : "warn"}">${!online ? "Broken down" : now > 0 ? `Running, ${Math.round(now)} of ${t.power} kW` : t.sun ? "No sun" : "Idle"}</span>${t.green ? `<span class="status ok">Clean</span>` : ""}</div>`;
+  else if(!online) h += `<div class="row"><span class="status no">Broken down</span></div>`;
+  if(kGraph && !kGraph.anchors[b.id]) h += `<div class="row"><span class="status no">No path for mechanics.</span></div>`;
+  h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   const fed = [...gridInfo.feeds].filter(([, n]) => n === net).map(([id]) => state.buildings.find(x => x.id === id) || state.exhibits.find(x => x.id === id)).filter(Boolean);
   const off = fed.filter(o => o.powered === false || o.filterPowered === false);
   if(net){
