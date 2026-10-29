@@ -761,15 +761,32 @@ function workshopHtml(b){
   return h;
 }
 
-function generatorHtml(b){
+// Power stations and transformers: this building, then the network it's on
+function gridNodeHtml(b){
+  const t = BUILDINGS[b.type], st = isStation(b), net = gridInfo.netOf.get(b.id);
   let h = deptHead(b) + zoneRow("building", b);
-  const sup = powerSupply(), dem = powerDemand(), online = genOnline(b), k = knownCond(b);
-  h += `<div class="row"><span class="status ${online ? "ok" : "no"}">${online ? `Running, ${BUILDINGS.generator.power} kW` : "Broken down"}</span></div>`;
+  const online = genOnline(b), k = knownCond(b), now = st ? stationOutput(b) : 0;
+  if(st) h += `<div class="row"><span class="status ${!online ? "no" : now > 0 ? "ok" : "warn"}">${!online ? "Broken down" : now > 0 ? `Running, ${Math.round(now)} of ${t.power} kW` : t.sun ? "No sun" : "Idle"}</span>${t.green ? `<span class="status ok">Clean</span>` : ""}</div>`;
+  else if(!online) h += `<div class="row"><span class="status no">Broken down</span></div>`;
+  if(kGraph && !kGraph.anchors[b.id]) h += `<div class="row"><span class="status no">No path for mechanics.</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
-  h += `<section><h3>Park power</h3><dl class="kv"><dt>Generators running</dt><dd>${generators().filter(genOnline).length} of ${generators().length}</dd><dt>Supply</dt><dd>${Math.round(sup)} kW</dd><dt>Electric fences need</dt><dd>${Math.round(dem)} kW</dd><dt class="sum">${sup >= dem ? "Spare" : "Short by"}</dt><dd class="sum" style="color:${sup >= dem ? "var(--good)" : "var(--bad)"}">${Math.round(Math.abs(sup - dem))} kW</dd></dl></section>`;
-  const fences = state.exhibits.filter(e => fenceDraw(e) > 0);
-  if(fences.length) h += `<section><h3>Electrified fences</h3><ul class="issues">${fences.map(e => `<li class="${e.powered === false ? "bad" : ""}">${esc(e.name)}: ${Math.round(fenceDraw(e))} kW, ${e.powered === false ? "no power" : "powered"}</li>`).join("")}</ul></section>`;
+  const fed = [...gridInfo.feeds].filter(([, n]) => n === net).map(([id]) => state.buildings.find(x => x.id === id) || state.exhibits.find(x => x.id === id)).filter(Boolean);
+  const off = fed.filter(o => o.powered === false || o.filterPowered === false);
+  if(net){
+    h += `<section><h3>Network</h3><dl class="kv"><dt>Stations</dt><dd>${net.nodes.filter(isStation).length}</dd><dt>Transformers</dt><dd>${net.nodes.filter(x => !isStation(x)).length}</dd>`;
+    h += `<dt>Supply</dt><dd>${Math.round(net.supply)} of ${Math.round(net.cap)} kW</dd><dt>Demand</dt><dd>${Math.round(net.load + net.short)} kW</dd><dt>Reach</dt><dd>${t.reach} m</dd></dl>`;
+    h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Load</span>${meter(net.supply ? Math.min(100, (net.load + net.short) / net.supply * 100) : 100, net.short ? "var(--bad)" : "var(--good)")}<span>${net.supply ? Math.round((net.load + net.short) / net.supply * 100) : 0}%</span></div>`;
+    if(!net.supply) h += `<div class="row"><span class="status no">No power on this network.</span></div>`;
+    h += `</section>`;
+  }
+  if(off.length) h += `<section><h3>Without power</h3><ul class="issues">${off.map(o => `<li class="bad">${esc(o.name || BUILDINGS[o.type].label)}</li>`).join("")}</ul></section>`;
+  if(powerFree()) h += `<div class="meta" style="margin-top:6px">Free power until ${fmtDate(state.powerFree)}.</div>`;
   return h;
+}
+// The power line on every other building's panel
+function powerRow(b){
+  if(!needsPower(b)) return "";
+  return `<div class="row"><span class="status ${unpowered(b) ? "no" : "ok"}">${unpowered(b) ? "No power" : "Powered"}</span><span class="meta">${kwOf(b)} kW</span></div>`;
 }
 
 function pmcHtml(b){
@@ -817,7 +834,7 @@ function depotHtml(b){
 // every building panel gets a theme picker just above its bulldoze button
 function buildingHtml(b){
   const h = buildingBody(b), mark = `<div class="row"><button class="btn danger" data-action="demolish"`, i = h.lastIndexOf(mark);
-  return i < 0 ? h : h.slice(0, i) + themeHtml("building", b) + h.slice(i);
+  return i < 0 ? h : h.slice(0, i) + powerRow(b) + themeHtml("building", b) + h.slice(i);
 }
 function buildingBody(b){
   if(b.type === "dock") return dockHtml(b) + demolishRow(b);
@@ -828,7 +845,7 @@ function buildingBody(b){
   if(b.type === "pmc") return pmcHtml(b) + demolishRow(b);
   if(b.type === "greenhouse") return greenhouseHtml(b) + demolishRow(b);
   if(b.type === "ceres") return ceresHtml(b) + demolishRow(b);
-  if(b.type === "generator") return generatorHtml(b) + demolishRow(b);
+  if(isGridNode(b)) return gridNodeHtml(b) + demolishRow(b);
   if(b.type === "workshop") return workshopHtml(b) + demolishRow(b);
   if(b.type === "station" || b.type === "diveshack") return stationHtml(b) + demolishRow(b);
   if(b.type === "breakroom") return breakroomHtml(b) + demolishRow(b);

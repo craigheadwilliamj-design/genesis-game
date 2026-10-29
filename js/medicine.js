@@ -306,7 +306,7 @@ function admit(a, t){
 }
 // The ward's clock: patients with their doses get better while there's a vet on staff, and go home when they're done
 function wardTick(dtMin){
-  const h = state.health; if(!h.ward.length || !pmcBuilding()) return;
+  const h = state.health; if(!h.ward.length || !pmcBuilding() || unpowered(pmcBuilding())) return;
   for(const p of [...h.ward]){
     if(p.recovered) continue;
     if(!p.dosed && !dosePatient(p)) continue;

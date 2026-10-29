@@ -61,7 +61,6 @@ const BUILD_MENU = [
     {label:"Vehicle Depot", tool:"depot"},
     {label:"Security Office", tool:"security"},
     {label:"Tool Shed", tool:"toolshed"},
-    {label:"Generator", tool:"generator"},
     {label:"Draw Work Zone", tool:"zone", price:() => "Free"},
   ]},
   {id:"mgmt", label:"Park Management", items:[
@@ -69,6 +68,15 @@ const BUILD_MENU = [
     {label:"Time Travel Lab", tool:"ghost"},
     {label:"Genetics Lab", tool:"tar"},
     {label:"Botany Lab", tool:"ceres"},
+  ]},
+  {id:"power", label:"Power", items:[
+    {label:"Diesel Generator", tool:"generator"},
+    {label:"Gas Power Plant", tool:"gasplant"},
+    {label:"Solar Array", tool:"solar"},
+    {label:"Wind Turbine", tool:"wind"},
+    {label:"Geothermal Plant", tool:"geothermal"},
+    {label:"Transformer", tool:"transformer"},
+    {label:"Power Cable", tool:"cable", price:() => `${money(POWER.cablePerMeter)}/m`, note:"Underground, so guests never see it. Tap a power station or transformer, then another, to join them into one network. Tap a cable to lift it."},
   ]},
   {id:"logi", label:"Logistics Buildings", items:[
     {label:"Delivery Dock", tool:"dock"},
@@ -115,6 +123,7 @@ const ICON_LINES = {
   "land-barn":'<rect x="3" y="4" width="18" height="16" rx="1.5" fill="#7E6142" stroke="#3B3226" stroke-width="1.4"/><path d="M3 12h18" stroke="#3B3226" stroke-width="1"/>',
   parcels:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".55"/><rect x="9" y="9" width="6" height="6" fill="#D8B04A" stroke="#1D2B22" stroke-width="1.2"/>',
   paint:'<rect x="3" y="5" width="18" height="14" rx="2" fill="#BFA96C"/><path d="M3 12l6-7h6l-9 14H5a2 2 0 0 1-2-2z" fill="#7DAA68"/><path d="M15 19l6-8v6a2 2 0 0 1-2 2z" fill="#DFC48A"/>',
+  cable:'<circle cx="5" cy="18" r="3" fill="#7C848A"/><circle cx="19" cy="6" r="3" fill="#7C848A"/><path d="M5 18L19 6" stroke="#E8C34A" stroke-width="2.5" stroke-dasharray="3 2"/>',
   zone:'<path d="M4 7l7-3 9 4-2 11-9 2-6-6z" fill="#E0A030" fill-opacity=".35" stroke="#E0A030" stroke-width="1.8" stroke-dasharray="3 2" stroke-linejoin="round"/>',
   viv:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/>',
   aqua:'<rect x="3" y="6" width="18" height="13" rx="1.5" fill="#A9D3DA" stroke="#24414A" stroke-width="1.6"/><rect x="4" y="9" width="16" height="9" fill="#3E86A8"/><path d="M4 9h16" stroke="#BFE6F5" stroke-width="1"/><circle cx="9" cy="14" r="1.2" fill="#BFE6F5"/><circle cx="12" cy="11.5" r=".8" fill="#BFE6F5"/>',
@@ -225,7 +234,7 @@ const menuHidden = it => (it.statues && !statuesOn()) || (it.tool === "tram" && 
 // The left column's big buttons. Each opens a tray along the bottom (menu A): Buildings lists its groups, the others list their tools,
 // and anything that holds a list opens that list in a second bar above it (menu B).
 const BUILD_CATS = [
-  {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
+  {id:"build", label:"Buildings", groups:["guest", "staff", "mgmt", "logi", "power"], icon:'<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><rect x="10" y="14" width="4" height="6" fill="currentColor"/>'},
   {id:"land", label:"Landscaping", groups:["land", "land-buy"], icon:'<g transform="translate(12 12) rotate(40) scale(1.2) translate(-12 -12)"><path d="M9 1.5h6v3.5H9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M11 5h2v9h-2z" fill="currentColor"/><path d="M7.5 13.5h9v4.5c0 2.5-2 4-4.5 5-2.5-1-4.5-2.5-4.5-5z" fill="currentColor"/><path d="M12 15.5v4.5" stroke="#1F3A2B" stroke-opacity=".6" stroke-width="1.2"/></g>'},
   {id:"exhibits", label:"Exhibits", groups:["exhibits"], icon:'<path d="M5 3v18M19 3v18M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2"/>'},
   {id:"paths", label:"Paths", groups:["paths"], icon:'<path d="M8 21c0-5 6-5 6-9s-5-5-5-9M15 21c0-5 6-5 6-9s-5-5-5-9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'},
@@ -235,6 +244,7 @@ const GROUP_ICONS = {
   guest:'<circle cx="12" cy="6" r="3.2" fill="#F0C9A0"/><path d="M7 21v-7a5 5 0 0 1 10 0v7z" fill="#D9558C"/><path d="M9 6.5c0-3 6-3 6 0-1-1.5-5-1.5-6 0z" fill="#E8C34A"/>',
   staff:'<circle cx="12" cy="7" r="3.2" fill="#F0C9A0"/><path d="M7 5.5h10l-1-2.5H8z" fill="#8A7A4A"/><path d="M7 21v-7a5 5 0 0 1 10 0v7z" fill="#6E7B3E"/>',
   mgmt:'<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="#DDEFE6" fill-opacity=".25" stroke="#DDEFE6" stroke-width="1.8" stroke-linejoin="round"/><path d="M6.5 15.5h11l1.5 3a1.5 1.5 0 0 1-1.3 2H6.3a1.5 1.5 0 0 1-1.3-2z" fill="#5FD36E"/>',
+  power:'<path d="M13 2L5 13h6l-2 9 9-12h-6z" fill="#E8C34A" stroke="#8A6A1E" stroke-width="1.2" stroke-linejoin="round"/>',
   logi:'<rect x="2" y="7" width="12" height="9" fill="#8C939A"/><path d="M14 10h4l3 3v3h-7z" fill="#6E757C"/><circle cx="6.5" cy="17.5" r="2" fill="#3A3F44"/><circle cx="17" cy="17.5" r="2" fill="#3A3F44"/>',
 };
 let sideCat = null;   // the open tray's category, or null

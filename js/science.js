@@ -553,6 +553,9 @@ function scienceTick(dtMin){
   if(dept("oracle")) sc.points += Math.max(0, sc.crew.paleo - sc.projects.length) * RESEARCH_PER_PALEO * dtMin / DAY_MIN;
   // a hair of slack: nowMin() is rebuilt from the day and minute, so a step that lands on `end` can read a rounding error short
   const now = state.sandbox ? Infinity : nowMin() + 1e-6;
+  // a Research Lab with no power holds its projects where they are
+  const lab = state.buildings.find(b => b.type === "oracle");
+  if(lab && unpowered(lab)) for(const p of sc.projects){ if(p.start !== undefined) p.start += dtMin; p.end += dtMin; }
   if(sc.projects.length && sc.projects.some(p => p.end <= now)){
     const done = sc.projects.filter(p => p.end <= now);
     sc.projects = sc.projects.filter(p => p.end > now);

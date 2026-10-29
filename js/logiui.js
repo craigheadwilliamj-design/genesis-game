@@ -108,7 +108,7 @@ function zoneHtml(z){
   h += m.exhibits.length ? `<ul class="herd">${m.exhibits.map(e => row("exhibit", e, e.name, `${e.animals.length} animal${e.animals.length === 1 ? "" : "s"}`)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.exhibits.filter(e => e.zone !== z.id).map(e => ["exhibit", e.id, e.zone ? `${e.name} (${zoneName(e.zone)})` : e.name]), "Add an exhibit…");
   h += `</section><section><h3>Buildings</h3>`;
-  const zb = b => storeOf(b) || ["station", "diveshack", "breakroom", "workshop", "generator", "depot"].includes(b.type);
+  const zb = b => storeOf(b) || (["station", "diveshack", "breakroom", "workshop", "depot"].includes(b.type) || isGridNode(b));
   h += m.stores.length ? `<ul class="herd">${m.stores.map(b => row("building", b, BUILDINGS[b.type].label)).join("")}</ul>` : `<div class="meta">None.</div>`;
   h += addRow(z, state.buildings.filter(b => zb(b) && b.zone !== z.id).map(b => ["building", b.id, b.zone ? `${BUILDINGS[b.type].label} (${zoneName(b.zone)})` : BUILDINGS[b.type].label]), "Add a building…");
   h += `<div class="row" style="margin-top:8px"><button class="btn" data-action="claimZone">Claim everything inside</button></div></section>`;

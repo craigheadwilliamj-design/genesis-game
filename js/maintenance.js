@@ -37,11 +37,11 @@ function wearTick(dtMin){
     if(e.viv) continue;
     e.cond = Math.max(0, condOf(e) - wearPerDay(e) * dtMin / DAY_MIN);
   }
-  // generators wear too; one that drops below the cut-out point stops making power
-  for(const b of generators()){
+  // power stations and transformers wear too; one that drops below the cut-out point stops making or carrying power
+  for(const b of gridMachines()){
     const was = genOnline(b);
-    b.cond = Math.max(0, condOf(b) - POWER.genWear * dtMin / DAY_MIN);
-    if(was && !genOnline(b)){ events.toast("A generator has broken down. Electrified fences may lose power until a mechanic repairs it.", "bad"); updatePower(); }
+    b.cond = Math.max(0, condOf(b) - POWER.genWear * (BUILDINGS[b.type].wear ?? 1) * dtMin / DAY_MIN);
+    if(was && !genOnline(b)){ events.toast(`${BUILDINGS[b.type].one.replace(/^a/, "A")} has broken down. Its network may lose power until a mechanic repairs it.`, "bad"); updatePower(); }
   }
   // vehicle depots wear; a worn-out depot grounds its ATVs
   for(const b of depots()){
@@ -66,17 +66,17 @@ function tramWear(b){
   return TRAM.wear + TRAM.trackWear * len / 100;
 }
 
-// Things mechanics look after: exhibit fences, generators, vehicle depots, and tram stations
+// Things mechanics look after: exhibit fences, power stations and transformers, vehicle depots, and tram stations
 function findTarget(id){ return state.exhibits.find(x => x.id === id) || state.buildings.find(x => x.id === id); }
-const isMachine = o => o.type === "generator" || o.type === "depot" || !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
+const isMachine = o => isGridNode(o) || o.type === "depot" || !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
 const isTramB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].tram);
 const isPropB = o => !!(o.type && BUILDINGS[o.type] && BUILDINGS[o.type].prop);
 const anchorFor = o => kGraph.anchors[isMachine(o) || isPropB(o) ? o.id : "fix:" + o.id];
-const targetName = o => o.type === "generator" ? "a generator" : o.type === "depot" ? (devMode() ? "a vehicle depot" : "a depot") : isTramB(o) ? "a tram station" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
-// broken = needs urgent work: a fence with a hole in it, or a generator that has cut out
-const isDown = o => o.type === "generator" ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : isTramB(o) ? !tramWorking(o) : condOf(o) <= 0;
+const targetName = o => isGridNode(o) ? BUILDINGS[o.type].one : o.type === "depot" ? (devMode() ? "a vehicle depot" : "a depot") : isTramB(o) ? "a tram station" : isPropB(o) ? BUILDINGS[o.type].one : o.name;
+// broken = needs urgent work: a fence with a hole in it, or a power station or transformer that has cut out
+const isDown = o => isGridNode(o) ? !genOnline(o) : o.type === "depot" ? condOf(o) < VEHICLES.offlineBelow : isTramB(o) ? !tramWorking(o) : condOf(o) <= 0;
 function repairCost(o, gain){
-  if(o.type === "generator") return POWER.repairPerPercent * gain;
+  if(isGridNode(o)) return POWER.repairPerPercent * gain;
   if(o.type === "depot") return VEHICLES.repairPerPercent * gain;
   if(isTramB(o)) return TRAM.repairPerPercent * gain;
   if(isPropB(o)) return BUILDINGS[o.type].price * VANDAL.repairShare * gain;
@@ -100,11 +100,11 @@ function pickFence(c){
   // only jobs this mechanic can walk to, so one cut-off fence can't stall the whole crew
   const w = c.at && walkFrom(c.at, c), far = o => w && !w.dist.has(anchorFor(o));
   let best = null;
-  for(const e of state.exhibits.filter(x => !x.viv).concat(generators(), depots(), tramStations())){
+  for(const e of state.exhibits.filter(x => !x.viv).concat(gridMachines(), depots(), tramStations())){
     if(taken.has(e.id) || !anchorFor(e) || far(e) || (mz && e.zone !== mz)) continue;
     const k = knownCond(e), overdue = daysSinceInspect(e) >= MAINT.inspectEvery;
     let score = 0;
-    if(isDown(e)) score = 1000;                               // broken fences and dead generators are obvious
+    if(isDown(e)) score = 1000;                               // broken fences and dead power stations are obvious
     else if(k < MAINT.repairBelow) score = 500 + (100 - k);
     else if(overdue) score = 100 + daysSinceInspect(e);
     if(score && (!best || score > best.score)) best = {e, score};
@@ -169,7 +169,7 @@ function mechanicsTick(dtMin){
         const gain = mins * MAINT.repairPerMinute;
         spend(repairCost(e, gain), "repairs");
         e.cond = Math.min(100, condOf(e) + gain); left -= mins;
-        if(condOf(e) >= 99.9){ e.cond = 100; e.inspected = {day:state.day, cond:100}; c.job = "idle"; c.target = null; if(e.type === "generator") updatePower(); if(isTramB(e)) buildGuestGraph(); events.changed(); }
+        if(condOf(e) >= 99.9){ e.cond = 100; e.inspected = {day:state.day, cond:100}; c.job = "idle"; c.target = null; if(isGridNode(e)) updatePower(); if(isTramB(e)) buildGuestGraph(); events.changed(); }
         continue;
       }
       if(c.job === "resting"){ left = staffRestStep(c, left); continue; }

@@ -163,7 +163,7 @@ function newPark(){
     gate:[ENTRANCE_X,305],
     exhibits:[], decor:[], water:[], waterGrid5:true, fences:[], fenceGrid:{}, fenceGrid5:true,
     paths:[], ...(() => { const m = mainWalkChunks([ENTRANCE_X,305]); return {pathChunks:m.C, pathFixed:m.F}; })(),
-    buildings:[],
+    buildings:[], cables:[],
     crates:[],         // boxed animals standing in the park: an animal's record with x and y (science.js)
     science:freshScience(), staff:freshStaff(), safety:freshSafety(), ceres:freshCeres(), health:freshHealth(), zones:[], biomePaint:[], logi:freshLogi(), starters:pickStarters(), guestLog:freshGuestLog(), litter:{}, lodging:freshLodging(), weather:freshWeather(), themes:freshThemes(),
     today:freshLedger(), history:[], goalsDone:[], over:false
@@ -272,9 +272,15 @@ function upgradeSave(s){
   if(s.science.trip !== undefined){ s.science.trips = s.science.trip ? [s.science.trip] : []; delete s.science.trip; }
   delete s.science.budget;
   if(!s.science.tech) s.science.tech = [];
-  // hotels, cold stores, security, generators and viewing platforms became research: parks already using them keep them
-  for(const [type, id] of [["campground","hotels"], ["lodge","hotels"], ["resort","hotels"], ["coldstore","coldstore"], ["security","security"], ["generator","generator"], ["platform","platform"]])
+  // hotels, cold stores, security and viewing platforms became research: parks already using them keep them
+  for(const [type, id] of [["campground","hotels"], ["lodge","hotels"], ["resort","hotels"], ["coldstore","coldstore"], ["security","security"], ["platform","platform"]])
     if(s.buildings.some(b => b.type === type) && !s.science.tech.includes(id)) s.science.tech.push(id);
+  // the power grid: buildings need power, carried by cable and transformers. Older parks get a few days of free power to wire up, and back the points spent on generators (they need no research now).
+  if(!s.cables){
+    s.cables = []; s.powerFree = s.day + POWER.grace; s.powerNotice = true;
+    if(s.science.tech.includes("generator")){ s.science.tech = s.science.tech.filter(t => t !== "generator"); s.science.points = (s.science.points || 0) + 15; }
+    for(const p of (s.science.projects || []).filter(p => p.kind === "tech" && p.id === "generator")){ s.science.points = (s.science.points || 0) + (p.cost || 15); s.science.projects.splice(s.science.projects.indexOf(p), 1); }
+  }
   if(!s.staff.mechanics) s.staff.mechanics = [];
   if(!s.staff.transfers) s.staff.transfers = [];
   if(!s.staff.calls) s.staff.calls = [];
@@ -721,7 +727,7 @@ function recompute(){
   const reach = {}, reports = {}, themes = {};
   // Guests reach exhibits and shops by footpath. Staff reach backstage buildings by footpath or service road.
   for(const e of state.exhibits){ reach[e.id] = near(e.points, guestPaths, false); reports[e.id] = exhibitReport(e); themes[e.id] = themeZone(e); }
-  for(const b of state.buildings){ const staff = !!BUILDINGS[b.type].dept; reach[b.id] = (!BUILDINGS[b.type].prop && doorNear(b, !staff)) || near(b.points, staff ? anyPaths : guestPaths, staff); }   // the door side first, then any side
+  for(const b of state.buildings){ const staff = !!BUILDINGS[b.type].dept; reach[b.id] = !!BUILDINGS[b.type].noPath || (!BUILDINGS[b.type].prop && doorNear(b, !staff)) || near(b.points, staff ? anyPaths : guestPaths, staff); }   // the door side first, then any side
 
   // How much guests want to visit
   let appeal = 0, animals = 0, happySum = 0;
@@ -841,6 +847,7 @@ function tickStep(dtMin){
 
   sinceRecompute += m1 - m0;
   if(sinceRecompute >= 20 || !derived){ recompute(); sinceRecompute = 0; }
+  powerTick();
 
   // Animals eat, keepers walk
   scienceTick(m1 - m0);
@@ -899,11 +906,13 @@ const PERIOD_BY_ID = Object.fromEntries(TIME_PERIODS.map(p => [p.id, p]));
 const rand = (a, b) => a + Math.random() * (b - a);
 
 // A department only works when it's built and staff can reach it
-function dept(type){ const b = state.buildings.find(x => x.type === type); return b && isReachable(b) ? b : null; }
+function dept(type){ const b = state.buildings.find(x => x.type === type); return b && isReachable(b) && !unpowered(b) ? b : null; }
 function hasDept(type){ return state.buildings.some(x => x.type === type); }
 function deptProblem(type){
   if(!hasDept(type)) return `Build ${BUILDINGS[type].one} first.`;
-  if(!dept(type)) return `${BUILDINGS[type].one.replace(/^the/, "The")} isn't connected. Run a path or service road from the entrance to it.`;
+  const b = state.buildings.find(x => x.type === type);
+  if(!isReachable(b)) return `${BUILDINGS[type].one.replace(/^the/, "The")} isn't connected. Run a path or service road from the entrance to it.`;
+  if(unpowered(b)) return `${BUILDINGS[type].one.replace(/^the/, "The")} has no power.`;
   return null;
 }
 function logScience(text, ok){ state.science.log.unshift({day:state.day, text, ok}); state.science.log.length = Math.min(state.science.log.length, 8); }

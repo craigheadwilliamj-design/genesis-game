@@ -16,7 +16,7 @@ function foodType(s){
 const ceresOpen = () => state.buildings.some(b => b.type === "ceres" && kGraph && kGraph.anchors[b.id]);
 
 /* ---------- Botany Lab growing Paleoflora ---------- */
-const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b));
+const greenhouses = () => state.buildings.filter(b => b.type === "greenhouse" && isReachable(b) && !unpowered(b));
 function ceresRate(){ return dept("ceres") && hasTech("paleoflora") && anyPlantDna() ? PALEOFLORA.perDay + greenhouses().length * PALEOFLORA.greenhouse : 0; }
 function ceresCap(){ return Math.max(PALEOFLORA.perDay, ceresRate()) * PALEOFLORA.storeDays; }
 function ceresTick(dtMin){ const c = state.ceres; c.stock = Math.min(ceresCap(), c.stock + ceresRate() * dtMin / DAY_MIN); }
@@ -115,7 +115,7 @@ function buildKeeperGraph(){
     }
     if(best){ best.c.adds.push({i:best.i, t:best.r.t, pt:[best.r.x, best.r.y], id}); }
   };
-  for(const b of state.buildings) if((["station", "diveshack", "breakroom", "workshop", "generator", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
+  for(const b of state.buildings) if((["station", "diveshack", "breakroom", "workshop", "ceres", "tar", "depot", "pmc", "closet", "security"].includes(b.type) || isGridNode(b) || BUILDINGS[b.type].tram || storeOf(b) || guestBuilding(b) || BUILDINGS[b.type].prop) && isReachable(b)){
     const [cx, cy] = centroid(b.points); attach(b.id, cx, cy, BUILDINGS[b.type].d/2 + 6, false);
   }
   // mechanics reach each fence from the closest path or road
@@ -247,7 +247,7 @@ const tireRate = () => KEEPER.tirePerMeter * (hasUpgrade("boots") ? .6 : 1);
 
 // Keepers start from Keeper Stations, aquarists from Dive Shacks (pass the walker or record)
 function stations(c){ const t = c && (c.role === "aqua") ? "diveshack" : "station"; return state.buildings.filter(b => b.type === t && kGraph && kGraph.anchors[b.id]); }
-function restSpots(c){ const r = state.buildings.filter(b => b.type === "breakroom" && kGraph && kGraph.anchors[b.id]); return r.length ? r : stations(c); }
+function restSpots(c){ const r = state.buildings.filter(b => b.type === "breakroom" && kGraph && kGraph.anchors[b.id] && !unpowered(b)); return r.length ? r : stations(c); }
 
 // Lagoons and aquariums are tended by aquarists, every other exhibit by keepers. An aquarist is a keeper record (and walker) with role "aqua".
 const aquaEx = e => !!e && (!!e.aqua || lagoonWalled(e));
