@@ -229,7 +229,7 @@ function render(){
       const u = i / n, v = (i + 1) / n, q = [[a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u], [a[0] + (z[0] - a[0]) * v, a[1] + (z[1] - a[1]) * v]], mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
       const it = {y:my, o:0, svg:fenceRunSvg(q, r.b, false)}, host = tilt ? state.exhibits.find(e => e.open && !e.viv && (inPoly(mx, my, e.points) || distToEdge(mx, my, e.points) < 1.5)) : null;
       if(host) (openFence34.get(host.id) || openFence34.set(host.id, []).get(host.id)).push(it); else looseLeft.push(it);
-      if(tilt) fov.push(fenceOverSeg(q[0], q[1], it.svg));
+      if(tilt) fov.push(fenceOverSeg(q[0], q[1], it.svg + (host ? fenceOverInside(host) : "")));
     }
   }
 
@@ -288,7 +288,7 @@ function render(){
     if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
     if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) + vivScene34(e, "wall") : fence34(e.points, true, kinds34, "back", fo34);
     if(tilt && !e.open && !e.viv) e.points.forEach((p, i) => { if(norm34(e.points, i)[1] > .05) return; const o = fo34.off && fo34.off[i], q = e.points[(i + 1) % e.points.length];
-      fov.push(fenceOverSeg(o ? [p[0] + o[0], p[1] + o[1]] : p, o ? [q[0] + o[0], q[1] + o[1]] : q, fence34(e.points, true, kinds34, "back", {...fo34, only:i}))); });
+      fov.push(fenceOverSeg(o ? [p[0] + o[0], p[1] + o[1]] : p, o ? [q[0] + o[0], q[1] + o[1]] : q, fence34(e.points, true, kinds34, "back", {...fo34, only:i}) + fenceOverInside(e))); });
     if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
       if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
@@ -1009,6 +1009,8 @@ function camp34(bl, P, col, line){
 // Each far fence side and loose run is drawn again in fenceOverLayer, clipped to the boxes of the buildings, props, decor and guests behind it.
 const FENCE_OVER = {up:4.5};   // meters: the tallest fence picture, so a box further back than this can't be covered
 let fenceOver34 = [];
+// the exhibit's plants, rocks and animals stand in front of its far fence, so they go over the copy again (a live copy of its depth group, landSvg)
+const fenceOverInside = e => `<use href="#z34-${esc(e.id)}"/>`;
 function fenceOverSeg(a, b, svg){ if(a[0] > b[0]) [a, b] = [b, a]; return b[0] - a[0] > .01 ? {a, b, svg} : null; }
 // is a box from x0 to x1 standing on yb behind fence f, near enough to be covered
 function fenceOverHits(f, x0, x1, yb){
