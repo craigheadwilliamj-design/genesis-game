@@ -971,29 +971,34 @@ function pxRefBox(){
   const k = (px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1) * px.refK, w = r.width * k, h = r.height * k;
   return [(px.fw - w) / 2 + px.refX, px.fh - h + px.refY, w, h];
 }
-// The reference's own pixel size, for pixel-art references blown up by a whole number: the biggest block size most same-color runs
-// are a multiple of, and where its grid starts. {s:1} for a photo or a reference already 1:1.
+// The reference's own pixel size, for pixel-art references blown up by a whole number. Edges are where a row (or column) changes color
+// most sharply, so JPEG ringing and soft screenshots still read; the block size is the biggest one 75% of edges fall on a grid of, and
+// its start where they fall. ok is false for a photo: no grid, and too many colors to be pixel art at 1 to 1.
 function pxRefGrid(){
-  const r = px.refCv, w = r.width, h = r.height, d = r.getContext("2d").getImageData(0, 0, w, h).data, runs = [];
-  const key = i => d[i + 3] < 128 ? 0 : (d[i] << 16 | d[i + 1] << 8 | d[i + 2]) + 1;
-  const scan = (n, m, at) => { for(let a = 0; a < m; a++){ let st = 0, k = key(at(a, 0)); for(let b = 1; b <= n; b++){ const k2 = b < n ? key(at(a, b)) : -1; if(k2 !== k){ if(st > 0 && b < n) runs.push([b - st, st]); st = b; k = k2; } } } };
-  scan(w, h, (y, x) => (y * w + x) * 4); const nx = runs.length; scan(h, w, (x, y) => (y * w + x) * 4);
-  if(runs.length < 8) return {s:1, ox:0, oy:0};
-  let s = 1; for(let t = 2; t <= 32; t++) if(runs.filter(([n]) => n % t === 0).length >= runs.length * .85) s = t;
-  const phase = rs => { const c = new Array(s).fill(0); rs.forEach(([, st]) => c[st % s]++); return c.indexOf(Math.max(...c)); };
-  return {s, ox:phase(runs.slice(0, nx)), oy:phase(runs.slice(nx))};
+  const r = px.refCv, w = r.width, h = r.height, d = r.getContext("2d").getImageData(0, 0, w, h).data, E = new Array(w).fill(0), F = new Array(h).fill(0);
+  const diff = (i, j) => Math.abs(d[i] - d[j]) + Math.abs(d[i + 1] - d[j + 1]) + Math.abs(d[i + 2] - d[j + 2]) + Math.abs(d[i + 3] - d[j + 3]);
+  const scan = (n, m, at, H) => { for(let a = 0; a < m; a++){ let pv = 0, cu = 0; for(let b = 1; b <= n; b++){ const nx = b < n ? diff(at(a, b), at(a, b - 1)) : 0; if(b > 1 && cu > 60 && cu >= pv && cu > nx) H[b - 1]++; pv = cu; cu = nx; } } };
+  scan(w, h, (y, x) => (y * w + x) * 4, E); scan(h, w, (x, y) => (y * w + x) * 4, F);
+  const tot = E.reduce((a, v) => a + v, 0) + F.reduce((a, v) => a + v, 0);
+  const best = (H, t) => { const c = new Array(t).fill(0); H.forEach((v, i) => c[i % t] += v); const m = Math.max(...c); return [m, c.indexOf(m)]; };
+  let g = {s:1, ox:0, oy:0};
+  if(tot >= 20) for(let t = 2; t <= 32; t++){ const [ex, ox] = best(E, t), [ey, oy] = best(F, t); if(ex + ey >= tot * .75) g = {s:t, ox, oy}; }
+  const cols = new Set(); for(let i = 0; i < d.length && cols.size <= 256; i += 4) if(d[i + 3] > 127) cols.add(d[i] << 16 | d[i + 1] << 8 | d[i + 2]);
+  g.ok = g.s > 1 || cols.size <= 256;
+  return g;
 }
-// Match pixels: one reference pixel to one sprite pixel, its grid on the canvas grid, still standing on the bottom middle
+// Match pixels: one reference pixel to one sprite pixel, its grid on the canvas grid, still standing on the bottom middle. A photo is left alone.
 function pxRefMatch(){
   if(!px.refCv) return ui.toast("No reference to match.");
   const g = pxRefGrid(), r = px.refCv, k0 = px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1;
+  if(!g.ok) return ui.toast("No pixel grid found in the reference.", "bad");
   px.refK = 1 / g.s / k0; px.refX = px.refY = 0;
   const b = pxRefBox(), fx = b[0] + g.ox / g.s, fy = b[1] + g.oy / g.s;
   px.refX = Math.round(fx) - fx; px.refY = Math.round(fy) - fy; pxChanged();
-  ui.toast(g.s > 1 ? `Matched: ${g.s} reference pixels to a pixel.` : "Matched at 1 to 1. No bigger pixel grid found.");
+  ui.toast(g.s > 1 ? `Matched: ${g.s} reference pixels to a pixel.` : "Matched at 1 to 1.");
 }
 // To layer: the reference as it sits on the canvas, sampled into a new top layer on this frame. Each pixel takes the main color under it
-// (near colors pooled, so JPEG noise and smoothing don't win), then near-duplicate colors are merged and the count capped at 32.
+// (near colors pooled, so JPEG noise and smoothing don't win), then colors within 14 levels are merged and the count capped at 32.
 // With the park or Dimetrodon palette picked, colors snap to it instead.
 function pxRefToLayer(){
   const b = pxRefBox(); if(!b) return ui.toast("No reference to copy.");
@@ -1003,6 +1008,7 @@ function pxRefToLayer(){
     if(x1 <= 0 || y1 <= 0 || x0 >= rw || y0 >= rh) continue;
     if(x1 - x0 <= 1 && y1 - y0 <= 1){ x0 = x1 = Math.floor((x + .5 - b[0]) / b[2] * rw); y0 = y1 = Math.floor((y + .5 - b[1]) / b[3] * rh); x1++; y1++; if(x0 < 0 || y0 < 0 || x0 >= rw || y0 >= rh) continue; }   // enlarged: the one pixel under the centre
     x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(rw, x1); y1 = Math.min(rh, y1);
+    { const ix = x1 - x0 >> 2, iy = y1 - y0 >> 2; x0 += ix; x1 -= ix; y0 += iy; y1 -= iy; }   // the middle of a big cell: its edges carry the neighbors' blur and JPEG ringing
     const pool = new Map(); let clear = 0;
     for(let sy = y0; sy < y1; sy++) for(let sx = x0; sx < x1; sx++){
       const i = (sy * rw + sx) * 4; if(d[i + 3] < 128){ clear++; continue; }
@@ -1017,8 +1023,8 @@ function pxRefToLayer(){
   let cols = new Map(); for(let i = 0; i < out.length; i += 4) if(out[i + 3]){ const k = out[i] << 16 | out[i + 1] << 8 | out[i + 2], c = cols.get(k); if(c) c[3]++; else cols.set(k, [out[i], out[i + 1], out[i + 2], 1]); }
   let pal = [...cols.values()].sort((a, c) => c[3] - a[3]);
   if(fixed && fixed.length) pal = fixed;
-  else {   // merge into the most used color within 10 levels, then the closest pair until 32 are left
-    const keep = []; for(const c of pal){ const m = keep.find(q => dist(c, q) < 100); if(m) m[3] += c[3]; else keep.push(c.slice()); }
+  else {   // merge into the most used color within 14 levels, then the closest pair until 32 are left
+    const keep = []; for(const c of pal){ const m = keep.find(q => dist(c, q) < 196); if(m) m[3] += c[3]; else keep.push(c.slice()); }
     while(keep.length > 32){ let bi = 0, bj = 1, bd = Infinity; for(let i = 0; i < keep.length; i++) for(let j = i + 1; j < keep.length; j++){ const e = dist(keep[i], keep[j]); if(e < bd){ bd = e; bi = i; bj = j; } } keep[bi][3] += keep[bj][3]; keep.splice(bj, 1); }
     pal = keep;
   }
@@ -1027,7 +1033,8 @@ function pxRefToLayer(){
   if(!n) return ui.toast("The reference doesn't cover the canvas.");
   pxPush(); px.frames.forEach((f, i) => f.push(i === px.cur ? out : pxBlank(px.fw, px.fh)));
   px.layers.push({...pxLayerNew(px.layers.length + 1), name:"From reference"}); px.lay = px.layers.length - 1; px.sel = null;
-  pxChanged(); ui.toast(`Copied the reference into a new layer: ${new Set(memo.values()).size} colors.`, "good");
+  px.refShow = false;   // so the copy shows, not the reference over it
+  pxChanged(); ui.toast(`Copied the reference into a new layer: ${new Set(memo.values()).size} colors. Reference hidden.`, "good");
 }
 function pxDrawRef(ctx, z){
   const b = pxRefBox(); if(!b || !px.refShow) return;
