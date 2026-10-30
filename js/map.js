@@ -2375,7 +2375,7 @@ function pathProblem(pts, type){
   if(lineLength(pts) < 2) return "Too short.";
   if(!insidePlot(pts)) return "Keep it inside the park boundary.";
   if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
-  if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+  if(state.buildings.some(b => !BUILDINGS[b.type].onPath && !BUILDINGS[b.type].pathOk && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
   const hit = lineHitsLandscape(pts, halfWidth({type}), type === "bridge"); if(hit) return hit;
   const cost = pathCost(pts, type);
   if(!canAfford(cost)) return `Costs ${money(cost)}. You have ${money(state.money)}.`;
@@ -2870,7 +2870,7 @@ function placeGhost(clientX, clientY){
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
   if(!why && t.onPath && !shapeOnGuestPath(pts)) why = "Keep it on a path.";
-  if(!why && !t.onPath && bldOnPath(tool, pts)) why = "It sits on a path.";
+  if(!why && !t.onPath && !t.pathOk && bldOnPath(tool, pts)) why = "It sits on a path.";
   if(!why) why = shapeHitsLandscape(pts);
   if(!why && !canAfford(t.price)) why = `Costs ${money(t.price)}. You have ${money(state.money)}.`;
   ghost = {pts, x, y, angle, ok:!why, why, face};
@@ -3509,7 +3509,7 @@ function moveProblem(kind, it){
     if(state.exhibits.some(e => shapesOverlap(pts, e.points))) return "It overlaps an exhibit.";
     if(state.buildings.some(b => b !== it && shapesOverlap(pts, b.points))) return "It overlaps another building.";
     if(BUILDINGS[it.type].onPath){ if(!shapeOnGuestPath(pts)) return "Keep it on a path."; }
-    else if(bldOnPath(it.type, pts)) return "It sits on a path.";
+    else if(!BUILDINGS[it.type].pathOk && bldOnPath(it.type, pts)) return "It sits on a path.";
     return shapeHitsLandscape(pts);
   } else if(kind === "fence"){
     const keep = state.fences; state.fences = keep.filter(l => l !== it);
@@ -3517,7 +3517,7 @@ function moveProblem(kind, it){
     return why;
   } else {
     if(state.exhibits.some(e => lineEntersShape(pts, e.points))) return "Paths can't go through an exhibit.";
-    if(state.buildings.some(b => !BUILDINGS[b.type].onPath && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
+    if(state.buildings.some(b => !BUILDINGS[b.type].onPath && !BUILDINGS[b.type].pathOk && lineEntersShape(pts, b.points))) return "Paths can't go through a building.";
     return lineHitsLandscape(pts, halfWidth(it), isBridge(it));
   }
 }
