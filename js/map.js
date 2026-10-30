@@ -229,7 +229,7 @@ function render(){
       const u = i / n, v = (i + 1) / n, q = [[a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u], [a[0] + (z[0] - a[0]) * v, a[1] + (z[1] - a[1]) * v]], mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
       const it = {y:my, o:0, svg:fenceRunSvg(q, r.b, false)}, host = tilt ? state.exhibits.find(e => e.open && !e.viv && (inPoly(mx, my, e.points) || distToEdge(mx, my, e.points) < 1.5)) : null;
       if(host) (openFence34.get(host.id) || openFence34.set(host.id, []).get(host.id)).push(it); else looseLeft.push(it);
-      if(tilt) fov.push(fenceOverSeg(q[0], q[1], it.svg + (host ? fenceOverInside(host) : "")));
+      if(tilt) fov.push(fenceOverSeg(q[0], q[1], it.svg + (host ? fenceOverInside(host) : ""), !host));
     }
   }
 
@@ -318,7 +318,7 @@ function render(){
 
   // plants, rocks and statues out in the park stand over the path edges
   // plants, rocks and statues out in the park and loose fence runs stand on the ground, so they sort by depth together: a tree north of a fence is behind it, one south of it is in front
-  const standing = decorOf().map(f => ({y:f.y, o:1, svg:featSvg(f, parkBiome(), tool === "bulldoze" || tool === "move", isDoomed)}));
+  const standing = decorOf().map(f => ({y:f.y, o:1, svg:`<g id="do-${esc(f.id)}">${featSvg(f, parkBiome(), tool === "bulldoze" || tool === "move", isDoomed)}</g>`}));   // the id lets a loose fence's copy put it back in front (setFenceOver34)
   for(const q of looseLeft) standing.push(q);
   for(const c of state.crates) if(c.x != null) standing.push({y:c.y, o:1, svg:crateSvg(c, isSel("crate", c.id), inv)});
   standing.push({y:state.gate[1], o:2, svg:entrance34(inv)});   // the entrance building stands on the south edge, so it sorts in too
@@ -1015,12 +1015,19 @@ const FENCE_OVER = {up:4.5};   // meters: the tallest fence picture, so a box fu
 let fenceOver34 = [];
 // the exhibit's plants, rocks and animals stand in front of its far fence, so they go over the copy again (a live copy of its depth group, landSvg)
 const fenceOverInside = e => `<use href="#z34-${esc(e.id)}"/>`;
-function fenceOverSeg(a, b, svg){ if(a[0] > b[0]) [a, b] = [b, a]; return b[0] - a[0] > .01 ? {a, b, svg} : null; }
+function fenceOverSeg(a, b, svg, loose){ if(a[0] > b[0]) [a, b] = [b, a]; return b[0] - a[0] > .01 ? {a, b, svg, loose} : null; }
+// the fence's base line under a box from x0 to x1, or null if the box isn't over it
+function fenceOverY(f, x0, x1){
+  if(x1 <= f.a[0] || x0 >= f.b[0]) return null;
+  const x = clamp((x0 + x1) / 2, f.a[0], f.b[0]);
+  return f.a[1] + (f.b[1] - f.a[1]) * (x - f.a[0]) / (f.b[0] - f.a[0]);
+}
 // is a box from x0 to x1 standing on yb behind fence f, near enough to be covered
-function fenceOverHits(f, x0, x1, yb){
-  if(x1 <= f.a[0] || x0 >= f.b[0]) return false;
-  const x = clamp((x0 + x1) / 2, f.a[0], f.b[0]), yf = f.a[1] + (f.b[1] - f.a[1]) * (x - f.a[0]) / (f.b[0] - f.a[0]);
-  return yb <= yf + .05 && yb > yf - FENCE_OVER.up / TILT;
+function fenceOverHits(f, x0, x1, yb){ const yf = fenceOverY(f, x0, x1); return yf !== null && yb <= yf + .05 && yb > yf - FENCE_OVER.up / TILT; }
+// a loose run has the park on both sides: the buildings, props and decor standing in front of it, near enough to reach up over it, go over its copy again, back to front
+function fenceOverFront(f, boxes){
+  return boxes.filter(q => { const yf = fenceOverY(f, q[0], q[1]); return yf !== null && q[2] > yf + .05 && q[2] < yf + q[3] / TILT; })
+    .sort((p, q) => p[2] - q[2]).map(q => `<use href="#${q[4]}"/>`).join("");
 }
 const fenceOverRect = (x0, x1, yb, h) => `<rect x="${x0.toFixed(2)}" y="${(yb - h / TILT).toFixed(2)}" width="${(x1 - x0).toFixed(2)}" height="${(h / TILT).toFixed(2)}"/>`;
 function setFenceOver34(segs){
@@ -1029,14 +1036,14 @@ function setFenceOver34(segs){
   for(const bl of state.buildings){
     const t = BUILDINGS[bl.type], b = bbox(bl.points), B = BLD_PICS[bl.type], pad = t.prop ? Math.max(t.w, t.d) * .25 + .3 : .3;
     const w = B ? Math.max(b.x1 - b.x0, B.w * FLAT34.px) / 2 : (b.x1 - b.x0) / 2 + pad, cx = (b.x0 + b.x1) / 2;
-    boxes.push([cx - w, cx + w, b.y1, 12]);
+    boxes.push([cx - w, cx + w, b.y1, 12, `bo-${esc(bl.id)}`]);
     if(tilt) bldOver34.push({id:bl.id, x0:cx - w, x1:cx + w, yb:b.y1, j:bldOver34.length, cur:""});
   }
   bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#bo-${esc(o.id)}"/></g>`).join("");
   for(const o of bldOver34) o.clip = bldOverLayer.querySelector(`#bov${o.j}`);
-  for(const f of decorOf()){ const r = (LAND[f.type] && LAND[f.type].r) || 1; boxes.push([f.x - r, f.x + r, f.y, 12]); }
-  fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(...q)).join(""), cur:null}));
-  fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}</g>`).join("");
+  for(const f of decorOf()){ const r = (LAND[f.type] && LAND[f.type].r) || 1; boxes.push([f.x - r, f.x + r, f.y, 12, `do-${esc(f.id)}`]); }
+  fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(q[0], q[1], q[2], q[3])).join(""), cur:null}));
+  fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}${f.loose ? fenceOverFront(f, boxes) : ""}</g>`).join("");
   for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
 }
 // Guests, staff and trams are drawn above the world too, so each building and prop is copied over the ones behind it (bldOverLayer, under fenceOverLayer)
