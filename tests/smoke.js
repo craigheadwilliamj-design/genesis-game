@@ -1930,6 +1930,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           thin = thin || t.footW < t.footSide;
         }
         return ok && thin && FOOT.rect.length > 0 && Object.entries(LAND).every(([k, t]) => !!t.footW === FOOT.rect.includes(k)); })();   // only the listed plants have a base rectangle
+      out.footBoxByHand = (() => {   // a box set in the pixel editor (setFootBox) replaces a plant's base box or a rock's rects, and clearing it brings the old one back
+        const k = "qua-temperate-large", t = LAND[k], was = [t.footW, t.footD, t.footSide], biome = Object.keys(ROCK_FOOT.rock)[0], rn = `rock-${biome}-1`, r0 = JSON.stringify(rockFootAt("rock", 0, biome));
+        setFootBox(k, [1.5, 1]); const [sx, sy] = footSnap(k, 0, null, 20.3, 30.8), b = footBoxAt(k, 0, null, sx, sy), plantOk = b[2] - b[0] === 1.5 && b[3] - b[1] === 1 && b[3] === sy;
+        setFootBox(k, null); const plantBack = t.footW === undefined && t.footD === undefined && t.footSide === was[2];
+        setFootBox(rn, [3, 2]); const r = rockFootAt("rock", 0, biome), rockOk = r.w === 3 && r.rects.length === 1 && r.rects[0].join() === "-1.5,-2,1.5,0";
+        setFootBox(rn, null); return plantOk && plantBack && rockOk && JSON.stringify(rockFootAt("rock", 0, biome)) === r0 && !(k in FOOT.box) && !(rn in FOOT.box); })();
       // two props can't overlap; side by side they can
       const m0 = state.money, land0 = gx.land; state.money = 1e6; state.ceres.pots["Carboniferous-small"] = 9; gx.land = []; gx.biome = "tropical";
       const side = LAND["qua-tropical-large"].footSide, [ax, ay] = footSnap("qua-tropical-large", 0, null, 120, 120);
