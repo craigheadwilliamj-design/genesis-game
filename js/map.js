@@ -2832,8 +2832,8 @@ function doorOnGrid(pts, face, type){
   const b = bbox(pts), e = [b.y0, b.x1, b.y1, b.x0][face], d = Math.round(e / GRID_STEP) * GRID_STEP - e, ax = face % 2;
   return pts.map(([x, y]) => [Math.round((x + (ax ? d : 0)) * 1e6) / 1e6, Math.round((y + (ax ? 0 : d)) * 1e6) / 1e6]);
 }
-// Slide a building so its box lies on the 5 m grid (the path chunks), so it never straddles a path. Props and cases keep the 1 m grid.
-const snapsToChunks = t => !t.prop && !t.viv && !t.gallery && t !== BUILDINGS.platform;
+// Slide a building or case so its box lies on the 5 m grid (the path chunks), so it never straddles a path. Props keep the 1 m grid.
+const snapsToChunks = t => !t.prop && !t.gallery && t !== BUILDINGS.platform;
 function onChunkGrid(pts){
   const b = bbox(pts), dx = Math.round(b.x0 / CHUNK) * CHUNK - b.x0, dy = Math.round(b.y0 / CHUNK) * CHUNK - b.y0;
   return pts.map(([x, y]) => [Math.round((x + dx) * 1e6) / 1e6, Math.round((y + dy) * 1e6) / 1e6]);
@@ -2866,7 +2866,6 @@ function placeGhost(clientX, clientY){
   let pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
   if(snapsToChunks(t)){ pts = onChunkGrid(pts); [x, y] = centroid(pts); }
   else if(!t.prop && !t.viv) pts = doorOnGrid(pts, face, tool);
-  else if(t.viv){ const b = bbox(pts), dx = Math.round(b.x0 / GRID_STEP) * GRID_STEP - b.x0, dy = Math.round(b.y0 / GRID_STEP) * GRID_STEP - b.y0; pts = pts.map(([x, y]) => [Math.round((x + dx) * 1e6) / 1e6, Math.round((y + dy) * 1e6) / 1e6]); [x, y] = centroid(pts); }   // a case's corner lands on the 1 m grid, so an odd width can line up with the 5 m path chunks
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
@@ -3553,7 +3552,7 @@ function dragMove(m, e){
   }
   const g = moveStep(m);
   let dx = Math.round((w.x - m.wx) / g) * g, dy = Math.round((w.y - m.wy) / g) * g;
-  if(m.kind === "building" && snapsToChunks(BUILDINGS[m.it.type])){ const b = bbox(m.orig); dx = Math.round((b.x0 + w.x - m.wx) / CHUNK) * CHUNK - b.x0; dy = Math.round((b.y0 + w.y - m.wy) / CHUNK) * CHUNK - b.y0; }   // buildings land on the chunk grid even if they stood off it
+  if(m.kind === "building" && snapsToChunks(BUILDINGS[m.it.type]) || m.kind === "exhibit" && m.it.viv){ const b = bbox(m.orig); dx = Math.round((b.x0 + w.x - m.wx) / CHUNK) * CHUNK - b.x0; dy = Math.round((b.y0 + w.y - m.wy) / CHUNK) * CHUNK - b.y0; }   // buildings and cases land on the chunk grid even if they stood off it
   moveBy(m, dx, dy);
   const why = moveProblem(m.kind, m.it);
   m.why = why; setStat(why || "Let go to drop it here.", !!why);
