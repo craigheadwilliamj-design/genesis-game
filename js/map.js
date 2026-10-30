@@ -1029,11 +1029,12 @@ function setFenceOver34(segs){
   fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}</g>`).join("");
   for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
 }
-// Each frame: add the guests standing behind each fence to its clip
-function fenceOverGuests(at){
+// Each frame: add the guests and staff standing behind each fence to its clip ([x, y, height] each)
+const fenceOverAt = {guests:[], staff:[]};
+function fenceOverPeople(){
   for(const f of fenceOver34){
     let g = f.stat;
-    for(const [x, y, h] of at) if(fenceOverHits(f, x - h * .3, x + h * .3, y)) g += fenceOverRect(x - h * .3, x + h * .3, y, h * 1.2);
+    for(const [x, y, h] of fenceOverAt.guests.concat(fenceOverAt.staff)) if(fenceOverHits(f, x - h * .3, x + h * .3, y)) g += fenceOverRect(x - h * .3, x + h * .3, y, h * 1.2);
     if(g !== f.cur){ f.cur = g; f.clip.innerHTML = g; }
   }
 }
@@ -2308,7 +2309,7 @@ function drawParties(){
     d[ci].push(m); all.push(m);
   }
   for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
-  fenceOverGuests(behind);
+  fenceOverAt.guests = behind; fenceOverPeople();
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
@@ -3116,7 +3117,7 @@ function humanStep(el, kind, c, x, y){
   if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); }
 }
 function drawKeepers(){
-  const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
+  const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set(), staff = [];
   for(const c of crew){
     if(!c.at) continue;
     seen.add(c.id);
@@ -3134,7 +3135,7 @@ function drawKeepers(){
         humanSvg(aquaCrew(c) ? "aquarist" : "keeper", hm, food, c.crate);
     }
     humanStep(el, aquaCrew(c) ? "aquarist" : "keeper", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push([x, y, hm]);
   }
   // mechanics: pixel people in orange coveralls, ringed while inspecting or repairing
   for(const c of mcrew){
@@ -3149,7 +3150,7 @@ function drawKeepers(){
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "mechanic", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push([x, y, hm]);
   }
   // vets: pixel people in green scrubs, ringed while darting
   for(const c of vcrew){
@@ -3164,7 +3165,7 @@ function drawKeepers(){
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "vet", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push([x, y, hm]);
   }
   // custodians: pixel people; the crate in their hands is whatever stock they carry
   for(const c of ccrew){
@@ -3179,7 +3180,7 @@ function drawKeepers(){
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "custodian", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push([x, y, hm]);
   }
   // security guards: pixel people in navy, ringed while chasing; the escort strip plays while walking a party out
   for(const c of gcrew){
@@ -3194,7 +3195,7 @@ function drawKeepers(){
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "guard", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push([x, y, hm]);
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
   for(const a of usableAtvs()){
@@ -3205,9 +3206,10 @@ function drawKeepers(){
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
     const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
     if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
-    walker34(el, n.x, n.y);
+    walker34(el, n.x, n.y); if(!hidden34(n.x, n.y)) staff.push([n.x, n.y, r * 2]);
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
+  fenceOverAt.staff = staff; fenceOverPeople();
 }
 
 // A little ATV: under a staff member who is driving, or parked on its own
