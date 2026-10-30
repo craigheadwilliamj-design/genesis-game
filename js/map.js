@@ -6,7 +6,7 @@
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), fenceOverLayer = $("#fenceOverLayer"), overlay = $("#overlay");
+const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), fenceOverLayer = $("#fenceOverLayer"), bldOverLayer = $("#bldOverLayer"), overlay = $("#overlay");
 const mapwrap = $("#mapwrap");
 
 const KMIN = 0.4, KMAX = 27.3;      // zoom limits, in screen pixels per meter
@@ -336,11 +336,14 @@ function render(){
 
   // guest buildings, back to front in the 3/4 view so taller ones in front cover the ones behind
   tanks.sort((a, b) => a.y - b.y);
+  let bOpen = false;   // each building's own drawing is wrapped in a group with an id, so bldOverLayer can copy it over the people behind it
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    if(bOpen){ s += `</g>`; bOpen = false; }
     while(standing.length && standing[0].y <= cy) s += standing.shift().svg;   // trees, rocks, loose fence behind this building draw first
     while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
+    if(tilt){ s += `<g id="bo-${esc(bl.id)}">`; bOpen = true; }
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : themeOf(bl).edge, full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
@@ -375,6 +378,7 @@ function render(){
     }
     s += `</g>`;
   }
+  if(bOpen) s += `</g>`;
   for(const tk of tanks) s += tk.svg;
   for(const it of standing) s += it.svg;
   // with cameras researched, a selected Security Office shows what every office watches
@@ -1021,17 +1025,23 @@ function fenceOverHits(f, x0, x1, yb){
 const fenceOverRect = (x0, x1, yb, h) => `<rect x="${x0.toFixed(2)}" y="${(yb - h / TILT).toFixed(2)}" width="${(x1 - x0).toFixed(2)}" height="${(h / TILT).toFixed(2)}"/>`;
 function setFenceOver34(segs){
   const boxes = [];
+  bldOver34 = [];
   for(const bl of state.buildings){
     const t = BUILDINGS[bl.type], b = bbox(bl.points), B = BLD_PICS[bl.type], pad = t.prop ? Math.max(t.w, t.d) * .25 + .3 : .3;
     const w = B ? Math.max(b.x1 - b.x0, B.w * FLAT34.px) / 2 : (b.x1 - b.x0) / 2 + pad, cx = (b.x0 + b.x1) / 2;
     boxes.push([cx - w, cx + w, b.y1, 12]);
+    if(tilt) bldOver34.push({id:bl.id, x0:cx - w, x1:cx + w, yb:b.y1, j:bldOver34.length, cur:""});
   }
+  bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#bo-${esc(o.id)}"/></g>`).join("");
+  for(const o of bldOver34) o.clip = bldOverLayer.querySelector(`#bov${o.j}`);
   for(const f of decorOf()){ const r = (LAND[f.type] && LAND[f.type].r) || 1; boxes.push([f.x - r, f.x + r, f.y, 12]); }
   fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(...q)).join(""), cur:null}));
   fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}</g>`).join("");
   for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
 }
-// Each frame: add the guests, staff and trams behind each fence to its clip (boxes [x0, x1, base y, height in meters])
+// Guests, staff and trams are drawn above the world too, so each building and prop is copied over the ones behind it (bldOverLayer, under fenceOverLayer)
+let bldOver34 = [];
+// Each frame: add the guests, staff and trams behind each fence and building to its clip (boxes [x0, x1, base y, height in meters])
 const fenceOverAt = {guests:[], staff:[], trams:[]}, personBox34 = (x, y, h) => [x - h * .3, x + h * .3, y, h * 1.2];
 function fenceOverPeople(){
   const all = fenceOverAt.guests.concat(fenceOverAt.staff, fenceOverAt.trams);
@@ -1039,6 +1049,11 @@ function fenceOverPeople(){
     let g = f.stat;
     for(const q of all) if(fenceOverHits(f, q[0], q[1], q[2])) g += fenceOverRect(...q);
     if(g !== f.cur){ f.cur = g; f.clip.innerHTML = g; }
+  }
+  for(const o of bldOver34){
+    let g = "";
+    for(const q of all) if(q[1] > o.x0 && q[0] < o.x1 && q[2] < o.yb - .05 && q[2] > o.yb - 12 / TILT) g += fenceOverRect(...q);
+    if(g !== o.cur){ o.cur = g; o.clip.innerHTML = g; }
   }
 }
 
