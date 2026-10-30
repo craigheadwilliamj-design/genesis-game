@@ -234,8 +234,9 @@ function render(){
   }
 
   // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  // and they go north to south, so one exhibit's floor and plants never cover the far fence of the exhibit south of it
   const tanks = [];
-  for(const e of state.exhibits){
+  for(const e of tilt ? [...state.exhibits].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.exhibits){
     const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
@@ -504,10 +505,11 @@ function lift34(h){ return ([x, y]) => [x, y - h / TILT]; }
 // light from the upper left: positive is lit, negative in shadow
 function lit34([nx, ny]){ return nx*-.55 + ny*-.83; }
 function shade34(pts, l){ return l > 0 ? `<polygon points="${polyStr(pts)}" fill="#fff" fill-opacity="${(l*.22).toFixed(2)}" pointer-events="none"/>` : `<polygon points="${polyStr(pts)}" fill="#000" fill-opacity="${(-l*.3).toFixed(2)}" pointer-events="none"/>`; }
-// outward normal of footprint edge i
+// outward normal of footprint edge i, by which way the outline winds (a test against the middle gets the sides of a notch in a concave exhibit wrong)
 function norm34(P, i){
-  const n = P.length, [cx, cy] = centroid(P), [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1;
-  let nx = (by - ay)/L, ny = -(bx - ax)/L; if(nx*((ax+bx)/2 - cx) + ny*((ay+by)/2 - cy) < 0){ nx = -nx; ny = -ny; } return [nx, ny];
+  const n = P.length, [ax, ay] = P[i], [bx, by] = P[(i+1) % n], L = Math.hypot(bx - ax, by - ay) || 1;
+  let wind = 0; for(let j = 0; j < n; j++){ const p = P[j], q = P[(j+1) % n]; wind += p[0] * q[1] - q[0] * p[1]; }
+  const k = wind < 0 ? -1 : 1; return [k * (by - ay)/L, -k * (bx - ax)/L];
 }
 function edgeLen34(P, i){ const b = P[(i+1) % P.length]; return Math.hypot(b[0] - P[i][0], b[1] - P[i][1]); }
 // the walls facing the viewer, from h0 up to h1; returns the svg and the widest front edge
