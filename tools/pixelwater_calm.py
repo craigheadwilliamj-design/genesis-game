@@ -1,5 +1,5 @@
-# Draws the desert and scrubland water tiles, sprites/water/<biome>-1..4.png (8 x 8 px, 1 m; WATER_TILES in data.js): tile 1 plain and 2 to 4 the glint frames
-# (a sparkle that rises and fades). Desert is a soft oasis teal on the pale sand, scrubland a murkier green-teal on the terracotta. The bank (shallows band, wet and damp ground)
+# Draws the desert, scrubland and boreal water tiles, sprites/water/<biome>-1..4.png (8 x 8 px, 1 m; WATER_TILES in data.js): tile 1 plain and 2 to 4 the glint frames
+# (a sparkle that rises and fades). Desert is a soft oasis teal on the pale sand, scrubland a murkier green-teal on the terracotta, boreal a cold steel blue on the moss. The bank (shallows band, wet and damp ground)
 # is each biome's WATER_TEX entry in js/landscape.js.
 # Usage: python3 -I tools/pixelwater_calm.py [outdir]
 import sys, os
@@ -15,6 +15,12 @@ BIOMES = {
     [E, ".gg.....", E, E, E, E, E, E],
   ]),
   "scrubland": ({".": "#4E8A7E", "g": "#A9CDB9"}, [
+    [E] * 8,
+    [E, ".gg.....", E, E, E, E, E, E],
+    [E, "..g.....", "...gg...", E, E, E, E, E],
+    [E, E, "....g...", E, E, E, E, E],
+  ]),
+  "boreal": ({".": "#4A7A8C", "g": "#B7D3D6"}, [
     [E] * 8,
     [E, ".gg.....", E, E, E, E, E, E],
     [E, "..g.....", "...gg...", E, E, E, E, E],

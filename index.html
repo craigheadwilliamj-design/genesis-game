@@ -11,7 +11,7 @@
   --outside:#C9D2B8; --grass:#B7C995; --contour:rgba(50,75,45,.13); --boundary:#1F3A2B; --field:#FFFFFF;
   --grid:rgba(40,62,36,.10); --grid-major:rgba(40,62,36,.2); --halo:rgba(238,241,232,.92);
   --sel:#C8961E; --good:#2F7D4A; --warn:#A8701A; --bad:#B3261E;
-  --fence:#3B3226; --dirt:#CDBF95; --ground-shade:transparent;
+  --fence:#3B3226; --dirt:#CDBF95;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
@@ -21,7 +21,7 @@
     --outside:#17251C; --grass:#2A3E2C; --contour:rgba(200,225,190,.07); --boundary:#E6D48E; --field:#0F1B14;
     --grid:rgba(200,225,190,.06); --grid-major:rgba(200,225,190,.13); --halo:rgba(21,36,27,.92);
     --sel:#F0C24A; --good:#6BC38A; --warn:#E3A948; --bad:#F2867D;
-    --fence:#0E0B07; --dirt:#5A5238; --ground-shade:rgba(8,16,10,.55);
+    --fence:#0E0B07; --dirt:#5A5238;
     color-scheme:dark;
   }
 }
@@ -31,7 +31,7 @@
   --outside:#17251C; --grass:#2A3E2C; --contour:rgba(200,225,190,.07); --boundary:#E6D48E; --field:#0F1B14;
   --grid:rgba(200,225,190,.06); --grid-major:rgba(200,225,190,.13); --halo:rgba(21,36,27,.92);
   --sel:#F0C24A; --good:#6BC38A; --warn:#E3A948; --bad:#F2867D;
-  --fence:#0E0B07; --dirt:#5A5238; --ground-shade:rgba(8,16,10,.55);
+  --fence:#0E0B07; --dirt:#5A5238;
   color-scheme:dark;
 }
 html{height:100%}
@@ -656,7 +656,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <pattern id="b-fern" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/fern.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <pattern id="b-wetland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <pattern id="b-temperate" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
-          <pattern id="b-boreal" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-boreal" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
           <pattern id="b-tundra" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <!-- park ground textures: the open land between the exhibits, by the park's biome (larger and softer than an exhibit's floor) -->
           <pattern id="p-grassland" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
@@ -682,7 +682,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <pattern id="w-deep" width="1" height="1" patternUnits="userSpaceOnUse"><image data-sp="sprites/water/deep-1.png" width="1" height="1" style="image-rendering:pixelated"/></pattern>
           <pattern id="r-sea" width="1" height="1" patternUnits="userSpaceOnUse"><image width="1" height="1" style="image-rendering:pixelated"/></pattern>
           <pattern id="r-deep" width="1" height="1" patternUnits="userSpaceOnUse"><image width="1" height="1" style="image-rendering:pixelated"/></pattern>
-          <pattern id="p-boreal" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-boreal" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
           <pattern id="p-tundra" width="18" height="18" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>
           <!-- theme textures, laid over paths, buildings, exhibit border bands and zone ground -->
           <pattern id="t-gilded" width="12" height="6" patternUnits="userSpaceOnUse">
