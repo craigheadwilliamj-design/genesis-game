@@ -1093,7 +1093,7 @@ const WATER_TEX = {
   scrubland:{shore:"#B59A6D", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
   temperate:{shore:"#5C4A3D", shoreW:1, lit:"#7DB6B0", dark:"#2B6D5E"},   // a 1 px shore line, no bank
-  desert:   {shore:"#E3C788", shoreW:1, lit:"#6CC0D8", dark:"#24748C"},   // a 1 px shore line, no bank
+  desert:   {shore:"#8FC4B8", shoreW:2, lit:"#8FC4B8", dark:"#3A7F82", mud:"#D8BE8A", damp:"#E5CF9F"},   // a 2 px band of shallows, then wet and damp sand outside
   grassland:{shore:"#7A6246", shoreW:1, lit:"#5096B8", dark:"#2F6682"},   // a 1 px shore line, no bank
   tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
   tundra:   {shore:"#EBF5F7", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
