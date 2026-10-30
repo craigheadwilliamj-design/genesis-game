@@ -26,7 +26,6 @@ const WX_ICON = {
   sandstorm:'<path d="M3 7h13M6 11h15M3 15h12M7 19h11" stroke="#D9B26A" stroke-width="2.4" stroke-linecap="round"/><circle cx="19" cy="7" r="1.3" fill="#D9B26A"/><circle cx="18" cy="15" r="1.3" fill="#D9B26A"/>',
 };
 const wxIconSvg = (k, night) => `<svg viewBox="0 0 24 24">${WX_ICON[k === "clear" && night ? "moon" : k] || WX_ICON.clear}</svg>`;
-const fmtTemp = t => `${t}\u00b0F`;
 const degHtml = t => `${t}<i class="deg"></i>`;   // the HUD font has no degree sign: a small drawn ring
 
 const ui = {
@@ -550,7 +549,7 @@ function propsHtml(e){
     const list = HABITAT_PROPS.filter(k => !isTray(k) && !isToy(k) && !toyHidden(k));
     h += `<div class="meta" style="margin-top:6px">${haveText(list)}</div>`;
     if(e.animals.length){ const c = coverOf(e), have = Math.round(c.shelter + (c.shade || 0)), r = c.need ? have / c.need : 1, lv = r >= 1 ? "ok" : r >= .5 ? "mid" : "no";
-      h += `<div class="need-row ${lv}" style="margin-top:6px" title="Animals' shelter slots covered, in today's weather (${esc(weatherNow().label.toLowerCase())}).${c.idle ? ` ${c.idle} slots of room can't be used by these animals.` : ""}"><b>Shelter cover</b><span>${have}/${c.need}</span></div>`; }
+      h += `<div class="need-row ${lv}" style="margin-top:6px" title="Animals' shelter slots covered, in the weather right now (${esc(wxNow().label.toLowerCase())}, ${fmtTemp(wxNow().temp)}). Canopies don't help in the cold.${c.idle ? ` ${c.idle} slots of room can't be used by these animals.` : ""}"><b>Shelter cover</b><span>${have}/${c.need}</span></div>`; }
     const tip = k => k === "screen" ? `Hides ${SCREEN.holds} animals from the path, within ${SCREEN.fenceReach} m of the fence. Shy animals stress less and hooligans bang on the glass far less, and the animals stay in sight.` : `Bigger animals take more room, and a shelter only takes animals up to its size.${LAND[k].only ? " Burrows only take burrowing species: Lystrosaurus, Heterodontosaurus, Hypsilophodon, Hyaenodon and the dire wolf." : ""}${LAND[k].noCold ? " Doesn't help in the cold." : ""}`;
     return h + `<div class="row" style="margin-top:8px">${btnsFor(list, tip, t => t.slots ? `${t.slots} slots` : "")}</div></section>`;
   }

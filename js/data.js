@@ -1840,8 +1840,22 @@ const WX = {
   sky:{clear:"Clear", partly:"Partly cloudy", cloudy:"Cloudy"},
   events:{rain:"Rain", snow:"Snow", storm:"Storm", wind:"Windy", sandstorm:"Sandstorm"},
 };
-// Ice age animals shrug off the cold
-const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast", "mglo"];
+// Temperature tolerance, by biome: an animal is comfortable from lo to hi (°F) and gets worse a level every `cold` degrees under lo
+// or `heat` degrees over hi, up to TEMP_HARM.levels. An animal with two biomes takes the colder lo and the hotter hi, each with its own step.
+// Judged on the temperature the top bar shows now (wxNow); illness and injuries take the worse of the day's high and low.
+const TOLERANCE = {
+  desert:   {lo:25,  hi:120, cold:8,  heat:12},
+  scrubland:{lo:28,  hi:110, cold:8,  heat:10},
+  grassland:{lo:-10, hi:104, cold:12, heat:8},
+  fern:     {lo:45,  hi:100, cold:8,  heat:8},
+  tropical: {lo:65,  hi:97,  cold:6,  heat:6},
+  wetland:  {lo:30,  hi:101,  cold:8,  heat:8},
+  temperate:{lo:-5,  hi:100,  cold:12, heat:8},
+  boreal:   {lo:-30, hi:85,  cold:15, heat:6},
+  tundra:   {lo:-50, hi:65,  cold:20, heat:5},
+};
+// How much each level of too hot or too cold hurts, times WEATHER.kinds.hot or cold (level 0 is comfortable)
+const TEMP_HARM = {weights:[0, .4, 1, 1.8], levels:["", "a little", "badly", "dangerously"]};
 // Shelter slots one animal takes: bigger animals need more room
 const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 

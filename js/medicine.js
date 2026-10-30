@@ -149,10 +149,13 @@ function illChance(e, a){
     const hs = heatShare(e);
     if(hs > 0) p *= 1 + (VIV_LAMP.ill - 1) * hs;
     if(hs < 1){ if(!w.lamp) why.push("lamp"); w.lamp = (w.lamp || 0) + (1 - VIV_LAMP.ill) * (1 - hs); }
-    if(hs < 1 && state.weather && state.weather.today === "cold") raise(1 + (VIV_LAMP.cold - 1) * (1 - hs), "lamp");
+    if(hs < 1 && state.weather && wxDays().t.lo <= WX.freeze) raise(1 + (VIV_LAMP.cold - 1) * (1 - hs), "lamp");
   }
-  const wx = weatherNow(), x = exposure(e);
-  if(wx.ill && x > 0 && !(state.weather.today === "cold" && COLD_HARDY.includes(s.id))) raise(1 + wx.ill * x, "shelter");
+  // out in the weather with no cover: the worse of the day's high and low
+  const wd = state.weather ? wxDays().t : null;
+  let wi = 0;
+  for(const t of wd ? [wd.hi, wd.lo] : []){ const c = coverWhy(s, t), o = c && exposures(e, t)[c.why]; if(o && o.share > 0) wi = Math.max(wi, WEATHER.kinds[c.why].ill * o.share * c.w); }
+  if(wi > 0) raise(1 + wi, "shelter");
   if(a.need && a.need.stress > 60) raise(BEHAVIOR.stressIll, "stress");
   if(crowded(e) < 1) raise(HEALTH.crowdIll, "crowd");
   if(medicated(e, s)) p *= MEDICINE.feedCut;
