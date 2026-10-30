@@ -888,7 +888,8 @@ function viv34(e, which, hi){
     }
   }
   // a one-pixel light blue, see-through border: the floor's edges behind the animals, the lid's in front, and the corner edges from the foot of the base up
-  const ln = (a, b) => `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#BFE6F5" stroke-opacity=".6" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`;
+  const hp = FLAT34.px / 2, ins = q => [q[0] + (Math.abs(q[0] - cx) > hp ? Math.sign(cx - q[0]) * hp : 0), q[1] + (Math.abs(q[1] - cy) > hp / TILT ? Math.sign(cy - q[1]) * hp / TILT : 0)],   // the line sits half a pixel inside the edge so its width doesn't spill past the footprint (and the path under it)
+    ln = (a0, b0) => { const a = ins(a0), b = ins(b0); return `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#BFE6F5" stroke-opacity=".6" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; };
   for(let i = 0; i < P.length; i++){
     const a = P[i], b = P[(i + 1) % P.length];
     s += back ? ln(a, b) : ln(up(a), up(b));
