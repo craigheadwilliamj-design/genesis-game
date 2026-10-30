@@ -1,8 +1,8 @@
 # Writes every Scutosaurus clip from the hand-made rig (scutosaurus-rig.json: parts drawn and shaded in the pixel editor, every limb hanging off the body,
 # the same layout as the Dimetrodon's) into scutosaurus.json, which is what gets exported. The parts are left alone.
 #   python3 -I tools/rigger/scutosaurus/gen-clips.py IN.json OUT.json      (SHEETS=<dir> also writes contact sheets and GIFs)
-# walk: a heavy, slow lateral-sequence plod (near hind, near front, far hind, far front, a quarter cycle apart), feet planted and sliding back at body
-#   speed, then swung forward just off the ground; the body sways and rocks, the head nods.
+# walk: a heavy lateral-sequence plod (near hind, near front, far hind, far front, a quarter cycle apart): feet planted and sliding back at body
+#   speed, heel rolling up at push-off, then lifted with the knee or elbow bending and the toes hanging; the body sways and rocks, the head nods.
 # stand: a slow, deep breathing loop. idle: lifts its head and bellows with the mouth open, then shakes it off. dynamic idle: tips forward on bent
 #   front legs, crops plants at the ground twice and chews, looks up. rest: sinks onto its belly with the legs folded flat, lays the chin down, a yawn,
 #   then breathes slowly (the game holds the last frame).
@@ -53,21 +53,30 @@ def check(name, frames):
     bad += ['%s joint shifted %.1f' % (V.by[th]['name'], f[th]['dy']) for th, _, _ in LIMBS if abs(f[th]['dy']) > 3]
     if bad: print(' ', name, 'frame', i, ':', ', '.join(bad))
 
-def walk(N=8, fps=6, ds=.65, S=5.0, SF=4.4, lift=1.2, liftF=1.4, bob=.4, pitch=.8, crouch=.3):
+def walk(N=12, fps=8, ds=.62, S=7.0, SF=6.0, lift=1.8, liftF=1.8, crouch=.6, bob=.5, pitch=.8, knee=34, elbow=26, hang=24, hangF=8, roll=14, give=5):
+  # each limb swings about its hip or shoulder, with its knee bending in the swing (`knee` degrees at the top of the step; an elbow flexes `elbow` early in the step and
+  # reaches as far the other way before touchdown) and the
+  # toes hanging (`hang`, `hangF` for the front feet, which otherwise reach under the ground and push the shoulder up), the heel rolling up at push-off (`roll`) and the joint giving a little mid-stance (`give`) as it takes the weight;
+  # full IK folds these short-boned limbs too far, so the bends are capped by hand and the joint fits the foot to the ground
   PHASE = {NEAR_BACK[0]: 0, NEAR_FRONT[0]: .25, FAR_BACK[0]: .5, FAR_FRONT[0]: .75}
   out = []
   for i in range(N):
-    f = i/N; feet = {}
+    f = i/N
     rb = pitch*math.sin(4*math.pi*(f + .125))
-    for th in PHASE:
+    p = pose((rb, 0, crouch + bob*math.sin(4*math.pi*f + .6)), head=-.5*rb + 2*math.sin(4*math.pi*(f + .2)), tail=-1.2*rb + 3*math.sin(2*math.pi*(f + .1)))
+    for th, lg, ft in LIMBS:
       fl, fr = (f + PHASE[th]) % 1, th in FRONT
       st, d = (SF, ds*SF/S) if fr else (S, ds)   # a front foot takes a shorter step, planted for less of the cycle so it still slides at body speed
-      if fl < d: feet[th] = (st/2 - st*fl/d, 0, 0)
+      if fl < d:
+        u = fl/d; ox, up, bend = st/2 - st*u, 0.0, give*math.sin(math.pi*u)
+        toe = roll*max(0, (u - .7)/.3)   # the heel peels up, the toes stay down
       else:
-        t = (fl - d)/(1 - d); s = math.sin(math.pi*t)
-        feet[th] = (-st/2 + st*sm(t), (liftF if fr else lift)*s, 0)
-    out.append(pose((rb, 0, crouch + bob*math.sin(4*math.pi*f + .6)), head=-.5*rb + 2*math.sin(4*math.pi*(f + .2)),
-                    tail=-1.2*rb + 3*math.sin(2*math.pi*(f + .1)), feet=feet))
+        t = (fl - d)/(1 - d); s = math.sin(math.pi*t); ox = -st/2 + st*sm(t); up = (liftF if fr else lift)*s
+        bend = elbow*math.sin(2*math.pi*t) if fr else knee*math.sin(math.pi*min(1, t*1.2))   # an elbow flexes, then reaches the forefoot out ahead
+        toe = roll*(1 - t)*(1 - t) + (hangF if fr else hang)*s*(1 - .4*t)
+      ang = -math.degrees(math.asin(max(-.9, min(.9, ox/ARM[th]))))
+      stiff(p, (th, lg, ft), ang - .3*bend, ang + .7*bend, ang + .7*bend + toe, up)
+    out.append(p)
   print('walk:', N, 'frames; rstep at rsize %.1f:' % RSIZE, round(S/ds/(P['cell']['w']/(2.5*RSIZE))/N, 4))
   return {'name': 'walk', 'fps': fps, 'frames': unwrap(out)}
 
