@@ -14,8 +14,8 @@ const PX_ICONS = {pencil:"M3 17l10-10 2 2-10 10H3zM14 6l2-2 2 2-2 2z", eraser:"M
 // New-picture sizes the game expects ({id} a species, {name} anything); animals are 100 x 75 with the feet on the bottom rows, facing right
 const PX_DASH = {select:' stroke-dasharray="3.2 2.6" stroke-linecap="butt"', lasso:' stroke-dasharray="3.2 2.2" stroke-linecap="butt"'};   // icons drawn dashed (a marquee)
 const PX_TEMPLATES = {animal:["Animal, standing", 100, 75, 1, "sprites/{id}.png"], walk:["Animal walk strip", 100, 75, 4, "sprites/{id}-walk.png"], idle:["Animal idle strip", 100, 75, 8, "sprites/{id}-idle.png"],
-  person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 64, 92, 1, "sprites/plants/{name}.png"], plantM:["Plant, medium", 64, 58, 1, "sprites/plants/{name}.png"],
-  plantS:["Plant, small", 64, 58, 1, "sprites/plants/{name}.png"], rock:["Rock or boulder shape", 24, 18, 1, "sprites/rocks/{name}.png"],
+  person:["Keeper or guest strip", 16, 32, 4, "sprites/human/{name}-walk.png"], plant:["Plant, large", 120, 120, 1, "sprites/plants/{name}.png"], plantM:["Plant, medium", 64, 64, 1, "sprites/plants/{name}.png"],
+  plantS:["Plant, small", 64, 64, 1, "sprites/plants/{name}.png"], rock:["Rock or boulder shape", 24, 18, 1, "sprites/rocks/{name}.png"],
   prop:["Prop, one view (a bin is 14 x 21)", 14, 21, 1, "sprites/bld/{name}-{view}.png"], bld:["Building, one view", 80, 80, 1, "sprites/bld/{name}-{view}.png"], custom:["Any size", 32, 32, 1, "sprites/{name}.png"]};
 const PX_VIEWS = ["front", "back", "left", "right"];
 const PX_SKIP_BLD = ["vivS", "vivM", "vivL", "platform", "tramstop", "campground"];   // drawn with what's inside them or from parts, not one picture
