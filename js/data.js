@@ -647,6 +647,7 @@ const STARTER_POOLS = {
 //   kind       "food" or "merch": an empty shell that sells whatever you put on its menu (up to menuSlots items)
 //   serves     the guest needs it takes care of, for buildings without a menu
 //   seats      guests can sit down and rest here
+//   indoor     guests in line or inside are out of the weather
 //   slots      parties served at once, each taking serveMin minutes
 //   patience   minutes a party will wait for a free spot (default GUEST.patience)
 //   minRating  stars the park needs before you can build it
@@ -655,11 +656,11 @@ const BUILDINGS = {
   // every building's footprint sides are multiples of 5 m (path props like bins and benches are exempt)
   kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5, d:5, kind:"food",  menuSlots:1, slots:2,  serveMin:3},
   food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:10,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
-  restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:20, d:15, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
+  restaurant:{label:"Restaurant",  one:"a restaurant", indoor:true,  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:20, d:15, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
   cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5, d:5, kind:"merch", menuSlots:1, slots:2,  serveMin:3},
   shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:10,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
-  megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:20, d:15, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
-  restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:10,  d:5,  serves:["bladder"], slots:4, serveMin:3},
+  megastore: {label:"Gift shop",   one:"a gift shop", indoor:true,   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:20, d:15, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
+  restroom:  {label:"Restrooms",   one:"restrooms", indoor:true,     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:10,  d:5,  serves:["bladder"], slots:4, serveMin:3},
   // small things beside the path
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true, onPath:true},
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, onPath:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
@@ -671,11 +672,11 @@ const BUILDINGS = {
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
   quiet:     {label:"Quiet sign",  one:"a quiet sign",  glyph:"",  color:"#3E7C8C", price:200,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
-  lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:20, d:15, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300, confirm:true},
-  resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700, confirm:true},
+  lodge:     {label:"Safari Lodge", one:"a safari lodge", indoor:true, glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:20, d:15, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300, confirm:true},
+  resort:    {label:"Resort Hotel", one:"a resort hotel", indoor:true, glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700, confirm:true},
   campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, tech:"hotels", w:15, d:10, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100, confirm:true},
   // guests learn about prehistoric life here
-  edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:15, d:10, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education", confirm:true},
+  edcenter:  {label:"Education Center", one:"an Education Center", indoor:true, glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:15, d:10, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education", confirm:true},
   // guests ride the tram between these; each sits beside a footpath and a tram track
   tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
@@ -784,7 +785,7 @@ const PERSONALITIES = {
     n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
   family:{label:"Family Focused", color:"#2F86C8", weight:.26,
     text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
-    fx:{dark:1.6, infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
+    fx:{dark:1.6, infra:1.6, weather:1.3, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
     n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
   fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
     text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
@@ -832,7 +833,8 @@ const MENU = {
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
-  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains."},
+  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains. Keeps the rain off."},
+  jacket:  {label:"Park jackets",  kind:"merch", good:"merch", price:30, cost:9,  joy:5, text:"Sells far better in the cold. Keeps the cold off."},
   iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
   fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
   tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
@@ -888,6 +890,13 @@ const THOUGHTS = {
   playful:    {text:"We watched the animals play!", good:true},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
+  wxHot:      {text:"It's way too hot out here."},
+  wxCold:     {text:"It's freezing out here."},
+  wxRain:     {text:"We got soaked."},
+  wxSnow:     {text:"It wouldn't stop snowing."},
+  wxStorm:    {text:"That storm was frightening."},
+  wxSand:     {text:"The sandstorm was miserable."},
+  wxWind:     {text:"The wind blew our stuff around."},
   dark:       {text:"The paths were too dark at night."},
   noSeat:     {text:"My feet hurt and there's nowhere to sit."},
   litter:     {text:"There's trash all over the paths."},
@@ -1248,6 +1257,10 @@ const POWER = {
   perSqM:.12,             // kW a building draws for each m² of floor, unless it sets its own kw
   genWear:4,              // a power station's or transformer's condition lost per day (times its own wear); cables never wear
   offlineBelow:25,        // power stations and transformers cut out below this condition
+  // bad weather can knock the grid out: on a day of this event, this chance of one hit, at a random time, on one working station or transformer
+  hit:{odds:{storm:.25, snow:.15, sandstorm:.08}, cond:10,   // the condition it's left at
+    weight:{wind:3, transformer:3, solar:1, generator:1, gasplant:1, geothermal:.3}, sandSolar:3,   // which gets hit (anything else 1); sand goes for the solar arrays
+    text:{storm:"Lightning hit", snow:"Ice brought down", sandstorm:"Sand choked"}},
   repairPerPercent:60,    // materials to restore 1% of a power station's or transformer's condition
   cablePerMeter:12,       // underground cable, laid straight between two power buildings
   cableMax:200,           // longest single run of cable, in meters
@@ -1776,17 +1789,17 @@ const HAB = {
 //   ill     extra illness for animals without cover (1 means twice as likely)
 //   hurt    chance a day an animal without cover is hurt
 //   wear    fence wear multiplier
-//   guests  share of the usual guests who come
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
   umbrella:2.5,     // umbrellas sell this many times as well on a wet day
+  jacket:2.5,       // and jackets in the cold (GUEST_WX.coldBelow) or snow
   startDay:4,       // new parks get no weather events until this day
   kinds:{
-    fair:     {label:"Fair",      happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
-    hot:      {label:"Heat wave", happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
-    cold:     {label:"Cold snap", happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
-    storm:    {label:"Storm",     wet:true, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
-    sandstorm:{label:"Sandstorm", happy:15, ill:.6,  hurt:.03, wear:3,   guests:.55, grove:.3},
+    fair:     {label:"Fair",      happy:0,  ill:0,   hurt:0,   wear:1,   grove:0},
+    hot:      {label:"Heat wave", happy:10, ill:.8,  hurt:0,   wear:1,   grove:1},
+    cold:     {label:"Cold snap", happy:12, ill:1.5, hurt:0,   wear:1,   grove:0},
+    storm:    {label:"Storm",     wet:true, happy:15, ill:.6,  hurt:.03, wear:2.5, grove:.5},
+    sandstorm:{label:"Sandstorm", happy:15, ill:.6,  hurt:.03, wear:3,   grove:.3},
   },
 };
 // The park's climate: the biome it's set in (state.biome) decides each day's temperature, sky and event. One entry per month, Jan to Dec.
@@ -1824,6 +1837,19 @@ const CLIMATE = {
   tundra:   {drop:12, t:[[-45,15],[-45,18],[-35,25],[-20,38],[0,50],[25,65],[33,72],[30,68],[18,52],[-5,35],[-25,25],[-40,18]],
     cloud:[.5,.48,.48,.5,.55,.6,.62,.65,.65,.6,.55,.5], precip:[.1,.1,.1,.1,.1,.12,.14,.15,.15,.14,.12,.1],
     storm:[0,0,0,0,.01,.02,.03,.03,.01,0,0,0], wind:[.14,.14,.12,.1,.08,.06,.06,.06,.08,.1,.12,.14]},
+};
+// Weather and guests: it never keeps them away, but out in it they lose mood a minute (times how much they mind, pm "weather").
+// Guests in line at or inside an indoor building (BUILDINGS indoor) are out of it. A guest with an umbrella or jacket feels only part of it.
+const GUEST_WX = {
+  hotFrom:85, coldBelow:40,   // °F: hotter or colder than this bothers them
+  hot:.01, hotPer:.002,       // mood a minute over hotFrom, and more for each degree past it (being on their feet costs .03)
+  cold:.01, coldPer:.0015,
+  max:.05,                    // the most heat or cold can take a minute
+  ev:{rain:.02, snow:.015, wind:.012, storm:.05, sandstorm:.08},   // mood a minute each event takes
+  umbrella:.2,                // share of rain and storms a guest with an umbrella still feels
+  jacket:.2,                  // share of cold and snow a guest with a jacket still feels
+  thirst:.6,                  // guests get up to this much thirstier in the heat (at max)
+  thought:.012,               // mood a minute at which they say so
 };
 // How the climate plays out from day to day
 const WX = {

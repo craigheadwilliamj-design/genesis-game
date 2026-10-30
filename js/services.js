@@ -82,7 +82,7 @@ function serveAt(p, b, why){
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price, p);
-      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && wxWet() ? WEATHER.umbrella : 1);
+      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && wxWet() ? WEATHER.umbrella : m.id === "jacket" && wxChilly() ? WEATHER.jacket : 1);
       if(will < .6) thinks(p, "priceyGift");
       if(Math.random() < Math.min(.95, keen * boost * pm(p, "shop")) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
     }
@@ -122,6 +122,7 @@ function buy(p, b, m, n){
   for(const [k, v] of Object.entries(it.fills || {})) p.needs[k] = Math.max(0, p.needs[k] - v);
   if(it.joy) p.mood += it.joy;
   if(m.id === "map") p.map = true;
+  if(m.id === "umbrella" || m.id === "jacket") p[m.id] = (p[m.id] || 0) + n;   // how many in the party carry one
   if(m.id === "guide"){ if(!p.guide) learn(p, EDU.guide); p.guide = true; }
   if(m.id === "paleobook"){ if(!p.guide) learn(p, EDU.book); p.guide = true; }
   if(it.litter){ p.trash = (p.trash || 0) + n; p.trashAt = state.minute; }

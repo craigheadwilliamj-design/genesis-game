@@ -2077,7 +2077,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // an exhibit beside the entrance walk, so guests want to come
     state.exhibits = [{...wx, id:"e-wx2", points:[[206.5,240],[246,240],[246,280],[206.5,280]], land:[]}];
     const d1 = at("fair", () => (recompute(), derived.demand)), d2 = at("storm", () => (recompute(), derived.demand));
-    out.stormFewerGuests = d1 > 0 && Math.abs(d2 - d1 * WEATHER.kinds.storm.guests) < 1e-6;
+    out.weatherKeepsGuests = d1 > 0 && Math.abs(d2 - d1) < 1e-6;
+    // guests mind heat, cold, rain, snow and storms out in them: not inside, less with an umbrella or a jacket, and they get thirstier in the heat
+    {
+      const gp = newParty(2), keepT = state.weather.t, keepMin = state.minute, sky = (hi, ev = null) => { state.weather.t = {hi, lo:hi, sky:"clear", ev}; };
+      state.minute = minuteAtClock(13 * 60); state.weather.today = "fair";
+      sky(70); const mild = guestWeather(), mildHurt = weatherMood(gp, mild);
+      sky(100); const hot = guestWeather(), hotHurt = weatherMood(gp, hot);
+      sky(110); const hotter = weatherMood(gp, guestWeather());
+      sky(60, "rain"); const rain = weatherMood(gp, guestWeather()); gp.umbrella = 2; const dry = weatherMood(gp, guestWeather());
+      sky(20); const cold = weatherMood(gp, guestWeather()); gp.jacket = 2; const warm = weatherMood(gp, guestWeather());
+      sky(75, "storm"); const rest = state.buildings.find(b => BUILDINGS[b.type].indoor) || {id:"b-rest", type:"restaurant", points:[[0,0],[1,0],[1,1],[0,1]]};
+      if(!state.buildings.includes(rest)) state.buildings.push(rest);
+      gp.in = rest.id; const inside = weatherMood(gp, guestWeather()); gp.in = null;
+      state.buildings = state.buildings.filter(b => b.id !== "b-rest");
+      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && inside === 0
+        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket;
+      state.weather.t = keepT; state.minute = keepMin;
+    }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
     state.weather = keepW; recompute();
     const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
@@ -4344,7 +4361,17 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const sol = B("q-sol", "solar", 400, 400), wnd = B("q-wnd", "wind", 430, 400);
     wxDays().t = {hi:70, lo:50, sky:"clear", ev:null}; const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
     const keepT = state.weather.t; state.weather.t = {hi:70, lo:60, sky:"cloudy", ev:"storm"}; const storm = stationOutput(wnd), stormSun = stationOutput(sol);
-    state.weather.t = {hi:30, lo:20, sky:"cloudy", ev:"snow"}; out.snowNoSolar = stationOutput(sol) === 0; state.weather.t = keepT;
+    state.weather.t = {hi:30, lo:20, sky:"cloudy", ev:"snow"}; out.snowNoSolar = stationOutput(sol) === 0;
+    // bad weather can knock a station or transformer out: a hit is set for the day, lands once, and takes it offline
+    { const rnd = Math.random; Math.random = () => 0;
+      state.weather.t = {hi:70, lo:60, sky:"clear", ev:null}; rollGridHit(); const calm = state.weather.hit === null;
+      state.weather.t = {hi:70, lo:60, sky:"cloudy", ev:"storm"}; rollGridHit(); const set = !!state.weather.hit && state.weather.hit.at === 0;
+      const up0 = gridMachines().filter(genOnline);
+      gridHitTick(); Math.random = rnd;
+      const down = up0.filter(b => !genOnline(b));
+      out.stormHitsGrid = calm && set && down.length === 1 && state.weather.hit === null && condOf(down[0]) === POWER.hit.cond;
+      down.forEach(b => { b.cond = 100; }); updatePower(); }
+    state.weather.t = keepT;
     out.solarWind = day === BUILDINGS.solar.power && night < day * .2 && storm > BUILDINGS.wind.power && stormSun < day;
     // guests: an eyesore hurts, green power cheers conservationists and nobody else
     buildGuestGraph();

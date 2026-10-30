@@ -102,8 +102,27 @@ function updatePower(){
     events.toast(`Power shortage: ${what} without power.`, "bad");
   }
 }
-// Once a step: the guest map follows tram stations' power
+// Bad weather and the grid (POWER.hit): each night, maybe a hit for the coming day at a set minute (state.weather.hit); it lands once the clock gets there
+function rollGridHit(){
+  const w = state.weather, p = POWER.hit.odds[w.t && w.t.ev] || 0;
+  w.hit = p && Math.random() < p ? {at:Math.floor(Math.random() * DAY_MIN)} : null;
+}
+function gridHitTick(){
+  const h = state.weather && state.weather.hit, H = POWER.hit;
+  if(!h || state.minute < h.at) return;
+  state.weather.hit = null;
+  const ev = wxDays().t.ev, list = gridMachines().filter(genOnline);
+  const wt = b => (H.weight[b.type] ?? 1) * (ev === "sandstorm" && BUILDINGS[b.type].sun ? H.sandSolar : 1);
+  let r = Math.random() * list.reduce((s, b) => s + wt(b), 0), b = null;
+  for(const x of list){ r -= wt(x); if(r < 0){ b = x; break; } }
+  if(!b) return;
+  b.cond = Math.min(condOf(b), H.cond);
+  events.toast(`${H.text[ev] || "The weather knocked out"} ${BUILDINGS[b.type].one}. Its network may lose power until a mechanic repairs it.`, "bad");
+  updatePower();
+}
+// Once a step: the guest map follows tram stations' power, and the weather may hit the grid
 function powerTick(){
+  gridHitTick();
   if(state.powerNotice){ state.powerNotice = false; events.toast(`Every building now needs power. Join power stations and transformers with cable (Power in the build menu). Power is free until ${fmtDate(state.powerFree)}.`, "bad"); }
   if(gridStale && gGraph){ gridStale = false; buildGuestGraph(); }
 }

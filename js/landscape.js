@@ -400,6 +400,7 @@ function rollWeather(){
   const w = wxDays(), d = state.day + 2, calm = d < w.from;
   w.t = w.tm; w.tm = rollWxDay(d, w.t, calm); w.fc = forecastOf(d, w.tm, calm);
   w.today = wxKindOf(w.t); w.next = wxKindOf(w.tm);
+  rollGridHit();
 }
 // The part of the day it is (WX.phases) and the weather right now: the temperature, the sky, and the event (rain falls as snow at or under freezing)
 const wxPhase = (c = clockMin()) => WX.phases.find(p => c / 60 < p.to) || WX.phases[WX.phases.length - 1];
@@ -415,6 +416,7 @@ function wxNow(){
   wxMemo = {d, min:state.minute, v}; return v;
 }
 const fmtTemp = t => `${t}\u00b0F`;
+const wxChilly = () => { const w = wxNow(); return w.temp < GUEST_WX.coldBelow || w.ev === "snow"; };
 const wxWet = () => ["rain", "storm"].includes(wxDays().t.ev);
 // An animal's comfortable temperatures (TOLERANCE): the colder lo and the hotter hi of its two biomes, each with that biome's step
 const tolMemo = new Map();
