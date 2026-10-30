@@ -1,6 +1,6 @@
 # Draws the calm ground tiles, sprites/ground/<biome>.png for desert and scrubland: one seamless 288 px tile each (36 m at 8 px a meter) under both exhibits (#b-<biome>)
 # and the park (#p-<biome>). A pale flat floor (BIOMES.<biome>.color), faint 1 px specks, and a few small details in low-contrast tones, so the outlined animals and buildings
-# stand out. Everything wraps over the edges. Desert: sand with dune arcs, dry tufts, twigs, pebble trios and small rocks. Scrubland: sage hardpan with cracks,
+# stand out. Everything wraps over the edges. Desert: sand with dune arcs, dry tufts, twigs, pebble trios and small rocks. Scrubland: terracotta hardpan (Permian red beds) with cracks,
 # red sandstone pebbles and chips, twigs and dead brush (no grass, so it suits the Permian on).
 # Usage: python3 -I tools/pixelground_calm.py [outdir]
 import sys, os, random
@@ -30,17 +30,17 @@ BIOMES = {
       "dune2":   ["......lllll.....", "...llll....mm...", ".lll.........mm.", "l...............m"],
     }, weights=[("dune", 3), ("dune2", 3), ("tuft", 2), ("tuft2", 2), ("twig", 1), ("twig2", 1), ("pebbles", 2), ("rock", 1)]),
   "scrubland": dict(seed=23, specks=240, details=2300, pal={
-      "b": "#CFC7A4",   # hardpan: BIOMES.scrubland.color in data.js
-      "s": "#BDB592",   # faint speck
-      "d": "#A39C7C",   # darker speck
-      "c": "#B5AD8A",   # crack
-      "C": "#9C9474",   # crack, deep
-      "r": "#C2805A",   # sandstone lit
-      "R": "#A2654A",   # sandstone body
+      "b": "#D9A98A",   # hardpan: BIOMES.scrubland.color in data.js
+      "s": "#C8957A",   # faint speck
+      "d": "#B07A60",   # darker speck
+      "c": "#C08C70",   # crack
+      "C": "#A6765C",   # crack, deep
+      "r": "#C8794E",   # sandstone lit
+      "R": "#A85E3A",   # sandstone body
       "q": "#7E4630",   # sandstone shade
       "t": "#94704E",   # twig, brush
       "T": "#6E5038",   # twig, brush, dark
-      "m": "#C2BA96",   # ground shade under things
+      "m": "#CC9C80",   # ground shade under things
     }, stamps={
       "crack":  ["...c.....", "..c.C....", ".c...CC..", "c......Cc"],
       "crack2": ["c......", ".CC..c.", "...Cc..", "....C..", "....c.."],

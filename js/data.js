@@ -2075,7 +2075,7 @@ const BIOMES = {
   tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#155310", park:"#155310", perSqM:1, rock:0.6, plants:0.12},
   grassland:{label:"Grassland", ground:"open plains",                 color:"#C3CC76", park:"#C3CC76", perSqM:.3, rock:0.6, plants:0.03},
   fern:     {label:"Fern Prairie", ground:"open fern, horsetail and cycad ground", color:"#976937", park:"#976937", perSqM:.3, rock:0.7, plants:0.04},   // placeholder look: scrubland's
-  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#CFC7A4", park:"#CFC7A4", perSqM:.4, rock:1.3, plants:0.03},
+  scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#D9A98A", park:"#D9A98A", perSqM:.4, rock:1.3, plants:0.03},
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Seasonal Forest", ground:"broadleaf woodland and meadow", color:"#40813F", park:"#40813F", perSqM:.6, rock:0.8, plants:0.08},
   boreal:   {label:"Coniferous Forest", ground:"conifer forest, needle litter and moss", color:"#587260", park:"#587260", perSqM:.8, rock:1, plants:0.08},
