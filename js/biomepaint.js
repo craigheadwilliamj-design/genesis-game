@@ -95,8 +95,6 @@ function erasePaintAt(x, y){
   const o = paintAt(x, y); if(!o) return false;
   state.biomePaint = paintList().filter(p => p !== o); paintTouch(); return true;
 }
-// The night dimming layer over park ground (dark mode). A biome with ground tiles skips it, so it matches the exhibit floors, which are never dimmed.
-const groundShade = (biome, tag, attrs) => GROUND_TILES[biome] ? "" : `<${tag} ${attrs} fill="var(--ground-shade)"/>`;
 // The drawn patches: the biome's color with its texture, as the park ground is. Cached until the paint or the save changes.
 function paintSvg(){
   const list = paintList();
@@ -104,7 +102,7 @@ function paintSvg(){
   if(paintCache && paintCache.state === state && paintCache.ver === paintVer && paintCache.n === list.length) return paintCache.s;
   const s = `<g clip-path="url(#plotClip)" pointer-events="none">` + list.map(o => {
     const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="${tileFill("p", o.biome)}"/>` + groundShade(o.biome, "rect", a);
+    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="${tileFill("p", o.biome)}"/>`;
   }).join("") + `</g>`;
   paintCache = {state, ver:paintVer, n:list.length, s}; return s;
 }

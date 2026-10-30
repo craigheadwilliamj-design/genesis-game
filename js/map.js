@@ -127,7 +127,7 @@ function render(){
   $("#plotClipPoly").setAttribute("d", rd);
   // the park's own ground: its biome's color and texture, dimmed a little at night (dark mode)
   const pb = parkBiome();
-  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="${tileFill("p", pb)}"/>` + groundShade(pb, "path", `d="${rd}"`);
+  s += `<path d="${rd}" fill="${BIOMES[pb].park}"/><path d="${rd}" fill="${tileFill("p", pb)}"/>`;
 
   // painted biome ground, over the park ground and under paths, buildings and exhibits
   s += paintSvg();
