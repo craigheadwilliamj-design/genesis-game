@@ -2112,9 +2112,9 @@ const PLANT_SHADE = {desert:["#B8A559", "#9A9048", "#7C7A3E"], tropical:["#4DBA6
 // Landscape plants drawn with a picture instead of code: sprites/plants/<LAND key>.png, 3/4 view with the base at the bottom middle.
 // ratio is width over height; size scales the width (2 x the plant's radius) so a tall plant isn't drawn too wide. Plants not listed keep their SVG.
 const PLANT_SPRITES = {
-  "per-scrubland-small":  {ratio:44/46, size:1.15},
-  "per-scrubland-medium": {ratio:64/46, size:1.1},
-  "per-scrubland-large":  {ratio:72/96, size:.85},
+  "per-scrubland-small":  {ratio:64/64, size:1.15},
+  "per-scrubland-medium": {ratio:64/64, size:1.1},
+  "per-scrubland-large":  {ratio:120/120, size:.85},
   "tri-scrubland-small":  {ratio:54/40, size:1.42},
   "tri-scrubland-medium": {ratio:76/52, size:1.3},
   "tri-scrubland-large":  {ratio:64/92, size:.75},
@@ -2477,9 +2477,9 @@ const SPRITE_HIT = {
   "per-desert-large":[72,92,7.5,32.5,"21-51,18-54,21-51,11-61,12-60,14-58,6-66,7-65,8-64,4-68,5-67,6-66,27-45,34-38,34-38,34-38,33-39,33-39,33-39,33-39,33-39,33-39,29-43"],
   "per-desert-medium":[66,54,6.5,31.5,",21-43,15-49,11-53,5-59,3-61,6-58,1-63,2-62,30-35,31-35,31-35,31-35,27-39"],
   "per-desert-small":[44,36,19.5,19.5,",15-29,11-33,7-37,4-40,3-41,3-41,3-41,3-41"],
-  "per-scrubland-large":[72,96,15,31,"45-51,41-53,41-48,41-60,42-65,43-66,17-44,14-43,12-42,37-58,35-63,34-65,16-38,11-38,9-39,34-58,33-62,31-64,9-34,6-32,5-30,27-30,28-31,26-34"],
-  "per-scrubland-medium":[64,46,1.5,30.5,",,,,,14-52,13-55,6-59,3-61,2-62,31-33,31-33"],
-  "per-scrubland-small":[44,46,21.5,21.5,",7-19,8-38,14-37,16-30,10-34,4-35,2-41,1-42,1-43,5-41,19-25"],
+  "per-scrubland-large":[120,120,42,49.5,",,,,,,,,,24-46,19-102,15-102,15-101,15-107,43-108,45-105,40-91,40-91,49-97,22-96,14-95,10-99,10-99,12-96,24-91,19-88,15-88,11-87,11-94,54-87"],
+  "per-scrubland-medium":[64,64,4,20,",,,,,18-46,17-47,15-48,12-51,12-51,18-44,18-44,30-33,30-33,29-34,28-35"],
+  "per-scrubland-small":[64,64,6.5,30,",5-55,5-58,6-59,10-56,14-52,10-48,5-53,2-58,2-60,2-61,21-61,25-37,25-37,27-36,26-37"],
   "per-temperate-large":[72,92,7.5,35,"27-54,28-54,17-56,15-57,16-59,7-59,5-67,6-69,2-69,3-71,8-66,25-49,30-45,35-40,34-39,34-39,33-39,33-39,33-39,33-39,33-39,33-39,29-43"],
   "per-temperate-medium":[66,54,6.5,26.5,"26-40,16-50,15-51,12-54,8-58,8-58,8-58,7-59,28-38,31-35,31-35,31-35,31-35,27-39"],
   "per-temperate-small":[44,36,11.5,21.5,",13-31,6-38,6-38,1-43,2-42,6-38,9-35,16-28"],
@@ -2662,8 +2662,8 @@ const FOOT = {
   plain:{small:2, medium:3, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
-  rect:["dev-tropical-small"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  box:{},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
+  rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
+  box:{"per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
   rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
   rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}

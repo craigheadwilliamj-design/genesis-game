@@ -1926,7 +1926,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.footPlantBase = (() => { let ok = true, thin = false;
         for(const key of FOOT.rect) for(const [x, y] of [[10.3, 20.8], [11, 21], [12.5, 7.49]]){
           const t = LAND[key], [sx, sy] = footSnap(key, 0, null, x, y), b = footBoxAt(key, 0, null, sx, sy);
-          ok = ok && b.every(v => Number.isInteger(v * 2)) && b[3] === sy && b[2] - b[0] === t.footW && b[3] - b[1] === t.footD && t.footW >= .5 && t.footW <= t.footSide + .5 && t.footD <= t.footW && Math.abs(sx - x) <= .75 + t.footW / 2 && Math.abs(sy - y) <= .25;
+          ok = ok && b.every(v => Number.isInteger(v * 2)) && b[3] === sy && b[2] - b[0] === t.footW && b[3] - b[1] === t.footD && t.footW >= .5 && t.footW <= t.footSide + .5 && (t.footD <= t.footW || key in FOOT.box) && Math.abs(sx - x) <= .75 + t.footW / 2 && Math.abs(sy - y) <= .25;
           thin = thin || t.footW < t.footSide;
         }
         return ok && thin && FOOT.rect.length > 0 && Object.entries(LAND).every(([k, t]) => !!t.footW === FOOT.rect.includes(k)); })();   // only the listed plants have a base rectangle
