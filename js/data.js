@@ -2663,7 +2663,7 @@ const FOOT = {
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
   rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  box:{"per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
+  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
   rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
   rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}
