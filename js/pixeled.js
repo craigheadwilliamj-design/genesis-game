@@ -152,12 +152,14 @@ function pxSetBase(row){
 const pxBaseDiff = () => px.path in pxBaseOrig && px.guide !== pxBaseOrig[px.path] ? px.guide : null;
 function pxFootEnds(){ const gw = Math.round(Math.min(px.fw, px.guideW || px.fw)), x0 = Math.round((px.fw - gw) / 2); return [x0, x0 + gw]; }
 function pxFootHit(e){   // "w" on an end handle, "row" on the line between them; only with Adjust footprint on
+  if(px.footEdit && pxBoxType()) return pxBoxHit(e);
   if(!px.footEdit || px.guide == null || !px.guideW || !pxFootType()) return false;
   const r = pxCv.getBoundingClientRect(), z = r.width / px.fw, mx = e.clientX - r.left, my = e.clientY - r.top, gy = px.guide * z, [x0, x1] = pxFootEnds();
   if(my > gy - 4 * z - 6 && my < gy + 6 && [x0, x1].some(x => Math.abs(mx - x * z) < Math.max(6, z))) return "w";
   return Math.abs(my - gy) < Math.max(6, z / 2) && mx > x0 * z && mx < x1 * z ? "row" : false;
 }
 function pxFootDrag(e, how){
+  if(pxBoxType()) return pxBoxDrag(e, how);
   if(how === "row"){ const r = pxCv.getBoundingClientRect(), row = Math.max(1, Math.min(px.fh, Math.round((e.clientY - r.top) / r.height * px.fh))); if(row !== px.guide) pxSetBase(row); return pxDraw(); }
   const r = pxCv.getBoundingClientRect(), half = Math.abs((e.clientX - r.left) / r.width * px.fw - px.fw / 2), k = pxFootType(), t = BUILDINGS[k];
   const m = Math.max(.5, Math.round(Math.min(px.fw, Math.round(half * 2)) * ROCK_MPP * 10) / 10), side = /-(left|right)/.test(px.path);
@@ -165,6 +167,40 @@ function pxFootDrag(e, how){
   pxDraw();
 }
 function pxFootDiff(){ const k = pxFootType(), o = k && pxFootOrig[k], t = k && BUILDINGS[k]; return o && (o.w !== t.w || o.d !== t.d) ? {k, w:t.w, d:t.d} : null; }
+// The open picture's plant or rock: its ground box (FOOT.box, meters, standing on the picture's base and running up the map) can be changed here. pxBoxOrig keeps each picture's
+// box as the game had it (null: none set by hand). A plant's sides snap to half meters, a rock's to whole ones.
+const pxBoxOrig = {};
+function pxBoxType(){
+  const pl = px.path && px.path.match(/^sprites\/plants\/([a-z0-9-]+)\.png$/), rk = px.path && px.path.match(/^sprites\/rocks\/((?:rock|boulder)-[a-z]+-\d+)\.png$/);
+  if(pl && LAND[pl[1]] && LAND[pl[1]].flora) return {name:pl[1], rock:false};
+  return rk ? {name:rk[1], rock:true} : null;
+}
+function pxBoxDims(b){   // [width, depth] in meters as the game has it now
+  if(FOOT.box[b.name]) return FOOT.box[b.name];
+  if(b.rock){ const [t, bi, n] = b.name.split("-"), rf = rockFootAt(t, +n - 1, bi); return rf ? [rf.w, Math.max(...rf.rects.map(q => -q[1]))] : [1, 1]; }
+  return footDims(b.name, 0, null);
+}
+const pxBoxMpp = b => b.rock ? ROCK_MPP : LAND[b.name].r * 2 * ((PLANT_SPRITES[b.name] || {}).size || 1) / px.fw;   // meters a pixel: a plant's width is 2 r times its size
+const pxBoxBase = b => px.fh - (b.rock ? 4 : 0);   // the row the box's front edge stands on; a rock sinks 4 px below its point
+function pxBoxSet(b, box){
+  if(!(b.name in pxBoxOrig)) pxBoxOrig[b.name] = FOOT.box[b.name] || null;
+  setFootBox(b.name, box);
+}
+function pxBoxDiff(){ const b = pxBoxType(), v = b && FOOT.box[b.name], o = b && pxBoxOrig[b.name]; return v && (!o || o[0] !== v[0] || o[1] !== v[1]) ? {n:b.name, w:v[0], d:v[1]} : null; }
+function pxBoxRect(b){ const [w, d] = pxBoxDims(b), k = pxBoxMpp(b), wp = w / k, dp = d / k; return {x0:(px.fw - wp) / 2, x1:(px.fw + wp) / 2, y0:pxBoxBase(b) - dp, y1:pxBoxBase(b)}; }
+function pxBoxHit(e){   // "w" on a side, "d" on the top edge; only with Adjust footprint on
+  const b = pxBoxType(); if(!b) return false;
+  const r = pxCv.getBoundingClientRect(), z = r.width / px.fw, mx = e.clientX - r.left, my = e.clientY - r.top, q = pxBoxRect(b), t = Math.max(6, z / 2);
+  if(my > q.y0 * z - t && my < q.y1 * z + t && (Math.abs(mx - q.x0 * z) < t || Math.abs(mx - q.x1 * z) < t)) return "w";
+  return Math.abs(my - q.y0 * z) < t && mx > q.x0 * z && mx < q.x1 * z ? "d" : false;
+}
+function pxBoxDrag(e, how){
+  const b = pxBoxType(), r = pxCv.getBoundingClientRect(), k = pxBoxMpp(b), v = pxBoxDims(b).slice(), step = b.rock ? 1 : .5, snap = m => Math.max(step, Math.min(20, Math.round(m / step) * step));
+  if(how === "w") v[0] = snap(Math.abs((e.clientX - r.left) / r.width * px.fw - px.fw / 2) * 2 * k);
+  else v[1] = snap((pxBoxBase(b) - (e.clientY - r.top) / r.height * px.fh) * k);
+  if(v[0] !== pxBoxDims(b)[0] || v[1] !== pxBoxDims(b)[1]) pxBoxSet(b, v);
+  pxDraw(); pxSync();
+}
 const pxDrafts = () => pxStored("drafts") || {};
 let pxSaveT = 0;
 function pxChanged(){
@@ -181,7 +217,7 @@ function pxSaveDraft(){
   pxStore("d:" + px.path, pxDraft());
 }
 // A draft keeps every layer as its own strip, so they come back as layers
-const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront, x:px.refX, y:px.refY, k:px.refK}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
+const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), box:pxBoxDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront, x:px.refX, y:px.refY, k:px.refK}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
   const ims = await Promise.all(dr.layers.map(L => pxImg(L.png))), n = dr.n;
   px.fw = ims[0].width / n; px.fh = ims[0].height;
@@ -200,6 +236,7 @@ async function pxOpen(path, fresh){
     px.guide = pxGuideFor(path);
     if(path in pxBaseOrig) pxSetBase(pxBaseOrig[path]);   // back to the game's row, then the draft's
     if(dr && dr.base != null) pxSetBase(dr.base);
+    { const b = pxBoxType(); if(b){ if(dr && dr.box) pxBoxSet(b, [dr.box.w, dr.box.d]); else if(b.name in pxBoxOrig) setFootBox(b.name, pxBoxOrig[b.name]); } }   // a draft brings its box; Revert goes back to the game's
     if(dr && dr.ref && dr.ref.path){ const R = dr.ref; Object.assign(px, {refUrl:R.url || "", refAlpha:R.alpha ?? .3, refShow:R.show !== false, refFront:!!R.front}); await pxSetRef(R.path); Object.assign(px, {refX:R.x || 0, refY:R.y || 0, refK:R.k || 1}); }
     pxFit(); pxDraw(); pxSync();
     if(dr) ui.toast("Picked up your draft of " + path + ". Revert goes back to the game's copy.");
@@ -323,6 +360,13 @@ function pxDraw(){
       const hw = Math.max(4, Math.min(8, z)); ctx.fillRect(x0 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2); ctx.fillRect(x1 - hw / 2, px.guide * z - 4 * z, hw, 4 * z + 2);   // the handles
     }
   }   // the base row: its bottom stands on the footprint's front edge
+  { const b = pxBoxType();   // a plant's or rock's ground box: it stands on the base row and runs up
+    if(b){
+      const q = pxBoxRect(b), x0 = q.x0 * z, y0 = q.y0 * z, bw = (q.x1 - q.x0) * z, bh = (q.y1 - q.y0) * z;
+      ctx.fillStyle = "rgba(184,145,47,.16)"; ctx.fillRect(x0, y0, bw, bh);
+      ctx.strokeStyle = "rgba(184,145,47,.95)"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(x0, y0, bw, bh); ctx.setLineDash([]);
+      if(px.footEdit){ const hw = Math.max(5, Math.min(9, z)); ctx.fillStyle = "rgba(184,145,47,.95)"; for(const [hx, hy] of [[x0, y0 + bh / 2], [x0 + bw, y0 + bh / 2], [x0 + bw / 2, y0]]) ctx.fillRect(hx - hw / 2, hy - hw / 2, hw, hw); }
+    } }
   if(s){
     const box = c => s.mask ? ctx.stroke(pxMaskPath(s, z)) : ctx.strokeRect(s.x * z + .5, s.y * z + .5, s.w * z - 1, s.h * z - 1);
     ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeStyle = "#111"; box(); ctx.strokeStyle = "#fff"; ctx.lineDashOffset = 3.5; box(); ctx.setLineDash([]); ctx.lineDashOffset = 0;
@@ -396,7 +440,7 @@ function pxMove(e){
   const st = px.stroke;
   if(st && st.ref){ const [fx, fy] = pxXYf(e); px.refX = Math.round((st.ox + fx - st.ref[0]) * 2) / 2; px.refY = Math.round((st.oy + fy - st.ref[1]) * 2) / 2; return pxDraw(); }
   if(st && st.foot) return pxFootDrag(e, st.foot);
-  const fh = !st && pxFootHit(e); if(fh !== (px.footHover || false)){ px.footHover = fh; pxCv.style.cursor = fh === "w" ? "ew-resize" : fh === "row" ? "ns-resize" : pxCursor(px.tool); }
+  const fh = !st && pxFootHit(e); if(fh !== (px.footHover || false)){ px.footHover = fh; pxCv.style.cursor = fh === "w" ? "ew-resize" : fh === "row" || fh === "d" ? "ns-resize" : pxCursor(px.tool); }
   if(!st) return pxDraw();
   if(pxSelTool(px.tool)){
     const s = px.sel;
@@ -604,7 +648,7 @@ async function pxSend(){
   const why = pxEmptyWhy(); if(why) return ui.toast(why + " Nothing was sent.", "bad");
   const d = await pxDb(); if(!d) return ui.toast("Sending needs the game open on claude.ai and you signed in. Download it instead.", "bad");
   const png = pxPng();
-  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), ...(pxBaseDiff() != null ? {base:pxBaseDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
+  try{ await d.doc("pixeled/" + pxDocId(px.path)).set({path:px.path, png, w:px.fw * px.frames.length, h:px.fh, frames:px.frames.length, fps:px.fps, ...(pxFootDiff() ? {foot:pxFootDiff()} : {}), ...(pxBaseDiff() != null ? {base:pxBaseDiff()} : {}), ...(pxBoxDiff() ? {box:pxBoxDiff()} : {}), at:Date.now()}); ui.toast(`Sent ${px.path}. Ask Claude to pull your pixel edits into the repo.`, "good"); pxWatch(); }
   catch(e){ ui.toast("That didn't send (" + (e && e.code || "error") + ").", "bad"); }
 }
 // A draft as the strip the game reads: its visible layers stacked
@@ -649,7 +693,7 @@ async function pxSendAll(){
   let ok = 0; const blank = [];
   for(const path of todo){
     const dr = pxStored("d:" + path); if(!dr) continue;
-    try{ const png = await pxDraftPng(dr), im = await pxImg(png); if(!await pxPngInked(png)){ blank.push(path); continue; } await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), ...(dr.base != null ? {base:dr.base} : {}), at:Date.now()}); ok++; }catch{}
+    try{ const png = await pxDraftPng(dr), im = await pxImg(png); if(!await pxPngInked(png)){ blank.push(path); continue; } await d.doc("pixeled/" + pxDocId(path)).set({path, png, w:im.width, h:im.height, frames:dr.n || 1, fps:dr.fps || 6, ...(dr.foot ? {foot:dr.foot} : {}), ...(dr.base != null ? {base:dr.base} : {}), ...(dr.box ? {box:dr.box} : {}), at:Date.now()}); ok++; }catch{}
   }
   const fail = todo.length - ok - blank.length, skip = blank.length ? ` Not sent, blank (a hidden layer?): ${blank.join(", ")}.` : "";
   ui.toast((ok ? `Sent ${ok} picture${ok === 1 ? "" : "s"}.${fail ? ` ${fail} didn't send.` : " Ask Claude to pull them into the repo."}` : "None of them sent.") + skip, ok && !skip ? "good" : "bad"); pxWatch();
@@ -770,7 +814,8 @@ function pxBuild(){
         <div class="pxrow"><input type="number" id="pxW" class="pxnum" min="1" max="512"><span>×</span><input type="number" id="pxH" class="pxnum" min="1" max="512"><select id="pxAnchor"><option value="bc">Keep bottom middle</option><option value="tl">Keep top left</option><option value="cc">Keep center</option></select><button class="btn" data-px="resize">Resize</button></div>
         <div class="pxrow"><span>Strip of</span><input type="number" id="pxN" class="pxnum" min="1" max="128"><span>frames</span><button class="btn" data-px="reslice">Split</button></div>
         <div class="pxrow"><button class="btn" data-px="fliph">Flip ↔</button><button class="btn" data-px="flipv">Flip ↕</button><label><input type="checkbox" id="pxAll"> All frames</label></div>
-        <label class="pxrow" id="pxFootTog" hidden><input type="checkbox" id="pxFootEdit"> Adjust footprint: drag the gold line's ends for its size, the line itself for its row</label>
+        <label class="pxrow" id="pxFootTog" hidden title="A building: drag the gold line's ends for its size, the line itself for its row. A plant or rock: drag the box's sides for its width, its top for its depth."><input type="checkbox" id="pxFootEdit"> Adjust footprint: drag the gold lines</label>
+        <div class="meta" id="pxBoxNote" hidden></div>
         <div class="meta" id="pxGuideNote" hidden>The gold dashes are the base's bottom row, as wide as the footprint in this view: it stands on the footprint's front edge. Keep it on the same row in every view. With Adjust footprint on, drag its end handles to change the footprint (the depth on a side view) or the line to move its row; the park uses them at once, and they go with the picture when you send it.</div>
         <div class="meta">Shift+arrows nudge the current layer a pixel. Light comes from the top left; 0.13 m a pixel.</div></section>
       <section><h3>Keep it</h3><div class="pxrow"><button class="btn primary" data-px="try">Try in park</button><button class="btn primary" data-px="send">Send to repo</button><button class="btn" data-px="sendall" id="pxSendAll" title="Send every picture you have changed and not sent yet">Send all drafts</button><button class="btn" data-px="download">Download</button></div>
@@ -824,7 +869,7 @@ function pxSync(){
   const refs = ["", ...(px.refUrl ? ["upload"] : []), ...Object.keys(SPRITES).filter(id => !SPRITES[id].tried && SPRITE_PACK[`sprites/${id}.png`]).map(id => `sprites/${id}.png`)];
   if($p("pxRef").options.length !== refs.length) $p("pxRef").innerHTML = refs.map(r => `<option value="${r}">${r === "upload" ? "Your picture" : r ? esc(SPECIES_BY_ID[r.slice(8, -4)]?.name || r) : "Nothing"}</option>`).join("");
   $p("pxRef").value = px.ref; $p("pxRefEye").innerHTML = PX_EYE(px.refShow); $p("pxRefEye").setAttribute("aria-pressed", px.refShow);
-  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxRMove").checked = px.refMove; $p("pxRSize").value = Math.round(px.refK * 100); $p("pxRSizeN").textContent = Math.round(px.refK * 100) + "%"; $p("pxGuideNote").hidden = px.guide == null; $p("pxFootTog").hidden = px.guide == null || !pxFootType(); $p("pxFootEdit").checked = !!px.footEdit;
+  $p("pxRAlpha").value = Math.round(px.refAlpha * 100); $p("pxRAlphaN").textContent = Math.round(px.refAlpha * 100) + "%"; $p("pxRFront").checked = px.refFront; $p("pxRMove").checked = px.refMove; $p("pxRSize").value = Math.round(px.refK * 100); $p("pxRSizeN").textContent = Math.round(px.refK * 100) + "%"; $p("pxGuideNote").hidden = px.guide == null; { const b = pxBoxType(); $p("pxFootTog").hidden = !b && (px.guide == null || !pxFootType()); $p("pxBoxNote").hidden = !b; if(b){ const [w, d] = pxBoxDims(b); $p("pxBoxNote").textContent = `Footprint ${w} × ${d} m${FOOT.box[b.name] ? ", set by hand" : ""}`; } } $p("pxFootEdit").checked = !!px.footEdit;
   $p("pxFps").value = px.fps; $p("pxOnion").checked = px.onion;
   if(document.activeElement !== $p("pxW")) $p("pxW").value = px.fw;
   if(document.activeElement !== $p("pxH")) $p("pxH").value = px.fh;

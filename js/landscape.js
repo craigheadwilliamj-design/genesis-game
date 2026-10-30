@@ -57,6 +57,8 @@ const ROCK_FOOT = {rock:{}, boulder:{}};   // type -> biome -> a {w, rects} per 
 // silhouette bands, mirrored so a flipped rock (flip comes from its id, unknown to the ghost) takes the same ground, with the 4 px the picture sinks below its point left out.
 // A cell is taken when the silhouette covers FOOT.rockCover of it; each row runs from its first to its last taken cell, and rows of the same run join into one rect.
 function rockFootOf(name, type){
+  const bx = FOOT.box[name];
+  if(bx){ const W = Math.max(1, Math.round(bx[0])), D = Math.max(1, Math.round(bx[1])); return {w:W, rects:[[-W / 2, -D, W / 2, 0]]}; }   // a box set by hand
   const h = SPRITE_HIT[name], side = FOOT.side[name] || (!h && FOOT.plain[type]);
   if(side) return {w:side, rects:[[-side / 2, -side, side / 2, 0]]};
   const P = ROCK_MPP, [pw, ph] = h, segs = [];
@@ -84,15 +86,19 @@ function rockFootOf(name, type){
   }
   return {w:W, rects:rects.map(q => [q.c0 - W / 2, -q.j1, q.c1 + 1 - W / 2, -q.j0])};
 }
-for(const [k, S] of Object.entries(PLANT_SPRITES)){
-  const t = LAND[k], h = SPRITE_HIT[k]; if(!t || !h) continue;
-  const mpp = t.r * 2 * (S.size || 1) / h[0], range = FOOT.range[t.size];
+function plantFoot(k){
+  const t = LAND[k], S = PLANT_SPRITES[k], h = SPRITE_HIT[k]; if(!t) return;
+  if(!S || !h){ delete t.footW; delete t.footD; if(FOOT.box[k]){ t.footW = FOOT.box[k][0]; t.footD = FOOT.box[k][1]; } return; }
+  const mpp = t.r * 2 * (S.size || 1) / h[0], range = FOOT.range[t.size], bx = FOOT.box[k];
   t.footSide = FOOT.side[k] || clamp(Math.round(Math.max(h[2] * mpp * 2, h[3] * mpp * 2 * FOOT.crown)), range[0], range[1]);   // the old whole-cell square: where an old save's box stood
-  if(FOOT.rect.includes(k)){   // a redrawn plant: its box is its base width, down to the half meter, by a share of it deep
+  delete t.footW; delete t.footD;
+  if(bx){ t.footW = bx[0]; t.footD = bx[1]; }   // a box set by hand in the pixel editor
+  else if(FOOT.rect.includes(k)){   // a redrawn plant: its box is its base width, down to the half meter, by a share of it deep
     t.footW = FOOT.side[k] || clamp(Math.floor(h[2] * mpp * 4) / 2, .5, range[1]);
     t.footD = FOOT.side[k] || Math.max(.5, Math.round(t.footW * FOOT.depth * 2) / 2);
   }
 }
+for(const k of Object.keys(PLANT_SPRITES)) plantFoot(k);
 for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES})){   // a pictured shelter or tray takes a square as wide as its picture
   const t = LAND[k], h = SPRITE_HIT[k]; if(t && h) t.footSide = Math.max(1, Math.round(h[3] * 2 * ROCK_MPP));
 }
@@ -103,6 +109,13 @@ for(const type of ROCK_TYPES){
 }
 // The picture a placed rock shows: its f.pic, else one picked by its id (the same pick rockSpriteSvg makes)
 function rockPicIndex(f, biome){ const l = (ROCK_SPRITES[biome] || {})[f.type]; return !l ? null : f.pic != null && f.pic >= 0 && f.pic < l.length ? f.pic : seedOf(f) % l.length; }
+// Set (or with null clear) one picture's hand-made box [width, depth] in meters, and redo that plant's or rock's footprint (the pixel editor, live)
+function setFootBox(name, box){
+  if(box) FOOT.box[name] = box; else delete FOOT.box[name];
+  const m = name.match(/^(rock|boulder)-([a-z]+)-(\d+)$/);
+  if(m){ const l = (ROCK_FOOT[m[1]] || {})[m[2]], i = +m[3] - 1; if(l && l[i]) l[i] = rockFootOf(name, m[1]); }
+  else plantFoot(name);
+}
 // A pictured rock's ground ({w, rects}), given the picture index and the biome it is drawn in; null for anything else
 const rockFootAt = (key, pic, biome) => ROCK_TYPES.includes(key) && pic != null ? ((ROCK_FOOT[key] || {})[biome] || [])[pic] || null : null;
 // Side in meters of a plant, or width of a pictured rock's footprint, of this kind (rocks: given the picture index and the biome it is drawn in); other things are 2 * footR wide

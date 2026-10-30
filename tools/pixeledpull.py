@@ -46,6 +46,21 @@ for r in rows(json.load(open(args[0]))):
             print(f"{'would set' if dry else 'set'} {f['k']} footprint to {n(f['w'])} x {n(f['d'])} m in js/data.js")
             if not dry: open(dp, "w").write(rx.sub(lambda m: m.group(1) + n(f["w"]) + m.group(2) + n(f["d"]), src, 1))
         else: print("skip footprint, no BUILDINGS entry for", f["k"])
+    bx = r.get("box")   # a plant's or rock's ground box dragged in the editor: FOOT.box in data.js (a plant is also listed in FOOT.rect, so its footW/footD are used)
+    if isinstance(bx, dict) and isinstance(bx.get("n"), str) and re.fullmatch(r"[a-z0-9-]+", bx["n"]) and bx["n"] + ".png" == os.path.basename(p) and all(isinstance(bx.get(x), (int, float)) and .5 <= bx[x] <= 20 for x in "wd"):
+        dp = os.path.join(root, "js", "data.js"); src = open(dp).read(); name = bx["n"]; rock = bool(re.match(r"(rock|boulder)-", name)); n = lambda v: ("%g" % (round(v) if rock else round(v * 2) / 2))
+        m = re.search(r"^  box:\{([^}\n]*)\}", src, re.M)
+        if m:
+            cur = json.loads("{" + m.group(1) + "}") if m.group(1).strip() else {}
+            cur[name] = [float(n(bx["w"])), float(n(bx["d"]))]
+            line = "  box:{" + ", ".join('"%s":[%g, %g]' % (k, *v) for k, v in sorted(cur.items())) + "}"
+            src = src[:m.start()] + line + src[m.end():]
+            if not rock:
+                rm = re.search(r"^(  rect:\[)([^\]\n]*)(\])", src, re.M)
+                if rm and '"%s"' % name not in rm.group(2): src = src[:rm.start()] + rm.group(1) + (rm.group(2) + ", " if rm.group(2).strip() else "") + '"%s"' % name + rm.group(3) + src[rm.end():]
+            print(f"{'would set' if dry else 'set'} {name} footprint box to {n(bx['w'])} x {n(bx['d'])} m in js/data.js")
+            if not dry: open(dp, "w").write(src)
+        else: print("skip footprint box, no FOOT.box line in js/data.js")
     v = re.fullmatch(r"sprites/bld/([A-Za-z0-9]+)-(front|back|left|right)\.png", p); row = r.get("base")
     if v and isinstance(row, int) and 1 <= row <= h:   # a base row dragged in the editor: a building's BLD_PICS base (sideBase on the sides) or a prop view's 4th PROP_PICS number
         k, view = v.groups(); side = view in ("left", "right"); n = 0
