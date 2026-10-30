@@ -1117,6 +1117,8 @@ function speciesStatus(s){
 const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
 let ppPick = null;   // species id open on the card
 let ppPeriod = null; // period tab open, or null for none
+let ppBiomeTab = null; // biome tab open (or "sea"/"any"), or null for none
+let ppSort = "period"; // tabs by "period" or "biome"
 // A species' sprite box: a patch of its first biome's ground, laid from the same 1 m tiles as the map (biomepaint.js)
 const ppGround = {};   // biome -> data URL of the patch (null while its tiles load)
 const PP_SCALE = 2, PP_CELLS = [24, 14];
@@ -1165,18 +1167,29 @@ function ppCard(s){
     + `<div class="pp-acq"><span class="how ${st.cls}">${esc(st.how)}</span>${st.lock ? ` <span class="lock">${esc(st.lock)}</span>` : ""}${n ? ` <span class="have">${n} in your park.</span>` : ""}</div></div>`;
 }
 
+const PP_ORDER = ["Cambrian", "Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
+// Tabs for the current sort: periods, or biomes (a species shows under each of its biomes; sea animals under The Sea)
+function ppGroups(all){
+  if(ppSort === "period") return PP_ORDER.filter(per => all.some(s => s.period === per)).map(per => ({id:per, name:per, color:PERIOD_COLOR[per], has:s => s.period === per}));
+  const g = Object.keys(BIOMES).map(b => ({id:b, name:BIOMES[b].label, color:BIOMES[b].color, has:s => !s.aqua && (biomesOf(s) || []).includes(b)}));
+  g.push({id:"sea", name:"The Sea", color:"#2E6E9E", has:s => !!s.aqua}, {id:"any", name:"Any", color:"var(--ink-2)", has:s => !s.aqua && !biomesOf(s)});
+  return g.filter(x => all.some(x.has));
+}
+
 function catalogHtml(){
-  const order = ["Cambrian", "Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-  const all = SPECIES.filter(s => speciesAvailable(s.id)), pers = order.filter(per => all.some(s => s.period === per));
-  if(!pers.includes(ppPeriod)) ppPeriod = null;
-  const tabs = pers.map(per => `<button class="pp-tab" data-per="${per}" aria-pressed="${per === ppPeriod}">${per}</button>`).join("");
-  if(!ppPeriod) return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="meta">Pick a period.</div></div>`;
-  const here = all.filter(s => s.period === ppPeriod), got = here.filter(ppKnown), p = PERIOD_BY_ID[ppPeriod];
+  const all = SPECIES.filter(s => speciesAvailable(s.id)).sort((a, b) => PP_ORDER.indexOf(a.period) - PP_ORDER.indexOf(b.period)), groups = ppGroups(all);
+  const byPer = ppSort === "period"; let open = byPer ? ppPeriod : ppBiomeTab;
+  if(!groups.some(x => x.id === open)) open = null;
+  if(byPer) ppPeriod = open; else ppBiomeTab = open;
+  const sorts = `<span class="pp-sort">${[["period", "Period"], ["biome", "Biome"]].map(([k, t]) => `<button class="chipbtn" data-sort="${k}" aria-pressed="${k === ppSort}">${t}</button>`).join("")}</span>`;
+  const tabs = sorts + groups.map(x => `<button class="pp-tab" data-tab="${x.id}" aria-pressed="${x.id === open}">${esc(x.name)}</button>`).join("");
+  if(!open) return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="meta">Pick a ${byPer ? "period" : "biome"}.</div></div>`;
+  const G = groups.find(x => x.id === open), here = all.filter(G.has), got = here.filter(ppKnown);
   if(!got.some(s => s.id === ppPick)) ppPick = got.length ? got[0].id : null;
-  const list = `<h3 class="pp-ph"><span class="dot" style="background:${PERIOD_COLOR[ppPeriod]}"></span>${ppPeriod} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
+  const list = `<h3 class="pp-ph"><span class="dot" style="background:${G.color}"></span>${esc(G.name)} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
     + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${esc(s.name)}</button>`).join("")
     + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div>`;
-  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered in this period yet.</div>`;
+  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered in this ${byPer ? "period" : "biome"} yet.</div>`;
   return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div></div>`;
 }
 
@@ -1184,7 +1197,8 @@ function openCatalog(){ $("#catalogBody").innerHTML = catalogHtml(); if(!$("#dlg
 $("#animalsBtn").onclick = openCatalog;
 $("#closeAnimals").onclick = () => $("#dlgAnimals").close();
 $("#catalogBody").onclick = e => {
-  const t = e.target.closest("[data-per]"), b = e.target.closest("[data-sp]");
-  if(t){ ppPeriod = ppPeriod === t.dataset.per ? null : t.dataset.per; $("#catalogBody").innerHTML = catalogHtml(); }
+  const o = e.target.closest("[data-sort]"), t = e.target.closest("[data-tab]"), b = e.target.closest("[data-sp]");
+  if(o){ ppSort = o.dataset.sort; $("#catalogBody").innerHTML = catalogHtml(); }
+  else if(t){ const v = t.dataset.tab; if(ppSort === "period") ppPeriod = ppPeriod === v ? null : v; else ppBiomeTab = ppBiomeTab === v ? null : v; $("#catalogBody").innerHTML = catalogHtml(); }
   else if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
 };
