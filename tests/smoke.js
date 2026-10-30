@@ -1893,7 +1893,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.footRockShape = (() => { const all = [];
         for(const type of ["rock", "boulder"]) for(const [b, l] of Object.entries(ROCK_FOOT[type])) l.forEach((v, i) => all.push({type, b, i, v, name:`${type}-${b}-${i + 1}`, bb:boundsOf(v.rects)}));
         const tall = all.some(o => o.bb[3] - o.bb[1] > o.bb[2] - o.bb[0] + 1), wide = all.some(o => o.bb[2] - o.bb[0] > o.bb[3] - o.bb[1] + 1), notSquare = all.filter(o => o.v.rects.length > 1).length > 3;
-        const cover = all.every(o => { const h = SPRITE_HIT[o.name]; if(!h) return true; const area = o.v.rects.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), sil = h[4].split(",").reduce((n, b) => { if(!b) return n; const [a, z] = b.split("-").map(Number); return n + (z - a + 1) * 4 * ROCK_MPP * ROCK_MPP; }, 0); return area >= sil * .5 && area <= sil * 1.6; });
+        const cover = all.every(o => { const h = SPRITE_HIT[o.name]; if(!h || FOOT.box[o.name]) return true; const area = o.v.rects.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), sil = h[4].split(",").reduce((n, b) => { if(!b) return n; const [a, z] = b.split("-").map(Number); return n + (z - a + 1) * 4 * ROCK_MPP * ROCK_MPP; }, 0); return area >= sil * .5 && area <= sil * 1.6; });
         const tap = all.every(o => !SPRITE_HIT[o.name] || /^M/.test(spriteHitPath(o.name, 0, 0, ROCK_MPP)));
         return tall && wide && notSquare && cover && tap; })();
       // shelters and trays are drawn from pictures: each has a tap shape and a footprint, featSvg draws the picture, and a tray's food shows in its color (none when empty)
