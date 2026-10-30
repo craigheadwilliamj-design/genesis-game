@@ -2277,13 +2277,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const kb = {id:"b-kgrid", type:"kiosk", face:2, day:0, points:rectPts(240, 250, BUILDINGS.kiosk.w, BUILDINGS.kiosk.d, 0)}; kb.points = doorOnGrid(kb.points, 2); state.buildings.push(kb);
         setTool("move"); mvSel = kb.id; rotateMoved(); mvSel = null; setTool("select");
         out.cartDoorOnGrid = okPlace && kb.face === 3 && onGrid(kb.points, kb.face); state.buildings.splice(state.buildings.indexOf(kb), 1); }
-      // a cart's box may lie backOver meters over a path at its back, no more; saved north-facing carts backing onto a path, fully on it or with a gap, slide to that, once
+      // food and gift carts may sit on a path (pathOk), other buildings may not; saved north-facing carts backing onto a path, fully on it or with a gap, slide to backOver over it, once
       { const key = Object.keys(state.pathChunks).find(k => { const [x, y] = k.split(",").map(Number); return guestCell(state.pathChunks[k]) && !state.pathChunks[`${x},${y + 1}`]; }), [qx, qy] = key.split(",").map(Number), Y = (qy + 1) * CHUNK, t = BUILDINGS.kiosk;
         const kc = y1 => ({id:"b-kback", type:"kiosk", face:0, day:0, points:rectPts(qx * CHUNK + 2.5, y1 - t.d / 2, t.w, t.d, 0)}), msg = y1 => moveProblem("building", kc(y1));
         const mv = y1 => { const sv = JSON.parse(JSON.stringify(state)); delete sv.cardBack2; sv.buildings = [kc(y1)]; upgradeSave(sv); return sv.cardBack2 === true ? bbox(sv.buildings[0].points).y1 : NaN; }, o = BLD_PICS.kiosk.backOver;
-        out.cartBacksOntoPath = msg(Y + t.d - o) !== "It sits on a path." && msg(Y + t.d - o - .6) === "It sits on a path." && msg(Y) === "It sits on a path."
+        out.cartBacksOntoPath = [Y + t.d - o, Y + t.d - o - .6, Y].every(y1 => msg(y1) !== "It sits on a path.")
           && !bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + BUILDINGS.restroom.d / 2, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0)) && bldOnPath("restroom", rectPts(qx * CHUNK + 2.5, Y + BUILDINGS.restroom.d / 2 - .1, BUILDINGS.restroom.w, BUILDINGS.restroom.d, 0))
           && [Y + 2, Y + t.d, Y + t.d - o].every(y1 => Math.abs(mv(y1) - (Y + t.d - o)) < 1e-6); }
+      // a cart right on the walk is reached, and a path can be laid under one; a restroom there blocks the path
+      { const [wx, wy] = [202.5, 282.5], cpts = rectPts(wx, wy, BUILDINGS.cart.w, BUILDINGS.cart.d, 0), ch = chunkAt(wx, wy);
+        const kb = {id:"b-konpath", type:"cart", face:2, day:0, points:cpts}; state.buildings.push(kb); recompute(); buildGuestGraph();
+        const reach = isReachable(kb), lay = pathChunkProblem(ch[0], ch[1], "g", pathCtx()) || "", mv = moveProblem("building", kb) || "";
+        kb.type = "restroom"; const lay2 = pathChunkProblem(ch[0], ch[1], "g", pathCtx()) || "", mv2 = moveProblem("building", kb) || ""; state.buildings.splice(state.buildings.indexOf(kb), 1); recompute(); buildGuestGraph();
+        out.cartOnPath = reach && !lay.includes("building") && !mv.includes("path") && lay2.includes("building") && mv2.includes("path"); }
       // every building (not path props like bins and benches) has sides that are multiples of 5 m
       out.buildingFootprintsFive = Object.values(BUILDINGS).every(t => t.prop || (t.w % 5 === 0 && t.d % 5 === 0));
       // the door point is the middle of the wall that faces that way

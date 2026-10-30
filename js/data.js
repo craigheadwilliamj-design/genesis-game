@@ -654,10 +654,10 @@ const STARTER_POOLS = {
 const BUILDINGS = {
   // Dining and retail come in the same three tiers and sizes: cart (1 item), stand (3 items), and a large restaurant or shop (5 items)
   // every building's footprint sides are multiples of 5 m (path props like bins and benches are exempt)
-  kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5, d:5, kind:"food",  menuSlots:1, slots:2,  serveMin:3},
+  kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5, d:5, kind:"food",  menuSlots:1, slots:2,  serveMin:3, pathOk:true},
   food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:10,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
   restaurant:{label:"Restaurant",  one:"a restaurant", indoor:true,  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:20, d:15, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
-  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5, d:5, kind:"merch", menuSlots:1, slots:2,  serveMin:3},
+  cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5, d:5, kind:"merch", menuSlots:1, slots:2,  serveMin:3, pathOk:true},
   shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:10,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
   megastore: {label:"Gift shop",   one:"a gift shop", indoor:true,   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:20, d:15, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
   restroom:  {label:"Restrooms",   one:"restrooms", indoor:true,     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:10,  d:5,  serves:["bladder"], slots:4, serveMin:3},
@@ -3352,7 +3352,7 @@ const GOALS = [
   {id:"exhibit",  text:"Draw your first exhibit",            hint:"Open Build, then Exhibit Tools, pick a fence type, then tap corners on the map. Tap the first corner again to close it.", reward:2000,  check:g=>g.state.exhibits.length>0},
   {id:"connect",  text:"Connect an exhibit to the path",     hint:"Guests only see exhibits that touch a path from the entrance. Use Guest Paths under Path Tools to reach it.", reward:2000,  check:g=>g.state.exhibits.some(e=>g.isReachable(e))},
   {id:"animals",  text:"Buy animals for an exhibit",         hint:"Tap an exhibit, then buy starter animals from partner parks in the side panel.", reward:5000,  check:g=>g.state.exhibits.some(e=>e.animals.length>0)},
-  {id:"food",     text:"Build a Food Cart",                  hint:"Pick Food, then Cart, and tap next to a path. Tap the cart and choose what it sells. Hungry guests rate the park lower.", reward:3500,  check:g=>g.state.buildings.some(b=>b.type==="kiosk" && (b.menu||[]).length)},
+  {id:"food",     text:"Build a Food Cart",                  hint:"Pick Food, then Cart, and tap on or next to a path. Tap the cart and choose what it sells. Hungry guests rate the park lower.", reward:3500,  check:g=>g.state.buildings.some(b=>b.type==="kiosk" && (b.menu||[]).length)},
   {id:"restroom", text:"Build Restrooms",                    hint:"Guests need restrooms too. Place them next to a path.", reward:5000,  check:g=>g.state.buildings.some(b=>b.type==="restroom")},
   {id:"power",    text:"Power your buildings",               hint:"Every building needs power. Build a Diesel Generator from Power, put Transformers near your other buildings, and join them to it with Power Cable.", reward:5000, check:g=>g.state.buildings.some(isStation) && (g.state.cables || []).length > 0 && g.state.buildings.some(b=>needsPower(b) && b.powered === true)},
   {id:"keeper",   text:"Hire a Keeper",                      hint:"Partner parks feed your animals until day 5. Before then, build a Keeper Station beside a path or service road, tap it, and hire a keeper.", reward:6000, check:g=>g.state.staff.keepers.some(k=>k.role!=="aqua")},

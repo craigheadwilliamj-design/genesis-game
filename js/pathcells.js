@@ -55,7 +55,7 @@ function pathCtx(){
   for(const k of Object.keys(fencePieces())){ const [x, y, d] = k.split(","); if(d === "d" || d === "a") diag.add(x + "," + y); }
   return {
     ex: state.exhibits.map(e => ({...box(e.points), name:e.name})),
-    bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath).map(b => box(pathSolid(b.type, b.points))),
+    bl: state.buildings.filter(b => !BUILDINGS[b.type].onPath && !BUILDINGS[b.type].pathOk).map(b => box(pathSolid(b.type, b.points))),
     water: parkWater().map(w => box(w.points)),
     decor: decorOf().filter(f => LAND[f.type]).flatMap(f => footRects(f, null)),
     lines: (state.fences || []).map(l => l.points),
