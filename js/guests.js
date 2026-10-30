@@ -197,14 +197,14 @@ function guestsArrive(n){
 function guestWeather(){
   const w = wxNow(), G = GUEST_WX, t = w.temp;
   const heat = t > G.hotFrom ? Math.min(G.max, G.hot + G.hotPer * (t - G.hotFrom)) : 0, cold = t < G.coldBelow ? Math.min(G.max, G.cold + G.coldPer * (G.coldBelow - t)) : 0;
-  const indoor = heat || cold || G.ev[w.ev] ? new Set(state.buildings.filter(b => BUILDINGS[b.type] && BUILDINGS[b.type].indoor).map(b => b.id)) : null;
+  const indoor = heat || cold || G.ev[w.ev] ? new Set(state.buildings.filter(b => BUILDINGS[b.type] && BUILDINGS[b.type].indoor).map(b => b.id).concat(state.exhibits.filter(e => e.viv).map(e => e.id))) : null;   // vivariums are indoors too
   return {heat, cold, ev:w.ev, evHurt:G.ev[w.ev] || 0, thirst:1 + G.thirst * heat / G.max, indoor};
 }
 const WX_THOUGHT = {rain:"wxRain", snow:"wxSnow", storm:"wxStorm", sandstorm:"wxSand", wind:"wxWind"};
-// Mood a party loses a minute to the weather: nothing in line at or inside an indoor building; umbrellas keep off rain and storms, jackets the cold and snow
+// Mood a party loses a minute to the weather: nothing in line at or inside an indoor building, or watching a vivarium; umbrellas keep off rain and storms, jackets the cold and snow
 function weatherMood(p, wg){
   if(!wg.heat && !wg.cold && !wg.evHurt) return 0;
-  if(p.in && wg.indoor.has(p.in)) return 0;
+  if((p.in && wg.indoor.has(p.in)) || (p.watch && wg.indoor.has(p.watch.id))) return 0;
   const G = GUEST_WX, has = k => Math.min(1, (p[k] || 0) / p.n), umb = 1 - (1 - G.umbrella) * has("umbrella"), jak = 1 - (1 - G.jacket) * has("jacket");
   const ev = wg.evHurt * (wg.ev === "rain" || wg.ev === "storm" ? umb : wg.ev === "snow" ? jak : 1), cold = wg.cold * jak;
   const hurt = (wg.heat + cold + ev) * pm(p, "weather");

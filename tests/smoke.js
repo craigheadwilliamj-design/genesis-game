@@ -2090,8 +2090,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       sky(75, "storm"); const rest = state.buildings.find(b => BUILDINGS[b.type].indoor) || {id:"b-rest", type:"restaurant", points:[[0,0],[1,0],[1,1],[0,1]]};
       if(!state.buildings.includes(rest)) state.buildings.push(rest);
       gp.in = rest.id; const inside = weatherMood(gp, guestWeather()); gp.in = null;
+      const vv = {id:"e-vv", viv:true, animals:[], points:[[0,0],[1,0],[1,1],[0,1]], land:[]}; state.exhibits.push(vv);
+      gp.watch = {id:vv.id}; const atViv = weatherMood(gp, guestWeather()); gp.watch = {id:"e-none"}; const atOpen = weatherMood(gp, guestWeather()); gp.watch = null;
+      state.exhibits = state.exhibits.filter(e => e !== vv);
       state.buildings = state.buildings.filter(b => b.id !== "b-rest");
-      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && inside === 0
+      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && inside === 0 && atViv === 0 && atOpen > 0
         && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket;
       state.weather.t = keepT; state.minute = keepMin;
     }
