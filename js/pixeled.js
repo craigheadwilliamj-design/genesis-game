@@ -216,6 +216,18 @@ function pxSaveDraft(){
   const d = pxDrafts(); d[px.path] = Date.now(); pxStore("drafts", d); pxStore("last", px.path);
   pxStore("d:" + px.path, pxDraft());
 }
+function pxDelDraft(path){   // the Open list's ×: forget a draft for good
+  askConfirm("Delete draft?", `Delete your draft of ${path}? This can't be undone.`, "Delete", () => {
+    if(px.path === path) clearTimeout(pxSaveT);
+    const d = pxDrafts(); delete d[path]; pxStore("drafts", d); pxStore("d:" + path); delete pxGameEq[path];
+    if(pxStored("last") === path) pxStore("last");
+    if(px.path === path){
+      if(SPRITE_PACK[path]) pxOpen(path, true);
+      else { pxDrop(); Object.assign(px, {path:"", frames:[], layers:[], lay:0, cur:0, undo:[], redo:[], sel:null}); pxDraw(); }
+    }
+    pxSync(); pxOverlay("open"); ui.toast("Deleted the draft of " + path + ".");
+  });
+}
 // A draft keeps every layer as its own strip, so they come back as layers
 const pxDraft = () => ({foot:pxFootDiff(), base:pxBaseDiff(), box:pxBoxDiff(), n:px.frames.length, fps:px.fps, lay:px.lay, ref:{path:px.ref, url:px.ref === "upload" ? px.refUrl : "", alpha:px.refAlpha, show:px.refShow, front:px.refFront, x:px.refX, y:px.refY, k:px.refK}, layers:px.layers.map((L, l) => ({...L, png:pxStrip(l).toDataURL("image/png")}))});
 async function pxLoadDraft(dr){
@@ -913,9 +925,10 @@ function pxOverlay(kind, opt){
     const t = q.value.trim().toLowerCase(), only = u.checked; pxStore("q", t); pxStore("undrawn", only ? 1 : 0);
     const note = s => `<p class="meta" style="grid-column:1/-1">${s}</p>`, hit = x => !t || (x.label + " " + x.sub).toLowerCase().includes(t);
     px.needList = needsOf(px.tab).filter(hit);
-    const needBtn = (x, i) => `<button data-need="${i}"><b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`;
+    const del = p => drafts[p] ? `<span class="pxdel" data-deldraft="${esc(p)}" title="Delete this draft">×</span>` : "";
+    const needBtn = (x, i) => `<button data-need="${i}">${del(x.path)}<b>${esc(x.label)}</b><span>${esc(x.sub)}</span><span>${esc(x.note || "")}${drafts[x.path] ? " <i>draft</i>" : ""}</span></button>`;
     const thumb = p => SPRITE_PACK[p] ? spriteUrl(p) : (pxStored("d:" + p)?.layers || []).find(L => L.show !== false)?.png || "";
-    const drawnBtn = p => `<button data-openp="${esc(p)}"><img loading="lazy" src="${thumb(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`;
+    const drawnBtn = p => `<button data-openp="${esc(p)}">${del(p)}<img loading="lazy" src="${thumb(p)}" alt=""><span>${esc(p.replace(/^sprites\//, ""))}${drafts[p] ? " <i>draft</i>" : ""}</span></button>`;
     const ps = only ? [] : pxDrawn(px.tab).filter(p => !t || p.toLowerCase().includes(t)).sort((a, b) => (drafts[b] || 0) - (drafts[a] || 0) || a.localeCompare(b));
     const html = px.needList.map(needBtn).join("") + ps.map(drawnBtn).join("");
     document.getElementById("pxList").innerHTML = note(`${ps.length + px.needList.length} shown${only ? ", undrawn only" : ""}.`) + (html || note("Nothing matches that."));
@@ -1059,6 +1072,7 @@ async function pxRefUpload(file){
 }
 function pxClick(e){
   const b = e.target.closest("button"), row = e.target.closest("[data-layer]");
+  const dd = e.target.closest("[data-deldraft]"); if(dd) return pxDelDraft(dd.dataset.deldraft);
   if(b && e.detail) b.blur();   // a mouse-clicked button lets go of focus, so Enter, Delete and the arrows go to the canvas, not the button again
   if(b && b.dataset.eye){ const L = px.layers[+b.dataset.eye]; L.show = !L.show; return pxChanged(); }
   if(row && +row.dataset.layer !== px.lay){ pxDrop(); px.sel = null; px.lay = +row.dataset.layer; pxDraw(); pxSync(); }
