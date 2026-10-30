@@ -2866,6 +2866,7 @@ function placeGhost(clientX, clientY){
   let pts = rectPts(x, y, t.w, t.d, angle).map(v => [Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6]);   // clean float dust off the quarter turns
   if(snapsToChunks(t)){ pts = onChunkGrid(pts); [x, y] = centroid(pts); }
   else if(!t.prop && !t.viv) pts = doorOnGrid(pts, face, tool);
+  else if(t.viv){ const b = bbox(pts), dx = Math.round(b.x0 / GRID_STEP) * GRID_STEP - b.x0, dy = Math.round(b.y0 / GRID_STEP) * GRID_STEP - b.y0; pts = pts.map(([x, y]) => [Math.round((x + dx) * 1e6) / 1e6, Math.round((y + dy) * 1e6) / 1e6]); [x, y] = centroid(pts); }   // a case's corner lands on the 1 m grid, so an odd width can line up with the 5 m path chunks
   if(!why && !insidePlot(pts)) why = "Keep it inside the park boundary.";
   if(!why && state.exhibits.some(e => shapesOverlap(pts, e.points))) why = "It overlaps an exhibit.";
   if(!why && state.buildings.some(b => shapesOverlap(pts, b.points))) why = "It overlaps another building.";
