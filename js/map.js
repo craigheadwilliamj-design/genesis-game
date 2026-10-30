@@ -3092,9 +3092,9 @@ function drawKeepers(){
       el.dataset.key = key; el._hf = el._hfr = el._hm = undefined;
       // an animal being moved rides along beside its keeper; on a service road with an ATV, they ride it
       el.innerHTML = atvSvg(r, drive) + (cargo ? `<circle cx="${-r*1.6}" cy="${-r*.6}" r="${r*1.1}" fill="${cargo}" stroke="#1D2B22" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : "") +
-        humanSvg("keeper", hm, food, c.crate);
+        humanSvg(aquaCrew(c) ? "aquarist" : "keeper", hm, food, c.crate);
     }
-    humanStep(el, "keeper", c, x, y);
+    humanStep(el, aquaCrew(c) ? "aquarist" : "keeper", c, x, y);
     walker34(el, x, y);
   }
   // mechanics: pixel people in orange coveralls, ringed while inspecting or repairing
