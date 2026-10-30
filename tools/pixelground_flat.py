@@ -1,12 +1,11 @@
 # (The tropical tile, sprites/ground/tropical.png, is drawn by tropical_tile below: wet green, red-brown humus, leaf litter and twigs, no grass or flowers, same rules.)
 # (The grassland tile, sprites/ground/grassland.png, is drawn by grassland_tile below: sunlit loam with pale silt, clay and soil flecks and small pebbles. No grass, flowers or modern plants, so it suits the Neogene on and stays free of anything from the wrong era.)
-# (The boreal tile, sprites/ground/boreal.png, is drawn by boreal_tile below: cold conifer-forest floor of needle and leaf litter, moss, dark humus and small stones. No grass, flowers or modern plants, so it suits the Permian on and stays free of anything from the wrong era.)
 # (The tundra tile, sprites/ground/tundra.png, is drawn by tundra_tile below: frost-heaved grit with pale and dark flecks, frost cracks, pebbles and tiny lichen specks. No grass, flowers or plants, so it suits the Neogene on and stays free of anything from another biome.)
 # (The temperate tile, sprites/ground/temperate.png, is drawn by temperate_tile below: loam, moss crust and humus flecks, no grass or flowers, same rules.)
 # (The wetland tile, sprites/ground/wetland.png, is drawn by wetland_tile below: mud, algae and small shallow pools, same rules.)
 # Draws the older seamless 144 px ground tiles (18 m at 0.125 m a pixel), each laid over its biome color (BIOMES.<biome>.color, the same as .park), in the Dimetrodon's flat, simple style:
 # flat, stair-stepped features lit on their top row and shaded on their bottom row, no dithering, every feature small and wrapping over the edges so the repeat doesn't show.
-# Light is from the top left. (The desert and scrubland tiles are drawn by tools/pixelground_calm.py.)
+# Light is from the top left. (The desert, scrubland and boreal tiles are drawn by tools/pixelground_calm.py.)
 # Usage: python3 -I tools/pixelground_flat.py [outdir]
 import sys, os, random
 from PIL import Image
@@ -239,52 +238,6 @@ def tundra_tile(base, size, seed, flecks, cracks, pebbles, lichens):
     for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
     return im
 
-TAIGA = hexc("#587260")   # BIOMES.boreal.color in data.js, and its park color too (the park used to be the paler #8FA694): one floor for exhibits and the park
-def boreal_tile(base, size, seed, flecks, litter, twigs, stones):
-    # Cold forest floor built from small, low-contrast details so the repeat is hidden: a faint two-scale wash of damp moss and dark humus patches, 1 to 3 px flecks of moss, humus and pale rot,
-    # short litter dashes (brown, 2 to 4 px, some a step up or down), a few thin twig runs, and small wet stones (lit top row, shaded base). No grass, flowers or modern plants.
-    rnd = random.Random(seed); px = {}
-    def put(x, y, c): px[(x % size, y % size)] = c
-    moss = mix(base, (96, 150, 84), .2); humus = mix(base, (56, 46, 36), .24); damp = mix(base, BLACK, .08)
-    lit_l = mix(base, (176, 138, 90), .5); dry_l = mix(base, (150, 110, 70), .5); shade_l = mix(base, (60, 44, 34), .45)
-    fleck_m = mix(base, (120, 172, 98), .4); fleck_h = mix(base, (44, 38, 30), .4); fleck_r = mix(base, (206, 204, 184), .35)
-    twig = mix(base, (62, 48, 38), .55); twig_hi = mix(base, (150, 118, 84), .4)
-    g = 12; grids = [(g, [[rnd.random() for _ in range(g)] for _ in range(g)], .5), (g * 2, [[rnd.random() for _ in range(g * 2)] for _ in range(g * 2)], .5)]
-    def vn(x, y):
-        v = 0
-        for g, grid, wt in grids:
-            fx, fy = x / size * g, y / size * g; ix, iy = int(fx), int(fy); tx, ty = fx - ix, fy - iy
-            a = grid[iy % g][ix % g] * (1 - tx) + grid[iy % g][(ix + 1) % g] * tx; b = grid[(iy + 1) % g][ix % g] * (1 - tx) + grid[(iy + 1) % g][(ix + 1) % g] * tx
-            v += wt * (a * (1 - ty) + b * ty)
-        return v
-    for by in range(0, size, 2):   # the wash: 2x2 blocks, only the extremes of the noise
-        for bx in range(0, size, 2):
-            n = vn(bx + 1, by + 1) + ((bx // 2 * 7 + by // 2 * 13) % 5 - 2) * .02
-            c = humus if n > .72 else damp if n > .65 else moss if n < .3 else None
-            if c:
-                for dy in range(2):
-                    for dx in range(2): put(bx + dx, by + dy, c)
-    for _ in range(flecks):
-        x, y = rnd.randrange(size), rnd.randrange(size); r = rnd.random(); c = fleck_m if r < .45 else fleck_h if r < .85 else fleck_r
-        put(x, y, c)
-        if rnd.random() < .5: put(x + 1, y, c)
-        if rnd.random() < .2: put(x, y + 1, c)
-    for _ in range(litter):   # litter: a 2 to 4 px dash, one end a row higher or lower, a shaded pixel under it
-        x, y = rnd.randrange(size), rnd.randrange(size); n = rnd.randint(2, 4); c = rnd.choice((lit_l, dry_l, shade_l)); up = rnd.choice((-1, 0, 0, 1)); h = n // 2
-        for i in range(n): put(x + i, y + (up if i >= h and up else 0), c)
-        if rnd.random() < .5: put(x + n - 1, y + 1 + (up if up > 0 else 0), shade_l)
-    for _ in range(twigs):   # a thin twig: 4 to 7 px, a small step in the middle, a lit pixel at the top left
-        x, y = rnd.randrange(size), rnd.randrange(size); n = rnd.randint(4, 7); st = rnd.choice((-1, 1)); at = rnd.randint(2, n - 2)
-        for i in range(n): put(x + i, y + (st if i >= at else 0), twig)
-        put(x, y - 1, twig_hi)
-    for _ in range(stones):   # small wet stones: 2 to 3 px wide, lit top row, dark base, a shadow pixel to the right
-        x, y = rnd.randrange(size), rnd.randrange(size); w = rnd.choice((2, 2, 3)); pal = [mix(base, (170, 176, 176), .5), mix(base, (96, 106, 112), .55), mix(base, (36, 42, 46), .6)]
-        for i in range(w): put(x + i, y, pal[0]); put(x + i, y + 1, pal[1] if i < w - 1 else pal[2])
-        put(x + w, y + 1, twig)
-    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    for (x, y), c in px.items(): im.putpixel((x, y), c + (255,))
-    return im
-
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/ground"
 os.makedirs(out, exist_ok=True)
 im = wetland_tile(MARSH, 144, 11, 14, 520, 90, 26)   # 18 m, under both exhibits (#b-wetland) and the park (#p-wetland)
@@ -297,5 +250,3 @@ im = grassland_tile(PRAIRIE, 144, 13, 520, 80, 22)   # 18 m, under both exhibits
 im.save(f"{out}/grassland.png"); print("grassland", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
 im = tundra_tile(FROST, 144, 17, 500, 45, 20, 60)   # 18 m, under both exhibits (#b-tundra) and the park (#p-tundra)
 im.save(f"{out}/tundra.png"); print("tundra", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
-im = boreal_tile(TAIGA, 144, 41, 520, 150, 22, 16)   # 18 m, under both exhibits (#b-boreal) and the park (#p-boreal)
-im.save(f"{out}/boreal.png"); print("boreal", im.size, len({p[:3] for p in im.get_flattened_data() if p[3]}), "colors")
