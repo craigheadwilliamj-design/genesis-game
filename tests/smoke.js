@@ -13,6 +13,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
   // Google Fonts can't load in sandboxes; ignore network errors for it
   page.on("console", m => { if(m.type() === "error" && !/ERR_CERT|net::/.test(m.text())) errors.push(m.text()); });
   await page.goto("file://" + path.resolve(__dirname, "../index.html"));
+  // every day is mild and clear unless a check sets the weather itself, so temperatures don't wobble checks about other things (the climate checks use rollWxDayReal)
+  await page.evaluate(() => { window.rollWxDayReal = rollWxDay; rollWxDay = () => ({hi:72, lo:58, sky:"clear", ev:null}); });
   await page.waitForTimeout(400);
 
   const checks = await page.evaluate(() => {
@@ -2019,16 +2021,36 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const keepW = {...state.weather}, rnd = Math.random;
     const nw = newPark().weather;
     out.weatherStartsFair = nw.today === "fair" && nw.next === "fair" && nw.from === WEATHER.startDay;
-    state.weather = {today:"fair", next:"storm", from:0};
-    Math.random = () => .999; rollWeather();
-    out.forecastComesTrue = state.weather.today === "storm" && state.weather.next === "storm";
-    state.weather.from = state.day + 10; rollWeather(); Math.random = rnd;
-    out.fairBeforeStart = state.weather.next === "fair";
+    state.weather = {today:"fair", next:"storm", from:0}; wxDays();
+    state.weather.tm = {hi:70, lo:50, sky:"cloudy", ev:"storm"}; rollWeather();
+    out.forecastComesTrue = state.weather.today === "storm" && state.weather.t.ev === "storm" && !!state.weather.fc;
+    state.weather.from = state.day + 10; rollWeather();
+    out.fairBeforeStart = state.weather.next === "fair" && state.weather.tm.ev === null;
+    // climate: each biome's months, temperatures that drift, no snow in the desert, a forecast right about 3 days in 4
+    const mildDay = rollWxDay; rollWxDay = rollWxDayReal;
+    const keepBiome = state.biome, roll = (b, n) => { state.biome = b; const l = []; let d = null; for(let i = 1; i <= n; i++){ d = rollWxDay(i, d, false); l.push(d); } return l; };
+    out.climateTables = Object.keys(BIOMES).every(b => { const c = CLIMATE[b]; return c && c.t.length === 12 && ["cloud", "precip", "storm", "wind"].every(k => c[k].length === 12) && c.t.every(([lo, hi]) => lo + c.drop < hi); });
+    const desert = roll("desert", 3600), tundra = roll("tundra", 3600), tropic = roll("tropical", 3600), temper = roll("temperate", 3600);
+    out.desertNoSnow = !desert.some(d => d.ev === "snow" || d.ev === "wind") && desert.some(d => d.ev === "sandstorm") && !temper.some(d => d.ev === "sandstorm");
+    out.tropicsNoSnow = !tropic.some(d => d.ev === "snow" || d.lo <= WX.freeze) && tundra.some(d => d.ev === "snow") && !tundra.some(d => d.hi > 72);
+    out.noRainInHeat = [desert, tropic, temper].every(l => !l.some(d => d.ev === "rain" && d.hi > WX.rainMax));
+    out.tempsInRange = [["desert", desert], ["tundra", tundra], ["temperate", temper]].every(([b, l]) => l.every((d, i) => { const [lo, hi] = CLIMATE[b].t[dateOf(i + 1).m - 1]; return d.lo >= lo && d.hi <= hi && d.lo <= d.hi; }));
+    out.tempsDrift = temper.every((d, i) => !i || Math.abs(d.hi - temper[i - 1].hi) <= 35) && new Set(temper.map(d => d.hi)).size > 40;
+    state.biome = "temperate";
+    let fcRight = 0; for(let i = 0; i < 2000; i++){ const d = temper[i], f = forecastOf(i + 1, d, false); if(wxShown(f) === wxShown(d)) fcRight++; }
+    out.forecastMostlyRight = fcRight > 1300 && fcRight < 1700;
+    state.weather.t = {hi:40, lo:28, sky:"cloudy", ev:"rain"};
+    const keepMin = state.minute; state.minute = DAY_MIN - 1;
+    out.rainTurnsToSnowAtNight = wxNow().ev === "snow" && wxNow().temp === 28;
+    state.minute = minuteAtClock(13 * 60); out.rainByDay = wxNow().ev === "rain" && wxNow().temp === 40;
+    state.minute = keepMin; state.biome = keepBiome; Math.random = rnd; rollWxDay = mildDay;
     state.money = 1e6; state.buildings = [];
-    const wxSp = SPECIES.find(s => !s.viv && !s.pool && s.space >= 100 && !COLD_HARDY.includes(s.id) && !s.predator);
+    const wxSp = SPECIES.find(s => !s.viv && !s.pool && s.space >= 100 && toleranceOf(s) && toleranceOf(s).lo > 0 && !s.predator), wxTol = toleranceOf(wxSp);
     const wx = {id:"e-wx", name:"Weather test", points:[[100,100],[160,100],[160,160],[100,160]], animals:[1, 2, 3].map(i => ({id:"a-w" + i, sp:wxSp.id, q:90})), happy:70, cond:100, land:[]};
     state.exhibits = [wx];
-    const at = (k, f) => { state.weather.today = k; return f(); };
+    // a storm day, or a day hot or cold enough (two levels out) to bother wxSp, else a mild one
+    const at = (k, f, lv = 2) => { const T = k === "hot" ? wxTol.hi + lv * wxTol.heat : k === "cold" ? wxTol.lo - lv * wxTol.cold : (wxTol.lo + wxTol.hi) / 2;
+      state.weather.today = k === "storm" ? k : "fair"; state.weather.t = {hi:T, lo:T, sky:"clear", ev:null}; return f(); };
     out.stormExposes = at("storm", () => exposure(wx) === 1 && exhibitReport(wx).issues.some(i => i.bad && /Storm/.test(i.text)));
     out.stormHurts = at("storm", () => exhibitReport(wx).target) < at("fair", () => exhibitReport(wx).target)
       && at("storm", () => illChance(wx, wx.animals[0]).p) > at("fair", () => illChance(wx, wx.animals[0]).p)
@@ -2038,13 +2060,44 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.grovesShadeOnlyWhenHot = at("hot", () => exposure(wx)) < 1 && at("cold", () => exposure(wx)) === 1;
     placeLand(wx, "shelter", 130, 120);
     out.shelterCovers = coverOf(wx).shelter >= at("cold", () => coverOf(wx).need) && at("cold", () => exposure(wx)) === 0 && at("storm", () => exhibitReport(wx).issues.some(i => /Sheltered/.test(i.text)));
-    const hardy = SPECIES_BY_ID[COLD_HARDY.find(id => SPECIES_BY_ID[id] && !SPECIES_BY_ID[id].viv)];
-    const hx = {...wx, id:"e-hx", land:[], animals:[{id:"a-h", sp:hardy.id, q:90}]};
-    out.coldHardy = at("cold", () => exposure(hx)) === 0 && at("storm", () => exposure(hx)) === 1;
+    // tolerance comes from the two biomes: the colder low and the hotter high, each with its own step
+    const mt = toleranceOf(SPECIES_BY_ID.mamm), dt = toleranceOf(SPECIES_BY_ID.dime);
+    out.toleranceFromBiomes = mt.lo === TOLERANCE.tundra.lo && mt.cold === TOLERANCE.tundra.cold && mt.hi === TOLERANCE.boreal.hi && mt.heat === TOLERANCE.boreal.heat
+      && dt.lo === Math.min(TOLERANCE.scrubland.lo, TOLERANCE.wetland.lo) && dt.hi === Math.max(TOLERANCE.scrubland.hi, TOLERANCE.wetland.hi);
+    out.mildNeverHurts = tempStress(SPECIES_BY_ID.dime, 65).level === 0 && at("fair", () => exposure(wx)) === 0 && !at("fair", () => exhibitReport(wx).issues.some(i => /Too (hot|cold)/.test(i.text)));
+    out.levelsStep = [1, 2, 3, 4].map(n => tempStress(wxSp, wxTol.hi + wxTol.heat * n - .5).level).join() === "1,2,3,3" && tempStress(wxSp, wxTol.lo - 1).side === "cold" && tempStress(wxSp, wxTol.hi + 1).side === "hot";
+    const hx = {...wx, id:"e-hx", land:[], animals:[{id:"a-h", sp:"mamm", q:90}]};
+    state.weather.today = "fair"; state.weather.t = {hi:-30, lo:-40, sky:"clear", ev:null};
+    out.coldHardy = exposure(hx) === 0 && at("storm", () => exposure(hx)) === 1;
+    state.weather.today = "fair"; state.weather.t = {hi:105, lo:105, sky:"clear", ev:null}; out.mammothWiltsInHeat = exposure(hx) === 1 && tempStress(SPECIES_BY_ID.mamm).level === 3;
+    // the further out, the worse: happiness and illness both grow with the level (illness takes the worse of the high and low)
+    const bare = {...wx, id:"e-bare", land:[]};
+    out.heatGraded = at("hot", () => exhibitReport(bare).target, 1) > at("hot", () => exhibitReport(bare).target, 3) && at("hot", () => illChance(bare, bare.animals[0]).p, 1) < at("hot", () => illChance(bare, bare.animals[0]).p, 3)
+      && at("hot", () => exhibitReport(bare).issues.some(i => i.bad && /Too hot/.test(i.text) && /no shade/.test(i.text)));
     // an exhibit beside the entrance walk, so guests want to come
     state.exhibits = [{...wx, id:"e-wx2", points:[[206.5,240],[246,240],[246,280],[206.5,280]], land:[]}];
     const d1 = at("fair", () => (recompute(), derived.demand)), d2 = at("storm", () => (recompute(), derived.demand));
-    out.stormFewerGuests = d1 > 0 && Math.abs(d2 - d1 * WEATHER.kinds.storm.guests) < 1e-6;
+    out.weatherKeepsGuests = d1 > 0 && Math.abs(d2 - d1) < 1e-6;
+    // guests mind heat, cold, rain, snow and storms out in them: not inside, less with an umbrella or a jacket, and they get thirstier in the heat
+    {
+      const gp = newParty(2), keepT = state.weather.t, keepMin = state.minute, sky = (hi, ev = null) => { state.weather.t = {hi, lo:hi, sky:"clear", ev}; };
+      state.minute = minuteAtClock(13 * 60); state.weather.today = "fair";
+      sky(70); const mild = guestWeather(), mildHurt = weatherMood(gp, mild);
+      sky(100); const hot = guestWeather(), hotHurt = weatherMood(gp, hot);
+      sky(110); const hotter = weatherMood(gp, guestWeather());
+      sky(60, "rain"); const rain = weatherMood(gp, guestWeather()); gp.umbrella = 2; const dry = weatherMood(gp, guestWeather());
+      sky(20); const cold = weatherMood(gp, guestWeather()); gp.jacket = 2; const warm = weatherMood(gp, guestWeather());
+      sky(75, "storm"); const rest = state.buildings.find(b => BUILDINGS[b.type].indoor) || {id:"b-rest", type:"restaurant", points:[[0,0],[1,0],[1,1],[0,1]]};
+      if(!state.buildings.includes(rest)) state.buildings.push(rest);
+      gp.in = rest.id; const inside = weatherMood(gp, guestWeather()); gp.in = null;
+      const vv = {id:"e-vv", viv:true, animals:[], points:[[0,0],[1,0],[1,1],[0,1]], land:[]}; state.exhibits.push(vv);
+      gp.watch = {id:vv.id}; const atViv = weatherMood(gp, guestWeather()); gp.watch = {id:"e-none"}; const atOpen = weatherMood(gp, guestWeather()); gp.watch = null;
+      state.exhibits = state.exhibits.filter(e => e !== vv);
+      state.buildings = state.buildings.filter(b => b.id !== "b-rest");
+      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && inside === 0 && atViv === 0 && atOpen > 0
+        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket;
+      state.weather.t = keepT; state.minute = keepMin;
+    }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
     state.weather = keepW; recompute();
     const oldW = JSON.parse(JSON.stringify(newPark())); delete oldW.weather; oldW.day = 20;
@@ -2687,10 +2740,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         state.exhibits.push(ex);
         const diet = toyFor(LAND.shank, T) === 4 && toyFor(LAND.shank, H) === 0 && toyFor(LAND.ball, H) === 2 && toyFor(LAND.hay, T) === 3 && toyPoints(ex, m) === 1;
         const fed = browseRate(ex, "plants") === LAND.hay.hay && browseRate(ex, "paleoflora") === 0;
-        const w0 = state.weather.today; state.weather.today = "hot"; treatsNight(); treatsNight(); state.weather.today = "fair";
+        const w0 = wxDays().t; state.weather.t = {hi:100, lo:75, sky:"clear", ev:null}; treatsNight(); treatsNight(); state.weather.t = {hi:70, lo:50, sky:"clear", ev:null};
         const melt = !landOf(ex).some(f => f.type === "icefish") && landOf(ex).some(f => f.type === "hay" && f.left === LAND.hay.lasts - 2);
         for(let i = 0; i < LAND.hay.lasts; i++) treatsNight();
-        state.weather.today = w0;
+        state.weather.t = w0;
         // a Paleoflora bale feeds the older plant eaters, and takes Paleoflora from the Botany Lab and the research to bale it
         const st0 = state.ceres.stock, tech0 = state.science.tech.slice();
         state.science.tech = tech0.filter(k => k !== "paleoflora"); const noTech = !!landProblem(ex, "pbale", 430, 30);
@@ -2949,11 +3002,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.rigSwimStrip = swStrip.includes("prio-swim.png") && !swStrip.includes("rig-ghost");
       state.exhibits.splice(state.exhibits.indexOf(nap), 1); syncAnimals();
     }
-    {   // weather overlay: exists, ignores clicks, follows state.weather.today
-      const cv = document.getElementById("wxfx"), keep = state.weather.today, seen = {};
-      for(const k of ["fair", "hot", "cold", "storm"]){ state.weather.today = k; drawWeather(performance.now()); const d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = d.some(v => v) ; seen[k + "k"] = cv.dataset.kind; }
-      state.weather.today = keep; drawWeather(performance.now());
-      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.stormk === "storm" && seen.fairk === "fair";
+    {   // weather overlay: exists, ignores clicks, follows today's weather as it is now (wxNow)
+      const cv = document.getElementById("wxfx"), keep = wxDays().t, keepMin = state.minute, seen = {};
+      state.minute = minuteAtClock(13 * 60);
+      const days = {fair:{hi:70, lo:50, sky:"clear", ev:null}, hot:{hi:98, lo:70, sky:"clear", ev:null}, cold:{hi:20, lo:5, sky:"partly", ev:null}, storm:{hi:70, lo:60, sky:"cloudy", ev:"storm"}, snow:{hi:25, lo:15, sky:"cloudy", ev:"snow"}, sand:{hi:95, lo:70, sky:"cloudy", ev:"sandstorm"}};
+      for(const [k, d] of Object.entries(days)){ state.weather.t = d; drawWeather(performance.now()); drawWeather(performance.now() + 50); const px = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data; seen[k] = px.some(v => v); seen[k + "k"] = cv.dataset.kind; }
+      state.weather.t = keep; state.minute = keepMin; drawWeather(performance.now());
+      out.weatherOverlay = !!cv && getComputedStyle(cv).pointerEvents === "none" && !seen.fair && seen.hot && seen.cold && seen.storm && seen.snow && seen.sand && seen.stormk === "storm" && seen.fairk === "clear" && seen.coldk === "cold" && seen.sandk === "sandstorm";
     }
     // dust puff: the hook adds squares that don't take clicks, then they clear and nothing lands in state
     {
@@ -3397,14 +3452,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   const cal = await page.evaluate(() => {
     const f = fmtDate, dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length, yr = dpm * mpy;
-    const old = JSON.parse(JSON.stringify(state)); delete old.calendar;
+    const old = JSON.parse(JSON.stringify(state)); delete old.calendar; delete old.calStart;
     let loads = true; try{ upgradeSave(old); }catch{ loads = false; }
-    return {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
+    const spring = newPark().calStart === 3 && f(1) === "1 Apr Y1" && f(dpm * 9 + 1) === "1 Jan Y2" && dateOf(1).m === 4;
+    const c0 = state.calStart; state.calStart = 0;   // a park from before spring starts
+    const r = {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads:loads && old.calStart === 0, spring};
+    state.calStart = c0;
+    return {...r, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
   });
   checks.dateFirstDay = cal.first === "1 Jan Y1";
   checks.dateMonthRollover = cal.eom === "30 Jan Y1" && cal.next === "1 Feb Y1";
   checks.dateYearRollover = cal.eoy === "30 Dec Y1" && cal.ny === "1 Jan Y2" && cal.y3 === "1 Jan Y3";
   checks.dateBadDay = cal.zero === "1 Jan Y1";
+  checks.parksOpenInSpring = cal.spring;
   checks.dateOldSaveLoads = cal.loads;
   checks.dateInHud = cal.hud;
 
@@ -3659,7 +3719,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     startWith(newPark(), false); setSpeed(0);
     state.money = 1e9; state.staff.feedFrom = 999; state.safety.escapesFrom = 999; state.health.from = 999;
     state.paths.push({id:"p-loop", points:[[207.5,235],[100,235],[100,120],[300,120],[300,235],[207.5,235]]});
-    const sp = SPECIES.filter(s => !s.viv && !COLD_HARDY.includes(s.id) && traitsOf(s).active === "diurnal" && traitsOf(s).temper === "skittish").sort((x, y) => coverSlots(x) - coverSlots(y))[0], cap = Math.floor(LAND.shelter.slots / coverSlots(sp));
+    const sp = SPECIES.filter(s => !s.viv && toleranceOf(s) && traitsOf(s).active === "diurnal" && traitsOf(s).temper === "skittish").sort((x, y) => coverSlots(x) - coverSlots(y))[0], cap = Math.floor(LAND.shelter.slots / coverSlots(sp));
     const e = {id:"e-sh", name:"Shy", points:[[104,124],[180,124],[180,231],[104,231]], animals:Array.from({length:12}, (_, i) => ({id:"sh" + i, sp:sp.id})), happy:80, cond:100, stock:{}, land:[]};
     state.exhibits.push(e);
     const barn = {id:"l-b", type:"shelter", x:142, y:178}; e.land.push(barn);
@@ -3667,7 +3727,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const place = (list, x, y) => list.forEach(a => { const h = herd.get(a.id); h.x = x; h.y = y; h.placed = true; });
     const reset = () => { shelterRun.clear(); hideAvg.clear(); for(const a of e.animals){ a.inside = null; a.act = "forage"; a.actFor = 99; a.napFor = 0; a.napDay = -1; a.need = freshNeeds(); } };
     const inside = () => e.animals.filter(a => a.inside), step = () => { behaviorTick(BEHAVIOR.step); animateAnimals(.016); };
-    const wx = (w, m) => { state.weather = {today:w, next:"fair", from:999}; state.minute = m; };
+    const tol = toleranceOf(sp), wx = (w, m) => {   // a storm day, or a day too hot or too cold for these animals (two levels out), else a mild one
+      const T = w === "hot" ? tol.hi + 2 * tol.heat : w === "cold" ? tol.lo - 2 * tol.cold : (tol.lo + tol.hi) / 2, d = {hi:T, lo:T, sky:"clear", ev:null};
+      state.weather = {today:w === "storm" ? w : "fair", next:"fair", from:999, t:d, tm:d, fc:d}; state.minute = m; };
 
     // a storm sends them in, up to the room the shelter has (a small barn holds 10 slots, and each of these takes a few)
     reset(); wx("storm", DAWN_MIN + 120); place(e.animals, 142, 178);
@@ -3974,10 +4036,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // basking lamp: heat lovers get warmer and happier, less ill, it costs upkeep, and they gather under it
       const wantHeat = SPECIES_BY_ID.tikt, ok = wantsHeat(wantHeat) && !wantsHeat(SPECIES_BY_ID.ples) && !wantsHeat(SPECIES_BY_ID.arch);
       const tNo = exhibitReport(ev).target, ill0 = illChance(ev, ev.animals[0]).p, up0 = dailyCosts().upkeep, w0 = state.weather.today;
-      state.weather.today = "cold"; const coldNo = illChance(ev, ev.animals[0]); state.weather.today = w0;
+      const wt0 = wxDays().t, cold = {hi:25, lo:10, sky:"clear", ev:null};
+      state.weather.t = cold; const coldNo = illChance(ev, ev.animals[0]); state.weather.t = wt0;
       const cm0 = comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0});
       const m0 = state.money; addVivToy(ev, "vlamp"); const lamp = landOf(ev).find(f => f.type === "vlamp");
-      state.weather.today = "cold"; const coldYes = illChance(ev, ev.animals[0]); state.weather.today = w0;
+      state.weather.t = cold; const coldYes = illChance(ev, ev.animals[0]); state.weather.t = wt0;
       out.vivLampEffects = ok && state.money === m0 - LAND.vlamp.price && heatShare(ev) === 1 && exhibitReport(ev).target > tNo && illChance(ev, ev.animals[0]).p < ill0 && coldNo.why.includes("lamp") && !coldYes.why.includes("lamp") && coldYes.p < coldNo.p
         && comfortOf(ev, wantHeat, {comfort:new Map(), x:0, dirt:0}) > cm0 && dailyCosts().upkeep === up0 + LAND.vlamp.upkeep && noteBad(ev, /basking lamp|Cold/) === false;
       // one lamp warms VIV_LAMP.per animals: a bigger group is only partly warmed
@@ -4299,8 +4362,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     BUILDINGS.resort.kw = 90;
     // solar follows the sun; wind the weather
     const sol = B("q-sol", "solar", 400, 400), wnd = B("q-wnd", "wind", 430, 400);
-    const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
-    state.weather.today = "storm"; const storm = stationOutput(wnd), stormSun = stationOutput(sol); state.weather.today = "fair";
+    wxDays().t = {hi:70, lo:50, sky:"clear", ev:null}; const day = stationOutput(sol); state.minute = DAY_MIN - 1; const night = stationOutput(sol); state.minute = DAWN_MIN + 200;
+    const keepT = state.weather.t; state.weather.t = {hi:70, lo:60, sky:"cloudy", ev:"storm"}; const storm = stationOutput(wnd), stormSun = stationOutput(sol);
+    state.weather.t = {hi:30, lo:20, sky:"cloudy", ev:"snow"}; out.snowNoSolar = stationOutput(sol) === 0;
+    // bad weather can knock a station or transformer out: a hit is set for the day, lands once, and takes it offline
+    { const rnd = Math.random; Math.random = () => 0;
+      state.weather.t = {hi:70, lo:60, sky:"clear", ev:null}; rollGridHit(); const calm = state.weather.hit === null;
+      state.weather.t = {hi:70, lo:60, sky:"cloudy", ev:"storm"}; rollGridHit(); const set = !!state.weather.hit && state.weather.hit.at === 0;
+      const up0 = gridMachines().filter(genOnline);
+      gridHitTick(); Math.random = rnd;
+      const down = up0.filter(b => !genOnline(b));
+      out.stormHitsGrid = calm && set && down.length === 1 && state.weather.hit === null && condOf(down[0]) === POWER.hit.cond;
+      down.forEach(b => { b.cond = 100; }); updatePower(); }
+    state.weather.t = keepT;
     out.solarWind = day === BUILDINGS.solar.power && night < day * .2 && storm > BUILDINGS.wind.power && stormSun < day;
     // guests: an eyesore hurts, green power cheers conservationists and nobody else
     buildGuestGraph();

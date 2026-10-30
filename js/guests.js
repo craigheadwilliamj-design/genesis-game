@@ -193,6 +193,26 @@ function guestsArrive(n){
   const p = parties[parties.length - 1 - Math.floor(Math.random() * Math.min(50, parties.length))];
   p.n += n; p.cash += n * rand(...GUEST.cash);
 }
+// The weather now as guests feel it (GUEST_WX): mood a minute from the heat or cold, and from today's event as it falls now, and how much thirstier the heat makes them
+function guestWeather(){
+  const w = wxNow(), G = GUEST_WX, t = w.temp;
+  const heat = t > G.hotFrom ? Math.min(G.max, G.hot + G.hotPer * (t - G.hotFrom)) : 0, cold = t < G.coldBelow ? Math.min(G.max, G.cold + G.coldPer * (G.coldBelow - t)) : 0;
+  const indoor = heat || cold || G.ev[w.ev] ? new Set(state.buildings.filter(b => BUILDINGS[b.type] && BUILDINGS[b.type].indoor).map(b => b.id).concat(state.exhibits.filter(e => e.viv).map(e => e.id))) : null;   // vivariums are indoors too
+  return {heat, cold, ev:w.ev, evHurt:G.ev[w.ev] || 0, thirst:1 + G.thirst * heat / G.max, indoor};
+}
+const WX_THOUGHT = {rain:"wxRain", snow:"wxSnow", storm:"wxStorm", sandstorm:"wxSand", wind:"wxWind"};
+// Mood a party loses a minute to the weather: nothing in line at or inside an indoor building, or watching a vivarium; umbrellas keep off rain and storms, jackets the cold and snow
+function weatherMood(p, wg){
+  if(!wg.heat && !wg.cold && !wg.evHurt) return 0;
+  if((p.in && wg.indoor.has(p.in)) || (p.watch && wg.indoor.has(p.watch.id))) return 0;
+  const G = GUEST_WX, has = k => Math.min(1, (p[k] || 0) / p.n), umb = 1 - (1 - G.umbrella) * has("umbrella"), jak = 1 - (1 - G.jacket) * has("jacket");
+  const ev = wg.evHurt * (wg.ev === "rain" || wg.ev === "storm" ? umb : wg.ev === "snow" ? jak : 1), cold = wg.cold * jak;
+  const hurt = (wg.heat + cold + ev) * pm(p, "weather");
+  if(wg.heat >= G.thought) thinks(p, "wxHot");
+  if(cold >= G.thought) thinks(p, "wxCold");
+  if(ev >= G.thought) thinks(p, WX_THOUGHT[wg.ev]);
+  return hurt;
+}
 function thinks(p, k){
   p.thought.add(k);
   if(seeingEx && !seeingEx.th.has(k)){ seeingEx.th.add(k); const L = exLog(seeingEx.e); L.thoughts[k] = (L.thoughts[k] || 0) + p.n; }
@@ -669,9 +689,10 @@ function guestsTick(m0, m1){
   }
   const near = ([x, y]) => { let n = 0; for(let i = -1; i <= 1; i++) for(let j = -1; j <= 1; j++) for(const [a, b] of busy.get(cell(x + i*10, y + j*10)) || []) if((a-x)*(a-x) + (b-y)*(b-y) <= 25) n++; return n; };
 
+  const wg = guestWeather();
   for(const p of parties){
     const riding = !!(p.at && p.to && p.at.ride && p.at.ride.has(p.to));
-    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + (riding && k === "energy" ? 0 : NEEDS[k].rate * pneed(p, k) * gdt));
+    for(const k of Object.keys(NEEDS)) p.needs[k] = Math.min(100, p.needs[k] + (riding && k === "energy" ? 0 : NEEDS[k].rate * pneed(p, k) * (k === "thirst" ? wg.thirst : 1) * gdt));
     const inf = pm(p, "infra");   // family parties take bad infrastructure harder
     let hurt = riding ? 0 : GUEST.tire * pm(p, "walk");   // sitting on the tram, feet up
     for(const [k, d] of Object.entries(NEEDS)){ const o = p.needs[k] - d.seek; if(o > 0) hurt += GUEST.needHurt * inf * o / (100 - d.seek); }
@@ -688,6 +709,7 @@ function guestsTick(m0, m1){
     if(p.at && p.at.decor){ hurt -= DECOR.joy * pm(p, "decor") * p.at.decor; if(p.at.decor >= DECOR.pretty) thinks(p, "pretty"); }
     if(p.at && p.at.statues) for(const id of p.at.statues) statueSeen(p, id);
     hurt += gridMood(p);   // power plants in view (and green power, for conservationists)
+    hurt += weatherMood(p, wg);   // heat, cold, rain, snow, wind, storms
     p.mood = clamp(p.mood - hurt * gdt, 0, 100);
     if(p.needs.bladder >= 100){ thinks(p, "accident"); p.mood = Math.max(0, p.mood - 30); p.needs.bladder = 0; goHome(p); }
     if(!p.fled && p.at && danger.some(([x, y]) => Math.hypot(p.at.x - x, p.at.y - y) < GUEST.fleeRange * pm(p, "flee"))){ p.fled = true; thinks(p, "scared"); p.mood -= 15 * pm(p, "fleeHurt"); goHome(p); }

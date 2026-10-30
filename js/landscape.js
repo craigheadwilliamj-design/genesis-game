@@ -355,43 +355,129 @@ const thirsty = (e, s) => !s.aqua && !s.pool && likesOf(s).water >= HAB.wantsWat
 /* ---------- weather and shelter ---------- */
 function freshWeather(){ return {today:"fair", next:"fair", from:WEATHER.startDay}; }
 const weatherNow = () => WEATHER.kinds[state.weather ? state.weather.today : "fair"];
-const weatherNext = () => WEATHER.kinds[state.weather ? state.weather.next : "fair"];
-function pickWeather(){
-  let r = Math.random();
-  for(const [k, w] of Object.entries(WEATHER.kinds)){ r -= w.odds; if(r < 0) return k; }
-  return "fair";
+// The park's climate in the month of this day
+function climateOf(day = state.day){ const c = CLIMATE[parkBiome()] || CLIMATE[DEFAULT_PARK_BIOME], m = dateOf(day).m - 1; return {c, m, t:c.t[m]}; }
+const wxGauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 2;   // a bell curve from -3 to 3, mostly -1 to 1
+// One day's weather {hi, lo, sky, ev}, following on from the day before (prev). A calm day has no event.
+function rollWxDay(day, prev, calm){
+  const {c, m, t:[tlo, thi]} = climateOf(day), lo = tlo + c.drop, mid = (lo + thi) / 2;
+  const hi = clamp(prev ? prev.hi + (mid - prev.hi) * WX.pull + wxGauss() * WX.swing : mid + wxGauss() * WX.swing * 2, lo, thi);
+  let ev = null;
+  const r = calm ? 1 : Math.random(), freezing = hi <= WX.freeze;
+  if(r < c.storm[m]) ev = freezing ? "snow" : "storm";
+  else if(r < c.storm[m] + c.precip[m]) ev = freezing ? "snow" : hi > WX.rainMax ? null : "rain";
+  else if(r < c.storm[m] + c.precip[m] + c.wind[m]) ev = parkBiome() === "desert" ? "sandstorm" : "wind";
+  const cl = c.cloud[m], q = Math.random();
+  const sky = ev && ev !== "wind" ? "cloudy" : q < (1 - cl) ** 2 ? "clear" : q < 1 - cl * cl ? "partly" : "cloudy";
+  const drop = c.drop * (.8 + Math.random() * .4) * (sky === "cloudy" ? 1 - WX.overcast : 1);
+  return {hi:Math.round(hi), lo:Math.round(Math.max(tlo, hi - drop)), sky, ev};
 }
-// At night: tomorrow's forecast comes true, and a new one is made for the day after
-function rollWeather(){
+// What the top bar shows of a day: its event, else its sky
+const wxShown = d => d.ev || d.sky;
+// Tomorrow's forecast: right about the sky or event WX.accuracy of the time, the temperatures always a little off
+function forecastOf(day, d, calm){
+  const right = Math.random() < WX.accuracy, off = right ? WX.nearOff : WX.farOff, nudge = () => Math.round((Math.random() * 2 - 1) * off);
+  let f = {sky:d.sky, ev:d.ev};
+  for(let i = 0; !right && i < 12 && wxShown(f) === wxShown(d); i++) f = rollWxDay(day, d, calm);
+  const hi = d.hi + nudge();
+  return {hi, lo:Math.min(hi, d.lo + nudge()), sky:f.sky, ev:f.ev};
+}
+// What a day's weather does to the park (WEATHER.kinds)
+const wxKindOf = d => d && (d.ev === "storm" || d.ev === "sandstorm") ? d.ev : "fair";
+// state.weather: today's kind and tomorrow's (what the park feels), t today's weather, tm tomorrow's, fc the forecast of tomorrow. Made on first use.
+function wxDays(){
   const w = state.weather;
-  w.today = w.next;
-  w.next = state.day + 2 >= w.from ? pickWeather() : "fair";
-}
-// Shelter slots an exhibit's animals need today, and what it has. Ice age animals don't need cover from the cold.
-// A shelter only takes animals up to its `fits` size (coverSlots), so a pile of small shelters never houses a T. rex. A burrow ignores size and takes only the species in its `only` list.
-// Biggest animals go first, into the snuggest shelter they fit. `shelter` is what animals actually get, `idle` is room nobody here can use.
-function coverOf(e){
-  const wk = state.weather ? state.weather.today : "fair", w = WEATHER.kinds[wk];
-  let need = 0, shade = 0;   // pool animals ride out any weather under water
-  const sizes = [], pools = [];
-  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp]; if(!s.pool && !(wk === "cold" && COLD_HARDY.includes(s.id))){ const n = coverSlots(s); need += n; sizes.push([n, s.id]); } }
-  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots && !(wk === "cold" && L.noCold)) pools.push({left:L.slots, fits:L.fits || 99, only:L.only}); shade += (L.shade || 0) * w.grove; }
-  pools.sort((x, y) => x.fits - y.fits);
-  let shelter = 0;
-  for(const [n, id] of sizes.sort((x, y) => y[0] - x[0])){
-    let want = n;
-    for(const p of pools){ if(want <= 0) break; if(p.only ? !p.only.includes(id) : p.fits < n) continue; if(p.left <= 0) continue; const t = Math.min(want, p.left); p.left -= t; want -= t; shelter += t; }
+  if(!w.t){
+    w.t = rollWxDay(state.day, null, state.day < w.from);
+    w.tm = rollWxDay(state.day + 1, w.t, state.day + 1 < w.from);
+    w.fc = forecastOf(state.day + 1, w.tm, state.day + 1 < w.from);
+    w.today = wxKindOf(w.t); w.next = wxKindOf(w.tm);
   }
+  return w;
+}
+// At night: tomorrow's weather comes, and the day after is made and forecast
+function rollWeather(){
+  const w = wxDays(), d = state.day + 2, calm = d < w.from;
+  w.t = w.tm; w.tm = rollWxDay(d, w.t, calm); w.fc = forecastOf(d, w.tm, calm);
+  w.today = wxKindOf(w.t); w.next = wxKindOf(w.tm);
+  rollGridHit();
+}
+// The part of the day it is (WX.phases) and the weather right now: the temperature, the sky, and the event (rain falls as snow at or under freezing)
+const wxPhase = (c = clockMin()) => WX.phases.find(p => c / 60 < p.to) || WX.phases[WX.phases.length - 1];
+let wxMemo = null;   // wxNow is asked per animal per step: keep the last answer while the minute and the day stand
+function wxNow(){
+  const d = wxDays().t;
+  if(wxMemo && wxMemo.d === d && wxMemo.min === state.minute) return wxMemo.v;
+  const ph = wxPhase().id;
+  const temp = ph === "day" ? d.hi : ph === "night" ? d.lo : Math.round((d.hi + d.lo) / 2);
+  const ev = d.ev === "rain" && temp <= WX.freeze ? "snow" : d.ev;
+  const label = ev ? WX.events[ev] : temp >= WX.heatWave ? "Heat wave" : temp <= WX.freeze ? "Cold snap" : WX.sky[d.sky];
+  const v = {temp, phase:ph, sky:d.sky, ev, label, night:ph === "night"};
+  wxMemo = {d, min:state.minute, v}; return v;
+}
+const fmtTemp = t => `${t}\u00b0F`;
+const wxChilly = () => { const w = wxNow(); return w.temp < GUEST_WX.coldBelow || w.ev === "snow"; };
+const wxWet = () => ["rain", "storm"].includes(wxDays().t.ev);
+// An animal's comfortable temperatures (TOLERANCE): the colder lo and the hotter hi of its two biomes, each with that biome's step
+const tolMemo = new Map();
+function toleranceOf(s){
+  if(tolMemo.has(s.id)) return tolMemo.get(s.id);
+  let lo = null, hi = null;
+  for(const b of biomesOf(s) || []){ const t = TOLERANCE[b]; if(!t) continue; if(!lo || t.lo < lo.lo) lo = t; if(!hi || t.hi > hi.hi) hi = t; }
+  const r = lo && {lo:lo.lo, cold:lo.cold, hi:hi.hi, heat:hi.heat};
+  tolMemo.set(s.id, r); return r;
+}
+// How a temperature sits with a species: {side:"hot", "cold" or null, level 0 to 3}. Pool animals ride it out under water.
+function tempStress(s, t = wxNow().temp){
+  const b = !s.pool && toleranceOf(s), top = TEMP_HARM.weights.length - 1;
+  if(b && t > b.hi) return {side:"hot", level:Math.min(top, Math.ceil((t - b.hi) / b.heat))};
+  if(b && t < b.lo) return {side:"cold", level:Math.min(top, Math.ceil((b.lo - t) / b.cold))};
+  return {side:null, level:0};
+}
+// Why an animal wants cover at temperature t: a storm day for anything out of the water, else being too hot or too cold. {why, level, w} or null.
+function coverWhy(s, t){
+  if(s.pool) return null;
+  const wk = state.weather ? state.weather.today : "fair";
+  if(WEATHER.kinds[wk].happy) return {why:wk, level:2, w:1};
+  const st = tempStress(s, t);
+  return st.side ? {why:st.side, level:st.level, w:TEMP_HARM.weights[st.level]} : null;
+}
+// Shelter slots an exhibit's animals need at temperature t (now by default), and what it has.
+// A shelter only takes animals up to its `fits` size (coverSlots), so a pile of small shelters never houses a T. rex. A burrow ignores size and takes only the species in its `only` list.
+// Canopies (noCold) are no help in the cold. Biggest animals go first, into the snuggest shelter they fit; groves then shade what's left, fully from heat, partly from storms (WEATHER grove).
+// `shelter` is what animals actually get, `idle` is room nobody here can use, `herd` each animal that needs cover with the slots it `left` uncovered, `all` the slots of every animal out of the water.
+function coverOf(e, t){
+  let need = 0, shade = 0, all = 0;
+  const herd = [], pools = [];
+  for(const a of e.animals){ const s = SPECIES_BY_ID[a.sp], n = coverSlots(s); if(s.pool) continue; all += n; const c = coverWhy(s, t); if(c){ need += n; herd.push({...c, n, id:s.id, left:n}); } }
+  for(const f of landOf(e)){ const L = LAND[f.type]; if(!L) continue; if(L.slots) pools.push({left:L.slots, fits:L.fits || 99, only:L.only, noCold:L.noCold}); shade += L.shade || 0; }
+  pools.sort((x, y) => x.fits - y.fits);
+  let shelter = 0, shaded = 0;
+  for(const h of herd.sort((x, y) => y.n - x.n)){
+    for(const p of pools){ if(h.left <= 0) break; if(p.only ? !p.only.includes(h.id) : p.fits < h.n) continue; if(p.left <= 0 || (h.why === "cold" && p.noCold)) continue; const k = Math.min(h.left, p.left); p.left -= k; h.left -= k; shelter += k; }
+  }
+  for(const h of herd){ const g = WEATHER.kinds[h.why].grove; if(!g || h.left <= 0 || shade <= 0) continue; const k = Math.min(h.left, shade * g); h.left -= k; shade -= k / g; shaded += k; }
   const idle = pools.reduce((s, p) => s + p.left, 0);
-  return {need, shelter, shade, idle, have:shelter + shade};
+  return {need, shelter, shade:shaded, idle, have:shelter + shaded, herd, all};
 }
-// Share of the herd out in today's weather with no cover: 0 to 1
-function exposure(e){
-  if(e.viv || !e.animals.length || !weatherNow().happy) return 0;
-  const c = coverOf(e);
-  return c.need ? clamp(1 - c.have / c.need, 0, 1) : 0;
+// The herd out in the weather with no cover, at temperature t: for each reason (storm, sandstorm, hot, cold) the share of the herd it leaves out (`share`),
+// that share weighted by how bad it is (`x`, TEMP_HARM, can pass 1), and the worst level
+function exposures(e, t){
+  const out = {};
+  if(e.viv || !e.animals.length) return out;
+  const c = coverOf(e, t);
+  if(!c.all) return out;
+  for(const h of c.herd){
+    const o = out[h.why] || (out[h.why] = {share:0, x:0, level:0, need:0});
+    o.need += h.n / c.all; o.level = Math.max(o.level, h.level);
+    if(h.left > 0){ o.share += h.left / c.all; o.x += h.left * h.w / c.all; }
+  }
+  return out;
 }
-const WEATHER_TEXT = {hot:"no shade", cold:"nowhere warm", storm:"nowhere to shelter"};
+// Share of the herd out in the weather right now with no cover: 0 to 1
+function exposure(e, t){ let s = 0; for(const o of Object.values(exposures(e, t))) s += o.share; return clamp(s, 0, 1); }
+const WEATHER_TEXT = {hot:"no shade", cold:"nowhere warm", storm:"nowhere to shelter", sandstorm:"nowhere to shelter"};
+const WEATHER_NAME = {hot:"Too hot", cold:"Too cold"};   // what a heat or cold problem is called in the habitat list (storms use their label)
 
 // What the exhibit's biome does to happiness: each animal is either on one of its two biomes or not
 function biomeScore(e, out, n){
@@ -486,9 +572,11 @@ function habitatScore(e){
     out.issues.push({bad:false, text:home >= .6 ? "Groves from their era." : "A few groves from their era."});
   }
   // today's weather
-  const w = weatherNow(), x = exposure(e);
-  if(w.happy && x > 0){ out.delta -= w.happy * x; out.issues.push({bad:true, text:`${w.label}. ${x >= .99 ? "The animals have" : `${Math.round(x * 100)}% of the herd has`} ${WEATHER_TEXT[state.weather.today]}.`}); }
-  else if(w.happy && coverOf(e).need) out.issues.push({bad:false, text:`Sheltered from the ${w.label.toLowerCase()}.`});
+  for(const [why, o] of Object.entries(exposures(e))){
+    const k = WEATHER.kinds[why], name = WEATHER_NAME[why] || k.label;
+    if(o.share > 0){ out.delta -= k.happy * o.x; out.issues.push({bad:true, text:`${name}${WEATHER_NAME[why] ? ` (${fmtTemp(wxNow().temp)})` : ""}. ${o.share >= .99 ? "The animals have" : `${Math.round(o.share * 100)}% of the herd has`} ${WEATHER_TEXT[why]}.`}); }
+    else out.issues.push({bad:false, text:`Sheltered from the ${WEATHER_NAME[why] ? (why === "hot" ? "heat" : "cold") : k.label.toLowerCase()}.`});
+  }
   return out;
 }
 

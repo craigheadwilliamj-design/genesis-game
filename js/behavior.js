@@ -34,20 +34,22 @@ function traitsOf(s){
 const traitText = s => { const t = traitsOf(s); return `${TRAIT_TEXT[t.active]}, ${TRAIT_TEXT[t.social]}, ${TRAIT_TEXT[t.temper]}`; };
 // How many others of its kind an animal wants around: none for loners, one for pairs, the low end of its group otherwise
 const matesWanted = s => { const t = traitsOf(s); return t.social === "solitary" ? 0 : t.social === "pair" ? 1 : Math.max(1, s.group[0] - 1); };
+// Is today's afternoon high too hot for this species (TOLERANCE)?
+const hotDayFor = s => !!state.weather && tempStress(s, wxDays().t.hi).side === "hot";
 // How awake it is at this time of day, 0 to 1
 function awake(s, min = state.minute){
   const h = clockMin(min) / 60, a = traitsOf(s).active;   // min is state.minute; h is the hour on the 24 h clock
   if(a === "nocturnal") return isNight(min) ? 1 : h < 8 || h >= 18 ? .5 : .2;   // up all night, winding down at dawn, asleep by day
   if(a === "crepuscular") return h >= 4 && h < 9 || h >= 17 && h < 22 ? 1 : isNight(min) ? .3 : .45;   // dawn and dusk
   if(isNight(min)) return a === "diurnal" ? .2 : .3;   // dark: day animals sleep
-  // diurnal: a nap in the heat of a hot afternoon
-  return state.weather && state.weather.today === "hot" && h >= 12 && h < 15 ? .55 : 1;
+  // diurnal: a nap in the heat of an afternoon too hot for it
+  return h >= 12 && h < 15 && hotDayFor(s) ? .55 : 1;
 }
-// How ready an awake animal is for a nap: 0 outside midday, up to 1 halfway through the nap hours, more in a heat wave
+// How ready an awake animal is for a nap: 0 outside midday, up to 1 halfway through the nap hours, more on a day too hot for it
 function napLull(s, min = state.minute){
   const h = clockMin(min) / 60, N = BEHAVIOR.nap;
   if(awake(s, min) <= .7 || h < N.from || h >= N.to) return 0;
-  return Math.min(1, Math.sin(Math.PI * (h - N.from) / (N.to - N.from)) * (state.weather && state.weather.today === "hot" ? N.hot : 1));
+  return Math.min(1, Math.sin(Math.PI * (h - N.from) / (N.to - N.from)) * (hotDayFor(s) ? N.hot : 1));
 }
 // a steady 0 to 1 for an animal at this step, so the same park gives the same naps (and tests don't wobble)
 function napRoll(a, k, daily){
@@ -334,7 +336,7 @@ function needsStep(e, a, s, ctx, dt){
   const n = needsOf(a), T = traitsOf(s), B = BEHAVIOR, aw = awake(s), food = foodOk(e, s, ctx), floor = thirstFloor(s, ctx);
   const mates = (ctx.counts.get(s.id) || 1) - 1, want = matesWanted(s);
   n.hunger += B.hunger * dt * (.5 + .5 * aw);
-  if(!s.aqua && !s.pool) n.thirst += B.thirst * dt * (.5 + .5 * aw) * (state.weather && state.weather.today === "hot" ? B.hotThirst : 1);
+  if(!s.aqua && !s.pool) n.thirst += B.thirst * dt * (.5 + .5 * aw) * (tempStress(s).side === "hot" ? B.hotThirst : 1);
   const temper = {curious:1.4, skittish:.8, aggressive:1.1}[T.temper] * (T.temper === "curious" ? 1 - .3 * ctx.seen : 1);   // curious ones like watching the guests
   n.bored += B.bored * dt * aw * temper * (1.4 - ctx.enrich);
   if(want) n.lonely += B.lonely * dt * (mates >= want ? .5 : 1); else n.lonely -= B.social * dt;
@@ -384,7 +386,7 @@ function behaviorTick(dtMin){
 
 // Treats and hay bales get used up: a day each night, faster for frozen ones in a heat wave
 function treatsNight(){
-  const hot = state.weather && state.weather.today === "hot";
+  const hot = !!state.weather && wxDays().t.hi >= WX.heatWave;
   for(const e of state.exhibits){
     const gone = [];
     e.land = landOf(e).filter(f => {
@@ -466,7 +468,7 @@ function actsSummary(list){
 //   hideAvg     exhibit id -> the share of its animals guests could see, averaged over HIDING.window
 const shelterRun = new Map(), hideAvg = new Map();
 const isNight = (min = state.minute) => min < DAWN_MIN || min >= DUSK_MIN;   // dark, from DUSK_CLOCK to DAWN_CLOCK
-const insideText = a => { const w = a.inside, t = SHELTER.text[w]; return typeof t === "string" ? t : t ? t[state.weather && t[state.weather.today] ? state.weather.today : "storm"] : "Inside"; };
+const insideText = a => { const w = a.inside, t = SHELTER.text[w]; if(typeof t === "string") return t; if(!t) return "Inside"; const c = coverWhy(SPECIES_BY_ID[a.sp]); return t[c && t[c.why] ? c.why : "storm"]; };
 const shelterFits = (t, s) => !!t.slots && (t.only ? t.only.includes(s.id) : (t.fits || 99) >= coverSlots(s));
 const shelterTake = (t, s) => Math.min(coverSlots(s), t.slots);
 // Slots taken in each of an exhibit's shelters right now
@@ -486,8 +488,8 @@ function shelterWhy(a, s, act, n){
   if(act === "hide") return "hide";
   const run = shelterRun.get(a.id);   // a stressed animal, shy or not, makes for a shelter and stays in until it has calmed down (but comes out for food and water)
   if(n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && (n.stress >= SHELTER.stressLine || (run && run.why === "hide" && n.stress > SHELTER.calmLine))) return "hide";
-  const wk = state.weather ? state.weather.today : "fair", W = WEATHER.kinds[wk];
-  if(W.happy && !(wk === "cold" && COLD_HARDY.includes(s.id)) && n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && napRoll(a, 7, true) < (SHELTER.weather[wk] ?? 1)) return "weather";
+  const cw = coverWhy(s);   // a storm, or too hot or cold for it: the worse it is, the more of them go in
+  if(cw && n.hunger < SHELTER.needLine && n.thirst < SHELTER.needLine && napRoll(a, 7, true) < (SHELTER.weather[cw.why] ?? 1) * Math.min(1, .5 + cw.w / 2)) return "weather";
   if(act === "rest" && (a.napFor || awake(s) <= SHELTER.sleepBelow)) return "sleep";
   return null;
 }
@@ -517,10 +519,10 @@ function shelterStep(e, a, s, ctx, act){
   if(!why){ if(run) shelterOut(a, ctx); return act; }
   if(run){ run.why = why; if(run.in) a.inside = why; else { run.since += BEHAVIOR.step; shelterArrive(a, run); } return act; }
   // look for the nearest shelter with room that suits it (not a canopy in a cold snap, nothing too small, a burrow only for burrowers)
-  const wk = state.weather ? state.weather.today : "fair", h = bodyPos(a), from = h ? [h.x, h.y] : centroid(e.points);
+  const cold = why === "weather" && (coverWhy(s) || {}).why === "cold", h = bodyPos(a), from = h ? [h.x, h.y] : centroid(e.points);
   let best = null, bd = Infinity;
   for(const f of landOf(e)){
-    const t = LAND[f.type]; if(!t || !shelterFits(t, s) || (why === "weather" && wk === "cold" && t.noCold)) continue;
+    const t = LAND[f.type]; if(!t || !shelterFits(t, s) || (cold && t.noCold)) continue;
     if((ctx.load.get(f) || 0) + shelterTake(t, s) > t.slots) continue;
     const d = Math.hypot(f.x - from[0], f.y - from[1]); if(d < bd){ bd = d; best = f; }
   }

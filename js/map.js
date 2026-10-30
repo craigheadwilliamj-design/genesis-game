@@ -665,19 +665,30 @@ const gateOpen = {};
 let gateT = 0;
 const gateFrameOf = id => Math.round((gateOpen[id] || 0) * (GATE_OPEN.frames - 1));
 // Weather over the map (visual only): one low-res canvas stretched with pixelated scaling, a small fixed pool of square flecks.
-const WX_SCALE = 3, WX_N = {cold:36, storm:60};
-const WX_TINT = {hot:"rgba(255,140,30,.17)", cold:"rgba(90,140,255,.14)", storm:"rgba(10,15,40,.30)"};
+// Kinds: today's event as it falls now, else a heat wave or cold snap, else the sky. Particles: n flecks, speed (vx, vy) in canvas pixels a second, w x h, sway.
+const WX_SCALE = 3;
+const WX_FX = {
+  partly:   {tint:"rgba(40,50,70,.05)"},
+  cloudy:   {tint:"rgba(40,50,70,.13)"},
+  hot:      {tint:"rgba(255,140,30,.17)"},
+  cold:     {tint:"rgba(90,140,255,.14)"},
+  rain:     {tint:"rgba(20,35,70,.18)", n:45, vx:-30, vy:220, w:1, h:3, color:"rgba(170,195,240,.45)"},
+  storm:    {tint:"rgba(10,15,40,.30)", n:60, vx:-90, vy:260, w:1, h:4, color:"rgba(190,210,255,.55)", slant:true, flash:true},
+  snow:     {tint:"rgba(200,215,240,.16)", n:110, vx:0, vy:16, w:1, h:1, sway:8, grow:true, color:"rgba(255,255,255,.9)"},
+  wind:     {n:14, vx:240, vy:0, w:6, h:1, sway:6, color:"rgba(255,255,255,.28)"},
+  sandstorm:{tint:"rgba(150,95,40,.42)", n:170, vx:300, vy:10, w:4, h:1, sway:10, grow:true, color:"rgba(250,222,160,.7)"},
+};
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
-let wxKind = "fair", wxFlash = 0, wxNext = 0;
+let wxKind = "clear", wxFlash = 0, wxNext = 0;
 function drawWeather(now){
-  const k = state.weather ? state.weather.today : "fair";
+  const wn = wxNow(), k = wn.ev || (wn.temp >= WX.heatWave ? "hot" : wn.temp <= WX.freeze ? "cold" : wn.sky), fx = WX_FX[k];
   if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
-  if(k === "fair") return;
+  if(!fx) return;
   const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
   if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
   const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
   c.clearRect(0, 0, w, h);
-  c.fillStyle = WX_TINT[k]; c.fillRect(0, 0, w, h);
+  if(fx.tint){ c.fillStyle = fx.tint; c.fillRect(0, 0, w, h); }
   if(k === "hot"){   // gentle shimmer: faint pale rows, each broken into short dashes of different lengths that drift sideways at their own pace
     c.fillStyle = "rgba(255,230,160,.07)";
     for(let i = 0; i < 9; i++){
@@ -691,18 +702,19 @@ function drawWeather(now){
     }
     return;
   }
-  const n = WX_N[k];
-  while(wxPool.length < n) wxPool.push({x:Math.random() * 400, y:Math.random() * 300, z:.6 + Math.random() * .6});
-  for(let i = 0; i < n; i++){
+  if(!fx.n) return;
+  while(wxPool.length < fx.n) wxPool.push({x:Math.random() * 400, y:Math.random() * 300, z:.6 + Math.random() * .6});
+  c.fillStyle = fx.color;
+  for(let i = 0; i < fx.n; i++){
     const p = wxPool[i];
-    if(k === "storm"){ p.x -= 90 * p.z * dt; p.y += 260 * p.z * dt; }
-    else { p.x += Math.sin(now / 900 + i) * 8 * dt; p.y += 14 * p.z * dt; }
+    p.x += (fx.vx * p.z + (fx.sway ? Math.sin(now / 900 + i) * fx.sway : 0)) * dt; p.y += fx.vy * p.z * dt;
     if(p.y > h){ p.y = -4; p.x = Math.random() * (w + 40); }
-    if(p.x < -6) p.x = w + Math.random() * 20; else if(p.x > w + 6) p.x = 0;
-    if(k === "storm"){ c.fillStyle = "rgba(190,210,255,.55)"; const x = Math.floor(p.x), y = Math.floor(p.y); c.fillRect(x, y, 1, 2); c.fillRect(x - 1, y + 2, 1, 2); }
-    else { c.fillStyle = "rgba(255,255,255,.85)"; c.fillRect(Math.floor(p.x), Math.floor(p.y), 1, 1); }
+    if(p.x < -8) p.x = w + Math.random() * 20; else if(p.x > w + 8){ p.x = -6; p.y = Math.random() * h; }
+    const x = Math.floor(p.x), y = Math.floor(p.y);
+    if(fx.slant){ c.fillRect(x, y, 1, 2); c.fillRect(x - 1, y + 2, 1, 2); }
+    else { const g = fx.grow && p.z > 1 ? 1 : 0; c.fillRect(x, y, fx.w + g, fx.h + g); }   // grow: the nearer flecks are a pixel bigger
   }
-  if(k === "storm"){
+  if(fx.flash){
     if(now > wxNext){ wxFlash = .35; wxNext = now + 4000 + Math.random() * 9000; }
     if(wxFlash > 0){ c.fillStyle = `rgba(255,255,255,${wxFlash.toFixed(2)})`; c.fillRect(0, 0, w, h); wxFlash -= dt * 2.5; }
   }

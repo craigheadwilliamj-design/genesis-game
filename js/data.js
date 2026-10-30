@@ -35,8 +35,9 @@ const WALK_SPEED = 20;
 const WALK_PER_MIN = WALK_SPEED / 6;   // fixed at the old 6 minutes a second, so a longer day doesn't change how far anyone gets in a park minute (on screen that halves WALK_SPEED)
 // Staff (keepers, vets, mechanics, custodians, guards) walk at this share of WALK_PER_MIN (1 = the old sim speed; the longer day is what slows them on screen)
 const STAFF_PACE = 1;
-// The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the first month of startYear.
-const CALENDAR = {daysPerMonth:30, startYear:1, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
+// The calendar: state.day stays the counter, the date is only how it is shown (fmtDate in sim.js). Day 1 is the 1st of the park's first month
+// (state.calStart, months after January: new parks open in spring, startMonth; older parks opened in January) of startYear.
+const CALENDAR = {daysPerMonth:30, startYear:1, startMonth:4, months:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]};
 // The park day runs on a clock from ROLLOVER_HOUR (6 AM) to 11 PM, then jumps back. The sim counts in PARK minutes (DAY_MIN of them make one day, MINUTES_PER_SECOND a second on screen, so a day is still 240 s);
 // the 24 h clock is only how a park minute is shown: CLOCK_SCALE clock minutes each. state.minute is park minutes since the daily rollover,
 // which happens at ROLLOVER_HOUR on the clock (endDay and every *Night function run then). clockMin/minuteAtClock (sim.js) convert.
@@ -632,7 +633,7 @@ const PERIOD_COLOR = {
 // with only idle (no walk strip) the idle strip plays all the time in an open exhibit, and a vivarium animal plays it on its spot.
 // People drawn as pixel figures: each strip is `n` frames of 16 x 32 px side by side, facing right (flipped to face left). `walk` plays while moving (a frame every `step` meters), `work` while standing at a job in `jobs` (a frame every `ms`), and `wait` plays while standing with nothing to do (a frame every `ms`). `h` is how tall the 32 px cell is in meters (about 1.9 m of person; a bit larger than true pixel size so they read).
 const HUMAN_SPRITES = {keeper:{walk:{src:"sprites/human/keeper-walk.png", n:4}, work:{src:"sprites/human/keeper-work.png", n:4, ms:180, jobs:["mucking", "filling"]}, wait:{src:"sprites/human/keeper-wait.png", n:4, ms:450}, carry:{src:"sprites/human/keeper-carry.png", n:4}}, vet:{walk:{src:"sprites/human/vet-walk.png", n:4}, work:{src:"sprites/human/vet-work.png", n:4, ms:180, jobs:["checking", "treating", "darting"]}, wait:{src:"sprites/human/vet-wait.png", n:4, ms:450}, carry:{src:"sprites/human/vet-carry.png", n:4}}, mechanic:{walk:{src:"sprites/human/mechanic-walk.png", n:4}, work:{src:"sprites/human/mechanic-work.png", n:4, ms:180, jobs:["repairing", "inspecting"]}, wait:{src:"sprites/human/mechanic-wait.png", n:4, ms:450}, carry:{src:"sprites/human/mechanic-carry.png", n:4}}, guard:{walk:{src:"sprites/human/guard-walk.png", n:4}, work:{src:"sprites/human/guard-escort.png", n:4, ms:180, jobs:["escorting"]}, wait:{src:"sprites/human/guard-wait.png", n:4, ms:450}}, custodian:{walk:{src:"sprites/human/custodian-walk.png", n:4}, work:{src:"sprites/human/custodian-work.png", n:4, ms:180, jobs:["scrubbing", "emptying", "sweeping"]}, wait:{src:"sprites/human/custodian-wait.png", n:4, ms:450}, carry:{src:"sprites/human/custodian-carry.png", n:4}}, guest:{walk:{src:"sprites/human/guest-walk.png", n:4}, wait:{src:"sprites/human/guest-wait.png", n:4, ms:450}}, guest2:{walk:{src:"sprites/human/guest2-walk.png", n:4}, wait:{src:"sprites/human/guest2-wait.png", n:4, ms:450}}, guest3:{walk:{src:"sprites/human/guest3-walk.png", n:4}, wait:{src:"sprites/human/guest3-wait.png", n:4, ms:450}}, guest4:{walk:{src:"sprites/human/guest4-walk.png", n:4}, wait:{src:"sprites/human/guest4-wait.png", n:4, ms:450}}, guest5:{walk:{src:"sprites/human/guest5-walk.png", n:4}, wait:{src:"sprites/human/guest5-wait.png", n:4, ms:450}}, w:16, ht:32, h:3.6, step:.8, feet:30};
-const SPRITES = {mosa:{ratio:100/75, rig:1, rstep:.06}, saca:{ratio:100/75, size:.55, rig:1, rstep:.11}, anom:{ratio:100/75, size:.85, rig:1, rstep:.1}, trex:{ratio:100/75, rig:1, rstep:.073, pace:1.6}, allo:{ratio:100/75, rig:1, rstep:.07, pace:1.6}, chal:{ratio:100/75, rig:1, rstep:.0426, pace:.8}, comp:{ratio:100/75, foot:.92, idle:52, ms:125, base:10, dyn:[[10,14],[24,13],[37,15]], dynMs:125, dynGap:[3,8], rig:1, rdyn:.4}, dryo:{ratio:100/75, rig:1, rstep:.07}, scut:{ratio:100/75, rig:1, rstep:.0354}, coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.0221, pace:.55}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.0496, rsize:1.6}, plhy:{ratio:100/75, rig:1, rdyn:.1, foot:.92, idle:32, ms:125, base:7, dyn:[[7,6],[13,19]], dynMs:110, dynGap:[5,12]}, icht:{ratio:100/75, rig:1, foot:.96, rdyn:.25}, tikt:{ratio:100/75, rig:1, rdyn:.25, foot:.57, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400, rig:1, rstep:.09, rsize:1.1}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.07}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}, mega:{ratio:100/75, size:.67, idle:4, ms:50}, arth:{ratio:100/75, foot:.63, idle:6, ms:167}};
+const SPRITES = {mosa:{ratio:100/75, rig:1, rstep:.06}, saca:{ratio:100/75, size:.55, rig:1, rstep:.11}, anom:{ratio:100/75, size:.85, rig:1, rstep:.1}, trex:{ratio:100/75, rig:1, rstep:.073, pace:1.6}, allo:{ratio:100/75, rig:1, rstep:.07, pace:1.6}, chal:{ratio:100/75, rig:1, rstep:.0426, pace:.8}, comp:{ratio:100/75, foot:.92, idle:52, ms:125, base:10, dyn:[[10,14],[24,13],[37,15]], dynMs:125, dynGap:[3,8], rig:1, rdyn:.4}, dryo:{ratio:100/75, rig:1, rstep:.07}, scut:{ratio:100/75, rig:1, rstep:.0354}, coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.0221, pace:.55}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.0496, rsize:1.6}, plhy:{ratio:100/75, rig:1, rdyn:.1, foot:.92, idle:32, ms:125, base:7, dyn:[[7,6],[13,19]], dynMs:110, dynGap:[5,12]}, icht:{ratio:100/75, rig:1, foot:.96, rdyn:.25}, tikt:{ratio:100/75, rig:1, rdyn:.25, foot:.57, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400, rig:1, rstep:.056, rsize:1.8, pace:.5}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.07}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}, mega:{ratio:100/75, size:.67, idle:4, ms:50}, arth:{ratio:100/75, foot:.63, idle:6, ms:167}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
 // (appeal 6 to 8, so one herd actually draws a crowd while the rest of the starters barely do).
@@ -646,6 +647,7 @@ const STARTER_POOLS = {
 //   kind       "food" or "merch": an empty shell that sells whatever you put on its menu (up to menuSlots items)
 //   serves     the guest needs it takes care of, for buildings without a menu
 //   seats      guests can sit down and rest here
+//   indoor     guests in line or inside are out of the weather
 //   slots      parties served at once, each taking serveMin minutes
 //   patience   minutes a party will wait for a free spot (default GUEST.patience)
 //   minRating  stars the park needs before you can build it
@@ -654,11 +656,11 @@ const BUILDINGS = {
   // every building's footprint sides are multiples of 5 m (path props like bins and benches are exempt)
   kiosk:     {label:"Food cart",   one:"a food cart",   glyph:"K", color:"#3F86A8", price:3000,  upkeep:30,  w:5, d:5, kind:"food",  menuSlots:1, slots:2,  serveMin:3},
   food:      {label:"Food stand",  one:"a food stand",  glyph:"D", color:"#2F6E8F", price:6000,  upkeep:60,  w:10, d:10,  kind:"food",  menuSlots:3, slots:4,  serveMin:4},
-  restaurant:{label:"Restaurant",  one:"a restaurant",  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:20, d:15, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
+  restaurant:{label:"Restaurant",  one:"a restaurant", indoor:true,  glyph:"F", color:"#1F5470", price:20000, upkeep:220, w:20, d:15, kind:"food",  menuSlots:5, slots:10, serveMin:12, seats:true, minRating:2, confirm:true},
   cart:      {label:"Gift cart",   one:"a gift cart",   glyph:"C", color:"#A06A93", price:3000,  upkeep:30,  w:5, d:5, kind:"merch", menuSlots:1, slots:2,  serveMin:3},
   shop:      {label:"Gift stand",  one:"a gift stand",  glyph:"S", color:"#8C4F7D", price:6000,  upkeep:60,  w:10, d:10,  kind:"merch", menuSlots:3, slots:4,  serveMin:4},
-  megastore: {label:"Gift shop",   one:"a gift shop",   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:20, d:15, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
-  restroom:  {label:"Restrooms",   one:"restrooms",     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:10,  d:5,  serves:["bladder"], slots:4, serveMin:3},
+  megastore: {label:"Gift shop",   one:"a gift shop", indoor:true,   glyph:"M", color:"#6E3661", price:20000, upkeep:220, w:20, d:15, kind:"merch", menuSlots:5, slots:10, serveMin:6, minRating:2},
+  restroom:  {label:"Restrooms",   one:"restrooms", indoor:true,     glyph:"R", color:"#56708A", price:4000,  upkeep:40,  w:10,  d:5,  serves:["bladder"], slots:4, serveMin:3},
   // small things beside the path
   bin:       {label:"Trash bin",   one:"a trash bin",   glyph:"",  color:"#3C4A3F", price:150,   upkeep:1,   w:1.6, d:1.6, prop:true, onPath:true},
   bench:     {label:"Bench",       one:"a bench",       glyph:"",  color:"#8A6238", price:400,   upkeep:2,   w:3,  d:1.4, prop:true, onPath:true, serves:["energy"], seats:true, slots:2, serveMin:12, patience:2},
@@ -670,11 +672,11 @@ const BUILDINGS = {
   nofeed:    {label:"Do Not Feed sign", one:"a Do Not Feed sign", glyph:"", color:"#B5382E", price:200, upkeep:1, w:1.6, d:1, prop:true, onPath:true},
   quiet:     {label:"Quiet sign",  one:"a quiet sign",  glyph:"",  color:"#3E7C8C", price:200,   upkeep:1,   w:1.6, d:1,  prop:true, onPath:true},
   // hotels: guests stay the night and spend the next day in the park
-  lodge:     {label:"Safari Lodge", one:"a safari lodge", glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:20, d:15, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300, confirm:true},
-  resort:    {label:"Resort Hotel", one:"a resort hotel", glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700, confirm:true},
+  lodge:     {label:"Safari Lodge", one:"a safari lodge", indoor:true, glyph:"L", color:"#7B5B3A", price:30000, upkeep:200, tech:"hotels", w:20, d:15, serves:["sleep"], rooms:20, roomPrice:120, minRating:3, minGuests:300, confirm:true},
+  resort:    {label:"Resort Hotel", one:"a resort hotel", indoor:true, glyph:"H", color:"#A0473F", price:120000, upkeep:900, tech:"hotels", w:30, d:20, serves:["sleep"], rooms:80, roomPrice:180, minRating:4, minGuests:700, confirm:true},
   campground:{label:"Campground",   one:"a campground",   glyph:"G", color:"#4F7A3A", price:8000, upkeep:70, tech:"hotels", w:15, d:10, serves:["sleep"], rooms:10, roomPrice:60, minRating:2, minGuests:100, confirm:true},
   // guests learn about prehistoric life here
-  edcenter:  {label:"Education Center", one:"an Education Center", glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:15, d:10, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education", confirm:true},
+  edcenter:  {label:"Education Center", one:"an Education Center", indoor:true, glyph:"E", color:"#2F7A5A", price:12000, upkeep:90, w:15, d:10, serves:["learn"], slots:16, serveMin:20, patience:40, minRating:2, tech:"education", confirm:true},
   // guests ride the tram between these; each sits beside a footpath and a tram track
   tramstop:  {label:"Tram station", one:"a tram station", glyph:"T", color:"#B5533C", price:6000, upkeep:60, w:10, d:5, tram:true, tech:"transit"},
 
@@ -783,7 +785,7 @@ const PERSONALITIES = {
     n:{species:2.5, era:4, repeat:2.5, accurate:3, guess:5, nosign:2, collection:10, tasteNew:1.8, tasteOld:.6, center:1.5}},
   family:{label:"Family Focused", color:"#2F86C8", weight:.26,
     text:"Wants a safe, easy day: gentle herbivores, short walks, clean restrooms, benches, cheap food and a fair ticket. Punishes bad infrastructure harder than anyone.",
-    fx:{dark:1.6, infra:1.6, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
+    fx:{dark:1.6, infra:1.6, weather:1.3, ticket:.85, price:1.4, patience:.8, walk:1.3, food:1.15, shop:1.1, toilet:2, hideTol:.7, need:{energy:1.25, bladder:1.15}},
     n:{kids:5, scary:5, gory:4, tasteKids:1, tasteScary:.5, center:1.3}},
   fun:{label:"Fun Lover", color:"#E3B23C", weight:.26,
     text:"Here for a good time with no strong preferences. Likes good food and a nice atmosphere. Hates boredom, lines and anything broken.",
@@ -831,7 +833,8 @@ const MENU = {
   toy:     {label:"Toy dinosaurs", kind:"merch", good:"merch", price:10, cost:3,  joy:7},
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
-  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains."},
+  umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains. Keeps the rain off."},
+  jacket:  {label:"Park jackets",  kind:"merch", good:"merch", price:30, cost:9,  joy:5, text:"Sells far better in the cold. Keeps the cold off."},
   iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
   fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
   tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
@@ -887,6 +890,13 @@ const THOUGHTS = {
   playful:    {text:"We watched the animals play!", good:true},
   scared:     {text:"An animal got loose. We're getting out of here!"},
   pricey:     {text:"The ticket cost far too much."},
+  wxHot:      {text:"It's way too hot out here."},
+  wxCold:     {text:"It's freezing out here."},
+  wxRain:     {text:"We got soaked."},
+  wxSnow:     {text:"It wouldn't stop snowing."},
+  wxStorm:    {text:"That storm was frightening."},
+  wxSand:     {text:"The sandstorm was miserable."},
+  wxWind:     {text:"The wind blew our stuff around."},
   dark:       {text:"The paths were too dark at night."},
   noSeat:     {text:"My feet hurt and there's nowhere to sit."},
   litter:     {text:"There's trash all over the paths."},
@@ -1247,6 +1257,10 @@ const POWER = {
   perSqM:.12,             // kW a building draws for each m² of floor, unless it sets its own kw
   genWear:4,              // a power station's or transformer's condition lost per day (times its own wear); cables never wear
   offlineBelow:25,        // power stations and transformers cut out below this condition
+  // bad weather can knock the grid out: on a day of this event, this chance of one hit, at a random time, on one working station or transformer
+  hit:{odds:{storm:.25, snow:.15, sandstorm:.08}, cond:10,   // the condition it's left at
+    weight:{wind:3, transformer:3, solar:1, generator:1, gasplant:1, geothermal:.3}, sandSolar:3,   // which gets hit (anything else 1); sand goes for the solar arrays
+    text:{storm:"Lightning hit", snow:"Ice brought down", sandstorm:"Sand choked"}},
   repairPerPercent:60,    // materials to restore 1% of a power station's or transformer's condition
   cablePerMeter:12,       // underground cable, laid straight between two power buildings
   cableMax:200,           // longest single run of cable, in meters
@@ -1257,8 +1271,8 @@ const POWER = {
   ugly:.4,                // a stretch this ugly gets guests talking
   greenJoy:.03,           // mood a minute conservationists gain walking past green power (full at greenFull)
   greenFull:2,            // green stations within reach that make it as good as it gets
-  sun:{storm:.35},        // solar arrays: this share of their power in this weather; none after dark
-  wind:{storm:1.5, hot:.6},   // wind turbines: this share of their power in this weather
+  sun:{partly:.85, cloudy:.6, rain:.4, storm:.2, snow:0, sandstorm:0},   // solar arrays: this share of their power under this sky or event (wxNow); none after dark
+  wind:{wind:1.6, storm:1.5, sandstorm:1.3},   // wind turbines: this share of their power in this event
 };
 // Power stations: power (kW), reach (m they feed around themselves), eyesore (how much guests mind them, 0 is none),
 // green (conservationists like seeing them), wear (times POWER.genWear), sun/wind (output follows the sky).
@@ -1768,27 +1782,107 @@ const HAB = {
   meatPlants:.5,   // meat eaters want this share of the plants that plant eaters do
   browseMax:.75,   // groves can supply at most this share of an exhibit's daily food; keepers bring the rest
 };
-// Weather. Each night rolls the day after tomorrow, so the top bar always has tomorrow's forecast.
+// Weather's effects. Each day's weather comes from the park's climate (CLIMATE below); today's kind here is what it does to the park:
+// a storm or sandstorm day is that kind, any other day is fair. (Heat waves and cold snaps are kept for when temperature drives them.)
 // Animals with no cover in bad weather are unhappy, fall ill more, and in storms get hurt.
-//   odds    chance of this weather on any day
 //   happy   happiness an exhibit loses if none of its animals have cover
 //   ill     extra illness for animals without cover (1 means twice as likely)
 //   hurt    chance a day an animal without cover is hurt
 //   wear    fence wear multiplier
-//   guests  share of the usual guests who come
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
   umbrella:2.5,     // umbrellas sell this many times as well on a wet day
-  startDay:4,       // new parks get fair weather until this day
+  jacket:2.5,       // and jackets in the cold (GUEST_WX.coldBelow) or snow
+  startDay:4,       // new parks get no weather events until this day
   kinds:{
-    fair: {label:"Fair",      odds:.55, happy:0,  ill:0,   hurt:0,   wear:1,   guests:1,   grove:0},
-    hot:  {label:"Heat wave", odds:.17, happy:10, ill:.8,  hurt:0,   wear:1,   guests:.85, grove:1},
-    cold: {label:"Cold snap", odds:.15, happy:12, ill:1.5, hurt:0,   wear:1,   guests:.8,  grove:0},
-    storm:{label:"Storm",     wet:true, odds:.13, happy:15, ill:.6,  hurt:.03, wear:2.5, guests:.55, grove:.5},
+    fair:     {label:"Fair",      happy:0,  ill:0,   hurt:0,   wear:1,   grove:0},
+    hot:      {label:"Heat wave", happy:10, ill:.8,  hurt:0,   wear:1,   grove:1},
+    cold:     {label:"Cold snap", happy:12, ill:1.5, hurt:0,   wear:1,   grove:0},
+    storm:    {label:"Storm",     wet:true, happy:15, ill:.6,  hurt:.03, wear:2.5, grove:.5},
+    sandstorm:{label:"Sandstorm", happy:15, ill:.6,  hurt:.03, wear:3,   grove:.3},
   },
 };
-// Ice age animals shrug off the cold
-const COLD_HARDY = ["mamm", "colm", "elas", "arct", "dire", "smil", "mast", "mglo"];
+// The park's climate: the biome it's set in (state.biome) decides each day's temperature, sky and event. One entry per month, Jan to Dec.
+//   t       the coldest night and hottest afternoon the month can show (°F)
+//   drop    how far night falls below the day on a clear day (dawn and dusk sit halfway; clouds hold some heat in)
+//   cloud   how cloudy the sky runs, 0 to 1: clear (1-c)², partly cloudy 2c(1-c), cloudy c²
+//   precip  chance of a day of rain (snow if the day is at or under freezing, none over WX.rainMax)
+//   storm   chance of a storm (snow instead on a freezing day)
+//   wind    chance of a windy day (a sandstorm in the desert)
+const CLIMATE = {
+  desert:   {drop:30, t:[[25,75],[30,82],[38,90],[45,98],[55,106],[65,114],[72,118],[70,116],[62,110],[48,98],[35,85],[25,76]],
+    cloud:[.2,.2,.15,.1,.08,.05,.12,.15,.08,.1,.15,.2], precip:[.06,.05,.04,.02,.01,0,.03,.04,.02,.03,.04,.06],
+    storm:[0,0,0,0,0,.02,.06,.06,.02,0,0,0], wind:[.06,.08,.14,.14,.1,.06,.04,.04,.04,.06,.06,.06]},
+  scrubland:{drop:26, t:[[30,68],[32,72],[38,80],[45,88],[52,96],[60,104],[65,108],[64,106],[58,100],[48,90],[38,78],[30,68]],
+    cloud:[.4,.38,.32,.25,.18,.1,.08,.08,.12,.2,.32,.4], precip:[.16,.14,.12,.08,.04,.01,0,0,.02,.06,.12,.16],
+    storm:[.02,.02,.03,.04,.03,.01,.01,.01,.02,.03,.02,.02], wind:[.08,.1,.12,.12,.1,.08,.08,.08,.08,.08,.08,.08]},
+  grassland:{drop:24, t:[[-15,55],[-10,60],[5,72],[25,84],[38,92],[50,100],[56,106],[54,104],[40,96],[25,85],[8,70],[-10,58]],
+    cloud:[.45,.45,.45,.42,.4,.32,.25,.25,.28,.32,.42,.45], precip:[.08,.09,.12,.14,.14,.12,.09,.08,.08,.08,.08,.08],
+    storm:[.01,.02,.05,.1,.14,.13,.1,.08,.05,.03,.01,.01], wind:[.1,.12,.16,.16,.12,.08,.06,.06,.08,.1,.12,.1]},
+  fern:     {drop:20, t:[[45,80],[46,82],[52,86],[58,90],[64,94],[70,98],[72,100],[72,100],[66,96],[58,90],[50,84],[46,80]],
+    cloud:[.4,.4,.42,.42,.4,.35,.32,.32,.35,.4,.42,.4], precip:[.16,.16,.18,.18,.15,.1,.08,.08,.1,.14,.16,.16],
+    storm:[.03,.03,.05,.08,.1,.12,.12,.12,.1,.06,.04,.03], wind:[.06,.06,.08,.08,.06,.05,.05,.05,.05,.06,.06,.06]},
+  tropical: {drop:13, t:[[68,92],[68,93],[70,95],[72,96],[73,96],[72,94],[72,93],[72,93],[72,94],[72,94],[70,93],[68,92]],
+    cloud:[.4,.38,.4,.45,.55,.65,.7,.7,.65,.6,.5,.42], precip:[.1,.08,.1,.15,.25,.32,.35,.35,.32,.28,.18,.12],
+    storm:[.03,.03,.04,.06,.1,.14,.16,.16,.14,.12,.06,.04], wind:[.04,.04,.04,.04,.04,.05,.05,.05,.05,.05,.04,.04]},
+  wetland:  {drop:16, t:[[32,75],[35,78],[42,84],[50,88],[60,93],[68,97],[71,99],[71,99],[65,96],[52,90],[42,82],[34,76]],
+    cloud:[.55,.55,.52,.5,.5,.5,.5,.5,.5,.5,.52,.55], precip:[.2,.2,.22,.22,.2,.2,.2,.2,.18,.16,.18,.2],
+    storm:[.02,.03,.05,.07,.09,.12,.12,.12,.1,.05,.03,.02], wind:[.06,.06,.08,.08,.06,.05,.05,.05,.06,.06,.06,.06]},
+  temperate:{drop:20, t:[[-10,55],[-5,60],[10,75],[28,85],[40,90],[52,98],[58,104],[56,102],[42,95],[28,85],[12,70],[-5,60]],
+    cloud:[.55,.52,.5,.48,.45,.38,.32,.32,.35,.42,.52,.55], precip:[.14,.14,.16,.18,.16,.12,.1,.1,.1,.12,.14,.14],
+    storm:[.01,.02,.05,.1,.12,.1,.08,.07,.06,.04,.02,.01], wind:[.1,.1,.14,.12,.08,.05,.04,.04,.06,.1,.12,.1]},
+  boreal:   {drop:18, t:[[-35,35],[-30,40],[-15,50],[5,65],[25,78],[38,88],[45,92],[42,88],[30,75],[15,60],[-10,45],[-30,38]],
+    cloud:[.6,.55,.5,.48,.45,.45,.45,.48,.52,.58,.62,.62], precip:[.16,.14,.14,.14,.14,.14,.14,.15,.16,.18,.18,.17],
+    storm:[0,0,.01,.02,.04,.06,.06,.05,.03,.01,0,0], wind:[.08,.08,.1,.1,.08,.06,.06,.06,.08,.1,.1,.08]},
+  tundra:   {drop:12, t:[[-45,15],[-45,18],[-35,25],[-20,38],[0,50],[25,65],[33,72],[30,68],[18,52],[-5,35],[-25,25],[-40,18]],
+    cloud:[.5,.48,.48,.5,.55,.6,.62,.65,.65,.6,.55,.5], precip:[.1,.1,.1,.1,.1,.12,.14,.15,.15,.14,.12,.1],
+    storm:[0,0,0,0,.01,.02,.03,.03,.01,0,0,0], wind:[.14,.14,.12,.1,.08,.06,.06,.06,.08,.1,.12,.14]},
+};
+// Weather and guests: it never keeps them away, but out in it they lose mood a minute (times how much they mind, pm "weather").
+// Guests in line at or inside an indoor building (BUILDINGS indoor) are out of it. A guest with an umbrella or jacket feels only part of it.
+const GUEST_WX = {
+  hotFrom:85, coldBelow:40,   // °F: hotter or colder than this bothers them
+  hot:.01, hotPer:.002,       // mood a minute over hotFrom, and more for each degree past it (being on their feet costs .03)
+  cold:.01, coldPer:.0015,
+  max:.05,                    // the most heat or cold can take a minute
+  ev:{rain:.02, snow:.015, wind:.012, storm:.05, sandstorm:.08},   // mood a minute each event takes
+  umbrella:.2,                // share of rain and storms a guest with an umbrella still feels
+  jacket:.2,                  // share of cold and snow a guest with a jacket still feels
+  thirst:.6,                  // guests get up to this much thirstier in the heat (at max)
+  thought:.012,               // mood a minute at which they say so
+};
+// How the climate plays out from day to day
+const WX = {
+  pull:.25,          // each day the temperature moves this share of the way back to the month's middle
+  swing:7,           // and wanders about this many °F a day on top (rare days twice that)
+  overcast:.6,       // cloudy, rainy and snowy days lose this share of the usual night drop
+  freeze:32,         // at or under this precipitation falls as snow; the top bar calls it a cold snap
+  rainMax:95,        // no rain on a day hotter than this
+  heatWave:90,       // the top bar calls this or hotter a heat wave
+  accuracy:.75,      // chance tomorrow's forecast gets the sky or event right
+  nearOff:3,         // a forecast's temperatures are off by up to this many °F
+  farOff:10,         // and up to this many when it gets the day wrong
+  // parts of the day on the clock (hours): dawn and dusk sit halfway between the day's high and the night's low
+  phases:[{id:"dawn", label:"Dawn", to:9}, {id:"day", label:"Day", to:18}, {id:"dusk", label:"Dusk", to:21}, {id:"night", label:"Night", to:30}],
+  sky:{clear:"Clear", partly:"Partly cloudy", cloudy:"Cloudy"},
+  events:{rain:"Rain", snow:"Snow", storm:"Storm", wind:"Windy", sandstorm:"Sandstorm"},
+};
+// Temperature tolerance, by biome: an animal is comfortable from lo to hi (°F) and gets worse a level every `cold` degrees under lo
+// or `heat` degrees over hi, up to TEMP_HARM.levels. An animal with two biomes takes the colder lo and the hotter hi, each with its own step.
+// Judged on the temperature the top bar shows now (wxNow); illness and injuries take the worse of the day's high and low.
+const TOLERANCE = {
+  desert:   {lo:25,  hi:120, cold:8,  heat:12},
+  scrubland:{lo:28,  hi:110, cold:8,  heat:10},
+  grassland:{lo:-10, hi:104, cold:12, heat:8},
+  fern:     {lo:45,  hi:100, cold:8,  heat:8},
+  tropical: {lo:65,  hi:97,  cold:6,  heat:6},
+  wetland:  {lo:30,  hi:101,  cold:8,  heat:8},
+  temperate:{lo:-5,  hi:100,  cold:12, heat:8},
+  boreal:   {lo:-30, hi:85,  cold:15, heat:6},
+  tundra:   {lo:-50, hi:65,  cold:20, heat:5},
+};
+// How much each level of too hot or too cold hurts, times WEATHER.kinds.hot or cold (level 0 is comfortable)
+const TEMP_HARM = {weights:[0, .4, 1, 1.8], levels:["", "a little", "badly", "dangerously"]};
 // Shelter slots one animal takes: bigger animals need more room
 const coverSlots = s => Math.max(1, Math.round(Math.sqrt(s.space) / 4));
 
@@ -1827,13 +1921,13 @@ const SHELTER = {
   sleepBelow:.5,       // an animal this drowsy (awake() at or under it) that is resting goes in to sleep; so does a napper
   needLine:70,         // hunger or thirst over this and a weather-sheltering animal comes out to eat or drink
   giveUp:90,           // park minutes of walking before an animal that can't find its way to its shelter just goes in
-  weather:{storm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
+  weather:{storm:1, sandstorm:1, cold:.85, hot:.7},   // share of animals that seek shelter on a day of that weather (picked per animal per day)
   hideCalm:4,          // hiding behind walls sheds stress this many times as fast as hiding in the open
   restCalm:.8,         // stress shed a minute resting or sleeping inside (in the open it's .1)
   stressLine:55,       // a stressed animal (any temper) heads straight for a shelter over this much stress, and stays in until it is down to calmLine
   calmLine:25,
   hurry:2.2,           // how fast it walks there, as a multiple of its usual pace
-  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
+  text:{hide:"Hiding inside", sleep:"Sleeping inside", weather:{storm:"Sheltering from the storm", sandstorm:"Sheltering from the sand", hot:"Sheltering from the heat", cold:"Sheltering from the cold"}},
 };
 // Guests who come to see animals that are all indoors are let down (seeExhibit in guests.js; hideBother in behavior.js)
 const HIDING = {
