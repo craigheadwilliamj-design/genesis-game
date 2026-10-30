@@ -1,9 +1,9 @@
-# New hide texture for five rigged animals: the Allosaurus, Dryosaurus, Compsognathus, Platyhystrix and Tyrannosaurus (part pictures inside their rigger projects, tools/rigger/<species>/).
+# New hide texture for four rigged animals: the Allosaurus, Dryosaurus, Compsognathus and Tyrannosaurus (part pictures inside their rigger projects, tools/rigger/<species>/).
 # Their parts already carry an older shading pass, so this reads each pixel back to a role (base hide, belly, markings, sail...) from the colors the part holds now, then paints the roles again in the flat style:
 # a lit top-left edge, shade under the flank and the right side, rows of short scale dashes, belly scutes, a lit line where belly meets flank, markings with a lighter top and darker underside.
 # Every pixel keeps its place (asserted), eyes, claws and anything it doesn't know stay exactly as they are, and it is safe to run twice (it reads its own colors back).
 # Far limbs and feet stay flat. Parts turn with the animal, so each part is shaded in its own frame.
-# Usage: python3 -I tools/pixelretex4_rig.py [allo|dryo|comp|plhy|trex ...]   (no argument = all five; rewrites the rig and clips JSONs in place, then run rigtogame.py as in docs/rigs.md)
+# Usage: python3 -I tools/pixelretex4_rig.py [allo|dryo|comp|trex ...]   (no argument = all four; rewrites the rig and clips JSONs in place, then run rigtogame.py as in docs/rigs.md)
 import sys, os, io, json, base64
 from PIL import Image
 
@@ -35,17 +35,6 @@ SPECIES = {
         "new": {"base": "#d4b30c", "hi": "#ecd24a", "lo": "#a68a05", "scale": "#bd9f08", "dark": "#3b3028", "darkhi": "#55463a", "darklo": "#271f19", "far": "#251e19",
                 "belly": "#d9cd92", "bellyhi": "#ebe2b4", "bellylo": "#b3a66c", "rib": "#c5b87c",
                 "tail": "#0766b4", "tailhi": "#2a9af0", "taillo": "#0a4a86"},
-        "scale": True, "ribs": True,
-    },
-    "plhy": {
-        "dir": "platyhystrix", "files": ["platyhystrix-rig.json", "platyhystrix-clips.json"],
-        "map": {"#00b684": "base", "#00986e": "base", "#008963": "far", "#007a58": "belly", "#005c42": "belly", "#006b4d": "belly",
-                "#8cb600": "sailA", "#e7b600": "sailB", "#1a0b51": "mark"},
-        "new": {"base": "#0fb386", "hi": "#3fd3a3", "lo": "#07805f", "scale": "#0da97d", "far": "#08785a",
-                "belly": "#2b9478", "bellyhi": "#37a587", "bellylo": "#1d6f58", "rib": "#2f9c80",
-                "mark": "#1f1058", "markhi": "#3a2a80", "marklo": "#140a3a",
-                "sailA": "#94bd10", "sailAhi": "#b4d83a", "sailAlo": "#6b9206",
-                "sailB": "#eab80e", "sailBhi": "#f7d44c", "sailBlo": "#bc8d08"},
         "scale": True, "ribs": True,
     },
     "trex": {
