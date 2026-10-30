@@ -679,7 +679,7 @@ const WX_FX = {
   sandstorm:{tint:"rgba(150,95,40,.42)", n:170, vx:300, vy:10, w:4, h:1, sway:10, grow:true, color:"rgba(250,222,160,.7)"},
 };
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
-let wxKind = "clear", wxFlash = 0, wxNext = 0;
+let wxKind = "", wxFlash = 0, wxNext = 0;   // "" so the first frame always tags the canvas with its kind
 function drawWeather(now){
   const wn = wxNow(), k = wn.ev || (wn.temp >= WX.heatWave ? "hot" : wn.temp <= WX.freeze ? "cold" : wn.sky), fx = WX_FX[k];
   if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
