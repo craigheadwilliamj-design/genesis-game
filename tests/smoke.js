@@ -4193,6 +4193,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const rc = document.createElement("canvas"); rc.width = 400; rc.height = 100; rc.getContext("2d").fillRect(0, 0, 400, 100);
     const pngNoRef = pxPng(); px.refUrl = rc.toDataURL(); await pxSetRef("upload"); const refB = pxRefBox();
     out.pixelReference = refB[2] === px.fw && Math.abs(refB[3] - px.fw / 4) < 1e-9 && refB[1] + refB[3] === px.fh && refB[0] === 0 && pxDraft().ref.path === "upload" && pxPng() === pngNoRef;
+    // To layer: a 6x4 pixel-art picture blown up 5x with a 2 px margin, matched 1:1 and copied in, comes back as its 24 pixels and 4 colors
+    const art = [[200, 40, 40], [40, 160, 60], [30, 30, 120], [230, 200, 90]], ac = document.createElement("canvas"); ac.width = 34; ac.height = 24; const actx = ac.getContext("2d");
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 6; x++){ actx.fillStyle = `rgb(${art[(x * 3 + y) % 4]})`; actx.fillRect(2 + x * 5, 2 + y * 5, 5, 5); }
+    px.refUrl = ac.toDataURL(); await pxSetRef("upload"); const grid = pxRefGrid(); pxRefMatch(); const layN = px.layers.length; pxRefToLayer();
+    const got = px.frames[px.cur][px.layers.length - 1], gotC = new Set(); let gotN = 0; for(let i = 0; i < got.length; i += 4) if(got[i + 3]){ gotN++; gotC.add(got.slice(i, i + 3).join()); }
+    out.pixelRefToLayer = grid.s === 5 && grid.ox === 2 && px.layers.length === layN + 1 && gotN === 24 && gotC.size === 4 && art.every(c => gotC.has(c.join()));
+    pxUndo(false);
     await pxSetRef(""); px.refUrl = "";
     pxTool("pan"); out.pixelPanTool = pxPans({button:0}) && pxPans({button:1}) && pxCv.style.cursor === "grab" && !!document.querySelector('#dlgPixel [data-tool="pan"]'); pxTool("pencil");
     // the lasso snaps to pixels: a triangle's ring and inside, and copy and paste keep its shape

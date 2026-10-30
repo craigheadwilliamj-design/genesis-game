@@ -760,6 +760,7 @@ function pxBuild(){
         <div class="pxrow"><span>Reference opacity</span><input type="range" min="5" max="100" id="pxRAlpha"><span class="num" id="pxRAlphaN"></span></div>
         <div class="pxrow"><span>Reference size</span><input type="range" min="20" max="300" id="pxRSize"><span class="num" id="pxRSizeN"></span></div>
         <div class="pxrow"><label><input type="checkbox" id="pxRMove"> Drag the reference</label><button class="btn" data-px="refreset" title="Back to the bottom middle at full size">Reset</button></div>
+        <div class="pxrow"><button class="btn" data-px="refmatch" title="Scale and line up a blown-up pixel-art reference so each of its pixels lands on one canvas pixel">Match pixels</button><button class="btn" data-px="reflayer" title="Copy the reference, as it sits, into a new layer on this frame: each pixel gets the main color under it. With the park or Dimetrodon palette picked, colors snap to it.">To layer</button></div>
         <label class="pxrow"><input type="checkbox" id="pxRFront"> Draw the reference over the layers, to trace</label>
         <div class="meta">Every frame has the same layers. Tools draw on the highlighted one; the game gets them flattened. The reference is only a guide and never goes into the picture: an upload starts scaled to fit the canvas whole on the bottom middle; drag it or resize it from there.</div></section>
       <section><h3>Frames</h3><div class="pxframes" id="pxFrames"></div>
@@ -925,6 +926,64 @@ function pxRefBox(){
   const k = (px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1) * px.refK, w = r.width * k, h = r.height * k;
   return [(px.fw - w) / 2 + px.refX, px.fh - h + px.refY, w, h];
 }
+// The reference's own pixel size, for pixel-art references blown up by a whole number: the biggest block size most same-color runs
+// are a multiple of, and where its grid starts. {s:1} for a photo or a reference already 1:1.
+function pxRefGrid(){
+  const r = px.refCv, w = r.width, h = r.height, d = r.getContext("2d").getImageData(0, 0, w, h).data, runs = [];
+  const key = i => d[i + 3] < 128 ? 0 : (d[i] << 16 | d[i + 1] << 8 | d[i + 2]) + 1;
+  const scan = (n, m, at) => { for(let a = 0; a < m; a++){ let st = 0, k = key(at(a, 0)); for(let b = 1; b <= n; b++){ const k2 = b < n ? key(at(a, b)) : -1; if(k2 !== k){ if(st > 0 && b < n) runs.push([b - st, st]); st = b; k = k2; } } } };
+  scan(w, h, (y, x) => (y * w + x) * 4); const nx = runs.length; scan(h, w, (x, y) => (y * w + x) * 4);
+  if(runs.length < 8) return {s:1, ox:0, oy:0};
+  let s = 1; for(let t = 2; t <= 32; t++) if(runs.filter(([n]) => n % t === 0).length >= runs.length * .85) s = t;
+  const phase = rs => { const c = new Array(s).fill(0); rs.forEach(([, st]) => c[st % s]++); return c.indexOf(Math.max(...c)); };
+  return {s, ox:phase(runs.slice(0, nx)), oy:phase(runs.slice(nx))};
+}
+// Match pixels: one reference pixel to one sprite pixel, its grid on the canvas grid, still standing on the bottom middle
+function pxRefMatch(){
+  if(!px.refCv) return ui.toast("No reference to match.");
+  const g = pxRefGrid(), r = px.refCv, k0 = px.ref === "upload" ? Math.min(px.fw / r.width, px.fh / r.height) : 1;
+  px.refK = 1 / g.s / k0; px.refX = px.refY = 0;
+  const b = pxRefBox(), fx = b[0] + g.ox / g.s, fy = b[1] + g.oy / g.s;
+  px.refX = Math.round(fx) - fx; px.refY = Math.round(fy) - fy; pxChanged();
+  ui.toast(g.s > 1 ? `Matched: ${g.s} reference pixels to a pixel.` : "Matched at 1 to 1. No bigger pixel grid found.");
+}
+// To layer: the reference as it sits on the canvas, sampled into a new top layer on this frame. Each pixel takes the main color under it
+// (near colors pooled, so JPEG noise and smoothing don't win), then near-duplicate colors are merged and the count capped at 32.
+// With the park or Dimetrodon palette picked, colors snap to it instead.
+function pxRefToLayer(){
+  const b = pxRefBox(); if(!b) return ui.toast("No reference to copy.");
+  const r = px.refCv, rw = r.width, rh = r.height, d = r.getContext("2d").getImageData(0, 0, rw, rh).data, out = pxBlank(px.fw, px.fh);
+  for(let y = 0; y < px.fh; y++) for(let x = 0; x < px.fw; x++){
+    let x0 = Math.floor((x - b[0]) / b[2] * rw), x1 = Math.ceil((x + 1 - b[0]) / b[2] * rw), y0 = Math.floor((y - b[1]) / b[3] * rh), y1 = Math.ceil((y + 1 - b[1]) / b[3] * rh);
+    if(x1 <= 0 || y1 <= 0 || x0 >= rw || y0 >= rh) continue;
+    if(x1 - x0 <= 1 && y1 - y0 <= 1){ x0 = x1 = Math.floor((x + .5 - b[0]) / b[2] * rw); y0 = y1 = Math.floor((y + .5 - b[1]) / b[3] * rh); x1++; y1++; if(x0 < 0 || y0 < 0 || x0 >= rw || y0 >= rh) continue; }   // enlarged: the one pixel under the centre
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(rw, x1); y1 = Math.min(rh, y1);
+    const pool = new Map(); let clear = 0;
+    for(let sy = y0; sy < y1; sy++) for(let sx = x0; sx < x1; sx++){
+      const i = (sy * rw + sx) * 4; if(d[i + 3] < 128){ clear++; continue; }
+      const k = d[i] >> 3 << 10 | d[i + 1] >> 3 << 5 | d[i + 2] >> 3, p = pool.get(k) || [0, 0, 0, 0]; p[0] += d[i]; p[1] += d[i + 1]; p[2] += d[i + 2]; p[3]++; pool.set(k, p);
+    }
+    let best = null; for(const p of pool.values()) if(!best || p[3] > best[3]) best = p;
+    if(!best || clear > best[3]) continue;
+    const o = (y * px.fw + x) * 4; out[o] = Math.round(best[0] / best[3]); out[o + 1] = Math.round(best[1] / best[3]); out[o + 2] = Math.round(best[2] / best[3]); out[o + 3] = 255;
+  }
+  const dist = (a, c) => (a[0] - c[0]) ** 2 + (a[1] - c[1]) ** 2 + (a[2] - c[2]) ** 2, near = (c, pal) => pal.reduce((m, q) => dist(c, q) < dist(c, m) ? q : m, pal[0]);
+  const fixed = px.pal === "park" || px.pal === "dime" ? pxSwatches().filter(c => c[3]) : null;
+  let cols = new Map(); for(let i = 0; i < out.length; i += 4) if(out[i + 3]){ const k = out[i] << 16 | out[i + 1] << 8 | out[i + 2], c = cols.get(k); if(c) c[3]++; else cols.set(k, [out[i], out[i + 1], out[i + 2], 1]); }
+  let pal = [...cols.values()].sort((a, c) => c[3] - a[3]);
+  if(fixed && fixed.length) pal = fixed;
+  else {   // merge into the most used color within 10 levels, then the closest pair until 32 are left
+    const keep = []; for(const c of pal){ const m = keep.find(q => dist(c, q) < 100); if(m) m[3] += c[3]; else keep.push(c.slice()); }
+    while(keep.length > 32){ let bi = 0, bj = 1, bd = Infinity; for(let i = 0; i < keep.length; i++) for(let j = i + 1; j < keep.length; j++){ const e = dist(keep[i], keep[j]); if(e < bd){ bd = e; bi = i; bj = j; } } keep[bi][3] += keep[bj][3]; keep.splice(bj, 1); }
+    pal = keep;
+  }
+  const memo = new Map(); let n = 0;
+  for(let i = 0; i < out.length; i += 4) if(out[i + 3]){ n++; const k = out[i] << 16 | out[i + 1] << 8 | out[i + 2]; let c = memo.get(k); if(!c) memo.set(k, c = near(out.subarray(i, i + 3), pal)); out[i] = c[0]; out[i + 1] = c[1]; out[i + 2] = c[2]; }
+  if(!n) return ui.toast("The reference doesn't cover the canvas.");
+  pxPush(); px.frames.forEach((f, i) => f.push(i === px.cur ? out : pxBlank(px.fw, px.fh)));
+  px.layers.push({...pxLayerNew(px.layers.length + 1), name:"From reference"}); px.lay = px.layers.length - 1; px.sel = null;
+  pxChanged(); ui.toast(`Copied the reference into a new layer: ${new Set(memo.values()).size} colors.`, "good");
+}
 function pxDrawRef(ctx, z){
   const b = pxRefBox(); if(!b || !px.refShow) return;
   ctx.save(); ctx.globalAlpha = px.refAlpha; ctx.imageSmoothingEnabled = px.ref === "upload" && b[2] * z < px.refCv.width; ctx.imageSmoothingQuality = "high";   // smooth only when a big photo is shrunk; enlarging (a sprite, or a canvas-sized picture) stays pixel sharp
@@ -978,7 +1037,7 @@ function pxClick(e){
     fadd:() => pxFrameOp("add"), fdup:() => pxFrameOp("dup"), fdel:() => pxFrameOp("del"), fleft:() => pxFrameOp("left"), fright:() => pxFrameOp("right"),
     resize:() => pxResize(+document.getElementById("pxW").value, +document.getElementById("pxH").value, document.getElementById("pxAnchor").value),
     reslice:() => pxReslice(+document.getElementById("pxN").value), fliph:() => pxFlip("h", all), flipv:() => pxFlip("v", all),
-    refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); }, refreset:() => { px.refX = px.refY = 0; px.refK = 1; pxChanged(); },
+    refup:() => document.getElementById("pxRefFile").click(), refeye:() => { px.refShow = !px.refShow; pxChanged(); }, refreset:() => { px.refX = px.refY = 0; px.refK = 1; pxChanged(); }, refmatch:pxRefMatch, reflayer:pxRefToLayer,
     copy:() => pxCopy(false), cut:() => pxCopy(true), paste:pxPasteButton, selall:pxSelectAll,
     try:pxTry, send:pxSend, sendall:pxSendAll, download:pxDownload, rigger:pxToRigger}[a] || (() => {}))();
 }
