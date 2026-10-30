@@ -234,8 +234,9 @@ function render(){
   }
 
   // exhibits; in the 3/4 view a vivarium is a standing glass tank, so it waits for the building pass after the paths
+  // and they go north to south, so one exhibit's floor and plants never cover the far fence of the exhibit south of it
   const tanks = [];
-  for(const e of state.exhibits){
+  for(const e of tilt ? [...state.exhibits].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.exhibits){
     const c = exhibitColor(e), reach = isReachable(e), pts = polyStr(e.points), mark = s.length;
     const on = isSel("exhibit", e.id), dead = isDoomed("exhibit", e.id);
     s += `<g data-kind="exhibit" data-id="${esc(e.id)}" style="cursor:pointer">`;
