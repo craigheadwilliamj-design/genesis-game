@@ -3432,14 +3432,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
   const cal = await page.evaluate(() => {
     const f = fmtDate, dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length, yr = dpm * mpy;
-    const old = JSON.parse(JSON.stringify(state)); delete old.calendar;
+    const old = JSON.parse(JSON.stringify(state)); delete old.calendar; delete old.calStart;
     let loads = true; try{ upgradeSave(old); }catch{ loads = false; }
-    return {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
+    const spring = newPark().calStart === 3 && f(1) === "1 Apr Y1" && f(dpm * 9 + 1) === "1 Jan Y2" && dateOf(1).m === 4;
+    const c0 = state.calStart; state.calStart = 0;   // a park from before spring starts
+    const r = {first:f(1), eom:f(dpm), next:f(dpm + 1), eoy:f(yr), ny:f(yr + 1), y3:f(yr * 2 + 1), zero:f(0), loads:loads && old.calStart === 0, spring};
+    state.calStart = c0;
+    return {...r, hud:document.querySelector("#dayLabel").textContent.startsWith(fmtDate(state.day))};
   });
   checks.dateFirstDay = cal.first === "1 Jan Y1";
   checks.dateMonthRollover = cal.eom === "30 Jan Y1" && cal.next === "1 Feb Y1";
   checks.dateYearRollover = cal.eoy === "30 Dec Y1" && cal.ny === "1 Jan Y2" && cal.y3 === "1 Jan Y3";
   checks.dateBadDay = cal.zero === "1 Jan Y1";
+  checks.parksOpenInSpring = cal.spring;
   checks.dateOldSaveLoads = cal.loads;
   checks.dateInHud = cal.hud;
 

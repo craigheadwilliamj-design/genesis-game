@@ -156,7 +156,7 @@ function freshThemes(){ return {brush:"genesis", have:["genesis"]}; }
 function newPark(){
   return {
     animalSeq:{}, accV:1,
-    version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false,
+    version:1, name:"New Park", biome:DEFAULT_PARK_BIOME, sandbox:false, calStart:CALENDAR.startMonth - 1,
     money:START.money, ticket:START.ticket, tramFare:TRAM.fare, rating:START.rating,
     day:1, minute:60 / CLOCK_SCALE, clockV:3, vivDish:1, vivLay:1, vivScene:1, vivBig:1, discoV:1, parkClosed:false,
     boundary:PARK_PLOT.map(p => p.slice()), parcels:[],
@@ -359,6 +359,8 @@ function upgradeSave(s){
   s.themes.have = s.themes.have.map(rn);
   s.themes.brush = rn(s.themes.brush);
   // parks from before weather get 3 fair days to build shelters
+  // parks from before spring starts opened in January
+  if(s.calStart == null) s.calStart = 0;
   if(!s.weather){ s.weather = freshWeather(); s.weather.from = s.day + 3; }
   // viewing platforms used to stick out over the path; flip any old ones so they jut into their exhibit
   for(const b of s.buildings){
@@ -996,9 +998,9 @@ let devFlag = null;
 function devMode(){ if(devFlag !== null) return devFlag; try{ return localStorage.getItem("genesis-dev") === "1"; }catch{ return false; } }
 function money(n){ const s = "$" + Math.abs(Math.round(n)).toLocaleString(); return n < 0 ? "−" + s : s; }
 function fmtArea(m2){ return `${Math.round(m2).toLocaleString()} m²`; }
-// state.day to a calendar date: {d, m (1 based), y}, and "3 Mar Y2" for the HUD and logs. Days before 1 count as day 1.
+// state.day to a calendar date: {d, m (1 based), y}, and "3 Mar Y2" for the HUD and logs. Days before 1 count as day 1. The year turns over in January.
 function dateOf(day){
-  const n = Math.max(0, Math.floor(day) - 1), dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length;
+  const dpm = CALENDAR.daysPerMonth, mpy = CALENDAR.months.length, n = Math.max(0, Math.floor(day) - 1) + ((state && state.calStart) || 0) * dpm;
   return {d:n % dpm + 1, m:Math.floor(n / dpm) % mpy + 1, y:CALENDAR.startYear + Math.floor(n / (dpm * mpy))};
 }
 function fmtDate(day){ const t = dateOf(day); return `${t.d} ${CALENDAR.months[t.m - 1]} Y${t.y}`; }
