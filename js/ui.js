@@ -1145,7 +1145,10 @@ function ppGroundUrl(biome){
   return null;
 }
 const ppBiome = s => s.biome || (biomesOf(s) || [])[0];
-const ppBg = s => { const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); return u ? `${BIOMES[b].color} url('${u}') 0 0/${PP_CELLS[0] * GROUND_TILE_PX * PP_SCALE}px ${PP_CELLS[1] * GROUND_TILE_PX * PP_SCALE}px` : BIOMES[b].color; };
+// a biome with one big tile shows it at its own size: its pattern's meters at GROUND_TILE_PX a meter
+const ppBg = s => { const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); if(!u) return BIOMES[b].color;
+  const m = GROUND_TILES[b] ? PP_CELLS : [1, 1].map(() => +(document.getElementById(`b-${b}`)?.getAttribute("width") || 18));
+  return `${BIOMES[b].color} url('${u}') 0 0/${m[0] * GROUND_TILE_PX * PP_SCALE}px ${m[1] * GROUND_TILE_PX * PP_SCALE}px`; };
 const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
 
 function ppCard(s){
