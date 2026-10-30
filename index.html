@@ -295,6 +295,9 @@ dialog.pixed[open]{display:flex}
 .pxlist{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;align-content:start}
 .pxlist button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--chrome-2);font-size:12px;word-break:break-all;cursor:pointer}
 .pxlist button:hover{border-color:var(--gold)}
+.pxlist button{position:relative}
+.pxdel{position:absolute;top:2px;right:4px;width:18px;height:18px;line-height:16px;text-align:center;border-radius:50%;font-size:14px;color:var(--ink-2)}
+.pxdel:hover{background:var(--bad);color:#fff}
 .pxlist b{font-size:14px}
 .pxtabs .btn[aria-pressed="true"]{background:var(--forest);color:var(--on-forest);border-color:var(--forest)}
 .pxcard [hidden]{display:none}
