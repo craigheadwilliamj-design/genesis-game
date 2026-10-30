@@ -6,7 +6,7 @@
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), overlay = $("#overlay");
+const svg = $("#map"), cam = $("#cam"), world = $("#world"), animalLayer = $("#animalLayer"), guestLayer = $("#guestLayer"), fenceOverLayer = $("#fenceOverLayer"), bldOverLayer = $("#bldOverLayer"), overlay = $("#overlay");
 const mapwrap = $("#mapwrap");
 
 const KMIN = 0.4, KMAX = 27.3;      // zoom limits, in screen pixels per meter
@@ -222,13 +222,14 @@ function render(){
   s += clipDefs + (decks.length ? `<g mask="url(#deckcut)">${under}${over}</g>` : under + over);
 
   // loose fence cut into 3 m pieces of depth; the ones along an open exhibit go in its own depth group (landSvg), the rest sort with the park decor below
-  const looseLeft = []; openFence34 = new Map();
+  const looseLeft = [], fov = []; openFence34 = new Map();
   for(const r of looseRuns()){
     const P = r.off ? r.pts.map(p => [p[0] + r.off[0], p[1] + r.off[1]]) : r.pts, [a, z] = P, n = Math.max(1, Math.ceil(Math.abs(z[1] - a[1]) / 3));   // a run running up the screen is cut so what stands beside it sorts against each part
     for(let i = 0; i < n; i++){
       const u = i / n, v = (i + 1) / n, q = [[a[0] + (z[0] - a[0]) * u, a[1] + (z[1] - a[1]) * u], [a[0] + (z[0] - a[0]) * v, a[1] + (z[1] - a[1]) * v]], mx = (q[0][0] + q[1][0]) / 2, my = (q[0][1] + q[1][1]) / 2;
       const it = {y:my, o:0, svg:fenceRunSvg(q, r.b, false)}, host = tilt ? state.exhibits.find(e => e.open && !e.viv && (inPoly(mx, my, e.points) || distToEdge(mx, my, e.points) < 1.5)) : null;
       if(host) (openFence34.get(host.id) || openFence34.set(host.id, []).get(host.id)).push(it); else looseLeft.push(it);
+      if(tilt) fov.push(fenceOverSeg(q[0], q[1], it.svg + (host ? fenceOverInside(host) : "")));
     }
   }
 
@@ -286,6 +287,8 @@ function render(){
     const gi = tilt ? gateSide34(e, kinds34) : -1;
     if(gi >= 0) fo34.gate = {i:gi, p:e.gate, id:e.id, f:gateFrameOf(e.id)};
     if(tilt && !e.open) s += e.viv ? viv34(e, "back", hi34) + vivScene34(e, "wall") : fence34(e.points, true, kinds34, "back", fo34);
+    if(tilt && !e.open && !e.viv) e.points.forEach((p, i) => { if(norm34(e.points, i)[1] > .05) return; const o = fo34.off && fo34.off[i], q = e.points[(i + 1) % e.points.length];
+      fov.push(fenceOverSeg(o ? [p[0] + o[0], p[1] + o[1]] : p, o ? [q[0] + o[0], q[1] + o[1]] : q, fence34(e.points, true, kinds34, "back", {...fo34, only:i}) + fenceOverInside(e))); });
     if(e.barrier === "electric" && !e.viv && !e.open && themeKey(e) === "genesis" && !tilt){
       const pp = polyStr(insetRect(e.points, .96)), ns = `fill="none" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" pointer-events="none"`;
       if(e.powered === false) s += `<polygon points="${pp}" stroke="#2A2E2B" stroke-width="3" stroke-dasharray="0 34" ${ns}/>`;
@@ -333,11 +336,14 @@ function render(){
 
   // guest buildings, back to front in the 3/4 view so taller ones in front cover the ones behind
   tanks.sort((a, b) => a.y - b.y);
+  let bOpen = false;   // each building's own drawing is wrapped in a group with an id, so bldOverLayer can copy it over the people behind it
   for(const bl of tilt ? [...state.buildings].sort((a, b) => centroid(a.points)[1] - centroid(b.points)[1]) : state.buildings){
     const t = BUILDINGS[bl.type], on = isSel("building", bl.id), dead = isDoomed("building", bl.id), reach = isReachable(bl);
     const [cx, cy] = centroid(bl.points), fs = Math.min(t.w, t.d) * .55;
+    if(bOpen){ s += `</g>`; bOpen = false; }
     while(standing.length && standing[0].y <= cy) s += standing.shift().svg;   // trees, rocks, loose fence behind this building draw first
     while(tanks.length && tanks[0].y <= cy) s += tanks.shift().svg;
+    if(tilt){ s += `<g id="bo-${esc(bl.id)}">`; bOpen = true; }
     // bins, benches and picnic areas: small, but always big enough to see and tap
     if(t.prop){
       const r = Math.max(Math.max(t.w, t.d) / 2, 4.5*inv), edge = dead ? "var(--bad)" : on ? "var(--sel)" : themeOf(bl).edge, full = bl.type === "bin" && (bl.fill || 0) >= LITTER.binCap;
@@ -372,6 +378,7 @@ function render(){
     }
     s += `</g>`;
   }
+  if(bOpen) s += `</g>`;
   for(const tk of tanks) s += tk.svg;
   for(const it of standing) s += it.svg;
   // with cameras researched, a selected Security Office shows what every office watches
@@ -433,6 +440,7 @@ function render(){
   occ34 = tilt ? occluders34() : [];
   wall34 = tilt ? wallStrips34() : [];
   world.innerHTML = s;
+  setFenceOver34(fov);
   renderOverlay();
   syncAnimals();
   applyTransform();
@@ -749,12 +757,12 @@ function gateSide34(e, kinds){
   return F && F.sprite && FENCE_SPRITES[F.sprite].gate ? best : -1;
 }
 // kind is one fence for every side, or a list with one kind a side (a grid exhibit's pieces)
-// o: hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), gate ({i: side, p: point, id: exhibit id, f: open frame}), lights/powered (electric posts)
+// o: only (draw just side i), hi (outline color), cond (the exhibit's condition, which picks a bar fence's picture), gate ({i: side, p: point, id: exhibit id, f: open frame}), lights/powered (electric posts)
 function fence34(P, closed, kinds, which, o = {}){
   const n = closed ? P.length : P.length - 1, hi = o.hi, n2 = v => v.toFixed(2);
   const segs = [];
   for(let i = 0; i < n; i++){ let a = P[i], b = P[(i+1) % P.length]; const ny = closed ? norm34(P, i)[1] : 0, off = o.off && o.off[i];
-    if(which === "back" && ny > .05 || which === "front" && ny <= .05) continue;
+    if(which === "back" && ny > .05 || which === "front" && ny <= .05 || o.only !== undefined && i !== o.only) continue;
     if(off){ a = [a[0] + off[0], a[1] + off[1]]; b = [b[0] + off[0], b[1] + off[1]]; }   // a wall shared with another pen's fence stands a little inside, so both show
     segs.push({i, a, b, ny, y:(a[1] + b[1]) / 2, kind:Array.isArray(kinds) ? kinds[i] : kinds}); }
   segs.sort((p, q) => p.y - q.y);
@@ -999,6 +1007,54 @@ function camp34(bl, P, col, line){
   s += `<circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r="1" fill="#6E6A60"/><circle cx="${fx.toFixed(2)}" cy="${fy.toFixed(2)}" r=".6" fill="#E8742A"/><circle cx="${fx.toFixed(2)}" cy="${(fy - .2).toFixed(2)}" r=".3" fill="#FFD27A"/>`;
   for(const tn of tents) s += `<polygon points="${polyStr(tn.pts.map(([x, y]) => [x + .35, y + .3]))}" fill="#1D2B22" fill-opacity=".2" pointer-events="none"/>` + hipRoof34(tn.pts, 0, 1.8, tn.c, null, line, true) + tentDoor34(tn.pts);
   return s;
+}
+
+// Exhibits draw before the buildings, and guests above the whole world, so a fence would never cover what stands just behind it.
+// Each far fence side and loose run is drawn again in fenceOverLayer, clipped to the boxes of the buildings, props, decor and guests behind it.
+const FENCE_OVER = {up:4.5};   // meters: the tallest fence picture, so a box further back than this can't be covered
+let fenceOver34 = [];
+// the exhibit's plants, rocks and animals stand in front of its far fence, so they go over the copy again (a live copy of its depth group, landSvg)
+const fenceOverInside = e => `<use href="#z34-${esc(e.id)}"/>`;
+function fenceOverSeg(a, b, svg){ if(a[0] > b[0]) [a, b] = [b, a]; return b[0] - a[0] > .01 ? {a, b, svg} : null; }
+// is a box from x0 to x1 standing on yb behind fence f, near enough to be covered
+function fenceOverHits(f, x0, x1, yb){
+  if(x1 <= f.a[0] || x0 >= f.b[0]) return false;
+  const x = clamp((x0 + x1) / 2, f.a[0], f.b[0]), yf = f.a[1] + (f.b[1] - f.a[1]) * (x - f.a[0]) / (f.b[0] - f.a[0]);
+  return yb <= yf + .05 && yb > yf - FENCE_OVER.up / TILT;
+}
+const fenceOverRect = (x0, x1, yb, h) => `<rect x="${x0.toFixed(2)}" y="${(yb - h / TILT).toFixed(2)}" width="${(x1 - x0).toFixed(2)}" height="${(h / TILT).toFixed(2)}"/>`;
+function setFenceOver34(segs){
+  const boxes = [];
+  bldOver34 = [];
+  for(const bl of state.buildings){
+    const t = BUILDINGS[bl.type], b = bbox(bl.points), B = BLD_PICS[bl.type], pad = t.prop ? Math.max(t.w, t.d) * .25 + .3 : .3;
+    const w = B ? Math.max(b.x1 - b.x0, B.w * FLAT34.px) / 2 : (b.x1 - b.x0) / 2 + pad, cx = (b.x0 + b.x1) / 2;
+    boxes.push([cx - w, cx + w, b.y1, 12]);
+    if(tilt) bldOver34.push({id:bl.id, x0:cx - w, x1:cx + w, yb:b.y1, j:bldOver34.length, cur:""});
+  }
+  bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#bo-${esc(o.id)}"/></g>`).join("");
+  for(const o of bldOver34) o.clip = bldOverLayer.querySelector(`#bov${o.j}`);
+  for(const f of decorOf()){ const r = (LAND[f.type] && LAND[f.type].r) || 1; boxes.push([f.x - r, f.x + r, f.y, 12]); }
+  fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(...q)).join(""), cur:null}));
+  fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}</g>`).join("");
+  for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
+}
+// Guests, staff and trams are drawn above the world too, so each building and prop is copied over the ones behind it (bldOverLayer, under fenceOverLayer)
+let bldOver34 = [];
+// Each frame: add the guests, staff and trams behind each fence and building to its clip (boxes [x0, x1, base y, height in meters])
+const fenceOverAt = {guests:[], staff:[], trams:[]}, personBox34 = (x, y, h) => [x - h * .3, x + h * .3, y, h * 1.2];
+function fenceOverPeople(){
+  const all = fenceOverAt.guests.concat(fenceOverAt.staff, fenceOverAt.trams);
+  for(const f of fenceOver34){
+    let g = f.stat;
+    for(const q of all) if(fenceOverHits(f, q[0], q[1], q[2])) g += fenceOverRect(...q);
+    if(g !== f.cur){ f.cur = g; f.clip.innerHTML = g; }
+  }
+  for(const o of bldOver34){
+    let g = "";
+    for(const q of all) if(q[1] > o.x0 && q[0] < o.x1 && q[2] < o.yb - .05 && q[2] > o.yb - 12 / TILT) g += fenceOverRect(...q);
+    if(g !== o.cur){ o.cur = g; o.clip.innerHTML = g; }
+  }
 }
 
 // Solid fence sides on the far edge of an exhibit stand over the path behind them, so they cover a guest's legs there (guests are drawn above the whole world).
@@ -2235,7 +2291,7 @@ function deckLift(p, x, y){
 }
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
-  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h;
+  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h, behind = [];
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
@@ -2264,12 +2320,14 @@ function drawParties(){
       const col = cols[ci] || SHIRTS[ci];
       if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
       humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT); seen.add(p.id);
+      if(!deckLift(p, x, y)) behind.push(personBox34(x, y, hm));
       continue;
     }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
     d[ci].push(m); all.push(m);
   }
   for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
+  fenceOverAt.guests = behind; fenceOverPeople();
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
@@ -2291,7 +2349,7 @@ function guestAt(cx, cy){
 /* ---------- trams: one car shuttles between the end stations of each stretch of track ---------- */
 const tramEls = new Map();
 function drawTrams(){
-  const layer = $("#tramLayer"), seen = new Set();
+  const layer = $("#tramLayer"), seen = new Set(), boxes = [];
   for(const p of state.paths){
     if(!isTram(p) || !gGraph) continue;
     const {cum, stops} = tramStops(p);
@@ -2309,8 +2367,12 @@ function drawTrams(){
     }
     el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${ang.toFixed(1)})`);
     seen.add(p.id);
+    // a fence covers the car only while all of it is north of the fence: its footprint, 8 m by 2.6 m turned with the track
+    const c = Math.abs(Math.cos(ang * Math.PI / 180)), sn = Math.abs(Math.sin(ang * Math.PI / 180)), hx = 4 * c + 1.3 * sn, hy = 4 * sn + 1.3 * c;
+    boxes.push([x - hx, x + hx, y + hy, 2 * hy * TILT]);
   }
   for(const [id, el] of tramEls) if(!seen.has(id)){ el.remove(); tramEls.delete(id); }
+  fenceOverAt.trams = boxes; fenceOverPeople();
 }
 
 /* ---------- snapping new corners to things nearby ---------- */
@@ -3077,7 +3139,7 @@ function humanStep(el, kind, c, x, y){
   if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); }
 }
 function drawKeepers(){
-  const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set();
+  const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set(), staff = [];
   for(const c of crew){
     if(!c.at) continue;
     seen.add(c.id);
@@ -3095,7 +3157,7 @@ function drawKeepers(){
         humanSvg(aquaCrew(c) ? "aquarist" : "keeper", hm, food, c.crate);
     }
     humanStep(el, aquaCrew(c) ? "aquarist" : "keeper", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push(personBox34(x, y, hm));
   }
   // mechanics: pixel people in orange coveralls, ringed while inspecting or repairing
   for(const c of mcrew){
@@ -3110,7 +3172,7 @@ function drawKeepers(){
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#C8642A" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "mechanic", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push(personBox34(x, y, hm));
   }
   // vets: pixel people in green scrubs, ringed while darting
   for(const c of vcrew){
@@ -3125,7 +3187,7 @@ function drawKeepers(){
         (working ? `<circle r="${r*1.7}" fill="none" stroke="#B0384F" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "vet", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push(personBox34(x, y, hm));
   }
   // custodians: pixel people; the crate in their hands is whatever stock they carry
   for(const c of ccrew){
@@ -3140,7 +3202,7 @@ function drawKeepers(){
         (busy ? `<circle r="${r*1.7}" fill="none" stroke="#2E8B8B" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "custodian", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push(personBox34(x, y, hm));
   }
   // security guards: pixel people in navy, ringed while chasing; the escort strip plays while walking a party out
   for(const c of gcrew){
@@ -3155,7 +3217,7 @@ function drawKeepers(){
         (chasing ? `<circle r="${r*1.7}" fill="none" stroke="#E5484D" stroke-width="1.5" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>` : "");
     }
     humanStep(el, "guard", c, x, y);
-    walker34(el, x, y);
+    walker34(el, x, y); if(!hidden34(x, y)) staff.push(personBox34(x, y, hm));
   }
   // ATVs parked out on the roads, waiting for someone to come back to them
   for(const a of usableAtvs()){
@@ -3166,9 +3228,10 @@ function drawKeepers(){
     if(!el){ el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none"); layer.appendChild(el); keeperEls.set(id, el); }
     const r = Math.max(1.3, 5*inv), key = r.toFixed(3);
     if(el.dataset.key !== key){ el.dataset.key = key; el.innerHTML = atvSvg(r, true); }
-    walker34(el, n.x, n.y);
+    walker34(el, n.x, n.y); if(!hidden34(n.x, n.y)) staff.push(personBox34(n.x, n.y, r * 2));
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
+  fenceOverAt.staff = staff; fenceOverPeople();
 }
 
 // A little ATV: under a staff member who is driving, or parked on its own

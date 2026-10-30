@@ -1552,7 +1552,7 @@ function landSvg(e, pick, isDead){
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
   const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
-  return `<g data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}${ripplesSvg(e)}</g>`;
+  return `<g id="z34-${esc(e.id)}" data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}${ripplesSvg(e)}</g>`;
 }
 // Out in the park: water goes under everything, plants, rocks and statues over the paths
 const parkWaterSvg = () => watersSvg(parkWater(), parkBiome());
