@@ -1097,7 +1097,7 @@ const WATER_TEX = {
   grassland:{shore:"#7A6246", shoreW:1, lit:"#5096B8", dark:"#2F6682"},   // a 1 px shore line, no bank
   tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
   tundra:   {shore:"#EBF5F7", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
-  boreal:   {shore:"#4C4A44", shoreW:1, lit:"#2E667F", dark:"#1E4A5E"},   // a 1 px shore line, no bank
+  boreal:   {shore:"#8AB0B4", shoreW:2, lit:"#8AB0B4", dark:"#3A6070", mud:"#848D6C", damp:"#959C7E"},   // a 2 px band of shallows, then wet and damp moss outside
   sea:      {shore:"#E2D2A2", shoreW:1, lit:"#3AA6B4", dark:"#2C8896"},   // shallow sea (SEA_WATER): a pale sand shore line, no bank
   deep:     {shore:"#C9B98C", shoreW:1, lit:"#1E4C86", dark:"#173E70"},   // deep sea: a darker sand shore line, and none against shallow sea
 };
