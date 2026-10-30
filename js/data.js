@@ -2078,7 +2078,7 @@ const BIOMES = {
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#D9A98A", park:"#D9A98A", perSqM:.4, rock:1.3, plants:0.03},
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#6F9A7A", park:"#6F9A7A", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},
   temperate:{label:"Seasonal Forest", ground:"broadleaf woodland and meadow", color:"#40813F", park:"#40813F", perSqM:.6, rock:0.8, plants:0.08},
-  boreal:   {label:"Coniferous Forest", ground:"conifer forest, needle litter and moss", color:"#A9B092", park:"#A9B092", perSqM:.8, rock:1, plants:0.08},
+  boreal:   {label:"Coniferous Forest", ground:"conifer forest, needle litter and moss", color:"#4F594A", park:"#4F594A", perSqM:.8, rock:1, plants:0.08},
   tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#C3CDD4", park:"#C3CDD4", perSqM:.6, rock:1.4, plants:0.02},
 };
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had

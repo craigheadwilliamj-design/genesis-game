@@ -1,7 +1,7 @@
 # Draws the calm ground tiles, sprites/ground/<biome>.png for desert, scrubland and boreal (Coniferous Forest): one seamless 288 px tile each (36 m at 8 px a meter) under both exhibits (#b-<biome>)
 # and the park (#p-<biome>). A pale flat floor (BIOMES.<biome>.color), faint 1 px specks, and a few small details in low-contrast tones, so the outlined animals and buildings
 # stand out. Everything wraps over the edges. Desert: sand with dune arcs, dry tufts, twigs, pebble trios and small rocks. Scrubland: terracotta hardpan (Permian red beds) with cracks,
-# red sandstone pebbles and chips, twigs and dead brush (no grass, so it suits the Permian on). Boreal: grey-green moss floor with fallen needles,
+# red sandstone pebbles and chips, twigs and dead brush (no grass, so it suits the Permian on). Boreal: dark olive moss floor with fallen needles,
 # pine cones, moss clumps, twigs and grey stones.
 # Usage: python3 -I tools/pixelground_calm.py [outdir]
 import sys, os, random
@@ -54,20 +54,20 @@ BIOMES = {
       "brush2": ["..t.t..", "t.tTt.t", ".tTTTt.", "..mmm.."],
     }, weights=[("crack", 3), ("crack2", 2), ("crack3", 2), ("pebs", 2), ("stone", 1), ("chip", 2), ("twig", 2), ("brush", 2), ("brush2", 1)]),
   "boreal": dict(seed=41, specks=220, details=1900, pal={
-      "b": "#A9B092",   # moss floor: BIOMES.boreal.color in data.js
-      "s": "#99A182",   # faint speck
-      "d": "#848C6E",   # darker speck
-      "n": "#8A7656",   # fallen needles
-      "c": "#94704E",   # pine cone lit
-      "C": "#76583C",   # pine cone body
-      "k": "#55402C",   # pine cone shade
-      "o": "#7E9462",   # moss clump lit
-      "O": "#667C4C",   # moss clump
-      "m": "#9AA184",   # ground shade under things
-      "t": "#6E5A40",   # twig
-      "T": "#52432F",   # twig, dark
-      "g": "#BCBDB4",   # stone lit
-      "G": "#9C9D94",   # stone
+      "b": "#4F594A",   # dark olive moss floor, a touch of spruce blue: BIOMES.boreal.color in data.js
+      "s": "#485344",   # faint speck
+      "d": "#404A3C",   # darker speck
+      "n": "#424131",   # fallen needles
+      "c": "#463E2F",   # pine cone lit
+      "C": "#3A3426",   # pine cone body
+      "k": "#2D2B20",   # pine cone shade
+      "o": "#3D4D37",   # moss clump lit
+      "O": "#33442E",   # moss clump
+      "m": "#495345",   # ground shade under things
+      "t": "#373528",   # twig
+      "T": "#2B2C22",   # twig, dark
+      "g": "#575F58",   # stone lit
+      "G": "#4A514B",   # stone
     }, stamps={
       "needles":  ["n...n..", ".n.n..n", "..n.nn.", ".n...n."],
       "needles2": ["..n.n", "nn.n.", "...nn"],
