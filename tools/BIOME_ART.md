@@ -71,11 +71,11 @@ Instead of one 18 m tile, a biome can be built from several 8 x 8 px tiles, each
 
 ### 2. Rocks and boulders
 
-Model: `render()` and `shapes()` in `tools/pixelrocks_flat.py`. Add palette ramps (`ramp((r, g, b))`) and shape specs, no new rendering code needed.
+Model: `render()` and `shapes()` in `tools/pixelrocks_flat.py`. Add palette ramps (`ramp((r, g, b))`) and shape specs, no new rendering code needed. A spec is one or more bodies `(cx, cy, half-width, half-depth, height, options)`: an ellipsoid chipped by `n` flat cuts up to `jit` deep; `blocky` turns the cuts upright, `mesa` shaves a flat top, `lean` tips it. Round stones: many shallow cuts. Slabs and sandstone: few deep, blocky ones, and `strata=` for beds. Every rock gets the plants' 1 px dark outline.
 
 - Make 3 or 4 boulders and 5 or 6 rocks. Vary the silhouettes (round, tall, two stones together, low slab), not just the color. Keep a few different palettes per biome (stone, a stained variant, a mossy or sandy variant).
 - `ROCK_STONE[<biome>]` already gives the biome's stone color; use it as the base of the main ramp so the old SVG fallback and the sprites agree.
-- The script prints each picture's size. Register them in `ROCK_SPRITES` in `js/data.js` as `[width, height]`, in the same order, under `<biome>:{boulder:[...], rock:[...]}`. A wrong size squashes the rock in game.
+- The script prints each picture's size, then run `python3 -I tools/spritehit.py` and `python3 tools/packsprites.py`. Register the sizes in `ROCK_SPRITES` in `js/data.js` as `[width, height]`, in the same order, under `<biome>:{boulder:[...], rock:[...]}`. A wrong size squashes the rock in game.
 - Biome ideas: desert sandstone strata with red and cream bands; tundra frost-shattered grey slabs with lichen-colored caps; boreal dark wet granite with moss; tropical dark volcanic and mossy river stone; temperate grey with moss and leaf-litter caps; grassland rounded grey fieldstone and a pale limestone.
 
 ### 3. Landscape plants

@@ -1,7 +1,7 @@
 # (Rebuilt to be seen 3/4: each stone is rings of a rounded dome with a vertical front wall, so it shows a lit top and a shaded front like the other biomes, but with a smooth lopsided outline instead of stepped tiers.)
 # Draws the tropical rocks and boulders: sprites/rocks/{boulder,rock}-tropical-<n>.png, in the same flat style as tools/pixelrocks_flat.py but NOT built from stacked polygon tiers, which made every
 # stone look like a stepped cake. Each stone here is a rounded, lopsided lump: an outline from a few low harmonics (so every stone is its own shape), a flatter bottom, a domed height field with
-# smooth bumps, and flat tone bands cut from the light (top-left): top / hi / mid / lo / deep, no outline, no dithering. Structured detail only: rows of short dashes on the shaded bands, a few
+# smooth bumps, and flat tone bands cut from the light (top-left): top / hi / mid / lo / deep, no dithering, a 1 px near-black outline tinted to the stone (like the plants), colors pulled 30% toward grey. Structured detail only: rows of short dashes on the shaded bands, a few
 # cracks and pits, a lighter silhouette edge at the top left and a darker one along the bottom and right, and on the mossy ones a flat moss cap where the stone faces up.
 # Palettes: pale river grey, mossy river stone, warm tannin-stained stone, and dark volcanic (kept light enough to read on the near-black jungle floor, #002104). Clusters are single stones overlapped.
 # Deterministic (fixed seeds). The script prints each picture's [width, height]: put them in ROCK_SPRITES.tropical in js/data.js in the same order.
@@ -10,6 +10,9 @@ import sys, os, random, math
 from PIL import Image, ImageDraw
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
+def desat(c, t=.3):   # pull a color toward its own grey, so the rocks sit in the ground instead of on it
+    l = c[0] * .299 + c[1] * .587 + c[2] * .114; return mix(c, (l, l, l), t)
+def ink(c): return mix(c, (0, 0, 0), .72)   # the outline: near black, tinted to the stone it wraps
 def ramp(base): return {"top": mix(base, (255, 255, 255), .3), "hi": mix(base, (255, 255, 255), .1), "mid": base, "lo": mix(base, (0, 0, 0), .22), "deep": mix(base, (0, 0, 0), .4)}
 RIVER = ramp((120, 128, 124))     # pale river grey with a green cast
 TANNIN = ramp((130, 112, 88))     # warm brown, stained by leaf tea
@@ -122,7 +125,10 @@ def stone(seed, w, d, H, pal, lump=.12, moss=0., cracks=0, pits=2, wob=.05, lean
     im = Image.new("RGBA", (W, Ht), (0, 0, 0, 0))
     for y in range(Ht):
         for x in range(W):
-            if out[y][x]: im.putpixel((x, y), out[y][x] + (255,))
+            if out[y][x]: im.putpixel((x, y), desat(out[y][x]) + (255,))
+            else:   # a 1 px outline around the silhouette, like the plants
+                nb = [g[y + dy][x + dx] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) if 0 <= x + dx < W and 0 <= y + dy < Ht and g[y + dy][x + dx]]
+                if nb: im.putpixel((x, y), ink(desat(min(nb, key=sum))) + (255,))
     return crop(im)
 
 def crop(im):
@@ -151,4 +157,4 @@ def shapes():
 
 out = sys.argv[1] if len(sys.argv) > 1 else "sprites/rocks"
 os.makedirs(out, exist_ok=True)
-for k, im in shapes().items(): im.save(f"{out}/{k}.png"); print(k, list(im.size), len({p[:3] for p in im.getdata() if p[3]}), "colors")
+for k, im in shapes().items(): im.save(f"{out}/{k}.png"); print(k, list(im.size))
