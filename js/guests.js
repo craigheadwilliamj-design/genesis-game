@@ -427,7 +427,7 @@ function stepOff(p, meters){
     if(p.deckB && !p.stand && Math.hypot(p.ox || 0, p.oy || 0) < .3) p.deckB = null;   // back down on the path
     if(p.offK !== k){
       p.offK = k;
-      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (!p.to && inProp(p.at.x + o[0] * f, p.at.y + o[1] * f)) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
+      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (!p.to && (inProp(p.at.x + o[0] * f, p.at.y + o[1] * f) || besideSide(p.at.x + o[0] * f, p.at.y + o[1] * f))) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
       let f = 1; while(!(p.stand && p.stand.deck) && f > .05 && bad(f)) f *= .6;
       p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
     }
@@ -480,6 +480,10 @@ function observeTick(p, now){
 const offPath = (x, y) => !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw - .35);
 // Is this spot on (or right against) a bin, bench, lamp or other path prop? Guests walk past them but never stop inside one
 const inProp = (x, y) => state.buildings.some(b => BUILDINGS[b.type].prop && (inPoly(x, y, b.points) || distToEdge(x, y, b.points) < .4));
+// Is this spot too close to a fence running north-south? Seen edge-on in the 3/4 view, a guest standing nearer than half their width would overlap it
+const SIDE_GAP = .8;
+const steepNear = (x, y, P, closed) => { for(let i = 0; i < P.length - (closed ? 0 : 1); i++){ const a = P[i], b = P[(i + 1) % P.length]; if(Math.abs(b[1] - a[1]) > Math.abs(b[0] - a[0]) && segProj(x, y, a, b).d < SIDE_GAP) return true; } return false; };
+const besideSide = (x, y) => state.exhibits.some(e => steepNear(x, y, e.points, true)) || parkFences().some(l => steepNear(x, y, l.points, false));
 // Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
 function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
@@ -489,7 +493,7 @@ function standOk(x0, y0, x1, y1, skip){
   const L = Math.hypot(x1 - x0, y1 - y0), end = skip && (skip.type === "platform" || skip.type === "gallery") ? L - 1.5 : L;
   for(let t = 0; t <= end; t += .5){ const k = L ? t / L : 0; if(offPath(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
   if(end === L && offPath(x1, y1)) return false;
-  if(inProp(x1, y1)) return false;
+  if(inProp(x1, y1) || (end === L && besideSide(x1, y1))) return false;   // a deck's steps may run right up beside a fence
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
   for(const b of state.buildings){
     if(b === skip || BUILDINGS[b.type].prop) continue;
@@ -537,7 +541,7 @@ function standNear(p, pts, e, bld){
       if(inPoly(x + nx * .8, y + ny * .8, pts)){ nx = -nx; ny = -ny; }
       if(inPoly(x + nx * .8, y + ny * .8, pts)) continue;
       // as close to the fence as the paving goes: step out until on a guest path (grass between path and fence stays empty)
-      for(let g = .6; g <= SIGHT.standGap; g += .4){
+      for(let g = Math.abs(nx) > Math.abs(ny) ? SIDE_GAP + .1 : .6; g <= SIGHT.standGap; g += .4){   // a side seen edge-on needs room for half a guest
         const X = x + nx * g, Y = y + ny * g;
         if(offPath(X, Y)) continue;
         if(Math.hypot(X - n.x, Y - n.y) <= reach) cand.push([X, Y, wt / (1 + d / pull)]);

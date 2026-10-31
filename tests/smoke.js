@@ -861,6 +861,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       [tp1.at, tp1.to, tp1.stand, tp1.off, tp1.offK, tp1.ox, tp1.oy] = sv;
       out.standNotInProp = inside === 0 && !standOk(100, 158, 100, 160, null) && standOk(100, 158, 100, 155, null);
       state.buildings = state.buildings.filter(b => b !== pb); afterChange(); }
+    // nobody stands so close to a fence seen edge-on (running north-south) that half of them overlaps it; a fence they face is fine
+    { const te = {id:"e-side", name:"S", points:[[500, 500], [520, 500], [520, 515], [500, 515]], animals:[], land:[]}; state.exhibits.push(te);
+      out.standClearOfSide = besideSide(520.5, 508) && !besideSide(520 + SIDE_GAP + .1, 508) && !besideSide(510, 515.5);
+      state.exhibits.pop(); }
 
     // trash goes in a bin nearby; a nearly full bin spills the rest; a full one gets walked past; the night crew clears it all, for a fee
     const bin = {id:"b-bin", type:"bin", points:rectPts(96.7, 180, BUILDINGS.bin.w, BUILDINGS.bin.d, Math.PI / 2)};
