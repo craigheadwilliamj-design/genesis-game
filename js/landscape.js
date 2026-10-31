@@ -1451,7 +1451,10 @@ function statue34(f, t, edge, dead){
 // A vivarium prop from its picture (sprites/viv, tools/pixelviv.py): upright ones stand on their spot, flat ones lie on the floor centered on it. A dish shows what's in it.
 function vivPropSvg(f, t){
   const V = VIV_SPRITES[f.type], w = V.w * VIV_MPP, h = V.h * VIV_MPP, x = f.x - w / 2, y = V.flat ? f.y - h / 2 : f.y + t.r * .3 - h, n2 = v => v.toFixed(2);
-  let s = `<image href="${spriteUrl(`sprites/viv/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
+  // an animated one (frames) cycles its pictures, one shown at a time by CSS visibility, kept in step across redraws, each fitting a beat apart
+  const n = V.frames || 1, dur = n / (V.fps || 3), ph = (performance.now() / 1000 + [...String(f.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) / 7) % dur;
+  let s = "";
+  for(let k = 1; k <= n; k++) s += `<image href="${spriteUrl(`sprites/viv/${f.type}${k > 1 ? "-" + k : ""}.png`)}" style="image-rendering:pixelated${n < 2 ? "" : `;visibility:${k > 1 ? "hidden" : "visible"};animation:frame${k}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`}" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
   if(t.tray){
     const cap = trayCap(f), main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0], fill = main ? clamp(trayHas(f) / cap, .15, 1) : 0;
     if(fill > 0){ const rw = Math.max(2, Math.round(8 * fill)) * ROCK_MPP; s += `<rect x="${n2(f.x - rw / 2)}" y="${n2(y + 2 * ROCK_MPP)}" width="${n2(rw)}" height="${n2(ROCK_MPP * 1.5)}" fill="${FOOD_COLOR[main[0]] || "#999"}" pointer-events="none"/>`; }

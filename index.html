@@ -235,6 +235,21 @@ dialog .toasts{position:fixed;right:16px;bottom:16px}   /* toasts shown over a m
 /* building animations (bldSprite34): frame f of n is the only one shown for its share of each cycle. Visibility, not opacity: an opacity animation moves the picture to the compositor, which can blur it. */
 @keyframes frame1of2{0%{visibility:visible}50%{visibility:hidden}100%{visibility:hidden}}
 @keyframes frame2of2{0%{visibility:hidden}50%{visibility:visible}100%{visibility:visible}}
+/* vivarium and aquarium fittings (VIV_SPRITES frames): misters and bubble curtains 6 frames, kelp 8 */
+@keyframes frame1of6{0%{visibility:visible}16.7%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame2of6{0%{visibility:hidden}16.7%{visibility:visible}33.3%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame3of6{0%{visibility:hidden}33.3%{visibility:visible}50%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame4of6{0%{visibility:hidden}50%{visibility:visible}66.7%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame5of6{0%{visibility:hidden}66.7%{visibility:visible}83.3%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame6of6{0%{visibility:hidden}83.3%{visibility:visible}100%{visibility:visible}}
+@keyframes frame1of8{0%{visibility:visible}12.5%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame2of8{0%{visibility:hidden}12.5%{visibility:visible}25%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame3of8{0%{visibility:hidden}25%{visibility:visible}37.5%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame4of8{0%{visibility:hidden}37.5%{visibility:visible}50%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame5of8{0%{visibility:hidden}50%{visibility:visible}62.5%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame6of8{0%{visibility:hidden}62.5%{visibility:visible}75%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame7of8{0%{visibility:hidden}75%{visibility:visible}87.5%{visibility:hidden}100%{visibility:hidden}}
+@keyframes frame8of8{0%{visibility:hidden}87.5%{visibility:visible}100%{visibility:visible}}
 @keyframes tin{from{transform:translateY(8px);opacity:0}}
 @media (prefers-reduced-motion: reduce){.toast{animation:none}}
 

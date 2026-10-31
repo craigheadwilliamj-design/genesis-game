@@ -6,7 +6,7 @@
 # Usage: python3 -I tools/pixelaqua.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x4 view of every picture)
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from pixelviv import Cv, U, mat, ramp, mix, rect, poly, ell, line, stroke, curve, sheet, STEEL, STONE
+from pixelviv import Cv, U, mat, ramp, mix, rect, poly, ell, line, stroke, curve, sheet, save, STEEL, STONE
 
 SLATE = mat((18, 32, 38), (104, 136, 146), (74, 100, 110), (54, 76, 84))
 FOAM = ((232, 244, 244), (176, 214, 218), (110, 156, 168))   # bubble glint, body, ring
@@ -57,22 +57,23 @@ def weed():
         c.part(m, KELP, lambda x, y: "hi" if (x + y) % 7 == 0 else None)
     return c
 
-def bubbles():
+def bubbles(f=0, n=1):
     c = Cv(12 * U, 24 * U); W, H = c.w, c.h
     c.part(rect(U, 21 * U, W - U - 1, H - 1), STEEL)   # the air bar on the floor, with its holes
     c.dot([(x, 22 * U + 1) for x in range(2 * U, W - 2 * U, 2 * U)] + [(x + 1, 22 * U + 1) for x in range(2 * U, W - 2 * U, 2 * U)], STEEL["edge"])
-    # three staggered columns of bubbles rising, each a ring with a glint, smaller toward the top (see-through, their ring is their edge)
-    G, B, R = FOAM
-    for x0, y in ((2.5 * U, 19 * U), (6 * U, 16 * U), (9.5 * U, 20 * U)):
-        k = 0
-        while y > 1:
-            r = 1.6 * U if y > 13 * U else 1.1 * U if y > 6 * U else .7 * U; cx = x0 + math.sin(k * 1.3) * U * .5
+    # three staggered columns of bubbles rising, each a ring with a glint, smaller toward the top (see-through, their ring is their edge); each frame
+    # every bubble moves a frame's share of the spacing up its own wobbling path, so the last frame runs into the first
+    G, B, R = FOAM; gap = 4.4 * U
+    for col, x0 in enumerate((2.5 * U, 6 * U, 9.5 * U)):
+        for k in range(-1, 8):
+            d = (k + f / n + col * .37) * gap; y = 20 * U - d
+            if y < 1 or y > 20.5 * U: continue
+            r = .5 * U + 1.1 * U * min(1, y / (20 * U)) ** 1.3; cx = x0 + math.sin(d / (2.2 * U) + col) * U * .6
             m = ell(cx, y, r, r)
             for p in m:
                 ring = any(q not in m for q in ((p[0] - 1, p[1]), (p[0] + 1, p[1]), (p[0], p[1] - 1), (p[0], p[1] + 1)))
                 c.put(p[0], p[1], R if ring else B + (150,))
             c.put(round(cx - r * .4), round(y - r * .4), G); c.put(round(cx - r * .4) + 1, round(y - r * .4), G)
-            y -= r * 2 + U * 1.4; k += 1
     return c
 
 def boulders():
@@ -115,14 +116,17 @@ def sponges():
         c.part(ell(x0 + w / 2 - .5, top + U * .6, w / 2 - 2, U * .5), DARK(SPONGE))
     return c
 
-def kelpstand():
-    c = Cv(12 * U, 30 * U); W, H = c.w, c.h
-    for x0, tall, ph in ((3.5, 28, 0), (7.5, 23, 2)):   # two stalks swaying, a blade every few park pixels on alternate sides, a float bulb at each blade's root
-        pts = [(x0 * U + math.sin(i / 2.5 + ph) * U * .7, H - 2 * U - i * U * tall / 14) for i in range(15)]
-        c.part(curve(pts, U * .8), GOLD)
+def kelpstand(f=0, n=1):
+    c = Cv(16 * U, 30 * U); W, H = c.w, c.h
+    sway = math.sin(2 * math.pi * f / n)
+    for x0, tall, ph in ((5.5, 28, 0), (9.5, 23, 2)):   # two stalks swaying (more toward the tip, the second a beat behind), a blade every few park pixels on alternate sides, a float bulb at each blade's root
+        sw = math.sin(2 * math.pi * f / n - ph * .6)
+        pts = [(x0 * U + math.sin(i / 2.5 + ph) * U * .7 + sw * 1.3 * U * (i / 14) ** 1.5, H - 2 * U - i * U * tall / 14) for i in range(15)]
+        c.part(curve(pts, U * 1.4), GOLD, lambda x, y: "hi" if (x + y) % 5 == 0 else None)
         for i, (px, py) in enumerate(pts[2:-1:2]):
-            d = 1 if (i + ph // 2) % 2 else -1
-            c.part(poly([(px, py), (px + d * 3.2 * U, py - 1.6 * U), (px + d * 3.6 * U, py - 2.4 * U), (px + d * .6 * U, py - 1.2 * U)]), GOLD, lambda x, y: "lo" if (x + y) % 4 == 0 else None)
+            d = 1 if (i + ph // 2) % 2 else -1; lift = sw * d * .5 * U   # the blades lift and droop a little as the stalk swings
+            c.part(poly([(px, py + .4 * U), (px + d * 2 * U, py - .2 * U - lift * .6), (px + d * 4.2 * U, py - 1.6 * U - lift), (px + d * 4.4 * U, py - 2.8 * U - lift), (px + d * 2.2 * U, py - 2.4 * U - lift * .6), (px + d * .4 * U, py - 1.4 * U)]), GOLD,
+                   lambda x, y, px=px, py=py, d=d: "deep" if abs((y - py) + (x - px) * d * .45 + 1.2 * U) < .6 else "lo" if (x * 2 + y) % 5 == 0 else None)   # a broad blade with a midrib
             c.part(ell(px, py, U * .7, U * .7), mat(GOLD["edge"], (210, 196, 110), (184, 166, 80), GOLD["mid"]))
     c.part({p for p in ell(W / 2, H, 4.5 * U, 2.2 * U) if p[1] < H}, STONE)   # the holdfast on a stone
     return c
@@ -141,11 +145,12 @@ def shell():
     c.part(ell(cx, cy, U * .9, U * .8), DARK(SHELL))
     return c
 
+FRAMES = {"abubble":6, "akelp":8}   # animated fittings: frame count (<key>.png is the first, then <key>-2.png and on)
 ALL = {"afilter":canister, "asump":sump, "arock":arch, "aweed":weed, "abubble":bubbles, "aboulder":boulders, "abrain":brain, "acoral":coral, "afan":fan, "asponge":sponges, "akelp":kelpstand, "ashell":shell}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/viv"
     os.makedirs(out, exist_ok=True)
     ims = {}
-    for k, fn in ALL.items(): ims[k] = fn().img(); ims[k].save(os.path.join(out, k + ".png"))
+    save(ALL, FRAMES, out, ims)
     if len(sys.argv) > 2: sheet(list(ims.values()), sys.argv[2], (62, 134, 168, 255))

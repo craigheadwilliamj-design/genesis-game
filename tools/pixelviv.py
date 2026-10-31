@@ -109,20 +109,23 @@ def feed():
     return c
 
 DROPS = ((190, 226, 240), (124, 186, 214))
-def mist():
+def mist(f=0, n=1):
     c = Cv(14 * U, 17 * U); W, H = c.w, c.h
     cx = W // 2
     c.part(rect(3 * U, H - 2 * U, W - 3 * U - 1, H - 1), STEEL)   # base plate
     c.part(rect(cx - U, 6 * U, cx + U - 1, H - 2 * U), STEEL, lambda x, y: "deep" if y % (3 * U) == 0 else None)   # the pole, jointed
     c.part(rect(4 * U, 4 * U, W - 4 * U - 1, 6 * U), STEEL)   # the nozzle head
     c.dot([(x, 6 * U - 1) for x in range(5 * U, W - 5 * U, U)], STEEL["edge"])   # its jets
-    # the spray: droplets fanning down and out from the jets, smaller as they fall (see-through bits with no edge)
+    # the spray (see-through bits with no edge): on each side three streams of droplets thrown out and falling, each droplet a third of the way behind
+    # the next, moving a frame's share along its arc, smaller as it falls; frame f of n, so the last frame runs into the first
     for sd in (-1, 1):
-        for i, (dx, dy) in enumerate(((1.5, 1.5), (2.8, 3), (3.6, 4.8), (4.2, 6.6), (2, 4), (1, 6))):
-            x, y = round(cx + sd * dx * U), round(6 * U + dy * U); sz = 2 if i < 3 else 1
-            for a in range(sz):
-                for b in range(sz): c.put(x + a, y + b, DROPS[0] if (a, b) == (0, 0) else DROPS[1])
-    c.dot([(cx - 1, 3 * U), (cx, 2 * U), (cx + 2, U + 1)], DROPS[0])
+        for vx, vy in ((1.6, -.4), (2.4, .2), (1.0, .6)):
+            for j in range(3):
+                t = (j / 3 + f / n) % 1; x = round(cx + sd * (U + vx * t * 4 * U)); y = round(6 * U + (vy * t * 4 + t * t * 5) * U); sz = 2 if t < .55 else 1
+                for a in range(sz):
+                    for b_ in range(sz): c.put(x + a, y + b_, DROPS[0] if (a, b_) == (0, 0) else DROPS[1])
+    for j in range(3):   # a puff of fine mist drifting up off the nozzle
+        t = (j / 3 + f / n) % 1; c.put(round(cx - 1 + math.sin(t * 6.3 + j) * 2), round(4 * U - 1 - t * 3.5 * U), DROPS[0] if t < .5 else DROPS[1])
     return c
 
 def dish():
@@ -164,6 +167,13 @@ def pool():
         c.part(ell(sx, sy, 1.4 * U, U), STONE)
     return c
 
+FRAMES = {"vmist":6}   # animated props: frame count (<key>.png is the first, then <key>-2.png and on; VIV_SPRITES gives each its frames and fps)
+def save(fns, frames, out, ims):
+    for k, fn in fns.items():
+        n = frames.get(k, 1)
+        for f in range(n):
+            im = (fn(f, n) if n > 1 else fn()).img(); im.save(os.path.join(out, k + (f"-{f + 1}" if f else "") + ".png"))
+            if not f: ims[k] = im
 ALL = {"vbark":bark, "vbranch":branch, "vdig":dig, "vfeed":feed, "vmist":mist, "vdish":dish, "vlamp":lamp, "vpool":pool}
 
 def sheet(ims, path, bg=(214, 200, 160, 255), Z=4, pad=4):
@@ -175,6 +185,6 @@ if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/viv"
     os.makedirs(out, exist_ok=True)
     ims = {}
-    for k, fn in ALL.items(): ims[k] = fn().img(); ims[k].save(os.path.join(out, k + ".png"))
+    save(ALL, FRAMES, out, ims)
     lamp_pool().save(os.path.join(out, "vlamp-pool.png"))
     if len(sys.argv) > 2: sheet(list(ims.values()), sys.argv[2])
