@@ -1039,7 +1039,7 @@ function setFenceOver34(segs){
     const t = BUILDINGS[bl.type], b = bbox(bl.points), B = BLD_PICS[bl.type], pad = t.prop ? Math.max(t.w, t.d) * .25 + .3 : .3;
     const w = B ? Math.max(b.x1 - b.x0, B.w * FLAT34.px) / 2 : (b.x1 - b.x0) / 2 + pad, cx = (b.x0 + b.x1) / 2;
     boxes.push([cx - w, cx + w, b.y1, 12, `bo-${esc(bl.id)}`]);
-    if(tilt) bldOver34.push({ref:`bo-${esc(bl.id)}`, x0:cx - w, x1:cx + w, yb:b.y1, cur:""});
+    if(tilt) bldOver34.push({ref:`bo-${esc(bl.id)}`, x0:cx - w, x1:cx + w, yb:b.y1, seat:bl.type === "bench" ? benchSeat34(bl) : null, cur:""});
   }
   for(const f of decorOf()){
     const r = (LAND[f.type] && LAND[f.type].r) || 1;
@@ -1054,6 +1054,13 @@ function setFenceOver34(segs){
   fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}${f.loose ? fenceOverFront(f, boxes) : ""}</g>`).join("");
   for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
 }
+// A bench facing the viewer: the map y of its backrest's front, and the screen y of its seat's top (the picture's 8 rows above its base, or the drawn seat), so people on it stand in front of the backrest and behind the seat
+function benchSeat34(bl){
+  const [fx, fy] = propFront(bl);
+  if(!(fy > 0 && fy >= Math.abs(fx))) return null;
+  const [, cy] = centroid(bl.points), pic = PROP_PICS.bench && themeOf(bl) === THEMES.genesis;
+  return {back:cy - .38 * fy, top:cy + .5 * fy - (pic ? 8 * FLAT34.px : .5) / TILT};
+}
 // Guests, staff and trams are drawn above the world too, so each building and prop is copied over the ones behind it (bldOverLayer, under fenceOverLayer)
 let bldOver34 = [];
 // Each frame: add the guests, staff and trams behind each fence and building to its clip (boxes [x0, x1, base y, height in meters])
@@ -1067,7 +1074,12 @@ function fenceOverPeople(){
   }
   for(const o of bldOver34){
     let g = "";
-    for(const q of all) if(q[1] > o.x0 && q[0] < o.x1 && q[2] < o.yb - .05 && q[2] > o.yb - 12 / TILT) g += fenceOverRect(...q);
+    for(const q of all){
+      if(!(q[1] > o.x0 && q[0] < o.x1 && q[2] < o.yb - .05 && q[2] > o.yb - 12 / TILT)) continue;
+      // standing on a bench, in front of its backrest: only the seat covers them, from their feet up to its top
+      if(o.seat && q[2] > o.seat.back){ if(q[2] > o.seat.top) g += `<rect x="${q[0].toFixed(2)}" y="${o.seat.top.toFixed(2)}" width="${(q[1] - q[0]).toFixed(2)}" height="${(q[2] - o.seat.top).toFixed(2)}"/>`; }
+      else g += fenceOverRect(q[0], q[1], q[2] + .5, q[3] + .5 * TILT);   // and the pip under their feet
+    }
     if(g !== o.cur){ o.cur = g; o.clip.innerHTML = g; }
   }
 }
