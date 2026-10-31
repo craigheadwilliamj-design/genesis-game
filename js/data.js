@@ -2096,8 +2096,8 @@ const TRAIT_TEXT = {diurnal:"Diurnal", nocturnal:"Nocturnal", crepuscular:"Crepu
 //   park     the open ground between the exhibits when the park is set in this biome (the pattern id is "p-" + the key)
 const BIOMES = {
   desert:   {label:"Desert",    ground:"sand and bare rock",          color:"#F0DDB2", park:"#F0DDB2", perSqM:.5, rock:1.6, plants:0.01},
-  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#155310", park:"#155310", perSqM:1, rock:0.6, plants:0.12},
-  grassland:{label:"Grassland", ground:"open plains",                 color:"#C5BB29", park:"#C5BB29", perSqM:.3, rock:0.6, plants:0.03},
+  tropical: {label:"Tropical",  ground:"humid forest floor",          color:"#265523", park:"#265523", perSqM:1, rock:0.6, plants:0.12},
+  grassland:{label:"Grassland", ground:"open plains",                 color:"#BAB45C", park:"#BAB45C", perSqM:.3, rock:0.6, plants:0.03},
   fern:     {label:"Fern Prairie", ground:"open fern, horsetail and cycad ground", color:"#8F6843", park:"#8F6843", perSqM:.3, rock:0.7, plants:0.04},
   scrubland:{label:"Scrubland", ground:"dry brush and hardpan",       color:"#D9A98A", park:"#D9A98A", perSqM:.4, rock:1.3, plants:0.03},
   wetland:  {label:"Wetland",   ground:"marsh, mud and shallow water", color:"#5B6D2B", park:"#5B6D2B", perSqM:1.2, wet:.5, rock:0.4, plants:0.06},

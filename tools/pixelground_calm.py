@@ -81,17 +81,17 @@ BIOMES = {
       "stone":    [".ggg.", "gGGGk", ".kkk."],
     }, weights=[("needles", 3), ("needles2", 3), ("cone", 2), ("cones", 1), ("moss", 2), ("moss2", 2), ("twig", 2), ("stone", 1)]),
   "grassland": dict(seed=53, specks=240, details=2200, pal={
-      "b": "#C5BB29",   # sunlit grass floor: BIOMES.grassland.color in data.js
-      "s": "#BBB126",   # faint speck
-      "d": "#AFA524",   # darker speck
-      "g": "#ADAA2A",   # grass tuft lit
-      "G": "#959424",   # grass tuft dark
-      "y": "#D1C746",   # dry blade, pale
-      "t": "#9C8A36",   # twig, seed head
-      "T": "#7E6E2C",   # twig, dark
-      "p": "#BCB078",   # pebble lit
-      "P": "#9C9058",   # pebble shade
-      "m": "#B9AF27",   # ground shade under things
+      "b": "#BAB45C",   # sunlit grass floor: BIOMES.grassland.color in data.js
+      "s": "#B7B053",   # faint speck
+      "d": "#B1AA4A",   # darker speck
+      "g": "#B0AE50",   # grass tuft lit
+      "G": "#9C9B46",   # grass tuft dark
+      "y": "#C3BE7C",   # dry blade, pale
+      "t": "#A39658",   # twig, seed head
+      "T": "#897D4A",   # twig, dark
+      "p": "#BFB99E",   # pebble lit
+      "P": "#A29B7B",   # pebble shade
+      "m": "#B6AF53",   # ground shade under things
     }, stamps={
       "tuft":   ["g.g.g", ".gGg.", "..G..", ".mmm."],
       "tuft2":  ["..g.g..", "g.gGg.g", ".gGGGg.", "..mmm.."],
@@ -196,18 +196,18 @@ BIOMES = {
       "stone":  [".ggg.", "gGGGk", ".kkk."],
     }, weights=[("crack", 3), ("crack2", 2), ("lichen", 2), ("lichen2", 2), ("spots", 2), ("pebs", 2), ("stone", 1)]),
   "tropical": dict(seed=83, specks=200, details=1800, pal={
-      "b": "#155310",   # wet forest floor: BIOMES.tropical.color in data.js
-      "s": "#144D0F",   # faint speck
-      "d": "#12470E",   # darker speck
-      "l": "#3A4A16",   # plant litter, olive
-      "L": "#2E3C12",   # plant litter, dark
-      "r": "#4A3A16",   # red-brown humus
-      "R": "#3A2D12",   # humus, dark
-      "n": "#1F6618",   # sprout lit
-      "N": "#195C13",   # sprout
-      "t": "#36361A",   # twig, root
-      "T": "#282A13",   # twig, root, dark
-      "m": "#134E0F",   # ground shade under things
+      "b": "#265523",   # wet forest floor: BIOMES.tropical.color in data.js
+      "s": "#255021",   # faint speck
+      "d": "#224B1F",   # darker speck
+      "l": "#424E27",   # plant litter, olive
+      "L": "#374221",   # plant litter, dark
+      "r": "#4E4227",   # red-brown humus
+      "R": "#403620",   # humus, dark
+      "n": "#32652D",   # sprout lit
+      "N": "#2B5C27",   # sprout
+      "t": "#3D3D27",   # twig, root
+      "T": "#31321F",   # twig, root, dark
+      "m": "#245121",   # ground shade under things
     }, stamps={
       "litter": ["l..l.", ".lL.l", "L.lL.", ".L..."],
       "litter2":["..l", "lL.", ".L."],
