@@ -2092,7 +2092,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       sky(100); const hot = guestWeather(), hotHurt = weatherMood(gp, hot);
       sky(110); const hotter = weatherMood(gp, guestWeather());
       sky(60, "rain"); const rain = weatherMood(gp, guestWeather()); gp.umbrella = 2; const dry = weatherMood(gp, guestWeather());
-      sky(20); const cold = weatherMood(gp, guestWeather()); gp.jacket = 2; const warm = weatherMood(gp, guestWeather());
+      sky(20); const cold = weatherMood(gp, guestWeather()); gp.beanie = 2; const capped = weatherMood(gp, guestWeather()); gp.beanie = 0;
+      gp.warmTil = state.minute + 30; const cocoa = weatherMood(gp, guestWeather()); gp.warmTil = 0; gp.jacket = 2; const warm = weatherMood(gp, guestWeather());
+      sky(60, "wind"); const windJak = weatherMood(gp, guestWeather()); gp.jacket = 0; const windBare = weatherMood(gp, guestWeather());
+      sky(100); gp.coolTil = state.minute + 30; const slushed = weatherMood(gp, guestWeather()); gp.coolTil = 0;
       sky(75, "storm"); const rest = state.buildings.find(b => BUILDINGS[b.type].indoor) || {id:"b-rest", type:"restaurant", points:[[0,0],[1,0],[1,1],[0,1]]};
       if(!state.buildings.includes(rest)) state.buildings.push(rest);
       gp.in = rest.id; const inside = weatherMood(gp, guestWeather()); gp.in = null;
@@ -2100,8 +2103,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       gp.watch = {id:vv.id}; const atViv = weatherMood(gp, guestWeather()); gp.watch = {id:"e-none"}; const atOpen = weatherMood(gp, guestWeather()); gp.watch = null;
       state.exhibits = state.exhibits.filter(e => e !== vv);
       state.buildings = state.buildings.filter(b => b.id !== "b-rest");
-      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && inside === 0 && atViv === 0 && atOpen > 0
-        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket;
+      out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && capped < cold && warm < capped && cocoa < cold && windJak < windBare && slushed < hotHurt && slushed > 0 && inside === 0 && atViv === 0 && atOpen > 0
+        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket && MENU.cocoa.warm && MENU.coffee.warm && MENU.slushie.cool && MENU.water.cool && MENU.soda.cool && MENU.icecream.cool && !!MENU.beanie;
       state.weather.t = keepT; state.minute = keepMin;
     }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;
