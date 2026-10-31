@@ -3980,6 +3980,9 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
       out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && /<(polygon|path)/.test(x)));
       out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
+      // animated fittings (VIV_SPRITES frames): every frame drawn on the map, one visible at a time on a CSS loop, and every frame's picture packed
+      out.vivFittingsAnimate = ["vmist", "abubble", "akelp", "aweed"].every(k => { const V = VIV_SPRITES[k], svg = vivPropSvg({id:"l-a", type:k, x:5, y:5}, LAND[k]);
+        return V.frames > 1 && (svg.match(/<image/g) || []).length === V.frames && svg.includes(`animation:frame${V.frames}of${V.frames}`) && [...Array(V.frames).keys()].every(i => SPRITE_PACK[`sprites/viv/${k}${i ? "-" + (i + 1) : ""}.png`]); });
       { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
         state.exhibits.push(ev); syncAnimals();
         const hs = [...herd.values()].filter(h => h.exhibitId === "e-fa");

@@ -66,7 +66,8 @@ function vvProps(e, bb, E, B){
   const D = bb.y1 - bb.y0 || 1, cx = (bb.x0 + bb.x1) / 2;
   return landOf(e).filter(f => VIV_SPRITES[f.type] && LAND[f.type]).map(f => {
     const V = VIV_SPRITES[f.type], t = LAND[f.type], y = V.flat ? f.y : f.y + t.r * .3, sc = B + (1 - B) * clamp((y - bb.y0) / D, 0, 1), w = V.w * VIV_MPP, h = V.h * VIV_MPP * (V.flat ? VIV_VIEW.flat : 1);
-    return {y, svg:`<image href="${spriteUrl(`sprites/viv/${f.type}.png`)}" preserveAspectRatio="none" style="image-rendering:pixelated" x="${vvN((f.x - cx - w / 2) * sc)}" y="${vvN((E - h) * sc)}" width="${vvN(w * sc)}" height="${vvN(h * sc)}"><title>${esc(t.label)}</title></image>`};
+    const n = V.frames || 1, k = n < 2 ? 1 : 1 + Math.floor(performance.now() / 1000 * (V.fps || 3) + [...String(f.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) / 7 * (V.fps || 3)) % n;   // an animated one's frame, from the clock, in step with the map
+    return {y, svg:`<image href="${spriteUrl(`sprites/viv/${f.type}${k > 1 ? "-" + k : ""}.png`)}" preserveAspectRatio="none" style="image-rendering:pixelated" x="${vvN((f.x - cx - w / 2) * sc)}" y="${vvN((E - h) * sc)}" width="${vvN(w * sc)}" height="${vvN(h * sc)}"><title>${esc(t.label)}</title></image>`};
   });
 }
 // Each frame: every animal in the case, back to front, at its place seen through the glass
