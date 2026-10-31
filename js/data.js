@@ -642,8 +642,8 @@ const GUEST_GEAR = {
     trexhat:{slot:"head", src:"sprites/human/gear/cap-trex.png", w:10, h:5, ax:3, ay:1},
     sabhat:{slot:"head", src:"sprites/human/gear/cap-sabre.png", w:10, h:6, ax:3, ay:1},
     beanie:{slot:"head", src:"sprites/human/gear/beanie.png", w:8, h:6, ax:3, ay:2},
-    tribag:{slot:"back", src:"sprites/human/gear/pack-tri.png", w:5, h:8, ax:4, ay:2},
-    dimebag:{slot:"back", src:"sprites/human/gear/pack-dime.png", w:5, h:8, ax:4, ay:2},
+    tribag:{slot:"back", src:"sprites/human/gear/pack-tri.png", w:6, h:8, ax:2, ay:2},
+    dimebag:{slot:"back", src:"sprites/human/gear/pack-dime.png", w:6, h:8, ax:2, ay:2},
     umbrella:{slot:"hand", src:"sprites/human/gear/umbrella.png", w:13, h:21, ax:6, ay:21, wet:true},
   },
 };

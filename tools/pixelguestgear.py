@@ -57,25 +57,25 @@ GEAR = {
                "......O......",
                "......O......",
                "......O......"],
-  # back anchor at (4, 2); the strap runs over the shoulder
-  "pack-tri": [".w...",
-               "oooo.",
-               "ojJo.",
-               "jjJJJ",
-               "jjJJ.",
-               "jjJJ.",
-               "jJJJ.",
-               ".JJ.."],
-  "pack-dime": ["K.K..",
-                "KNKN.",
-                "RRRK.",
-                "RRRRN",
-                "RRRK.",
-                "RRRK.",
-                "RRKK.",
-                ".KK.."],
+  # back anchor at (2, 2): the pack overlaps the back by two pixels and its strap runs over the shoulder
+  "pack-tri": ["..w...",
+               ".ooo..",
+               "oojoo.",
+               "jjjJJJ",
+               "jjjJ..",
+               "jjJJ..",
+               "jjJJ..",
+               ".JJ..."],
+  "pack-dime": [".K.K..",
+                ".KNKN.",
+                "RRRRK.",
+                "RRRRNN",
+                "RRRK..",
+                "RRRK..",
+                "RRKK..",
+                ".KK..."],
 }
-for row in GEAR["pack-tri"] + GEAR["pack-dime"]: assert len(row) == 5, row
+for row in GEAR["pack-tri"] + GEAR["pack-dime"]: assert len(row) == 6, row
 
 # Jackets: each kind's shirt colors (darkest first) become the park jacket's greens, and bare arms above the hand become sleeves
 JACKET = [(43,84,45), (48,94,50), (63,124,69)]
