@@ -1005,7 +1005,7 @@ function landFit(e, key, x, y, pic, biome, skip){
 function landSpot(x, y, key){
   if(state.exhibits.some(o => o.viv && inPoly(x, y, o.points))) return {e:null, x, y, ok:false, why:"Plant a vivarium from its own panel."};
   const e = state.exhibits.find(o => !o.viv && inPoly(x, y, o.points));
-  const rock = ROCK_TYPES.includes(key), biome = rock ? (typeof rockBiome !== "undefined" && rockBiome) || (e ? biomeOf(e) : parkBiome()) : null;
+  const rock = ROCK_TYPES.includes(key), biome = rock ? rockBiomeAt(e) : null;
   const pic = rock ? rockPicFor(key, biome) : null;
   [x, y] = footSnap(key, pic, biome, x, y);
   const why = e ? landProblem(e, key, x, y, pic, biome) : decorProblem(key, x, y, pic, biome);
@@ -1332,7 +1332,10 @@ const rockSprites = (f, biome) => (ROCK_SPRITES[BIOMES[f.biome] ? f.biome : biom
 const rockPick = {rock:null, boulder:null};
 // The biome a rock is being placed under: the biome tab it was picked from, the build menu's biome pick, the exhibit under the cursor, or the park's
 let rockBiomeMenu = null;   // stone biome chosen in the build menu's Rock and Boulder pickers (null: the exhibit's, or the park's)
-const rockBiomeNow = () => rockBiome || rockBiomeMenu || (landGhost && landGhost.e ? biomeOf(landGhost.e) : parkBiome());
+// The stone picked (exhibit panel tab, else build menu dropdown), else null for the ground's own
+const rockBiomePicked = () => (typeof rockBiome !== "undefined" && rockBiome) || rockBiomeMenu;
+const rockBiomeAt = e => rockBiomePicked() || (e ? biomeOf(e) : parkBiome());
+const rockBiomeNow = () => rockBiomeAt(landGhost && landGhost.e);
 // The picked picture's index for this kind of rock, or null when it's random or the biome has fewer pictures than that
 function rockPicOf(type, biome){ const n = rockPick[type], l = (ROCK_SPRITES[biome] || {})[type]; return l && n != null && n < l.length ? n : null; }
 // The picture the next rock of this kind gets: the picked one, else one rolled ahead (so the ghost shows what a tap will place, and its footprint is known). Rolled again after each placement.
