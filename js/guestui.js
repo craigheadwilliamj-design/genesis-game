@@ -236,14 +236,14 @@ function menuHtml(b, served){
   if(!menu.length) h += `<div class="meta">Nothing for sale.</div>`;
   else h += `<ul class="shop">${menu.map(m => {
     const it = MENU[m.id], will = willPay(m.id, m.price), sold = served.items[m.id] || 0;
-    return `<li><span class="nm">${esc(it.label)}<span class="per">${sold} sold today</span></span>
+    return `<li><span class="nm"${it.text ? ` title="${esc(it.text)}"` : ""}>${esc(it.label)}<span class="per">${sold} sold today</span></span>
       <span class="row" style="gap:4px;flex-wrap:nowrap;align-items:center"><button class="btn" data-action="menuPrice" data-id="${m.id}" data-d="-1" aria-label="Lower the price" style="padding:2px 9px">−</button><b class="num" style="min-width:46px;text-align:center">${money(m.price)}</b><button class="btn" data-action="menuPrice" data-id="${m.id}" data-d="1" aria-label="Raise the price" style="padding:2px 9px">+</button></span>
       <span class="need">Cost ${cents(it.cost)} · usual ${money(it.price)}</span>
       ${will < 1 ? `<span class="${will < .6 ? "warn" : "need"}">${Math.round(will * 100)}% will pay</span>` : ""}
       <span class="need"><button class="btn" data-action="menuDrop" data-id="${m.id}" style="padding:2px 9px">Remove</button></span></li>`;
   }).join("")}</ul>`;
   const more = Object.keys(MENU).filter(id => MENU[id].kind === t.kind && (!MENU[id].only || MENU[id].only === b.type) && !menuItem(b, id));
-  if(menu.length < t.menuSlots && more.length) h += `<div class="row" style="margin-top:8px">${more.map(id => `<button class="btn" data-action="menuAdd" data-id="${id}" style="padding:4px 10px">${esc(MENU[id].label)}</button>`).join("")}</div>`;
+  if(menu.length < t.menuSlots && more.length) h += `<div class="row" style="margin-top:8px">${more.map(id => `<button class="btn" data-action="menuAdd" data-id="${id}"${MENU[id].text ? ` title="${esc(MENU[id].text)}"` : ""} style="padding:4px 10px">${esc(MENU[id].label)}</button>`).join("")}</div>`;
   return h + `</section>`;
 }
 

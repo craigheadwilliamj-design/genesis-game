@@ -16,6 +16,9 @@ const menuItem = (b, id) => menuOf(b).find(m => m.id === id) || null;
 
 const inStock = (b, id, n = 1) => guestGoodsFree() || stockOf(b, MENU[id].good) >= MENU[id].cost * n;
 const onSale = b => menuOf(b).filter(m => inStock(b, m.id));
+// Weather that sells jackets and beanies, and hot drinks: cold, snow or wind. Hot drinks or cool ones, by how it feels out now (null if neither).
+const wxWrapUp = () => wxChilly() || wxNow().ev === "wind";
+const wxDrink = () => wxWrapUp() ? "warm" : wxNow().temp > GUEST_WX.hotFrom ? "cool" : null;
 
 // The needs a building takes care of. A stand's come from what it has in stock; a gift shop with anything to sell serves shoppers.
 function servesOf(b){
@@ -56,13 +59,14 @@ function serveAt(p, b, why){
   if((b.graffiti || 0) >= VANDAL.grossAt){ thinks(p, "graffiti"); p.mood -= 4 * pm(p, "broken"); }
   if(t.kind === "food"){
     // each need that's bad enough gets the best thing on the menu for it, if the price is right
+    const wd = wxDrink(), helps = wd && menuOf(b).some(m => MENU[m.id][wd]);
     for(const need of ["hunger", "thirst", "energy"]){
-      if(p.needs[need] < 25 && need !== why) continue;
+      if(p.needs[need] < (need === "thirst" && helps ? GUEST_WX.drinkThirst : 25) && need !== why) continue;
       let best = null, gone = false;
       for(const m of menuOf(b)){
         const f = (MENU[m.id].fills || {})[need]; if(!f) continue;
         if(!inStock(b, m.id, n)){ gone = true; continue; }
-        const score = f * willPay(m.id, m.price, p);
+        const score = f * willPay(m.id, m.price, p) * (wd && MENU[m.id][wd] ? WEATHER.drink : 1);
         if(!best || score > best.score) best = {m, f, score, will:willPay(m.id, m.price, p)};
       }
       if(!best){ if(gone && need === why) thinks(p, "soldOut"); continue; }
@@ -82,7 +86,7 @@ function serveAt(p, b, why){
     for(let i = 0; i < n; i++){
       const menu = onSale(b); if(!menu.length){ if(!served) thinks(p, "soldOut"); break; }
       const m = menu[Math.floor(Math.random() * menu.length)], will = willPay(m.id, m.price, p);
-      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && wxWet() ? WEATHER.umbrella : m.id === "jacket" && wxChilly() ? WEATHER.jacket : 1);
+      const boost = (1 + EDU.shopBoost * edu * (["guide", "plush", "paleobook"].includes(m.id) ? 2 : 1)) * (m.id === "umbrella" && wxWet() ? WEATHER.umbrella : (m.id === "jacket" || m.id === "beanie") && wxWrapUp() ? WEATHER.jacket : 1);
       if(will < .6) thinks(p, "priceyGift");
       if(Math.random() < Math.min(.95, keen * boost * pm(p, "shop")) * will && p.cash - bill >= m.price){ buy(p, b, m, 1); bill += m.price; served++; }
     }
@@ -122,7 +126,9 @@ function buy(p, b, m, n){
   for(const [k, v] of Object.entries(it.fills || {})) p.needs[k] = Math.max(0, p.needs[k] - v);
   if(it.joy) p.mood += it.joy;
   if(m.id === "map") p.map = true;
-  if(m.id === "umbrella" || m.id === "jacket") p[m.id] = (p[m.id] || 0) + n;   // how many in the party carry one
+  if(it.warm) p.warmTil = state.minute + GUEST_WX.drinkMin;
+  if(it.cool) p.coolTil = state.minute + GUEST_WX.drinkMin;
+  if(m.id === "umbrella" || m.id === "jacket" || m.id === "beanie") p[m.id] = (p[m.id] || 0) + n;   // how many in the party carry one
   if(m.id === "guide"){ if(!p.guide) learn(p, EDU.guide); p.guide = true; }
   if(m.id === "paleobook"){ if(!p.guide) learn(p, EDU.book); p.guide = true; }
   if(it.litter){ p.trash = (p.trash || 0) + n; p.trashAt = state.minute; }

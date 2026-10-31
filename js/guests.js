@@ -201,14 +201,16 @@ function guestWeather(){
   return {heat, cold, ev:w.ev, evHurt:G.ev[w.ev] || 0, thirst:1 + G.thirst * heat / G.max, indoor};
 }
 const WX_THOUGHT = {rain:"wxRain", snow:"wxSnow", storm:"wxStorm", sandstorm:"wxSand", wind:"wxWind"};
-// Mood a party loses a minute to the weather: nothing in line at or inside an indoor building, or watching a vivarium; umbrellas keep off rain and storms, jackets the cold and snow
+// Mood a party loses a minute to the weather: nothing in line at or inside an indoor building, or watching a vivarium; umbrellas keep off rain and storms,
+// jackets and beanies the cold, snow and wind, a hot drink some of those for a while and a cool drink some of the heat
 function weatherMood(p, wg){
   if(!wg.heat && !wg.cold && !wg.evHurt) return 0;
   if((p.in && wg.indoor.has(p.in)) || (p.watch && wg.indoor.has(p.watch.id))) return 0;
-  const G = GUEST_WX, has = k => Math.min(1, (p[k] || 0) / p.n), umb = 1 - (1 - G.umbrella) * has("umbrella"), jak = 1 - (1 - G.jacket) * has("jacket");
-  const ev = wg.evHurt * (wg.ev === "rain" || wg.ev === "storm" ? umb : wg.ev === "snow" ? jak : 1), cold = wg.cold * jak;
-  const hurt = (wg.heat + cold + ev) * pm(p, "weather");
-  if(wg.heat >= G.thought) thinks(p, "wxHot");
+  const G = GUEST_WX, has = k => Math.min(1, (p[k] || 0) / p.n), umb = 1 - (1 - G.umbrella) * has("umbrella");
+  const wrap = (1 - (1 - G.jacket) * has("jacket")) * (1 - (1 - G.beanie) * has("beanie")) * ((p.warmTil || 0) > state.minute ? G.warm : 1);
+  const ev = wg.evHurt * (wg.ev === "rain" || wg.ev === "storm" ? umb : wg.ev === "snow" || wg.ev === "wind" ? wrap : 1), cold = wg.cold * wrap;
+  const heat = wg.heat * ((p.coolTil || 0) > state.minute ? G.cool : 1), hurt = (heat + cold + ev) * pm(p, "weather");
+  if(heat >= G.thought) thinks(p, "wxHot");
   if(cold >= G.thought) thinks(p, "wxCold");
   if(ev >= G.thought) thinks(p, WX_THOUGHT[wg.ev]);
   return hurt;
@@ -737,7 +739,7 @@ function shiftStamps(d){
     for(const k of Object.keys(p.cool)) p.cool[k] -= d;
     if(p.readyAt !== undefined) p.readyAt -= d;
     if(p.watch && p.watch.next !== undefined) p.watch.next -= d;
-    for(const k of ["trashAt", "ejectAt", "ejectTry"]) if(p[k] !== undefined) p[k] -= d;
+    for(const k of ["trashAt", "ejectAt", "ejectTry", "warmTil", "coolTil"]) if(p[k] !== undefined) p[k] -= d;
   }
 }
 // Remember how today's guests felt, for tomorrow's crowd and the rating

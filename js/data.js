@@ -807,6 +807,8 @@ const NEEDS = {
 //   fills   how much each need drops (food)        joy     mood a souvenir adds (merch)
 //   litter  leaves a wrapper or cup to throw away
 //   only    the one building type that can sell it (restaurant dishes)
+//   warm    a hot drink: takes the edge off cold, snow and wind for a while (GUEST_WX.warm); cool  a cold one, for the heat
+//   text    shown on hover
 const MENU = {
   burger:  {label:"Burgers",     kind:"food", good:"snacks",  price:8,  cost:2,   fills:{hunger:70},             litter:true},
   hotdog:  {label:"Hot dogs",    kind:"food", good:"snacks",  price:6,  cost:1.5, fills:{hunger:55},             litter:true},
@@ -814,9 +816,11 @@ const MENU = {
   fries:   {label:"Fries",       kind:"food", good:"snacks",  price:4,  cost:.8,  fills:{hunger:35},             litter:true},
   popcorn: {label:"Popcorn",     kind:"food", good:"snacks",  price:3,  cost:.5,  fills:{hunger:25},             litter:true},
   icecream:{label:"Ice cream",   kind:"food", good:"snacks",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3},
-  soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true},
-  water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true},
-  coffee:  {label:"Coffee",      kind:"food", good:"drinks",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true},
+  soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true, cool:true, text:"Sells better in the heat. Cools guests off."},
+  water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true, cool:true, text:"Sells better in the heat. Cools guests off."},
+  slushie: {label:"Slushies",    kind:"food", good:"drinks",  price:5,  cost:1,   fills:{thirst:55},             litter:true, cool:true, joy:2, text:"Sells better in the heat. Cools guests off."},
+  coffee:  {label:"Coffee",      kind:"food", good:"drinks",  price:4,  cost:.8,  fills:{thirst:30, energy:35},  litter:true, warm:true, text:"Sells better in the cold and wind. Warms guests up."},
+  cocoa:   {label:"Hot chocolate", kind:"food", good:"drinks", price:4, cost:.9,  fills:{thirst:35, hunger:10},  litter:true, warm:true, joy:2, text:"Sells better in the cold and wind. Warms guests up."},
   smoothie:{label:"Smoothies",   kind:"food", good:"drinks",  price:6,  cost:1.4, fills:{thirst:55, hunger:15},  litter:true},
   shake:   {label:"Milkshakes",  kind:"food", good:"drinks",  price:7,  cost:1.7, fills:{thirst:40, hunger:30},  litter:true},
   turkey:  {label:"Turkey legs", kind:"food", good:"snacks",  price:11, cost:3,   fills:{hunger:80},             litter:true},
@@ -834,7 +838,8 @@ const MENU = {
   map:     {label:"Park maps",     kind:"merch", good:"merch", price:3,  cost:.4, joy:2, text:"Guests with a map don't mind long walks."},
   guide:   {label:"Field guides",  kind:"merch", good:"merch", price:12, cost:3.5, joy:5},
   umbrella:{label:"Umbrellas",     kind:"merch", good:"merch", price:12, cost:3.5, joy:4, text:"Sells far better when it rains. Keeps the rain off."},
-  jacket:  {label:"Park jackets",  kind:"merch", good:"merch", price:30, cost:9,  joy:5, text:"Sells far better in the cold. Keeps the cold off."},
+  jacket:  {label:"Branded jackets", kind:"merch", good:"merch", price:55, cost:18, joy:10, text:"Sells far better in the cold and wind. Keeps the cold, snow and wind off."},
+  beanie:  {label:"Beanies",       kind:"merch", good:"merch", price:15, cost:4,  joy:4, text:"Sells far better in the cold and wind. Keeps some of the cold, snow and wind off."},
   iceplush:{label:"Ice Age plushies", kind:"merch", good:"merch", price:15, cost:4.5, joy:8},
   fossilkit:{label:"Fossil finder kits", kind:"merch", good:"merch", price:18, cost:5.5, joy:7},
   tribag:  {label:"Triceratops backpacks", kind:"merch", good:"merch", price:35, cost:11, joy:9},
@@ -845,7 +850,6 @@ const MENU = {
   tikshirt:{label:"Tiktaalik T-shirts", kind:"merch", good:"merch", price:20, cost:6, joy:6},
   trexhat: {label:"T-Rex hats",    kind:"merch", good:"merch", price:16, cost:4.5, joy:6},
   paleobook:{label:"Paleontology books", kind:"merch", good:"merch", price:24, cost:7, joy:6, text:"Guests who read one learn more, and learn more at every exhibit after."},
-  jacket:  {label:"Branded jackets", kind:"merch", good:"merch", price:55, cost:18, joy:10},
 };
 // How guests take prices: at the usual price everyone buys, at double nobody does
 const PRICE_SENSE = 1;     // share of buyers lost for each 100% over the usual price
@@ -1792,7 +1796,8 @@ const HAB = {
 //   grove   how much groves count as cover (shade on hot days, a little on stormy ones, none in the cold)
 const WEATHER = {
   umbrella:2.5,     // umbrellas sell this many times as well on a wet day
-  jacket:2.5,       // and jackets in the cold (GUEST_WX.coldBelow) or snow
+  jacket:2.5,       // and jackets and beanies in the cold (GUEST_WX.coldBelow), snow or wind
+  drink:2,          // guests out in the heat favor cool drinks this much, and in the cold or wind hot ones
   startDay:4,       // new parks get no weather events until this day
   kinds:{
     fair:     {label:"Fair",      happy:0,  ill:0,   hurt:0,   wear:1,   grove:0},
@@ -1839,7 +1844,7 @@ const CLIMATE = {
     storm:[0,0,0,0,.01,.02,.03,.03,.01,0,0,0], wind:[.14,.14,.12,.1,.08,.06,.06,.06,.08,.1,.12,.14]},
 };
 // Weather and guests: it never keeps them away, but out in it they lose mood a minute (times how much they mind, pm "weather").
-// Guests in line at or inside an indoor building (BUILDINGS indoor) are out of it. A guest with an umbrella or jacket feels only part of it.
+// Guests in line at or inside an indoor building (BUILDINGS indoor) are out of it. A guest with an umbrella, jacket, beanie or the right drink feels only part of it.
 const GUEST_WX = {
   hotFrom:85, coldBelow:40,   // °F: hotter or colder than this bothers them
   hot:.01, hotPer:.002,       // mood a minute over hotFrom, and more for each degree past it (being on their feet costs .03)
@@ -1847,7 +1852,11 @@ const GUEST_WX = {
   max:.05,                    // the most heat or cold can take a minute
   ev:{rain:.02, snow:.015, wind:.012, storm:.05, sandstorm:.08},   // mood a minute each event takes
   umbrella:.2,                // share of rain and storms a guest with an umbrella still feels
-  jacket:.2,                  // share of cold and snow a guest with a jacket still feels
+  jacket:.2,                  // share of cold, snow and wind a guest with a jacket still feels
+  beanie:.6,                  // and with a beanie (with both, the two multiply)
+  warm:.5, cool:.5,           // share of cold, snow and wind still felt after a hot drink, and of heat after a cool one
+  drinkMin:60,                // minutes a drink keeps it up
+  drinkThirst:10,             // out in the weather a drink would help with, guests get one when this thirsty (usually 25)
   thirst:.6,                  // guests get up to this much thirstier in the heat (at max)
   thought:.012,               // mood a minute at which they say so
 };
