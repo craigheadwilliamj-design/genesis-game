@@ -1,8 +1,10 @@
-# Draws the calm ground tiles, sprites/ground/<biome>.png for desert, scrubland and boreal (Coniferous Forest): one seamless 288 px tile each (36 m at 8 px a meter) under both exhibits (#b-<biome>)
-# and the park (#p-<biome>). A pale flat floor (BIOMES.<biome>.color), faint 1 px specks, and a few small details in low-contrast tones, so the outlined animals and buildings
+# Draws the calm ground tiles, sprites/ground/<biome>.png for every biome: one seamless 288 px tile each (36 m at 8 px a meter) under both exhibits (#b-<biome>)
+# and the park (#p-<biome>). A flat floor (BIOMES.<biome>.color), faint 1 px specks, and a few small details in low-contrast tones, so the outlined animals and buildings
 # stand out. Everything wraps over the edges. Desert: sand with dune arcs, dry tufts, twigs, pebble trios and small rocks. Scrubland: terracotta hardpan (Permian red beds) with cracks,
 # red sandstone pebbles and chips, twigs and dead brush (no grass, so it suits the Permian on). Boreal: dark olive moss floor with fallen needles,
-# pine cones, moss clumps, twigs and grey stones.
+# pine cones, moss clumps, twigs and grey stones. Grassland: grass tufts, dry blades, seed heads and pebbles (Neogene on). Wetland: small pools, mud, algae and dead stems.
+# Fern Prairie: bare loam with fern fronds, horsetail stubs, cracks and pebbles. Seasonal Forest: moss, plant litter, twigs and stones. Tundra: frost cracks, green and ochre lichen
+# and grey stones. Tropical: plant litter, red-brown humus, sprouts, roots and twigs. Nothing from after a biome's first period (no leaves before broadleaf trees, no grass before the Neogene).
 # Usage: python3 -I tools/pixelground_calm.py [outdir]
 import sys, os, random
 from PIL import Image
@@ -78,6 +80,144 @@ BIOMES = {
       "twig":     ["...t.....", "TttT.t...", "....TTt..", ".......T."],
       "stone":    [".ggg.", "gGGGk", ".kkk."],
     }, weights=[("needles", 3), ("needles2", 3), ("cone", 2), ("cones", 1), ("moss", 2), ("moss2", 2), ("twig", 2), ("stone", 1)]),
+  "grassland": dict(seed=53, specks=240, details=2200, pal={
+      "b": "#C5BB29",   # sunlit grass floor: BIOMES.grassland.color in data.js
+      "s": "#BBB126",   # faint speck
+      "d": "#AFA524",   # darker speck
+      "g": "#ADAA2A",   # grass tuft lit
+      "G": "#959424",   # grass tuft dark
+      "y": "#D1C746",   # dry blade, pale
+      "t": "#9C8A36",   # twig, seed head
+      "T": "#7E6E2C",   # twig, dark
+      "p": "#BCB078",   # pebble lit
+      "P": "#9C9058",   # pebble shade
+      "m": "#B9AF27",   # ground shade under things
+    }, stamps={
+      "tuft":   ["g.g.g", ".gGg.", "..G..", ".mmm."],
+      "tuft2":  ["..g.g..", "g.gGg.g", ".gGGGg.", "..mmm.."],
+      "blades": ["y...y.", ".y.y..", "..yy.y", "...y.."],
+      "seeds":  [".t.t.", "t.T.t", "..g..", ".mm.."],
+      "twig":   ["...t.....", "TttT.t...", "....TTt..", ".......T."],
+      "pebs":   [".pp....", "pPPP.p.", ".mm..P.", "......."],
+      "stone":  [".ppp.", "pPPPP", ".mmm."],
+    }, weights=[("tuft", 3), ("tuft2", 2), ("blades", 3), ("seeds", 2), ("twig", 1), ("pebs", 2), ("stone", 1)]),
+  "wetland": dict(seed=61, specks=220, details=2000, pal={
+      "b": "#5B6D2B",   # marsh mud and algae: BIOMES.wetland.color in data.js
+      "s": "#566828",   # faint speck
+      "d": "#4F6025",   # darker speck
+      "o": "#64772F",   # algae, moss lit
+      "O": "#506427",   # algae, moss
+      "u": "#535A27",   # mud
+      "U": "#474D22",   # mud, deep
+      "w": "#536A4A",   # small pool
+      "l": "#6F8A6C",   # pool glint
+      "t": "#4A4823",   # dead stem
+      "T": "#3C3A1D",   # dead stem, dark
+      "p": "#7A7A5C",   # pebble lit
+      "P": "#62634C",   # pebble shade
+      "m": "#56682A",   # ground shade under things
+    }, stamps={
+      "pool":   [".www..", "wlwwww", ".wwww.", "..mm.."],
+      "pool2":  [".ww.", "wlww", ".mm."],
+      "mud":    ["..uu...", ".uUUuu.", "uUUUUu.", ".uuu..."],
+      "mud2":   [".uu.", "uUUu", ".uu."],
+      "algae":  ["..oo..", ".oOOo.", "oOOOOo", ".mmmm."],
+      "algae2": [".o.o", "oOo.", ".mm."],
+      "stems":  ["t....t.", ".T..t..", "..TT...", "....T.."],
+      "pebs":   [".pp...", "pPP.p.", ".mm.P."],
+    }, weights=[("pool", 2), ("pool2", 2), ("mud", 2), ("mud2", 3), ("algae", 2), ("algae2", 2), ("stems", 2), ("pebs", 2)]),
+  "fern": dict(seed=67, specks=240, details=2200, pal={
+      "b": "#8F6843",   # bare loam between the ferns: BIOMES.fern.color in data.js
+      "s": "#87623F",   # faint speck
+      "d": "#7E5B3B",   # darker speck
+      "f": "#7A7A3A",   # fern frond lit
+      "F": "#61652E",   # fern frond dark
+      "h": "#768446",   # horsetail stub
+      "t": "#6E4E30",   # twig
+      "T": "#593F27",   # twig, dark
+      "c": "#835E3C",   # crack
+      "p": "#A57F5A",   # pebble lit
+      "P": "#7C5736",   # pebble shade
+      "m": "#896340",   # ground shade under things
+    }, stamps={
+      "frond":  ["f.f.f..", ".fFfFf.", "..f.F.f", "...mm.."],
+      "frond2": [".f.f", "fFF.", ".Ff.", ".mm."],
+      "curl":   [".ff.", "f..F", ".FF.", "..m."],
+      "horse":  ["h..h", "F..h", "h..F", "mm.m"],
+      "twig":   ["...t.....", "TttT.t...", "....TTt..", ".......T."],
+      "crack":  ["c......", ".cc..c.", "...cc..", "....c.."],
+      "pebs":   [".pp....", "pPP..p.", ".mm..P."],
+      "stone":  [".ppp.", "pPPPP", ".mmm."],
+    }, weights=[("frond", 2), ("frond2", 3), ("curl", 1), ("horse", 2), ("twig", 2), ("crack", 2), ("pebs", 2), ("stone", 1)]),
+  "temperate": dict(seed=71, specks=220, details=2000, pal={
+      "b": "#40813F",   # moss and groundcover: BIOMES.temperate.color in data.js
+      "s": "#3C7A3B",   # faint speck
+      "d": "#387337",   # darker speck
+      "o": "#4C8D42",   # moss clump lit
+      "O": "#367036",   # moss clump
+      "h": "#4F6E38",   # humus, plant litter
+      "H": "#456235",   # humus, dark
+      "t": "#4E5A36",   # twig
+      "T": "#3F4A2E",   # twig, dark
+      "g": "#6E7C64",   # stone lit
+      "G": "#58664F",   # stone
+      "k": "#465440",   # stone shade
+      "m": "#3C7A3B",   # ground shade under things
+    }, stamps={
+      "moss":   ["..ooo..", ".oOOoo.", "ooOOOo.", ".mmmm.."],
+      "moss2":  [".oo.", "oOOo", ".mm."],
+      "litter": ["h..h.", ".hH.h", "H.hH.", ".H..."],
+      "litter2":["..h", "hH.", ".H."],
+      "twig":   ["...t.....", "TttT.t...", "....TTt..", ".......T."],
+      "twig2":  ["..t..t", "TTtTt.", "...m.."],
+      "stone":  [".ggg.", "gGGGk", ".kkk."],
+    }, weights=[("moss", 2), ("moss2", 3), ("litter", 3), ("litter2", 2), ("twig", 2), ("twig2", 1), ("stone", 1)]),
+  "tundra": dict(seed=79, specks=220, details=2100, pal={
+      "b": "#C3CDD4",   # frosted grit: BIOMES.tundra.color in data.js
+      "s": "#B9C3CA",   # faint speck
+      "d": "#ADB8C0",   # darker speck
+      "c": "#B2BDC6",   # frost crack
+      "C": "#A3AFB9",   # frost crack, deep
+      "h": "#AFBCA9",   # lichen, green
+      "H": "#98A794",   # lichen, green dark
+      "y": "#C6C1A6",   # lichen, ochre
+      "Y": "#ADA98E",   # lichen, ochre dark
+      "g": "#A9B0B5",   # stone lit
+      "G": "#8F979D",   # stone
+      "k": "#7D858B",   # stone shade
+      "m": "#BAC4CB",   # ground shade under things
+    }, stamps={
+      "crack":  ["...c.....", "..c.C....", ".c...CC..", "c......Cc"],
+      "crack2": ["c......", ".CC..c.", "...Cc..", "....C..", "....c.."],
+      "lichen": [".hh.", "hHHh", ".mh."],
+      "lichen2":["..yy.", ".yYYy", "..Ym."],
+      "spots":  ["h...y", "..H..", "y...h"],
+      "pebs":   [".gg....", "gGGk.g.", ".kk..G.", "......."],
+      "stone":  [".ggg.", "gGGGk", ".kkk."],
+    }, weights=[("crack", 3), ("crack2", 2), ("lichen", 2), ("lichen2", 2), ("spots", 2), ("pebs", 2), ("stone", 1)]),
+  "tropical": dict(seed=83, specks=200, details=1800, pal={
+      "b": "#155310",   # wet forest floor: BIOMES.tropical.color in data.js
+      "s": "#144D0F",   # faint speck
+      "d": "#12470E",   # darker speck
+      "l": "#3A4A16",   # plant litter, olive
+      "L": "#2E3C12",   # plant litter, dark
+      "r": "#4A3A16",   # red-brown humus
+      "R": "#3A2D12",   # humus, dark
+      "n": "#1F6618",   # sprout lit
+      "N": "#195C13",   # sprout
+      "t": "#36361A",   # twig, root
+      "T": "#282A13",   # twig, root, dark
+      "m": "#134E0F",   # ground shade under things
+    }, stamps={
+      "litter": ["l..l.", ".lL.l", "L.lL.", ".L..."],
+      "litter2":["..l", "lL.", ".L."],
+      "humus":  [".rr..", "rRRr.", ".RRr.", "..m.."],
+      "humus2": [".r.", "rRr", ".m."],
+      "sprout": ["n.n", ".N.", ".m."],
+      "sprout2":["n...n", ".nNn.", "..N..", ".mm.."],
+      "root":   ["....t....", "TttT.TTt.", ".......Tt"],
+      "twig":   ["...t.....", "TttT.t...", "....TTt..", ".......T."],
+    }, weights=[("litter", 3), ("litter2", 3), ("humus", 2), ("humus2", 2), ("sprout", 2), ("sprout2", 1), ("root", 1), ("twig", 2)]),
 }
 
 def calm_tile(seed, specks, details, pal, stamps, weights):

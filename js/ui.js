@@ -1119,7 +1119,7 @@ let ppPick = null;   // species id open on the card
 let ppPeriod = null; // period tab open, or null for none
 let ppBiomeTab = null; // biome tab open (or "sea"/"any"), or null for none
 let ppSort = "period"; // tabs by "period" or "biome"
-// A species' sprite box: a patch of its first biome's ground, laid from the same 1 m tiles as the map (biomepaint.js)
+// A species' sprite box: a patch of its first biome's ground, laid from the same ground as the map (one big tile, or the 1 m tiles of biomepaint.js)
 const ppGround = {};   // biome -> data URL of the patch (null while its tiles load)
 const PP_SCALE = 2, PP_CELLS = [24, 14];
 function ppGroundUrl(biome){

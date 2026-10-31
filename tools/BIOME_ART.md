@@ -16,11 +16,11 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | boreal | done | done | 18/18 | 2/2 | done |
 | grassland | done | done | 6/6 | 1/1 | done |
 | tundra | done | done | 6/6 | 1/1 | done |
-| fern (Fern Prairie) | placeholder (scrubland's) | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | done (`fern-1..4`, 1 px shore) |
+| fern (Fern Prairie) | done | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | done (`fern-1..4`, 1 px shore) |
 
 Boreal is done (`tools/pixelplants_boreal.py`; its Quaternary Labrador Tea is called Marsh Rosemary, to keep tundra's Park Plant name unique). A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
-Fern Prairie (key `fern`) is the open ground before grass, Permian through Paleogene (5 periods, 3 plants each). Its ground, water and rocks are copies of scrubland's (`sprites/ground/fern*.png`, `sprites/water/fern.png`, `sprites/rocks/*-fern-*.png`): overwrite those files with real art, then run `python3 tools/packsprites.py`. Triassic through Paleogene have real names in `PLANT_TABLE`; Permian is still the placeholder "Permian Fern|Horsetail|Tree Fern". Pick the Permian names, then draw the sprites.
+Fern Prairie (key `fern`) is the open ground before grass, Permian through Paleogene (5 periods, 3 plants each). Its ground is its own (loam with fern fronds and horsetail stubs); its rocks are still copies of scrubland's (`sprites/rocks/*-fern-*.png`): overwrite those files with real art, then run `python3 tools/packsprites.py`. Triassic through Paleogene have real names in `PLANT_TABLE`; Permian is still the placeholder "Permian Fern|Horsetail|Tree Fern". Pick the Permian names, then draw the sprites.
 
 Suggested order, easiest and most visible first: **grassland, tundra** (6 plants each, almost nothing else), then **boreal**, **desert**, **temperate**, **tropical** last (most plants, the most to get wrong).
 
@@ -28,7 +28,7 @@ Suggested order, easiest and most visible first: **grassland, tundra** (6 plants
 
 Do these in order. Each step has a preview, see "Check your work".
 
-1. **Ground tile.** `sprites/ground/<biome>.png`, or 1 m tiles (see 1b).
+1. **Ground tile.** `sprites/ground/<biome>.png` (or 1 m tiles, see 1b, which no biome uses now).
 2. **Rocks and boulders.** `sprites/rocks/{boulder,rock}-<biome>-<n>.png`.
 3. **Landscape plants.** `sprites/plants/<period3>-<biome>-<size>.png`, three sizes per period.
 4. **Park Plants.** `sprites/plants/q-<name>.png`.
@@ -38,17 +38,17 @@ Do these in order. Each step has a preview, see "Check your work".
 
 ### 1. Ground
 
-Model: `wetland_tile` and `tile` in `tools/pixelground_flat.py`.
+Every biome's ground comes from `tools/pixelground_calm.py`: one entry in its `BIOMES` (seed, speck and detail density, a palette, small stamps and their weights). Add or change an entry and rerun it.
 
-- Tile is 144 px = 18 m (0.125 m a pixel), seamless, wraps over the edges. Add a function for your biome and one `im.save` line at the bottom of the file.
-- **Hide the repeat with small, low-contrast detail, not large shapes.** The first wetland tile had big mud blobs and looked like camouflage with a visible repeat. What worked: a faint two-scale noise wash applied in 2x2 blocks (only the extremes of the noise, so patches are small), roughly 500 scattered 1 to 3 px flecks, short dashes, tiny glints, a few small features. Nothing may be longer than about 10 px or distinctive enough to spot twice.
+- Tile is 288 px = 36 m (0.125 m a pixel), seamless, wraps over the edges: a flat base, faint 1 px specks, and a few small details a few shades off the base.
+- **Hide the repeat with small, low-contrast detail, not large shapes.** The first wetland tile had big mud blobs and looked like camouflage with a visible repeat. What works: a flat base, a few hundred faint specks, and a few dozen small stamps (tufts, twigs, pebbles, cracks) in tones close to the base. Nothing may be longer than about 10 px or distinctive enough to spot twice.
 - Only features that belong to every era the biome covers. No grass, flowers or modern plants on a Devonian-to-today floor. Pebbles, silt, hardpan, sand ripples, moss crust, frost cracks are fine.
 - Set `BIOMES[<biome>].color` and `.park` in `js/data.js` to the same value, equal to the tile's base color (this is what scrubland and wetland did, so one tile serves both the exhibits and the park). This changes how that biome's park looks, so say so in the change description. Keep the color in the same family as today's so the biome stays recognisable.
 - Register it in `index.html`: replace both `<pattern id="b-<biome>">` and `<pattern id="p-<biome>">` with
-  `<pattern id="b-<biome>" width="18" height="18" patternUnits="userSpaceOnUse"><image href="sprites/ground/<biome>.png" width="18" height="18" style="image-rendering:pixelated"/></pattern>`.
+  `<pattern id="b-<biome>" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/<biome>.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>`.
 - Plants must stay readable on it. If the plants vanish, lower the ground's contrast.
 
-### 1b. Ground from 1 m tiles (boreal does this; use it for a biome when you want per-cell variety)
+### 1b. Ground from 1 m tiles (no biome uses this now; use it for a biome when you want per-cell variety)
 
 Instead of one 18 m tile, a biome can be built from several 8 x 8 px tiles, each exactly 1 m (0.125 m a pixel). `buildTiles` (end of `js/biomepaint.js`, queued by `tileFill` the first time the biome is drawn) lays them on the 1 m grid at random, so the 18 m repeat never shows. It replaces both the `#p-<biome>` (park ground and paint) and `#b-<biome>` (exhibit floor) patterns, so keep the old `sprites/ground/<biome>.png` and its `index.html` patterns in place as the fallback.
 
