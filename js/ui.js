@@ -1161,7 +1161,7 @@ function ppCard(s){
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
-    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", ppWet(s) ? s.fresh ? "fresh water" : "the sea" : biomesOf(s) ? biomeNames(s) : "any") + row("Habitat", PP_HABITATS[ppHabitat(s)])
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", ppWet(s) ? s.fresh ? "freshwater" : "marine" : biomesOf(s) ? biomeNames(s) : "any") + row("Habitat", PP_HABITATS[ppHabitat(s)])
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
     + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
@@ -1179,7 +1179,7 @@ const ppBiomeKeys = s => ppWet(s) ? [s.fresh ? "fresh" : "sea"] : biomesOf(s) ||
 // The filters, one per menu: key, label, the options (value, name) and whether a species matches a value
 const PP_FILTERS = [
   {k:"period", label:"Period", opts:() => PP_ORDER.map(p => [p, p]), has:(s, v) => s.period === v},
-  {k:"biome", label:"Biome", opts:() => [...Object.keys(BIOMES).map(b => [b, BIOMES[b].label]), ["sea", "The Sea"], ["fresh", "Freshwater"], ["any", "Any"]], has:(s, v) => ppBiomeKeys(s).includes(v)},
+  {k:"biome", label:"Biome", opts:() => [...Object.keys(BIOMES).map(b => [b, BIOMES[b].label]), ["sea", "Marine"], ["fresh", "Freshwater"], ["any", "Any"]], has:(s, v) => ppBiomeKeys(s).includes(v)},
   {k:"diet", label:"Diet", opts:() => Object.entries(DIETS), has:(s, v) => s.diet.includes(v)},
   {k:"habitat", label:"Habitat", opts:() => Object.entries(PP_HABITATS), has:(s, v) => ppHabitat(s) === v},
 ];
