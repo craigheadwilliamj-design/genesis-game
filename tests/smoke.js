@@ -1092,6 +1092,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // zoomed in, guests are pixel people with a pip in the dot color; zoomed out they go back to dots
       { const k0 = view.k; view.k = 14; drawParties(); const sp = guestEls.size === 1 && guestEls.get(ej.id).firstChild.getAttribute("fill") === SHIRTS[PERS_INDEX.fun] && shirtPaths[PERS_INDEX.fun].getAttribute("d") === "";
         view.k = 1; drawParties(); out.guestSprites = sp && guestEls.size === 0 && shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0; view.k = k0; drawParties(); }
+      // what a party bought shows on its sprite: a jacket, one hat (the first it owns), a backpack, and the umbrella only in the rain; taking it off redresses the figure
+      { const k0 = view.k; view.k = 14; Object.assign(ej, {jacket:1, trexhat:1, beanie:1, dimebag:1, umbrella:1}); drawParties();
+        const el = guestEls.get(ej.id), g = el._gk, n = el.querySelectorAll(".hg image").length;
+        out.guestGear = n === 2 && g.startsWith(guestKind(ej) + "j") && g.includes("trexhat") && !g.includes("beanie") && g.includes("dimebag") && !wxWet() && !g.includes("umbrella");
+        for(const k of ["jacket", "trexhat", "beanie", "dimebag", "umbrella"]) delete ej[k];
+        drawParties(); out.guestGear = out.guestGear && !guestEls.get(ej.id).querySelector(".hg") && guestEls.get(ej.id).querySelectorAll(".hf").length === 1; view.k = k0; drawParties(); }
       // the guard reaches it: it is walked to the gate, unhappy, rather than thrown out
       gcrew[0].at = nearestNode(ej.at.x, ej.at.y); const mood0 = ej.mood, mn0 = state.today.moodN;
       guardWatch();

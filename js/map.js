@@ -2290,6 +2290,12 @@ function partyPos(p){
 }
 // Zoomed in (a guest at least GUEST_SPRITE_PX tall on screen) each party is a pixel guest from HUMAN_SPRITES.guest, with a pip under its feet in the dot's color; zoomed out it's a dot
 const GUEST_SPRITE_PX = 10, GUEST_KINDS = ["guest", "guest2", "guest3", "guest4", "guest5"], guestKind = p => GUEST_KINDS[[...String(p.id)].reduce((h, c) => h + c.charCodeAt(0), 0) % GUEST_KINDS.length], guestEls = new Map();
+// What a party wears: one gear item a slot (the first it owns), and its kind's jacket strips if it has a jacket
+function guestGear(p, wet){
+  const s = {};
+  for(const [id, it] of Object.entries(GUEST_GEAR.items)) if(p[id] > 0 && !s[it.slot] && (!it.wet || wet)) s[it.slot] = id;
+  return Object.values(s);
+}
 let guestClipN = 0;
 // A party up on a viewing platform is drawn at deck height, rising up the steps (the deck is outside its footprint by the steps' run)
 function deckLift(p, x, y){
@@ -2300,7 +2306,7 @@ function deckLift(p, x, y){
 }
 function drawParties(){
   const cols = moodColors ? MOOD_SHIRTS : SHIRTS, d = SHIRTS.map(() => []), all = [];
-  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h, behind = [];
+  const spr = HUMAN_SPRITES.h * view.k >= GUEST_SPRITE_PX, seen = new Set(), hm = HUMAN_SPRITES.h, behind = [], wet = spr && wxWet();
   for(const p of parties){
     if(!p.at) continue;
     const [x, y] = partyPos(p);
@@ -2309,12 +2315,16 @@ function drawParties(){
     const ci = moodColors ? (p.mood >= 60 ? 0 : p.mood >= 35 ? 1 : 2) : PERS_INDEX[p.pers[0]] || 0;
     if(spr){
       let el = guestEls.get(p.id);
+      const kind = guestKind(p) + (p.jacket > 0 ? "j" : ""), gear = guestGear(p, wet), gk = kind + gear.join();
       if(!el){
         el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
-        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(guestKind(p), hm, null);
+        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(kind, hm, null, null, gear);
         el._cid = "gcl" + guestEls.size + "-" + (guestClipN++);
         el.insertAdjacentHTML("beforeend", `<clipPath id="${el._cid}"><rect x="-9" width="18"/></clipPath>`);
-        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el);
+        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el); el._gk = gk;
+      }else if(el._gk !== gk){   // bought something or the rain changed: redress the figure
+        el._gk = gk; el.querySelector(".hf").remove(); el.firstChild.insertAdjacentHTML("afterend", humanSvg(kind, hm, null, null, gear));
+        el._hf = el._hm = el._hfr = undefined;
       }
       // behind a solid far fence: only what's above the fence's top edge shows
       const cut = wallCut34(x, y);
@@ -2328,7 +2338,7 @@ function drawParties(){
       }
       const col = cols[ci] || SHIRTS[ci];
       if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
-      humanStep(el, guestKind(p), {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT); seen.add(p.id);
+      humanStep(el, kind, {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT); seen.add(p.id);
       if(!deckLift(p, x, y)) behind.push(personBox34(x, y, hm));
       continue;
     }
@@ -3131,10 +3141,19 @@ function carryBox(col){
 }
 // A finished specimen's crate in the hands instead: crate.png squeezed into the same box
 const carryCrate = () => `<image class="hcb" href="${spriteUrl("sprites/crate.png")}" x="10.5" y="17.5" width="5.5" height="6.5" preserveAspectRatio="none" style="image-rendering:pixelated"/>`;
-function humanSvg(kind, hm, food, crate){
+// A guest's gear (GUEST_GEAR) over the figure, in its frame's pixels; humanStep bobs the inner group with the walk
+function gearSvg(kind, gear, k, w){
+  const G = GUEST_GEAR, dy = G.headY[kind.replace(/j$/, "")] || 0, order = ["back", "head", "hand"];
+  const ims = gear.map(id => G.items[id]).sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot)).map(it => {
+    const [x, y] = G.at[it.slot];
+    return `<image href="${spriteUrl(it.src)}" x="${x - it.ax}" y="${y - it.ay + (it.slot === "head" ? dy : 0)}" width="${it.w}" height="${it.h}" style="image-rendering:pixelated"/>`;
+  });
+  return `<g transform="translate(${-w/2} ${-HUMAN_SPRITES.feet * k}) scale(${k})"><g class="hg">${ims.join("")}</g></g>`;
+}
+function humanSvg(kind, hm, food, crate, gear){
   const H = HUMAN_SPRITES, k = hm / H.ht, w = H.w * k, V = H[kind];
   const im = (cls, a) => `<image class="${cls}" href="${spriteUrl(a.src)}" width="${H.w * a.n}" height="${H.ht}" style="image-rendering:pixelated"/>`;
-  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}${V.carry ? im("hc", V.carry) : ""}${V.carry && crate ? carryCrate() : V.carry && food ? carryBox(food) : ""}</svg></g>`;
+  return `<g class="hf"><svg x="${-w/2}" y="${-H.feet * k}" width="${w}" height="${hm}" viewBox="0 0 ${H.w} ${H.ht}" overflow="hidden">${im("hw", V.walk)}${V.work ? im("hk", V.work) : ""}${V.wait ? im("hs", V.wait) : ""}${V.carry ? im("hc", V.carry) : ""}${V.carry && crate ? carryCrate() : V.carry && food ? carryBox(food) : ""}</svg>${gear && gear.length ? gearSvg(kind, gear, k, w) : ""}</g>`;
 }
 function humanStep(el, kind, c, x, y){
   const H = HUMAN_SPRITES, V = H[kind], dx = x - (el._hx ?? x), dy = y - (el._hy ?? y), d = Math.hypot(dx, dy), now = performance.now();
@@ -3145,7 +3164,7 @@ function humanStep(el, kind, c, x, y){
   const f = moving ? Math.floor((el._hd || 0) / H.step) % A.n : mode === "hw" ? 0 : Math.floor(now / A.ms) % A.n;
   if(el._hf !== el._hface){ el._hf = el._hface; g.setAttribute("transform", el._hface < 0 ? "scale(-1 1)" : ""); }
   if(el._hm !== mode){ el._hm = mode; for(const m of ["hw", "hk", "hs", "hc"]){ const im = el.querySelector("." + m); if(im) im.style.display = m === mode ? "" : "none"; } el._hfr = -1; }
-  if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); }
+  if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); const hg = el.querySelector(".hg"); if(hg) hg.setAttribute("transform", `translate(0 ${GUEST_GEAR.bob[f] || 0})`); }
 }
 function drawKeepers(){
   const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set(), staff = [];

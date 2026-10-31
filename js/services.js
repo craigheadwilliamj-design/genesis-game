@@ -128,7 +128,7 @@ function buy(p, b, m, n){
   if(m.id === "map") p.map = true;
   if(it.warm) p.warmTil = state.minute + GUEST_WX.drinkMin;
   if(it.cool) p.coolTil = state.minute + GUEST_WX.drinkMin;
-  if(m.id === "umbrella" || m.id === "jacket" || m.id === "beanie") p[m.id] = (p[m.id] || 0) + n;   // how many in the party carry one
+  if(m.id === "jacket" || GUEST_GEAR.items[m.id]) p[m.id] = (p[m.id] || 0) + n;   // how many in the party carry one
   if(m.id === "guide"){ if(!p.guide) learn(p, EDU.guide); p.guide = true; }
   if(m.id === "paleobook"){ if(!p.guide) learn(p, EDU.book); p.guide = true; }
   if(it.litter){ p.trash = (p.trash || 0) + n; p.trashAt = state.minute; }
