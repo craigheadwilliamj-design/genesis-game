@@ -806,7 +806,7 @@ function fence34(P, closed, kinds, which, o = {}){
   }
   return `<g pointer-events="none">${s}</g>`;
 }
-// A vivarium, aquarium or paludarium case: a brown tiled base slab with a green border (park style), and the glass as one-pixel see-through light blue edges, so nothing hides the animals.
+// A vivarium, aquarium or paludarium case: a brown tiled base slab (park style, as the restroom's), and the glass as one-pixel see-through light blue edges, so nothing hides the animals.
 // sill: the base slab's height (whole pixels); post: how far animals keep from the side glass.
 const VIV34 = {S:{sill:.65, post:.22}, M:{sill:.78, post:.28}, L:{sill:.91, post:.34}};
 // the park palette's letters used by the case (tools/genesis_style.py PAL)
@@ -885,7 +885,7 @@ function viv34(e, which, hi){
   if(back){
     fr("S", 0, W, -1, 0, .39); fr("S", 1, W - 1, -2, -1, .39);   // the see-through shadow under the front edge
     bk("k", 1, W - 1, Bs, Hr - 1, .35);   // the far glass, faint (a scene's wall goes over it)
-    bk("A", 0, W, Bs - 1, Bs); bk("U", 0, W, 1, Bs - 1); bk("A", 0, W, 0, 1);   // the base slab's inside, in shade, with its green border
+    bk("C", 0, W, Bs - 1, Bs); bk("U", 0, W, 1, Bs - 1); bk("G", 0, W, 0, 1);   // the base slab's inside, in shade
     for(let c = 3; c < W - 2; c += 5) bk("M", c, c + 1, 1, Bs - 1);
     bk("b", 1, W - 1, Bs, Bs + 1, ga);   // the far pane's foot
     s += flush();
@@ -903,10 +903,10 @@ function viv34(e, which, hi){
     }
   }
   if(!back){
-    // the base slab: a green border (dark edge, lit green trim under its top), brown tiles with staggered joints
-    fr("A", 0, W, Bs - 1, Bs); fr("L", 1, W - 1, Bs - 2, Bs - 1); fr("X", 1, W - 1, Bs - 3, Bs - 2); fr("W", 1, W - 1, 1, Bs - 3); fr("A", 0, W, 0, 1);
-    for(let r = 1; r < Bs - 3; r++) for(let c = 3 + (r % 2) * 2; c < W - 2; c += 5) fr("M", c, c + 1, r, r + 1);
-    fr("A", 0, 1, 0, Bs); fr("A", W - 1, W, 0, Bs);
+    // the base slab: dark brown edge, lit row under its top, brown tiles with staggered joints, darkest bottom row
+    fr("C", 0, W, Bs - 1, Bs); fr("X", 1, W - 1, Bs - 2, Bs - 1); fr("W", 1, W - 1, 1, Bs - 2); fr("G", 0, W, 0, 1);
+    for(let r = 1; r < Bs - 2; r++) for(let c = 3 + (r % 2) * 2; c < W - 2; c += 5) fr("M", c, c + 1, r, r + 1);
+    fr("a", 1, 2, Bs - 2, Bs - 1); fr("C", 0, 1, 0, Bs); fr("C", W - 1, W, 0, Bs);
     // the glass: one-pixel see-through edges, the front's top, the lid's back and the two sides from the lid down to the base
     fr("b", 1, W - 1, Hr - 1, Hr, ga); cell("b", 1, W - 1, Yb - Hr * ry, Yb - (Hr - 1) * ry, ga);
     cell("b", 0, 1, Yb - Hr * ry, Yf - Bs * ry, ga); cell("b", W - 1, W, Yb - Hr * ry, Yf - Bs * ry, ga);
