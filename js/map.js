@@ -1039,11 +1039,17 @@ function setFenceOver34(segs){
     const t = BUILDINGS[bl.type], b = bbox(bl.points), B = BLD_PICS[bl.type], pad = t.prop ? Math.max(t.w, t.d) * .25 + .3 : .3;
     const w = B ? Math.max(b.x1 - b.x0, B.w * FLAT34.px) / 2 : (b.x1 - b.x0) / 2 + pad, cx = (b.x0 + b.x1) / 2;
     boxes.push([cx - w, cx + w, b.y1, 12, `bo-${esc(bl.id)}`]);
-    if(tilt) bldOver34.push({id:bl.id, x0:cx - w, x1:cx + w, yb:b.y1, j:bldOver34.length, cur:""});
+    if(tilt) bldOver34.push({ref:`bo-${esc(bl.id)}`, x0:cx - w, x1:cx + w, yb:b.y1, cur:""});
   }
-  bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#bo-${esc(o.id)}"/></g>`).join("");
+  for(const f of decorOf()){
+    const r = (LAND[f.type] && LAND[f.type].r) || 1;
+    boxes.push([f.x - r, f.x + r, f.y, 12, `do-${esc(f.id)}`]);
+    if(tilt) bldOver34.push({ref:`do-${esc(f.id)}`, x0:f.x - r*1.5, x1:f.x + r*1.5, yb:f.y, cur:""});   // plants, rocks and statues cover the guests behind them too
+  }
+  bldOver34.sort((p, q) => p.yb - q.yb);   // back to front, so a near one covers the copy of a far one
+  bldOver34.forEach((o, j) => o.j = j);
+  bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#${o.ref}"/></g>`).join("");
   for(const o of bldOver34) o.clip = bldOverLayer.querySelector(`#bov${o.j}`);
-  for(const f of decorOf()){ const r = (LAND[f.type] && LAND[f.type].r) || 1; boxes.push([f.x - r, f.x + r, f.y, 12, `do-${esc(f.id)}`]); }
   fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(q[0], q[1], q[2], q[3])).join(""), cur:null}));
   fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}${f.loose ? fenceOverFront(f, boxes) : ""}</g>`).join("");
   for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
