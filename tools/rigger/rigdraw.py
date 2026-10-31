@@ -17,8 +17,9 @@ class Draw:
     def pose(self, pose):
         img = Image.new("RGBA", (self.W, self.H), (0, 0, 0, 0))
         for n in self.proj["nodes"]:
-            im = self.assets[n["asset"]]
-            if n.get("flip"): im = im.transpose(Image.FLIP_LEFT_RIGHT)
-            a, b, c, d, e, f = self.mat(n, pose); det = a*e - b*d; ia, ib, ic, ie = e/det, -b/det, -d/det, a/det
+            if pose.get(n["id"], {}).get("v") == 0: continue   # hidden in this frame
+            im = self.assets[n["asset"]]; a, b, c, d, e, f = self.mat(n, pose)
+            if n.get("flip"): a, d = -a, -d   # mirrored about its joint, like the rigger and the game (its children don't share it)
+            det = a*e - b*d; ia, ib, ic, ie = e/det, -b/det, -d/det, a/det
             img = Image.alpha_composite(img, im.transform((self.W, self.H), Image.AFFINE, (ia, ib, n["px"] - (ia*c + ib*f), ic, ie, n["py"] - (ic*c + ie*f)), Image.NEAREST))
         return img

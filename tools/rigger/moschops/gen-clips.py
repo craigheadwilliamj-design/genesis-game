@@ -102,16 +102,15 @@ def sniff(fps=7, K=dict(pitch=5, sink=.6, head=24, hdy=2.5)):
           g(.6, -4, 0, 1), g(.2, -6, 6, 2), g(0, -6, 0), g(0, -6, 6), g(0, -5, 0), g(0, -4, 5, 1), g(0, -3), g(0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(fps=5, lie=7, drop=6.8, fold={FAR_FRONT[0]: (85, 90), NEAR_FRONT[0]: (20, 100), FAR_BACK[0]: (-10, 80), NEAR_BACK[0]: (-45, 40)}):
-  # sinks onto its belly with the legs folded under it, out of sight (the near legs hidden once folded) (each limb's fold found by a search for the one that hides the most of it
-  # behind the body while its joint stays put); a joint fits its foot to the ground on the way down and is back in place once the legs are folded)
+def rest(fps=5, lie=7, drop=6, fold={FAR_FRONT[0]: (20, -90, -85), NEAR_FRONT[0]: (20, -90, -85), FAR_BACK[0]: (45, 75, 85), NEAR_BACK[0]: (45, 75, 85)}):
+  # sinks onto its belly, its limbs too short to fold out of sight under it, so it lies like a sphinx: elbows bent, forearms and forefeet flat
+  # on the ground out ahead of the chest, hind legs stretched back flat under the tail (each (upper, lower, foot) world angle); a joint fits its foot
+  # to the ground on the way down and is back in place once it's down
   def r(e, h, hdy=0.0, j=0.0, br=0.0):
     e = sm(e); p = pose((-.5*e, 0, drop*e - br), head=h, hdy=hdy, jaw=j, tail=4*e)
     for limb in LIMBS:
-      a, fo = fold[limb[0]]
-      stiff(p, limb, a*e, fo*e, 0); p[limb[0]]['dy'] = rd(p[limb[0]]['dy']*(1 - e))
-      if limb in (NEAR_FRONT, NEAR_BACK) and e > .75:
-        for k in limb: p[k]['v'] = 0   # drawn over the body, so once folded its outline would score the flank
+      a, fo, t = fold[limb[0]]
+      stiff(p, limb, a*e, fo*e, t*e); dy = p[limb[0]]['dy']; p[limb[0]]['dy'] = dy if dy < 0 else rd(dy*(1 - e))   # a lift that keeps a foot off the ground stays
     return p
   keys = [r(i/(lie - 1), 3*sm(i/(lie - 1))) for i in range(lie)]
   # (head turn, head drop, jaw, breath): a look round, a wide yawn, then its chin sinks and it breathes slowly
