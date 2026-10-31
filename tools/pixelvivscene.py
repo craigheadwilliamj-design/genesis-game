@@ -1,5 +1,5 @@
-# Draws the vivarium scenes in the flat pixel style (see CLAUDE.md, Art direction): flat fills, no outlines, stair-stepped shapes, light from the top left,
-# 0.13 m a pixel. A scene is an era (paleozoic, mesozoic, cenozoic) and a biome (the BIOMES keys in js/data.js), drawn as two layers for each case size:
+# Draws the vivarium scenes in the park style (docs/art.md, "Park style"): flat fills with a dark edge tinted to each thing (near plants and rocks, floor
+# decals; far plants, hills and the horizon get a softer one so they stay back), stair-stepped shapes, structured texture, light from the top left, 0.13 m a pixel. A scene is an era (paleozoic, mesozoic, cenozoic) and a biome (the BIOMES keys in js/data.js), drawn as two layers for each case size:
 #   <scene>-<S|M|L>-wall.png    the back wall, the pane above the sill (sky, far hills, far and near plants, a strip of ground)
 #   <scene>-<S|M|L>-floor.png   the floor, flat and seen from above (rows squashed by TILT like the rest of the 3/4 art)
 # <scene> is "<era>-<biome>" (a later "<period>-<biome>" scene overrides its era; see VIV_SCENE_PERIODS in data.js). Every picture is built from the same
@@ -9,13 +9,13 @@ import sys, os, math, zlib, random
 from PIL import Image
 
 PX, TILT = .13, .7
-SIZES = {"S":(9, 6, .35), "M":(15, 9, .45), "L":(24, 15, .55)}   # w, d (VIVARIUMS) and sill height (VIV34 in map.js); the glass stands d * .45 tall
+SIZES = {"S":(10, 5, .65), "M":(15, 10, .78), "L":(25, 15, .91)}   # w, d (VIVARIUMS) and sill height (VIV34 in map.js); the glass stands d * .45 tall
 def dims(size):
     w, d, sill = SIZES[size]
     return round(w / PX), round((d * .45 - sill) / PX), round(d * TILT / PX)   # width, wall rows, floor rows
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
-def ramp(base): return {"hi": mix(base, (255, 255, 255), .26), "mid": base, "lo": mix(base, (0, 0, 0), .22), "deep": mix(base, (0, 0, 0), .42)}
+def ramp(base): return {"hi": mix(base, (255, 255, 255), .26), "mid": base, "lo": mix(base, (0, 0, 0), .22), "deep": mix(base, (0, 0, 0), .42), "edge": mix(base, (0, 0, 0), .66)}
 
 ERAS = {   # leaf and trunk colors, and a haze laid over the sky
     "paleozoic": {"leaf":(46, 104, 86), "trunk":(88, 86, 62), "haze":((176, 198, 166), .35)},
@@ -67,6 +67,8 @@ def shade(c, mask, R, tex=True):
         col = R["hi"] if l and not r else R["lo"] if r and not l else R["hi"] if t and not b else R["lo"] if b and not t else R["mid"]
         if tex and col == R["mid"] and y % 3 == 1 and (x + y // 3 * 2) % 4 == 0: col = R["lo"]
         c.put(x, y, col)
+def edge(c, mask, col):   # a one-pixel edge round a shape, on whatever is behind it (4-neighbours)
+    for (x, y) in {(x + dx, y + dy) for (x, y) in mask for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))} - mask: c.put(x, y, col)
 def flat(c, mask, R):   # far away: one tone, darker on the right edge
     for (x, y) in mask: c.put(x, y, R["lo"] if (x + 1, y) not in mask else R["mid"])
 
@@ -169,8 +171,9 @@ def plant(c, kind, x, b, h, P, far):
     trunk, leaf, extra = SHAPES[kind](x, b, h)
     lr = P["stone"] if kind == "rock" else P["far"] if far else P["leaf"]
     if far:
-        flat(c, trunk | leaf, lr)
+        edge(c, trunk | leaf, lr["deep"]); flat(c, trunk | leaf, lr)
     else:
+        edge(c, trunk, P["trunk"]["edge"]); edge(c, leaf, lr["edge"])
         shade(c, trunk, P["trunk"], False); shade(c, leaf, lr, kind != "rock")
         for p in extra: c.put(p[0], p[1], P["trunk"]["deep"])
 
@@ -181,9 +184,11 @@ def wall(era, biome, size):
     for y in range(hz):   # sky: two flat bands, lighter toward the horizon
         for x in range(W): c.put(x, y, P["sky"]["mid"] if y < hz * .45 else P["sky"]["hi"])
     hh = max(2, H // 4); ph = rng.uniform(0, 6)   # far hills: a stepped skyline, each step 3 px wide
+    tops = [hz - 1 - round(hh * (.55 + .3 * math.sin(x // 3 * 3 * .09 + ph) + .15 * math.sin(x // 3 * 3 * .23 + ph * 2))) for x in range(W)]
     for x in range(W):
-        sx = x // 3 * 3; top = hz - 1 - round(hh * (.55 + .3 * math.sin(sx * .09 + ph) + .15 * math.sin(sx * .23 + ph * 2)))
-        for y in range(top, hz): c.put(x, y, P["hill"]["hi"] if y == top and x % 3 == 0 else P["hill"]["mid"])
+        top = tops[x]
+        for y in range(top, hz): c.put(x, y, P["hill"]["hi"] if y == top + 1 and x % 3 == 0 else P["hill"]["mid"])
+        for y in range(top, min(hz, max(top + 1, tops[x - 1] if x else top, tops[x + 1] if x + 1 < W else top))): c.put(x, y, P["hill"]["deep"])   # its skyline edge, down each step
     opts, dens = FLORA[biome][era], B["dens"]
     def row(far):
         step = max(3, round((7 if far else 10) / dens * (H / 20) ** .5)); x = rng.randrange(step)
@@ -196,7 +201,7 @@ def wall(era, biome, size):
     for y in range(hz, H):   # the ground strip, with a row of darker dashes; a wet biome has water along the back of it
         for x in range(W):
             wet = B.get("wet") and y == hz and x % 11 < 7
-            c.put(x, y, WATER["hi" if x % 11 in (1, 2) else "mid"] if wet else P["ground"]["lo"] if (y - hz) % 2 == 1 and (x + y * 3) % 5 < 2 else P["ground"]["mid"])
+            c.put(x, y, WATER["hi" if x % 11 in (1, 2) else "mid"] if wet else P["ground"]["deep"] if y == hz else P["ground"]["lo"] if (y - hz) % 2 == 1 and (x + y * 3) % 5 < 2 else P["ground"]["mid"])
     row(False)
     return c
 
@@ -209,7 +214,8 @@ def floor(era, biome, size):
             c.put(x, y, G["lo"] if y == 0 else (G["hi"] if y // 3 % 3 == 2 else G["lo"]) if dash else G["mid"])
     L, T = P["leaf"], P["trunk"]
     def decal(kind, x, y):
-        if kind == "pebble": c.put(x, y, P["stone"]["hi"]); c.put(x + 1, y, P["stone"]["mid"]); c.put(x, y + 1, P["stone"]["lo"]); c.put(x + 1, y + 1, P["stone"]["lo"])
+        if kind == "pebble":   # lit top left, its edge only along the bottom and right where it's in shade
+            c.put(x, y, P["stone"]["hi"]); c.put(x + 1, y, P["stone"]["mid"]); c.put(x + 2, y, P["stone"]["deep"]); c.put(x, y + 1, P["stone"]["deep"]); c.put(x + 1, y + 1, P["stone"]["deep"])
         elif kind == "ripple":
             for k in range(5): c.put(x + k, y, G["hi"]); c.put(x + k + 1, y + 1, G["lo"])
         elif kind == "tuft":
@@ -222,7 +228,7 @@ def floor(era, biome, size):
             for dx, dy in ((0, 0), (1, 1), (3, 0), (4, -1), (2, 2)): c.put(x + dx, y + dy, T["lo"])
         elif kind in ("moss", "puddle", "snow"):
             R = L if kind == "moss" else WATER if kind == "puddle" else SNOW; rx = rng.choice((2.5, 3.5, 4.5))
-            m = ell(x, y, rx, max(1, rx * .4)); shade(c, m, R, False)
+            m = ell(x, y, rx, max(1, rx * .4)); edge(c, m, R["edge"]); shade(c, m, R, False)
             if kind == "puddle": c.put(x - 1, y, mix(WATER["hi"], (255, 255, 255), .4)); c.put(x, y, mix(WATER["hi"], (255, 255, 255), .4))
     cw, ch = 9, 6   # one decal at most in each cell of a grid, nudged inside it, so they spread evenly
     for gy in range(1, F, ch):
