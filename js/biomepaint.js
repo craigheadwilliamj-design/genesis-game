@@ -221,21 +221,36 @@ function buildTiles(biome, T, water){
             g.putImageData(d, 0, 0); return c; });
         } catch(e){ base = null; keyed = tiles; }   // a tainted canvas: no ripple layer
       }
-      const rurls = [];
-      const frame = f => {
-        if(dead) return;
-        const c = document.createElement("canvas"); c.width = c.height = px;
-        const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+      const rurls = [], h = GROUND_TILE_PX / 2;
+      // the cells as they are with no glint, drawn once; every frame copies it and redraws only the cells glinting in that frame
+      let still = null;
+      const stillLayer = () => {
+        const c = document.createElement("canvas"); c.width = c.height = px; const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
         for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
-          let t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8);
-          if(gl && t < T.plain){ let k = gl;
-            if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const PS = P * S, q = (f + PS - Math.floor((x + y) % W * PS / W) + j * S) % PS; if(q < gl * S){ k = Math.floor(q / S); break; } } }
-            else k = Math.floor((f + cellHash(x + 9001 + salt, y + 31337) * S) % (T.frames * S) / S);
-            if(k < gl){ t = T.plain + T.detail + k; o = 0; } }   // a glint is never turned or mirrored, so it always travels the same way
-          const h = GROUND_TILE_PX / 2, a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
+          const t = pick[x * GROUND_SPAN + y], o = T.still && T.still.includes(t + 1) ? 0 : cellHash(x + 7919 + salt, y + 104729) % (T.turn === false ? 2 : 8), a = (o >> 1) * Math.PI / 2, m = o & 1 ? -1 : 1;
           g.setTransform(Math.cos(a) * m, Math.sin(a) * m, -Math.sin(a), Math.cos(a), x * GROUND_TILE_PX + h, y * GROUND_TILE_PX + h);
           g.drawImage(keyed[t], -h, -h);
         }
+        return c;
+      };
+      const frame = f => {
+        if(dead) return;
+        if(!still) still = stillLayer();
+        if(F === 1){ frameDone(f, still); return; }
+        const c = document.createElement("canvas"); c.width = c.height = px;
+        const g = c.getContext("2d"); g.imageSmoothingEnabled = false; g.drawImage(still, 0, 0);
+        if(gl) for(let x = 0; x < GROUND_SPAN; x++) for(let y = 0; y < GROUND_SPAN; y++){
+          if(pick[x * GROUND_SPAN + y] >= T.plain) continue;
+          let k = gl;
+          if(T.waves){ const j = cellHash(x + 9001 + salt, y + 31337) & 1; for(const [P, W] of T.waves){ const PS = P * S, q = (f + PS - Math.floor((x + y) % W * PS / W) + j * S) % PS; if(q < gl * S){ k = Math.floor(q / S); break; } } }
+          else k = Math.floor((f + cellHash(x + 9001 + salt, y + 31337) * S) % (T.frames * S) / S);
+          if(k >= gl) continue;
+          const X = x * GROUND_TILE_PX, Y = y * GROUND_TILE_PX;   // a glint is never turned or mirrored, so it always travels the same way
+          g.clearRect(X, Y, GROUND_TILE_PX, GROUND_TILE_PX); g.drawImage(keyed[T.plain + T.detail + k], X, Y);
+        }
+        frameDone(f, c);
+      };
+      const frameDone = (f, c) => {
         // with ripples: the canvas so far is the marks alone; the water is its base color with them on top
         const rc = base && c; let wc = c;
         if(rc){ wc = document.createElement("canvas"); wc.width = wc.height = px; const w = wc.getContext("2d"); w.fillStyle = base; w.fillRect(0, 0, px, px); w.drawImage(rc, 0, 0); }

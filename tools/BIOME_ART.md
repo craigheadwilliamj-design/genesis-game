@@ -106,7 +106,7 @@ The Park Plants and Quaternary plants lists in the build menu already show each 
 
 ### 5. Water
 
-Every biome's water is done, all one recipe from `tools/pixelwater_calm.py`: 1 m cells (8 x 8 px), `sprites/water/<biome>-1.png` plain and `-2..4` a glint that rises and fades, and the biome's `WATER_TILES` entry in `js/data.js` (`{plain:1, detail:0, share:0, turn:false, glint:3, ...}`; the comment above `WATER_TILES` explains each field). The `<pattern id="w-<biome>">` in `index.html` is 1 x 1 on `-1.png` (the code builds the 100 m pattern at load).
+Every biome's water is done, all one recipe from `tools/pixelwater_calm.py`: 1 m cells (8 x 8 px), `sprites/water/<biome>-1.png` plain and `-2..4` a glint that slides down and right (the way the wave bands sweep; keep that order or the water shimmers backwards), and the biome's `WATER_TILES` entry in `js/data.js` (`{plain:1, detail:0, share:0, turn:false, glint:3, ...}`; the comment above `WATER_TILES` explains each field). The `<pattern id="w-<biome>">` in `index.html` is 1 x 1 on `-1.png` (the code builds the 100 m pattern at load).
 
 - To change a biome's water, edit its entry (water color `.` and glint `g`) in `tools/pixelwater_calm.py`, rerun it, then run `python3 tools/packsprites.py` and commit `js/spritepack.js`.
 - The bank is the biome's `WATER_TEX` entry in `js/landscape.js`: `shore` (= `lit`) is a 2 px band of lighter shallows (`shoreW:2`), `dark` the deep tone (animals' waterlines, the park map), `mud` and `damp` the wet and damp ground outside, a little darker than the biome's ground color. Change `mud` and `damp` whenever the ground color changes.
