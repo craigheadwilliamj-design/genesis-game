@@ -19,6 +19,7 @@ class View(Rig):
     W, H = size or (self.P['cell']['w'], self.P['cell']['h']); out = Image.new('RGBA', (W, H), bg or (0, 0, 0, 0))
     wd = self.worlds(pose)
     for n in self.P['nodes']:
+      if pose.get(n['id'], {}).get('v') == 0: continue   # hidden in this frame
       m = wd[n['id']]; ox, oy = round(m[4]), round(m[5])
       # world -> image: image point = joint + inverse(linear part) * (world - origin)
       a, b, c, d = m[0], m[1], m[2], m[3]; det = a*d - b*c
