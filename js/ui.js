@@ -1171,9 +1171,9 @@ function ppCard(s){
 }
 
 const PP_ORDER = ["Cambrian", "Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-// Where a species lives: lagoon, aquarium, paludarium, vivarium or an open exhibit
-const PP_HABITATS = {exhibit:"Exhibit", vivarium:"Vivarium", paludarium:"Paludarium", aquarium:"Sea aquarium", freshaq:"Freshwater aquarium", lagoon:"Lagoon"};
-const ppHabitat = s => s.pool ? "lagoon" : s.aqua ? s.fresh ? "freshaq" : "aquarium" : s.palu ? "paludarium" : s.viv ? "vivarium" : "exhibit";
+// Where a species lives: a lagoon or aquarium (sea or fresh), a paludarium, a vivarium or an open exhibit
+const PP_HABITATS = {exhibit:"Exhibit", vivarium:"Vivarium", paludarium:"Paludarium", aquarium:"Sea aquarium", freshaq:"Freshwater aquarium", lagoon:"Sea lagoon", freshlag:"Freshwater lagoon"};
+const ppHabitat = s => s.pool ? s.fresh ? "freshlag" : "lagoon" : s.aqua ? s.fresh ? "freshaq" : "aquarium" : s.palu ? "paludarium" : s.viv ? "vivarium" : "exhibit";
 // A species' biome keys for the filter: its biomes, "sea" or "fresh" for water animals, "any" for none
 const ppBiomeKeys = s => ppWet(s) ? [s.fresh ? "fresh" : "sea"] : biomesOf(s) || ["any"];
 // The filters, one per menu: key, label, the options (value, name) and whether a species matches a value
