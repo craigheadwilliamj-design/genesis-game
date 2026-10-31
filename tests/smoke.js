@@ -4118,6 +4118,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       closeVivView(); out.vivGuestView = out.vivGuestView && !q("#dlgVivView").open;
       out.aquaFits = fitsHabitat(sea, aq) && !fitsHabitat(land, aq) && !fitsHabitat(sea, ev) && !fitsHabitat(sea, {points:[]}) && fitsHabitat(land, ev) && SPECIES.filter(x => x.aqua).every(x => x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)));
       out.aquaFittings = !vivToyProblem(aq, "afilter") && !vivToyProblem(aq, "vdish") && !!vivToyProblem(aq, "vlamp") && !!vivToyProblem(aq, "vpool") && !!vivToyProblem(ev, "afilter") && !vivToyProblem(ev, "vlamp");
+      // freshwater aquariums: fresh species only there, sea ones only in sea water; corals stay out; the swap needs the other water's animals out and drops a sea backdrop
+      { const fq = {id:"e-fq", viv:"L", aqua:true, fresh:true, wq:100, points:aq.points, animals:[], vivScene:null}, fw = SPECIES_BY_ID.both, m0 = state.money;
+        state.money = 1e6; const sq = {...fq, fresh:undefined, vivScene:{sea:"paleozoic"}, animals:[]};
+        const swapBlocked = !!freshProblem(aq, true), swapOk = !freshProblem(sq, true); setFresh(sq, true);
+        out.freshAquarium = fitsHabitat(fw, fq) && !fitsHabitat(fw, aq) && !fitsHabitat(sea, fq) && !caseTakes(fq, "abrain") && caseTakes(fq, "arock") && caseTakes(aq, "abrain")
+          && swapBlocked && swapOk && sq.fresh === true && sq.vivScene === null && !!vivSceneProblem(fq, {sea:"cenozoic"}) && !vivSceneProblem(fq, {sea:"fresh"})
+          && seaSceneOf(fw) === "fresh" && (fq.vivScene = {sea:"fresh"}, sceneFit(fq, fw) === 1) && sceneFit(fq, sea) === 0;
+        state.money = m0; }
       const noFilter = filterText(aq), aim0 = wqAim(aq);
       aquaTick(DAY_MIN); const dirty1 = wqOf(aq);
       addVivToy(aq, "asump"); aq.filterPowered = true;

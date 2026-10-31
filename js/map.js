@@ -814,7 +814,8 @@ const VIV34 = {
   L:{frame:["#6F7980", "#4F575D", "#363C41"], top:"#8793A0", sill:.55, post:.34, lamps:2, mullion:true, label:"L"}};
 const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
 // An aquarium's water: its colour clean and foul (mixed by water quality), how thick it looks clean and foul, and how much of that its top surface takes
-const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486"};
+const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486", fresh:"#2C7466", gravel:"#93805E"};   // fresh, gravel: a freshwater aquarium's clean water and floor
+const aquaClean34 = e => e.fresh ? AQUA34.fresh : AQUA34.clean;
 // The waterline's height in meters: a little under the lid
 const aquaLine = e => VIVARIUMS[e.viv].d * .45 - .6;
 // A paludarium's water: its depth in meters, and the flooded part of the floor (the front of the case, from paluY)
@@ -828,7 +829,7 @@ const vivFace34 = nx => nx < -.3 ? 0 : nx > .3 ? 2 : 1;
 const vivSubCache = {};
 // the floor of a vivarium: the biome's substrate, flat, with rows of darker and lighter dashes and a lit strip along the far sides
 function vivFloor34(e, c, dead, on, reach){
-  const P = e.points, bio = BIOMES[biomeOf(e)].color, sub = e.aqua ? AQUA34.sand : vivMix34(bio, "#5A4630", .4), key = e.viv + "|" + sub + "|" + polyStr(P);
+  const P = e.points, bio = BIOMES[biomeOf(e)].color, sub = e.aqua ? e.fresh ? AQUA34.gravel : AQUA34.sand : vivMix34(bio, "#5A4630", .4), key = e.viv + "|" + sub + "|" + polyStr(P);
   let det = vivSubCache[key];
   if(!det){
     const bb = bbox(P), inner = insetRect(P, .9), dark = vivMix34(sub, "#000000", .2), light = vivMix34(sub, "#FFFFFF", .18);
@@ -875,7 +876,7 @@ function viv34(e, which, hi){
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
   let s = "";
   if(e.aqua || e.palu && !back){   // the water: an aquarium's far faces behind the animals, then the near faces and a thinner surface over them (a paludarium's only over its flooded front); clear blue when clean, thicker and greener as it fouls
-    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = e.palu ? paluLine(e) : aquaLine(e), WP = e.palu ? paluPoly(e) : P;
+    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, aquaClean34(e), w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = e.palu ? paluLine(e) : aquaLine(e), WP = e.palu ? paluPoly(e) : P;
     for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back || e.palu ? vivMix34(col, "#000000", e.palu ? .3 : .15) : col, a.toFixed(2));   // a paludarium's front band darker, as deep water seen through the glass
     if(!back && e.palu){   // a paludarium's water is drawn on its floor: here only a film of murk on it as it fouls, and the waterline on the front glass
       if(w < 1) s += flatPoly34(WP, AQUA34.foul, op(((1 - w) * .6).toFixed(2)), true);
