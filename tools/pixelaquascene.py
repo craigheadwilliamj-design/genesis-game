@@ -4,7 +4,8 @@
 #   sea-<scene>-<S|M|L>-wall.png    the back wall above the sill: the water in stepped bands with slanting light, far shapes, near shapes, a strip of sea floor
 #   sea-<scene>-<S|M|L>-floor.png   the floor, flat and seen from above, with its scatter of shells and bits
 # Scenes: cambrian (mud, microbial mats, sponges, stalked animals, no fish or coral), paleozoic (crinoid gardens, horn and honeycomb corals, Ordovician to Permian),
-# mesozoic (the first stony corals, glass sponges, ammonite shells), cenozoic (kelp forest and a modern reef: sea fans, table and branching corals, starfish). The aquarium's water tint is laid over all of it in the game, so the colors here run a little bright.
+# mesozoic (the first stony corals, glass sponges, ammonite shells), cenozoic (kelp forest and a modern reef: sea fans, table and branching corals, starfish),
+# fresh (a river or lake bed for freshwater aquariums, any period: tea-green water, gravel, reeds, waterweed, eelgrass and sunken branches; pebbles, twigs, snails and leaves). The aquarium's water tint is laid over all of it in the game, so the colors here run a little bright.
 # Usage: python3 -I tools/pixelaquascene.py [outdir] [--sheet sheet.png]   (default sprites/vivscene; the sheet is a x4 view of every backdrop)
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,9 +25,12 @@ SCENES = {   # the water (top and deep), the floor, what stands on it, what lies
     "cenozoic":  {"water":((100, 192, 212), (30, 110, 152)), "ground":(222, 208, 166), "dens":1.1,
                   "near":[("kelp", 4), ("seafan", 2), ("table", 2), ("staghorn3", 2)], "dec":["sanddollar", "scallop", "starfish", "coralbit"],
                   "col":{"kelp":(150, 132, 52), "seafan":(156, 84, 146), "table":(188, 160, 116), "staghorn3":(228, 132, 70), "sanddollar":(220, 214, 186), "scallop":(214, 156, 120), "starfish":(222, 110, 60), "coralbit":(232, 200, 186)}},
+    "fresh":     {"water":((136, 170, 132), (48, 88, 70)), "ground":(146, 128, 96), "dens":1.0,
+                  "near":[("reed", 3), ("weed", 3), ("strand", 2), ("snag", 1)], "dec":["pebble", "twig", "snail", "leaf", "pebble"],
+                  "col":{"reed":(132, 150, 70), "weed":(84, 128, 62), "strand":(110, 140, 66), "snag":(112, 88, 62), "pebble":(156, 150, 136), "twig":(120, 94, 64), "snail":(178, 150, 104), "leaf":(170, 120, 60)}},
 }
-TALL = {"sponge":.55, "stalk":.5, "strand":.7, "crinoid":.85, "crinoid2":.65, "horncoral":.35, "staghorn":.55, "staghorn2":.45, "vase":.5, "kelp":.95, "seafan":.5, "table":.38, "staghorn3":.5}   # height, as a share of the wall
-LOW = {"mat":.14, "honeycomb":.24, "brain":.26}
+TALL = {"sponge":.55, "stalk":.5, "strand":.7, "crinoid":.85, "crinoid2":.65, "horncoral":.35, "staghorn":.55, "staghorn2":.45, "vase":.5, "kelp":.95, "seafan":.5, "table":.38, "staghorn3":.5, "reed":.8, "weed":.6}   # height, as a share of the wall
+LOW = {"mat":.14, "honeycomb":.24, "brain":.26, "snag":.16}
 
 # Each shape gives (body pixels, extra pixels drawn in the body's darkest tone) standing on (x, b), h pixels tall
 def sponge(x, b, h):   # a clump of upright tubes, each open at the top
@@ -80,6 +84,22 @@ def table(x, b, h):   # a table coral: a stout stem holding up a wide flat plate
     body = {(x + k, y) for y in range(b - h + 3, b + 1) for k in range(2)} | {(x + k, y) for y in range(b - h + 1, b - h + 3) for k in range(-round(h * .9), round(h * .9) + 2)}
     return body, {(x + k, b - h + 2) for k in range(-round(h * .9) + 1, round(h * .9) + 1, 3)}
 def staghorn3(x, b, h): return staghorn(x, b, h)
+def reed(x, b, h):   # a clump of thin blades a pixel apart, the outer ones shorter and leaning out, the tallest tipped with a cattail head
+    body, ex = set(), set()
+    for dx, f, lean in ((-3, .55, -1), (-1, .85, 0), (1, 1, 0), (3, .65, 1)):
+        t = max(3, round(h * f)); body |= {(x + dx + (lean if i > t * .6 else 0), b - i) for i in range(t)}
+    t = max(3, h); ex |= {(x + 1 + k, b - t + 2 + j) for k in (-1, 0) for j in range(4)}
+    return body | ex, ex
+def weed(x, b, h):   # waterweed: a stem with whorls of short leaves, wider at the middle
+    body, ex = {(x, b - i) for i in range(h)}, set()
+    for i in range(2, h, 3):
+        w = 1 + round(2 * math.sin(math.pi * i / h)); body |= {(x + k, b - i) for k in range(-w, w + 1)} | {(x + k, b - i + 1) for k in (-w, w)}
+        ex.add((x, b - i))
+    return body, ex
+def snag(x, b, h):   # a sunken branch lying on the bed, two pixels thick, with a side branch sticking up and back
+    L = h * 5; body = {(x + k, b - j - (k * 2 // L)) for k in range(L) for j in range(2)}
+    body |= line(x + L // 3, b - 2, x + L // 3 + 3, b - h - 2, 1) | line(x + L * 2 // 3, b - 2, x + L * 2 // 3 - 2, b - h, 1)
+    return body, {(x + k, b) for k in range(0, L, 3)}
 SHAPES = {k: globals()[k] for k in list(TALL) + list(LOW)}
 
 def palette(scene):
@@ -145,6 +165,14 @@ def floor(scene, size):
             for dx, dy, t in ((0, -1, "hi"), (1, -1, "hi"), (2, -1, "mid"), (-1, 0, "hi"), (0, 0, "lo"), (1, 0, "mid"), (2, 0, "lo"), (3, 0, "mid"), (0, 1, "mid"), (1, 1, "mid"), (2, 1, "lo"), (1, 2, "deep")): c.put(x + dx, y + dy, C["scallop"][t])
         elif kind == "starfish":
             for dx, dy, t in ((0, 0, "mid"), (1, 0, "mid"), (0, -1, "hi"), (-1, 0, "hi"), (-2, 1, "hi"), (2, 0, "lo"), (3, 1, "lo"), (0, 1, "lo"), (-1, 2, "lo"), (1, 1, "lo"), (2, 2, "lo")): c.put(x + dx, y + dy, C["starfish"][t])
+        elif kind == "pebble":
+            r = rng.choice((1.2, 1.6, 2)); shade(c, ell(x, y, r, max(1, r * .7)), C["pebble"], False)
+        elif kind == "twig":
+            for k in range(rng.choice((4, 5, 6))): c.put(x + k, y + (k > 2), C["twig"]["mid" if k % 3 else "lo"])
+        elif kind == "snail":
+            for dx, dy, t in ((0, -1, "hi"), (1, -1, "mid"), (-1, 0, "hi"), (0, 0, "deep"), (1, 0, "mid"), (2, 0, "lo"), (0, 1, "lo"), (1, 1, "lo")): c.put(x + dx, y + dy, C["snail"][t])
+        elif kind == "leaf":
+            for dx, dy, t in ((0, 0, "hi"), (1, 0, "mid"), (2, 0, "mid"), (1, -1, "hi"), (2, 1, "lo"), (3, 0, "lo")): c.put(x + dx, y + dy, C["leaf"][t])
         elif kind == "belemnite":
             for k in range(5): c.put(x + k, y, C["belemnite"]["hi" if k < 2 else "mid" if k < 4 else "lo"])
     cw, ch = 9, 6   # one decal at most in each cell of a grid, nudged inside it, so they spread evenly

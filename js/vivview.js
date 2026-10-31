@@ -9,7 +9,7 @@ function openVivView(e){
   if(!e || !e.viv || !VIVARIUMS[e.viv]) return;
   vvEx = e.id;
   const bb = bbox(e.points), W = bb.x1 - bb.x0, H = VIVARIUMS[e.viv].d * .45, K = VIV34[e.viv] || VIV34.M, E = H * VIV_VIEW.eye, B = VIV_VIEW.back;
-  const w2 = W / 2, sub = e.aqua ? AQUA34.sand : vivMix34(BIOMES[biomeOf(e)].color, "#5A4630", .4), wallCol = e.aqua ? "#1B4F78" : vivMix34(BIOMES[biomeOf(e)].color, "#FFFFFF", .15);
+  const w2 = W / 2, sub = e.aqua ? e.fresh ? AQUA34.gravel : AQUA34.sand : vivMix34(BIOMES[biomeOf(e)].color, "#5A4630", .4), wallCol = e.aqua ? e.fresh ? "#1E4A40" : "#1B4F78" : vivMix34(BIOMES[biomeOf(e)].color, "#FFFFFF", .15);
   const P = pts => `points="${pts.map(p => vvN(p[0]) + "," + vvN(p[1])).join(" ")}"`, at = (x, y, s) => [x * s, y * s];
   let s = `<defs><linearGradient id="vvFloor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${vivMix34(sub, "#000000", .3)}"/><stop offset="1" stop-color="${sub}"/></linearGradient>`
     + `<linearGradient id="vvWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${vivMix34(wallCol, "#FFFFFF", .2)}"/><stop offset="1" stop-color="${vivMix34(wallCol, "#000000", .25)}"/></linearGradient></defs>`;
@@ -25,7 +25,7 @@ function openVivView(e){
   s += `<g id="vvAnimals"></g>`;
   // the water over everything in it: an aquarium's from the floor to the waterline, a paludarium's over its flooded front; its surface seen from below or above
   if(e.aqua || e.palu){
-    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, AQUA34.clean, w), a = (AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w)) * VIV_VIEW.tint;
+    const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, aquaClean34(e), w), a = (AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w)) * VIV_VIEW.tint;
     const wl = e.palu ? paluLine(e) : aquaLine(e), t0 = e.palu ? (paluY(e) - bb.y0) / (bb.y1 - bb.y0) : 0, sb = B + (1 - B) * t0, fy = E - wl;
     const body = E > wl ? [[-w2, E], [w2, E], [w2, fy], at(w2, fy, sb), at(-w2, fy, sb), [-w2, fy]] : [[-w2, E], [w2, E], [w2, fy], [-w2, fy]];
     s += `<polygon ${P(body)} fill="${col}" fill-opacity="${a.toFixed(2)}" pointer-events="none"/>`;

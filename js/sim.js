@@ -589,7 +589,7 @@ const caseOf = e => (e.aqua ? AQUARIUMS : VIVARIUMS)[e.viv];
 // A diet can be written as one word or a list; treat it as a list everywhere
 for(const s of SPECIES) if(!Array.isArray(s.diet)) s.diet = [s.diet];
 const eats = (s, d) => s.diet.includes(d);
-const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.aqua || s.pool ? ", marine" : "") + (s.bug ? ", bug" : "");
+const dietText = s => s.diet.map(d => DIETS[d] || d).join(" and ") + (s.predator ? ", predator" : "") + (s.semi ? ", semi-aquatic" : "") + (s.aqua || s.pool ? s.fresh ? ", freshwater" : ", marine" : "") + (s.bug ? ", bug" : "");
 
 // Does species x go after species y? Returns how, or null if it leaves it alone.
 // The rules are explained next to SPECIES in data.js.
@@ -604,7 +604,7 @@ function attackReason(x, y){
 function conflict(a, b){ return attackReason(a, b) || attackReason(b, a); }
 
 // Can this species live in this exhibit (a vivarium of some size, or an open habitat)?
-function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (lagoonWalled(e) ? !!s.pool && poolM2(e, s) > 0 : !s.pool); }   // pool animals only inside a lagoon wall, with their water in, and a lagoon holds nothing else
+function fitsHabitat(s, e){ return e.viv ? !!s.viv && !!s.aqua === !!e.aqua && (!e.aqua || !!s.fresh === !!e.fresh) && (!s.palu || !!e.palu) && vivRank(e.viv) >= vivRank(s.viv) : !s.viv && (lagoonWalled(e) ? !!s.pool && poolM2(e, s) > 0 : !s.pool); }   // pool animals only inside a lagoon wall, with their water in, and a lagoon holds nothing else
 
 // Which paths are joined up to the entrance? With guestsOnly, service roads don't count,
 // because guests won't walk on them.
@@ -654,6 +654,7 @@ function exhibitReport(e){
     const need = (s.aqua ? AQUARIUMS : VIVARIUMS)[s.viv];
     if(e.viv && !s.viv){ target -= 40; issues.push({bad:true, text:`${s.name} is far too big for ${e.aqua ? "an aquarium" : "a vivarium"}.`}); }
     else if(e.viv && !!s.aqua !== !!e.aqua){ target -= 40; issues.push({bad:true, text:s.aqua ? `${s.name} needs an aquarium.` : `${s.name} can't live under water.`}); }
+    else if(e.aqua && !!s.fresh !== !!e.fresh){ target -= 40; issues.push({bad:true, text:`${s.name} needs ${s.fresh ? "fresh" : "sea"} water.`}); }
     else if(e.viv && s.palu && !e.palu){ target -= 30; issues.push({bad:true, text:`${s.name} needs a paludarium.`}); }
     else if(e.viv && vivRank(e.viv) < vivRank(s.viv)){ target -= 25; issues.push({bad:true, text:`${s.name} needs a ${need.label.toLowerCase()} or bigger.`}); }
     else if(!e.viv && s.viv){ target -= s.aqua ? 60 : 20; issues.push({bad:true, text:`${s.name} needs ${s.aqua ? "an aquarium" : "a vivarium"}.`}); }

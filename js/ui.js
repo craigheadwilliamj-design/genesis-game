@@ -419,8 +419,10 @@ function aquascapeHtml(e){
 }
 function aquaSceneHtml(e){
   const sc = e.vivScene, kinds = [...new Set(e.animals.map(a => a.sp))].map(sp => SPECIES_BY_ID[sp]), pick0 = sc ? sc.sea : kinds.length ? seaSceneOf(kinds[0]) : "";
-  let h = `<section><h3>Backdrop</h3><div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(AQUA_SCENES[sc.sea].label)}</b>.` : "No backdrop yet."}</div>`;
-  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="aquaSceneSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"><option value="">No backdrop</option>${Object.entries(AQUA_SCENES).map(([k, x]) => `<option value="${k}"${k === pick0 ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`;
+  const fr = !!e.fresh;
+  let h = `<section><h3>Water</h3><div class="row"><span class="status ok">${fr ? "Fresh water" : "Sea water"}</span><button class="btn" data-action="aquaFresh" data-on="${fr ? 0 : 1}">${fr ? "Sea water" : "Fresh water"}, ${money(AQUA.swap)}</button></div></section>`;
+  h += `<section><h3>Backdrop</h3><div class="need-line ${sc ? "ok" : "no"}">${sc ? `<b>${esc(AQUA_SCENES[sc.sea].label)}</b>.` : "No backdrop yet."}</div>`;
+  h += `<div class="row" style="margin-top:6px;flex-wrap:nowrap"><select id="aquaSceneSel" style="flex:1;min-width:0;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--field)"><option value="">No backdrop</option>${Object.entries(AQUA_SCENES).filter(([, x]) => !!x.fresh === fr).map(([k, x]) => `<option value="${k}"${k === pick0 ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select>`;
   h += `<button class="btn" data-action="aquaScene">Set, ${money(VIV_SCENE.price)}</button></div>`;
   for(const s of kinds){ const ok = sc && sceneFit(e, s) > 0, home = seaSceneOf(s); h += `<div class="need-line ${ok ? "ok" : "no"}">${esc(s.name)}: ${esc(home ? AQUA_SCENES[home].label : s.period)}</div>`; }
   return h + `</section>`;
@@ -964,6 +966,7 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ openLandList("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
+  if(a === "aquaFresh"){ const on = b.dataset.on === "1", why = freshProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setFresh(it, on); afterChange(); render(); return; }
   if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
   if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
   if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
@@ -1116,9 +1119,6 @@ function speciesStatus(s){
 // Known to the Paleopedia: a starter, a discovered species, or one with DNA already collected
 const ppKnown = s => isStarter(s) || isUnlocked(s.id) || !!state.science.dna[s.id];
 let ppPick = null;   // species id open on the card
-let ppPeriod = null; // period tab open, or null for none
-let ppBiomeTab = null; // biome tab open (or "sea"/"any"), or null for none
-let ppSort = "period"; // tabs by "period" or "biome"
 // A species' sprite box: a patch of its first biome's ground, laid from the same ground as the map (one big tile, or the 1 m tiles of biomepaint.js)
 const ppGround = {};   // biome -> data URL of the patch (null while its tiles load)
 const PP_SCALE = 2, PP_CELLS = [24, 14];
@@ -1147,8 +1147,11 @@ function ppGroundUrl(biome){
   return null;
 }
 const ppBiome = s => s.biome || (biomesOf(s) || [])[0];
+const ppWet = s => !!(s.aqua || s.pool);
+// a water animal swims in front of its aquarium backdrop (the river bed for a freshwater one), stretched to the box's height;
 // a biome with one big tile shows it at its own size: its pattern's meters at GROUND_TILE_PX a meter
-const ppBg = s => { const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); if(!u) return BIOMES[b].color;
+const ppBg = s => { if(ppWet(s) && !s.biome){ const k = seaSceneOf(s); return k ? `${s.fresh ? AQUA34.fresh : AQUA34.clean} url('${spriteUrl(`sprites/vivscene/sea-${k}-L-wall.png`)}') center bottom/auto 100% repeat-x` : AQUA34.clean; }
+  const b = ppBiome(s); if(!b) return "var(--chrome-2)"; const u = ppGroundUrl(b); if(!u) return BIOMES[b].color;
   const m = GROUND_TILES[b] ? PP_CELLS : [1, 1].map(() => +(document.getElementById(`b-${b}`)?.getAttribute("width") || 18));
   return `${BIOMES[b].color} url('${u}') 0 0/${m[0] * GROUND_TILE_PX * PP_SCALE}px ${m[1] * GROUND_TILE_PX * PP_SCALE}px`; };
 const ppImg = s => SPRITES[s.id] ? `<img src="${spriteUrl(`sprites/${s.id}.png`)}" alt="${esc(s.name)}">` : `<span class="pp-noart">No picture yet</span>`;
@@ -1158,7 +1161,7 @@ function ppCard(s){
   let n = 0; for(const e of state.exhibits) for(const a of e.animals) if(a.sp === s.id) n++;
   const stars = Math.min(5, Math.max(1, Math.ceil(s.appeal / 5))), row = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
   return `<div class="pp-card"><div class="pp-left"><div class="pp-pic" data-biome="${ppBiome(s) || ""}" style="background:${ppBg(s)};image-rendering:pixelated">${ppImg(s)}</div><dl class="pp-stats">`
-    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", s.aqua ? "the sea" : biomesOf(s) ? biomeNames(s) : "any")
+    + row("Period", `${s.period} (${per.ago})`) + row("Diet", dietText(s)) + row("Biome", ppWet(s) ? s.fresh ? "freshwater" : "marine" : biomesOf(s) ? biomeNames(s) : "any") + row("Habitat", PP_HABITATS[ppHabitat(s)])
     + row("Size", I.ft ? `${I.ft} ft long` : "?") + row("Activity", TRAIT_TEXT[t.active]) + row("Space", `${s.space.toLocaleString()} m²`)
     + row("Social", TRAIT_TEXT[t.social]) + row("Personality", TRAIT_TEXT[t.temper]) + row("Group size", s.group[0] === s.group[1] ? s.group[0] : `${s.group[0]}–${s.group[1]}`)
     + row("Appeal", `<span title="Appeal ${s.appeal}">${"★".repeat(stars)}${"☆".repeat(5 - stars)}</span>`)
@@ -1168,37 +1171,56 @@ function ppCard(s){
 }
 
 const PP_ORDER = ["Cambrian", "Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian", "Triassic", "Jurassic", "Cretaceous", "Paleogene", "Neogene", "Quaternary"];
-// Tabs for the current sort: periods, or biomes (a species shows under each of its biomes; sea animals under The Sea)
-function ppGroups(all){
-  if(ppSort === "period") return PP_ORDER.filter(per => all.some(s => s.period === per)).map(per => ({id:per, name:per, color:PERIOD_COLOR[per], has:s => s.period === per}));
-  const g = Object.keys(BIOMES).map(b => ({id:b, name:BIOMES[b].label, color:BIOMES[b].color, has:s => !s.aqua && (biomesOf(s) || []).includes(b)}));
-  g.push({id:"sea", name:"The Sea", color:"#2E6E9E", has:s => !!s.aqua}, {id:"any", name:"Any", color:"var(--ink-2)", has:s => !s.aqua && !biomesOf(s)});
-  return g.filter(x => all.some(x.has));
-}
+// Where a species lives: a lagoon or aquarium (sea or fresh), a paludarium, a vivarium or an open exhibit
+const PP_HABITATS = {exhibit:"Exhibit", vivarium:"Vivarium", paludarium:"Paludarium", aquarium:"Sea aquarium", freshaq:"Freshwater aquarium", lagoon:"Sea lagoon", freshlag:"Freshwater lagoon"};
+const ppHabitat = s => s.pool ? s.fresh ? "freshlag" : "lagoon" : s.aqua ? s.fresh ? "freshaq" : "aquarium" : s.palu ? "paludarium" : s.viv ? "vivarium" : "exhibit";
+// A species' biome keys for the filter: its biomes, "sea" or "fresh" for water animals, "any" for none
+const ppBiomeKeys = s => ppWet(s) ? [s.fresh ? "fresh" : "sea"] : biomesOf(s) || ["any"];
+// The filters, one per menu: key, label, the options (value, name) and whether a species matches a value
+const PP_FILTERS = [
+  {k:"period", label:"Period", opts:() => PP_ORDER.map(p => [p, p]), has:(s, v) => s.period === v},
+  {k:"biome", label:"Biome", opts:() => [...Object.keys(BIOMES).map(b => [b, BIOMES[b].label]), ["sea", "Marine"], ["fresh", "Freshwater"], ["any", "Any"]], has:(s, v) => ppBiomeKeys(s).includes(v)},
+  {k:"diet", label:"Diet", opts:() => Object.entries(DIETS), has:(s, v) => s.diet.includes(v)},
+  {k:"habitat", label:"Habitat", opts:() => Object.entries(PP_HABITATS), has:(s, v) => ppHabitat(s) === v},
+];
+const ppFilter = {};   // filter key -> picked value ("" or missing for all)
+const ppAbbr = per => per.slice(0, 3);
 
 function catalogHtml(){
-  const all = SPECIES.filter(s => speciesAvailable(s.id)).sort((a, b) => PP_ORDER.indexOf(a.period) - PP_ORDER.indexOf(b.period)), groups = ppGroups(all);
-  const byPer = ppSort === "period"; let open = byPer ? ppPeriod : ppBiomeTab;
-  if(!groups.some(x => x.id === open)) open = null;
-  if(byPer) ppPeriod = open; else ppBiomeTab = open;
-  const sorts = `<span class="pp-sort">${[["period", "Period"], ["biome", "Biome"]].map(([k, t]) => `<button class="chipbtn" data-sort="${k}" aria-pressed="${k === ppSort}">${t}</button>`).join("")}</span>`;
-  const tabs = sorts + groups.map(x => `<button class="pp-tab" data-tab="${x.id}" aria-pressed="${x.id === open}">${esc(x.name)}</button>`).join("");
-  if(!open) return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="meta">Pick a ${byPer ? "period" : "biome"}.</div></div>`;
-  const G = groups.find(x => x.id === open), here = all.filter(G.has), got = here.filter(ppKnown);
+  const avail = SPECIES.filter(s => speciesAvailable(s.id));
+  const pass = (s, skip) => PP_FILTERS.every(F => F.k === skip || !ppFilter[F.k] || F.has(s, ppFilter[F.k]));
+  // each menu lists only values some species has, given the other menus' picks
+  const menus = PP_FILTERS.map(F => {
+    const opts = F.opts().filter(([v]) => v === ppFilter[F.k] || avail.some(s => pass(s, F.k) && F.has(s, v)));
+    return `<label class="pp-filter${ppFilter[F.k] ? " on" : ""}"><span>${F.label}</span><select data-filter="${F.k}"><option value="">All</option>`
+      + opts.map(([v, t]) => `<option value="${v}"${v === ppFilter[F.k] ? " selected" : ""}>${esc(t)}</option>`).join("") + `</select></label>`;
+  }).join("");
+  const any = PP_FILTERS.some(F => ppFilter[F.k]);
+  const all = avail.filter(s => pass(s)).sort((a, b) => PP_ORDER.indexOf(a.period) - PP_ORDER.indexOf(b.period) || a.name.localeCompare(b.name));
+  const got = all.filter(ppKnown);
+  const bar = `<div class="pp-tabs">${menus}${any ? `<button class="chipbtn pp-clear" data-clear="1">Clear</button>` : ""}<span class="pp-count">${got.length} of ${all.length} discovered</span></div>`;
   if(!got.some(s => s.id === ppPick)) ppPick = got.length ? got[0].id : null;
-  const list = `<h3 class="pp-ph"><span class="dot" style="background:${G.color}"></span>${esc(G.name)} <span class="meta">${got.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
-    + got.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${esc(s.name)}</button>`).join("")
-    + `<span class="pp-tile blank" title="Not discovered yet"></span>`.repeat(here.length - got.length) + `</div>`;
-  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered in this ${byPer ? "period" : "biome"} yet.</div>`;
-  return `<div class="pp-tabs">${tabs}</div><div class="pp-body"><div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div></div>`;
+  const list = PP_ORDER.filter(per => all.some(s => s.period === per)).map(per => {
+    const here = all.filter(s => s.period === per), k = here.filter(ppKnown), mark = `<span class="pp-per" style="--pc:${PERIOD_COLOR[per]}" title="${per}">${ppAbbr(per)}</span>`;
+    return `<section><h3 class="pp-ph"><span class="dot" style="background:${PERIOD_COLOR[per]}"></span>${per} <span class="meta">${k.length} of ${here.length} discovered</span></h3><div class="pp-grid">`
+      + k.map(s => `<button class="pp-tile" data-sp="${s.id}" aria-pressed="${s.id === ppPick}">${mark}<span>${esc(s.name)}</span></button>`).join("")
+      + `<span class="pp-tile blank" title="Not discovered yet">${mark}</span>`.repeat(here.length - k.length) + `</div></section>`;
+  }).join("") || `<div class="meta">No animals match.</div>`;
+  const view = ppPick ? ppCard(SPECIES_BY_ID[ppPick]) : `<div class="meta">Nothing discovered here yet.</div>`;
+  return `${bar}<div class="pp-body"><div class="pp"><div class="pp-list">${list}</div><div class="pp-view">${view}</div></div></div>`;
 }
 
 function openCatalog(){ $("#catalogBody").innerHTML = catalogHtml(); if(!$("#dlgAnimals").open) $("#dlgAnimals").showModal(); }
 $("#animalsBtn").onclick = openCatalog;
 $("#closeAnimals").onclick = () => $("#dlgAnimals").close();
+// keep the list's scroll when a click redraws it
+const ppRedraw = () => { const b = $("#catalogBody .pp-body"), y = b ? b.scrollTop : 0; $("#catalogBody").innerHTML = catalogHtml(); const n = $("#catalogBody .pp-body"); if(n) n.scrollTop = y; };
 $("#catalogBody").onclick = e => {
-  const o = e.target.closest("[data-sort]"), t = e.target.closest("[data-tab]"), b = e.target.closest("[data-sp]");
-  if(o){ ppSort = o.dataset.sort; $("#catalogBody").innerHTML = catalogHtml(); }
-  else if(t){ const v = t.dataset.tab; if(ppSort === "period") ppPeriod = ppPeriod === v ? null : v; else ppBiomeTab = ppBiomeTab === v ? null : v; $("#catalogBody").innerHTML = catalogHtml(); }
-  else if(b){ ppPick = b.dataset.sp; $("#catalogBody").innerHTML = catalogHtml(); }
+  const c = e.target.closest("[data-clear]"), b = e.target.closest("[data-sp]");
+  if(c){ for(const k in ppFilter) delete ppFilter[k]; $("#catalogBody").innerHTML = catalogHtml(); }
+  else if(b){ ppPick = b.dataset.sp; ppRedraw(); }
+};
+$("#catalogBody").onchange = e => {
+  const f = e.target.closest("[data-filter]"); if(!f) return;
+  ppFilter[f.dataset.filter] = f.value; $("#catalogBody").innerHTML = catalogHtml();
 };

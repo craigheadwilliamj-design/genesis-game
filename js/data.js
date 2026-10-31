@@ -86,13 +86,13 @@ const UPKEEP = {
 //     herbivores and piscivores don't bother land animals
 //   shop     true means partner parks sell it, so you can buy it without cloning
 //   viv      "S", "M", or "L" means it lives in a vivarium at least that size, not an open exhibit
-//   aqua     true for sea animals: viv is then the aquarium size it needs, and it lives only in an aquarium
+//   aqua     true for water animals: viv is then the aquarium size it needs, and it lives only in an aquarium (a sea one, or a freshwater one with `fresh`)
 //   floor    a sea animal that crawls the bottom of its aquarium instead of swimming
 //   palu     a semi-aquatic vivarium animal that needs its vivarium laid out as a paludarium (PALU)
 //   wade     a vivarium animal that swims in a paludarium's water and is happier for it, but does fine in a dry case (semi ones swim there too)
 //   pool     a big sea animal: it lives in an open exhibit flooded with sea water (a pool, POOL), swims only in that water and never leaves it
 //   deep     a pool animal that needs deep sea water for POOL.deepNeed of its pool
-//   fresh    a pool animal from rivers and estuaries: any water counts for its pool, not just sea water
+//   fresh    a freshwater animal from rivers, lakes and estuaries: a pool one counts any water for its pool, not just sea water; an aquarium one lives only in a freshwater aquarium (e.fresh)
 //   breach   a pool animal that now and then leaps clear of the water as it surfaces
 const DIETS = {herbivore:"Herbivore", omnivore:"Omnivore", insectivore:"Insectivore", piscivore:"Piscivore", carnivore:"Carnivore", frugivore:"Frugivore", molluscovore:"Molluscovore"};
 
@@ -109,7 +109,7 @@ const SPECIES = [
   // Devonian
   {id:"icht", name:"Ichthyostega",   period:"Devonian", diet:["piscivore"], price:4000, food:10, space:8, group:[2,6], appeal:4, stars:0.5, viv:"M", wade:true},
   {id:"tikt", name:"Tiktaalik",      period:"Devonian", diet:["piscivore"], price:4500, food:12, space:10, group:[2,6], appeal:5, stars:0.5, viv:"M", wade:true},
-  {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true, floor:true},
+  {id:"both", name:"Bothriolepis",   period:"Devonian", diet:["herbivore"], price:3000, food:4, space:4, group:[3,10], appeal:3, stars:0.5, viv:"S", aqua:true, floor:true, fresh:true},
   {id:"dunk", name:"Dunkleosteus",   period:"Devonian", diet:["carnivore"], predator:true, price:26000, food:150, space:900, group:[1,2], appeal:13, stars:2.5, pool:true, deep:true},
   // Carboniferous
   {id:"stet", name:"Stethacanthus",  period:"Carboniferous", diet:["piscivore"], price:6000, food:15, space:20, group:[2,5], appeal:5, stars:1, viv:"M", aqua:true},
@@ -1722,18 +1722,18 @@ const LAND = {
   vdish:  {label:"Food Dish",           one:"a food dish",          price:250,  r:.8, color:"#8A8F96", vivToy:true, tray:6, fit:true, look:"vdish"},
   vlamp:  {label:"Basking Lamp",        one:"a basking lamp",       price:900,  r:.7, color:"#B87034", vivToy:true, lamp:true, fit:true, upkeep:6, look:"vlamp"},
   vpool:  {label:"Pool",                one:"a pool",               price:1800, r:1.3, color:"#3E86A8", vivToy:true, pool:true, poolM2:2.5, fit:true, flat:true, look:"vpool"},
-  // aquarium fittings and enrichment (aqua: aquariums only; the dish goes in both): filters clean `clean` load a day (AQUA) and draw `kw` of power
+  // aquarium fittings and enrichment (aqua: aquariums only; the dish goes in both): filters clean `clean` load a day (AQUA) and draw `kw` of power; sea: sea water only, never in a freshwater aquarium
   afilter:{label:"Canister Filter",     one:"a canister filter",    price:1500, r:.6, color:"#5E7E8A", vivToy:true, aqua:true, fit:true, filter:true, clean:30, kw:10, upkeep:8, look:"afilter"},
   asump:  {label:"Sump Filter",         one:"a sump filter",        price:5000, r:1, color:"#46606A", vivToy:true, aqua:true, fit:true, filter:true, clean:120, kw:30, upkeep:25, look:"asump"},
   arock:  {label:"Rock Arch",           one:"a rock arch",          price:600,  r:1, color:"#80796C", toy:2, vivToy:true, aqua:true, hide:true, look:"arock"},
-  aweed:  {label:"Seaweed Bed",         one:"a seaweed bed",        price:500,  r:.9, color:"#4E7A3A", toy:2, vivToy:true, aqua:true, look:"aweed"},
+  aweed:  {label:"Seaweed Bed",         one:"a seaweed bed",        price:500,  r:.9, color:"#4E7A3A", toy:2, vivToy:true, aqua:true, sea:true, look:"aweed"},
   aboulder:{label:"Boulder Pile",       one:"a boulder pile",       price:400,  r:1, color:"#80796C", toy:1, vivToy:true, aqua:true, hide:true, look:"aboulder"},
-  abrain: {label:"Brain Coral",         one:"a brain coral",        price:700,  r:.8, color:"#C0AC64", toy:2, vivToy:true, aqua:true, look:"abrain"},
-  acoral: {label:"Branching Coral",     one:"a branching coral",    price:800,  r:.8, color:"#E48446", toy:2, vivToy:true, aqua:true, look:"acoral"},
-  afan:   {label:"Sea Fan",             one:"a sea fan",            price:700,  r:.8, color:"#9C5492", toy:2, vivToy:true, aqua:true, look:"afan"},
-  asponge:{label:"Sponge Cluster",      one:"a sponge cluster",     price:600,  r:.7, color:"#B8905C", toy:2, vivToy:true, aqua:true, look:"asponge"},
-  akelp:  {label:"Kelp Stand",          one:"a kelp stand",         price:900,  r:.6, color:"#968434", toy:3, vivToy:true, aqua:true, look:"akelp"},
-  ashell: {label:"Giant Ammonite Shell",one:"a giant ammonite shell",price:1500, r:1.1, color:"#C4A878", toy:3, vivToy:true, aqua:true, hide:true, look:"ashell"},
+  abrain: {label:"Brain Coral",         one:"a brain coral",        price:700,  r:.8, color:"#C0AC64", toy:2, vivToy:true, aqua:true, sea:true, look:"abrain"},
+  acoral: {label:"Branching Coral",     one:"a branching coral",    price:800,  r:.8, color:"#E48446", toy:2, vivToy:true, aqua:true, sea:true, look:"acoral"},
+  afan:   {label:"Sea Fan",             one:"a sea fan",            price:700,  r:.8, color:"#9C5492", toy:2, vivToy:true, aqua:true, sea:true, look:"afan"},
+  asponge:{label:"Sponge Cluster",      one:"a sponge cluster",     price:600,  r:.7, color:"#B8905C", toy:2, vivToy:true, aqua:true, sea:true, look:"asponge"},
+  akelp:  {label:"Kelp Stand",          one:"a kelp stand",         price:900,  r:.6, color:"#968434", toy:3, vivToy:true, aqua:true, sea:true, look:"akelp"},
+  ashell: {label:"Giant Ammonite Shell",one:"a giant ammonite shell",price:1500, r:1.1, color:"#C4A878", toy:3, vivToy:true, aqua:true, sea:true, hide:true, look:"ashell"},
   abubble:{label:"Bubble Curtain",      one:"a bubble curtain",     price:1100, r:.8, color:"#9FCFE0", toy:3, vivToy:true, aqua:true, look:"abubble"},
 };
 // Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at ROCK_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
@@ -1753,7 +1753,7 @@ const WARM_BLOODED = ["anch", "yiqi", "arch", "micr", "scan", "mono", "comp", "l
 const VIV_POOL = {bonus:5};
 // Aquarium water: the animals foul it by their food a day (their load) and filters clean it (LAND `clean`, only while powered). Quality (0 to 100) heads for
 // 100 x cleaning / load at `rate` points a day. Under `murky` the animals are unhappy (up to `lack`), under `foul` they fall ill (x`ill` at 0); clean water is worth `happy`.
-const AQUA = {rate:40, murky:60, foul:30, happy:6, lack:14, ill:3};
+const AQUA = {rate:40, murky:60, foul:30, happy:6, lack:14, ill:3, swap:1500};   // swap: draining an aquarium and refilling it with the other water (fresh or sea)
 // A vivarium can be laid out as a paludarium from its Landscaping tab: the front `water` share of its floor flooded `depth` of the glass deep, a bank behind, for
 // `price` (draining it refunds COST.refundShare). Its water fouls like an aquarium's (AQUA, and it takes the aquarium filters), but only the animals that swim in it
 // count, at `load` of their food. Water lovers swim and get `happy` there, and need no pool. Species with `palu` live only in one.
@@ -1779,8 +1779,9 @@ const AQUA_SCENES = {
   paleozoic: {label:"Paleozoic sea", periods:["Ordovician", "Silurian", "Devonian", "Carboniferous", "Permian"]},
   mesozoic:  {label:"Mesozoic sea",  periods:["Triassic", "Jurassic", "Cretaceous"]},
   cenozoic:  {label:"Cenozoic sea",  periods:["Paleogene", "Neogene", "Quaternary"]},
+  fresh:     {label:"River bed",     periods:[], fresh:true},   // the one freshwater backdrop, for every `fresh` species whatever its period
 };
-const seaSceneOf = s => Object.keys(AQUA_SCENES).find(k => AQUA_SCENES[k].periods.includes(s.period)) || null;
+const seaSceneOf = s => s.fresh ? "fresh" : Object.keys(AQUA_SCENES).find(k => AQUA_SCENES[k].periods.includes(s.period)) || null;
 const HAB = {
   waterFull:.03,   // share of the exhibit's floor under water that fully satisfies water lovers
   rockEvery:500,   // square meters of exhibit that one point of rock cover looks after

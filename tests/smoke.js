@@ -2247,9 +2247,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.science.tech = techKeep; out.placeServiceRules = depotGuest && depotStaff;
       // the Paleopedia card renders for every species, discovered or not, in every period
       { const un = state.science.unlocked.slice(); let bad = ""; ppPick = null;
-        for(const s of SPECIES){ if(!speciesAvailable(s.id)) continue; for(const known of [true, false]){ state.science.unlocked = known ? [s.id] : []; ppPeriod = s.period; ppPick = s.id; try { catalogHtml(); } catch(x){ bad = s.id + ": " + x.message; } } }
-        ppSort = "biome"; for(const b of [...Object.keys(BIOMES), "sea", "any"]){ ppBiomeTab = b; try { catalogHtml(); } catch(x){ bad = b + ": " + x.message; } }
-        state.science.unlocked = un; ppSort = "period"; ppPeriod = null; ppBiomeTab = null; ppPick = null; out.paleopediaCards = bad === ""; }
+        for(const s of SPECIES){ if(!speciesAvailable(s.id)) continue; for(const known of [true, false]){ state.science.unlocked = known ? [s.id] : []; ppPick = s.id; try { catalogHtml(); } catch(x){ bad = s.id + ": " + x.message; } } }
+        for(const F of PP_FILTERS) for(const [v] of F.opts()){ ppFilter[F.k] = v; try { catalogHtml(); } catch(x){ bad = F.k + " " + v + ": " + x.message; } delete ppFilter[F.k]; }
+        state.science.unlocked = SPECIES.map(s => s.id); const h = catalogHtml(), ids = [...h.matchAll(/data-sp="(\w+)"/g)].map(m => SPECIES_BY_ID[m[1]]);
+        if(ids.some((s, i) => i && (PP_ORDER.indexOf(ids[i - 1].period) - PP_ORDER.indexOf(s.period) || ids[i - 1].name.localeCompare(s.name)) > 0)) bad = "list out of order";
+        if(ids.length !== SPECIES.filter(s => speciesAvailable(s.id)).length) bad = "list misses species";
+        state.science.unlocked = un; ppPick = null; out.paleopediaCards = bad === ""; }
       // the guest walking graph still finds a building placed at the reach limit, in both turns
       setTool("restroom");
       for(const r of [0, 2]){
@@ -4115,6 +4118,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       closeVivView(); out.vivGuestView = out.vivGuestView && !q("#dlgVivView").open;
       out.aquaFits = fitsHabitat(sea, aq) && !fitsHabitat(land, aq) && !fitsHabitat(sea, ev) && !fitsHabitat(sea, {points:[]}) && fitsHabitat(land, ev) && SPECIES.filter(x => x.aqua).every(x => x.viv && TIME_SITES.some(t => (t.fauna || []).includes(x.id)));
       out.aquaFittings = !vivToyProblem(aq, "afilter") && !vivToyProblem(aq, "vdish") && !!vivToyProblem(aq, "vlamp") && !!vivToyProblem(aq, "vpool") && !!vivToyProblem(ev, "afilter") && !vivToyProblem(ev, "vlamp");
+      // freshwater aquariums: fresh species only there, sea ones only in sea water; corals stay out; the swap needs the other water's animals out and drops a sea backdrop
+      { const fq = {id:"e-fq", viv:"L", aqua:true, fresh:true, wq:100, points:aq.points, animals:[], vivScene:null}, fw = SPECIES_BY_ID.both, m0 = state.money;
+        state.money = 1e6; const sq = {...fq, fresh:undefined, vivScene:{sea:"paleozoic"}, animals:[]};
+        const swapBlocked = !!freshProblem(aq, true), swapOk = !freshProblem(sq, true); setFresh(sq, true);
+        out.freshAquarium = fitsHabitat(fw, fq) && !fitsHabitat(fw, aq) && !fitsHabitat(sea, fq) && !caseTakes(fq, "abrain") && caseTakes(fq, "arock") && caseTakes(aq, "abrain")
+          && swapBlocked && swapOk && sq.fresh === true && sq.vivScene === null && !!vivSceneProblem(fq, {sea:"cenozoic"}) && !vivSceneProblem(fq, {sea:"fresh"})
+          && seaSceneOf(fw) === "fresh" && (fq.vivScene = {sea:"fresh"}, sceneFit(fq, fw) === 1) && sceneFit(fq, sea) === 0;
+        state.money = m0; }
       const noFilter = filterText(aq), aim0 = wqAim(aq);
       aquaTick(DAY_MIN); const dirty1 = wqOf(aq);
       addVivToy(aq, "asump"); aq.filterPowered = true;

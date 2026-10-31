@@ -916,12 +916,13 @@ const sameScene = (a, b) => !a ? !b : !!b && a.sea === b.sea && a.era === b.era 
 // half for a scene from its own era (or its own period, for a period scene), half for one of its biomes
 function sceneFit(e, s){
   const sc = e.vivScene; if(!sc) return 0;
-  if(sc.sea) return AQUA_SCENES[sc.sea] && AQUA_SCENES[sc.sea].periods.includes(s.period) ? 1 : 0;   // a backdrop has no biome: its own time is the whole of it
+  if(sc.sea) return sc.sea === seaSceneOf(s) ? 1 : 0;   // a backdrop has no biome: its own time (or the river bed, for a freshwater animal) is the whole of it
   return ((sc.period ? sc.period === s.period : sc.era === ERA_OF[s.period]) ? .5 : 0) + (biomeFit(s, sc.biome) !== "away" ? .5 : 0);
 }
 function vivSceneProblem(e, sc){
   if(!e.viv) return "Only vivariums take a scene.";
   if(sc && e.aqua ? !AQUA_SCENES[sc.sea] : sc && sc.sea) return "Pick a backdrop.";
+  if(sc && e.aqua && !!AQUA_SCENES[sc.sea].fresh !== !!e.fresh) return e.fresh ? "That backdrop is for sea water." : "That backdrop is for fresh water.";
   if(sc && !e.aqua && (!VIV_SCENE.eras.includes(sc.era) || !BIOMES[sc.biome])) return "Pick an era and a biome.";
   if(sameScene(e.vivScene, sc)) return sc ? `That's the ${e.aqua ? "backdrop" : "scene"} it has.` : `It has no ${e.aqua ? "backdrop" : "scene"}.`;
   if(sc && !canAfford(VIV_SCENE.price)) return `Costs ${money(VIV_SCENE.price)}.`;
@@ -942,13 +943,28 @@ function paluProblem(e, on){
   if(!on && filters(e).length) return "Take the filters out first.";
   return null;
 }
+// Draining an aquarium and refilling it with fresh water (on) or sea water. The backdrop goes with the old water.
+function freshProblem(e, on){
+  if(!e.aqua) return "Only aquariums hold water.";
+  if(on === !!e.fresh) return on ? "It's already fresh water." : "It's already sea water.";
+  if(!canAfford(AQUA.swap)) return `Costs ${money(AQUA.swap)}.`;
+  const s = e.animals.map(a => SPECIES_BY_ID[a.sp]).find(s => s && !!s.fresh !== on); if(s) return `Move the ${s.name} out first.`;
+  const f = on && landOf(e).find(f => LAND[f.type] && LAND[f.type].sea); if(f) return `Take out the ${LAND[f.type].label.toLowerCase()} first.`;
+  return null;
+}
+function setFresh(e, on){
+  spend(AQUA.swap, "built");
+  if(on) e.fresh = true; else delete e.fresh;
+  e.wq = 100;
+  if(e.vivScene && !!(AQUA_SCENES[e.vivScene.sea] || {}).fresh !== on) e.vivScene = null;
+}
 function setPalu(e, on){
   if(on){ spend(PALU.price, "built"); e.palu = true; e.wq = 100; }
   else { earn(Math.round(PALU.price * COST.refundShare), "sold"); delete e.palu; delete e.wq; delete e.filterPowered; }
   relayViv(e);   // the fittings move up onto the bank (or spread back out), and the animals find their spots again
 }
 // Which fittings a case takes: aquarium ones (filters, sea enrichment) only in aquariums, the rest only in vivariums; a food dish goes in either
-const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu))); };   // a paludarium takes filters too, and needs no pool
+const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu) && !(t.sea && e.fresh))); };   // and corals, kelp and the like stay out of fresh water   // a paludarium takes filters too, and needs no pool
 // Vivarium enrichment goes in the same way, full size
 function vivToyProblem(e, key){
   const t = LAND[key];
