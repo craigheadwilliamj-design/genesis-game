@@ -46,14 +46,15 @@ def arch():
         c.part({p for p in ell(mx, my, r, r * .55) if p in rk}, MOSS)
     return c
 
-def weed():
-    c = Cv(14 * U, 22 * U); W, H = c.w, c.h
-    c.part(rect(U, H - 2 * U, W - U - 1, H - 1), STONE, lambda x, y: "deep" if x % (3 * U) == 0 else None)   # the stony base
-    for x0, tall, ph in ((3, 13, 0), (6, 19, 1), (8.5, 21, 2), (10.5, 15, 3), (12.5, 9, 4), (4.5, 16, 5)):   # fronds swaying up, leaves stepping off them
-        pts = [(x0 * U + math.sin(i / 2 + ph) * U * .9, H - 2 * U - i * U * tall / 8) for i in range(9)]
+def weed(f=0, n=1):
+    c = Cv(16 * U, 22 * U); W, H = c.w, c.h
+    c.part(rect(2 * U, H - 2 * U, W - 2 * U - 1, H - 1), STONE, lambda x, y: "deep" if x % (3 * U) == 0 else None)   # the stony base
+    for x0, tall, ph in ((4, 13, 0), (7, 19, 1), (9.5, 21, 2), (11.5, 15, 3), (13.5, 9, 4), (5.5, 16, 5)):   # fronds swaying (more toward the tips, each a beat apart), leaves stepping off them
+        sw = math.sin(2 * math.pi * f / n - ph * .9)
+        pts = [(x0 * U + math.sin(i / 2 + ph) * U * .9 + sw * 1.1 * U * (i / 8) ** 1.5, H - 2 * U - i * U * tall / 8) for i in range(9)]
         m = curve(pts, U * .9)
         for i, (px, py) in enumerate(pts[1:-1]):
-            d = 1 if (i + ph) % 2 else -1; m |= stroke(px, py, px + d * 1.6 * U, py - U, U * .7)
+            d = 1 if (i + ph) % 2 else -1; m |= stroke(px, py, px + d * 1.6 * U, py - U - sw * d * .3 * U, U * .7)
         c.part(m, KELP, lambda x, y: "hi" if (x + y) % 7 == 0 else None)
     return c
 
@@ -145,7 +146,7 @@ def shell():
     c.part(ell(cx, cy, U * .9, U * .8), DARK(SHELL))
     return c
 
-FRAMES = {"abubble":6, "akelp":8}   # animated fittings: frame count (<key>.png is the first, then <key>-2.png and on)
+FRAMES = {"abubble":6, "akelp":8, "aweed":8}   # animated fittings: frame count (<key>.png is the first, then <key>-2.png and on)
 ALL = {"afilter":canister, "asump":sump, "arock":arch, "aweed":weed, "abubble":bubbles, "aboulder":boulders, "abrain":brain, "acoral":coral, "afan":fan, "asponge":sponges, "akelp":kelpstand, "ashell":shell}
 
 if __name__ == "__main__":
