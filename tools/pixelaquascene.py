@@ -1,5 +1,5 @@
-# Draws the aquarium backdrops in the flat pixel style (see CLAUDE.md, Art direction), with the vivarium scenes' canvas, shading and sizes (tools/pixelvivscene.py):
-# flat fills, no outlines, stair-stepped shapes, light from the top left, 0.13 m a pixel. A backdrop is a stretch of sea floor from one part of the past
+# Draws the aquarium backdrops in the park style like the vivarium scenes, with their canvas, shading, edges and sizes (tools/pixelvivscene.py):
+# flat fills with a dark edge tinted to each thing (softer on the far shapes and rises), stair-stepped shapes, light from the top left, 0.13 m a pixel. A backdrop is a stretch of sea floor from one part of the past
 # (AQUA_SCENES in js/data.js), drawn as two layers for each case size:
 #   sea-<scene>-<S|M|L>-wall.png    the back wall above the sill: the water in stepped bands with slanting light, far shapes, near shapes, a strip of sea floor
 #   sea-<scene>-<S|M|L>-floor.png   the floor, flat and seen from above, with its scatter of shells and bits
@@ -10,7 +10,7 @@
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
-from pixelvivscene import Cv, SIZES, dims, mix, ramp, shade, flat, ell, line, pick
+from pixelvivscene import Cv, SIZES, dims, mix, ramp, shade, flat, edge, ell, line, pick
 
 SCENES = {   # the water (top and deep), the floor, what stands on it, what lies about on the floor and the colors they're drawn in
     "cambrian":  {"water":((128, 164, 150), (70, 104, 100)), "ground":(124, 118, 94), "dens":.8,
@@ -116,9 +116,11 @@ def wall(scene, size):
         for x in range(W):
             ray = y < hz * .7 and (x - y // 2) % 23 < 3
             c.put(x, y, mix(col, P["top"]["hi"], .35 * (1 - y / hz)) if ray else col)
-    for x in range(W):   # far rises of sea floor, one flat tone
-        sx = x // 3 * 3; top = hz - 1 - round(H * .1 * (.6 + .4 * math.sin(sx * .11 + 1.3)))
+    tops = [hz - 1 - round(H * .1 * (.6 + .4 * math.sin(x // 3 * 3 * .11 + 1.3))) for x in range(W)]
+    for x in range(W):   # far rises of sea floor, one flat tone, with a soft edge along their tops and down each step
+        top = tops[x]
         for y in range(top, hz): c.put(x, y, P["far"]["mid"])
+        for y in range(top, min(hz, max(top + 1, tops[x - 1] if x else top, tops[x + 1] if x + 1 < W else top))): c.put(x, y, P["far"]["deep"])
     def row(far):
         step = max(3, round((6 if far else 9) / S["dens"] * (H / 20) ** .5)); x = rng.randrange(step)
         while x < W + 2:
@@ -126,15 +128,15 @@ def wall(scene, size):
             h = max(3, round(H * share * rng.uniform(.75, 1.1) * (.55 if far else 1)))
             b = hz if far else H - 1 - rng.randrange(max(1, g - 1))
             body, ex = SHAPES[k](x, b, h)
-            if far: flat(c, body, P["far"] if k in LOW else ramp(mix(P["far"]["lo"], P["deep"]["lo"], .5)))
+            if far: F = P["far"] if k in LOW else ramp(mix(P["far"]["lo"], P["deep"]["lo"], .5)); edge(c, body, F["deep"]); flat(c, body, F)
             else:
-                R = P["col"][k]; shade(c, body, R, False)
+                R = P["col"][k]; edge(c, body, R["edge"]); shade(c, body, R, False)
                 for p in ex: c.put(p[0], p[1], R["deep"])
             x += step + rng.randrange(-step // 3, step // 3 + 1)
     row(True)
     G = P["ground"]
     for y in range(hz, H):   # the strip of sea floor, with rows of darker dashes
-        for x in range(W): c.put(x, y, G["hi"] if y == hz else G["lo"] if (y - hz) % 2 == 1 and (x + y * 3) % 5 < 2 else G["mid"])
+        for x in range(W): c.put(x, y, G["deep"] if y == hz else G["lo"] if (y - hz) % 2 == 1 and (x + y * 3) % 5 < 2 else G["mid"])
     row(False)
     return c
 
@@ -147,7 +149,7 @@ def floor(scene, size):
             c.put(x, y, G["lo"] if y == 0 else (G["hi"] if y // 3 % 3 == 2 else G["lo"]) if dash else G["mid"])
     def decal(kind, x, y):
         if kind == "burrow": c.put(x, y, G["deep"]); c.put(x + 1, y, G["deep"]); c.put(x, y - 1, G["hi"]); c.put(x + 1, y + 1, G["lo"])
-        elif kind == "mat": shade(c, ell(x, y, rng.choice((2.5, 3.5, 4.5)), 1.4), C["mat"], False)
+        elif kind == "mat": m = ell(x, y, rng.choice((2.5, 3.5, 4.5)), 1.4); edge(c, m, C["mat"]["edge"]); shade(c, m, C["mat"], False)
         elif kind == "cone":
             for k in range(4): c.put(x + k, y, C["cone"]["hi"] if k == 0 else C["cone"]["mid"])
             c.put(x + 3, y + 1, C["cone"]["lo"])
@@ -160,13 +162,13 @@ def floor(scene, size):
         elif kind == "ammonite":
             for dx, dy, t in ((0, -1, "hi"), (1, -1, "hi"), (2, -1, "mid"), (-1, 0, "hi"), (2, 0, "lo"), (3, 0, "mid"), (-1, 1, "mid"), (0, 1, "deep"), (3, 1, "lo"), (0, 2, "lo"), (1, 2, "lo"), (2, 2, "lo"), (1, 0, "mid"), (1, 1, "mid")): c.put(x + dx, y + dy, C["ammonite"][t])
         elif kind == "sanddollar":
-            shade(c, ell(x, y, 2.2, 1.4), C["sanddollar"], False); c.put(x, y, C["sanddollar"]["deep"]); c.put(x - 1, y, C["sanddollar"]["lo"]); c.put(x + 1, y, C["sanddollar"]["lo"])
+            m = ell(x, y, 2.2, 1.4); edge(c, m, C["sanddollar"]["edge"]); shade(c, m, C["sanddollar"], False); c.put(x, y, C["sanddollar"]["deep"]); c.put(x - 1, y, C["sanddollar"]["lo"]); c.put(x + 1, y, C["sanddollar"]["lo"])
         elif kind == "scallop":
             for dx, dy, t in ((0, -1, "hi"), (1, -1, "hi"), (2, -1, "mid"), (-1, 0, "hi"), (0, 0, "lo"), (1, 0, "mid"), (2, 0, "lo"), (3, 0, "mid"), (0, 1, "mid"), (1, 1, "mid"), (2, 1, "lo"), (1, 2, "deep")): c.put(x + dx, y + dy, C["scallop"][t])
         elif kind == "starfish":
             for dx, dy, t in ((0, 0, "mid"), (1, 0, "mid"), (0, -1, "hi"), (-1, 0, "hi"), (-2, 1, "hi"), (2, 0, "lo"), (3, 1, "lo"), (0, 1, "lo"), (-1, 2, "lo"), (1, 1, "lo"), (2, 2, "lo")): c.put(x + dx, y + dy, C["starfish"][t])
         elif kind == "pebble":
-            r = rng.choice((1.2, 1.6, 2)); shade(c, ell(x, y, r, max(1, r * .7)), C["pebble"], False)
+            r = rng.choice((1.2, 1.6, 2)); m = ell(x, y, r, max(1, r * .7)); edge(c, m, C["pebble"]["edge"]); shade(c, m, C["pebble"], False)
         elif kind == "twig":
             for k in range(rng.choice((4, 5, 6))): c.put(x + k, y + (k > 2), C["twig"]["mid" if k % 3 else "lo"])
         elif kind == "snail":

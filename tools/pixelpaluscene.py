@@ -1,4 +1,4 @@
-# Draws the paludarium floors in the flat pixel style (see CLAUDE.md, Art direction): each vivarium scene's floor (tools/pixelvivscene.py) with its front half
+# Draws the paludarium floors in the park style like the vivarium scenes (tools/pixelvivscene.py, whose edges it borrows): each vivarium scene's floor (tools/pixelvivscene.py) with its front half
 # flooded, as a vivarium laid out as a paludarium has it (PALU.water in js/data.js). Seen from above like the rest of the floor: the bank at the back keeps the
 # scene's ground, then a dark wet strip and a row of lit stones along the shore, then open water, shallow and light at the shore and darker toward the front
 # glass in stepped bands, with staggered rows of ripple dashes and, in the wet and warm biomes, lily pads. The water takes a little of the biome's ground color.
@@ -7,7 +7,7 @@
 import sys, os, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
-from pixelvivscene import SIZES, dims, mix, ramp, shade, ell, floor, palette, scenes, BIOMES, WATER
+from pixelvivscene import SIZES, dims, mix, ramp, shade, edge, ell, floor, palette, scenes, BIOMES, WATER
 
 WET = .5   # PALU.water: the share of the floor, from the front, under water
 PADS = {"wetland":.5, "tropical":.35, "temperate":.15}   # lily pads: how likely each grid cell of open water has one
@@ -34,7 +34,7 @@ def palu(era, biome, size):
             for gx in range(0, W - 4, 8):
                 if rng.random() < p:
                     x, y = gx + rng.randrange(1, 5), gy + rng.randrange(0, 2)
-                    pad = ell(x, y, 2.4, 1.3); shade(c, pad, LEAF, False)
+                    pad = ell(x, y, 2.4, 1.3); edge(c, pad, LEAF["edge"]); shade(c, pad, LEAF, False)
                     c.put(x + 1, y, R["mid"]); c.put(x + 2, y, R["mid"])   # the notch
                     if rng.random() < .25: c.put(x - 1, y - 1, (240, 196, 218))   # a flower
     return c

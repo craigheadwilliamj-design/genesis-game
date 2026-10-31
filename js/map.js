@@ -806,13 +806,12 @@ function fence34(P, closed, kinds, which, o = {}){
   }
   return `<g pointer-events="none">${s}</g>`;
 }
-// A vivarium in the flat pixel style (3/4 view): a glass case in a frame, one flat tone a face (left lightest, front base, right darkest), snapped to the 0.13 m pixel.
-// S is a light aluminium case, M a dark wood one, L a dark aluminium case with a middle post and two lamp bars. Each size has its own label plate.
-const VIV34 = {
-  S:{frame:["#DDE2E5", "#B4BCC1", "#89939A"], top:"#EEF1F3", sill:.35, post:.22, lamps:1, label:"S"},
-  M:{frame:["#7A5638", "#5E402A", "#432D1E"], top:"#94694A", sill:.45, post:.28, lamps:1, label:"M"},
-  L:{frame:["#6F7980", "#4F575D", "#363C41"], top:"#8793A0", sill:.55, post:.34, lamps:2, mullion:true, label:"L"}};
-const VIV_GLASS34 = ["#CFEAEE", "#A9D3DA", "#86B6C0"];
+// A vivarium, aquarium or paludarium case: a brown tiled base slab (park style, as the restroom's), and the glass as one-pixel see-through light blue edges, so nothing hides the animals.
+// sill: the base slab's height (whole pixels); post: how far animals keep from the side glass.
+const VIV34 = {S:{sill:.65, post:.22}, M:{sill:.78, post:.28}, L:{sill:.91, post:.34}};
+// the park palette's letters used by the case (tools/genesis_style.py PAL)
+const PARK34 = {A:"#122213", L:"#3F7C45", H:"#305E32", F:"#2B542D", C:"#1C1A10", G:"#2C2313", M:"#42351D", X:"#A57D4A", W:"#8F6D40", U:"#6E5531", V:"#84653B", a:"#E3DDC3",
+  k:"#7EA8AA", S:"#1D2B22", b:"#BFE6F5"};   // b: the glass edge (not in PAL: it's drawn see-through)
 // An aquarium's water: its colour clean and foul (mixed by water quality), how thick it looks clean and foul, and how much of that its top surface takes
 const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486", fresh:"#2C7466", gravel:"#93805E"};   // fresh, gravel: a freshwater aquarium's clean water and floor
 const aquaClean34 = e => e.fresh ? AQUA34.fresh : AQUA34.clean;
@@ -869,12 +868,28 @@ function vivScene34(e, layer){
   const [a, b] = layer === "wall" ? [flatSnap34([bb.x0, bb.y0 - H / TILT]), flatSnap34([bb.x1, bb.y0 - K.sill / TILT])] : [flatSnap34([bb.x0, bb.y0]), flatSnap34([bb.x1, bb.y1])];
   return `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-${layer}.png`)}" x="${n2(a[0])}" y="${n2(a[1])}" width="${n2(b[0] - a[0])}" height="${n2(b[1] - a[1])}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
 }
-// A glass box on a solid base: "back" draws the far panes and sill (before what's inside), "front" the near panes, sill and the lid glass. All glass but the base, with a thin see-through light blue border: no posts, beams or lamp bars
+// The case, pixel by pixel on the 0.13 m grid: "back" draws the shadow, far glass and the base's inside (before what's inside), "front" the base and the glass edges
 function viv34(e, which, hi){
-  const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, up = lift34(H), back = which === "back", n2 = v => v.toFixed(2);
-  const [cx, cy] = centroid(P), fr = K.frame, rim = .25, op = a => `fill-opacity="${a}"`;
+  const P = e.points, V = VIVARIUMS[e.viv], K = VIV34[e.viv] || VIV34.M, H = V.d * .45, back = which === "back", n2 = v => v.toFixed(2);
+  const op = a => `fill-opacity="${a}"`;
   const wallQ = (i, f0, f1, h0, h1, fill, a) => flatPoly34([onEdge34(P, i, f0, h0), onEdge34(P, i, f1, h0), onEdge34(P, i, f1, h1), onEdge34(P, i, f0, h1)], fill, a ? op(a) : "", true);
+  const bb = bbox(P), px = FLAT34.px, ry = px / TILT, [X0, Yb] = flatSnap34([bb.x0, bb.y0]), [X1, Yf] = flatSnap34([bb.x1, bb.y1]);
+  const W = Math.round((X1 - X0) / px), D = Math.round((Yf - Yb) / ry), Hr = Math.round(H / px), Bs = Math.round(K.sill / px), ga = .6;
+  // cells by color and opacity: f(c0, c1, y0, y1) with columns from the left and y in world units, joined into one path per color
+  const cells = {}, cell = (col, c0, c1, yTop, yBot, a = 1) => { if(c1 <= c0) return; const k = col + "|" + a; cells[k] = (cells[k] || "") + `M${n2(X0 + c0 * px)} ${n2(yTop)}H${n2(X0 + c1 * px)}V${n2(yBot)}H${n2(X0 + c0 * px)}z`; };
+  const fr = (col, c0, c1, r0, r1, a) => cell(col, c0, c1, Yf - r1 * ry, Yf - r0 * ry, a);   // front face, rows up from the ground
+  const bk = (col, c0, c1, r0, r1, a) => cell(col, c0, c1, Yb - r1 * ry, Yb - r0 * ry, a);   // back pane, seen from inside
+  const tp = (col, c0, c1, d0, d1, a) => cell(col, c0, c1, Yf - Hr * ry - d1 * ry, Yf - Hr * ry - d0 * ry, a);   // the lid's top, rows back from its front edge
+  const flush = () => Object.entries(cells).map(([k, d]) => { const [col, a] = k.split("|"); return `<path d="${d}" fill="${PARK34[col]}"${a !== "1" ? ` fill-opacity="${a}"` : ""} shape-rendering="crispEdges"/>`; }).join("");
   let s = "";
+  if(back){
+    fr("S", 0, W, -1, 0, .39); fr("S", 1, W - 1, -2, -1, .39);   // the see-through shadow under the front edge
+    bk("k", 1, W - 1, Bs, Hr - 1, .35);   // the far glass, faint (a scene's wall goes over it)
+    bk("C", 0, W, Bs - 1, Bs); bk("U", 0, W, 1, Bs - 1); bk("G", 0, W, 0, 1);   // the base slab's inside, in shade
+    for(let c = 3; c < W - 2; c += 5) bk("M", c, c + 1, 1, Bs - 1);
+    bk("b", 1, W - 1, Bs, Bs + 1, ga);   // the far pane's foot
+    s += flush();
+  }
   if(e.aqua || e.palu && !back){   // the water: an aquarium's far faces behind the animals, then the near faces and a thinner surface over them (a paludarium's only over its flooded front); clear blue when clean, thicker and greener as it fouls
     const w = wqOf(e) / 100, col = vivMix34(AQUA34.foul, aquaClean34(e), w), a = AQUA34.alpha[0] + (AQUA34.alpha[1] - AQUA34.alpha[0]) * (1 - w), wl = e.palu ? paluLine(e) : aquaLine(e), WP = e.palu ? paluPoly(e) : P;
     for(let i = 0; i < P.length; i++) if(back ? norm34(P, i)[1] <= .05 : norm34(P, i)[1] > .05) s += wallQ(i, 0, 1, back ? 0 : K.sill, wl, back || e.palu ? vivMix34(col, "#000000", e.palu ? .3 : .15) : col, a.toFixed(2));   // a paludarium's front band darker, as deep water seen through the glass
@@ -887,29 +902,16 @@ function viv34(e, which, hi){
       for(let i = 0; i < WP.length; i++){ const p = lift34(wl)(WP[i]), q = lift34(wl)(WP[(i + 1) % WP.length]); s += `<path d="M${n2(p[0])} ${n2(p[1])}L${n2(q[0])} ${n2(q[1])}" stroke="${vivMix34(col, "#FFFFFF", .6)}" stroke-opacity=".7" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; }
     }
   }
-  for(let i = 0; i < P.length; i++){
-    const n = norm34(P, i); if(back ? n[1] > .05 : n[1] <= .05) continue;
-    const f = vivFace34(n[0]), ft = back ? 2 - f : f;   // the far panes are seen from inside, so their light is turned around
-    s += wallQ(i, 0, 1, 0, H, VIV_GLASS34[f], back ? .42 : .17);
-    if(back) s += wallQ(i, 0, 1, 0, K.sill, fr[ft]);
-    else {
-      const pt = (fr_, h_) => onEdge34(P, i, fr_, h_), lo = K.sill + .15, hi_ = H - rim - .1;
-      s += flatPoly34([pt(.12, lo), pt(.2, lo), pt(.34, hi_), pt(.26, hi_)], "#FFFFFF", op(.3), true) + flatPoly34([pt(.4, lo), pt(.43, lo), pt(.51, hi_), pt(.48, hi_)], "#FFFFFF", op(.2), true);
-      s += wallQ(i, 0, 1, 0, K.sill, fr[f]) + wallQ(i, 0, 1, K.sill - .13, K.sill, fr[Math.max(0, f - 1)]);
-    }
-  }
-  // a one-pixel light blue, see-through border: the floor's edges behind the animals, the lid's in front, and the corner edges from the foot of the base up
-  const hp = FLAT34.px / 2, ins = q => [q[0] + (Math.abs(q[0] - cx) > hp ? Math.sign(cx - q[0]) * hp : 0), q[1] + (Math.abs(q[1] - cy) > hp / TILT ? Math.sign(cy - q[1]) * hp / TILT : 0)],   // the line sits half a pixel inside the edge so its width doesn't spill past the footprint (and the path under it)
-    ln = (a0, b0) => { const a = ins(a0), b = ins(b0); return `<path d="M${n2(a[0])} ${n2(a[1])}L${n2(b[0])} ${n2(b[1])}" stroke="#BFE6F5" stroke-opacity=".6" stroke-width="${FLAT34.px}" fill="none" shape-rendering="crispEdges"/>`; };
-  for(let i = 0; i < P.length; i++){
-    const a = P[i], b = P[(i + 1) % P.length];
-    s += back ? ln(a, b) : ln(up(a), up(b));
-    if(back ? a[1] <= cy : a[1] > cy) s += ln(a, up(a));
-  }
   if(!back){
-    // the lid: clear glass
-    s += flatPoly34(P.map(up), "#DDEFF2", op(.16), true);
-    if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(up))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    // the base slab: dark brown edge, lit row under its top, brown tiles with staggered joints, darkest bottom row
+    fr("C", 0, W, Bs - 1, Bs); fr("X", 1, W - 1, Bs - 2, Bs - 1); fr("W", 1, W - 1, 1, Bs - 2); fr("G", 0, W, 0, 1);
+    for(let r = 1; r < Bs - 2; r++) for(let c = 3 + (r % 2) * 2; c < W - 2; c += 5) fr("M", c, c + 1, r, r + 1);
+    fr("a", 1, 2, Bs - 2, Bs - 1); fr("C", 0, 1, 0, Bs); fr("C", W - 1, W, 0, Bs);
+    // the glass: one-pixel see-through edges, the front's top, the lid's back and the two sides from the lid down to the base
+    fr("b", 1, W - 1, Hr - 1, Hr, ga); cell("b", 1, W - 1, Yb - Hr * ry, Yb - (Hr - 1) * ry, ga);
+    cell("b", 0, 1, Yb - Hr * ry, Yf - Bs * ry, ga); cell("b", W - 1, W, Yb - Hr * ry, Yf - Bs * ry, ga);
+    s += flush();
+    if(hi) s += `<polygon points="${polyStr(P)}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><polygon points="${polyStr(P.map(lift34(H)))}" fill="none" stroke="${hi}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   }
   return `<g pointer-events="none">${s}</g>`;
 }
