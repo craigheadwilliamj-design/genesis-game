@@ -427,7 +427,7 @@ function stepOff(p, meters){
     if(p.deckB && !p.stand && Math.hypot(p.ox || 0, p.oy || 0) < .3) p.deckB = null;   // back down on the path
     if(p.offK !== k){
       p.offK = k;
-      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
+      const bad = f => offPath(p.at.x + o[0] * f, p.at.y + o[1] * f) || (!p.to && inProp(p.at.x + o[0] * f, p.at.y + o[1] * f)) || (p.to && offPath(p.to.x + o[0] * f, p.to.y + o[1] * f));
       let f = 1; while(!(p.stand && p.stand.deck) && f > .05 && bad(f)) f *= .6;
       p.offT = f > .05 ? [o[0] * f, o[1] * f] : [0, 0];
     }
@@ -478,6 +478,8 @@ function observeTick(p, now){
 }
 // Is this spot off the guest paths (on grass, a staff path, anything that isn't paving guests may use)? A little in from the edge so feet stay on it.
 const offPath = (x, y) => !guestSegs.some(([a, b, hw]) => segProj(x, y, a, b).d < hw - .35);
+// Is this spot on (or right against) a bin, bench, lamp or other path prop? Guests walk past them but never stop inside one
+const inProp = (x, y) => state.buildings.some(b => BUILDINGS[b.type].prop && (inPoly(x, y, b.points) || distToEdge(x, y, b.points) < .4));
 // Can a guest walk straight from (x0, y0) to (x1, y1) off the path? Not through a fence, over a staff road, into water or through a building (skip is the one they're heading for)
 function standOk(x0, y0, x1, y1, skip){
   const A = [x0, y0], B = [x1, y1], cross = pts => { for(let i = 1; i < pts.length; i++) if(segCross(A, B, pts[i-1], pts[i])) return true; return false; };
@@ -487,6 +489,7 @@ function standOk(x0, y0, x1, y1, skip){
   const L = Math.hypot(x1 - x0, y1 - y0), end = skip && (skip.type === "platform" || skip.type === "gallery") ? L - 1.5 : L;
   for(let t = 0; t <= end; t += .5){ const k = L ? t / L : 0; if(offPath(x0 + (x1 - x0) * k, y0 + (y1 - y0) * k)) return false; }
   if(end === L && offPath(x1, y1)) return false;
+  if(inProp(x1, y1)) return false;
   for(const w of parkWater()) if(inPoly(x1, y1, w.points) || cross(w.points.concat([w.points[0]]))) return false;
   for(const b of state.buildings){
     if(b === skip || BUILDINGS[b.type].prop) continue;

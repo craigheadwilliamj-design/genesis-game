@@ -854,6 +854,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     resetParties(); state.minute = DAWN_MIN + 60; guestsArrive(2); const tp1 = parties[0];
     tp1.needs = {hunger:0, thirst:0, bladder:0, energy:75}; tp1.until = DUSK_MIN;
     out.benchRests = !!gGraph.anchors["b-bench"] && run(400, () => tp1.needs.energy < 5) && bench.served && bench.served.n === 2;
+    // a party standing about on the path never stops inside a bin sitting on it, whichever way it drifts from its node, and never picks a spot in one
+    { const pb = {id:"b-pbin", type:"bin", points:rectPts(100, 160, BUILDINGS.bin.w, BUILDINGS.bin.d, 0)}; state.buildings.push(pb); afterChange();
+      const n = nearestGuestNode(100, 161.2), sv = [tp1.at, tp1.to, tp1.stand, tp1.off, tp1.offK, tp1.ox, tp1.oy]; let inside = 0;
+      for(let i = 0; i < 40; i++){ Object.assign(tp1, {at:n, to:null, stand:null, off:i / 20 - 1, offK:null, ox:undefined}); stepOff(tp1, 99); if(Math.hypot(tp1.ox, tp1.oy) > 0 && inPoly(n.x + tp1.ox, n.y + tp1.oy, pb.points)) inside++; }
+      [tp1.at, tp1.to, tp1.stand, tp1.off, tp1.offK, tp1.ox, tp1.oy] = sv;
+      out.standNotInProp = inside === 0 && !standOk(100, 158, 100, 160, null) && standOk(100, 158, 100, 155, null);
+      state.buildings = state.buildings.filter(b => b !== pb); afterChange(); }
 
     // trash goes in a bin nearby; a nearly full bin spills the rest; a full one gets walked past; the night crew clears it all, for a fee
     const bin = {id:"b-bin", type:"bin", points:rectPts(96.7, 180, BUILDINGS.bin.w, BUILDINGS.bin.d, Math.PI / 2)};
