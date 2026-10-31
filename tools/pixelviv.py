@@ -1,5 +1,6 @@
-# Draws the vivarium props in the flat pixel style (see CLAUDE.md, Art direction): flat fills, no outlines, light from the top left, a lit top-left edge and
-# shade on the undersides and right. Pixels are 0.13 m (ROCK_MPP). Upright props are drawn with their base at the bottom middle; the pool, the light pool and the dish are flat on the floor.
+# Draws the vivarium props in the park style (docs/art.md, "Park style"; the browns and greens are tools/genesis_style.py PAL): each material is a set of a dark edge
+# tinted to it, a light, a mid and a shade; light from the top left, a lit top-left edge and shade on the undersides and right; Cv.img() puts a one-pixel edge round
+# the silhouette in the material's edge color, so every picture is 2 px wider and taller than its canvas (VIV_SPRITES in data.js). Pixels are 0.13 m (ROCK_MPP). Upright props are drawn with their base at the bottom middle; the pool, the light pool and the dish are flat on the floor.
 #   vbark   Cork Bark Hide      vbranch Climbing Branches   vdig  Dig Box            vfeed Live-Feed Dispenser   vmist Misters
 #   vdish   Food Dish (empty bowl; the food is drawn over it)   vlamp Basking Lamp (+ vlamp-pool, its warm pool of light)   vpool Pool
 # Usage: python3 -I tools/pixelviv.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x8 view of every picture)
@@ -7,9 +8,23 @@ import sys, os, math
 from PIL import Image
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
-def ramp(base): return {"hi": mix(base, (255, 255, 255), .28), "mid": base, "lo": mix(base, (0, 0, 0), .24), "deep": mix(base, (0, 0, 0), .45)}
-BARK, WOOD, SOIL, STEEL, WATER, STONE, COPPER = ramp((122, 90, 58)), ramp((138, 106, 72)), ramp((107, 82, 54)), ramp((126, 133, 140)), ramp((62, 134, 168)), ramp((128, 124, 114)), ramp((184, 112, 52))
-OLIVE, BULB = ramp((97, 111, 34)), ramp((250, 214, 110))
+EDGE, SHADE = {}, {}   # every material tone -> that material's dark edge (for the outline) and its shade (to fill gaps the outline can't reach)
+def mat(edge, hi, md, lo):
+    m = {"hi": hi, "mid": md, "lo": lo, "deep": edge, "edge": edge}
+    for c in (hi, md, lo, edge): EDGE.setdefault(c, edge); SHADE.setdefault(c, lo)
+    return m
+NO_EDGE = set()   # see-through bits drawn without an outline (spray, glow)
+# browns from PAL (X light, W/V mid, U shade, M joints, G darkest)
+BARK = mat((44, 35, 19), (165, 125, 74), (132, 101, 59), (110, 85, 49))
+WOOD = mat((44, 35, 19), (165, 125, 74), (143, 109, 64), (110, 85, 49))
+SOIL = mat((44, 35, 19), (132, 101, 59), (110, 85, 49), (66, 53, 29))
+STEEL = mat((31, 37, 41), (184, 192, 196), (138, 146, 152), (96, 104, 110))
+WATER = mat((20, 50, 70), (120, 188, 216), (62, 134, 168), (44, 102, 134))
+STONE = mat((38, 36, 30), (176, 170, 152), (138, 133, 118), (102, 98, 86))
+COPPER = mat((66, 32, 12), (228, 152, 92), (190, 112, 52), (142, 80, 36))
+OLIVE = mat((40, 44, 10), (140, 152, 60), (97, 111, 34), (70, 80, 24))
+BULB = mat((120, 84, 20), (255, 240, 180), (250, 214, 110), (220, 170, 70))
+def ramp(base): return mat(mix(base, (0, 0, 0), .7), mix(base, (255, 255, 255), .28), base, mix(base, (0, 0, 0), .24))   # a set from one color, for a material with no PAL tones
 
 class Cv:
     def __init__(s, w, h): s.w, s.h, s.px = w, h, {}
@@ -31,8 +46,21 @@ class Cv:
             x, y = round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n)
             for k in range(th): s.put(x + k, y, c_hi if k == 0 else c_lo if k == th - 1 else c_mid)
     def img(s, a=255):
-        im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0))
-        for (x, y), c in s.px.items(): im.putpixel((x, y), c + (a,) if len(c) == 3 else c)
+        # the picture with a one-pixel edge round its silhouette (4-neighbours), in the edge color of the pixel it borders (above first, then left, right, below);
+        # gaps inside the silhouette that the outside can't reach are filled with the shade of what's round them instead, so they don't turn to dark specks
+        im = Image.new("RGBA", (s.w + 2, s.h + 2), (0, 0, 0, 0)); solid = {k for k, c in s.px.items() if c not in NO_EDGE}
+        out, todo = {(-2, -2)}, [(-2, -2)]
+        while todo:
+            x, y = todo.pop()
+            for q in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if -2 <= q[0] <= s.w + 1 and -2 <= q[1] <= s.h + 1 and q not in out and q not in solid: out.add(q); todo.append(q)
+        for y in range(-1, s.h + 1):
+            for x in range(-1, s.w + 1):
+                if (x, y) in solid: continue
+                for nb in ((x, y + 1), (x + 1, y), (x - 1, y), (x, y - 1)):
+                    if nb in solid:
+                        c = s.px[nb]; im.putpixel((x + 1, y + 1), (EDGE.get(c, mix(c, (0, 0, 0), .7)) if (x, y) in out else SHADE.get(c, c)) + (a,)); break
+        for (x, y), c in s.px.items(): im.putpixel((x + 1, y + 1), c + (a,) if len(c) == 3 else c)
         return im
 
 def bark():
@@ -116,7 +144,7 @@ def mist():
     c.rect(3, 15, 10, 16, S["lo"]); c.rect(3, 15, 10, 15, S["mid"])
     c.rect(4, 4, 9, 5, S["mid"]); c.rect(4, 4, 9, 4, S["hi"]); c.rect(4, 5, 9, 5, S["lo"])
     # the spray: pale blue droplets fanning down and out, thinner as they fall
-    DR, DR2 = (190, 226, 240), (124, 186, 214)
+    DR, DR2 = (190, 226, 240), (124, 186, 214); NO_EDGE.update((DR, DR2))
     for (x, y, d) in ((3, 6, 0), (2, 8, 1), (3, 10, 0), (10, 6, 0), (11, 8, 1), (10, 10, 0), (6, 3, 0), (7, 2, 1), (1, 11, 1), (12, 11, 1), (5, 8, 1), (8, 9, 1)):
         c.put(x, y, DR if d == 0 else DR2)
     return c
@@ -150,7 +178,7 @@ def lamp():
     for x in range(0, 10):
         if (x, 6) in c.px: c.put(x, 6, C["deep"])
     c.rect(3, 7, 6, 7, BULB["mid"]); c.rect(4, 7, 5, 7, BULB["hi"])
-    c.put(4, 8, (255, 232, 160)); c.put(5, 8, (255, 232, 160))
+    c.put(4, 8, (255, 232, 160)); c.put(5, 8, (255, 232, 160)); NO_EDGE.add((255, 232, 160))   # the glow under the bulb
     return c
 
 def lamp_pool():

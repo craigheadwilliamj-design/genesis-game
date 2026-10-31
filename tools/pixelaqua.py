@@ -1,14 +1,15 @@
-# Draws the aquarium fittings in the same flat pixel style as the vivarium props (tools/pixelviv.py, whose canvas and ramps it borrows): flat fills, no outlines,
-# light from the top left, a lit top-left edge and shade on the undersides and right. Pixels are 0.13 m (ROCK_MPP). All stand upright with their base at the bottom middle.
+# Draws the aquarium fittings in the park style like the vivarium props (tools/pixelviv.py, whose canvas, materials and outline it borrows): a dark edge tinted
+# to each material round the silhouette, light from the top left, a lit top-left edge and shade on the undersides and right. Pixels are 0.13 m (ROCK_MPP). All stand upright with their base at the bottom middle.
 #   afilter Canister Filter   asump Sump Filter   arock Rock Arch   aweed Seaweed Bed   abubble Bubble Curtain
 #   aboulder Boulder Pile   abrain Brain Coral   acoral Branching Coral   afan Sea Fan   asponge Sponge Cluster   akelp Kelp Stand   ashell Giant Ammonite Shell
 # Usage: python3 -I tools/pixelaqua.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x8 view of every picture)
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
-from pixelviv import Cv, ramp, mix, STEEL, STONE, OLIVE
+from pixelviv import Cv, ramp, mat, mix, NO_EDGE, STEEL, STONE, OLIVE
 
-SLATE, KELP, FOAM, LED = ramp((70, 96, 106)), ramp((78, 122, 58)), ramp((159, 207, 224)), ramp((110, 200, 90))
+SLATE, FOAM, LED = mat((18, 32, 38), (98, 128, 138), (70, 96, 106), (50, 72, 80)), mat((52, 100, 120), (232, 244, 244), (176, 214, 218), (126, 168, 170)), ramp((110, 200, 90))
+KELP = mat((18, 34, 19), (63, 124, 69), (48, 94, 50), (43, 84, 45))   # PAL greens
 CORAL, BRAIN, FAN, SPONGE, GOLD, SHELL = ramp((228, 132, 70)), ramp((192, 172, 100)), ramp((156, 84, 146)), ramp((184, 144, 92)), ramp((150, 132, 52)), ramp((196, 168, 120))
 
 def box(c, x0, y0, x1, y1, R):
@@ -77,14 +78,17 @@ def bubbles():
     c = Cv(12, 24)
     box(c, 1, 21, 10, 23, STEEL)                # the air bar on the floor
     for x in range(3, 9, 2): c.put(x, 22, STEEL["deep"])   # its holes
-    # three columns of bubbles rising, each a 2x2 with a lit corner, smaller and further apart toward the top
-    for col, x in enumerate((2, 5, 8)):
-        y = 19 - col
+    # three staggered columns of bubbles rising, each a ring with a lit corner: 4 px low down, 3 px higher, 2 px near the top
+    E, H, M = FOAM["lo"], FOAM["hi"], FOAM["mid"]
+    BIG, MID, SMALL = [".EE.", "EHME", "EMME", ".EE."], [".E.", "EHE", ".E."], ["HE", "EE"]
+    for x0, y in ((0, 16), (4, 12), (8, 17)):
         while y > 0:
-            big = y > 8
-            c.put(x, y, mix(FOAM["hi"], (255, 255, 255), .4))
-            if big: c.put(x + 1, y, FOAM["mid"]); c.put(x, y + 1, FOAM["mid"]); c.put(x + 1, y + 1, FOAM["lo"])
-            y -= 4 if big else 5
+            g = BIG if y > 11 else MID if y > 5 else SMALL
+            for j, r in enumerate(g):
+                for i, ch in enumerate(r):
+                    if ch != ".": c.put(x0 + i + (2 - len(g[0]) // 2), y + j, {"E": E, "H": H, "M": M}[ch])
+            y -= 5 if y > 11 else 4
+    NO_EDGE.update((E, H, M))   # the rings are their own edge
     return c
 
 def lump(c, cx, cy, rx, ry, R, cut=None):
@@ -124,11 +128,14 @@ def coral():
 def fan():
     c = Cv(16, 18)
     for y in range(13, 18): c.put(7, y, FAN["mid"]); c.put(8, y, FAN["lo"])   # the stem
-    for y in range(14):   # a flat, half-round net: a lattice of lit and shaded strands
+    # a flat half-round fan: ribs fanning out from the stem's top and two rings of cross strands, lit along its top left rim
+    for y in range(14):
         for x in range(16):
-            if c.inside(x, y, 8, 14, 8, 14):
-                lit = (x + y) % 3 == 0; dark = (x - y) % 3 == 0
-                if lit or dark: c.put(x, y, FAN["hi"] if lit and x < 9 else FAN["lo"] if dark and x >= 8 else FAN["mid"])
+            if not c.inside(x, y, 8, 14, 8, 14): continue
+            dx, dy = x + .5 - 8, 14 - (y + .5); ang = math.degrees(math.atan2(dy, dx)); r = math.hypot(dx, dy * 8 / 14)
+            rib = int(ang) % 22 < 5 and r > 1.5; ring = abs(r - 4.5) < .5 or abs(r - 6.8) < .45
+            rim = not c.inside(x - 1, y, 8, 14, 8, 14) or not c.inside(x, y - 1, 8, 14, 8, 14)
+            c.put(x, y, FAN["hi"] if rim and x < 10 else FAN["lo"] if rib or ring or (rim and x >= 10) else FAN["mid"])
     for x in range(4, 12): c.put(x, 17, FAN["deep"])
     return c
 
