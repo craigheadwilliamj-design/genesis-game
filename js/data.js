@@ -648,7 +648,7 @@ const GUEST_GEAR = {
   },
 };
 for(const k of ["guest", "guest2", "guest3", "guest4", "guest5"]) HUMAN_SPRITES[k + "j"] = {walk:{src:`sprites/human/${k}-jacket-walk.png`, n:4}, wait:{src:`sprites/human/${k}-jacket-wait.png`, n:4, ms:450}};
-const SPRITES = {mosa:{ratio:100/75, rig:1, rstep:.06}, saca:{ratio:100/75, size:.55, rig:1, rstep:.11}, anom:{ratio:100/75, size:.85, rig:1, rstep:.1}, trex:{ratio:100/75, rig:1, rstep:.073, pace:1.6}, allo:{ratio:100/75, rig:1, rstep:.07, pace:1.6}, chal:{ratio:100/75, rig:1, rstep:.0426, pace:.8}, comp:{ratio:100/75, foot:.92, idle:52, ms:125, base:10, dyn:[[10,14],[24,13],[37,15]], dynMs:125, dynGap:[3,8], rig:1, rdyn:.4}, dryo:{ratio:100/75, rig:1, rstep:.07}, scut:{ratio:100/75, rig:1, rstep:.0353, rsize:1.5, pace:.7}, coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.0221, pace:.55}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.0682, rsize:2.4}, plhy:{ratio:100/75, rig:1, rdyn:.1, idle:47, ms:166, base:12, dyn:[[12,15],[27,20]], dynMs:125, dynGap:[5,12]}, icht:{ratio:100/75, rig:1, foot:.96, rdyn:.25}, tikt:{ratio:100/75, rig:1, rdyn:.25, foot:.57, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400, rig:1, rstep:.056, rsize:1.8, pace:.5}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.07}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}, mega:{ratio:100/75, size:.67, idle:4, ms:50}, arth:{ratio:100/75, foot:.63, idle:6, ms:167}, dcau:{ratio:100/75}, macr:{ratio:100/75}};
+const SPRITES = {mosa:{ratio:100/75, rig:1, rstep:.06}, saca:{ratio:100/75, size:.55, rig:1, rstep:.11}, anom:{ratio:100/75, size:.85, rig:1, rstep:.1}, trex:{ratio:100/75, rig:1, rstep:.073, pace:1.6}, allo:{ratio:100/75, rig:1, rstep:.07, pace:1.6}, chal:{ratio:100/75, rig:1, rstep:.0426, pace:.8}, comp:{ratio:100/75, foot:.92, idle:52, ms:125, base:10, dyn:[[10,14],[24,13],[37,15]], dynMs:125, dynGap:[3,8], rig:1, rdyn:.4}, dryo:{ratio:100/75, rig:1, rstep:.07}, scut:{ratio:100/75, rig:1, rstep:.0353, rsize:1.5, pace:.7}, coty:{ratio:100/75, walk:4, step:.25, idle:8, ms:500, rig:1, rstep:.0221, pace:.55}, coel:{ratio:100/75, walk:8, step:.073, size:1.4, rig:1, rstep:.073}, plat:{ratio:100/75, walk:6, step:.15, rig:1}, dime:{ratio:100/75, walk:4, step:.25, rig:1, rstep:.0682, rsize:2.4}, plhy:{ratio:100/75, rig:1, rdyn:.1, idle:47, ms:166, base:12, dyn:[[12,15],[27,20]], dynMs:125, dynGap:[5,12]}, icht:{ratio:100/75, rig:1, foot:.96, rdyn:.25}, tikt:{ratio:100/75, rig:1, rdyn:.25, foot:.57, idle:20, ms:600, base:4, dyn:[[4,8],[12,8]], dynMs:130, dynGap:[6,14]}, lyst:{ratio:100/75, walk:4, step:.25, size:.7, idle:8, ms:520, rest:7, restMs:260, holdMs:1400, rig:1, rstep:.056, rsize:1.8, pace:.5}, prio:{ratio:100/75, walk:4, step:.25, idle:5, ms:500, swim:6, swimMs:180, rig:1, rstep:.04, rswim:.07}, carc:{ratio:100/75, rig:1, rstep:.07}, spin:{ratio:100/75, rig:1, rstep:.15, rswim:.09}, mega:{ratio:100/75, size:.67, idle:4, ms:50}, arth:{ratio:100/75, foot:.63, idle:6, ms:167}, dcau:{ratio:100/75}, macr:{ratio:100/75}, diic:{ratio:100/75}, inos:{ratio:100/75}};
 
 // Partner parks sell a few starter species. Each new park gets one from pool A, two from pool B and one mid-tier anchor from pool C
 // (appeal 6 to 8, so one herd actually draws a crowd while the rest of the starters barely do).
@@ -2534,7 +2534,7 @@ const SPRITE_HIT = {
   "q-prickly-pear":[32,32,11.5,15.5,"5-23,3-30,2-30,0-28,0-29,1-30,7-29,10-25"],
   "q-quaking-aspen":[64,92,6.5,24,",28-38,17-43,13-48,13-53,11-54,10-54,9-56,9-55,12-53,11-51,16-50,18-46,25-36,30-34,30-34,30-34,30-34,30-34,30-34,30-34,29-35,26-38"],
   "q-rose-bush":[56,44,18.5,24.5,",,,26-28,19-43,10-46,5-51,4-52,5-51,8-48,15-42"],
-  "q-sagebrush":[11,12,2.5,5.5,"1-8,0-10,1-7"],
+  "q-sagebrush":[64,64,16,23.5,",,,,25-26,21-44,18-48,13-49,11-48,9-50,8-53,10-54,18-54,16-48,25-35,23-34"],
   "q-strangler-fig":[72,92,13.5,36,"27-45,21-52,15-58,14-59,15-58,3-69,0-71,0-71,2-70,0-71,0-71,1-71,4-68,27-45,25-47,23-49,22-50,23-49,23-49,25-47,25-47,24-48,23-49"],
   "q-sugar-maple":[64,92,7.5,25.5,",26-38,22-42,15-49,11-53,10-54,8-56,7-57,8-56,7-57,8-56,10-54,27-37,28-36,30-34,30-34,30-34,29-35,29-35,29-35,29-35,29-35,25-39"],
   "q-water-lily":[48,26,22,23,",,18-40,16-39,3-45,2-47,17-47"],
@@ -2596,7 +2596,7 @@ const SPRITE_HIT = {
   "boulder-grassland-3":[38,38,16,16,"18-22,14-26,10-29,7-31,3-33,3-34,3-34,3-34,7-28"],
   "boulder-grassland-4":[50,36,19.5,22,"24-32,12-37,8-41,5-43,4-44,3-46,6-46,10-44,19-32"],
   "boulder-scrubland-1":[58,51,23.5,26,"18-29,13-43,11-45,8-47,5-49,5-51,4-53,3-54,3-54,5-53,8-48,10-42"],
-  "boulder-scrubland-2":[34,48,14,14,"19-20,13-22,11-24,9-26,8-27,7-28,6-28,4-29,3-30,3-30,5-30,12-23"],
+  "boulder-scrubland-2":[64,64,14,14,",,,,34-35,28-37,26-39,24-41,23-42,22-43,21-43,19-44,18-45,18-45,20-45,27-38"],
   "boulder-scrubland-3":[73,51,31,33.5,"49-58,39-63,32-66,29-67,12-67,9-68,7-69,5-69,4-69,3-67,4-57,8-31"],
   "boulder-scrubland-4":[48,53,19,21,"23-26,15-33,11-34,9-36,8-38,7-39,6-41,5-43,4-44,3-44,5-42,8-38,18-35"],
   "boulder-temperate-1":[54,45,22.5,24,"28-33,15-39,9-43,6-47,5-49,4-50,3-50,3-50,4-49,6-48,14-31"],
@@ -2639,9 +2639,9 @@ const SPRITE_HIT = {
   "rock-grassland-5":[37,22,15,15.5,"21-23,7-31,4-33,3-33,4-29"],
   "rock-grassland-6":[32,20,12.5,13,"12-20,6-24,3-27,3-28,7-22"],
   "rock-scrubland-1":[38,23,14,16,"7-19,3-33,3-34,3-33,4-31"],
-  "rock-scrubland-2":[32,26,12,13,"16-22,7-25,4-26,3-27,3-28,8-23"],
+  "rock-scrubland-2":[32,32,12,13,",,11-24,5-26,3-27,3-28,4-27,13-19"],
   "rock-scrubland-3":[27,33,10,10.5,"10-13,6-17,5-21,4-22,4-22,3-23,3-22,8-20"],
-  "rock-scrubland-4":[30,25,10,12,"11-16,8-22,5-26,3-26,3-26,8-18"],
+  "rock-scrubland-4":[32,32,10,12,",,11-19,8-25,5-27,4-27,5-26,13-14"],
   "rock-scrubland-5":[30,28,9.5,12,"12-19,7-23,5-24,3-25,3-26,7-25,13-15"],
   "rock-scrubland-6":[37,30,14,15.5,"11-15,6-18,6-28,5-31,3-33,3-32,7-28"],
   "rock-temperate-1":[39,23,14,16.5,"16-28,6-33,3-35,3-35,7-34"],
@@ -2686,8 +2686,8 @@ const FOOT = {
   plain:{small:2, medium:3, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
-  rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
+  rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small", "q-sagebrush"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
+  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "q-sagebrush":[0.5, 0.5], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
   rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
   rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}
