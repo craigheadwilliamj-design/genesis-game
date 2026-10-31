@@ -7,7 +7,7 @@
 import sys, os, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
-from pixelvivscene import SIZES, dims, mix, ramp, shade, edge, ell, floor, palette, scenes, BIOMES, WATER
+from pixelvivscene import SIZES, dims, mix, ramp, shade, edge, ell, floor, palette, scenes, BIOMES, WATER, U
 
 WET = .5   # PALU.water: the share of the floor, from the front, under water
 PADS = {"wetland":.5, "tropical":.35, "temperate":.15}   # lily pads: how likely each grid cell of open water has one
@@ -18,25 +18,27 @@ def palu(era, biome, size):
     rng = random.Random(zlib.crc32(f"{era}-{biome}-{size}-palu".encode()))
     y0 = round(F * (1 - WET))   # the first row of water
     R = ramp(mix(WATER["mid"], BIOMES[biome]["ground"], .25))
-    for y in range(y0 - 3, F):
+    for y in range(y0 - 3 * U, F):
         for x in range(W):
-            if y < y0 - 1: c.put(x, y, G["lo"] if (x + y) % 4 else G["deep"])   # wet ground just above the waterline
-            elif y < y0 + 1:   # the shore: a row of stones, lit on top, with dark water between
-                k = (x + (y - y0) * 3) % 5
-                c.put(x, y, P["stone"]["hi"] if k == 0 and y == y0 - 1 else P["stone"]["mid"] if k < 3 else R["deep"])
-            else:   # open water in stepped bands, lighter at the shore, with rows of ripple dashes
+            if y < y0 - U: c.put(x, y, G["deep"] if (x + y // 2 * 3) % 7 == 0 else G["lo"])   # wet ground just above the waterline
+            elif y < y0 + U: c.put(x, y, R["deep"])   # dark water between the shore stones
+            else:   # open water in stepped bands, lighter at the shore, with staggered rows of ripple dashes
                 t = min(3, (y - y0) * 4 // max(1, F - y0)); base = [R["hi"], R["mid"], R["mid"], R["lo"]][t]
-                dash = (y - y0) % 3 == 2 and (x + (y // 3) * 5) % 9 < 3
+                dash = (y - y0) % 6 == 4 and (x + ((y - y0) // 6) * 7) % 16 < 5
                 c.put(x, y, mix(base, (255, 255, 255), .3) if dash and t < 2 else R["hi"] if dash else base)
+    S = P["stone"]
+    for x in range(0, W, round(1.6 * U)):   # the shore: a row of stones, lit on top, each with its edge
+        m = ell(x + U * .8, y0, U * rng.uniform(.7, 1), U * .75); edge(c, m, S["edge"]); shade(c, m, S, False)
     p = PADS.get(biome, 0)
     if p:
-        for gy in range(y0 + 2, F - 2, 5):
-            for gx in range(0, W - 4, 8):
+        for gy in range(y0 + 2 * U, F - 2 * U, 5 * U):
+            for gx in range(0, W - 4 * U, 8 * U):
                 if rng.random() < p:
-                    x, y = gx + rng.randrange(1, 5), gy + rng.randrange(0, 2)
-                    pad = ell(x, y, 2.4, 1.3); edge(c, pad, LEAF["edge"]); shade(c, pad, LEAF, False)
-                    c.put(x + 1, y, R["mid"]); c.put(x + 2, y, R["mid"])   # the notch
-                    if rng.random() < .25: c.put(x - 1, y - 1, (240, 196, 218))   # a flower
+                    x, y = gx + rng.randrange(U, 5 * U), gy + rng.randrange(0, 2 * U)
+                    pad = ell(x, y, 2.4 * U, 1.3 * U) - {(x + k, y + j) for k in range(0, 3 * U) for j in range(-abs(k) // 3, abs(k) // 3 + 1)}   # a pad with its notch cut in
+                    edge(c, pad, LEAF["edge"]); shade(c, pad, LEAF, False)
+                    for k in range(1, 2 * U): c.put(x - k, y, LEAF["lo"])   # a vein
+                    if rng.random() < .25: fl = ell(x - U, y - U, U * .7, U * .5); edge(c, fl, (150, 80, 110)); [c.put(a, b_, (240, 196, 218)) for a, b_ in fl]; c.put(x - U, y - U, (250, 230, 120))   # a flower
     return c
 
 if __name__ == "__main__":
@@ -49,10 +51,10 @@ if __name__ == "__main__":
     for era, biome in scenes():
         for size in SIZES:
             im = palu(era, biome, size).img()
-            im.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=32).save(os.path.join(out, f"{era}-{biome}-{size}-palu.png"), optimize=True)
+            im.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=48).save(os.path.join(out, f"{era}-{biome}-{size}-palu.png"), optimize=True)
             if size == "M" and biome in ("wetland", "tropical", "desert", "tundra"): picks.append(im)
     if sheet:
-        Z, pad = 4, 4; w, h = picks[0].size
+        Z, pad = 2, 4 * U; w, h = picks[0].size
         im = Image.new("RGBA", ((w + pad) * 4 * Z + pad * Z, ((h + pad) * ((len(picks) + 3) // 4)) * Z + pad * Z), (40, 44, 48, 255))
         for i, p in enumerate(picks):
             im.alpha_composite(p.resize((w * Z, h * Z), Image.NEAREST), ((pad + (i % 4) * (w + pad)) * Z, (pad + (i // 4) * (h + pad)) * Z))

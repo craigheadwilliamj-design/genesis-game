@@ -1,5 +1,7 @@
 # Draws the vivarium scenes in the park style (docs/art.md, "Park style"): flat fills with a dark edge tinted to each thing (near plants and rocks, floor
-# decals; far plants, hills and the horizon get a softer one so they stay back), stair-stepped shapes, structured texture, light from the top left, 0.13 m a pixel. A scene is an era (paleozoic, mesozoic, cenozoic) and a biome (the BIOMES keys in js/data.js), drawn as two layers for each case size:
+# decals; far plants, hills and the horizon get a softer one so they stay back), stair-stepped shapes, structured texture, light from the top left.
+# Inside a case everything is drawn DET times finer than the park's 0.13 m a pixel (0.043 m), to match the animals, which are drawn that big in a case:
+# every shape is sized in fine pixels, with strokes and spacing in units of U (= DET, one park pixel), and the texture and edges a fine pixel wide. A scene is an era (paleozoic, mesozoic, cenozoic) and a biome (the BIOMES keys in js/data.js), drawn as two layers for each case size:
 #   <scene>-<S|M|L>-wall.png    the back wall, the pane above the sill (sky, far hills, far and near plants, a strip of ground)
 #   <scene>-<S|M|L>-floor.png   the floor, flat and seen from above (rows squashed by TILT like the rest of the 3/4 art)
 # <scene> is "<era>-<biome>" (a later "<period>-<biome>" scene overrides its era; see VIV_SCENE_PERIODS in data.js). Every picture is built from the same
@@ -8,11 +10,13 @@
 import sys, os, math, zlib, random
 from PIL import Image
 
-PX, TILT = .13, .7
+PX, TILT, DET = .13, .7, 3   # DET: fine pixels to a park pixel inside a case
+U = DET
+FPX = PX / DET
 SIZES = {"S":(10, 5, .65), "M":(15, 10, .78), "L":(25, 15, .91)}   # w, d (VIVARIUMS) and sill height (VIV34 in map.js); the glass stands d * .45 tall
 def dims(size):
     w, d, sill = SIZES[size]
-    return round(w / PX), round((d * .45 - sill) / PX), round(d * TILT / PX)   # width, wall rows, floor rows
+    return round(w / FPX), round((d * .45 - sill) / FPX), round(d * TILT / FPX)   # width, wall rows, floor rows, in fine pixels
 
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
 def ramp(base): return {"hi": mix(base, (255, 255, 255), .26), "mid": base, "lo": mix(base, (0, 0, 0), .22), "deep": mix(base, (0, 0, 0), .42), "edge": mix(base, (0, 0, 0), .66)}
@@ -56,20 +60,24 @@ class Cv:
     def put(s, x, y, c):
         if 0 <= x < s.w and 0 <= y < s.h: s.px[(x, y)] = c
     def img(s):
-        im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0))
-        for (x, y), c in s.px.items(): im.putpixel((x, y), c + (255,))
+        im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0)); p = im.load()
+        for (x, y), c in s.px.items(): p[x, y] = c + (255,)
         return im
 
 def shade(c, mask, R, tex=True):
-    # light from the top left: a pixel on the left or top edge of the shape is lit, one on the right or bottom edge shaded; leaf clumps as a regular dot pattern
+    # light from the top left: two fine pixels along the top and left edges lit, two along the bottom and right shaded; a leaf clump gets rows of short
+    # dark and light leaf marks, staggered row to row (structured, not noise)
     for (x, y) in mask:
-        l, r, t, b = (x - 1, y) not in mask, (x + 1, y) not in mask, (x, y - 1) not in mask, (x, y + 1) not in mask
-        col = R["hi"] if l and not r else R["lo"] if r and not l else R["hi"] if t and not b else R["lo"] if b and not t else R["mid"]
-        if tex and col == R["mid"] and y % 3 == 1 and (x + y // 3 * 2) % 4 == 0: col = R["lo"]
+        l = (x - 1, y) not in mask or (x - 2, y) not in mask; r = (x + 1, y) not in mask or (x + 2, y) not in mask
+        t = (x, y - 1) not in mask or (x, y - 2) not in mask; b = (x, y + 1) not in mask or (x, y + 2) not in mask
+        col = R["hi"] if (l and not r) or (t and not b) else R["lo"] if (r and not l) or (b and not t) else R["mid"]
+        if tex and col == R["mid"]:
+            if y % 4 == 1 and (x + (y // 4) * 3) % 7 < 2: col = R["lo"]
+            elif y % 4 == 3 and (x + (y // 4) * 3 + 4) % 7 < 2: col = R["hi"]
         c.put(x, y, col)
 def edge(c, mask, col):   # a one-pixel edge round a shape, on whatever is behind it (4-neighbours)
     for (x, y) in {(x + dx, y + dy) for (x, y) in mask for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))} - mask: c.put(x, y, col)
-def flat(c, mask, R):   # far away: one tone, darker on the right edge
+def flat(c, mask, R):   # far away: one tone, darker down the right edge
     for (x, y) in mask: c.put(x, y, R["lo"] if (x + 1, y) not in mask else R["mid"])
 
 def ell(cx, cy, rx, ry):
@@ -78,80 +86,101 @@ def ell(cx, cy, rx, ry):
 def line(x0, y0, x1, y1, th=1):
     n = max(abs(x1 - x0), abs(y1 - y0)) or 1
     return {(round(x0 + (x1 - x0) * i / n) + k, round(y0 + (y1 - y0) * i / n)) for i in range(n + 1) for k in range(th)}
+def stroke(x0, y0, x1, y1, w):   # a line w fine pixels thick, round-ended
+    n = max(1, round(math.hypot(x1 - x0, y1 - y0))); r = w / 2; out = set()
+    for i in range(n + 1):
+        cx, cy = x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n
+        out |= {(x, y) for y in range(math.floor(cy - r), math.ceil(cy + r) + 1) for x in range(math.floor(cx - r), math.ceil(cx + r) + 1) if (x + .5 - cx) ** 2 + (y + .5 - cy) ** 2 <= r * r + .25}
+    return out
+def curve(pts, w):   # strokes through a list of points
+    out = set()
+    for a, b in zip(pts, pts[1:]): out |= stroke(a[0], a[1], b[0], b[1], w)
+    return out
 
-# Each shape returns (trunk pixels, leaf pixels, extra pixels in the trunk's darkest tone) standing on (x, b), h pixels tall
+# Each shape returns (trunk pixels, leaf pixels, extra pixels in the trunk's darkest tone) standing on (x, b), h fine pixels tall
 def conifer(x, b, h):
-    top, th = b - h + 1, max(2, h // 4)
-    trunk = {(x, y) for y in range(b - 1, b + 1)}
+    top, th = b - h + 1, max(2 * U, h // 4)
+    trunk = {(x + k, y) for y in range(b - 2 * U, b + 1) for k in range(-U // 2, U - U // 2)}
     leaf = set()
-    for y in range(top, b - 1):
-        r = y - top; half = min(h // 3 + 1, r // th + (r % th) * 2 // 3)
+    for y in range(top, b - 2 * U):   # tiers that widen downward, each overhanging the one below
+        r = y - top; half = min(h // 3 + U, (r // th) * U + (r % th) * 2 // 3)
         leaf |= {(x + k, y) for k in range(-half, half + 1)}
     return trunk, leaf, set()
 def broadleaf(x, b, h):
-    R = max(2, h * .34); cy = b - h + R
-    trunk = {(x + k, y) for y in range(round(cy), b + 1) for k in range(1 + (h > 16))}
-    leaf = ell(x + .5, cy, R * 1.15, R) | ell(x - R * .6, cy + R * .45, R * .6, R * .5) | ell(x + R * .8, cy + R * .4, R * .55, R * .5)
+    R = max(2 * U, h * .34); cy = b - h + R; tw = U * (1 + (h > 16 * U))
+    trunk = {(x + k, y) for y in range(round(cy), b + 1) for k in range(-tw // 2, tw - tw // 2)} | stroke(x, cy + R * .6, x - R * .5, cy + R * .2, U * .8) | stroke(x, cy + R * .7, x + R * .55, cy + R * .25, U * .8)
+    leaf = ell(x + .5, cy, R * 1.15, R) | ell(x - R * .6, cy + R * .45, R * .6, R * .5) | ell(x + R * .8, cy + R * .4, R * .55, R * .5) | ell(x - R * .2, cy - R * .5, R * .6, R * .45)
     return trunk, leaf, set()
 def palm(x, b, h):
-    top = b - h + 2; trunk = set()
-    for y in range(top, b + 1): trunk.add((x + (b - y) // 5, y))
-    tx = x + (b - top) // 5; L = max(3, h // 3); leaf = set()
+    top = b - h + 2 * U; trunk = set()
+    for y in range(top, b + 1): trunk |= {(x + (b - y) // 5 + k, y) for k in range(U)}
+    rings = {(x + (b - y) // 5 + k, y) for y in range(top + U, b, 2 * U) for k in range(U)}   # ring scars
+    tx = x + (b - top) // 5 + U // 2; L = max(3 * U, h // 3); leaf = set()
     for sd in (-1, 1):
-        for i in range(L + 1): leaf.add((tx + sd * i, top + round(i * i / L * .6)))
-        for i in range(L * 2 // 3 + 1): leaf.add((tx + sd * i, top - 1 + round(i * i / L * .3)))
-    leaf |= {(tx, top - 1), (tx, top - 2)}
-    return trunk, leaf, set()
+        leaf |= curve([(tx + sd * L * i / 6, top + (i / 6) ** 2 * L * .6) for i in range(7)], U)
+        leaf |= curve([(tx + sd * L * .66 * i / 6, top - U + (i / 6) ** 2 * L * .3) for i in range(7)], U)
+        for i in range(2, 7):   # leaflets hanging off each frond
+            fx, fy = tx + sd * L * i / 6, top + (i / 6) ** 2 * L * .6; leaf |= stroke(fx, fy, fx + sd * U * .6, fy + U * 1.4, 1.2)
+    leaf |= ell(tx, top - U, U, U * 1.2)
+    return trunk, leaf, rings
 def lycopsid(x, b, h):
-    top = b - h + 1; trunk = {(x + k, y) for y in range(top + 2, b + 1) for k in range(2)}
-    bark = {(x + (y // 2) % 2, y) for y in range(top + 3, b + 1) if y % 2 == 0}   # the diamond leaf-scar pattern
-    leaf = {(x - 1, top + 1), (x, top), (x + 1, top), (x + 2, top + 1), (x - 2, top + 2), (x + 3, top + 2), (x, top + 1), (x + 1, top + 1)}
-    leaf |= {(x - 1, y) for y in range(top + 3, top + h // 2, 3)} | {(x + 2, y) for y in range(top + 4, top + h // 2, 3)}
+    top = b - h + 1; tw = 2 * U; trunk = {(x + k, y) for y in range(top + 2 * U, b + 1) for k in range(tw)}
+    bark = {(x + k, y) for y in range(top + 3 * U, b + 1) for k in range(tw) if (y // 2 + (k + (y // 4) % 2 * 2) // 2) % 3 == 0}   # the diamond leaf-scar pattern
+    leaf = ell(x + U, top + U, U * 2, U * 1.2) | stroke(x + U, top + U, x - U, top + 2.5 * U, U * .8) | stroke(x + U, top + U, x + 3 * U, top + 2.5 * U, U * .8)
+    for y in range(top + 3 * U, top + h // 2, 3 * U): leaf |= stroke(x, y, x - U, y + U, 2)   # short leaves low on the trunk
+    for y in range(top + 4 * U, top + h // 2, 3 * U): leaf |= stroke(x + tw - 1, y, x + tw + U, y + U, 2)
     return trunk, leaf, bark
 def horsetail(x, b, h):
-    top = b - h + 1; trunk = {(x, y) for y in range(top + 2, b + 1)}
-    leaf = {(x + k, y) for y in range(top + 3, b - 1, 2) for k in (-1, 1)} | {(x + k, y) for y in range(top + 4, b - 2, 4) for k in (-2, 2)}
-    return trunk, leaf, {(x, top), (x, top + 1)}   # the cone at the tip
+    top = b - h + 1; trunk = {(x + k, y) for y in range(top + 2 * U, b + 1) for k in range(-1, 1)}
+    leaf = set()
+    for i, y in enumerate(range(top + 3 * U, b - U, 2 * U)):   # whorls of needles angled up, the low ones wider
+        w = U * (1 + (i % 2)); leaf |= stroke(x, y, x - w, y - U // 2, 1.5) | stroke(x, y, x + w, y - U // 2, 1.5)
+    nodes = {(x + k, y) for y in range(top + 3 * U, b, 2 * U) for k in range(-1, 1)}
+    return trunk | nodes, leaf, ell(x, top + U, U * .6, U * 1.1) | nodes   # the cone at the tip, dark joints
 def treefern(x, b, h):
-    top = b - h + 2; trunk = {(x, y) for y in range(top, b + 1)}; L = max(3, h // 3); leaf = {(x, top - 1)}
+    top = b - h + 2 * U; trunk = {(x + k, y) for y in range(top, b + 1) for k in range(-U // 2, U - U // 2)}; L = max(3 * U, h // 3); leaf = ell(x, top - U // 2, U, U)
     for sd in (-1, 1):
-        for i in range(1, L + 1): leaf |= {(x + sd * i, top + round((i / L) ** 2 * L * .7)), (x + sd * i, top - 1 + round((i / L) ** 2 * L * .5))}
-    return trunk, leaf, {(x, y) for y in range(top + 1, b + 1, 2)}
+        for drop, rise in ((.7, 0), (.5, -1)):
+            pts = [(x + sd * L * i / 6, top + rise * U + (i / 6) ** 2 * L * drop) for i in range(7)]; leaf |= curve(pts, U * .8)
+            for i in range(1, 7):   # pinnae down each frond
+                fx, fy = pts[i]; leaf |= stroke(fx, fy, fx + sd * U * .4, fy + U * 1.2, 1.5)
+    return trunk, leaf, {(x + k, y) for y in range(top + U, b + 1, 2 * U) for k in range(-U // 2, U - U // 2)}
 def cycad(x, b, h):
-    th = max(2, h * 2 // 5); trunk = {(x + k, y) for y in range(b - th + 1, b + 1) for k in range(2)}
-    bark = {(x + (y % 2), y) for y in range(b - th + 1, b + 1)}
-    top, L, leaf = b - th, max(2, h - th), set()
-    for a in (-150, -120, -90, -60, -30):
-        ax, ay = math.cos(math.radians(a)), math.sin(math.radians(a))
-        leaf |= line(x + (a > -90), top, round(x + (a > -90) + ax * L * 1.2), round(top + ay * L * .9))
+    th = max(2 * U, h * 2 // 5); trunk = {(x + k, y) for y in range(b - th + 1, b + 1) for k in range(2 * U)}
+    bark = {(x + k, y) for y in range(b - th + 1, b + 1) for k in range(2 * U) if (y + (k // 2) * 2) % 4 == 0}   # crossed leaf-base scales
+    top, L, leaf = b - th, max(2 * U, h - th), set()
+    for a in (-155, -125, -90, -55, -25):
+        ax, ay = math.cos(math.radians(a)), math.sin(math.radians(a)); x0 = x + U
+        x1, y1 = x0 + ax * L * 1.2, top + ay * L * .9; leaf |= stroke(x0, top, x1, y1, U * .7)
+        for i in range(2, 7):   # leaflets along each frond
+            fx, fy = x0 + (x1 - x0) * i / 7, top + (y1 - top) * i / 7; leaf |= stroke(fx, fy, fx - ay * U * .8, fy + ax * U * .8, 1.2) | stroke(fx, fy, fx + ay * U * .8, fy - ax * U * .8, 1.2)
     return trunk, leaf, bark
 def fernmound(x, b, h):
     rx = h * 1.3; leaf = {p for p in ell(x, b + 1, rx, h) if p[1] <= b}
-    tops = {p for p in leaf if (p[0], p[1] - 1) not in leaf}
-    leaf -= {p for p in tops if p[0] % 3 == 0}   # notched frond tips
-    leaf |= {(p[0], p[1] - 1) for p in tops if p[0] % 4 == 1}
+    for i in range(-3, 4):   # fronds arching out over the mound
+        a = math.radians(-90 + i * 24); leaf |= stroke(x, b - h * .3, x + math.cos(a) * rx * 1.05, b + math.sin(a) * h * 1.05 + h * .25, U * .8)
     return set(), leaf, set()
 def bush(x, b, h):
-    leaf = {p for p in ell(x, b - h * .45, h * 1.1, h * .62) | ell(x - h * .7, b - h * .25, h * .5, h * .4) | ell(x + h * .75, b - h * .28, h * .5, h * .38) if p[1] <= b}
+    leaf = {p for p in ell(x, b - h * .45, h * 1.1, h * .62) | ell(x - h * .7, b - h * .25, h * .5, h * .4) | ell(x + h * .75, b - h * .28, h * .5, h * .38) | ell(x - h * .2, b - h * .8, h * .5, h * .3) if p[1] <= b}
     return set(), leaf, set()
 def grass(x, b, h):
     leaf = set()
-    for k in (-2, -1, 0, 1, 2):
-        hh = max(1, h - abs(k) * h // 4)
-        for r in range(hh): leaf.add((x + k + (k * r) // max(1, h), b - r))
+    for k in range(-5, 6):   # a tussock of blades fanning out, the outer ones shorter
+        hh = max(U, h - abs(k) * h // 7); leaf |= stroke(x + k * U * .4, b, x + k * U * .9, b - hh, 1.5)
     return set(), leaf, set()
 def reeds(x, b, h):
-    trunk, extra = set(), set()
-    for i, k in enumerate((-2, 0, 2)):
-        hh = h - (i % 2) * h // 4
-        trunk |= {(x + k, b - r) for r in range(hh - 2)}; extra |= {(x + k, b - hh + 1), (x + k, b - hh + 2)}
-    return set(), trunk, extra   # stems drawn as leaf, heads in the trunk's dark tone
+    stems, heads = set(), set()
+    for i, k in enumerate((-2, -1, 0, 1, 2)):
+        hh = h - (i % 2) * h // 4; sx = x + k * U
+        stems |= stroke(sx, b, sx + k * U * .3, b - hh + 2 * U, 1.5); heads |= ell(sx + k * U * .3, b - hh + U * 1.2, U * .55, U * 1.3)
+    return set(), stems, heads   # stems drawn as leaf, heads in the trunk's dark tone
 def cactus(x, b, h):
-    leaf = {(x + k, y) for y in range(b - h + 1, b + 1) for k in range(3)}
-    m = b - h // 2; leaf |= {(x - 1, m), (x - 2, m)} | {(x - 2, y) for y in range(m - 3, m)} | {(x + 3, m - 2), (x + 4, m - 2)} | {(x + 4, y) for y in range(m - 5, m - 2)}
-    return set(), leaf, set()
+    w = U * 3; leaf = {(x + k, y) for y in range(b - h + U, b + 1) for k in range(w)} | ell(x + w / 2, b - h + U, w / 2, U)
+    m = b - h // 2; leaf |= stroke(x, m, x - 2 * U, m, U * 1.6) | stroke(x - 2 * U, m, x - 2 * U, m - 3 * U, U * 1.6) | stroke(x + w, m - 2 * U, x + w + 2 * U, m - 2 * U, U * 1.6) | stroke(x + w + 2 * U, m - 2 * U, x + w + 2 * U, m - 5 * U, U * 1.6)
+    ribs = {(x + k, y) for y in range(b - h + 2 * U, b) for k in (U - 1, 2 * U - 1)}   # ribs down the stem
+    return ribs, leaf, set()
 def rock(x, b, h): return set(), {p for p in ell(x, b + 1, h * 1.4, h) if p[1] <= b}, set()
-def moss(x, b, h): return set(), {p for p in ell(x, b + 1, max(2, h * 2.2), max(1.2, h)) if p[1] <= b}, set()
+def moss(x, b, h): return set(), {p for p in ell(x, b + 1, max(2 * U, h * 2.2), max(1.2 * U, h)) if p[1] <= b}, set()
 SHAPES = {k: globals()[k] for k in list(TALL) + list(LOW)}
 
 def pick(rng, opts):
@@ -173,67 +202,80 @@ def plant(c, kind, x, b, h, P, far):
     if far:
         edge(c, trunk | leaf, lr["deep"]); flat(c, trunk | leaf, lr)
     else:
+        if kind == "cactus": edge(c, leaf, lr["edge"]); shade(c, leaf, lr, False); [c.put(px, py, lr["lo"]) for px, py in trunk]; return
         edge(c, trunk, P["trunk"]["edge"]); edge(c, leaf, lr["edge"])
-        shade(c, trunk, P["trunk"], False); shade(c, leaf, lr, kind != "rock")
+        shade(c, trunk, P["trunk"], False); shade(c, leaf, lr, kind not in ("rock",))
+        if kind == "rock":   # a crack or two, and a lit ledge
+            for i in range(2): x0 = x + (i * 2 - 1) * h // 2; [c.put(px, py, lr["deep"]) for px, py in line(x0, b - h // 2, x0 + U, b - h // 5) if (px, py) in leaf]
         for p in extra: c.put(p[0], p[1], P["trunk"]["deep"])
 
 def wall(era, biome, size):
     W, H, _ = dims(size); c = Cv(W, H); P, B = palette(era, biome), BIOMES[biome]
     rng = random.Random(zlib.crc32(f"{era}-{biome}-{size}-wall".encode()))
-    g = max(2, round(H * .18)); hz = H - g   # the ground strip is the bottom g rows; hz is the first of them
-    for y in range(hz):   # sky: two flat bands, lighter toward the horizon
-        for x in range(W): c.put(x, y, P["sky"]["mid"] if y < hz * .45 else P["sky"]["hi"])
-    hh = max(2, H // 4); ph = rng.uniform(0, 6)   # far hills: a stepped skyline, each step 3 px wide
-    tops = [hz - 1 - round(hh * (.55 + .3 * math.sin(x // 3 * 3 * .09 + ph) + .15 * math.sin(x // 3 * 3 * .23 + ph * 2))) for x in range(W)]
+    g = max(2 * U, round(H * .18)); hz = H - g   # the ground strip is the bottom g rows; hz is the first of them
+    for y in range(hz):   # sky: three flat bands, lighter toward the horizon
+        for x in range(W): c.put(x, y, P["sky"]["mid"] if y < hz * .3 else mix(P["sky"]["mid"], P["sky"]["hi"], .5) if y < hz * .55 else P["sky"]["hi"])
+    hh = max(2 * U, H // 4); ph = rng.uniform(0, 6)   # far hills: a stepped skyline, each step a park pixel wide
+    tops = [hz - 1 - round(hh * (.55 + .3 * math.sin(x // U * U * .09 / U + ph) + .15 * math.sin(x // U * U * .23 / U + ph * 2))) for x in range(W)]
     for x in range(W):
         top = tops[x]
-        for y in range(top, hz): c.put(x, y, P["hill"]["hi"] if y == top + 1 and x % 3 == 0 else P["hill"]["mid"])
+        for y in range(top, hz): c.put(x, y, P["hill"]["hi"] if top < y <= top + 2 and x % (3 * U) < U else P["hill"]["lo"] if y > top + 4 and (y + x // (2 * U)) % (2 * U) == 0 and x % 5 < 2 else P["hill"]["mid"])
         for y in range(top, min(hz, max(top + 1, tops[x - 1] if x else top, tops[x + 1] if x + 1 < W else top))): c.put(x, y, P["hill"]["deep"])   # its skyline edge, down each step
     opts, dens = FLORA[biome][era], B["dens"]
     def row(far):
-        step = max(3, round((7 if far else 10) / dens * (H / 20) ** .5)); x = rng.randrange(step)
-        while x < W + 2:
+        step = max(3, round((7 if far else 10) / dens * (H / U / 20) ** .5)) * U; x = rng.randrange(step)
+        while x < W + 2 * U:
             k = pick(rng, opts); share = TALL.get(k) or LOW[k]
-            h = max(3, round(H * share * rng.uniform(.75, 1.1) * (.5 if far else 1)))
-            plant(c, k, x, hz if far else H - 1 - rng.randrange(max(1, g - 1)), h, P, far)
+            h = max(3 * U, round(H * share * rng.uniform(.75, 1.1) * (.5 if far else 1)))
+            plant(c, k, x, hz if far else H - 1 - rng.randrange(max(1, g - U)), h, P, far)
             x += step + rng.randrange(-step // 3, step // 3 + 1)
     row(True)
-    for y in range(hz, H):   # the ground strip, with a row of darker dashes; a wet biome has water along the back of it
+    G = P["ground"]
+    for y in range(hz, H):   # the ground strip: a dark horizon row, then rows of short dashes; a wet biome has water along the back of it
         for x in range(W):
-            wet = B.get("wet") and y == hz and x % 11 < 7
-            c.put(x, y, WATER["hi" if x % 11 in (1, 2) else "mid"] if wet else P["ground"]["deep"] if y == hz else P["ground"]["lo"] if (y - hz) % 2 == 1 and (x + y * 3) % 5 < 2 else P["ground"]["mid"])
+            wet = B.get("wet") and hz <= y < hz + U and x % (11 * U) < 7 * U
+            c.put(x, y, (WATER["hi"] if x % (11 * U) in range(U, 3 * U) and y == hz + 1 else WATER["mid"]) if wet else G["deep"] if y == hz else G["lo"] if (y - hz) % 4 == 2 and (x + (y - hz) // 4 * 5) % 9 < 3 else G["hi"] if (y - hz) % 4 == 0 and (x + (y - hz) // 4 * 5 + 4) % 11 < 2 else G["mid"])
     row(False)
     return c
 
 def floor(era, biome, size):
     W, _, F = dims(size); c = Cv(W, F); P, B = palette(era, biome), BIOMES[biome]
     G = P["ground"]; rng = random.Random(zlib.crc32(f"{era}-{biome}-{size}-floor".encode()))
-    for y in range(F):   # the substrate: flat, with rows of short darker dashes and every third row lighter ones (like the case floor in map.js)
+    for y in range(F):   # the substrate: flat, with staggered rows of short darker dashes and every third dash row lighter (like the case floor in map.js)
         for x in range(W):
-            dash = y % 3 == 1 and (x + (y // 3 * 7) % 5) % 6 < 2
-            c.put(x, y, G["lo"] if y == 0 else (G["hi"] if y // 3 % 3 == 2 else G["lo"]) if dash else G["mid"])
+            dash = y % 6 == 3 and (x + (y // 6 * 7) % 13) % 14 < 4
+            grain = y % 6 == 0 and (x + (y // 6) * 5) % 9 == 0
+            c.put(x, y, G["lo"] if y < 2 else (G["hi"] if y // 6 % 3 == 2 else G["lo"]) if dash else G["lo"] if grain else G["mid"])
     L, T = P["leaf"], P["trunk"]
+    def blob(m, R, tex=False): edge(c, m, R["edge"]); shade(c, m, R, tex)
     def decal(kind, x, y):
-        if kind == "pebble":   # lit top left, its edge only along the bottom and right where it's in shade
-            c.put(x, y, P["stone"]["hi"]); c.put(x + 1, y, P["stone"]["mid"]); c.put(x + 2, y, P["stone"]["deep"]); c.put(x, y + 1, P["stone"]["deep"]); c.put(x + 1, y + 1, P["stone"]["deep"])
+        if kind == "pebble":   # a pebble lit on top, its edge only along the bottom and right where it's in shade
+            m = ell(x, y, U * rng.uniform(.8, 1.3), U * .7); shade(c, m, P["stone"], False)
+            for px, py in {(px + 1, py) for px, py in m} | {(px, py + 1) for px, py in m}:
+                if (px, py) not in m: c.put(px, py, P["stone"]["deep"])
         elif kind == "ripple":
-            for k in range(5): c.put(x + k, y, G["hi"]); c.put(x + k + 1, y + 1, G["lo"])
+            for k in range(5 * U): c.put(x + k, y + round(math.sin(k / U) * .8), G["hi"]); c.put(x + k + 1, y + 1 + round(math.sin(k / U) * .8), G["lo"])
         elif kind == "tuft":
-            for dx, dy in ((0, 0), (1, -1), (2, 0), (1, 0)): c.put(x + dx, y + dy, L["hi"] if dx == 0 else L["mid"] if dx == 1 else L["lo"])
+            m = set()
+            for k in range(-3, 4): m |= stroke(x + k * .6, y, x + k * 1.6, y - (2 * U - abs(k)), 1.2)
+            blob(m, L)
         elif kind == "frond":
-            for dx, dy, t in ((0, 0, "mid"), (-1, 0, "hi"), (-2, 0, "hi"), (1, 0, "lo"), (2, 0, "lo"), (0, -1, "hi"), (0, 1, "lo"), (-1, -1, "mid"), (1, 1, "lo")): c.put(x + dx, y + dy, L[t])
+            m = stroke(x - 2 * U, y + U * .3, x + 2 * U, y - U * .3, 1.5)
+            for i in range(-3, 4): fx = x + i * U * .55; m |= stroke(fx, y, fx - U * .4, y - U * .8, 1.2) | stroke(fx, y, fx + U * .4, y + U * .8, 1.2)
+            blob(m, L)
         elif kind == "litter":
-            for dx, dy, t in ((0, 0, "mid"), (1, 0, "lo"), (3, 1, "hi"), (4, 1, "mid"), (1, 2, "lo")): c.put(x + dx, y + dy, LITTER[t])
+            for dx, dy in ((0, 0), (2.6 * U, U)): m = ell(x + dx, y + dy, U * .9, U * .45); blob(m, LITTER); [c.put(px, py, LITTER["lo"]) for px, py in line(round(x + dx - U * .6), y + dy, round(x + dx + U * .6), y + dy)]
         elif kind == "needles":
-            for dx, dy in ((0, 0), (1, 1), (3, 0), (4, -1), (2, 2)): c.put(x + dx, y + dy, T["lo"])
+            for dx, dy, ex, ey in ((0, 0, 1.5, 1), (2, -1, 4, 0), (1, 2, 3, 2.5)): [c.put(px, py, T["lo"]) for px, py in line(x + dx * U, y + dy * U // 2, x + round(ex * U), y + round(ey * U / 2))]
         elif kind in ("moss", "puddle", "snow"):
-            R = L if kind == "moss" else WATER if kind == "puddle" else SNOW; rx = rng.choice((2.5, 3.5, 4.5))
-            m = ell(x, y, rx, max(1, rx * .4)); edge(c, m, R["edge"]); shade(c, m, R, False)
-            if kind == "puddle": c.put(x - 1, y, mix(WATER["hi"], (255, 255, 255), .4)); c.put(x, y, mix(WATER["hi"], (255, 255, 255), .4))
-    cw, ch = 9, 6   # one decal at most in each cell of a grid, nudged inside it, so they spread evenly
-    for gy in range(1, F, ch):
+            R = L if kind == "moss" else WATER if kind == "puddle" else SNOW; rx = rng.choice((2.5, 3.5, 4.5)) * U
+            m = ell(x, y, rx, max(U, rx * .4)); blob(m, R)
+            if kind == "puddle": [c.put(x - U + k, y - 1, mix(WATER["hi"], (255, 255, 255), .4)) for k in range(2 * U)]
+            if kind == "moss": [c.put(px, py, R["hi"]) for px, py in m if py % 3 == 0 and (px + py) % 5 == 0]
+    cw, ch = 9 * U, 6 * U   # one decal at most in each cell of a grid, nudged inside it, so they spread evenly
+    for gy in range(U, F, ch):
         for gx in range(0, W, cw):
-            if rng.random() < .35 + .25 * B["dens"]: decal(rng.choice(B["dec"]), gx + rng.randrange(1, cw - 2), min(F - 2, gy + rng.randrange(1, ch - 1)))
+            if rng.random() < .35 + .25 * B["dens"]: decal(rng.choice(B["dec"]), gx + rng.randrange(U, cw - 2 * U), min(F - 2 * U, gy + rng.randrange(U, ch - U)))
     return c
 
 def scenes(): return [(e, b) for e in ERAS for b in BIOMES]
@@ -242,19 +284,22 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:]]
     sheet = args[args.index("--sheet") + 1] if "--sheet" in args else None
     if sheet: del args[args.index("--sheet"):args.index("--sheet") + 2]
+    only = args[args.index("--only") + 1].split(",") if "--only" in args else None
+    if only: del args[args.index("--only"):args.index("--only") + 2]
     out = args[0] if args else "sprites/vivscene"
     os.makedirs(out, exist_ok=True)
     ims = []
     for era, biome in scenes():
+        if only and f"{era}-{biome}" not in only: continue
         row = []
         for size in SIZES:
             w, f = wall(era, biome, size).img(), floor(era, biome, size).img()
             for im, layer in ((w, "wall"), (f, "floor")):   # opaque with few colors: a palette PNG keeps the sprite pack small
-                im.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=32).save(os.path.join(out, f"{era}-{biome}-{size}-{layer}.png"), optimize=True)
+                im.convert("RGB").convert("P", palette=Image.ADAPTIVE, colors=48).save(os.path.join(out, f"{era}-{biome}-{size}-{layer}.png"), optimize=True)
             row.append((w, f))
         ims.append(row)
     if sheet:
-        Z, pad = 4, 4; cw = sum(dims(s)[0] + pad for s in SIZES) + pad; rh = max(dims(s)[1] + dims(s)[2] for s in SIZES) + pad
+        Z, pad = 2, 4 * U; cw = sum(dims(s)[0] + pad for s in SIZES) + pad; rh = max(dims(s)[1] + dims(s)[2] for s in SIZES) + pad
         im = Image.new("RGBA", (cw * Z, rh * len(ims) * Z + pad * Z), (40, 44, 48, 255))
         for i, row in enumerate(ims):
             x = pad

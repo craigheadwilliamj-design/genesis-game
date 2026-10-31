@@ -1450,11 +1450,11 @@ function statue34(f, t, edge, dead){
 }
 // A vivarium prop from its picture (sprites/viv, tools/pixelviv.py): upright ones stand on their spot, flat ones lie on the floor centered on it. A dish shows what's in it.
 function vivPropSvg(f, t){
-  const V = VIV_SPRITES[f.type], w = V.w * ROCK_MPP, h = V.h * ROCK_MPP, x = f.x - w / 2, y = V.flat ? f.y - h / 2 : f.y + t.r * .3 - h, n2 = v => v.toFixed(2);
+  const V = VIV_SPRITES[f.type], w = V.w * VIV_MPP, h = V.h * VIV_MPP, x = f.x - w / 2, y = V.flat ? f.y - h / 2 : f.y + t.r * .3 - h, n2 = v => v.toFixed(2);
   let s = `<image href="${spriteUrl(`sprites/viv/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
   if(t.tray){
     const cap = trayCap(f), main = Object.entries(f.food || {}).sort((a, b) => b[1] - a[1])[0], fill = main ? clamp(trayHas(f) / cap, .15, 1) : 0;
-    if(fill > 0){ const rw = Math.max(2, Math.round(8 * fill)) * ROCK_MPP; s += `<rect x="${n2(f.x - rw / 2)}" y="${n2(y + 3 * ROCK_MPP)}" width="${n2(rw)}" height="${n2(ROCK_MPP * 1.5)}" fill="${FOOD_COLOR[main[0]] || "#999"}" pointer-events="none"/>`; }
+    if(fill > 0){ const rw = Math.max(2, Math.round(8 * fill)) * ROCK_MPP; s += `<rect x="${n2(f.x - rw / 2)}" y="${n2(y + 2 * ROCK_MPP)}" width="${n2(rw)}" height="${n2(ROCK_MPP * 1.5)}" fill="${FOOD_COLOR[main[0]] || "#999"}" pointer-events="none"/>`; }
   }
   return s;
 }
