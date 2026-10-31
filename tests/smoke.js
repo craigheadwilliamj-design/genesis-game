@@ -3978,7 +3978,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const ev = {id:"e-fv" + sz, name:"Flat " + sz, viv:sz, points:rectPts(200, 260, V.w, V.d, 0), animals:[], happy:70, biome:"tropical"};
         svgs[sz] = viv34(ev, "back", null) + "|" + viv34(ev, "front", null) + "|" + vivFloor34(ev, null, false, false, true);
       }
-      out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && x.includes("<polygon")));
+      out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && /<(polygon|path)/.test(x)));
       out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
       { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
         state.exhibits.push(ev); syncAnimals();
