@@ -1736,13 +1736,13 @@ const LAND = {
   ashell: {label:"Giant Ammonite Shell",one:"a giant ammonite shell",price:1500, r:1.1, color:"#C4A878", toy:3, vivToy:true, aqua:true, sea:true, hide:true, look:"ashell"},
   abubble:{label:"Bubble Curtain",      one:"a bubble curtain",     price:1100, r:.8, color:"#9FCFE0", toy:3, vivToy:true, aqua:true, look:"abubble"},
 };
-// Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at ROCK_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
+// Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at VIV_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
 // Shelter pictures (sprites/shelter/<key>.png, made by tools/pixelshelter.py): size in pixels at ROCK_MPP a pixel, and `b`, the picture's base (its bottom row) in radii below the spot.
 const SHELTER_SPRITES = {shelter:{w:48, h:40, b:.78}, barn:{w:84, h:62, b:.78}, burrow:{w:26, h:14, b:.85}, cavesm:{w:62, h:34, b:.85}, cavelg:{w:92, h:50, b:.85}, canopysm:{w:42, h:34, b:.6}, canopylg:{w:70, h:52, b:.6}};
 // Food tray pictures (sprites/tray/<key>.png): flat dishes centered on the spot; `well` is [cx, cy, rx, ry] in pixels, the hollow the food is drawn into.
 const TRAY_SPRITES = {traysm:{w:18, h:9, well:[9, 4.5, 6.5, 2.6]}, traymd:{w:30, h:14, well:[15, 7, 11.5, 4.6]}, traylg:{w:46, h:20, well:[23, 10, 18, 7.4]}};
-// Vivarium and aquarium fitting pictures (sprites/viv, tools/pixelviv.py and tools/pixelaqua.py), w x h in pixels including their one-pixel edge; flat ones lie on the floor
-const VIV_SPRITES = {aboulder:{w:20, h:12}, abrain:{w:18, h:12}, acoral:{w:18, h:18}, afan:{w:18, h:20}, asponge:{w:16, h:16}, akelp:{w:14, h:32}, ashell:{w:22, h:19}, afilter:{w:12, h:18}, asump:{w:20, h:16}, arock:{w:22, h:14}, aweed:{w:16, h:24}, abubble:{w:14, h:26}, vbark:{w:18, h:12}, vbranch:{w:18, h:22}, vdig:{w:18, h:13}, vfeed:{w:12, h:17}, vmist:{w:16, h:19}, vdish:{w:14, h:8, flat:true}, vlamp:{w:12, h:21}, vpool:{w:22, h:13, flat:true}};
+// Vivarium and aquarium fitting pictures (sprites/viv, tools/pixelviv.py and tools/pixelaqua.py), w x h in pixels at VIV_MPP a pixel (DET, 3, times finer than ROCK_MPP, to match the animals drawn in a case); flat ones lie on the floor
+const VIV_SPRITES = {aboulder:{w:54, h:30}, abrain:{w:48, h:30}, acoral:{w:48, h:48}, afan:{w:48, h:54}, asponge:{w:42, h:42}, akelp:{w:36, h:90}, ashell:{w:60, h:51}, afilter:{w:30, h:48}, asump:{w:54, h:42}, arock:{w:60, h:36}, aweed:{w:42, h:66}, abubble:{w:36, h:72}, vbark:{w:48, h:30}, vbranch:{w:48, h:60}, vdig:{w:48, h:33}, vfeed:{w:30, h:45}, vmist:{w:42, h:51}, vdish:{w:36, h:18, flat:true}, vlamp:{w:30, h:57}, vpool:{w:60, h:33, flat:true}};
 // Vivarium food: animals eat from dishes (LAND.vdish), and keepers can only deliver into dishes, so a case with none can't be fed. A dish holds one food at a time, up to cap units
 // by case size, and serves perDish animals; more animals than dishes go hungry. A dish costs nothing to run.
 const VIV_DISH = {cap:{S:6, M:10, L:16}, perDish:4};
@@ -2331,6 +2331,7 @@ const PLANT_SPRITES = {
 // Rocks and boulders drawn with pictures: sprites/rocks/<type>-<biome>-<n>.png, one entry per picture as [width, height] in pixels. A rock takes one at random by its id,
 // and a biome with no entry keeps the code-drawn rock. ROCK_MPP is meters per pixel.
 const ROCK_MPP = .13;
+const VIV_MPP = ROCK_MPP / 3;   // inside a vivarium or aquarium: fittings and scenes are drawn 3 times finer, to match the animals (VIV_SPRITES)
 // Park ground made of 1 m tiles: sprites/ground/<biome>-<n>.png, 8 x 8 px each. Tile 1..plain are plain ground, the next `detail` tiles carry a mark (a twig, a stone).
 // js/biomepaint.js lays them out on the 1 m grid (a fixed pick per cell, turned and mirrored at random) and uses the result as the #p-<biome> and #b-<biome> patterns,
 // with `share` of the cells in each 5 m chunk (rounded at random) taking a detail tile. Tiles listed in `still` are never turned or mirrored (a stone is lit from the top left). A biome not listed keeps its sprites/ground/<biome>.png tile.

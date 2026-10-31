@@ -1,234 +1,180 @@
-# Draws the vivarium props in the park style (docs/art.md, "Park style"; the browns and greens are tools/genesis_style.py PAL): each material is a set of a dark edge
-# tinted to it, a light, a mid and a shade; light from the top left, a lit top-left edge and shade on the undersides and right; Cv.img() puts a one-pixel edge round
-# the silhouette in the material's edge color, so every picture is 2 px wider and taller than its canvas (VIV_SPRITES in data.js). Pixels are 0.13 m (ROCK_MPP). Upright props are drawn with their base at the bottom middle; the pool, the light pool and the dish are flat on the floor.
+# Draws the vivarium props in the park style (docs/art.md, "Park style"; the browns and greens are tools/genesis_style.py PAL), at the case's fine pixel:
+# DET (3) times finer than the park's 0.13 m (0.043 m a pixel), to match the animals, which are drawn that big in a case. Each picture is built from parts;
+# a part is a mask in one material (a set of a dark edge tinted to it, a light, a mid, a shade and a deep detail tone): its own one-pixel edge all round, a
+# two-pixel lit rim along its top and left and a shaded rim along its bottom and right, then structured detail (grain, seams, rivets, grooves) in its tones.
+# A later part laid over an earlier one keeps its edge, so the parts read apart. Upright props have their base on the bottom row, centered; the pool and the
+# dish lie flat on the floor. VIV_SPRITES in js/data.js lists each picture's size in fine pixels (VIV_MPP a pixel).
 #   vbark   Cork Bark Hide      vbranch Climbing Branches   vdig  Dig Box            vfeed Live-Feed Dispenser   vmist Misters
-#   vdish   Food Dish (empty bowl; the food is drawn over it)   vlamp Basking Lamp (+ vlamp-pool, its warm pool of light)   vpool Pool
-# Usage: python3 -I tools/pixelviv.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x8 view of every picture)
+#   vdish   Food Dish (empty bowl; the food is drawn over it)   vlamp Basking Lamp (+ vlamp-pool, its warm pool of light, at 0.13 m)   vpool Pool
+# Usage: python3 -I tools/pixelviv.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x4 view of every picture)
 import sys, os, math
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from PIL import Image
+from pixelvivscene import ell, line, stroke, curve, DET
 
+U = DET   # one park pixel in fine pixels
 def mix(a, b, t): return tuple(round(x * (1 - t) + y * t) for x, y in zip(a, b))
-EDGE, SHADE = {}, {}   # every material tone -> that material's dark edge (for the outline) and its shade (to fill gaps the outline can't reach)
 def mat(edge, hi, md, lo):
-    m = {"hi": hi, "mid": md, "lo": lo, "deep": edge, "edge": edge}
-    for c in (hi, md, lo, edge): EDGE.setdefault(c, edge); SHADE.setdefault(c, lo)
-    return m
-NO_EDGE = set()   # see-through bits drawn without an outline (spray, glow)
+    return {"hi": hi, "mid": md, "lo": lo, "deep": mix(lo, edge, .45), "edge": edge}
+def ramp(base): return mat(mix(base, (0, 0, 0), .7), mix(base, (255, 255, 255), .28), base, mix(base, (0, 0, 0), .24))   # a set from one color, for a material with no PAL tones
 # browns from PAL (X light, W/V mid, U shade, M joints, G darkest)
 BARK = mat((44, 35, 19), (165, 125, 74), (132, 101, 59), (110, 85, 49))
 WOOD = mat((44, 35, 19), (165, 125, 74), (143, 109, 64), (110, 85, 49))
-SOIL = mat((44, 35, 19), (132, 101, 59), (110, 85, 49), (66, 53, 29))
-STEEL = mat((31, 37, 41), (184, 192, 196), (138, 146, 152), (96, 104, 110))
+SOIL = mat((44, 35, 19), (132, 101, 59), (110, 85, 49), (84, 66, 38))
+STEEL = mat((31, 37, 41), (196, 204, 208), (146, 154, 160), (104, 112, 118))
 WATER = mat((20, 50, 70), (120, 188, 216), (62, 134, 168), (44, 102, 134))
-STONE = mat((38, 36, 30), (176, 170, 152), (138, 133, 118), (102, 98, 86))
-COPPER = mat((66, 32, 12), (228, 152, 92), (190, 112, 52), (142, 80, 36))
-OLIVE = mat((40, 44, 10), (140, 152, 60), (97, 111, 34), (70, 80, 24))
-BULB = mat((120, 84, 20), (255, 240, 180), (250, 214, 110), (220, 170, 70))
-def ramp(base): return mat(mix(base, (0, 0, 0), .7), mix(base, (255, 255, 255), .28), base, mix(base, (0, 0, 0), .24))   # a set from one color, for a material with no PAL tones
+STONE = mat((38, 36, 30), (180, 174, 156), (140, 135, 120), (104, 100, 88))
+COPPER = mat((66, 32, 12), (232, 160, 100), (192, 114, 54), (144, 82, 38))
+OLIVE = mat((40, 44, 10), (150, 162, 66), (104, 118, 38), (74, 84, 26))
+BULB = mat((120, 84, 20), (255, 244, 196), (250, 216, 116), (222, 172, 72))
+GOLD = mat((80, 58, 14), (240, 210, 120), (216, 176, 74), (170, 132, 46))
 
 class Cv:
     def __init__(s, w, h): s.w, s.h, s.px = w, h, {}
     def put(s, x, y, c):
         if 0 <= x < s.w and 0 <= y < s.h: s.px[(x, y)] = c
-    def rect(s, x0, y0, x1, y1, c):
-        for y in range(y0, y1 + 1):
-            for x in range(x0, x1 + 1): s.put(x, y, c)
-    def ell(s, cx, cy, rx, ry, c, top=None):
-        # filled ellipse; the rows in `top` (a count) from the upper edge are drawn in that colour pair's lit tone by the caller
-        for y in range(s.h):
-            for x in range(s.w):
-                if ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2 <= 1: s.put(x, y, c)
-    def inside(s, x, y, cx, cy, rx, ry): return ((x + .5 - cx) / rx) ** 2 + ((y + .5 - cy) / ry) ** 2 <= 1
-    def line(s, x0, y0, x1, y1, th, c_hi, c_mid, c_lo):
-        # a thick stick: left pixel lit, right pixel shaded
-        n = max(abs(x1 - x0), abs(y1 - y0)) or 1
-        for i in range(n + 1):
-            x, y = round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n)
-            for k in range(th): s.put(x + k, y, c_hi if k == 0 else c_lo if k == th - 1 else c_mid)
-    def img(s, a=255):
-        # the picture with a one-pixel edge round its silhouette (4-neighbours), in the edge color of the pixel it borders (above first, then left, right, below);
-        # gaps inside the silhouette that the outside can't reach are filled with the shade of what's round them instead, so they don't turn to dark specks
-        im = Image.new("RGBA", (s.w + 2, s.h + 2), (0, 0, 0, 0)); solid = {k for k, c in s.px.items() if c not in NO_EDGE}
-        out, todo = {(-2, -2)}, [(-2, -2)]
-        while todo:
-            x, y = todo.pop()
-            for q in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
-                if -2 <= q[0] <= s.w + 1 and -2 <= q[1] <= s.h + 1 and q not in out and q not in solid: out.add(q); todo.append(q)
-        for y in range(-1, s.h + 1):
-            for x in range(-1, s.w + 1):
-                if (x, y) in solid: continue
-                for nb in ((x, y + 1), (x + 1, y), (x - 1, y), (x, y - 1)):
-                    if nb in solid:
-                        c = s.px[nb]; im.putpixel((x + 1, y + 1), (EDGE.get(c, mix(c, (0, 0, 0), .7)) if (x, y) in out else SHADE.get(c, c)) + (a,)); break
-        for (x, y), c in s.px.items(): im.putpixel((x + 1, y + 1), c + (a,) if len(c) == 3 else c)
+    def part(s, mask, M, tex=None, rim=2):
+        # mask in material M: its edge, a lit rim top and left, a shaded rim bottom and right; tex(x, y) can then name a tone ("hi", "lo", "deep", "edge") for an inside pixel
+        mask = {p for p in mask if 0 <= p[0] < s.w and 0 <= p[1] < s.h}
+        for (x, y) in mask:
+            if any(q not in mask for q in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))): s.px[(x, y)] = M["edge"]; continue
+            lit = any((x - k, y) not in mask or (x, y - k) not in mask for k in range(2, rim + 2))
+            dark = any((x + k, y) not in mask or (x, y + k) not in mask for k in range(2, rim + 2))
+            tone = "hi" if lit and not dark else "lo" if dark and not lit else "mid"
+            t = tex(x, y) if tex else None
+            s.px[(x, y)] = M[t or tone]
+        return mask
+    def dot(s, pts, col):
+        for x, y in pts: s.put(x, y, col)
+    def img(s):
+        im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0)); p = im.load()
+        for (x, y), c in s.px.items(): p[x, y] = c + (255,) if len(c) == 3 else c
         return im
+def rect(x0, y0, x1, y1): return {(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)}
+def poly(pts):   # a filled polygon (pixel centers inside)
+    xs, ys = [p[0] for p in pts], [p[1] for p in pts]; out = set()
+    for y in range(math.floor(min(ys)), math.ceil(max(ys)) + 1):
+        for x in range(math.floor(min(xs)), math.ceil(max(xs)) + 1):
+            cx, cy, inside = x + .5, y + .5, False
+            for (ax, ay), (bx, by) in zip(pts, pts[1:] + pts[:1]):
+                if (ay > cy) != (by > cy) and cx < ax + (cy - ay) * (bx - ax) / (by - ay): inside = not inside
+            if inside: out.add((x, y))
+    return out
 
 def bark():
-    c = Cv(16, 10)
-    # a curl of cork bark: a dome with a dark opening, lit on the top left, grooves running down it
-    for y in range(10):
-        for x in range(16):
-            if c.inside(x, y, 8, 10, 8, 9.6):
-                lit = (x - 8) / 8 + (y - 10) / 9.6 < -.9
-                shade = x > 11 or y > 8
-                c.put(x, y, BARK["hi"] if lit else BARK["lo"] if shade else BARK["mid"])
-    for x in (4, 7, 10, 13):
-        for y in range(2 + (x % 3), 8, 2):
-            if (x, y) in c.px and c.px[(x, y)] != BARK["hi"]: c.put(x, y, BARK["lo"])
-    for y in range(5, 10):
-        for x in range(4, 12):
-            if c.inside(x, y, 8, 10, 3.6, 4.6): c.put(x, y, BARK["deep"])
-    for x in range(1, 15): 
-        if (x, 9) in c.px and c.px[(x, 9)] != BARK["deep"]: c.put(x, 9, BARK["lo"])
+    c = Cv(16 * U, 10 * U); W, H = c.w, c.h
+    # a curl of cork bark: a dome with grooves running down it, a dark opening low in the middle
+    dome = {p for p in ell(W / 2, H, W / 2, H - .5) if p[1] < H}
+    c.part(dome, BARK, lambda x, y: "deep" if (x + round(math.sin(y / 3) * 1.5)) % 6 == 0 and y > 3 else "lo" if (x * 2 + y) % 9 == 0 and y % 4 == 1 else None)
+    c.part({p for p in ell(W / 2, H, 3.6 * U, 4.6 * U) if p[1] < H}, mat((24, 18, 10), (60, 46, 28), (40, 31, 18), (32, 24, 14)))
+    c.dot([(x, H - 1) for x in range(W) if (x, H - 1) in dome and not (W / 2 - 3.6 * U < x < W / 2 + 3.6 * U)], BARK["edge"])
     return c
 
 def branch():
-    c = Cv(16, 20)
-    H, M, L = WOOD["hi"], WOOD["mid"], WOOD["lo"]
-    c.line(7, 19, 8, 8, 3, H, M, L)          # trunk
-    c.line(8, 8, 3, 2, 2, H, M, L)           # left fork
-    c.line(8, 10, 13, 4, 2, H, M, L)         # right fork
-    c.line(5, 5, 2, 7, 2, H, M, L)           # twig
-    c.line(11, 7, 14, 10, 2, H, M, L)        # twig
-    for y in (13, 16): c.put(8, y, WOOD["deep"])   # knots
-    c.put(10, 5, WOOD["deep"]); c.put(5, 4, WOOD["deep"])
-    for x in range(5, 12): c.put(x, 19, WOOD["deep"])   # a flat foot
-    for x in range(6, 11): c.put(x, 18, L)
+    c = Cv(16 * U, 20 * U); W, H = c.w, c.h
+    groove = lambda x, y: "deep" if x % 4 == 1 and (y // 5 + x) % 3 else None   # bark lines running along, broken every few pixels
+    c.part(rect(5 * U, H - 2, 11 * U, H - 1) | rect(6 * U, H - 4, 10 * U, H - 3), WOOD)   # a flat foot
+    c.part(curve([(8 * U, H - 2), (8 * U - 1, 14 * U), (8.5 * U, 8 * U)], 2.6 * U), WOOD, groove)   # trunk
+    c.part(curve([(8.5 * U, 8.5 * U), (6 * U, 5 * U), (3 * U, 2 * U)], 1.8 * U), WOOD, groove)   # left fork
+    c.part(curve([(8.5 * U, 10 * U), (11 * U, 7 * U), (13.5 * U, 4 * U)], 1.8 * U), WOOD, groove)   # right fork
+    c.part(stroke(5 * U, 5 * U, 1.5 * U, 7 * U, 1.3 * U), WOOD); c.part(stroke(11.5 * U, 7 * U, 14.5 * U, 10 * U, 1.3 * U), WOOD)   # twigs
+    for kx, ky in ((8 * U, 13 * U), (8 * U, 16.5 * U), (5 * U, 4.5 * U)): c.part(ell(kx, ky, U * .8, U * .6), mat(WOOD["edge"], WOOD["lo"], WOOD["deep"], WOOD["deep"]))   # knots
     return c
 
 def dig():
-    c = Cv(16, 11)
-    # top face: loose soil with scooped holes and dashes; front face: planks
-    for y in range(0, 5):
-        for x in range(1, 15): c.put(x, y, SOIL["mid"])
-    for x in range(1, 15): c.put(x, 0, SOIL["hi"])
-    for y in range(0, 5): c.put(1, y, SOIL["hi"]); c.put(14, y, SOIL["lo"])
-    for (x, y, w) in ((4, 1, 3), (9, 2, 3), (5, 3, 2), (11, 1, 2)):
-        for k in range(w): c.put(x + k, y, SOIL["lo"])
-    for x in range(8, 11): c.put(x, 3, SOIL["deep"])
-    for y in range(5, 11):
-        for x in range(0, 16): c.put(x, y, WOOD["mid"])
-    for x in range(0, 16): c.put(x, 5, WOOD["hi"]); c.put(x, 10, WOOD["deep"]); c.put(x, 9, WOOD["lo"])
-    for y in range(5, 11): c.put(0, y, WOOD["hi"]); c.put(15, y, WOOD["lo"])
-    for x in (5, 10): 
-        for y in range(6, 9): c.put(x, y, WOOD["lo"])
-    for x in (2, 7, 12): c.put(x, 7, WOOD["lo"])
+    c = Cv(16 * U, 11 * U); W, H = c.w, c.h
+    top = 5 * U
+    # top face: loose soil with scooped hollows and crumbs; front face: two planks with a gap, grain and nails, a post at each end
+    c.part(rect(U, 0, W - U - 1, top), SOIL, lambda x, y: "lo" if (x + (y // 3) * 4) % 9 < 2 and y % 3 == 1 else "hi" if (x + y * 5) % 17 == 0 else None)
+    for hx, hy, rx in ((4.5 * U, 2 * U, 1.6 * U), (10.5 * U, 2.6 * U, 1.4 * U), (7.5 * U, 3.6 * U, 1.1 * U)):
+        c.part(ell(hx, hy, rx, rx * .55), mat(SOIL["edge"], SOIL["lo"], SOIL["deep"], SOIL["deep"]))
+    for i, (y0, y1) in enumerate(((top + 1, top + 3 * U - 1), (top + 3 * U + 1, H - 1))):
+        c.part(rect(0, y0, W - 1, y1), WOOD, lambda x, y, i=i: "lo" if (y - y0) % 3 == 1 and (x + i * 7 + (y // 3) * 5) % 13 < 6 else None)
+    for px in (0, W - 1 - 2 * U): c.part(rect(px, top, px + 2 * U, H - 1), WOOD)
+    for nx in (U, W - U - 1):
+        for ny in (top + U + 1, top + 4 * U + 1): c.part(rect(nx - 1, ny, nx, ny + 1), STEEL)
     return c
 
 def feed():
-    c = Cv(10, 15)
-    S = STEEL
-    # a hopper with a spout and a little tray; olive crickets in the tray
-    for y in range(0, 7):
-        for x in range(0, 10):
-            half = 5 - y * .4
-            if abs(x + .5 - 5) <= half: c.put(x, y, S["mid"])
-    for y in range(0, 7):
-        for x in range(0, 10):
-            if (x, y) in c.px and x + .5 - 5 < -(5 - y * .4) + 1.2: c.put(x, y, S["hi"])
-            elif (x, y) in c.px and x + .5 - 5 > (5 - y * .4) - 1.4: c.put(x, y, S["lo"])
-    for x in range(1, 9): c.put(x, 0, S["hi"])
-    c.rect(4, 7, 5, 10, S["lo"]); c.put(4, 7, S["mid"]); c.put(4, 8, S["mid"])
-    c.rect(1, 11, 8, 13, S["mid"]); c.rect(1, 11, 8, 11, S["hi"]); c.rect(1, 13, 8, 13, S["lo"]); c.put(8, 12, S["lo"])
-    c.rect(2, 12, 7, 12, S["deep"])
-    for x in (3, 5, 6): c.put(x, 12, OLIVE["mid"])
-    c.put(4, 12, OLIVE["hi"])
-    c.rect(0, 14, 9, 14, S["deep"])
-    c.put(3, 3, (216, 176, 74)); c.put(4, 3, (216, 176, 74))   # a gold hatch
+    c = Cv(10 * U, 15 * U); W, H = c.w, c.h
+    # a steel hopper with a seam and rivets and a gold hatch, a spout, and a tray of crickets
+    c.part(poly([(0, 0), (W, 0), (W - 3 * U, 7 * U), (3 * U, 7 * U)]), STEEL, lambda x, y: "deep" if y == 2 * U else "lo" if x == W // 2 and y > 2 * U else None)
+    c.dot([(x, 2 * U - 2) for x in range(U + 1, W - U - 1, 2 * U)], STEEL["edge"])   # rivets
+    c.part(rect(3 * U, 3 * U, 5 * U, 5 * U - 1), GOLD); c.dot([(4 * U, 4 * U)], GOLD["edge"])
+    c.part(rect(4 * U, 7 * U, 6 * U - 1, 11 * U), STEEL)
+    c.part(rect(U // 2, 11 * U, W - U // 2 - 1, 14 * U - 1), STEEL); c.part(rect(U + 2, 11 * U + 3, W - U - 3, 13 * U - 1), mat((24, 26, 28), (60, 64, 68), (44, 48, 52), (36, 40, 44)))
+    for cx in (2.5 * U, 5 * U, 7.5 * U):   # crickets: a body and two kicked-back legs
+        c.part(ell(cx, 12 * U - 1, U * 1.1, U * .7), OLIVE); c.dot([(round(cx + U * .5), round(12 * U) - 3), (round(cx + U), round(12 * U) - 4), (round(cx - U), round(12 * U) - 3)], OLIVE["edge"])
+    c.part(rect(0, H - U, W - 1, H - 1), STEEL)
     return c
 
+DROPS = ((190, 226, 240), (124, 186, 214))
 def mist():
-    c = Cv(14, 17)
-    S = STEEL
-    c.rect(6, 6, 7, 15, S["mid"]); c.rect(6, 6, 6, 15, S["hi"]); c.rect(7, 6, 7, 15, S["lo"])
-    c.rect(3, 15, 10, 16, S["lo"]); c.rect(3, 15, 10, 15, S["mid"])
-    c.rect(4, 4, 9, 5, S["mid"]); c.rect(4, 4, 9, 4, S["hi"]); c.rect(4, 5, 9, 5, S["lo"])
-    # the spray: pale blue droplets fanning down and out, thinner as they fall
-    DR, DR2 = (190, 226, 240), (124, 186, 214); NO_EDGE.update((DR, DR2))
-    for (x, y, d) in ((3, 6, 0), (2, 8, 1), (3, 10, 0), (10, 6, 0), (11, 8, 1), (10, 10, 0), (6, 3, 0), (7, 2, 1), (1, 11, 1), (12, 11, 1), (5, 8, 1), (8, 9, 1)):
-        c.put(x, y, DR if d == 0 else DR2)
+    c = Cv(14 * U, 17 * U); W, H = c.w, c.h
+    cx = W // 2
+    c.part(rect(3 * U, H - 2 * U, W - 3 * U - 1, H - 1), STEEL)   # base plate
+    c.part(rect(cx - U, 6 * U, cx + U - 1, H - 2 * U), STEEL, lambda x, y: "deep" if y % (3 * U) == 0 else None)   # the pole, jointed
+    c.part(rect(4 * U, 4 * U, W - 4 * U - 1, 6 * U), STEEL)   # the nozzle head
+    c.dot([(x, 6 * U - 1) for x in range(5 * U, W - 5 * U, U)], STEEL["edge"])   # its jets
+    # the spray: droplets fanning down and out from the jets, smaller as they fall (see-through bits with no edge)
+    for sd in (-1, 1):
+        for i, (dx, dy) in enumerate(((1.5, 1.5), (2.8, 3), (3.6, 4.8), (4.2, 6.6), (2, 4), (1, 6))):
+            x, y = round(cx + sd * dx * U), round(6 * U + dy * U); sz = 2 if i < 3 else 1
+            for a in range(sz):
+                for b in range(sz): c.put(x + a, y + b, DROPS[0] if (a, b) == (0, 0) else DROPS[1])
+    c.dot([(cx - 1, 3 * U), (cx, 2 * U), (cx + 2, U + 1)], DROPS[0])
     return c
 
 def dish():
-    c = Cv(12, 6)
-    for y in range(6):
-        for x in range(12):
-            if c.inside(x, y, 6, 2.6, 6, 2.6): c.put(x, y, STEEL["mid"])
-    for y in range(6):
-        for x in range(12):
-            if (x, y) in c.px and (x + y * .8 < 5): c.put(x, y, STEEL["hi"])
-    for y in range(6):
-        for x in range(12):
-            if c.inside(x, y, 6, 2.4, 4.4, 1.7): c.put(x, y, STEEL["deep"])
-    for x in range(2, 10): c.put(x, 5, STEEL["lo"])
-    for x in range(3, 9): 
-        if (x, 5) in c.px: c.put(x, 5, STEEL["deep"])
+    c = Cv(12 * U, 6 * U); W, H = c.w, c.h
+    c.part(ell(W / 2, H / 2 - .5, W / 2, H / 2 - .5), STEEL)
+    c.part(ell(W / 2, H / 2 - U * .3, W / 2 - 1.6 * U, H / 2 - 1.3 * U), mat((24, 26, 28), (70, 74, 80), (48, 52, 56), (40, 44, 48)))   # the well
+    c.dot([(x, U) for x in range(3 * U, 6 * U)], STEEL["hi"])   # a glint on the rim
     return c
 
 def lamp():
-    c = Cv(10, 19)
-    S, C = STEEL, COPPER
-    c.rect(2, 17, 7, 18, S["lo"]); c.rect(2, 17, 7, 17, S["mid"])
-    c.rect(5, 6, 6, 17, S["mid"]); c.rect(5, 6, 5, 17, S["hi"]); c.rect(6, 6, 6, 17, S["lo"])
-    # the shade: a copper dome leaning over the stand, with a glowing bulb under it
-    for y in range(0, 8):
-        for x in range(0, 10):
-            if c.inside(x, y, 5, 8, 5, 7.6) and y <= 6:
-                c.put(x, y, C["hi"] if (x - 5) / 5 + (y - 8) / 7.6 < -.85 else C["lo"] if x > 6 or y > 5 else C["mid"])
-    for x in range(0, 10):
-        if (x, 6) in c.px: c.put(x, 6, C["deep"])
-    c.rect(3, 7, 6, 7, BULB["mid"]); c.rect(4, 7, 5, 7, BULB["hi"])
-    c.put(4, 8, (255, 232, 160)); c.put(5, 8, (255, 232, 160)); NO_EDGE.add((255, 232, 160))   # the glow under the bulb
+    c = Cv(10 * U, 19 * U); W, H = c.w, c.h
+    cx = W // 2
+    c.part(rect(2 * U, H - 2 * U, W - 2 * U - 1, H - 1), STEEL)
+    c.part(rect(cx - 1, 7 * U, cx + U, H - 2 * U), STEEL, lambda x, y: "deep" if y in (11 * U, 15 * U) else None)
+    # the shade: a copper dome with ribs, a rolled rim, and the glowing bulb under it
+    c.part({p for p in ell(cx, 7 * U, W / 2, 6.6 * U) if p[1] < 7 * U}, COPPER, lambda x, y: "deep" if abs(x - cx) % (2 * U) == 0 and y > U * 2 and x != cx else "hi" if abs(x - cx + 1) % (2 * U) == 0 and y > U * 2 and x < cx else None)
+    c.part(rect(0, 6 * U, W - 1, 7 * U), COPPER)
+    c.part(ell(cx, 7.6 * U, 1.8 * U, U * .9), BULB)
+    for k in range(-2, 3): c.put(cx + k, 8 * U + 2, (255, 236, 170))
     return c
 
 def lamp_pool():
-    # the pool of warm light on the floor: three stepped bands, each a flat tone at one opacity (no soft edges)
+    # the pool of warm light on the floor, at the park's 0.13 m (it lies on the map's floor, not in the case's fine pixels): three stepped bands, each one flat tone at one opacity
     W, H = 44, 20
     im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    bands = ((1.0, 1.0, 34), (.72, .74, 40), (.42, .46, 48))
-    for rx, ry, a in bands:
+    for rx, ry, a in ((1.0, 1.0, 34), (.72, .74, 40), (.42, .46, 48)):
         for y in range(H):
             for x in range(W):
                 if ((x + .5 - W / 2) / (W / 2 * rx)) ** 2 + ((y + .5 - H / 2) / (H / 2 * ry)) ** 2 <= 1:
-                    old = im.getpixel((x, y))
-                    im.putpixel((x, y), (255, 214, 120, min(255, old[3] + a)))
+                    old = im.getpixel((x, y)); im.putpixel((x, y), (255, 214, 120, min(255, old[3] + a)))
     return im
 
 def pool():
-    c = Cv(20, 11)
-    cx, cy, rx, ry = 10, 5.5, 10, 5.5
-    for y in range(11):
-        for x in range(20):
-            if c.inside(x, y, cx, cy, rx, ry):
-                c.put(x, y, STONE["lo"] if (y > 7 or x > 16) else STONE["hi"] if (y < 3 and x < 9) else STONE["mid"])
-    # stones along the rim: a few darker joints
-    for (x, y) in ((3, 2), (7, 0), (13, 0), (17, 3), (18, 6), (14, 10), (7, 10), (2, 7)):
-        if (x, y) in c.px: c.put(x, y, STONE["deep"])
-    # the water, set in the rim: darker toward the far (top) side, lit glints
-    for y in range(11):
-        for x in range(20):
-            if c.inside(x, y, cx, cy + .2, rx - 2, ry - 1.7):
-                c.put(x, y, WATER["lo"] if y < 4 else WATER["mid"] if y < 7 else WATER["hi"])
-    for (x, y, w) in ((5, 4, 3), (11, 6, 4), (7, 7, 2), (13, 4, 2)):
-        for k in range(w):
-            if (x + k, y) in c.px: c.put(x + k, y, mix(WATER["hi"], (255, 255, 255), .45))
-    for x in range(4, 16):
-        if (x, 2) in c.px and c.px[(x, 2)] == WATER["lo"]: c.put(x, 2, WATER["deep"])
+    c = Cv(20 * U, 11 * U); W, H = c.w, c.h
+    c.part(ell(W / 2, H / 2, W / 2 - .5, H / 2 - .5), STONE)
+    c.part(ell(W / 2, H / 2 + U * .3, W / 2 - 2.2 * U, H / 2 - 1.8 * U), WATER, lambda x, y: "lo" if y < H * .38 else "hi" if (y - 4) % 5 == 0 and (x + y * 3) % 13 < 5 else None)
+    for i in range(14):   # stones round the rim, each with its edge
+        a = i / 14 * 2 * math.pi; sx, sy = W / 2 + math.cos(a) * (W / 2 - 1.2 * U), H / 2 + math.sin(a) * (H / 2 - 1.1 * U)
+        c.part(ell(sx, sy, 1.4 * U, U), STONE)
     return c
 
 ALL = {"vbark":bark, "vbranch":branch, "vdig":dig, "vfeed":feed, "vmist":mist, "vdish":dish, "vlamp":lamp, "vpool":pool}
+
+def sheet(ims, path, bg=(214, 200, 160, 255), Z=4, pad=4):
+    sh = Image.new("RGBA", (sum(i.width for i in ims) * Z + pad * Z * (len(ims) + 1), max(i.height for i in ims) * Z + pad * Z * 2), bg); x = pad * Z
+    for im in ims: sh.alpha_composite(im.resize((im.width * Z, im.height * Z), Image.NEAREST), (x, pad * Z)); x += (im.width + pad) * Z
+    sh.save(path)
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/viv"
     os.makedirs(out, exist_ok=True)
     ims = {}
-    for k, fn in ALL.items():
-        ims[k] = fn().img(); ims[k].save(os.path.join(out, k + ".png"))
-    ims["vlamp-pool"] = lamp_pool(); ims["vlamp-pool"].save(os.path.join(out, "vlamp-pool.png"))
-    if len(sys.argv) > 2:
-        Z, pad = 8, 3
-        sheet = Image.new("RGBA", (sum(i.width for i in ims.values()) * Z + pad * Z * (len(ims) + 1), max(i.height for i in ims.values()) * Z + pad * Z * 2), (214, 200, 160, 255))
-        x = pad * Z
-        for im in ims.values():
-            sheet.alpha_composite(im.resize((im.width * Z, im.height * Z), Image.NEAREST), (x, pad * Z)); x += (im.width + pad) * Z
-        sheet.save(sys.argv[2])
+    for k, fn in ALL.items(): ims[k] = fn().img(); ims[k].save(os.path.join(out, k + ".png"))
+    lamp_pool().save(os.path.join(out, "vlamp-pool.png"))
+    if len(sys.argv) > 2: sheet(list(ims.values()), sys.argv[2])
