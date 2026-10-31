@@ -2310,7 +2310,7 @@ const PLANT_SPRITES = {
   "q-ginkgo":              {ratio:64/52, size:1.05},
   "q-lilac":               {ratio:56/50, size:0.92},
   "q-mesquite":            {ratio:64/52, size:1.05},
-  "q-sagebrush":        {ratio:11/12, size:0.32},
+  "q-sagebrush":        {ratio:64/64, size:1.1},
   "q-prickly-pear":     {ratio:32/32, size:0.63},
   "q-agave":            {ratio:30/29, size:0.87},
   "q-strangler-fig":       {ratio:72/92, size:0.83},
