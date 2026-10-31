@@ -1102,15 +1102,15 @@ const pickAt = (pick, kind, id) => pick ? ` data-kind="${kind}" data-id="${esc(i
 // per biome, the bank colors: damp ground around the shore, the band of mud (or salt crust) next to the water, and the lit and dark shallows rims. A biome with `shore` draws that one color
 // on all four edges instead of the lit and dark rims (`shoreW` px wide, default 1), and with no `damp` or `mud` has no bank
 const WATER_TEX = {
-  wetland:  {shore:"#544636", shoreW:2, lit:"#5A865B", dark:"#4A6B49"},   // shore: the 1 px line on every edge that touches land (the north, south, east and west tiles); no mud or damp bank
+  wetland:  {shore:"#6F978A", shoreW:2, lit:"#6F978A", dark:"#355A55", mud:"#44521D", damp:"#4F6024"},   // a 2 px band of shallows, then wet and damp mud outside
   scrubland:{shore:"#8DB3A0", shoreW:2, lit:"#8DB3A0", dark:"#3C6F66", mud:"#BF8466", damp:"#CD9A7D"},   // a 2 px band of shallows, then wet and damp clay outside
-  fern:     {shore:"#988B4A", shoreW:1, lit:"#B4B8A0", dark:"#6C7358"},   // a 1 px shore line, no bank
-  temperate:{shore:"#5C4A3D", shoreW:1, lit:"#7DB6B0", dark:"#2B6D5E"},   // a 1 px shore line, no bank
+  fern:     {shore:"#86AFA0", shoreW:2, lit:"#86AFA0", dark:"#3A6860", mud:"#765433", damp:"#835E3B"},   // a 2 px band of shallows, then wet and damp loam outside
+  temperate:{shore:"#7FAAB8", shoreW:2, lit:"#7FAAB8", dark:"#36667A", mud:"#30682F", damp:"#387537"},   // a 2 px band of shallows, then wet and damp soil outside
   desert:   {shore:"#8FC4B8", shoreW:2, lit:"#8FC4B8", dark:"#3A7F82", mud:"#D8BE8A", damp:"#E5CF9F"},   // a 2 px band of shallows, then wet and damp sand outside
-  grassland:{shore:"#7A6246", shoreW:1, lit:"#5096B8", dark:"#2F6682"},   // a 1 px shore line, no bank
-  tropical: {shore:"#D9C08E", shoreW:1, lit:"#39C7AA", dark:"#1F7A68"},   // a 1 px shore line, no bank
-  tundra:   {shore:"#EBF5F7", shoreW:1, lit:"#ACCAD6", dark:"#6A98A8"},   // a 1 px shore line, no bank
-  boreal:   {shore:"#8AB0B4", shoreW:2, lit:"#8AB0B4", dark:"#3A6070", mud:"#848D6C", damp:"#959C7E"},   // a 2 px band of shallows, then wet and damp moss outside
+  grassland:{shore:"#8CBFBF", shoreW:2, lit:"#8CBFBF", dark:"#3A7078", mud:"#ABA542", damp:"#B6B04B"},   // a 2 px band of shallows, then wet and damp earth outside
+  tropical: {shore:"#5FA59A", shoreW:2, lit:"#5FA59A", dark:"#22625D", mud:"#183A15", damp:"#1F481C"},   // a 2 px band of shallows, then wet and damp humus outside
+  tundra:   {shore:"#A2C2D0", shoreW:2, lit:"#A2C2D0", dark:"#557F94", mud:"#AAB9C4", damp:"#B7C3CC"},   // a 2 px band of shallows, then wet and damp grit outside
+  boreal:   {shore:"#8AB0B4", shoreW:2, lit:"#8AB0B4", dark:"#3A6070", mud:"#3B4337", damp:"#454E40"},   // a 2 px band of shallows, then wet and damp moss outside
   sea:      {shore:"#E2D2A2", shoreW:1, lit:"#3AA6B4", dark:"#2C8896"},   // shallow sea (SEA_WATER): a pale sand shore line, no bank
   deep:     {shore:"#C9B98C", shoreW:1, lit:"#1E4C86", dark:"#173E70"},   // deep sea: a darker sand shore line, and none against shallow sea
 };

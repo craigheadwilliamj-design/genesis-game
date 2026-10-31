@@ -1,6 +1,6 @@
 # Finishing the biome art: instructions
 
-Wetland is done and is the model: ground, rocks and boulders, all 27 landscape plants, the six Park Plants, and textured water with a pixel shoreline. Scrubland has ground, rocks and boulders, all 24 plants and water (it has no Park Plants). Everything else is still in the older vector or shaded style.
+Wetland is done and is the model: ground, rocks and boulders, all 27 landscape plants, the six Park Plants, and calm water with a band of shallows. Scrubland has ground, rocks and boulders, all 24 plants and water (it has no Park Plants). Everything else is still in the older vector or shaded style.
 
 This is a brief for whoever does the work (a person or a fresh Claude session). Read `CLAUDE.md` and `docs/art.md` first (the **Art direction (locked)** section is the law), then this. Work one biome at a time and ship each as its own change.
 
@@ -16,7 +16,7 @@ This is a brief for whoever does the work (a person or a fresh Claude session). 
 | boreal | done | done | 18/18 | 2/2 | done |
 | grassland | done | done | 6/6 | 1/1 | done |
 | tundra | done | done | 6/6 | 1/1 | done |
-| fern (Fern Prairie) | done | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | done (`fern-1..4`, 1 px shore) |
+| fern (Fern Prairie) | done | placeholder (scrubland's) | 0/15, Permian names are placeholders | none exist | done |
 
 Boreal is done (`tools/pixelplants_boreal.py`; its Quaternary Labrador Tea is called Marsh Rosemary, to keep tundra's Park Plant name unique). A biome that didn't exist in a period has no plants for it (`PLANT_TABLE` in `js/data.js` is the source of truth; boreal starts in the Permian, grassland and tundra in the Neogene).
 
@@ -32,7 +32,7 @@ Do these in order. Each step has a preview, see "Check your work".
 2. **Rocks and boulders.** `sprites/rocks/{boulder,rock}-<biome>-<n>.png`.
 3. **Landscape plants.** `sprites/plants/<period3>-<biome>-<size>.png`, three sizes per period.
 4. **Park Plants.** `sprites/plants/q-<name>.png`.
-5. **Water.** `sprites/water/<biome>.png` plus the small code change below.
+5. **Water.** An entry in `tools/pixelwater_calm.py` plus its `WATER_TEX` bank (see below).
 6. Common names for the modern periods (see "Names").
 7. Update the status lines in `docs/art.md`, run the smoke test, commit.
 
@@ -106,21 +106,13 @@ The Park Plants and Quaternary plants lists in the build menu already show each 
 
 ### 5. Water
 
-Water has two art styles. **Wetland uses the tile style** (the model); the other biomes still use the older textured tile, and moving one over is the steps below.
+Every biome's water is done, all one recipe from `tools/pixelwater_calm.py`: 1 m cells (8 x 8 px), `sprites/water/<biome>-1.png` plain and `-2..4` a glint that rises and fades, and the biome's `WATER_TILES` entry in `js/data.js` (`{plain:1, detail:0, share:0, turn:false, glint:3, ...}`; the comment above `WATER_TILES` explains each field). The `<pattern id="w-<biome>">` in `index.html` is 1 x 1 on `-1.png` (the code builds the 100 m pattern at load).
 
-**Tile style** (wetland). Water is drawn as 1 m cells (8 x 8 px, 0.125 m a pixel), the same way `GROUND_TILES` does ground:
-
-- `sprites/water/<biome>-1.png` is the plain tile, one solid color. Then the `detail` tiles (a mark like a reed clump), then the `glint` tiles of the shimmer. File numbers run in that order: wetland is `-1` plain, `-2` clump, `-3` to `-5` glints (a sparkle that moves left to right, never mirrored).
-- Add the biome to `WATER_TILES` in `js/data.js`: `{plain, detail, share, turn, glint, frames, fps, waves}`. `share` is the part of each 5 m chunk's cells that take a detail tile (wetland .075, so 1 or 2 per chunk). `turn:false` mirrors but never turns. `waves` is a list of `[period in frames, wavelength in cells]`; each wavelength must divide 100, and the loop is the least common multiple of the periods (wetland 24 frames). Leave `waves` out for glints at random starts. The comment above `WATER_TILES` explains each field.
-- In `index.html` change the biome's `<pattern id="w-<biome>">` to `width="1" height="1"` and its image to `sprites/water/<biome>-1.png` at 1 x 1 (the code resizes it to the 100 m pattern at load).
-- In `WATER_TEX` (`js/landscape.js`) give the biome `{shore:"#hex", shoreW:2, lit:..., dark:...}` and no `damp` or `mud`. `shore` is the bank line's color, `shoreW` its width in px; `lit` and `dark` are still used by animals' waterlines and the park map. `softenShore` then stair-steps the edge and rounds the corners with no extra work (tune `SHORE_NOISE`, `SHORE_ERODE`, `SHORE_CHIP`). The irregular coast is opt-in: only a biome with `shore` gets it (the older textured biomes keep straight lit and dark rims until moved over). It is drawing only and only removes water pixels, never adds any, by 0 to 2 px; keep it at 2 so a shore can't get near the 0.5 m margin water keeps from fences. `SHORE_NOISE`, `SHORE_ERODE` and `SHORE_CHIP` are shared by every biome, so a different wobble for one biome needs a per-biome override in its `WATER_TEX` entry.
-- Desert, scrubland and boreal are the exception: their `shore` is a 2 px band of lighter shallows, and they keep `mud` and `damp` (wet and damp ground outside the water) so a pond sits in the pale floor. Their tiles come from `tools/pixelwater_calm.py`.
-- Delete the old `sprites/water/<biome>.png` and its entry in `tools/pixelwater_flat.py`. Run `python3 tools/packsprites.py` and commit `js/spritepack.js`.
+- To change a biome's water, edit its entry (water color `.` and glint `g`) in `tools/pixelwater_calm.py`, rerun it, then run `python3 tools/packsprites.py` and commit `js/spritepack.js`.
+- The bank is the biome's `WATER_TEX` entry in `js/landscape.js`: `shore` (= `lit`) is a 2 px band of lighter shallows (`shoreW:2`), `dark` the deep tone (animals' waterlines, the park map), `mud` and `damp` the wet and damp ground outside, a little darker than the biome's ground color. Change `mud` and `damp` whenever the ground color changes.
+- `softenShore` stair-steps the edge and rounds the corners (`SHORE_NOISE`, `SHORE_ERODE`, `SHORE_CHIP`, shared by every biome). It only removes water pixels, 0 to 2 px; keep it at 2 so a shore can't get near the 0.5 m margin water keeps from fences.
+- A detail tile (a reed clump, an ice floe) can be added after the plain tile: set `detail` and `share` (the part of each 5 m chunk's cells that take one) and number the glints after it.
 - Check it with Playwright: lay water boxes with `watersSvg([{kind:"<biome>", points:[...]}], "<biome>")` into a page, look at a few frames and at a join with another kind (no gap), and run `node tests/smoke.js`.
-
-**Older textured style** (every other biome today). `sprites/water/<biome>.png` is a 144 px opaque tile from `tools/pixelwater_flat.py` (a function or `PAL` entry plus a save line). The `<pattern id="w-<biome>" ...>` in `index.html` is 18 x 18, and the biome has a `WATER_TEX` entry with `damp`, `mud`, `lit` and `dark` bank colors (the mud bank adds about 3 px of ground-colored margin around every pond; accepted). Pick a base color that reads as the biome's water, darker than the ground but not black so animals stay readable.
-
-Biome ideas: desert, a clear turquoise oasis with pale sandy banks; tropical, clear blue-green with bright glints and dark leaf-litter mud; grassland, a murky brown-green river with silt; temperate, a blue-green pond; boreal, cold dark blue with moss banks; tundra, pale glacial blue-grey with an ice-white rim and a little snow-dust on the bank (tundra's floes would be its detail tiles); scrubland, a flat tan-grey brackish pool with a crusty salt-pale bank.
 
 ## Names
 

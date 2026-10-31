@@ -2338,14 +2338,14 @@ const GROUND_TILES = {};   // none now: every biome is one 36 m tile from tools/
 // `glint` more tiles after the detail ones are an animation: they play as the first `glint` of `frames` frames on every plain cell (each at its own random start, or with `waves`, a list of [period in frames, wavelength in cells] (each wavelength must divide GROUND_SPAN) that makes bands sweep down and right by the cell's x + y; the loop is the least common multiple of the periods, so waves of different periods drift in and out of step; `fps` frames a second), the other frames are the plain tile. `sub` splits each frame into that many smaller steps (same speed, `sub` times the frames and frame rate).
 // A biome not listed keeps its sprites/water/<biome>.png tile.
 const WATER_TILES = {
-  wetland:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
-  fern:{plain:1, detail:1, share:.075, turn:false, glint:2, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
+  wetland:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
+  fern:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   scrubland:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   desert:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   grassland:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   tropical:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   boreal:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
-  tundra:{plain:1, detail:1, share:.075, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
+  tundra:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   temperate:{plain:1, detail:0, share:0, turn:false, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
   // the sea water types for pools (SEA_WATER), from tools/pixelseawater.py: sand ripples in the shallows, dark troughs in the deep
   sea:{plain:1, detail:1, share:.1, glint:3, frames:8, fps:4, sub:2, waves:[[12, 10], [24, 25]]},
