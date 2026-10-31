@@ -2104,7 +2104,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits = state.exhibits.filter(e => e !== vv);
       state.buildings = state.buildings.filter(b => b.id !== "b-rest");
       out.guestsMindWeather = mildHurt === 0 && mild.thirst === 1 && hotHurt > 0 && hot.thirst > 1 && hotter > hotHurt && rain > 0 && dry < rain && cold > 0 && warm < cold && capped < cold && warm < capped && cocoa < cold && windJak < windBare && slushed < hotHurt && slushed > 0 && inside === 0 && atViv === 0 && atOpen > 0
-        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket && MENU.cocoa.warm && MENU.coffee.warm && MENU.slushie.cool && MENU.water.cool && MENU.soda.cool && !!MENU.beanie;
+        && gp.thought.has("wxHot") && gp.thought.has("wxRain") && gp.thought.has("wxCold") && !!MENU.jacket && MENU.cocoa.warm && MENU.coffee.warm && MENU.slushie.cool && MENU.water.cool && MENU.soda.cool && MENU.icecream.cool && !!MENU.beanie;
       state.weather.t = keepT; state.minute = keepMin;
     }
     state.exhibits = keepEx; state.buildings = keepBld; state.money = keepMoney;

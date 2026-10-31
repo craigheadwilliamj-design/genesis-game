@@ -815,7 +815,7 @@ const MENU = {
   pizza:   {label:"Pizza",       kind:"food", good:"snacks",  price:9,  cost:2.2, fills:{hunger:65},             litter:true},
   fries:   {label:"Fries",       kind:"food", good:"snacks",  price:4,  cost:.8,  fills:{hunger:35},             litter:true},
   popcorn: {label:"Popcorn",     kind:"food", good:"snacks",  price:3,  cost:.5,  fills:{hunger:25},             litter:true},
-  icecream:{label:"Ice cream",   kind:"food", good:"snacks",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3},
+  icecream:{label:"Ice cream",   kind:"food", good:"snacks",  price:4,  cost:.9,  fills:{hunger:15, thirst:25},  joy:3, cool:true, text:"Sells better in the heat. Cools guests off."},
   soda:    {label:"Soda",        kind:"food", good:"drinks",  price:3,  cost:.5,  fills:{thirst:70},             litter:true, cool:true, text:"Sells better in the heat. Cools guests off."},
   water:   {label:"Water",       kind:"food", good:"drinks",  price:2,  cost:.3,  fills:{thirst:60},             litter:true, cool:true, text:"Sells better in the heat. Cools guests off."},
   slushie: {label:"Slushies",    kind:"food", good:"drinks",  price:5,  cost:1,   fills:{thirst:55},             litter:true, cool:true, joy:2, text:"Sells better in the heat. Cools guests off."},
