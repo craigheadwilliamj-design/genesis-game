@@ -2215,9 +2215,9 @@ const PLANT_SPRITES = {
   "car-desert-small":      {ratio:44/38, size:1.27},
   "car-desert-medium":     {ratio:64/58, size:1.05},
   "car-desert-large":      {ratio:64/92, size:0.74},
-  "per-desert-small":      {ratio:44/36, size:1.27},
-  "per-desert-medium":     {ratio:66/54, size:1.08},
-  "per-desert-large":      {ratio:72/92, size:0.83},
+  "per-desert-small":      {ratio:64/64, size:1.04},
+  "per-desert-medium":     {ratio:80/80, size:.88},
+  "per-desert-large":      {ratio:160/160, size:1},
   "tri-desert-small":      {ratio:44/38, size:1.27},
   "tri-desert-medium":     {ratio:62/56, size:1.02},
   "tri-desert-large":      {ratio:64/92, size:0.74},
@@ -2521,9 +2521,9 @@ const SPRITE_HIT = {
   "per-boreal-large":[72,92,9.5,35.5,"34-38,28-44,27-64,8-65,4-71,2-71,1-71,1-71,10-66,4-68,4-69,3-69,3-56,18-52,22-49,26-45,31-40,33-39,33-39,33-39,33-39,33-39,27-45"],
   "per-boreal-medium":[64,54,12.5,31,",,,,10-24,10-53,4-53,2-58,1-60,1-61,1-61,20-62,21-43,23-41"],
   "per-boreal-small":[44,38,19.5,19.5,",,,11-32,10-33,5-39,4-40,3-41,3-41,16-28"],
-  "per-desert-large":[72,92,7.5,32.5,"21-51,18-54,21-51,11-61,12-60,14-58,6-66,7-65,8-64,4-68,5-67,6-66,27-45,34-38,34-38,34-38,33-39,33-39,33-39,33-39,33-39,33-39,29-43"],
-  "per-desert-medium":[66,54,6.5,31.5,",21-43,15-49,11-53,5-59,3-61,6-58,1-63,2-62,30-35,31-35,31-35,31-35,27-39"],
-  "per-desert-small":[44,36,19.5,19.5,",15-29,11-33,7-37,4-40,3-41,3-41,3-41,3-41"],
+  "per-desert-large":[160,160,40.5,42.5,",,77-78,73-83,70-85,67-88,67-88,66-93,66-95,61-97,61-97,63-94,76-81,76-81,50-101,49-99,49-98,76-82,75-82,75-82,46-115,43-117,49-116,52-112,56-99,74-83,74-83,74-83,55-109,37-118,35-119,36-115,39-106,65-84,73-84,73-84,73-84,73-84,72-85,71-86"],
+  "per-desert-medium":[80,80,24.5,31,",,26-37,24-55,25-56,25-56,13-62,11-67,12-68,12-72,12-70,12-68,15-66,12-66,12-61,14-63,16-62,24-58,36-44,38-42"],
+  "per-desert-small":[64,64,5.5,25,",,22-41,11-52,10-52,10-51,9-54,8-54,7-56,9-54,14-35,29-33,30-33,29-33,28-35,26-36"],
   "per-scrubland-large":[120,120,42,49.5,",,,,,,,,,24-46,19-102,15-102,15-101,15-107,43-108,45-105,40-91,40-91,49-97,22-96,14-95,10-99,10-99,12-96,24-91,19-88,15-88,11-87,11-94,54-87"],
   "per-scrubland-medium":[64,64,4,20,",,,,,18-46,17-47,15-48,12-51,12-51,18-44,18-44,30-33,30-33,29-34,28-35"],
   "per-scrubland-small":[64,64,6.5,30,",5-55,5-58,6-59,10-56,14-52,10-48,5-53,2-58,2-60,2-61,21-61,25-37,25-37,27-36,26-37"],
@@ -2709,8 +2709,8 @@ const FOOT = {
   plain:{small:2, medium:3, large:3, rock:3, boulder:7},   // no picture to measure: the middle of the range
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
-  rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small", "q-sagebrush", "per-wetland-small", "per-wetland-medium", "per-wetland-large"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "per-wetland-large":[0.5, 2.5], "per-wetland-medium":[1.5, 2.5], "per-wetland-small":[1, 1], "q-sagebrush":[0.5, 0.5], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
+  rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small", "q-sagebrush", "per-wetland-small", "per-wetland-medium", "per-wetland-large", "per-desert-small", "per-desert-medium", "per-desert-large"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
+  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-desert-large":[1, 2.5], "per-desert-medium":[1.5, 1.5], "per-desert-small":[1, 1.5], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "per-wetland-large":[0.5, 2.5], "per-wetland-medium":[1.5, 2.5], "per-wetland-small":[1, 1], "q-sagebrush":[0.5, 0.5], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
   rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
   rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}
