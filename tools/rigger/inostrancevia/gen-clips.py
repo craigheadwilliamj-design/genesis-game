@@ -4,8 +4,8 @@
 # walk: a heavy lateral-sequence plod (near hind, near front, far hind, far front, a quarter cycle apart): feet planted and sliding back at body
 #   speed, heel rolling up at push-off, then lifted with the knee or elbow bending and the toes hanging; the body sways and rocks, the head nods.
 # stand: breathing. idle: rears its head and gapes wide to bare the sabers, snaps shut. dynamic idle: tips forward to sniff the ground twice, looks
-#   up and snaps. rest: the Cotylorhynchus's way down: rocks back, sinks onto its belly with stiff limbs sprawled flat, lays the tail down, lowers
-#   its head (the game holds the last frame).
+#   up and snaps. rest: lies down like a cat: sits back on its folded hind legs, walks its forepaws out and lowers its chest, yawns, settles its
+#   head (the game holds the last frame).
 # Near and far limbs each keep their own standing ground row (the far feet sit a pixel higher). One-shots start and end on the standing pose; the
 # script prints any part that dips under the ground row.
 import json, math, os, sys
@@ -100,27 +100,31 @@ def sniff(fps=8, K=dict(pitch=5, sink=.6, head=22, hdy=2)):
           g(.6, -4, 0, 1), g(.2, -8, 0, 2), g(0, -10, 8), g(0, -10, 30), g(0, -9, 0), g(0, -6, 0, 1), g(0, -3), g(0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(N=16, fps=4, front=-30, back=60, head=4, lie=.6, tmax=6):
-  # the Cotylorhynchus's way down (the Moschops's rest): rocks back onto its haunches a moment, sinks onto its belly with each limb stiff and
-  # sprawled a little (forefeet forward, hind legs laid back along the tail: its legs are long, so less and the near thigh's picture, slid up
-  # into the flank, covers the rump or stands up over the back; feet flat)
-  # while its shoulders and hips slide up into the flank so the feet stay on the ground, lays the tail down, then lowers its head, the jaw
-  # shut against it, and gives one slow breath (the game holds the last frame)
+def rest(N=22, fps=5, F=(-45, -90, 0), B=(-65, 110, 0), sit=(-9, 4), lie=.6, tmax=6, head=(-4, 2), yawn=30):
+  # lies down like a cat: lowers its hindquarters first, the thighs swinging forward into a haunch with the shanks folded back under them
+  # (hind feet flat under the haunch, `B`), then walks its forepaws out and lowers the chest till the belly is on the ground, forearms flat
+  # out ahead under the throat (`F`; each limb's (upper, lower, foot) world angles), a yawn that bares the sabers, then its head settles
+  # (the game holds the last frame). `sit` is the body's (turn, drop) with only the rear down. A joint slides up into the body to keep its
+  # foot on the ground, never down out of it: a limb still too short lifts its foot instead, so the forepaws step out.
   drop = rd(GROUND - V.lowest({})[BODY] - .1)   # the belly down to the ground row
   # the tail turned down till it lies on the ground, at most `tmax` degrees (further, its base swings up over the rump)
   tdown = next(r/10 for r in range(-10*tmax, 201) if V.lowest({BODY: {'r': lie, 'dx': 0, 'dy': drop}, TAIL: {'r': r/10, 'dx': 0, 'dy': 0}})[TAIL] <= GROUND + .05)
+  lag = {FAR_BACK[0]: .06, NEAR_BACK[0]: 0, NEAR_FRONT[0]: 0, FAR_FRONT[0]: .07}   # the far legs a step behind the near ones
   out = []
   for i in range(N):
     t = i/(N - 1)
-    shift = math.sin(math.pi*min(1, t/.2))*(t < .2)   # rocks back a moment before going down
-    down = sm(max(0, min(1, (t - .12)/.5)))             # sinks onto the belly
-    hd = sm(max(0, min(1, (t - .55)/.3)))               # then lays its head down
-    br = .3*math.sin(math.pi*max(0, (t - .85)/.15))      # one slow breath once it's down
-    p = pose((-.8*shift + lie*down, -.6*shift, drop*down - br), head=-1.5*shift + head*hd - .6*down, jaw=-.3*head*hd, tail=.8*shift + tdown*down)
+    hind = sm(max(0, min(1, t/.32)))                    # the rear goes down
+    front = sm(max(0, min(1, (t - .26)/.36)))           # then the chest
+    yw = math.sin(math.pi*max(0, min(1, (t - .66)/.2)))  # a yawn
+    hd = sm(max(0, min(1, (t - .84)/.16)))               # the head settles
+    br = r = sit[0]*hind*(1 - front) + lie*front
+    dy = sit[1]*hind*(1 - front) + drop*front
+    p = pose((r, 0, dy), head=-r + head[0]*front*(1 - hd) + head[1]*hd - 6*yw, jaw=yawn*yw, tail=-r*.5*(1 - front) + tdown*front)
     for limb in LIMBS:
-      if down < .01: continue
-      a = (front if limb[0] in FRONT else back)*down
-      stiff(p, limb, a, a, 0)
+      fr = limb[0] in FRONT; T = F if fr else B
+      e = sm(max(0, min(1, ((t - .26)/.36 if fr else t/.32) - lag[limb[0]]*3)))
+      stiff(p, limb, T[0]*e, T[1]*e, T[2]*e)
+      if p[limb[0]]['dy'] > .4: p[limb[0]]['dy'] = .4   # never out of the body: lift the foot instead
     out.append(p)
   out[0] = pose()
   return {'name': 'rest', 'fps': fps, 'frames': unwrap(out)}
