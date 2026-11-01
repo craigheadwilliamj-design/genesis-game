@@ -100,16 +100,19 @@ def sniff(fps=8, K=dict(pitch=5, sink=.6, head=22, hdy=2)):
           g(.6, -4, 0, 1), g(.2, -8, 0, 2), g(0, -10, 8), g(0, -10, 30), g(0, -9, 0), g(0, -6, 0, 1), g(0, -3), g(0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(N=22, fps=5, F=(-45, -90, 0), B=(-65, 110, 0), sit=(-9, 4), lie=.6, tmax=6, head=(-4, 2), yawn=30):
+def rest(N=22, fps=5, F=(-45, -90, 0), B=(-65, 110, 0), sit=(-18, 3), lie=.6, tmax=6, head=(-4, 2), yawn=30):
   # lies down like a cat: lowers its hindquarters first, the thighs swinging forward into a haunch with the shanks folded back under them
   # (hind feet flat under the haunch, `B`), then walks its forepaws out and lowers the chest till the belly is on the ground, forearms flat
   # out ahead under the throat (`F`; each limb's (upper, lower, foot) world angles), a yawn that bares the sabers, then its head settles
-  # (the game holds the last frame). `sit` is the body's (turn, drop) with only the rear down. A joint slides up into the body to keep its
-  # foot on the ground, never down out of it: a limb still too short lifts its foot instead, so the forepaws step out.
+  # (the game holds the last frame). `sit` is the body's (turn, drop) with only the rear down, the hips already at their lying height.
+  # The hips lead and the hind legs follow: each folds only as far as keeps its foot on the ground, so it never folds up in the air.
+  # A forepaw that can't reach the ground yet lifts (its joint never slides down out of the body), so the forepaws step out.
   drop = rd(GROUND - V.lowest({})[BODY] - .1)   # the belly down to the ground row
-  # the tail turned down till it lies on the ground, at most `tmax` degrees (further, its base swings up over the rump)
-  tdown = next(r/10 for r in range(-10*tmax, 201) if V.lowest({BODY: {'r': lie, 'dx': 0, 'dy': drop}, TAIL: {'r': r/10, 'dx': 0, 'dy': 0}})[TAIL] <= GROUND + .05)
-  lag = {FAR_BACK[0]: .06, NEAR_BACK[0]: 0, NEAR_FRONT[0]: 0, FAR_FRONT[0]: .07}   # the far legs a step behind the near ones
+  def tailr(p, want):   # the tail turned `want`, or raised till it's out of the ground
+    for r in range(int(10*want), 401):
+      p[TAIL]['r'] = rd(r/10)
+      if V.lowest(p)[TAIL] <= GROUND + .05: return
+  lag = {NEAR_FRONT[0]: 0, FAR_FRONT[0]: .07}   # the far forepaw a step behind the near one
   out = []
   for i in range(N):
     t = i/(N - 1)
@@ -117,13 +120,21 @@ def rest(N=22, fps=5, F=(-45, -90, 0), B=(-65, 110, 0), sit=(-9, 4), lie=.6, tma
     front = sm(max(0, min(1, (t - .26)/.36)))           # then the chest
     yw = math.sin(math.pi*max(0, min(1, (t - .66)/.2)))  # a yawn
     hd = sm(max(0, min(1, (t - .84)/.16)))               # the head settles
-    br = r = sit[0]*hind*(1 - front) + lie*front
+    r = sit[0]*hind*(1 - front) + lie*front
     dy = sit[1]*hind*(1 - front) + drop*front
-    p = pose((r, 0, dy), head=-r + head[0]*front*(1 - hd) + head[1]*hd - 6*yw, jaw=yawn*yw, tail=-r*.5*(1 - front) + tdown*front)
+    p = pose((r, 0, dy), head=-r + head[0]*front*(1 - hd) + head[1]*hd - 6*yw, jaw=yawn*yw)
+    tailr(p, -tmax*front)
     for limb in LIMBS:
-      fr = limb[0] in FRONT; T = F if fr else B
-      e = sm(max(0, min(1, ((t - .26)/.36 if fr else t/.32) - lag[limb[0]]*3)))
-      stiff(p, limb, T[0]*e, T[1]*e, T[2]*e)
+      if limb[0] in FRONT:
+        e = sm(max(0, min(1, (t - .26)/.36 - lag[limb[0]]*3)))
+      else:   # the least fold that keeps the foot on (not in) the ground
+        lo, hi = 0.0, 1.0
+        for _ in range(20):
+          e = (lo + hi)/2; stiff(p, limb, B[0]*e, B[1]*e, B[2]*e, fit=False)
+          if bottom(p, limb) > GND[limb[0]]: lo = e
+          else: hi = e
+        e = hi
+      stiff(p, limb, *[a*e for a in (F if limb[0] in FRONT else B)])
       if p[limb[0]]['dy'] > .4: p[limb[0]]['dy'] = .4   # never out of the body: lift the foot instead
     out.append(p)
   out[0] = pose()
