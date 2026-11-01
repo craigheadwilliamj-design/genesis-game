@@ -6,10 +6,11 @@
 #   about its hip or shoulder with the foot kept flat, the joint giving so the stance foot stays on the ground; the swing foot lifts, its toes
 #   hanging a little; the body bobs, the head nods and the tail sways, never into the ground.
 # stand: breathing. idle: lifts its snout, gapes wide and snaps shut, tail flick. dynamic idle: lunges, snapping sideways at fish twice, and
-#   settles back. rest: sinks onto its belly with the forelegs splayed forward and the hind legs back, lays the tail down and lowers its head
-#   a little (the game holds the last frame). swim: low in the water (the game clips everything under the waterline, WL), legs tucked
+#   settles back. rest: sinks onto its belly with the forelegs splayed forward and the hind legs back, lays the tail down and lifts its snout
+#   to bask in the sun (the game holds the last frame). bask (the game's restidle, now and then while it lies there): opens its jaws
+#   wide, holds them open through a slow breath, closes them. swim: low in the water (the game clips everything under the waterline, WL), legs tucked
 #   back along the flank, a big tail wave and a little body roll.
-# One-shots start and end on the standing pose; the script prints any part that dips under the ground row.
+# One-shots start and end on the standing pose (bask on the rest's last pose); the script prints any part that dips under the ground row.
 import json, math, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lystrosaurus'))
 from lystkit import View, rd, sm, unwrap
@@ -109,9 +110,9 @@ def snap(fps=10):
           g(3, 6, 0, 4), g(2, 4, 2, 3), g(1, 2, 0, 2), g(0, 0, 0, 1), g(0, 0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(N=14, fps=6, front=-70, back=60):
+def rest(N=14, fps=6, front=-70, back=60, bask=-12):
   # sinks onto its belly (the body down to the ground row), forelegs splayed forward and hind legs back, each limb's joint sliding up into
-  # the flank so the foot stays down; lays the tail down, then lays its head down a little, jaw shut
+  # the flank so the foot stays down; lays the tail down, then lifts its snout to bask, jaw shut
   drop = rd(GROUND - V.lowest({})[BODY] - .1)
   out = []
   for i in range(N):
@@ -121,12 +122,26 @@ def rest(N=14, fps=6, front=-70, back=60):
     for lm in LIMBS:
       limb(p, lm, (front if lm[0] in FRONT else back)*down)
       p[lm[0]]['dy'] = rd(min(0, p[lm[0]]['dy']))   # a joint only slides up into the body
-    # the head laid down a little: a small tilt and at most a pixel down at the neck, since the head and body pictures overlap only a few
-    # pixels there and a bigger drop opens a step between them (the chin stays just off the ground)
-    p[HEAD] = {'r': rd(3*hd), 'dx': 0, 'dy': rd(1*hd)}
+    # then it lifts its snout as if basking in the sun, the forelegs showing under the chin: turned up about the neck, shifted at most a pixel,
+    # since the head and body pictures overlap only a few pixels there and a bigger shift opens a step between them
+    p[HEAD] = {'r': rd(bask*hd), 'dx': 0, 'dy': rd(-1*hd)}
     out.append(tailr(p, 0))
   out[0] = pose()
   return {'name': 'rest', 'fps': fps, 'frames': unwrap(out)}
+
+def bask(last, fps=4, gape=26, lift=-3):
+  # played now and then while it lies basking (the game's restidle): from the rest's last pose it slowly opens its jaws wide, the snout lifting
+  # a little more, holds them open through a slow breath, and closes them; the jaw opens only as far as keeps it out of the ground
+  op = [0, .15, .4, .7, .9, 1, 1, 1, 1, 1, 1, 1, 1, .95, .7, .35, .1, 0, 0]
+  out = []
+  for i, e in enumerate(op):
+    p = json.loads(json.dumps(last)); br = .3*math.sin(math.pi*max(0, min(1, (i - 5)/7)))
+    p[BODY]['dy'] = rd(p[BODY]['dy'] - br); p[HEAD]['r'] = rd(p[HEAD]['r'] + lift*e)
+    j = gape*e
+    while j > 0 and V.lowest(dict(p, **{JAW: {'r': j, 'dx': 0, 'dy': 0}}))[JAW] > GROUND + .05: j -= .5
+    p[JAW] = {'r': rd(max(0, j)), 'dx': 0, 'dy': 0}
+    out.append(p)
+  return {'name': 'bask', 'fps': fps, 'frames': unwrap(out)}
 
 def swim(N=8, fps=6, dy=2, tuck=72, tail=6):
   out = []
@@ -162,7 +177,8 @@ def gif(frames, path, fps, k=6, bg=(214, 228, 240, 255), wl=None):
   ims[0].save(path, save_all=True, append_images=ims[1:], duration=int(1000/fps), loop=0, disposal=2)
 
 RSIZE = 1.25
-clips = [walk(), stand(), gape(), snap(), rest(), swim()]
+R = rest()
+clips = [walk(), stand(), gape(), snap(), R, bask(R['frames'][-1]), swim()]
 for c in clips: check(c['name'], c['frames'])
 P['clips'] = clips
 json.dump(P, open(sys.argv[2], 'w'), separators=(',', ':'))

@@ -2952,6 +2952,15 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const f4 = {r:3, sp:"plat", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; f4.el.innerHTML = rigSvg("plat", f4);
       const rs = () => { f4.rg.last = performance.now() - 100; rigStep(f4, "rest"); }; rs(); const lockedRest = f4.rg.lock; for(let i = 0; i < 80; i++) rs();
       out.rigRestLock = lockedRest && !f4.rg.lock;
+      // a restidle clip (the Prionosuchus's basking gape) waits until it has lain down, plays now and then from the held rest pose, locks while it plays and ends back on that pose
+      const fp = {r:3, sp:"prio", stride:0, face:1, act:"rest", el:document.createElementNS("http://www.w3.org/2000/svg", "g")}; fp.el.innerHTML = rigSvg("prio", fp);
+      const pr = () => { fp.rg.last = performance.now() - 100; rigStep(fp, "rest"); }, RP = rigOf("prio");
+      pr(); const waitsDown = fp.rg.rIdleT >= 1; for(let i = 0; i < 40; i++) pr();
+      const restEnd = RP.clips.rest.dense[RP.clips.rest.dense.length - 1], heldDown = fp.rg.rIdleT >= 1 && !fp.rg.lock && restEnd.every((v, i) => Math.abs(v - fp.rg.cur[i]) < 1e-3);
+      fp.rg.gap = 0; pr(); const plays = fp.rg.rIdleT < 1 && fp.rg.lock; let gaped = false;
+      for(let i = 0; i < 80 && fp.rg.rIdleT < 1; i++){ pr(); if(Math.abs(fp.rg.cur[RP.parts.findIndex(p => p.n === "Jaw")*3] - restEnd[RP.parts.findIndex(p => p.n === "Jaw")*3]) > 15) gaped = true; }
+      pr(); const backDown = fp.rg.rIdleT >= 1 && !fp.rg.lock && restEnd.every((v, i) => Math.abs(v - fp.rg.cur[i]) < 1e-3) && fp.rg.gap >= RIG_IDLE.rest[0] - .2;
+      out.rigRestIdle = !!RP.clips.restidle && waitsDown && heldDown && plays && gaped && backDown;
       // swapped parts (o:1, a frame's v): a rig (a stand-in in the coty slot) shows its open head while it walks and a shut one once it has lain down to sleep
       const realCoty = RIGS.coty, hp = {img:"sprites/coty/head.png", ix:0, iy:0, iw:10, ih:10, p:-1, x:20, y:20, f:0};
       RIGS.coty = {w:100, h:75, parts:[{...hp, n:"COTY_HEAD"}, {...hp, n:"COTY_HEAD_CLOSED", o:1}], clips:{walk:{frames:[{}, {}]}, rest:{fps:4, frames:[{}, {}, {v:{0:0, 1:1}}, {v:{0:0, 1:1}}]}}};
