@@ -1,5 +1,5 @@
 /* Biome paint: decoration for the park ground outside exhibits.
-   state.biomePaint is a list of patches {id, biome, r:[x0,y0,x1,y1]} on the 1 m grid, drawn in list order (later paints over earlier).
+   state.biomePaint is a list of patches {id, biome, v, r:[x0,y0,x1,y1]} on the 1 m grid (v is one of the biome's GROUND_KINDS, left out for its own floor), drawn in list order (later paints over earlier).
    It only changes how the ground looks (the park's own biome, state.biome, stays locked). Painting keeps the list short: a patch that is
    fully covered is deleted, a partly covered one is trimmed when what is left is still one rectangle, and touching patches of the same
    biome merge when nothing painted above them is in the way. Drawing is clipped to the owned land (#plotClip) and cached. */
@@ -26,15 +26,21 @@ function paintUnion(a, b){
   if(a[1] === b[1] && a[3] === b[3] && a[0] <= b[2] && b[0] <= a[2]) return [Math.min(a[0], b[0]), a[1], Math.max(a[2], b[2]), a[3]];
   return null;
 }
+// A biome's ground kinds (GROUND_KINDS in data.js): the kind if the biome has it, else "" (its own floor); its pattern name ("wetland-mud") and its base color
+const groundKindOf = (b, v) => v && (GROUND_KINDS[b] || []).some(k => k[0] === v) ? v : "";
+const paintTex = (b, v) => groundKindOf(b, v) ? b + "-" + v : b;
+const groundColor = (b, v) => { const k = groundKindOf(b, v) && GROUND_KINDS[b].find(x => x[0] === v); return k ? k[2] : BIOMES[b].park; };
+const sameGround = (o, b, v) => o.biome === b && (o.v || "") === v;
 // Paint a box. Returns {removed, merged} or a string saying why not.
-function paintRect(biome, box){
+function paintRect(biome, box, v){
   if(!BIOMES[biome]) return "Pick a biome to paint.";
+  v = groundKindOf(biome, v);
   const r = paintClip(box); if(!r) return "Paint on land you own.";
   const list = paintList();
   // already that biome on top of everything here: nothing to do
   for(let i = list.length - 1; i >= 0; i--){
     if(!rectOverlap(list[i].r, r)) continue;
-    if(list[i].biome === biome && rectCovers(list[i].r, r)) return {removed:0, merged:0, same:true};
+    if(sameGround(list[i], biome, v) && rectCovers(list[i].r, r)) return {removed:0, merged:0, same:true};
     break;
   }
   let out = [], removed = 0, merged = 0;
@@ -52,14 +58,14 @@ function paintRect(biome, box){
   for(let again = true; again;){
     again = false;
     for(let i = out.length - 1; i >= 0; i--){
-      const o = out[i]; if(o.biome !== biome) continue;
+      const o = out[i]; if(!sameGround(o, biome, v)) continue;
       const u = paintUnion(o.r, r); if(!u) continue;
       if(out.slice(i + 1).some(p => rectOverlap(p.r, o.r))) continue;
       out.splice(i, 1); r.splice(0, 4, ...u); merged++; removed++; again = true; break;
     }
   }
   if(out.length >= PAINT.max) return "Too many painted patches. Paint over some of them first.";
-  out.push({id:uid("pt"), biome, r});
+  out.push(v ? {id:uid("pt"), biome, v, r} : {id:uid("pt"), biome, r});
   state.biomePaint = out; paintTouch();
   return {removed, merged};
 }
@@ -74,7 +80,7 @@ function eraseRect(box){
     const pieces = [[q[0], q[1], q[2], Math.max(q[1], r[1])], [q[0], Math.min(q[3], r[3]), q[2], q[3]],
       [q[0], Math.max(q[1], r[1]), Math.max(q[0], r[0]), Math.min(q[3], r[3])], [Math.min(q[2], r[2]), Math.max(q[1], r[1]), q[2], Math.min(q[3], r[3])]];
     let first = true;
-    for(const p of pieces) if(p[2] - p[0] > 0 && p[3] - p[1] > 0){ out.push(first ? (o.r = p, first = false, o) : {id:uid("pt"), biome:o.biome, r:p}); }
+    for(const p of pieces) if(p[2] - p[0] > 0 && p[3] - p[1] > 0){ out.push(first ? (o.r = p, first = false, o) : Object.assign({id:uid("pt"), biome:o.biome, r:p}, o.v ? {v:o.v} : {})); }
   }
   if(n){ state.biomePaint = out; paintTouch(); }
   return n;
@@ -85,11 +91,12 @@ function paintAt(x, y){
   for(let i = list.length - 1; i >= 0; i--){ const r = list[i].r; if(x >= r[0] && x < r[2] && y >= r[1] && y < r[3]) return list[i]; }
   return null;
 }
-// Change the biome of a patch that hasn't been painted over (the whole patch, as it is now)
-function repickPaint(id, biome){
+// Change the biome (and ground kind) of a patch that hasn't been painted over (the whole patch, as it is now)
+function repickPaint(id, biome, v){
   const o = paintList().find(p => p.id === id);
-  if(!o || !BIOMES[biome] || o.biome === biome) return false;
-  o.biome = biome; paintTouch(); return true;
+  v = groundKindOf(biome, v);
+  if(!o || !BIOMES[biome] || sameGround(o, biome, v)) return false;
+  o.biome = biome; if(v) o.v = v; else delete o.v; paintTouch(); return true;
 }
 function erasePaintAt(x, y){
   const o = paintAt(x, y); if(!o) return false;
@@ -102,7 +109,7 @@ function paintSvg(){
   if(paintCache && paintCache.state === state && paintCache.ver === paintVer && paintCache.n === list.length) return paintCache.s;
   const s = `<g clip-path="url(#plotClip)" pointer-events="none">` + list.map(o => {
     const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="${tileFill("p", o.biome)}"/>`;
+    return `<rect ${a} fill="${groundColor(o.biome, o.v)}"/><rect ${a} fill="${tileFill("p", paintTex(o.biome, o.v))}"/>`;
   }).join("") + `</g>`;
   paintCache = {state, ver:paintVer, n:list.length, s}; return s;
 }
@@ -137,7 +144,7 @@ function exhibitPaintSvg(e){
   const id = "pc-" + esc(e.id);
   return `<clipPath id="${id}"><polygon points="${polyStr(e.points)}"/></clipPath><g clip-path="url(#${id})" pointer-events="none">` + list.map(o => {
     const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].color}" fill-opacity=".8"/><rect ${a} fill="${tileFill("b", o.biome)}"/>`;
+    return `<rect ${a} fill="${groundColor(o.biome, o.v)}" fill-opacity=".8"/><rect ${a} fill="${tileFill("b", paintTex(o.biome, o.v))}"/>`;
   }).join("") + `</g>`;
 }
 // What painting a box in this biome costs: the biome's grading price for each square meter inside an exhibit that isn't already that biome

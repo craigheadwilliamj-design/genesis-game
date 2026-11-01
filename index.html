@@ -218,6 +218,7 @@ main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .drawbar .sizes.grid button:hover{background:color-mix(in srgb,var(--forest),#F3EFD9 12%)}
 .drawbar .sizes.grid button[aria-pressed="true"]{background:var(--money)}
 .drawbar .sizes button{border:0;border-radius:0}
+.drawbar .sizes .soil{width:14px;height:14px;vertical-align:-3px;margin-right:5px;border-radius:2px}
 .drawbar .sizes button+button{border-left:1px solid rgba(243,239,217,.25)}
 .drawbar .sizes button[aria-pressed="true"]{background:var(--money);color:#1D2B22;font-weight:600}
 
@@ -712,6 +713,43 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
           <pattern id="r-deep" width="1" height="1" patternUnits="userSpaceOnUse"><image width="1" height="1" style="image-rendering:pixelated"/></pattern>
           <pattern id="p-boreal" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
           <pattern id="p-tundra" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <!-- the other grounds each biome paints with (GROUND_KINDS) -->
+          <pattern id="b-desert-gravel" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert-gravel.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-desert-gravel" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert-gravel.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-desert-salt" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert-salt.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-desert-salt" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/desert-salt.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-scrubland-rubble" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland-rubble.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-scrubland-rubble" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland-rubble.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-scrubland-wash" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland-wash.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-scrubland-wash" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/scrubland-wash.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-boreal-needles" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal-needles.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-boreal-needles" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal-needles.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-boreal-lichen" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal-lichen.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-boreal-lichen" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/boreal-lichen.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-grassland-straw" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland-straw.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-grassland-straw" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland-straw.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-grassland-bare" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland-bare.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-grassland-bare" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/grassland-bare.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-wetland-mud" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland-mud.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-wetland-mud" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland-mud.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-wetland-peat" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland-peat.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-wetland-peat" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/wetland-peat.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-fern-fronds" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/fern-fronds.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-fern-fronds" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/fern-fronds.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-fern-silt" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/fern-silt.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-fern-silt" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/fern-silt.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-temperate-litter" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate-litter.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-temperate-litter" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate-litter.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-temperate-rocky" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate-rocky.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-temperate-rocky" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/temperate-rocky.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tundra-snow" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra-snow.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tundra-snow" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra-snow.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tundra-heath" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra-heath.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tundra-heath" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tundra-heath.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tropical-clay" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical-clay.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tropical-clay" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical-clay.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="b-tropical-litter" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical-litter.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
+          <pattern id="p-tropical-litter" width="36" height="36" patternUnits="userSpaceOnUse"><image data-sp="sprites/ground/tropical-litter.png" width="36" height="36" style="image-rendering:pixelated"/></pattern>
           <!-- theme textures, laid over paths, buildings, exhibit border bands and zone ground -->
           <pattern id="t-gilded" width="12" height="6" patternUnits="userSpaceOnUse">
             <path d="M0 .25H12M0 3.25H12M3 .25V3.25M9 3.25V6.25" fill="none" stroke="#2B1D18" stroke-width=".5" stroke-opacity=".5"/><rect x="4" y="3.7" width="4" height="2" fill="#D9A07F" fill-opacity=".25"/><rect x="9.5" y=".6" width="2" height="2.3" fill="#000" fill-opacity=".12"/>

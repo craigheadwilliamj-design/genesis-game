@@ -3878,6 +3878,19 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     paintRect(B, [x - 1, y + 11, x + 11, y + 14]);
     out.paintMergesNeighbours = rs() === JSON.stringify([[A, x - 5, y - 5, x + 15, y + 2], [B, x - 1, y + 2, x + 11, y + 14]]);
     out.paintNeverOffLand = typeof paintRect(A, [o[2] + 5, o[1], o[2] + 20, o[1] + 10]) === "string" && state.biomePaint.length === 2;
+    // ground kinds: another ground of a biome paints over its floor, keeps its kind when split, and counts as the biome
+    out.paintKinds = (() => {
+      const keep2 = state.biomePaint; state.biomePaint = [];
+      const k = GROUND_KINDS[A][1][0];
+      paintRect(A, [x, y, x + 10, y + 10]); paintRect(A, [x, y, x + 10, y + 5], k);
+      const two = state.biomePaint.length === 2 && paintAt(x + 1, y + 1).v === k && !paintAt(x + 1, y + 7).v;
+      const bad = paintRect(A, [x, y, x + 5, y + 5], "nope"), plain = !paintAt(x + 1, y + 1).v;
+      paintRect(A, [x, y, x + 10, y + 5], k); eraseRect([x + 3, y, x + 6, y + 5]);
+      const split = state.biomePaint.filter(p => p.v === k).length === 2;
+      paintVer++; const svg = paintSvg().includes(`#p-${A}-${k}`);
+      state.biomePaint = keep2; paintVer++;
+      return two && typeof bad === "object" && plain && split && svg && !!document.getElementById(`p-${A}-${k}`) && !!document.getElementById(`b-${A}-${k}`);
+    })();
     // erasing: a tap takes the patch, a box splits what it cuts
     out.eraseBoxSplits = (() => { const n = eraseRect([x + 3, y + 5, x + 7, y + 8]); return n === 1 && state.biomePaint.filter(p => p.biome === B).length === 4 && !paintAt(x + 4, y + 6) && !!paintAt(x + 1, y + 6) && !!paintAt(x + 4, y + 3) && !!paintAt(x + 4, y + 10) && !!paintAt(x + 9, y + 6); })();
     out.eraseTapTakesPatch = erasePaintAt(x + 1, y + 6) && !paintAt(x + 1, y + 6) && !erasePaintAt(x + 1, y + 6);
@@ -3916,12 +3929,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     out.waterMenuList = (() => { setTool("select"); const b = document.querySelector('#sideMenu .sitem[data-open="water"] [data-water="desert"]'); if(!b) return false; b.click();
       const on = tool === "water" && waterPick === "desert" && b.getAttribute("aria-pressed") === "true" && $("#dSizes").hidden; b.click();
       const off = tool === "select" && b.getAttribute("aria-pressed") === "false"; waterPick = "auto"; return on && off; })();
-    out.paintToolBar = (() => { setTool("select"); document.querySelector('#sideMenu [data-paint="tropical"]').click(); const ok = tool === "paint" && paintPick === "tropical" && document.querySelectorAll("#sideMenu [data-paint]").length === Object.keys(BIOMES).length + 1 && document.querySelector('#sideMenu [data-paint="tropical"]').getAttribute("aria-pressed") === "true" && $("#dSizes").hidden;
+    out.paintToolBar = (() => { setTool("select"); document.querySelector('#sideMenu [data-paint="tropical"]').click(); const ok = tool === "paint" && paintPick === "tropical" && document.querySelectorAll("#sideMenu [data-paint]").length === Object.keys(BIOMES).length + 1 && document.querySelector('#sideMenu [data-paint="tropical"]').getAttribute("aria-pressed") === "true" && !$("#dSizes").hidden && $("#dSizes").querySelectorAll("[data-soil]").length === GROUND_KINDS.tropical.length;
+      $("#dSizes").querySelector('[data-soil="clay"]').click();
+      const soil = paintKind.tropical === "clay" && $("#dSizes").querySelector('[data-soil="clay"]').getAttribute("aria-pressed") === "true";
       const [pcx, pcy] = chunkAt(x + 20, y), px = pcx * 5, py = pcy * 5;
       pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
-      const drawn = state.biomePaint.some(p => p.r.join() === [px, py, px + 10, py + 5].join());
+      const drawn = state.biomePaint.some(p => p.r.join() === [px, py, px + 10, py + 5].join() && p.v === "clay"); delete paintKind.tropical;
       paintPick = "erase"; pdrag = {a:[pcx, pcy], b:[pcx + 1, pcy]}; endPaintDrag();
-      const gone = !paintAt(px + 1, py + 1); paintPick = null; setTool("select"); return ok && drawn && gone; })();
+      const gone = !paintAt(px + 1, py + 1); paintPick = null; setTool("select"); return ok && soil && drawn && gone && $("#dSizes").hidden; })();
     state.biomePaint = keep || []; paintTouch(); render();
     out.waterChunks = (() => {
       const kw = state.water; state.water = []; setTool("water");
