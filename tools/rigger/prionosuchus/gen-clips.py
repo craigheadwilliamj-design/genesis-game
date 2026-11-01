@@ -6,8 +6,8 @@
 #   about its hip or shoulder with the foot kept flat, the joint giving so the stance foot stays on the ground; the swing foot lifts, its toes
 #   hanging a little; the body bobs, the head nods and the tail sways, never into the ground.
 # stand: breathing. idle: lifts its snout, gapes wide and snaps shut, tail flick. dynamic idle: lunges, snapping sideways at fish twice, and
-#   settles back. rest: sinks onto its belly with the forelegs splayed forward and the hind legs back, lays the tail down and rests its chin
-#   on the ground (the game holds the last frame). swim: low in the water (the game clips everything under the waterline, WL), legs tucked
+#   settles back. rest: sinks onto its belly with the forelegs splayed forward and the hind legs back, lays the tail down and lowers its head
+#   a little (the game holds the last frame). swim: low in the water (the game clips everything under the waterline, WL), legs tucked
 #   back along the flank, a big tail wave and a little body roll.
 # One-shots start and end on the standing pose; the script prints any part that dips under the ground row.
 import json, math, os, sys
@@ -68,7 +68,7 @@ def check(name, frames):
     if name != 'rest': bad += ['%s joint shifted %.1f' % (V.by[lg]['name'], f[lg]['dy']) for lg, _ in LIMBS if abs(f[lg]['dy']) > 2.5]
     if bad: print(' ', name, 'frame', i, ':', ', '.join(bad))
 
-def walk(N=12, fps=8, ds=.66, S=5.0, lift=1.6, bob=.35, hang=14, roll=10):
+def walk(N=12, fps=8, ds=.7, S=7.0, lift=1.3, bob=.35, hang=10, roll=10):
   PHASE = {NEAR_BACK[0]: 0, NEAR_FRONT[0]: .25, FAR_BACK[0]: .5, FAR_FRONT[0]: .75}
   out = []
   for i in range(N):
@@ -111,7 +111,7 @@ def snap(fps=10):
 
 def rest(N=14, fps=6, front=-70, back=60):
   # sinks onto its belly (the body down to the ground row), forelegs splayed forward and hind legs back, each limb's joint sliding up into
-  # the flank so the foot stays down; lays the tail down, then lowers its head till the chin rests on the ground, jaw shut
+  # the flank so the foot stays down; lays the tail down, then lays its head down a little, jaw shut
   drop = rd(GROUND - V.lowest({})[BODY] - .1)
   out = []
   for i in range(N):
@@ -121,10 +121,9 @@ def rest(N=14, fps=6, front=-70, back=60):
     for lm in LIMBS:
       limb(p, lm, (front if lm[0] in FRONT else back)*down)
       p[lm[0]]['dy'] = rd(min(0, p[lm[0]]['dy']))   # a joint only slides up into the body
-    # the head lowered flat (a small tilt, then shifted down at the neck) till the chin is on the ground
-    h = 0.0
-    while h < 6 and V.lowest(dict(p, **{HEAD: {'r': 2, 'dx': 0, 'dy': h + .5}}))[JAW] <= GROUND + .05: h += .5
-    p[HEAD] = {'r': rd(2*hd), 'dx': 0, 'dy': rd(h*hd)}
+    # the head laid down a little: a small tilt and at most a pixel down at the neck, since the head and body pictures overlap only a few
+    # pixels there and a bigger drop opens a step between them (the chin stays just off the ground)
+    p[HEAD] = {'r': rd(3*hd), 'dx': 0, 'dy': rd(1*hd)}
     out.append(tailr(p, 0))
   out[0] = pose()
   return {'name': 'rest', 'fps': fps, 'frames': unwrap(out)}
