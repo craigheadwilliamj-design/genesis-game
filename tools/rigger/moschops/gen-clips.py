@@ -102,13 +102,14 @@ def sniff(fps=7, K=dict(pitch=5, sink=.6, head=24, hdy=2.5)):
           g(.6, -4, 0, 1), g(.2, -6, 6, 2), g(0, -6, 0), g(0, -6, 6), g(0, -5, 0), g(0, -4, 5, 1), g(0, -3), g(0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(N=16, fps=4, front=-30, back=55, head=10, lie=.6):
+def rest(N=16, fps=4, front=-30, back=55, head=10, lie=.6, tmax=20):
   # the Cotylorhynchus's way down: rocks back onto its haunches a moment, sinks onto its belly with each limb stiff and sprawled a little
   # (forefeet forward, hind legs well back along the tail, which keeps the near thigh's picture under the line of the rump; feet flat)
   # while its shoulders and hips slide up into the flank so the feet stay on the ground, lays the tail down, then lowers its head, the jaw
   # shut against it, and gives one slow breath (the game holds the last frame)
   drop = rd(GROUND - V.lowest({})[BODY] - .1)   # the belly down to the ground row
-  tdown = next(r/10 for r in range(-200, 201) if V.lowest({BODY: {'r': lie, 'dx': 0, 'dy': drop}, TAIL: {'r': r/10, 'dx': 0, 'dy': 0}})[TAIL] <= GROUND + .05)
+  # the tail turned down till it lies on the ground, at most `tmax` degrees (further, its base swings up over the rump)
+  tdown = next(r/10 for r in range(-10*tmax, 201) if V.lowest({BODY: {'r': lie, 'dx': 0, 'dy': drop}, TAIL: {'r': r/10, 'dx': 0, 'dy': 0}})[TAIL] <= GROUND + .05)
   out = []
   for i in range(N):
     t = i/(N - 1)
