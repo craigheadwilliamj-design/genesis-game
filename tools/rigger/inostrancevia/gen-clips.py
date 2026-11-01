@@ -3,9 +3,9 @@
 #   python3 -I tools/rigger/inostrancevia/gen-clips.py IN.json OUT.json      (SHEETS=<dir> also writes contact sheets and GIFs)
 # walk: a heavy lateral-sequence plod (near hind, near front, far hind, far front, a quarter cycle apart): feet planted and sliding back at body
 #   speed, heel rolling up at push-off, then lifted with the knee or elbow bending and the toes hanging; the body sways and rocks, the head nods.
-# stand: a slow, deep breathing loop. idle: lifts its head and bellows with the mouth open, then shakes it off. dynamic idle: tips forward on bent
-#   front legs, crops plants at the ground twice and chews, looks up. rest: sinks onto its belly with the legs folded flat, lays the chin down, a yawn,
-#   then breathes slowly (the game holds the last frame).
+# stand: breathing. idle: rears its head and gapes wide to bare the sabers, snaps shut. dynamic idle: tips forward to sniff the ground twice, looks
+#   up and snaps. rest: the Cotylorhynchus's way down: rocks back, sinks onto its belly with stiff limbs sprawled flat, lays the tail down, lowers
+#   its head (the game holds the last frame).
 # Near and far limbs each keep their own standing ground row (the far feet sit a pixel higher). One-shots start and end on the standing pose; the
 # script prints any part that dips under the ground row.
 import json, math, os, sys
@@ -50,7 +50,7 @@ def pose(body=(0, 0, 0), head=0.0, hdy=0.0, jaw=0.0, tail=0.0, feet=None, kneel=
 def check(name, frames):
   for i, f in enumerate(frames):
     bad = [V.by[k]['name'] + ' %.1f' % (v - GROUND) for k, v in V.lowest(f).items() if v > GROUND + .5]
-    bad += ['%s joint shifted %.1f' % (V.by[th]['name'], f[th]['dy']) for th, _, _ in LIMBS if abs(f[th]['dy']) > 3]
+    if name != 'rest': bad += ['%s joint shifted %.1f' % (V.by[th]['name'], f[th]['dy']) for th, _, _ in LIMBS if abs(f[th]['dy']) > 3]   # lying, the joints slide up into the flank
     if bad: print(' ', name, 'frame', i, ':', ', '.join(bad))
 
 def walk(N=12, fps=8, ds=.6, S=9.0, SF=8.0, lift=2.4, liftF=2.4, crouch=.4, bob=.5, pitch=.7, knee=40, elbow=22, hang=22, hangF=-14, roll=16, give=4):
@@ -100,21 +100,30 @@ def sniff(fps=8, K=dict(pitch=5, sink=.6, head=22, hdy=2)):
           g(.6, -4, 0, 1), g(.2, -8, 0, 2), g(0, -10, 8), g(0, -10, 30), g(0, -9, 0), g(0, -6, 0, 1), g(0, -3), g(0, 0)]
   return {'name': 'dynamic idle', 'fps': fps, 'frames': unwrap(keys)}
 
-def rest(fps=5, lie=7, drop=8.5, fold={FAR_FRONT[0]: (40, 130), NEAR_FRONT[0]: (45, 150), FAR_BACK[0]: (-65, 90), NEAR_BACK[0]: (-95, -60)}):
-  # sinks onto its belly with the legs folded under it, out of sight (each limb's fold found by a search for the one that hides the most of it
-  # behind the body while its joint stays put)
-  def r(e, h, hdy=0.0, j=0.0, br=0.0):
-    e = sm(e); p = pose((-.5*e, 0, drop*e - br), head=h, hdy=hdy, jaw=j, tail=4*e)
+def rest(N=16, fps=4, front=-30, back=60, head=4, lie=.6, tmax=6):
+  # the Cotylorhynchus's way down (the Moschops's rest): rocks back onto its haunches a moment, sinks onto its belly with each limb stiff and
+  # sprawled a little (forefeet forward, hind legs laid back along the tail: its legs are long, so less and the near thigh's picture, slid up
+  # into the flank, covers the rump or stands up over the back; feet flat)
+  # while its shoulders and hips slide up into the flank so the feet stay on the ground, lays the tail down, then lowers its head, the jaw
+  # shut against it, and gives one slow breath (the game holds the last frame)
+  drop = rd(GROUND - V.lowest({})[BODY] - .1)   # the belly down to the ground row
+  # the tail turned down till it lies on the ground, at most `tmax` degrees (further, its base swings up over the rump)
+  tdown = next(r/10 for r in range(-10*tmax, 201) if V.lowest({BODY: {'r': lie, 'dx': 0, 'dy': drop}, TAIL: {'r': r/10, 'dx': 0, 'dy': 0}})[TAIL] <= GROUND + .05)
+  out = []
+  for i in range(N):
+    t = i/(N - 1)
+    shift = math.sin(math.pi*min(1, t/.2))*(t < .2)   # rocks back a moment before going down
+    down = sm(max(0, min(1, (t - .12)/.5)))             # sinks onto the belly
+    hd = sm(max(0, min(1, (t - .55)/.3)))               # then lays its head down
+    br = .3*math.sin(math.pi*max(0, (t - .85)/.15))      # one slow breath once it's down
+    p = pose((-.8*shift + lie*down, -.6*shift, drop*down - br), head=-1.5*shift + head*hd - .6*down, jaw=-.3*head*hd, tail=.8*shift + tdown*down)
     for limb in LIMBS:
-      a, fo = fold[limb[0]]
-      stiff(p, limb, a*e, fo*e, 0)
-    return p
-  keys = [r(i/(lie - 1), 3*sm(i/(lie - 1))) for i in range(lie)]
-  # (head turn, head drop, jaw, breath): a look round, a wide yawn, then its chin sinks and it breathes slowly
-  for h, hdy, j, br in [(3, 0, 0, 0), (-2, 0, 0, .2), (-4, 0, 0, 0), (0, 0, 0, .2), (-2, 0, 10, 0), (-5, 0, 34, .3), (-3, 0, 14, .2), (3, 0, 0, 0),
-                        (6, .3, 0, .2), (9, .6, 0, 0), (11, .9, 0, .3), (11, .9, 0, 0), (11, .9, 0, .3), (11, .9, 0, 0)]:
-    keys.append(r(1, h, hdy, j, br))
-  return {'name': 'rest', 'fps': fps, 'frames': unwrap(keys)}
+      if down < .01: continue
+      a = (front if limb[0] in FRONT else back)*down
+      stiff(p, limb, a, a, 0)
+    out.append(p)
+  out[0] = pose()
+  return {'name': 'rest', 'fps': fps, 'frames': unwrap(out)}
 
 CROP = (10, 36, 90, 75)
 def sheet(frames, path, cols=6, k=4, bg=(214, 228, 240, 255)):
