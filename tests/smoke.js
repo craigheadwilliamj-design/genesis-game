@@ -3920,9 +3920,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const priced = exhibitPaintCost(box, T) === Math.round(108 * BIOMES[T].perSqM) && exhibitPaintCost(box, "grassland") === 0;
       paintRect(T, box);
       const drawn = exhibitPaintSvg(e).includes(`url(#b-${T})`) && exhibitPaintSvg(e).includes("clip-path");
+      const fenced = paintShapes().get(state.biomePaint[0]).c === "" && !/<rect/.test(paintSvg());   // paint that fills the exhibit scatters nothing past its fence, and edges are drawn ragged, not as boxes
       const panel = biomeHtml(e).includes("Paint ground") && !biomeHtml(e).includes("biomeSel");
       state.exhibits.pop(); state.biomePaint = keepP; paintTouch();
-      return first && minority && tipped && free && priced && drawn && panel;
+      return first && minority && tipped && free && priced && drawn && fenced && panel;
     })();
     out.vivNeverPainted = (() => { const v = {viv:"S", biome:"desert", points:[[0,0],[5,0],[5,5],[0,5]], animals:[]}; const k = state.biomePaint; state.biomePaint = [{id:"x", biome:"tropical", r:[0,0,5,5]}]; paintTouch(); const ok = biomeOf(v) === "desert"; state.biomePaint = k; paintTouch(); return ok; })();
     out.paintMenuAndTool = !!document.querySelector('#sideMenu .sitem[data-open="paint"] .ssub [data-paint="erase"]');
