@@ -2114,6 +2114,19 @@ const BIOMES = {
   boreal:   {label:"Coniferous Forest", ground:"conifer forest, needle litter and moss", color:"#4F594A", park:"#4F594A", perSqM:.8, rock:1, plants:0.08},
   tundra:   {label:"Tundra",    ground:"frozen moss and lichen",      color:"#C3CDD4", park:"#C3CDD4", perSqM:.6, rock:1.4, plants:0.02},
 };
+// The grounds each biome paints with: [kind, label, color]. The first is the biome's own floor (kind "", BIOMES color); the others are sprites/ground/<biome>-<kind>.png
+// from tools/pixelground_calm.py (KINDS there), with that tile's base color. Every kind counts as its biome; they only vary the look.
+const GROUND_KINDS = {
+  desert:   [["", "Sand"], ["gravel", "Gravel plain", "#D9C39B"], ["salt", "Salt flat", "#F3EEE0"]],
+  tropical: [["", "Forest floor"], ["clay", "Red clay", "#7A4630"], ["litter", "Deep litter", "#3E4426"]],
+  grassland:[["", "Grass"], ["straw", "Dry grass", "#CCC07E"], ["bare", "Bare earth", "#A99168"]],
+  fern:     [["", "Loam"], ["fronds", "Fern carpet", "#6F6A3A"], ["silt", "Sandy silt", "#AD8C66"]],
+  scrubland:[["", "Hardpan"], ["rubble", "Red rubble", "#C9917A"], ["wash", "Dry wash", "#E2C3A3"]],
+  wetland:  [["", "Marsh"], ["mud", "Mudflat", "#665B3A"], ["peat", "Peat bog", "#443F27"]],
+  temperate:[["", "Moss"], ["litter", "Forest litter", "#5C5A36"], ["rocky", "Rocky ground", "#5D7350"]],
+  boreal:   [["", "Moss floor"], ["needles", "Needle litter", "#5C5341"], ["lichen", "Lichen rock", "#666C64"]],
+  tundra:   [["", "Frosted grit"], ["snow", "Snow", "#E9EEF2"], ["heath", "Lichen heath", "#A9AD91"]],
+};
 const DEFAULT_PARK_BIOME = "grassland";   // older parks keep the plain grass they had
 // (The Permian fern plants are placeholders named for their period until the real list.)
 // Landscape plants, one small, medium and large of each for every biome that existed in a period (names "small|medium|large").

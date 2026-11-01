@@ -1,5 +1,5 @@
 /* Biome paint: decoration for the park ground outside exhibits.
-   state.biomePaint is a list of patches {id, biome, r:[x0,y0,x1,y1]} on the 1 m grid, drawn in list order (later paints over earlier).
+   state.biomePaint is a list of patches {id, biome, v, r:[x0,y0,x1,y1]} on the 1 m grid (v is one of the biome's GROUND_KINDS, left out for its own floor), drawn in list order (later paints over earlier).
    It only changes how the ground looks (the park's own biome, state.biome, stays locked). Painting keeps the list short: a patch that is
    fully covered is deleted, a partly covered one is trimmed when what is left is still one rectangle, and touching patches of the same
    biome merge when nothing painted above them is in the way. Drawing is clipped to the owned land (#plotClip) and cached. */
@@ -26,15 +26,21 @@ function paintUnion(a, b){
   if(a[1] === b[1] && a[3] === b[3] && a[0] <= b[2] && b[0] <= a[2]) return [Math.min(a[0], b[0]), a[1], Math.max(a[2], b[2]), a[3]];
   return null;
 }
+// A biome's ground kinds (GROUND_KINDS in data.js): the kind if the biome has it, else "" (its own floor); its pattern name ("wetland-mud") and its base color
+const groundKindOf = (b, v) => v && (GROUND_KINDS[b] || []).some(k => k[0] === v) ? v : "";
+const paintTex = (b, v) => groundKindOf(b, v) ? b + "-" + v : b;
+const groundColor = (b, v) => { const k = groundKindOf(b, v) && GROUND_KINDS[b].find(x => x[0] === v); return k ? k[2] : BIOMES[b].park; };
+const sameGround = (o, b, v) => o.biome === b && (o.v || "") === v;
 // Paint a box. Returns {removed, merged} or a string saying why not.
-function paintRect(biome, box){
+function paintRect(biome, box, v){
   if(!BIOMES[biome]) return "Pick a biome to paint.";
+  v = groundKindOf(biome, v);
   const r = paintClip(box); if(!r) return "Paint on land you own.";
   const list = paintList();
   // already that biome on top of everything here: nothing to do
   for(let i = list.length - 1; i >= 0; i--){
     if(!rectOverlap(list[i].r, r)) continue;
-    if(list[i].biome === biome && rectCovers(list[i].r, r)) return {removed:0, merged:0, same:true};
+    if(sameGround(list[i], biome, v) && rectCovers(list[i].r, r)) return {removed:0, merged:0, same:true};
     break;
   }
   let out = [], removed = 0, merged = 0;
@@ -52,14 +58,14 @@ function paintRect(biome, box){
   for(let again = true; again;){
     again = false;
     for(let i = out.length - 1; i >= 0; i--){
-      const o = out[i]; if(o.biome !== biome) continue;
+      const o = out[i]; if(!sameGround(o, biome, v)) continue;
       const u = paintUnion(o.r, r); if(!u) continue;
       if(out.slice(i + 1).some(p => rectOverlap(p.r, o.r))) continue;
       out.splice(i, 1); r.splice(0, 4, ...u); merged++; removed++; again = true; break;
     }
   }
   if(out.length >= PAINT.max) return "Too many painted patches. Paint over some of them first.";
-  out.push({id:uid("pt"), biome, r});
+  out.push(v ? {id:uid("pt"), biome, v, r} : {id:uid("pt"), biome, r});
   state.biomePaint = out; paintTouch();
   return {removed, merged};
 }
@@ -74,7 +80,7 @@ function eraseRect(box){
     const pieces = [[q[0], q[1], q[2], Math.max(q[1], r[1])], [q[0], Math.min(q[3], r[3]), q[2], q[3]],
       [q[0], Math.max(q[1], r[1]), Math.max(q[0], r[0]), Math.min(q[3], r[3])], [Math.min(q[2], r[2]), Math.max(q[1], r[1]), q[2], Math.min(q[3], r[3])]];
     let first = true;
-    for(const p of pieces) if(p[2] - p[0] > 0 && p[3] - p[1] > 0){ out.push(first ? (o.r = p, first = false, o) : {id:uid("pt"), biome:o.biome, r:p}); }
+    for(const p of pieces) if(p[2] - p[0] > 0 && p[3] - p[1] > 0){ out.push(first ? (o.r = p, first = false, o) : Object.assign({id:uid("pt"), biome:o.biome, r:p}, o.v ? {v:o.v} : {})); }
   }
   if(n){ state.biomePaint = out; paintTouch(); }
   return n;
@@ -85,26 +91,118 @@ function paintAt(x, y){
   for(let i = list.length - 1; i >= 0; i--){ const r = list[i].r; if(x >= r[0] && x < r[2] && y >= r[1] && y < r[3]) return list[i]; }
   return null;
 }
-// Change the biome of a patch that hasn't been painted over (the whole patch, as it is now)
-function repickPaint(id, biome){
+// Change the biome (and ground kind) of a patch that hasn't been painted over (the whole patch, as it is now)
+function repickPaint(id, biome, v){
   const o = paintList().find(p => p.id === id);
-  if(!o || !BIOMES[biome] || o.biome === biome) return false;
-  o.biome = biome; paintTouch(); return true;
+  v = groundKindOf(biome, v);
+  if(!o || !BIOMES[biome] || sameGround(o, biome, v)) return false;
+  o.biome = biome; if(v) o.v = v; else delete o.v; paintTouch(); return true;
 }
 function erasePaintAt(x, y){
   const o = paintAt(x, y); if(!o) return false;
   state.biomePaint = paintList().filter(p => p !== o); paintTouch(); return true;
 }
+/* ---- blended edges ----
+   A patch isn't drawn as its box. Its edge is stair-stepped on the 0.125 m pixel grid and bulges outward by 0 to BLEND.max pixels (never inward, so no gap opens
+   between two patches), following smooth noise of the world position along that line. Past the edge, small pixel clumps of its ground are scattered over
+   the neighbouring ground (`near` ones just past the bulge, smaller `far` ones up to about 2 m out). Clumps are drawn after every patch, so where two
+   grounds meet each sends clumps into the other. A clump is only kept where its patch's edge shows (the patch is on top just inside it) and it lands on a
+   different ground. All of it is a fixed hash of the world position, so it never changes between draws and lines up across patches. Drawing only. */
+const BLEND = {step:2, max:8, knot:16, near:.5, far:.25,
+  nearShapes:[[".##.", "####", "####", ".##."], [".###.", "#####", ".###."], ["..##..", ".####.", "######", ".####."], [".##", "###", "##."], ["###", "###"]],
+  farShapes:[["##", "##"], [".#.", "###", ".#."], ["###"], ["##.", ".##"], ["#"]]};
+// how far (in pixels, 0 to BLEND.max) an edge on line `line` bulges at pixel `a` along it; `axis` 0 for horizontal edges, 1 for vertical
+function blendWob(a, line, axis){
+  const k = Math.floor(a / BLEND.knot), t = a / BLEND.knot - k, h = i => cellHash(i * 7 + axis * 1013, line + 4099) % 1000 / 999, m = (1 - Math.cos(t * Math.PI)) / 2;
+  return Math.round((h(k) * (1 - m) + h(k + 1) * m) * BLEND.max);
+}
+// Which open exhibit a point (in pixels) is in, "" for none: an edge only bulges and scatters within one, never across a fence
+let blendZones = [];
+const blendZone = (x, y) => { x /= 8; y /= 8; const z = blendZones.find(z => x >= z.bb.x0 && x <= z.bb.x1 && y >= z.bb.y0 && y <= z.bb.y1 && inPoly(x, y, z.pts)); return z ? z.id : ""; };
+const blendKeep = (ax, ay, bx, by) => blendZone(ax, ay) === blendZone(bx, by);
+// The ragged outline of a box in meters, as path data (every step axis-aligned, on the pixel grid)
+function blendOutline(r){
+  const X0 = r[0] * 8, Y0 = r[1] * 8, X1 = r[2] * 8, Y1 = r[3] * 8, S = BLEND.step, pts = [];
+  const M = BLEND.max, w = (a, line, axis, ix, iy, ox, oy) => blendKeep(ix, iy, ox, oy) ? blendWob(a, line, axis) : 0;
+  for(let a = X0; a < X1; a += S){ const m = a + S / 2, o = w(m, Y0, 0, m, Y0 + 1, m, Y0 - M); pts.push([a, Y0 - o], [Math.min(a + S, X1), Y0 - o]); }
+  for(let b = Y0; b < Y1; b += S){ const m = b + S / 2, o = w(m, X1, 1, X1 - 1, m, X1 + M, m); pts.push([X1 + o, b], [X1 + o, Math.min(b + S, Y1)]); }
+  for(let a = X1; a > X0; a -= S){ const m = a - S / 2, o = w(m, Y1, 0, m, Y1 - 1, m, Y1 + M); pts.push([a, Y1 + o], [Math.max(a - S, X0), Y1 + o]); }
+  for(let b = Y1; b > Y0; b -= S){ const m = b - S / 2, o = w(m, X0, 1, X0 + 1, m, X0 - M, m); pts.push([X0 - o, b], [X0 - o, Math.max(b - S, Y0)]); }
+  // relative steps, a run in one direction merged into one
+  let d = `M${pts[0][0] / 8} ${pts[0][1] / 8}`, [px, py] = pts[0], run = "", n = 0;
+  const step = (c, v) => { if(c === run && Math.sign(v) === Math.sign(n)){ n += v; return; } if(run) d += run + blendNum(n / 8); run = c; n = v; };
+  for(const [x, y] of pts.slice(1)){
+    if(x !== px){ step("h", x - px); px = x; }   // at a corner, across first, then down
+    if(y !== py){ step("v", y - py); py = y; }
+  }
+  if(run) d += run + blendNum(n / 8);
+  return d + "Z";
+}
+// a number for path data, short: .25 not 0.25
+const blendNum = v => String(+v.toFixed(3)).replace(/^(-?)0\./, "$1.");
+// A pixel clump (rows of "#") at pixel (x, y), turned on its side for a vertical edge, as path data. `at` is the pen ({x, y} in pixels, null to start
+// with an absolute move); each run is a relative move from the last, since a closed subpath leaves the pen at its start.
+function blendClump(shape, x, y, side, at){
+  let d = "";
+  shape.forEach((row, j) => { for(let i = 0; i < row.length; i++) if(row[i] === "#"){
+    let n = 1; while(row[i + n] === "#") n++;
+    const [cx, cy, w, h] = side ? [x + j, y + i, 1, n] : [x + i, y + j, n, 1];
+    d += (at.x === null ? `M${cx / 8} ${cy / 8}` : `m${blendNum((cx - at.x) / 8)} ${blendNum((cy - at.y) / 8)}`) + `h${blendNum(w / 8)}v${blendNum(h / 8)}h${blendNum(-w / 8)}z`;
+    at.x = cx; at.y = cy; i += n - 1;
+  } });
+  return d;
+}
+// The clumps a patch scatters past its four edges
+function blendClumps(o){
+  const r = o.r, X0 = r[0] * 8, Y0 = r[1] * 8, X1 = r[2] * 8, Y1 = r[3] * 8, M = BLEND.max, P = 8;
+  const top = (x, y) => { const t = paintAt(x, y); return t && sameGround(t, o.biome, o.v || "") ? t : null; };
+  let d = ""; const at = {x:null, y:null};
+  // each edge: [start, end, line, axis, outward sign]; along it one cell a meter
+  for(const [a0, a1, line, axis, sg] of [[X0, X1, Y0, 0, -1], [X0, X1, Y1, 0, 1], [Y0, Y1, X0, 1, -1], [Y0, Y1, X1, 1, 1]]){
+    for(let a = a0; a < a1; a += P){
+      const h = cellHash(a * 3 + axis * 7919 + (sg > 0 ? 17 : 0), line + 811);
+      for(const [far, chance, shapes] of [[0, BLEND.near, BLEND.nearShapes], [1, BLEND.far, BLEND.farShapes]]){
+        const hh = cellHash(h + far, far * 31 + 5);
+        if(hh % 1000 / 1000 >= chance) continue;
+        const sh = shapes[(hh >>> 10) % shapes.length], len = sh[0].length, dep = sh.length;
+        const along = a + (hh >>> 4) % Math.max(1, P - len), gap = far ? 3 + (hh >>> 7) % 7 : (hh >>> 7) % 4 - 2;   // pixels past the furthest bulge (near ones may touch it)
+        const out = sg < 0 ? line - M - gap - dep : line + M + gap;
+        // only where this patch's edge shows, and onto other ground
+        const inside = axis ? [(line - sg * 2) / 8, (along + len / 2) / 8] : [(along + len / 2) / 8, (line - sg * 2) / 8];
+        const mid = axis ? [(out + dep / 2) / 8, (along + len / 2) / 8] : [(along + len / 2) / 8, (out + dep / 2) / 8];
+        if(paintAt(inside[0], inside[1]) !== o || top(mid[0], mid[1]) || !blendKeep(inside[0] * 8, inside[1] * 8, mid[0] * 8, mid[1] * 8)) continue;
+        d += axis ? blendClump(sh, out, along, 1, at) : blendClump(sh, along, out, 0, at);
+      }
+    }
+  }
+  return d;
+}
+// Every patch's outline and clumps, cached until the paint or the save changes
+// the open exhibits' shapes as one string: edges change when a fence moves
+const blendSig = () => state.exhibits.map(e => e.viv || !e.points ? "" : e.id + ptsSig(e.points)).join();
+let blendCache = null;
+function paintShapes(){
+  const list = paintList(), sig = blendSig();
+  if(blendCache && blendCache.state === state && blendCache.ver === paintVer && blendCache.n === list.length && blendCache.sig === sig) return blendCache.m;
+  const m = new Map();
+  blendZones = state.exhibits.filter(e => !e.viv && e.points).map(e => ({id:e.id, pts:e.points, bb:bbox(e.points)}));
+  for(const o of list) m.set(o, {d:blendOutline(o.r), c:blendClumps(o)});
+  blendCache = {state, ver:paintVer, n:list.length, sig, m}; return m;
+}
+// The patches as SVG: each outline in order, then every patch's clumps over them. `kind` is "p" (park) or "b" (exhibit floor, its color a little see-through like the floor)
+function blendSvg(list, kind){
+  const m = paintShapes(), op = kind === "b" ? ` fill-opacity=".8"` : "";
+  const fill = (d, o) => d ? `<path d="${d}" fill="${groundColor(o.biome, o.v)}"${op}/><path d="${d}" fill="${tileFill(kind, paintTex(o.biome, o.v))}"/>` : "";
+  return list.map(o => fill(m.get(o).d, o)).join("") + list.map(o => fill(m.get(o).c, o)).join("");
+}
 // The drawn patches: the biome's color with its texture, as the park ground is. Cached until the paint or the save changes.
 function paintSvg(){
   const list = paintList();
   if(!list.length) return "";
-  if(paintCache && paintCache.state === state && paintCache.ver === paintVer && paintCache.n === list.length) return paintCache.s;
-  const s = `<g clip-path="url(#plotClip)" pointer-events="none">` + list.map(o => {
-    const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].park}"/><rect ${a} fill="${tileFill("p", o.biome)}"/>`;
-  }).join("") + `</g>`;
-  paintCache = {state, ver:paintVer, n:list.length, s}; return s;
+  const m = paintShapes();
+  if(paintCache && paintCache.m === m) return paintCache.s;
+  const s = `<g clip-path="url(#plotClip)" pointer-events="none">` + blendSvg(list, "p") + `</g>`;
+  paintCache = {m, s}; return s;
 }
 
 /* ---- paint inside exhibits (not vivariums) ----
@@ -130,15 +228,16 @@ function paintShare(e){
   exShareCache.set(e, r); return r;
 }
 const paintedBiome = e => e.points && !e.viv && state && state.biomePaint && state.biomePaint.length ? paintShare(e).biome : e.biome;
-// The patches over an open exhibit's floor, drawn clipped to its shape
+// The patches over an open exhibit's floor, drawn clipped to its shape (cached per exhibit like paintShare)
+const exSvgCache = new WeakMap();
 function exhibitPaintSvg(e){
-  const bb = bbox(e.points), list = paintList().filter(p => rectOverlap(p.r, [bb.x0, bb.y0, bb.x1, bb.y1]));
-  if(!list.length) return "";
+  const bb = bbox(e.points), sig = ptsSig(e.points), c = exSvgCache.get(e);
+  const m = paintShapes();
+  if(c && c.m === m && c.sig === sig) return c.s;
+  const list = paintList().filter(p => rectOverlap(p.r, [bb.x0 - 3, bb.y0 - 3, bb.x1 + 3, bb.y1 + 3]));   // a patch's edge and clumps reach about 2 m past its box
   const id = "pc-" + esc(e.id);
-  return `<clipPath id="${id}"><polygon points="${polyStr(e.points)}"/></clipPath><g clip-path="url(#${id})" pointer-events="none">` + list.map(o => {
-    const r = o.r, a = `x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}"`;
-    return `<rect ${a} fill="${BIOMES[o.biome].color}" fill-opacity=".8"/><rect ${a} fill="${tileFill("b", o.biome)}"/>`;
-  }).join("") + `</g>`;
+  const s = !list.length ? "" : `<clipPath id="${id}"><polygon points="${polyStr(e.points)}"/></clipPath><g clip-path="url(#${id})" pointer-events="none">` + blendSvg(list, "b") + `</g>`;
+  exSvgCache.set(e, {m, sig, s}); return s;
 }
 // What painting a box in this biome costs: the biome's grading price for each square meter inside an exhibit that isn't already that biome
 function exhibitPaintCost(box, biome){

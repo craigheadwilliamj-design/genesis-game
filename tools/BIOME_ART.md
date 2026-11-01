@@ -38,7 +38,7 @@ Do these in order. Each step has a preview, see "Check your work".
 
 ### 1. Ground
 
-Every biome's ground comes from `tools/pixelground_calm.py`: one entry in its `BIOMES` (seed, speck and detail density, a palette, small stamps and their weights). Add or change an entry and rerun it.
+Every biome's ground comes from `tools/pixelground_calm.py`: one entry in its `BIOMES` (seed, speck and detail density, a palette, small stamps and their weights). Add or change an entry and rerun it. Its two other paint grounds (`GROUND_KINDS` in js/data.js) are entries in `KINDS` there, saved as `sprites/ground/<biome>-<kind>.png`; keep each one's base color equal to its `GROUND_KINDS` color, and give it `#b-` and `#p-<biome>-<kind>` patterns in index.html.
 
 - Tile is 288 px = 36 m (0.125 m a pixel), seamless, wraps over the edges: a flat base, faint 1 px specks, and a few small details a few shades off the base.
 - **Hide the repeat with small, low-contrast detail, not large shapes.** The first wetland tile had big mud blobs and looked like camouflage with a visible repeat. What works: a flat base, a few hundred faint specks, and a few dozen small stamps (tufts, twigs, pebbles, cracks) in tones close to the base. Nothing may be longer than about 10 px or distinctive enough to spot twice.

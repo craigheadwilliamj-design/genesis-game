@@ -31,6 +31,7 @@ let wdrag = null;                   // water box being dragged: {a, b} (chunks, 
 let waterPick = "auto";             // what the water tool lays: a WATER_TEX key (a water type), or "auto" for the biome's own water
 let pdrag = null;                   // biome paint box being dragged: {a, b} (grid points, js/biomepaint.js)
 let paintPick = null;               // what the paint tool does: a biome id, or "erase"
+const paintKind = {};               // the ground kind picked for each biome (GROUND_KINDS), "" for its own floor
 let fdrag = null;                   // fence being laid or lifted: {a, b, lift, first} (grid points, js/fences.js)
 let cdrag = null;                   // path run being laid: {a, b, kind, plan} (chunks, js/pathcells.js)
 let chover = null;                  // path tool or bulldoze: the chunk [cx, cy] under the pointer
@@ -1500,7 +1501,7 @@ function renderOverlay(){
   }
   if(pdrag){
     const r = paintBox(pdrag.a, pdrag.b), er = paintPick === "erase", c = er ? "var(--bad)" : "var(--sel)";
-    s += `<rect x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}" fill="${er ? c : BIOMES[paintPick].park}" fill-opacity="${er ? .15 : .7}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
+    s += `<rect x="${r[0]}" y="${r[1]}" width="${r[2] - r[0]}" height="${r[3] - r[1]}" fill="${er ? c : groundColor(paintPick, paintKind[paintPick])}" fill-opacity="${er ? .15 : .7}" stroke="${c}" stroke-width="1.5" stroke-dasharray="${5*inv} ${3*inv}" vector-effect="non-scaling-stroke"/>`;
   }
   if(wdrag){
     const b = waterBox(), c = b.err ? "var(--bad)" : "var(--sel)";
@@ -2691,7 +2692,15 @@ function finishDraw(){
 /* ---------- painting ground (js/biomepaint.js) ---------- */
 function paintBar(){
   if(!paintPick) paintPick = Object.keys(BIOMES).find(b => b !== parkBiome()) || parkBiome();
-  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Paint ground over water to remove it. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+  paintKindsBar();
+  showBar(paintPick === "erase" ? "Erase ground paint" : `Paint ${BIOMES[paintPick].label.toLowerCase()} ground`, "Pick one of the biome's grounds; each counts as that biome. Drag a box to paint it in 5 m chunks, like a path. A tap paints one chunk. New paint covers old paint. Pick Erase and drag or tap to take paint off. Paint ground over water to remove it. Free out in the park. Inside an exhibit (not vivariums) it costs the biome's grading price a m², and the biome with the most ground there becomes the exhibit's biome.", "", {undo:false, finish:false, cancel:"Done"});
+}
+// The picked biome's grounds as a row of swatches in the bar (its own floor and its GROUND_KINDS)
+function paintKindsBar(){
+  const el = $("#dSizes"), kinds = paintPick !== "erase" && GROUND_KINDS[paintPick];
+  el.hidden = !kinds; if(!kinds) return;
+  const cur = groundKindOf(paintPick, paintKind[paintPick]);
+  el.innerHTML = kinds.map(([k, label]) => `<button data-soil="${k}" aria-pressed="${k === cur}"><svg class="soil" viewBox="0 0 12 12" aria-hidden="true"><rect width="12" height="12" fill="${groundColor(paintPick, k)}"/><image href="${spriteUrl(`sprites/ground/${paintTex(paintPick, k)}.png`)}" width="288" height="288" style="image-rendering:pixelated"/></svg>${esc(label)}</button>`).join("");
 }
 // The Water and Paint Ground lists in the Landscaping tray show the picked type pressed while that tool is on
 function pressPicks(){
@@ -2716,7 +2725,7 @@ function endPaintDrag(){
   }
   const c = exhibitPaintCost(r, paintPick);
   if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
-  const res = paintRect(paintPick, r);
+  const res = paintRect(paintPick, r, paintKind[paintPick]);
   if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
   if(c) spend(c, "built");
   const cut = cutWaterAll(r);
@@ -4073,7 +4082,11 @@ $("#sideMenu").addEventListener("click", e => {
     it.classList.toggle("open", !was); b.setAttribute("aria-expanded", !was);
   }
 });
-$("#dSizes").addEventListener("click", e => { const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick); });
+$("#dSizes").addEventListener("click", e => {
+  const s = e.target.closest("[data-soil]");
+  if(s){ paintKind[paintPick] = s.dataset.soil; paintKindsBar(); return; }
+  const b = e.target.closest("[data-pick]"); if(b) setTool(b.dataset.pick);
+});
 $("#zin").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1.4); };
 $("#zout").onclick = () => { const {w, h} = svgSize(); zoomAt(w/2, h/2, 1/1.4); };
 $("#zfit").onclick = fit;
