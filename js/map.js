@@ -690,12 +690,15 @@ const WX_FX = {
   sandstorm:{tint:"rgba(150,95,40,.42)", n:170, vx:300, vy:10, w:4, h:1, sway:10, grow:true, color:"rgba(250,222,160,.7)"},
 };
 const wxCan = $("#wxfx"), wxCtx = wxCan.getContext("2d"), wxPool = [];
+const wxSize = {w:0, h:0};
+new ResizeObserver(() => { wxSize.w = 0; }).observe(wxCan);
 let wxKind = "", wxFlash = 0, wxNext = 0;   // "" so the first frame always tags the canvas with its kind
 function drawWeather(now){
   const wn = wxNow(), k = wn.ev || (wn.temp >= WX.heatWave ? "hot" : wn.temp <= WX.freeze ? "cold" : wn.sky), fx = WX_FX[k];
   if(k !== wxKind){ wxKind = k; wxCan.dataset.kind = k; wxFlash = 0; wxCtx.clearRect(0, 0, wxCan.width, wxCan.height); }
   if(!fx) return;
-  const w = Math.max(1, Math.round(wxCan.clientWidth / WX_SCALE)), h = Math.max(1, Math.round(wxCan.clientHeight / WX_SCALE));
+  if(!wxSize.w){ wxSize.w = Math.max(1, wxCan.clientWidth); wxSize.h = Math.max(1, wxCan.clientHeight); }   // measured once (reading it every frame forces a layout); a resize re-reads it
+  const w = Math.max(1, Math.round(wxSize.w / WX_SCALE)), h = Math.max(1, Math.round(wxSize.h / WX_SCALE));
   if(wxCan.width !== w || wxCan.height !== h){ wxCan.width = w; wxCan.height = h; }
   const c = wxCtx, dt = Math.min(.1, (now - (wxCan.t || now)) / 1000); wxCan.t = now;
   c.clearRect(0, 0, w, h);
@@ -1053,10 +1056,10 @@ function setFenceOver34(segs){
   bldOver34.sort((p, q) => p.yb - q.yb);   // back to front, so a near one covers the copy of a far one
   bldOver34.forEach((o, j) => o.j = j);
   bldOverLayer.innerHTML = bldOver34.map(o => `<clipPath id="bov${o.j}"></clipPath><g clip-path="url(#bov${o.j})"><use href="#${o.ref}"/></g>`).join("");
-  for(const o of bldOver34) o.clip = bldOverLayer.querySelector(`#bov${o.j}`);
+  { const cs = bldOverLayer.children; for(const o of bldOver34) o.clip = cs[o.j * 2]; }   // each item is a clipPath then its group
   fenceOver34 = segs.filter(Boolean).map((f, j) => ({...f, j, stat:boxes.filter(q => fenceOverHits(f, q[0], q[1], q[2])).map(q => fenceOverRect(q[0], q[1], q[2], q[3])).join(""), cur:null}));
   fenceOverLayer.innerHTML = fenceOver34.map(f => `<clipPath id="fov${f.j}">${f.stat}</clipPath><g clip-path="url(#fov${f.j})">${f.svg}${f.loose ? fenceOverFront(f, boxes) : ""}</g>`).join("");
-  for(const f of fenceOver34){ f.clip = fenceOverLayer.querySelector(`#fov${f.j}`); f.cur = f.stat; }
+  { const cs = fenceOverLayer.children; for(const f of fenceOver34){ f.clip = cs[f.j * 2]; f.cur = f.stat; } }
 }
 // A bench facing the viewer: the map y of its backrest's front, and the screen y of its seat's top (the picture's 8 rows above its base, or the drawn seat), so people on it stand in front of the backrest and behind the seat
 function benchSeat34(bl){
@@ -3318,8 +3321,9 @@ function drawFx(now){
 // Escaped animals outside an exhibit: a species with a picture is drawn like it is in its pen (walk strip or rig, facing the way it goes, idle when it stops),
 // with the red ring and the ! / z marker over it; otherwise (or zoomed far out) the old dot. Each loose animal keeps one element group (looseEls), so the rig and strip can animate.
 const looseEls = new Map();
+let looseLayerEl = null;
 function drawLoose(){
-  const layer = $("#looseLayer"), inv = 1/view.k;
+  const layer = looseLayerEl || (looseLayerEl = $("#looseLayer")), inv = 1/view.k;
   if(!state.safety || !state.safety.loose.length || !kGraph){ if(layer.childElementCount) layer.innerHTML = ""; looseEls.clear(); return; }
   const seen = new Set(), pulse = 1 + .25 * Math.sin(performance.now() / 180);
   for(const l of state.safety.loose){
