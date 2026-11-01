@@ -3980,8 +3980,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       }
       out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && /<(polygon|path)/.test(x)));
       out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
+      // freshwater fittings: only in a freshwater aquarium, each with its picture; a case holding one can't go back to sea water
+      { const fk = Object.keys(LAND).filter(k => LAND[k].fresh), sea = {id:"e-fs", viv:"M", aqua:true, points:rectPts(0, 0, 15, 10, 0), animals:[], land:[]}, fr = {...sea, id:"e-ff", fresh:true, land:[{id:"l-ff", type:"flog", x:0, y:0}]};
+        out.freshFittings = fk.length === 6 && fk.every(k => VIV_SPRITES[k] && SPRITE_PACK[`sprites/viv/${k}.png`] && caseTakes(fr, k) && !caseTakes(sea, k) && !caseTakes({...sea, aqua:false}, k))
+          && Object.keys(LAND).filter(k => LAND[k].sea).every(k => !caseTakes(fr, k)) && /Take out the sunken log/.test(freshProblem(fr, false) || ""); }
       // animated fittings (VIV_SPRITES frames): every frame drawn on the map, one visible at a time on a CSS loop, and every frame's picture packed
-      out.vivFittingsAnimate = ["vmist", "abubble", "akelp", "aweed"].every(k => { const V = VIV_SPRITES[k], svg = vivPropSvg({id:"l-a", type:k, x:5, y:5}, LAND[k]);
+      out.vivFittingsAnimate = ["vmist", "abubble", "akelp", "aweed", "fhorn", "feel"].every(k => { const V = VIV_SPRITES[k], svg = vivPropSvg({id:"l-a", type:k, x:5, y:5}, LAND[k]);
         return V.frames > 1 && (svg.match(/<image/g) || []).length === V.frames && svg.includes(`animation:frame${V.frames}of${V.frames}`) && [...Array(V.frames).keys()].every(i => SPRITE_PACK[`sprites/viv/${k}${i ? "-" + (i + 1) : ""}.png`]); });
       { const V = VIVARIUMS.M, ev = {id:"e-fa", name:"Tikts", viv:"M", points:rectPts(200, 300, V.w, V.d, 0), animals:[1,2,3,4].map(i => ({id:"fa" + i, sp:"tikt"})), happy:70};
         state.exhibits.push(ev); syncAnimals();
@@ -4105,8 +4109,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.vivPoolDrawn = poolSvg.includes("sprites/viv/vpool.png") && poolSvg.includes(`data-y="${pool.y - 1000}"`);
       state.exhibits = state.exhibits.filter(x => x !== pv);
 
-      // pictures: the five old props and the new ones all come from sprites/viv through the pack, and the dish shows its food
-      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble", "aboulder", "abrain", "acoral", "afan", "asponge", "akelp", "ashell"];
+      // pictures: every prop and fitting all come from sprites/viv through the pack, and the dish shows its food
+      const picsEv = mk("e-pic", 1, 200); const keys = ["vbark", "vbranch", "vdig", "vfeed", "vmist", "vdish", "vlamp", "vpool", "afilter", "asump", "arock", "aweed", "abubble", "aboulder", "abrain", "acoral", "afan", "asponge", "akelp", "ashell", "fdrift", "flog", "fhorn", "feel", "flily", "fstones"];
       picsEv.land = keys.map((k, i) => ({id:"pc" + i, type:k, x:196 + i * 1.5, y:300}));
       const svgp = landSvg(picsEv, null, () => false);
       out.vivSpritesDrawn = keys.every(k => VIV_SPRITES[k] && svgp.includes(`sprites/viv/${k}.png`)) && !svgp.includes("<circle") && Object.keys(VIV_SPRITES).length === keys.length;
