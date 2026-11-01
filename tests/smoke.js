@@ -1912,7 +1912,8 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         const tall = all.some(o => o.bb[3] - o.bb[1] > o.bb[2] - o.bb[0] + 1), wide = all.some(o => o.bb[2] - o.bb[0] > o.bb[3] - o.bb[1] + 1), notSquare = all.filter(o => o.v.rects.length > 1).length > 3;
         const cover = all.every(o => { const h = SPRITE_HIT[o.name]; if(!h || FOOT.box[o.name]) return true; const area = o.v.rects.reduce((n, q) => n + (q[2] - q[0]) * (q[3] - q[1]), 0), sil = h[4].split(",").reduce((n, b) => { if(!b) return n; const [a, z] = b.split("-").map(Number); return n + (z - a + 1) * 4 * ROCK_MPP * ROCK_MPP; }, 0); return area >= sil * .5 && area <= sil * 1.6; });
         const tap = all.every(o => !SPRITE_HIT[o.name] || /^M/.test(spriteHitPath(o.name, 0, 0, ROCK_MPP)));
-        return tall && wide && notSquare && cover && tap; })();
+        const sized = all.every(o => { const h = SPRITE_HIT[o.name], [t, b, n] = o.name.split('-'), d = ROCK_SPRITES[b][t][+n - 1]; return !h || (h[0] === d[0] && h[1] === d[1]); });   // the drawn size matches the measured picture, so the tap shape lines up
+        return tall && wide && notSquare && cover && tap && sized; })();
       // shelters and trays are drawn from pictures: each has a tap shape and a footprint, featSvg draws the picture, and a tray's food shows in its color (none when empty)
       out.shelterTraySprites = (() => {
         const keys = [...Object.keys(SHELTER_SPRITES), ...Object.keys(TRAY_SPRITES)], svg = (k, food) => featSvg({id:"t-" + k, type:k, x:50, y:50, food}, "temperate", null, () => false);
