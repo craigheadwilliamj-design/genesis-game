@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn a rigger project (the Save project JSON from tools/rigger) into game files.
 
-    python3 tools/rigtogame.py PROJECT.json plat --walk walk --idle plat_idle [idle2 ...] --rest resting --rest-end 14 [--swim swim --waterline 40]
+    python3 tools/rigtogame.py PROJECT.json plat --walk walk --idle plat_idle [idle2 ...] --rest resting --rest-end 14 [--rest-idle bask] [--swim swim --waterline 40]
 
 writes `sprites/<id>/<part>.png`, one picture per part cropped to its pixels, and replaces the line
 `RIGS.<id> = ...;` in js/rigs.js with the parts (draw order, parent, joint, picture box) and the poses of the
@@ -29,6 +29,7 @@ def main():
     ap.add_argument("--idle", nargs="+", help="name of the idle clip (played once now and then at its fps while the animal stands); give several names and they take turns at random (idle, idle2, ...)")
     ap.add_argument("--stand", help="name of a standing clip (a loop played while the animal stands still; with it, the idle clips play now and then in its place)")
     ap.add_argument("--rest", help="name of the rest clip (played once when the animal settles to rest, then its last frame is held)")
+    ap.add_argument("--rest-idle", help="name of a clip played now and then while it lies at rest, once the rest clip is done (it should start and end on the rest clip's last frame)")
     ap.add_argument("--swim", help="name of the swim clip (a loop played while the animal is in water: everything under the waterline is clipped away and ghosted, with ripples on it)")
     ap.add_argument("--waterline", type=int, default=40, help="the cell row of the waterline for the swim clip (rows above show, rows below are under water)")
     ap.add_argument("--rest-end", type=int, help="index of the last frame to play of the rest clip (default: all); later frames, like getting up, are left out")
@@ -75,6 +76,7 @@ def main():
     if a.rest:
         fps, fr = frames(a.rest)
         clips["rest"] = {"fps": fps, "frames": fr[:a.rest_end + 1] if a.rest_end is not None else fr}
+    if a.rest_idle: fps, fr = frames(a.rest_idle); clips["restidle"] = {"fps": fps, "frames": fr}
     if a.swim: fps, fr = frames(a.swim); clips["swim"] = {"fps": fps, "wl": a.waterline, "frames": fr}
     rig = {"w": proj["cell"]["w"], "h": proj["cell"]["h"], "parts": parts, "clips": clips}
     line = f"RIGS.{a.id} = " + json.dumps(rig, separators=(",", ":")) + ";"
@@ -87,7 +89,7 @@ def main():
         if mark not in src: sys.exit("js/rigs.js has no marker line for the species data")
         src = src.replace(mark, mark + line + "\n", 1)
     open(path, "w").write(src)
-    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, stand {len(clips.get('stand', {}).get('frames', []))} frames, idle {'+'.join(str(len(c['frames'])) for k, c in clips.items() if k.startswith('idle')) or 0} frames, rest {len(clips.get('rest', {}).get('frames', []))} frames, swim {len(clips.get('swim', {}).get('frames', []))} frames, js/rigs.js updated")
+    print(f"{a.id}: {len(parts)} parts in sprites/{a.id}/, walk {len(clips.get('walk', {}).get('frames', []))} frames, stand {len(clips.get('stand', {}).get('frames', []))} frames, idle {'+'.join(str(len(c['frames'])) for k, c in clips.items() if k.startswith('idle')) or 0} frames, rest {len(clips.get('rest', {}).get('frames', []))}+{len(clips.get('restidle', {}).get('frames', []))} frames, swim {len(clips.get('swim', {}).get('frames', []))} frames, js/rigs.js updated")
 
 if __name__ == "__main__":
     main()

@@ -7,9 +7,10 @@
 #   hanging a little; the body bobs, the head nods and the tail sways, never into the ground.
 # stand: breathing. idle: lifts its snout, gapes wide and snaps shut, tail flick. dynamic idle: lunges, snapping sideways at fish twice, and
 #   settles back. rest: sinks onto its belly with the forelegs splayed forward and the hind legs back, lays the tail down and lifts its snout
-#   to bask in the sun (the game holds the last frame). swim: low in the water (the game clips everything under the waterline, WL), legs tucked
+#   to bask in the sun (the game holds the last frame). bask (the game's restidle, now and then while it lies there): opens its jaws
+#   wide, holds them open through a slow breath, closes them. swim: low in the water (the game clips everything under the waterline, WL), legs tucked
 #   back along the flank, a big tail wave and a little body roll.
-# One-shots start and end on the standing pose; the script prints any part that dips under the ground row.
+# One-shots start and end on the standing pose (bask on the rest's last pose); the script prints any part that dips under the ground row.
 import json, math, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lystrosaurus'))
 from lystkit import View, rd, sm, unwrap
@@ -128,6 +129,20 @@ def rest(N=14, fps=6, front=-70, back=60, bask=-12):
   out[0] = pose()
   return {'name': 'rest', 'fps': fps, 'frames': unwrap(out)}
 
+def bask(last, fps=4, gape=26, lift=-3):
+  # played now and then while it lies basking (the game's restidle): from the rest's last pose it slowly opens its jaws wide, the snout lifting
+  # a little more, holds them open through a slow breath, and closes them; the jaw opens only as far as keeps it out of the ground
+  op = [0, .15, .4, .7, .9, 1, 1, 1, 1, 1, 1, 1, 1, .95, .7, .35, .1, 0, 0]
+  out = []
+  for i, e in enumerate(op):
+    p = json.loads(json.dumps(last)); br = .3*math.sin(math.pi*max(0, min(1, (i - 5)/7)))
+    p[BODY]['dy'] = rd(p[BODY]['dy'] - br); p[HEAD]['r'] = rd(p[HEAD]['r'] + lift*e)
+    j = gape*e
+    while j > 0 and V.lowest(dict(p, **{JAW: {'r': j, 'dx': 0, 'dy': 0}}))[JAW] > GROUND + .05: j -= .5
+    p[JAW] = {'r': rd(max(0, j)), 'dx': 0, 'dy': 0}
+    out.append(p)
+  return {'name': 'bask', 'fps': fps, 'frames': unwrap(out)}
+
 def swim(N=8, fps=6, dy=2, tuck=72, tail=6):
   out = []
   for i in range(N):
@@ -162,7 +177,8 @@ def gif(frames, path, fps, k=6, bg=(214, 228, 240, 255), wl=None):
   ims[0].save(path, save_all=True, append_images=ims[1:], duration=int(1000/fps), loop=0, disposal=2)
 
 RSIZE = 1.25
-clips = [walk(), stand(), gape(), snap(), rest(), swim()]
+R = rest()
+clips = [walk(), stand(), gape(), snap(), R, bask(R['frames'][-1]), swim()]
 for c in clips: check(c['name'], c['frames'])
 P['clips'] = clips
 json.dump(P, open(sys.argv[2], 'w'), separators=(',', ':'))
