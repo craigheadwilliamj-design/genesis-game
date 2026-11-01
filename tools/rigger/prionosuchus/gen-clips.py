@@ -68,7 +68,7 @@ def check(name, frames):
     if name != 'rest': bad += ['%s joint shifted %.1f' % (V.by[lg]['name'], f[lg]['dy']) for lg, _ in LIMBS if abs(f[lg]['dy']) > 2.5]
     if bad: print(' ', name, 'frame', i, ':', ', '.join(bad))
 
-def walk(N=12, fps=8, ds=.66, S=5.0, lift=1.6, bob=.35, hang=14, roll=10):
+def walk(N=12, fps=8, ds=.7, S=7.0, lift=1.3, bob=.35, hang=10, roll=10):
   PHASE = {NEAR_BACK[0]: 0, NEAR_FRONT[0]: .25, FAR_BACK[0]: .5, FAR_FRONT[0]: .75}
   out = []
   for i in range(N):
