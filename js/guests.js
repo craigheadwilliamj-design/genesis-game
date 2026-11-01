@@ -691,7 +691,7 @@ function guestsTick(m0, m1){
   // guests near a dangerous animal on the loose run for the gate
   const danger = state.safety.loose.filter(l => l.status === "loose" && isDangerous(SPECIES_BY_ID[l.sp])).map(loosePos).filter(Boolean);
   // how packed the path is around each walker: parties within 5 m either way, so short stretches at joins don't read as packed
-  const busy = new Map(), cell = (x, y) => Math.floor(x / 10) + ":" + Math.floor(y / 10), pos = new Map();
+  const busy = new Map(), cell = (x, y) => (Math.floor(x / 10) + 512) * 4096 + Math.floor(y / 10) + 512, pos = new Map();
   for(const p of parties) if(p.at && p.to){
     const x = p.at.x + (p.to.x - p.at.x) * p.t, y = p.at.y + (p.to.y - p.at.y) * p.t, k = cell(x, y);
     pos.set(p, [x, y]); if(!busy.has(k)) busy.set(k, []); busy.get(k).push([x, y]);

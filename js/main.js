@@ -71,7 +71,7 @@ events.gameOver = () => {
 
 /* ---------- the clock ---------- */
 let lastT = performance.now(), sinceDraw = 0, sincePanel = 0;
-let frameErrors = 0;
+let frameErrors = 0, renderMs = 0;
 function frame(now){
   // schedule the next frame first so one exception can't freeze the game for good
   requestAnimationFrame(frame);
@@ -101,7 +101,7 @@ function step(now){
   drawFx(now);
   ui.hud();
   sinceDraw += dt; sincePanel += dt;
-  if(speed && sinceDraw > 1 && !drag && !pinch){ sinceDraw = 0; render(); }
+  if(speed && sinceDraw > Math.min(6, Math.max(1, renderMs * 50 / 1000)) && !drag && !pinch){ sinceDraw = 0; const t0 = performance.now(); render(); renderMs = renderMs * .6 + (performance.now() - t0) * .4; }   // a heavy park redraws less often, so it spends about 2% of its time here (at most 6 s apart)
   // refresh the side panel now and then, but not while the mouse is over it (so buttons don't jump)
   if(sincePanel > 1.5 && !(sel && (sel.kind === "guest" || sel.kind === "staff" || sel.kind === "animal")) && !document.querySelector("dialog[open]") && !aside.matches(":hover") && !aside.contains(document.activeElement)){ sincePanel = 0; ui.panel(); }
 }
