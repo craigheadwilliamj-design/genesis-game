@@ -2296,6 +2296,18 @@ const outline = document.createElementNS("http://www.w3.org/2000/svg", "path");
 outline.setAttribute("stroke", "#1D2B22"); outline.setAttribute("stroke-width", "8.5"); outline.setAttribute("stroke-linecap", "round");
 outline.setAttribute("vector-effect", "non-scaling-stroke"); outline.setAttribute("fill", "none"); outline.setAttribute("stroke-opacity", ".55");
 guestLayer.insertBefore(outline, guestLayer.firstChild);
+// Zoomed in, guests and staff share peopleG and are kept in depth order (nearest last, sortPeople34); guests' pips all lie under it in pipG, so no pip covers someone's feet
+const pipG = document.createElementNS("http://www.w3.org/2000/svg", "g"), peopleG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+pipG.setAttribute("pointer-events", "none"); peopleG.setAttribute("pointer-events", "none");
+guestLayer.append(pipG, peopleG);
+// by ground y (el._z, set in walker34); only what's out of place moves, and ties keep their order
+function sortPeople34(){
+  const cs = peopleG.children;
+  let ok = true; for(let i = 1; i < cs.length && ok; i++) ok = cs[i]._z >= cs[i - 1]._z;
+  if(ok) return;
+  const els = [...cs].sort((a, b) => a._z - b._z);
+  els.forEach((el, i) => { if(cs[i] !== el) peopleG.insertBefore(el, cs[i]); });
+}
 
 // A ring around the party whose panel is open
 const guestRing = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -2343,12 +2355,13 @@ function drawParties(){
       const kind = guestKind(p) + (p.jacket > 0 ? "j" : ""), gear = guestGear(p, wet), gk = kind + gear.join();
       if(!el){
         el = document.createElementNS("http://www.w3.org/2000/svg", "g"); el.setAttribute("pointer-events", "none");
-        el.innerHTML = `<ellipse class="gpip" rx="1" ry=".45" fill="#fff" opacity=".8"/>` + humanSvg(kind, hm, null, null, gear);
+        el.innerHTML = humanSvg(kind, hm, null, null, gear);
+        el._pip = document.createElementNS("http://www.w3.org/2000/svg", "ellipse"); el._pip.setAttribute("rx", "1"); el._pip.setAttribute("ry", ".45"); el._pip.setAttribute("opacity", ".8"); pipG.appendChild(el._pip);
         el._cid = "gcl" + guestEls.size + "-" + (guestClipN++);
         el.insertAdjacentHTML("beforeend", `<clipPath id="${el._cid}"><rect x="-9" width="18"/></clipPath>`);
-        guestLayer.insertBefore(el, guestRing); guestEls.set(p.id, el); el._gk = gk;
+        peopleG.appendChild(el); guestEls.set(p.id, el); el._gk = gk;
       }else if(el._gk !== gk){   // bought something or the rain changed: redress the figure
-        el._gk = gk; el.querySelector(".hf").remove(); el.firstChild.insertAdjacentHTML("afterend", humanSvg(kind, hm, null, null, gear));
+        el._gk = gk; el.querySelector(".hf").remove(); el.insertAdjacentHTML("afterbegin", humanSvg(kind, hm, null, null, gear));
         el._hf = el._hm = el._hfr = undefined;
       }
       // behind a solid far fence: only what's above the fence's top edge shows
@@ -2362,16 +2375,17 @@ function drawParties(){
         }
       }
       const col = cols[ci] || SHIRTS[ci];
-      if(el._gc !== col){ el._gc = col; el.firstChild.setAttribute("fill", col); }
-      humanStep(el, kind, {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT); seen.add(p.id);
+      if(el._gc !== col){ el._gc = col; el._pip.setAttribute("fill", col); }
+      humanStep(el, kind, {}, x, y); walker34(el, x, y - deckLift(p, x, y) / TILT, y); seen.add(p.id);
+      el._pip.setAttribute("transform", el.getAttribute("transform")); el._pip.style.display = cut === null ? el.style.display : "none";   // a guest behind a solid fence shows no pip
       if(!deckLift(p, x, y)) behind.push(personBox34(x, y, hm));
       continue;
     }
     const m = `M${x.toFixed(2)} ${y.toFixed(2)}h0.001`;
     d[ci].push(m); all.push(m);
   }
-  for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); guestEls.delete(id); }
-  fenceOverAt.guests = behind; fenceOverPeople();
+  for(const [id, el] of guestEls) if(!seen.has(id)){ el.remove(); el._pip.remove(); guestEls.delete(id); }
+  sortPeople34(); fenceOverAt.guests = behind; fenceOverPeople();
   shirtPaths.forEach((el, i) => { el.setAttribute("stroke", cols[i] || SHIRTS[i]); el.setAttribute("d", d[i].join("")); });
   outline.setAttribute("d", all.join(""));
   const sp = sel && sel.kind === "guest" ? parties.find(q => q.id === sel.id) : null, at = sp && sp.at ? partyPos(sp) : null;
@@ -3166,7 +3180,8 @@ function gateTap(e){
 
 /* ---------- keepers on the map ---------- */
 const keeperEls = new Map();
-function walker34(el, x, y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; }
+// z: the ground y it stands on, for depth order (a guest up on a deck is drawn higher than it stands)
+function walker34(el, x, y, z = y){ el.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)})${upright()}`); el.style.display = hidden34(x, y) ? "none" : ""; el._z = z; }
 // A person drawn from strips (HUMAN_SPRITES): the walk frame follows distance walked, the work strip plays on the clock while standing at a job, and it faces the way it last moved
 // The feed crate held out in front of the carrying pose (sprite pixels, right of the body, at hand height; drawn in every pose while the keeper has food, so it looks the same walking, working and standing)
 function carryBox(col){
@@ -3200,7 +3215,7 @@ function humanStep(el, kind, c, x, y){
   if(el._hfr !== f){ el._hfr = f; el.querySelector("." + mode).setAttribute("x", -f * H.w); const hg = el.querySelector(".hg"); if(hg) hg.setAttribute("transform", `translate(0 ${GUEST_GEAR.bob[f] || 0})`); }
 }
 function drawKeepers(){
-  const layer = $("#keeperLayer"), inv = 1/view.k, seen = new Set(), staff = [];
+  const layer = peopleG, inv = 1/view.k, seen = new Set(), staff = [];
   for(const c of crew){
     if(!c.at) continue;
     seen.add(c.id);
@@ -3292,7 +3307,7 @@ function drawKeepers(){
     walker34(el, n.x, n.y); if(!hidden34(n.x, n.y)) staff.push(personBox34(n.x, n.y, r * 2));
   }
   for(const [id, el] of keeperEls) if(!seen.has(id)){ el.remove(); keeperEls.delete(id); }
-  fenceOverAt.staff = staff; fenceOverPeople();
+  sortPeople34(); fenceOverAt.staff = staff; fenceOverPeople();
 }
 
 // A little ATV: under a staff member who is driving, or parked on its own

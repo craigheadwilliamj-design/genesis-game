@@ -1101,7 +1101,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       drawParties();
       out.guestDotColored = shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0 && guestRing.style.display === "";
       // zoomed in, guests are pixel people with a pip in the dot color; zoomed out they go back to dots
-      { const k0 = view.k; view.k = 14; drawParties(); const sp = guestEls.size === 1 && guestEls.get(ej.id).firstChild.getAttribute("fill") === SHIRTS[PERS_INDEX.fun] && shirtPaths[PERS_INDEX.fun].getAttribute("d") === "";
+      { const k0 = view.k; view.k = 14; drawParties(); const sp = guestEls.size === 1 && guestEls.get(ej.id)._pip.getAttribute("fill") === SHIRTS[PERS_INDEX.fun] && shirtPaths[PERS_INDEX.fun].getAttribute("d") === "";
+        // people are drawn in depth order, the nearer one last, and pips lie under them all
+        const tw = {...ej, id:"p-twin", oy:(ej.oy || 0) - 1}; parties.push(tw); drawParties();
+        const ord = () => [...peopleG.children].indexOf(guestEls.get(ej.id)) > [...peopleG.children].indexOf(guestEls.get(tw.id)), back = ord();
+        tw.oy += 2; drawParties(); out.peopleDepthOrder = back && !ord() && guestEls.get(tw.id)._pip.parentNode === pipG && !guestEls.get(ej.id).querySelector("ellipse");
+        parties.splice(parties.indexOf(tw), 1); drawParties();
         view.k = 1; drawParties(); out.guestSprites = sp && guestEls.size === 0 && shirtPaths[PERS_INDEX.fun].getAttribute("d").length > 0; view.k = k0; drawParties(); }
       // what a party bought shows on its sprite: a jacket, one hat (the first it owns), a backpack, and the umbrella only in the rain; taking it off redresses the figure
       { const k0 = view.k; view.k = 14; Object.assign(ej, {jacket:1, trexhat:1, beanie:1, dimebag:1, umbrella:1}); drawParties();
