@@ -2215,9 +2215,9 @@ const PLANT_SPRITES = {
   "car-desert-small":      {ratio:44/38, size:1.27},
   "car-desert-medium":     {ratio:64/58, size:1.05},
   "car-desert-large":      {ratio:64/92, size:0.74},
-  "per-desert-small":      {ratio:44/36, size:1.27},
-  "per-desert-medium":     {ratio:66/54, size:1.08},
-  "per-desert-large":      {ratio:72/92, size:0.83},
+  "per-desert-small":      {ratio:64/64, size:1.04},
+  "per-desert-medium":     {ratio:80/80, size:.88},
+  "per-desert-large":      {ratio:160/160, size:1},
   "tri-desert-small":      {ratio:44/38, size:1.27},
   "tri-desert-medium":     {ratio:62/56, size:1.02},
   "tri-desert-large":      {ratio:64/92, size:0.74},
@@ -2710,7 +2710,7 @@ const FOOT = {
   crown:.5,    // the old square side of a plant is its base width, or this share of its crown width if that is more (kept for old saves)
   depth:.5,    // a plant in `rect` has a box its base width (to the half meter, held to the range) by this share of it deep, from the base back up the map
   rect:["dev-tropical-small", "per-scrubland-medium", "per-scrubland-large", "per-scrubland-small", "q-sagebrush", "per-wetland-small", "per-wetland-medium", "per-wetland-large", "per-desert-small", "per-desert-medium", "per-desert-large"],   // add a plant's key here when its picture is redrawn with a real base; the rest keep their square
-  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-desert-large":[1, 2], "per-desert-medium":[2, 2], "per-desert-small":[1, 2], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "per-wetland-large":[0.5, 2.5], "per-wetland-medium":[1.5, 2.5], "per-wetland-small":[1, 1], "q-sagebrush":[0.5, 0.5], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
+  box:{"boulder-scrubland-2":[3, 2], "boulder-scrubland-3":[8, 2], "boulder-scrubland-4":[5, 3], "per-desert-large":[1, 2.5], "per-desert-medium":[1.5, 1.5], "per-desert-small":[1, 1.5], "per-scrubland-large":[1.5, 2], "per-scrubland-medium":[1, 1.5], "per-scrubland-small":[1, 1], "per-wetland-large":[0.5, 2.5], "per-wetland-medium":[1.5, 2.5], "per-wetland-small":[1, 1], "q-sagebrush":[0.5, 0.5], "rock-scrubland-1":[3, 1], "rock-scrubland-2":[3, 2], "rock-scrubland-3":[2, 2], "rock-scrubland-4":[3, 2], "rock-scrubland-5":[2, 2], "rock-scrubland-6":[3, 2]},    // picture name -> [width, depth] in meters, set in the pixel editor: a plant's base box (half meters; lists it as `rect` too), a rock's one whole-cell box standing on its point
   rockCover:.5,   // a rock's ground cell is taken when its silhouette covers at least this share of it
   rockWide:.9,    // a rock's footprint is this share of its silhouette's width, to whole meters
   side:{}
