@@ -3,6 +3,7 @@
 # (DET times finer than 0.13 m). All stand upright with their base on the bottom row, centered.
 #   afilter Canister Filter   asump Sump Filter   arock Rock Arch   aweed Seaweed Bed   abubble Bubble Curtain
 #   aboulder Boulder Pile   abrain Brain Coral   acoral Branching Coral   afan Sea Fan   asponge Sponge Cluster   akelp Kelp Stand   ashell Giant Ammonite Shell
+#   freshwater only: fdrift Driftwood   flog Sunken Log   fhorn Hornwort Thicket   feel Eelgrass Meadow   flily Water Lily   fstones River Stones
 # Usage: python3 -I tools/pixelaqua.py [outdir] [sheet.png]   (default sprites/viv; the optional sheet is a x4 view of every picture)
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -146,8 +147,76 @@ def shell():
     c.part(ell(cx, cy, U * .9, U * .8), DARK(SHELL))
     return c
 
-FRAMES = {"abubble":6, "akelp":8, "aweed":8}   # animated fittings: frame count (<key>.png is the first, then <key>-2.png and on)
-ALL = {"afilter":canister, "asump":sump, "arock":arch, "aweed":weed, "abubble":bubbles, "aboulder":boulders, "abrain":brain, "acoral":coral, "afan":fan, "asponge":sponges, "akelp":kelpstand, "ashell":shell}
+# Freshwater fittings (LAND fresh: fresh water only), to go with the river bed backdrop
+DRIFT, LOGB, HORN, EEL, PAD, STEM, PETAL, STAMEN = ramp((168, 150, 122)), ramp((112, 84, 54)), ramp((70, 120, 58)), ramp((112, 146, 70)), ramp((74, 128, 62)), ramp((118, 140, 72)), ramp((236, 158, 186)), ramp((246, 214, 96))
+PEBBLES = (STONE, ramp((152, 124, 98)), ramp((112, 118, 124)), ramp((176, 160, 128)))
+
+def driftwood():
+    c = Cv(18 * U, 12 * U); W, H = c.w, c.h
+    grain = lambda x, y: "deep" if (y + round(math.sin(x / 4) * 1.5)) % 4 == 0 and x % 7 else "hi" if (y + round(math.sin(x / 4) * 1.5)) % 4 == 2 and x % 5 == 0 else None   # wavy grain along the wood
+    c.part(curve([(1.5 * U, H - 2 * U), (6 * U, H - 2.6 * U), (12 * U, H - 2.2 * U), (16.5 * U, H - 3.2 * U)], 3.2 * U), DRIFT, grain)   # the lying trunk
+    c.part(curve([(5 * U, H - 3 * U), (4 * U, 6 * U), (2.5 * U, 2 * U)], 2.2 * U), DRIFT, grain)   # limbs reaching up, worn smooth
+    c.part(curve([(9.5 * U, H - 3 * U), (11 * U, 6 * U), (10 * U, 3 * U), (11.5 * U, 1.2 * U)], 2 * U), DRIFT, grain)
+    c.part(curve([(14 * U, H - 3.5 * U), (15.5 * U, 5.5 * U)], 1.7 * U), DRIFT, grain)
+    c.part(stroke(1.2 * U, H - 2.4 * U, 0, H - U, 1.4 * U) | stroke(1.5 * U, H - 1.5 * U, 3 * U, H - 1, U * 1.1), DRIFT)   # root stubs
+    c.part(ell(7 * U, H - 2.5 * U, U * .9, U * .6), DARK(DRIFT))   # a knot hole
+    return c
+
+def sunkenlog():
+    c = Cv(20 * U, 9 * U); W, H = c.w, c.h
+    body = rect(3 * U, U, W - U - 1, H - 1) | ell(W - U - 1, H / 2 + U * .5, U, H / 2 - U * .5)
+    c.part(body, LOGB, lambda x, y: "deep" if x % 5 == 0 and (y // 3 + x // 5) % 3 else "hi" if y == U + 3 and x % 4 else None)   # bark in long broken furrows
+    c.part(ell(3 * U, H / 2 + U * .5, 2.6 * U, H / 2 - U * .5), mat(LOGB["edge"], (186, 150, 104), (160, 124, 82), (130, 98, 62)), lambda x, y: "deep" if abs(math.hypot((x + .5 - 3 * U) / 2.6, (y + .5 - H / 2 - U * .5) / (H / 2 / U - .5)) / U - 1.2) < .14 else None)   # the cut end with its rings
+    c.part(ell(3 * U, H / 2 + U * .6, 1.5 * U, H / 2 - 2 * U), mat((20, 16, 10), (64, 50, 32), (40, 31, 20), (32, 25, 16)))   # hollow inside
+    for mx, w in ((9 * U, 3 * U), (15 * U, 2 * U)): c.part({p for p in ell(mx, U * 1.2, w, U * .9) if p in body}, MOSS, lambda x, y: "hi" if (x + y) % 3 == 0 else None)   # moss on top
+    return c
+
+def hornwort(f=0, n=1):
+    c = Cv(14 * U, 22 * U); W, H = c.w, c.h
+    for x0, tall, ph in ((3.5, 18, 0), (6.5, 21, 1.4), (9.5, 16, 2.6), (11.5, 12, 3.7), (5, 13, 4.6)):   # stems with whorls of fine needle leaves, swaying a beat apart
+        sw = math.sin(2 * math.pi * f / n - ph)
+        pts = [(x0 * U + math.sin(i / 2 + ph) * U * .5 + sw * 1.1 * U * (i / 10) ** 1.5, H - U - i * U * tall / 10) for i in range(11)]
+        m = curve(pts, 1.6)
+        for i, (px, py) in enumerate(pts[1:]):
+            w = U * (1.5 - .6 * i / 10)
+            for a in (-150, -120, -60, -30): m |= stroke(px, py, px + math.cos(math.radians(a)) * w, py + math.sin(math.radians(a)) * w * .8, 1.3)
+        c.part(m, HORN, lambda x, y: "hi" if (x + y * 2) % 7 == 0 else None, rim=1)
+    c.part({p for p in ell(W / 2, H, 5 * U, 1.4 * U) if p[1] < H}, ramp((120, 104, 80)))   # the gravel it roots in
+    return c
+
+def eelgrass(f=0, n=1):
+    c = Cv(16 * U, 26 * U); W, H = c.w, c.h
+    for k in range(9):   # long ribbon blades from a tuft, each swaying a beat after the last, curling over at the tip
+        x0 = 4 * U + k * U; tall = H * (.62 + .34 * math.sin(k * 2.1) ** 2); lean = (k - 4) * .8 * U + math.sin(k * 1.7) * 1.2 * U; sw = math.sin(2 * math.pi * f / n - k * .7)
+        pts = [(x0 + lean * (i / 8) ** 1.4 + sw * 1.6 * U * (i / 8) ** 1.6 + math.sin(i / 2 + k) * .5 * U, H - U - tall * i / 8) for i in range(9)]
+        c.part(curve(pts, U * .9), EEL, lambda x, y, k=k: "hi" if (x + k) % 3 == 0 and y % 5 < 3 else None, rim=1)
+    c.part({p for p in ell(W / 2, H, 5 * U, 1.4 * U) if p[1] < H}, ramp((120, 104, 80)))
+    return c
+
+def lily():
+    c = Cv(18 * U, 30 * U); W, H = c.w, c.h
+    pads = ((4.2 * U, 4.6 * U, 3.6 * U), (13.4 * U, 3.2 * U, 4 * U), (8.6 * U, 9 * U, 3 * U))
+    for px, py, r in pads: c.part(curve([(W / 2, H - U), (W / 2 + (px - W / 2) * .4, H * .6), (px, py + U)], U * .9), STEM, rim=1)   # long stems up from the root to each pad
+    c.part(curve([(W / 2, H - U), (W / 2 + U, H * .5), (10.5 * U, 3.4 * U)], U * .9), STEM, rim=1)   # and to the flower
+    for px, py, r in pads:   # the pads, tipped toward us, each with its notch and veins
+        pad = ell(px, py, r, r * .5) - {(x, y) for x in range(round(px), round(px + r) + 1) for y in range(round(py) - abs(round((x - px) * .25)), round(py) + abs(round((x - px) * .25)) + 1)}
+        c.part(pad, PAD, lambda x, y, px=px, py=py: "deep" if (round(math.degrees(math.atan2(y - py, (x - px) / 2))) % 40) < 5 else None)
+    fl = set()
+    for a in range(-170, 0, 24): fl |= stroke(10.5 * U, 3.4 * U, 10.5 * U + math.cos(math.radians(a)) * 2.2 * U, 3.4 * U + math.sin(math.radians(a)) * 2.2 * U, U * 1.1)
+    c.part(fl, PETAL, lambda x, y: "hi" if (x + y) % 4 == 0 else None, rim=1); c.part(ell(10.5 * U, 3 * U, U * .8, U * .55), STAMEN, rim=1)   # the flower
+    c.part({p for p in ell(W / 2, H, 3 * U, 1.2 * U) if p[1] < H}, ramp((96, 80, 52)))   # the rootstock in the mud
+    return c
+
+def riverstones():
+    c = Cv(18 * U, 9 * U); W, H = c.w, c.h
+    for i, (cx, cy, rx, ry) in enumerate(((4, 6, 3.4, 2.6), (13.5, 6.2, 3.8, 2.4), (8.8, 5, 3.2, 2.6), (6.2, 7.6, 2.4, 1.6), (16, 7.8, 1.8, 1.3), (11, 7.8, 2.2, 1.4), (1.6, 7.9, 1.5, 1.1))):   # rounded cobbles, the far ones first, in mixed colors, banded or speckled
+        M = PEBBLES[i % 4]; tex = (lambda x, y: "hi" if (x * 3 + y * 7) % 19 == 0 else None) if i % 2 else (lambda x, y, cy=cy: "lo" if round(y - cy * U) % 5 == 2 else None)
+        c.part({p for p in ell(cx * U, cy * U, rx * U, ry * U) if p[1] < H}, M, tex)
+    return c
+
+FRAMES = {"abubble":6, "akelp":8, "aweed":8, "fhorn":8, "feel":8}   # animated fittings: frame count (<key>.png is the first, then <key>-2.png and on)
+ALL = {"afilter":canister, "asump":sump, "arock":arch, "aweed":weed, "abubble":bubbles, "aboulder":boulders, "abrain":brain, "acoral":coral, "afan":fan, "asponge":sponges, "akelp":kelpstand, "ashell":shell,
+       "fdrift":driftwood, "flog":sunkenlog, "fhorn":hornwort, "feel":eelgrass, "flily":lily, "fstones":riverstones}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/viv"

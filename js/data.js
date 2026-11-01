@@ -1722,7 +1722,7 @@ const LAND = {
   vdish:  {label:"Food Dish",           one:"a food dish",          price:250,  r:.8, color:"#8A8F96", vivToy:true, tray:6, fit:true, look:"vdish"},
   vlamp:  {label:"Basking Lamp",        one:"a basking lamp",       price:900,  r:.7, color:"#B87034", vivToy:true, lamp:true, fit:true, upkeep:6, look:"vlamp"},
   vpool:  {label:"Pool",                one:"a pool",               price:1800, r:1.3, color:"#3E86A8", vivToy:true, pool:true, poolM2:2.5, fit:true, flat:true, look:"vpool"},
-  // aquarium fittings and enrichment (aqua: aquariums only; the dish goes in both): filters clean `clean` load a day (AQUA) and draw `kw` of power; sea: sea water only, never in a freshwater aquarium
+  // aquarium fittings and enrichment (aqua: aquariums only; the dish goes in both): filters clean `clean` load a day (AQUA) and draw `kw` of power; sea: sea water only, never in a freshwater aquarium; fresh: the other way round
   afilter:{label:"Canister Filter",     one:"a canister filter",    price:1500, r:.6, color:"#5E7E8A", vivToy:true, aqua:true, fit:true, filter:true, clean:30, kw:10, upkeep:8, look:"afilter"},
   asump:  {label:"Sump Filter",         one:"a sump filter",        price:5000, r:1, color:"#46606A", vivToy:true, aqua:true, fit:true, filter:true, clean:120, kw:30, upkeep:25, look:"asump"},
   arock:  {label:"Rock Arch",           one:"a rock arch",          price:600,  r:1, color:"#80796C", toy:2, vivToy:true, aqua:true, hide:true, look:"arock"},
@@ -1735,6 +1735,13 @@ const LAND = {
   akelp:  {label:"Kelp Stand",          one:"a kelp stand",         price:900,  r:.6, color:"#968434", toy:3, vivToy:true, aqua:true, sea:true, look:"akelp"},
   ashell: {label:"Giant Ammonite Shell",one:"a giant ammonite shell",price:1500, r:1.1, color:"#C4A878", toy:3, vivToy:true, aqua:true, sea:true, hide:true, look:"ashell"},
   abubble:{label:"Bubble Curtain",      one:"a bubble curtain",     price:1100, r:.8, color:"#9FCFE0", toy:3, vivToy:true, aqua:true, look:"abubble"},
+  // freshwater enrichment (fresh: fresh water only, never in a sea aquarium)
+  fdrift: {label:"Driftwood",           one:"a piece of driftwood", price:500,  r:1, color:"#A8967A", toy:2, vivToy:true, aqua:true, fresh:true, look:"fdrift"},
+  flog:   {label:"Sunken Log",          one:"a sunken log",         price:900,  r:1.1, color:"#70543A", toy:3, vivToy:true, aqua:true, fresh:true, hide:true, look:"flog"},
+  fhorn:  {label:"Hornwort Thicket",    one:"a hornwort thicket",   price:500,  r:.8, color:"#46783A", toy:2, vivToy:true, aqua:true, fresh:true, look:"fhorn"},
+  feel:   {label:"Eelgrass Meadow",     one:"an eelgrass meadow",   price:600,  r:.9, color:"#709246", toy:2, vivToy:true, aqua:true, fresh:true, look:"feel"},
+  flily:  {label:"Water Lily",          one:"a water lily",         price:1200, r:.9, color:"#EC9EBA", toy:3, vivToy:true, aqua:true, fresh:true, look:"flily"},
+  fstones:{label:"River Stones",        one:"a pile of river stones", price:300, r:1, color:"#8C877A", toy:1, vivToy:true, aqua:true, fresh:true, hide:true, look:"fstones"},
 };
 // Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at VIV_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
 // Shelter pictures (sprites/shelter/<key>.png, made by tools/pixelshelter.py): size in pixels at ROCK_MPP a pixel, and `b`, the picture's base (its bottom row) in radii below the spot.
@@ -1742,7 +1749,7 @@ const SHELTER_SPRITES = {shelter:{w:48, h:40, b:.78}, barn:{w:84, h:62, b:.78}, 
 // Food tray pictures (sprites/tray/<key>.png): flat dishes centered on the spot; `well` is [cx, cy, rx, ry] in pixels, the hollow the food is drawn into.
 const TRAY_SPRITES = {traysm:{w:18, h:9, well:[9, 4.5, 6.5, 2.6]}, traymd:{w:30, h:14, well:[15, 7, 11.5, 4.6]}, traylg:{w:46, h:20, well:[23, 10, 18, 7.4]}};
 // Vivarium and aquarium fitting pictures (sprites/viv, tools/pixelviv.py and tools/pixelaqua.py), w x h in pixels at VIV_MPP a pixel (DET, 3, times finer than ROCK_MPP, to match the animals drawn in a case); flat ones lie on the floor; frames: an animation, <key>-2.png and on, looping at fps
-const VIV_SPRITES = {aboulder:{w:54, h:30}, abrain:{w:48, h:30}, acoral:{w:48, h:48}, afan:{w:48, h:54}, asponge:{w:42, h:42}, akelp:{w:48, h:90, frames:8, fps:4}, ashell:{w:60, h:51}, afilter:{w:30, h:48}, asump:{w:54, h:42}, arock:{w:60, h:36}, aweed:{w:48, h:66, frames:8, fps:4}, abubble:{w:36, h:72, frames:6, fps:6}, vbark:{w:48, h:30}, vbranch:{w:48, h:60}, vdig:{w:48, h:33}, vfeed:{w:30, h:45}, vmist:{w:42, h:51, frames:6, fps:8}, vdish:{w:36, h:18, flat:true}, vlamp:{w:30, h:57}, vpool:{w:60, h:33, flat:true}};
+const VIV_SPRITES = {aboulder:{w:54, h:30}, abrain:{w:48, h:30}, acoral:{w:48, h:48}, afan:{w:48, h:54}, asponge:{w:42, h:42}, akelp:{w:48, h:90, frames:8, fps:4}, ashell:{w:60, h:51}, afilter:{w:30, h:48}, asump:{w:54, h:42}, arock:{w:60, h:36}, aweed:{w:48, h:66, frames:8, fps:4}, fdrift:{w:54, h:36}, flog:{w:60, h:27}, fhorn:{w:42, h:66, frames:8, fps:4}, feel:{w:48, h:78, frames:8, fps:4}, flily:{w:54, h:90}, fstones:{w:54, h:27}, abubble:{w:36, h:72, frames:6, fps:6}, vbark:{w:48, h:30}, vbranch:{w:48, h:60}, vdig:{w:48, h:33}, vfeed:{w:30, h:45}, vmist:{w:42, h:51, frames:6, fps:8}, vdish:{w:36, h:18, flat:true}, vlamp:{w:30, h:57}, vpool:{w:60, h:33, flat:true}};
 // Vivarium food: animals eat from dishes (LAND.vdish), and keepers can only deliver into dishes, so a case with none can't be fed. A dish holds one food at a time, up to cap units
 // by case size, and serves perDish animals; more animals than dishes go hungry. A dish costs nothing to run.
 const VIV_DISH = {cap:{S:6, M:10, L:16}, perDish:4};

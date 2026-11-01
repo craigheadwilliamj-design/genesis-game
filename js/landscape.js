@@ -949,7 +949,7 @@ function freshProblem(e, on){
   if(on === !!e.fresh) return on ? "It's already fresh water." : "It's already sea water.";
   if(!canAfford(AQUA.swap)) return `Costs ${money(AQUA.swap)}.`;
   const s = e.animals.map(a => SPECIES_BY_ID[a.sp]).find(s => s && !!s.fresh !== on); if(s) return `Move the ${s.name} out first.`;
-  const f = on && landOf(e).find(f => LAND[f.type] && LAND[f.type].sea); if(f) return `Take out the ${LAND[f.type].label.toLowerCase()} first.`;
+  const f = landOf(e).find(f => LAND[f.type] && (on ? LAND[f.type].sea : LAND[f.type].fresh)); if(f) return `Take out the ${LAND[f.type].label.toLowerCase()} first.`;
   return null;
 }
 function setFresh(e, on){
@@ -963,8 +963,8 @@ function setPalu(e, on){
   else { earn(Math.round(PALU.price * COST.refundShare), "sold"); delete e.palu; delete e.wq; delete e.filterPowered; }
   relayViv(e);   // the fittings move up onto the bank (or spread back out), and the animals find their spots again
 }
-// Which fittings a case takes: aquarium ones (filters, sea enrichment) only in aquariums, the rest only in vivariums; a food dish goes in either
-const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu) && !(t.sea && e.fresh))); };   // and corals, kelp and the like stay out of fresh water   // a paludarium takes filters too, and needs no pool
+// Which fittings a case takes: aquarium ones (filters, enrichment; sea ones only in sea water, fresh ones only in fresh) only in aquariums, the rest only in vivariums; a food dish goes in either
+const caseTakes = (e, key) => { const t = LAND[key]; return !!e.viv && !!t && !!t.vivToy && (!!t.tray || (t.filter && e.palu) || (!!t.aqua === !!e.aqua && !(t.pool && e.palu) && !(t.sea && e.fresh) && !(t.fresh && !e.fresh))); };   // and corals, kelp and the like stay out of fresh water   // a paludarium takes filters too, and needs no pool
 // Vivarium enrichment goes in the same way, full size
 function vivToyProblem(e, key){
   const t = LAND[key];
