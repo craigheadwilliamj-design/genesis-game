@@ -2244,7 +2244,7 @@ const PLANT_SPRITES = {
   "car-temperate-large":    {ratio:64/92, size:0.74},
   "per-temperate-small":    {ratio:80/80, size:2.31},
   "per-temperate-medium":   {ratio:80/80, size:1.31},
-  "per-temperate-large":    {ratio:160/160, size:2.6},
+  "per-temperate-large":    {ratio:160/160, size:1.2},
   "dev-tropical-small":   {ratio:20/14, size:0.65},
   "dev-tropical-medium":  {ratio:64/54, size:1.05},
   "dev-tropical-large":   {ratio:64/92, size:0.74},
