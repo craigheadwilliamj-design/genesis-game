@@ -384,8 +384,6 @@ function callKeeper(e, kind = "keeper"){
   }
   if(best) call.keeper = best.c.id;
   calls.push(call);
-  const k = best && K.staff().find(x => x.id === best.c.id);
-  events.toast(k ? `${k.name} is on the way to ${callName(e)}.` : `Every ${K.word} is tied up. The next one free will go to ${callName(e)}.`, k ? "good" : "");
   return null;
 }
 function cancelCall(e, kind = "keeper"){ state.staff.calls = state.staff.calls.filter(x => !(x.ex === e.id && callKind(x) === kind)); }
@@ -470,14 +468,14 @@ function dropOff(t, a){
   state.staff.transfers = state.staff.transfers.filter(x => x !== t);
   if(t.ward){   // a recovered patient going home: into its exhibit, or a crate by it if it can't go in
     const e = state.exhibits.find(x => x.id === t.to);
-    if(e && !crateProblem(a, e)){ putAnimal(e, a); events.toast(`A ${SPECIES_BY_ID[a.sp].name} was delivered to ${e.name}.`, "good"); }
+    if(e && !crateProblem(a, e)){ putAnimal(e, a); }
     else { const pmc = pmcBuilding(), [x, y] = e ? centroid(e.points) : pmc ? centroid(pmc.points) : labSpot(); dropCrate(a, x, y); }
     events.changed(); return;
   }
   if(t.lab){
     const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp], list = specimens();
-    if(e && !crateProblem(a, e)){ const i = list.findIndex(x => x.id === a.id); if(i >= 0) list.splice(i, 1); putAnimal(e, a); events.toast(`A ${s.name} was delivered to ${e.name}.`, "good"); }
-    else { if(!list.some(x => x.id === a.id)) list.push(a); events.toast(`The ${s.name}'s exhibit can't take it, so it went back to the Genetics Lab.`, "bad"); }
+    if(e && !crateProblem(a, e)){ const i = list.findIndex(x => x.id === a.id); if(i >= 0) list.splice(i, 1); putAnimal(e, a); }
+    else { if(!list.some(x => x.id === a.id)) list.push(a); dayNote(`A ${s.name} went back to the Genetics Lab: its exhibit couldn't take it.`); }
     events.changed(); return;
   }
   const pmc = pmcBuilding();
@@ -486,8 +484,8 @@ function dropOff(t, a){
   if(t.med && !state.exhibits.some(x => x.id === t.to) && state.exhibits.some(x => x.id === t.from)){ sendHome(a, t.from); events.changed(); return; }
   delete a.darted;
   const e = state.exhibits.find(x => x.id === t.to), s = SPECIES_BY_ID[a.sp];
-  if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); events.toast(`Keepers moved a ${s.name} into ${e.name}.`, "good"); }
-  else { const from = state.exhibits.find(x => x.id === t.from), [x, y] = from ? centroid(from.points) : labSpot(); dropCrate(a, x, y); events.toast(`The ${s.name}'s new exhibit is gone, so keepers put it in a crate.`, "bad"); }
+  if(e){ if(!e.animals.length) e.happy = 70; e.animals.push(a); }
+  else { const from = state.exhibits.find(x => x.id === t.from), [x, y] = from ? centroid(from.points) : labSpot(); dropCrate(a, x, y); dayNote(`A ${s.name} was crated: its new exhibit is gone.`); }
   events.changed();
 }
 
@@ -667,9 +665,8 @@ function arrive(c, k){
       e.stock[c.carry.type] = (e.stock[c.carry.type] || 0) + give; c.carry.amount -= give;
       noteFlow(null, e.id, give);
       if(c.carry.amount <= 0.01) setCarry(c, null);
-      if(c.carry && startFilling(c, e)){ events.toast(`${k.name} checked ${e.name}.`, "good"); return; }
+      if(c.carry && startFilling(c, e)) return;
     }
-    events.toast(`${k.name} checked ${e.name}.`, "good");
     if((e.dirt || 0) > 2){ c.cleanId = e.id; c.cleanLow = false; c.job = "mucking"; }
     return;
   }

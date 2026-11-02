@@ -98,7 +98,8 @@ function breakOut(e, a){
   turnLoose(e, a);
   e.cond = 0; e.inspected = {day:state.day, cond:0};   // a breakout leaves the fence broken until a mechanic fixes it
   state.rating = Math.max(0, state.rating - .05);
-  events.toast(`ESCAPE! A ${s.name} broke out of ${e.name}.${isDangerous(s) ? " It's dangerous. Guests are at risk." : ""} ${vetsOnDuty() ? "Vets with dart guns are on the way." : "Keepers with dart guns are on the way."}`, "bad");
+  notify(`A ${s.name} broke out of ${e.name}.`, {kind:"exhibit", id:e.id});
+  events.incident({kind:"escape", animal:s.name, exhibit:e.name, danger:isDangerous(s)});
   events.changed();
 }
 
@@ -141,7 +142,8 @@ function harmGuests(dtMin){
       sf.deaths++;
       spend(ESCAPE.lawsuit, "fines");
       state.rating = Math.max(0, state.rating - .3);
-      events.toast(`A guest was killed by the escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}.`, "bad");
+      notify(`A guest was killed by an escaped ${SPECIES_BY_ID[l.sp].name}. The family is suing for ${money(ESCAPE.lawsuit)}.`);
+      events.incident({kind:"guest", animal:SPECIES_BY_ID[l.sp].name, fine:ESCAPE.lawsuit});
     }
   }
 }
@@ -157,8 +159,8 @@ function fearFactor(){
 function returnAnimal(l, e){
   state.safety.loose = state.safety.loose.filter(x => x !== l);
   const s = SPECIES_BY_ID[l.sp];
-  if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, ...geneFields(l), ...(l.sick ? {sick:l.sick} : {})}); events.toast(`Keepers returned the ${s.name} to ${e.name}.`, "good"); }
-  else { const [x, y] = loosePos(l) || labSpot(); dropCrate(l, x, y); events.toast(`Keepers put the ${s.name} in a crate.`, "good"); }
+  if(e){ e.animals.push({id:l.id, name:l.name, sex:l.sex, rank:l.rank, sp:l.sp, cl:l.cl, ...geneFields(l), ...(l.sick ? {sick:l.sick} : {})}); }
+  else { const [x, y] = loosePos(l) || labSpot(); dropCrate(l, x, y); }
   events.changed();
 }
 

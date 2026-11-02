@@ -363,14 +363,14 @@ panelEl.addEventListener("click", ev => {
   if(a === "cperiod"){ cerePeriod = b.dataset.k; ui.panel(); return; }
   if(a === "gsite"){ if(b.dataset.site !== ghostSite) ghostPick = null; ghostSite = b.dataset.site; ghostRefresh(); return; }
   if(a === "gpick"){ ghostPick = b.dataset.sp; ghostRefresh(); return; }
-  if(a === "gscout"){ if(sendDrone("scout", ghostSite)) done(); else ui.toast(scoutProblem(ghostSite) || "The Time Travel Lab can't go there.", "bad"); return; }
-  if(a === "gdig"){ const s = SITE_BY_ID[ghostSite], id = s && s.event ? s.event : ghostPick; if(sendDrone("dig", ghostSite, id)){ ghostPick = null; done(); } else ui.toast(expeditionProblem(ghostSite, id) || "Pick a target first.", "bad"); return; }
+  if(a === "gscout"){ if(sendDrone("scout", ghostSite)) done(); else sayWhy(scoutProblem(ghostSite) || "The Time Travel Lab can't go there.", b); return; }
+  if(a === "gdig"){ const s = SITE_BY_ID[ghostSite], id = s && s.event ? s.event : ghostPick; if(sendDrone("dig", ghostSite, id)){ ghostPick = null; done(); } else sayWhy(expeditionProblem(ghostSite, id) || "Pick a target first.", b); return; }
   if(a === "gdeep"){ const s = SITE_BY_ID[b.dataset.site]; if(s && sendDrone("dig", s.id, s.event)) done(); return; }
-  if(a === "gbuy"){ const why = buyDrone(); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "gbuy"){ const why = buyDrone(); done(); sayWhy(why, b); return; }
   if(a === "greport"){ dismissReport(+b.dataset.id); done(); return; }
-  if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "research"){ const why = startProject(b.dataset.kind, b.dataset.id); done(); sayWhy(why, b); return; }
   if(a === "stopResearch"){ const p = state.science.projects[+b.dataset.i]; if(p) stopProject(p); done(); return; }
   if(a === "discardClone"){ if(discardClone(b.dataset.id)) done(); return; }
-  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else ui.toast(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "The Botany Lab can't grow that.", "bad"); return; }
+  if(a === "grow"){ if(growBatch(b.dataset.kind, b.dataset.era, b.dataset.size)) done(); else sayWhy(growProblem(b.dataset.kind, b.dataset.era, b.dataset.size) || "The Botany Lab can't grow that.", b); return; }
   if(a === "autoGrow"){ state.ceres.auto[b.dataset.era] = !state.ceres.auto[b.dataset.era]; done(); return; }
 });

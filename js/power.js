@@ -99,7 +99,7 @@ function updatePower(){
     powerShortNotified = state.day;
     const pl = (n, one, many) => n ? `${n} ${n === 1 ? one : many}` : "";
     const what = [pl(cut, "electrified fence", "electrified fences"), pl(dry, "aquarium's filters", "aquariums' filters"), pl(dark, "building", "buildings")].filter(Boolean).join(", ");
-    events.toast(`Power shortage: ${what} without power.`, "bad");
+    notify(`Power shortage: ${what} without power.`);
   }
 }
 // Bad weather and the grid (POWER.hit): each night, maybe a hit for the coming day at a set minute (state.weather.hit); it lands once the clock gets there
@@ -117,13 +117,13 @@ function gridHitTick(){
   for(const x of list){ r -= wt(x); if(r < 0){ b = x; break; } }
   if(!b) return;
   b.cond = Math.min(condOf(b), H.cond);
-  events.toast(`${H.text[ev] || "The weather knocked out"} ${BUILDINGS[b.type].one}. Its network may lose power until a mechanic repairs it.`, "bad");
+  notify(`${H.text[ev] || "The weather knocked out"} ${bldName(b)}.`, {kind:"building", id:b.id});
   updatePower();
 }
 // Once a step: the guest map follows tram stations' power, and the weather may hit the grid
 function powerTick(){
   gridHitTick();
-  if(state.powerNotice){ state.powerNotice = false; events.toast(`Every building now needs power. Join power stations and transformers with cable (Power in the build menu). Power is free until ${fmtDate(state.powerFree)}.`, "bad"); }
+  state.powerNotice = false;
   if(gridStale && gGraph){ gridStale = false; buildGuestGraph(); }
 }
 

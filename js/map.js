@@ -2585,6 +2585,8 @@ function showBar(title, hint, stat, o){
 }
 function hideBar(){ $("#drawbar").classList.remove("on"); }
 function setStat(t, err){ const el = $("#dStat"); el.textContent = t; el.classList.toggle("err", !!err); }
+// A warning about what a tool just did: on the tool bar while it's up, else under the panel's top
+function toolWarn(t){ if($("#drawbar").classList.contains("on")) setStat(t, true); else sayWhy(t); }
 
 function startDraw(kind){
   draw = {kind, pts:[], snaps:[], hover:null, error:null};
@@ -2645,7 +2647,6 @@ function finishZoneEdit(){
   for(const b of state.buildings) if(!b.zone && !b.exhibitId && inPoly(...centroid(b.points), z.points)){ b.zone = z.id; joined++; }
   zedit.done = true; const id = z.id;
   afterChange(); toolDone({kind:"zone", id});
-  ui.toast(joined ? `${z.name} reshaped. ${joined} more thing${joined === 1 ? "" : "s"} joined it.` : `${z.name} reshaped.`);
 }
 function startZoneEdit(id){ const z = zoneById(id); if(!z) return; zedit = {id, orig:z.points.map(p => p.slice()), sel:null, done:false}; setTool("zoneedit"); }
 function updateParcelBar(){
@@ -2665,7 +2666,6 @@ function buyLand(){
   const [i, j] = parcelSel, price = parcelPrice(i, j);
   if(!buyParcel(i, j)){ updateParcelBar(); return; }
   parcelSel = null; recompute(); events.changed(); render(); updateParcelBar();
-  ui.toast(`Bought ${fmtArea(parcelArea(i, j))} of land for ${money(price)}.`, "good");
 }
 function cancelTool(){ setTool("select"); }
 function undoDrawPoint(){ if(isBuildTool(tool)){ rotateTool(); return; } if(tool === "exhibit"){ fenceMeet = !fenceMeet; fenceBar(); return; } if(tool === "zoneedit"){ deleteZoneCorner(); return; } if(tool === "move"){ deleteMoveCorner(); return; } if(!draw || !draw.pts.length) return; draw.pts.pop(); draw.snaps.pop(); updateDrawbar(); renderOverlay(); }
@@ -2688,8 +2688,6 @@ function finishDraw(){
     for(const b of state.buildings) if(!b.zone && !b.exhibitId && inPoly(...centroid(b.points), pts)) b.zone = z.id;
     afterChange();
     toolDone({kind:"zone", id:z.id});
-    const m = zoneMembers(z);
-    ui.toast(`${z.name}: ${m.exhibits.length} exhibit${m.exhibits.length === 1 ? "" : "s"} and ${m.stores.length} building${m.stores.length === 1 ? "" : "s"} inside. Assign keepers to it from its panel.`);
     return;
   }
   d.snaps.forEach((sn, i) => { if(sn && sn.kind === "path" && sn.type === "seg") insertJunction(sn.id, pts[i][0], pts[i][1]); });
@@ -2705,7 +2703,7 @@ function finishDraw(){
   render();
   const joinedNow = type === "tram" || (type === "service" ? derived.joinedAll : derived.joined).has(p.id);
   const what = type === "service" ? "service road" : type === "wide" ? "wide path" : type === "tram" ? "tram track" : type === "bridge" ? "wooden bridge" : "path";
-  ui.toast(joinedNow ? `Built ${Math.round(lineLength(pts))} m of ${what} for ${money(cost)}.` : `Built a ${what}, but it doesn't reach the entrance yet.`, joinedNow ? "" : "bad");
+  if(!joinedNow) toolWarn(`This ${what} doesn't reach the entrance yet.`);
 }
 
 /* ---------- painting ground (js/biomepaint.js) ---------- */
@@ -2736,19 +2734,18 @@ function paintDragStat(){
 function endPaintDrag(){
   const d = pdrag; pdrag = null; renderOverlay();
   const r = paintBox(d.a, d.b);
-  const wetToast = c => c.m2 ? ui.toast(`Removed ${fmtArea(c.m2)} of water. ${money(c.refund)} back.`, "good") : 0;
   if(paintPick === "erase"){
     const n = eraseRect(r), cut = cutWaterAll(r);
     if(!n && !cut.m2){ setStat("No paint there."); return; }
-    setStat(""); afterChange(); render(); wetToast(cut); return;
+    setStat(""); afterChange(); render(); return;
   }
   const c = exhibitPaintCost(r, paintPick);
-  if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); ui.toast(why, "bad"); return; }
+  if(!canAfford(c)){ const why = `Costs ${money(c)}. You have ${money(state.money)}.`; setStat(why, true); return; }
   const res = paintRect(paintPick, r, paintKind[paintPick]);
-  if(typeof res === "string"){ setStat(res, true); ui.toast(res, "bad"); return; }
+  if(typeof res === "string"){ setStat(res, true); return; }
   if(c) spend(c, "built");
-  const cut = cutWaterAll(r);
-  setStat(""); afterChange(); render(); wetToast(cut);
+  cutWaterAll(r);
+  setStat(""); afterChange(); render();
 }
 // Bulldoze on empty ground: a tap takes the patch under it, a box takes the paint in it. Returns true if paint went.
 function bulldozePaint(d){
@@ -2788,10 +2785,9 @@ function waterDragStat(){
 }
 function endWaterDrag(){
   const b = waterBox(); wdrag = null; renderOverlay();
-  if(b.err){ setStat(b.err, true); if(!b.same) ui.toast(b.err, "bad"); return; }
+  if(b.err){ setStat(b.err, true); return; }
   for(const p of b.ptsOf) layWater(b.host, p, b.kind);
   setStat(""); afterChange(); render();
-  ui.toast(`Laid ${fmtArea(b.m2)} of water in ${b.host ? b.host.name : "the park"} for ${money(b.cost)}.`, "good");
 }
 
 /* ---------- laying fence on the grid (js/fences.js) ---------- */
@@ -2871,8 +2867,7 @@ function finishFenceDrag(keys, lift, opts){
   if(!r){ renderOverlay(); return; }   // the stat line already says why
   afterChange(); render();
   if(lift) setStat(""); else fenceBar();
-  const what = lift ? `Lifted ${r.n} piece${r.n === 1 ? "" : "s"} of fence for ${money(r.back)} back.` : `Laid ${r.n} piece${r.n === 1 ? "" : "s"} of fence for ${money(r.cost)}.`;
-  ui.toast([what].concat(r.notes).join(" "), r.notes.some(n => /gap/.test(n)) ? "bad" : "good");
+  if(r.notes.length) setStat(r.notes.join(" "), r.notes.some(n => /gap/.test(n)));
 }
 
 /* ---------- laying paths on the chunk grid (js/pathcells.js) ---------- */
@@ -2905,10 +2900,10 @@ function endPathDrag(){
   const d = cdrag; cdrag = null;
   if(!d.plan || !d.plan.chunks.length){ renderOverlay(); return; }
   const K = PATH_CELLS.kinds[d.kind], r = layPath(d.a, d.b, d.kind);
-  if(!r){ renderOverlay(); if(d.plan.why) ui.toast(d.plan.why, "bad"); return; }
+  if(!r){ renderOverlay(); if(d.plan.why) setStat(d.plan.why, true); return; }
   afterChange(); render(); pathBar();
   const joined = chunksJoined(d.plan.todo, d.kind !== "s");
-  ui.toast(joined ? `Laid ${r.n} chunk${r.n === 1 ? "" : "s"} of ${K.label.toLowerCase()} for ${money(r.cost)}.` : `Laid ${K.label.toLowerCase()}, but it doesn't reach the entrance yet.`, joined ? "good" : "bad");
+  if(!joined) toolWarn(`This ${K.label.toLowerCase()} doesn't reach the entrance yet.`);
 }
 // The chunks a bulldoze box (or tap) takes: the lit ones, never the chunk at the gate
 function bulldozeChunkKeys(box){ const F = pathFixedChunks(); return chunksInBox(box.a, box.b).filter(k => !F[k]); }
@@ -2919,8 +2914,7 @@ function bulldozeChunks(box){
   const r = removeChunks(all);
   if(!r.n){ setStat("The path at the entrance stays.", true); return true; }
   afterChange(); render();
-  setStat("");
-  ui.toast(`Removed ${r.n} path chunk${r.n === 1 ? "" : "s"}, refunded ${money(r.back)}.${r.kept ? " The path at the entrance stays." : ""}`, "good");
+  setStat(r.kept ? "The path at the entrance stays." : "");
   return true;
 }
 function toolDone(newSel){
@@ -3047,7 +3041,7 @@ function placeBuilding(e){
     themeNew("exhibit", e);
     state.exhibits.push(e);
     afterChange(); render();
-    ui.toast(isReachable(e) ? `Built ${t.one} for ${money(t.price)}. Tap it to add animals.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(e) ? "" : "bad");
+    if(!isReachable(e)) toolWarn("No path to the entrance yet.");
     return;
   }
   const b = {id:uid("b-"), type:tool, points:ghost.pts, day:state.day};
@@ -3058,7 +3052,7 @@ function placeBuilding(e){
   state.buildings.push(b);
   afterChange();
   render();
-  ui.toast(isReachable(b) ? `Built ${t.one} for ${money(t.price)}.` : `Built ${t.one}, but it has no path to the entrance yet, so it won't work.`, isReachable(b) ? "" : "bad");
+  if(!isReachable(b)) toolWarn("No path to the entrance yet.");
   if(t.dept || t.kind){ toolDone({kind:"building", id:b.id}); }
 }
 
@@ -3177,7 +3171,7 @@ function gateTap(e){
   if(!g.pen) ex.gate = [g.x, g.y];
   afterChange(); render();
   if(lagoonWalled(ex) && !waterOf(ex).length) askLagoonWater(ex);
-  ui.toast(`${g.pen ? `Made ${ex.name}, ${fmtArea(area(ex.points))}, with a gate` : `${cost ? "Built" : "Moved"} the gate on ${ex.name}`}. ${g.why}`, g.ok ? "" : "bad");
+  if(!g.ok) toolWarn(g.why);
 }
 
 /* ---------- keepers on the map ---------- */
@@ -3426,7 +3420,7 @@ function platformTap(ev){
   const b = {id:uid("b-"), type:"platform", exhibitId:g.e.id, points:g.pts, inward:true, day:state.day};
   state.buildings.push(b);
   afterChange(); render();
-  ui.toast(isReachable(b) ? `Built a viewing platform on ${g.e.name}. Guests will love it.` : "Built a viewing platform, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
+  if(!isReachable(b)) toolWarn("No guest path reaches it yet.");
 }
 
 /* ---------- viewing galleries ---------- */
@@ -3474,7 +3468,7 @@ function galleryTap(ev){
   const b = {id:uid("b-"), type:"gallery", exhibitId:g.e.id, points:g.pts, face:g.face, day:state.day};
   state.buildings.push(b);
   afterChange(); render();
-  ui.toast(isReachable(b) ? `Built a viewing gallery on ${g.e.name}.` : "Built a viewing gallery, but no guest path reaches it yet.", isReachable(b) ? "good" : "bad");
+  if(!isReachable(b)) toolWarn("No guest path reaches it yet.");
 }
 
 /* ---------- crates standing in the park, and carrying one (science.js crates) ---------- */
@@ -3534,7 +3528,6 @@ function crateTap(ev){
   else { moveCrate(id, g.x, g.y); sel = {kind:"crate", id}; }
   crateSel = null; crateGhost = null; setTool("select");
   afterChange(); render();
-  if(g.open) ui.toast(`${name} is out of its crate in ${g.e.name}.`, "good");
 }
 
 /* ---------- rocks, groves and shelters ---------- */
@@ -3557,7 +3550,6 @@ function landTap(ev){
   placeLand(g.e, key, g.x, g.y, rockBiomePicked() || (g.e ? null : parkBiome()), g.pic);
   if(rockRoll[key] !== undefined) rockRoll[key] = Math.random();
   afterChange(); render();
-  ui.toast(g.e ? `Added ${LAND[key].one} to ${g.e.name}.` : `Added ${LAND[key].one} to the park.`, "good");
 }
 
 /* ---------- bulldozing ---------- */
@@ -3604,7 +3596,7 @@ function releaseAnimals(e){
     if(SPECIES_BY_ID[a.sp]?.pool) crateAnimal(e, a);
     else { turnLoose(e, a); out++; }
   }
-  if(out) events.toast(`${out} animal${out === 1 ? "" : "s"} got out of ${e.name}.`, "bad");
+  if(out) notify(`${out} animal${out === 1 ? "" : "s"} got out of ${e.name}.`);
 }
 
 function removeItem(kind, it, opts = {}){
@@ -3703,7 +3695,7 @@ function dragMove(m, e){
 // Drop a land item: it keeps its id and moves between exhibits and the park's decor for free
 function dropLand(m){
   const sp = m.spot, f = m.it, from = m.from;
-  if(!sp || !sp.ok || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(sp && !sp.ok) ui.toast(`Couldn't move it. ${sp.why}`, "bad"); setStat(""); render(); return; }
+  if(!sp || !sp.ok || (!m.dx && !m.dy)){ moveBy(m, 0, 0); setStat(sp && !sp.ok ? `Couldn't move it. ${sp.why}` : "", sp && !sp.ok); render(); return; }
   const to = sp.e;
   if(to !== from){
     const old = from ? from.land : state.decor;
@@ -3714,18 +3706,18 @@ function dropLand(m){
   }
   if(sp.pic != null && ROCK_TYPES.includes(f.type) && f.pic == null) f.pic = sp.pic;   // pin the picture it was showing
   if(from && from.viv) regatherViv(from);
-  afterChange(); render(); ui.toast("Moved."); setStat("");
+  afterChange(); render(); setStat("");
 }
 function dropMove(m){
   if(m.kind === "land"){ dropLand(m); return; }
   const why = moveProblem(m.kind, m.it);
-  if(why || (!m.dx && !m.dy)){ moveBy(m, 0, 0); if(why) ui.toast(`Couldn't move it. ${why}`, "bad"); setStat(""); render(); return; }
+  if(why || (!m.dx && !m.dy)){ moveBy(m, 0, 0); setStat(why ? `Couldn't move it. ${why}` : "", !!why); render(); return; }
   if(m.kind === "exhibit"){
     for(const h of herd.values()) if(h.exhibitId === m.it.id){ h.x += m.dx; h.y += m.dy; h.path = null; }
   }
   afterChange(); render();
   const it = m.it, reach = m.kind === "fence" || (m.kind === "path" ? (isService(it) ? derived.joinedAll : derived.joined).has(it.id) : isReachable(it));
-  ui.toast(reach ? "Moved." : "Moved, but it doesn't reach the entrance from there.", reach ? "" : "bad");
+  if(!reach) toolWarn("It doesn't reach the entrance from there.");
   setStat("");
 }
 
@@ -3782,7 +3774,6 @@ function commitReshape(e, orig){
     e.gate = [best.x, best.y];
   }
   afterChange(); render();
-  ui.toast(diff > 0 ? `Reshaped ${e.name}. The extra fence cost ${money(diff)}.` : diff < 0 ? `Reshaped ${e.name}. You got ${money(Math.round(-diff * COST.refundShare))} back.` : `Reshaped ${e.name}.`);
 }
 function deleteMoveCorner(){
   const s = mvCorner && reshapeables().find(x => x.t.id === mvCorner.id); if(!s) return;
@@ -3828,7 +3819,7 @@ function select(kind, id){
   sel = kind ? {kind, id} : null;
   if(kind) officeOpen = false;
   render(); ui.panel();
-  if(kind && focusMode()){ const it = selItem(); ui.toast(`Selected ${it && (it.name || BUILDINGS[it.type]?.label) || kind}. Press H to show the panel.`); return; }
+  if(kind && focusMode()) return;
 }
 
 /* ---------- pointer and touch ---------- */
@@ -4006,7 +3997,7 @@ function endPointer(e){
       updateMoveBar(); render(); return;
     }
     const why = rvProblem(r);
-    if(why){ r.t.points = r.orig; ui.toast(`Couldn't reshape it. ${why}`, "bad"); setStat(""); render(); return; }
+    if(why){ r.t.points = r.orig; setStat(`Couldn't reshape it. ${why}`, true); render(); return; }
     mvCorner = {id:r.t.id, i:r.i}; updateMoveBar(); setStat(""); rvCommit(r); return;
   }
   if(d.zv !== undefined){

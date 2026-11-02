@@ -86,7 +86,27 @@ let derived = null;   // numbers worked out from the saved game, rebuilt when it
 let arrivalCarry = 0; // fractions of a guest carried between frames
 
 // Hooks other files fill in, so the simulation can tell the screen what happened
-const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){}, died(){}, fx(){} };
+const events = { toast(){}, dayEnded(){}, changed(){}, gameOver(){}, died(){}, incident(){}, logged(){}, fx(){} };
+// The message log behind the bell: only what needs the player now. at = {kind, id} of the thing it's about.
+// The same message again the same day, before it's been read, counts up on the one entry.
+const LOG_MAX = 100;
+function notify(text, at){
+  const L = state.log, last = L.items[0];
+  if(last && last.text === text && last.day === state.day && last.id > L.seen){ last.n = (last.n || 1) + 1; last.min = state.minute; }
+  else { L.items.unshift({id:++L.next, day:state.day, min:state.minute, text, ...(at ? {at} : {})}); if(L.items.length > LOG_MAX) L.items.length = LOG_MAX; }
+  events.logged();
+}
+const logUnread = () => state.log.items.filter(x => x.id > state.log.seen).length;
+// A building's name for the player: "Generator 4". One-of-a-kind buildings and props go by their label alone.
+// Each other building keeps a number for its type (b.no, the lowest one free when it's first named), so names don't shift when another goes.
+const numbered = b => { const t = BUILDINGS[b.type]; return !!t && !t.unique && !t.prop; };
+function bldNo(b){
+  if(!b.no){ const used = new Set(state.buildings.filter(x => x.type === b.type && x.no).map(x => x.no)); let n = 1; while(used.has(n)) n++; b.no = n; }
+  return b.no;
+}
+function bldName(b){ const t = BUILDINGS[b.type] || {label:"Building"}; return b.name || (numbered(b) ? `${t.label} ${bldNo(b)}` : t.label); }
+// A line for tonight's day report
+function dayNote(text){ if(!state.dayNotes.includes(text)) state.dayNotes.push(text); }
 
 // Starter species partner parks sell in this park: random picks from each pool
 function pickStarters(){
@@ -190,6 +210,8 @@ function upgradeSave(s){
   if(s.clockV === 2) s.clockV = 3;   // the clock became 6 AM to 11 PM: same park minutes, so every stamp stays exact
   if(s.clockV !== 3){ s.minute = clamp((s.minute === undefined ? 480 : s.minute) - 480, 0, DAY_MIN - 1e-6); s.clockV = 3; }
   if(s.parkClosed === undefined) s.parkClosed = false;
+  if(!s.log) s.log = {items:[], seen:0, next:0};
+  if(!s.dayNotes) s.dayNotes = [];
   // vivariums feed from dishes now: every case already standing gets a free one, once (food it held loose becomes the dish's)
   if(s.vivDish !== 1){
     for(const e of s.exhibits || []) if(e.viv){
@@ -719,6 +741,7 @@ function exhibitReport(e){
 
 // Rebuild all the worked-out numbers. Called whenever the park changes.
 function recompute(){
+  for(const b of state.buildings) if(!b.no && numbered(b)) bldNo(b);
   syncPathStrips();
   updatePower();
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);
@@ -811,7 +834,7 @@ function checkBankrupt(){
   if(state.money > -BANKRUPT / 2) state.debtWarned = false;
   else if(!state.debtWarned){
     state.debtWarned = true;
-    events.toast(`Careful: you're ${money(-state.money)} in debt. The park goes bankrupt at ${money(BANKRUPT)}.`, "bad");
+    notify(`${money(-state.money)} in debt. Bankrupt at ${money(BANKRUPT)}.`);
   }
 }
 
@@ -943,10 +966,10 @@ function endDay(){
   behaviorNight();
   // today's weather has done its harm; tomorrow's forecast comes true
   rollWeather();
-  if(weatherNow().happy) events.toast(`Tomorrow: ${weatherNow().label.toLowerCase()}. Animals without shelter will suffer, and guests out in it will be miserable.`, "bad");
-  if(state.day + 1 === state.safety.escapesFrom) events.toast("Animals can start escaping tomorrow. Check each exhibit's barrier.", "bad");
-  if(state.day + 1 === state.staff.feedFrom) events.toast("Partner parks stop feeding your animals tomorrow. Keepers need to take over.", "bad");
-  if(state.day + 1 === state.logi.guestFrom) events.toast("From tomorrow, food stands and gift shops sell from their own stock. The dock orders it, and custodians carry it out. Build a Custodial Closet and hire one.", "bad");
+  if(weatherNow().happy) dayNote(`Tomorrow: ${weatherNow().label.toLowerCase()}.`);
+  if(state.day + 1 === state.safety.escapesFrom) dayNote("Animals can escape from tomorrow.");
+  if(state.day + 1 === state.staff.feedFrom) dayNote("Partner parks stop feeding your animals tomorrow.");
+  if(state.day + 1 === state.logi.guestFrom) dayNote("Stands and shops sell from their own stock from tomorrow.");
 
   const before = state.rating;
   // Move a third of the way to the target each night, but at least 0.1 stars, so it actually gets there
@@ -963,7 +986,8 @@ function endDay(){
   guestsNight();
 
   // Warn about unhappy animals
-  for(const e of state.exhibits) if(e.animals.length && e.happy < 30) events.toast(`${e.name}: the animals are unhappy. Tap the exhibit to see why.`, "bad");
+  const sad = state.exhibits.filter(e => e.animals.length && e.happy < 30).map(e => e.name);
+  if(sad.length) dayNote(`Unhappy animals: ${sad.join(", ")}.`);
 
   state.day++;
   state.minute = 0;
@@ -973,6 +997,7 @@ function endDay(){
 
   checkBankrupt();
   recompute();
+  report.notes = state.dayNotes; state.dayNotes = [];
   events.dayEnded(report);
   events.changed();
 }
@@ -988,7 +1013,7 @@ function checkGoals(){
     if(g.check(goalApi)){
       state.goalsDone.push(g.id);
       if(g.reward) earn(g.reward, "rewards");
-      events.toast(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${grantStatue(g) ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`, "good");
+      dayNote(`Grant awarded: ${g.text}. ${g.theme ? `You unlocked the ${THEMES[g.theme].label} theme.` : `You earned ${money(g.reward)}.`}${grantStatue(g) ? ` You can now place the ${LAND["st-" + g.statue].label.replace(/ Statue$/, "")} statue from Landscaping.` : ""}`);
     }
   }
   checkThemes();   // a grant can unlock a theme

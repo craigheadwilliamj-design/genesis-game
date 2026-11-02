@@ -178,7 +178,6 @@ function teaseTick(p, dt){
       p.vandal = true;
       if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); }
       state.today.teased = (state.today.teased || 0) + 1;
-      if(state.today.teased === 1) events.toast(`A guest is banging on the glass at ${e.name}. It stresses the animals. Guards nearby put them off and throw them out.`, "bad");
     }
     return;
   }
@@ -209,19 +208,17 @@ function ejectTick(p){
   if(p.ejecting !== true) return;
   if(state.minute - p.ejectAt > PERS.ejectWait){
     p.ejecting = false; p.hold = false; p.wanted = false;
-    events.toast(`Security never reached the ${p.name}. They carry on.`, "bad");
     return;
   }
   if(state.minute - p.ejectTry >= 2 && !gcrew.some(c => c.chase === p)){ p.ejectTry = state.minute; dispatchGuard(p); }
 }
 // A guard has reached a waiting party: walk it to the gate, unhappy
-function escortOut(p, c, quiet){
+function escortOut(p, c){
   p.hold = false; p.ejecting = "escort"; p.wanted = false;
   leaveQueue(p); p.home = true; p.dest = null; p.why = null; p.lastStop = p.shopped = true;
   moodAdd(p, -PERS.ejectMood); thinks(p, "ejected");
   if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
   c.escort = p;
-  if(!quiet) events.toast(`${(guardRec(c) || {}).name || "A guard"} walked the ${p.name} to the gate.`, "good");
 }
 
 /* ---------- what a party is doing, for its panel ---------- */

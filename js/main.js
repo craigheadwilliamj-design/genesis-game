@@ -19,26 +19,59 @@ document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => setSpee
 
 /* ---------- what the simulation tells the screen ---------- */
 events.toast = (t, kind) => ui.toast(t, kind);
-// Deaths pile up while the day rolls over, then show once in a dialog that pauses the game
-let deathQueue = [];
-events.died = d => deathQueue.push(d);
-events.fx = (kind, x, y) => fxAdd(kind, x, y);
-function showDeaths(){
-  if(!deathQueue.length) return;
-  const n = deathQueue.length;
-  $("#deathsTitle").textContent = n === 1 ? "An animal died" : `${n} animals died`;
-  $("#deathsList").innerHTML = `<tr><th>Animal</th><th>Exhibit</th><th>Cause of death</th></tr>` + deathQueue.map(d => `<tr><td>${esc(d.animal)}</td><td>${esc(d.exhibit)}</td><td>${esc(d.cause)}</td></tr>`).join("");
-  deathQueue = [];
-  setSpeed(0);
-  if(!$("#dlgDeaths").open) $("#dlgDeaths").showModal();
+// Dialogs the player OKs (incidents, the day report): one at a time, with the game paused until the last one is closed
+const ackQueue = []; let ackSpeed = null;   // the speed to go back to, while any is up
+function ackShow(dlg, fill){
+  if(state.over) return;
+  if(ackSpeed !== null){ if(!ackQueue.some(q => q[0] === dlg)) ackQueue.push([dlg, fill]); return; }
+  ackSpeed = speed; setSpeed(0); fill(); dlg.showModal();
 }
-$("#deathsOk").onclick = () => $("#dlgDeaths").close();
-$("#dlgDeaths").addEventListener("close", () => { if(deathQueue.length) showDeaths(); else if(!state.over) setSpeed(lastSpeed || 1); });
-$("#dlgDeaths").addEventListener("cancel", e => e.preventDefault());   // Esc doesn't skip it
+function ackClosed(){
+  if(ackSpeed === null) return;
+  const next = ackQueue.shift();
+  if(next){ next[1](); next[0].showModal(); return; }
+  const s = ackSpeed; ackSpeed = null;
+  if(!state.over) setSpeed(s);
+}
+// Deaths, escapes and guests killed: what happens in one step (a whole night, say) shows in one dialog
+let incidents = [], incidentSoon = 0;
+function queueIncident(d){ incidents.push(d); if(!incidentSoon) incidentSoon = setTimeout(showIncidents, 0); }
+events.died = d => queueIncident({kind:"death", ...d});
+events.incident = queueIncident;
+events.logged = () => bellRefresh(true);
+events.fx = (kind, x, y) => fxAdd(kind, x, y);
+function showIncidents(){
+  incidentSoon = 0;
+  if(!incidents.length || state.over) return;
+  if($("#dlgIncident").open) return;   // more came in while it's up: they show when it closes
+  ackShow($("#dlgIncident"), fillIncidents);
+}
+function fillIncidents(){
+  const of = k => incidents.filter(d => d.kind === k), dead = of("death"), out = of("escape"), hit = of("guest");
+  const head = (n, one, many) => n === 1 ? one : `${n} ${many}`, td = t => `<td>${esc(t)}</td>`, parts = [];
+  if(dead.length) parts.push([head(dead.length, "An animal died", "animals died"), `<tr><th>Animal</th><th>Exhibit</th><th>Cause of death</th></tr>` + dead.map(d => `<tr>${td(d.animal)}${td(d.exhibit)}${td(d.cause)}</tr>`).join("")]);
+  if(out.length) parts.push([head(out.length, "An animal escaped", "animals escaped"), `<tr><th>Animal</th><th>Escaped from</th><th></th></tr>` + out.map(d => `<tr>${td(d.animal)}${td(d.exhibit)}<td class="danger">${d.danger ? "Dangerous" : ""}</td></tr>`).join("")]);
+  if(hit.length) parts.push([head(hit.length, "A guest was killed", "guests were killed"), `<tr><th>Killed by</th><th>Lawsuit</th></tr>` + hit.map(d => `<tr>${td(d.animal)}${td(money(d.fine))}</tr>`).join("")]);
+  $("#incTitle").textContent = parts.length === 1 ? parts[0][0] : "Park incidents";
+  $("#incBody").innerHTML = parts.map(([h, t]) => `${parts.length > 1 ? `<h3>${esc(h)}</h3>` : ""}<table class="deaths">${t}</table>`).join("");
+  incidents = [];
+}
+$("#incOk").onclick = () => $("#dlgIncident").close();
+$("#dlgIncident").addEventListener("close", () => { if(incidents.length) ackQueue.unshift([$("#dlgIncident"), fillIncidents]); ackClosed(); });
+$("#dlgIncident").addEventListener("cancel", e => e.preventDefault());   // Esc doesn't skip it
+$("#dayOk").onclick = () => $("#dlgDay").close();
+$("#dlgDay").addEventListener("close", ackClosed);   // Esc closes it too
+// What else happened: the sim's notes for the day (dayNote), and the day's guest nuisances
+function dayNotesHtml(r){
+  const L = r.ledger, times = n => n === 1 ? "once" : `${n} times`, notes = [...(r.notes || [])];
+  if(L.thrown) notes.push(`Guests threw trash into exhibits ${times(L.thrown)}.`);
+  if(L.teased) notes.push(`Guests banged on the glass ${times(L.teased)}.`);
+  return notes.length ? `<ul class="daynotes">${notes.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : "";
+}
 events.dayEnded = r => {
   const L = r.ledger, row = (a, b) => `<tr><td>${a}</td><td>${b}</td></tr>`;
   const stars = r.rating - r.ratingBefore;
-  ui.toast("", "day", `<h4>${fmtDate(r.day)} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}</h4><table>
+  const html = `<table>
     ${row("Tickets", money(L.tickets))}
     ${L.food + L.shop ? row("Food and gifts", money(L.food + L.shop)) : ""}
     ${L.donations + L.edfees >= 1 ? row("Donations and education", money(L.donations + L.edfees)) : ""}
@@ -57,10 +90,10 @@ events.dayEnded = r => {
     ${L.built + L.animals ? row("Building and animals", "−" + money(L.built + L.animals)) : ""}
     <tr class="tot"><td>Profit</td><td>${r.net >= 0 ? "+" : ""}${money(r.net)}</td></tr>
     ${L.wasted >= 1 ? row("Goods Wasted", money(Math.round(L.wasted))) : ""}
-  </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${starTxt(r.rating)} stars.</div>` : ""}`);
+  </table>${L.moodN ? `<div class="meta" style="margin-top:4px">Guests left ${Math.round(L.moodSum / L.moodN)}% happy on average.</div>` : ""}${Math.abs(stars) >= .05 ? `<div class="meta" style="margin-top:4px">Rating ${stars > 0 ? "up" : "down"} to ${starTxt(r.rating)} stars.</div>` : ""}${dayNotesHtml(r)}`;
+  ackShow($("#dlgDay"), () => { $("#dayTitle").textContent = `${fmtDate(r.day)} closed. ${r.guests.toLocaleString()} guest${r.guests === 1 ? "" : "s"}`; $("#dayBody").innerHTML = html; });
   render(); ui.panel(); ui.hud(true);
   saveNow();
-  showDeaths();
 };
 events.gameOver = () => {
   setSpeed(0);
@@ -166,7 +199,6 @@ function showStart(){
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
     const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
     buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
-    ui.toast(on ? "Dev mode on. The pixel editor is at the bottom of the right-hand column." : "Dev mode off.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
@@ -237,7 +269,6 @@ requestAnimationFrame(frame);
         if($("#dlgStart").open){ savedGame = remote; showStart(); return; }   // still on the start screen: offer it to Continue
         const wasIntro = $("#dlgIntro").open; if(wasIntro) $("#dlgIntro").close();
         startWith(remote, false);
-        ui.toast(`Welcome back to ${remote.name}.`, "good");
         return;
       }
     }

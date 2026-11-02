@@ -395,7 +395,7 @@ function treatsNight(){
       if(f.left > 0) return true;
       gone.push(t.label.toLowerCase()); return false;
     });
-    if(gone.length && e.animals.length) events.toast(`${e.name}: the ${[...new Set(gone)].join(" and ")} ${gone.length === 1 ? "is" : "are"} all used up. Put out more in Habitat Items.`, "bad");
+    if(gone.length && e.animals.length) notify(`${e.name}: the ${[...new Set(gone)].join(" and ")} ${gone.length === 1 ? "is" : "are"} used up.`, {kind:"exhibit", id:e.id});
   }
 }
 // Overnight they eat what's left, drink, sleep it off and wake up fresh
@@ -611,12 +611,11 @@ function hurtAnimal(e, v, by, how, range, killP, msg, who){
   if(v.sick.sev >= 100){
     v.sick.killed = true;
     animalDies(e, v);
-    events.toast(`${how === "fight" ? `A ${s.name} was killed in a fight` : `A ${by} killed a ${s.name}`} in ${e.name}.`, "bad");
     return "killed";
   }
   v.sick.sev = Math.round(v.sick.sev);
-  if(how !== "fight") events.toast(`A ${by} attacked a ${s.name} in ${e.name}.`, "bad");
-  else if(e.fightDay !== state.day){ e.fightDay = state.day; events.toast(msg || `Animals are fighting in ${e.name}. Stress and cramped quarters make them lash out.`, "bad"); }
+  sickSeen(e, v);
+  if(how === "fight" && e.fightDay !== state.day){ e.fightDay = state.day; notify(msg || `Animals are fighting in ${e.name}.`, {kind:"exhibit", id:e.id}); }
   return "hurt";
 }
 

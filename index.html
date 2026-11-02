@@ -78,6 +78,25 @@ button:disabled{cursor:default}
 .speed button+button{border-left:1px solid #3D6450}
 .speed button[aria-pressed="true"]{background:var(--money);color:#1D2B22}
 .hmenu{flex-direction:column;justify-content:center;gap:4px;width:52px;padding:0 13px;cursor:pointer}
+.tbtn.bell{position:relative;overflow:visible}
+.tbtn.bell[aria-expanded="true"]{background:#355C46}
+.bellnum{position:absolute;top:-7px;right:-7px;min-width:21px;height:21px;padding:0 5px;border-radius:11px;background:#D33A2C;color:#fff;border:2px solid #1F3A2B;font:700 12px/17px var(--font-body);text-align:center}
+.tbtn.bell.ring svg{animation:ring .7s ease-in-out}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(16deg)}40%{transform:rotate(-14deg)}60%{transform:rotate(9deg)}80%{transform:rotate(-5deg)}}
+.bellpop{position:fixed;z-index:40;width:min(380px,calc(100vw - 24px));max-height:min(60vh,520px);overflow:auto;background:var(--chrome);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.3)}
+.bellhead{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--chrome);font:600 15px/1.2 var(--font-head)}
+.bellhead .btn{padding:3px 10px;font-size:13px}
+.logrow{display:flex;align-items:stretch;border-bottom:1px solid var(--line);border-left:4px solid transparent}
+.logrow.new{border-left-color:var(--bad);background:var(--chrome-2)}
+.logmain{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;padding:8px 4px 8px 10px;border:0;background:none;color:inherit;font:inherit;font-size:14px;cursor:default}
+.logmain[data-at]{cursor:pointer}
+.logmain[data-at]:hover{background:var(--chrome-2)}
+.logx{flex-shrink:0;width:36px;border:0;background:none;color:var(--ink-2);font:600 18px/1 var(--font-body);cursor:pointer}
+.logx:hover{color:var(--bad);background:var(--chrome-2)}
+#bellClear:disabled{opacity:.45}
+.logwhen{font-size:12px;color:var(--ink-2)}
+#bellList .meta{padding:12px 14px}
+@media (prefers-reduced-motion: reduce){.tbtn.bell.ring svg{animation:none}}
 .hmenu i{display:block;width:100%;height:3px;border-radius:2px;background:currentColor}
 .hmenu:hover,.speed button:not([aria-pressed="true"]):hover{background:#355C46}
 .daybar{position:relative;height:5px;border-radius:3px;background:rgba(243,239,217,.18);overflow:hidden}
@@ -153,7 +172,7 @@ main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .mapwrap.tool-land-rock .tray .shapes[data-shapes="rock"],.mapwrap.tool-land-boulder .tray .shapes[data-shapes="boulder"]{display:flex}
 .tray .shapes .shape{width:44px;height:44px;border-color:#3D6450;background:#2A4A37;color:var(--on-forest)}
 .tray .shapes .shapebiome{align-self:center;margin-right:4px;padding:3px 4px;border:1px solid #3D6450;border-radius:6px;background:#2A4A37;color:var(--on-forest)}
-.rtools{position:absolute;top:12px;right:12px;z-index:5;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 24px);overflow-y:auto;scrollbar-width:none}
+.rtools{position:absolute;top:4px;right:4px;padding:8px 8px 0 0;z-index:5;display:flex;flex-direction:column;gap:8px;max-height:calc(100% - 16px);overflow-y:auto;scrollbar-width:none}
 .rtools .tbtn{flex-shrink:0;font-weight:700}
 .rtools .tbtn[hidden]{display:none}
 .verlabel{display:block;margin-top:14px;font:600 11px/1 var(--font-head);color:var(--ink-2);opacity:.6;cursor:default;user-select:none;-webkit-user-select:none}
@@ -225,14 +244,16 @@ main{position:relative;display:grid;grid-template-columns:1fr;min-height:0}
 .toasts{position:absolute;right:64px;bottom:16px;align-items:flex-end;z-index:9;display:flex;flex-direction:column;gap:8px;max-width:min(380px,calc(100% - 24px));pointer-events:none}
 dialog .toasts{position:fixed;right:16px;bottom:16px}   /* toasts shown over a modal sit in the screen corner, not on the dialog */
 .toast{pointer-events:auto;background:var(--chrome);border:1px solid var(--line);border-left:4px solid var(--ink-2);border-radius:9px;padding:9px 12px;box-shadow:0 6px 18px rgba(0,0,0,.2);font-size:14px;animation:tin .25s ease-out}
+.whyline{color:var(--bad);font-size:13.5px;font-weight:600;margin:4px 0 6px}
 .toast.good{border-left-color:var(--good)}
 .toast.bad{border-left-color:var(--bad)}
-.toast.day{border-left-color:var(--gold)}
-.toast h4{margin:0 0 3px;font:600 16px/1.2 var(--font-head)}
-.toast table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
-.toast td{padding:1px 0}
-.toast td:last-child{text-align:right}
-.toast .tot td{border-top:1px solid var(--line);font-weight:600;padding-top:3px}
+.dayrep{margin:0 0 14px;font-size:14.5px}
+.dayrep table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+.dayrep td{padding:2px 0}
+.dayrep td:last-child{text-align:right}
+.dayrep .tot td{border-top:1px solid var(--line);font-weight:600;padding-top:4px}
+.dayrep .daynotes{margin:8px 0 0;padding:8px 0 0 18px;border-top:1px solid var(--line)}
+.dayrep .daynotes li{margin:3px 0}
 /* building animations (bldSprite34): frame f of n is the only one shown for its share of each cycle. Visibility, not opacity: an opacity animation moves the picture to the compositor, which can blur it. */
 @keyframes frame1of2{0%{visibility:visible}50%{visibility:hidden}100%{visibility:hidden}}
 @keyframes frame2of2{0%{visibility:hidden}50%{visibility:visible}100%{visibility:visible}}
@@ -591,6 +612,8 @@ dialog ol,dialog ul{margin:0 0 14px;padding-left:20px;display:flex;flex-directio
 dialog .deaths{border-collapse:collapse;width:100%;margin:0 0 14px;font-size:14px}
 dialog .deaths th{text-align:left;font-weight:600;color:var(--ink-2);padding:2px 8px 4px 0;border-bottom:1px solid var(--line)}
 dialog .deaths td{padding:4px 8px 4px 0;vertical-align:top}
+dialog .deaths .danger{color:var(--bad);font-weight:600}
+#incBody h3{margin:4px 0 6px}
 dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color:var(--forest);font-weight:600}
 
 /* ----- map drawing classes ----- */
@@ -620,7 +643,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   .lefttools{gap:8px}
   .smallrow{flex-direction:column}
   .tbtn,.tbtn.sm,.tbtn.big{width:44px;height:44px;padding:8px;border-radius:8px}
-  .rtools{top:8px;right:8px;gap:6px}
+  .rtools{top:0;right:0;gap:6px}
   .rtools .tbtn{width:40px;height:40px;padding:7px}
   .sidebody{left:60px;right:52px;bottom:62px;width:auto;max-width:none}
   .tray .ssub,.tray .shapes{left:0;transform:none;max-width:100%}
@@ -654,6 +677,10 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
     </div>
     <button class="hbox hmenu" id="menuBtn" title="Main menu (pauses the game)" aria-label="Main menu"><i></i><i></i><i></i></button>
   </header>
+  <div class="bellpop" id="bellPop" role="dialog" aria-label="Messages" hidden>
+    <div class="bellhead"><b>Messages</b><button class="btn" id="bellClear">Clear</button></div>
+    <div id="bellList"></div>
+  </div>
 
   <main>
     <div class="mapwrap" id="mapwrap">
@@ -1081,6 +1108,7 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
       </div>
 
       <nav class="rtools" id="rtools" aria-label="Park office and science">
+        <button class="tbtn bell" id="bellBtn" title="Messages" aria-label="Messages" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17v-6a6 6 0 0 1 12 0v6l2 2H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M10 21h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><b id="bellCount" class="bellnum" hidden></b></button>
         <button class="tbtn" id="officeBtn" title="Park Office"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" stroke-width="1.6"/></svg></button>
         <button class="tbtn" data-dept="oracle" title="Research Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M7 15h10" stroke="currentColor" stroke-width="1.6"/></svg></button>
         <button class="tbtn" data-dept="ghost" title="Time Travel Lab"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l-3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
@@ -1178,10 +1206,16 @@ dialog .btn.primary{background:var(--forest);color:var(--on-forest);border-color
   <div class="row"><button class="btn primary" id="lagoonOk" style="margin-left:auto">Fill</button></div>
 </dialog>
 
-<dialog id="dlgDeaths">
-  <h2 id="deathsTitle">An animal died</h2>
-  <table id="deathsList" class="deaths"></table>
-  <div class="row"><button class="btn primary" id="deathsOk">OK</button></div>
+<dialog id="dlgDay">
+  <h2 id="dayTitle"></h2>
+  <div id="dayBody" class="dayrep"></div>
+  <div class="row"><button class="btn primary" id="dayOk">OK</button></div>
+</dialog>
+
+<dialog id="dlgIncident">
+  <h2 id="incTitle">An animal died</h2>
+  <div id="incBody"></div>
+  <div class="row"><button class="btn primary" id="incOk">OK</button></div>
 </dialog>
 
 <dialog id="dlgOver">

@@ -61,7 +61,7 @@ function animalLive(force){
   if(!force && now - animalLiveAt < 250) return;
   animalLiveAt = now;
   const a = selItem(), e = a && animalHome(a.id);
-  if(!a || !e){ const n = animalSelName; select(null); if(n) ui.toast(`${n} is no longer in the park.`); return; }
+  if(!a || !e){ select(null); return; }
   const bar = document.getElementById("anMoodBar"); if(!bar) return;
   const s = SPECIES_BY_ID[a.sp], n = needsOf(a), mood = animalMood(a, e);
   const set = (id, v) => { const el = document.getElementById(id); if(el && el.dataset.v !== String(v)){ el.dataset.v = v; el.textContent = v; } };
@@ -166,7 +166,6 @@ function crateAnimalNow(id){
   const h = herd.get(id); if(h){ h.el.remove(); herd.delete(id); }
   if(sel && sel.kind === "animal" && sel.id === id) sel = {kind:"crate", id:r.id};
   afterChange(); render(); ui.panel();
-  ui.toast(`${a.name || SPECIES_BY_ID[a.sp].name} is in a crate.`, "good");
   return true;
 }
 function sellAnimal(id){

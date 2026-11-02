@@ -41,19 +41,19 @@ function wearTick(dtMin){
   for(const b of gridMachines()){
     const was = genOnline(b);
     b.cond = Math.max(0, condOf(b) - POWER.genWear * (BUILDINGS[b.type].wear ?? 1) * dtMin / DAY_MIN);
-    if(was && !genOnline(b)){ events.toast(`${BUILDINGS[b.type].one.replace(/^a/, "A")} has broken down. Its network may lose power until a mechanic repairs it.`, "bad"); updatePower(); }
+    if(was && !genOnline(b)){ notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id}); updatePower(); }
   }
   // vehicle depots wear; a worn-out depot grounds its ATVs
   for(const b of depots()){
     const was = condOf(b) >= VEHICLES.offlineBelow;
     b.cond = Math.max(0, condOf(b) - VEHICLES.wear * dtMin / DAY_MIN);
-    if(was && condOf(b) < VEHICLES.offlineBelow) events.toast(devMode() ? "A vehicle depot has broken down. Its ATVs are grounded until a mechanic repairs it." : "A depot has broken down. A mechanic needs to repair it.", "bad");
+    if(was && condOf(b) < VEHICLES.offlineBelow) notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id});
   }
   // tram stations wear too; one that gives out stops taking riders, and the guest map drops it
   for(const b of tramStations()){
     const was = tramWorking(b);
     b.cond = Math.max(0, condOf(b) - tramWear(b) * dtMin / DAY_MIN);
-    if(was && !tramWorking(b)){ events.toast("A tram station has broken down. Nobody can ride from it until a mechanic repairs it.", "bad"); buildGuestGraph(); }
+    if(was && !tramWorking(b)){ notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id}); buildGuestGraph(); }
   }
 }
 
@@ -162,7 +162,7 @@ function mechanicsTick(dtMin){
         // no repairs on credit: a broke park can't buy parts
         if(state.money <= 0){
           c.job = "idle"; c.target = null; c.wait = 60;
-          if(repairsHaltedDay !== state.day){ repairsHaltedDay = state.day; events.toast("Mechanics stopped repairs. The park can't pay for parts until it's back in the black.", "bad"); }
+          if(repairsHaltedDay !== state.day){ repairsHaltedDay = state.day; notify("Mechanics stopped repairs: no money for parts."); }
           continue;
         }
         const need = 100 - condOf(e), mins = Math.min(left, need / MAINT.repairPerMinute);

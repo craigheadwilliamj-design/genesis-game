@@ -752,18 +752,17 @@ function snapWaterToGrid(s){
     if(host) host.water = fresh; else s.water = fresh;
   }
 }
-// Fill a lagoon right out to its fence line with one body of sea water (kind: a SEA_WATER key). Returns false if it can't be afforded.
+// Fill a lagoon right out to its fence line with one body of sea water (kind: a SEA_WATER key). Returns why not if it can't be afforded.
 function fillLagoon(e, kind){
   const cost = Math.round(area(e.points) * waterRate(kind));
-  if(!canAfford(cost)){ ui.toast(`Filling ${e.name} costs ${money(cost)}. You have ${money(state.money)}.`, "bad"); return false; }
+  if(!canAfford(cost)) return `Filling ${e.name} costs ${money(cost)}. You have ${money(state.money)}.`;
   const old = waterOf(e).reduce((n, w) => n + area(w.points) * waterRate(w.kind), 0);
   spend(cost, "built"); if(old) earn(waterCutRefund(old), "sold");
   e.water = [{id:uid("w-"), points:e.points.map(p => p.slice()), kind}];
   const off = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && lagoonTakes(e, f.type));   // sea life out of fresh water and the other way round: sold back
   if(off.length){ earn(off.reduce((n, f) => n + Math.round(LAND[f.type].price * COST.refundShare), 0), "sold"); e.land = landOf(e).filter(f => !off.includes(f)); }
   afterChange(); render();
-  ui.toast(`Filled ${e.name} with ${waterLabel(kind).toLowerCase()} for ${money(cost)}.`, "good");
-  return true;
+  return null;
 }
 // Every water type a lagoon can hold: the two sea waters, then the fresh water of each biome
 const lagoonWaters = () => ["sea", "deep", ...waterTypes()];
@@ -772,7 +771,7 @@ function askLagoonWater(e){
   const d = $("#dlgLagoon"), sel = $("#lagoonKind"), m2 = area(e.points);
   $("#lagoonTitle").textContent = `Fill ${e.name}`;
   sel.innerHTML = lagoonWaters().map(k => `<option value="${k}">${esc(SEA_WATER[k] ? waterLabel(k) : waterLabel(k) + " fresh water")}, ${money(m2 * waterRate(k))}</option>`).join("");
-  $("#lagoonOk").onclick = () => { d.close(); if(findItem("exhibit", e.id) && !fillLagoon(e, sel.value)) askLagoonWater(e); };
+  $("#lagoonOk").onclick = () => { d.close(); const why = findItem("exhibit", e.id) && fillLagoon(e, sel.value); if(why){ askLagoonWater(e); sayWhy(why, sel); } };
   d.oncancel = ev => ev.preventDefault();   // it has to pick one
   d.showModal();
 }

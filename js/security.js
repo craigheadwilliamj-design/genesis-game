@@ -178,14 +178,9 @@ function guardWatch(){
       if(free && p.hold && !p.vandal && d < PERS.escortRadius){ escortOut(p, c); continue; }
       if(free && (p.vandal || p.ejecting === true) && d < SECURITY.catchRadius){
         // caught: the guard walks them to the gate, no longer a vandal
-        const wasVandal = p.vandal;
-        p.vandal = false; p.ejected = true; escortOut(p, c, true);
+        if(p.vandal) L.caught++;
+        p.vandal = false; p.ejected = true; escortOut(p, c);
         if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
-        if(!wasVandal) events.toast(`${(guardRec(c) || {}).name || "A guard"} caught the ${p.name} and threw them out.`, "good");
-        else {
-          L.caught++;
-          if(L.caught === 1 || L.caught % 5 === 0) events.toast(`${(guardRec(c) || {}).name || "A guard"} threw out a party of vandals. ${L.caught} caught today.`, "good");
-        }
         continue;
       }
       if(d < SECURITY.deterRadius && !p.rowdy) thinks(p, "safe");
