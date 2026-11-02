@@ -1514,7 +1514,7 @@ function renderOverlay(){
   if(landGhost && landKey(tool)){
     const t = LAND[landGhost.key], gfill = t.flora || t.slots || t.tray || t.statue ? t.color : rockTone(rockBiomeAt(landGhost.e), landGhost.key).fill;
     // a picture plant or rock shows as itself with its footprint ringed on the ground; the rest stay a plain circle
-    const gb = rockBiomeAt(landGhost.e), pic = t.flora ? PLANT_SPRITES[landGhost.key] : rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : landGhost.pic != null ? landGhost.pic : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
+    const gb = rockBiomeAt(landGhost.e), pic = t.flora ? PLANT_SPRITES[landGhost.key] : LAGOON_SPRITES[landGhost.key] || rockSprites({type:landGhost.key}, gb), gp = t.flora ? null : landGhost.pic != null ? landGhost.pic : rockPicOf(landGhost.key, gb), ring = `stroke="${landGhost.ok ? "var(--sel)" : "var(--bad)"}" stroke-width="2.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"`;
     if(pic) s += `<g opacity="${landGhost.ok ? .7 : .45}" pointer-events="none">${featSvg({id:"ghost", type:landGhost.key, x:landGhost.x, y:landGhost.y, biome:t.flora ? undefined : gb, pic:gp != null ? gp : undefined}, gb, false)}</g>${footGhostSvg(landGhost, gb, ring)}`;
     else s += `<circle cx="${landGhost.x}" cy="${landGhost.y}" r="${t.r}" fill="${gfill}" fill-opacity=".55" ${ring}/>${footSquare(landGhost.key) ? footGhostSvg(landGhost, gb, ring) : ""}`;
   }
@@ -1687,7 +1687,9 @@ function aquaSwim(h, e, dt){
 const POOL_SWIM = {speed:1.1, rest:.25, accel:.8, near:2, hover:[.5, 2.5], dive:.6, fade:.45, shallow:.5, surface:.3, breach:[.06, 1.4, .9], turn:.35};
 // is p in the animal's water with room for its body (a third of its dot) to the north, south, east and west?
 function poolSpot(h, e, p){
-  const W = poolWater(e, SPECIES_BY_ID[h.sp]), r = h.r || 1, S = SPRITES[h.sp] || {}, mx = r * Math.max(.35, 1.25 * (S.rsize || S.size || 1) * .72), wet = (x, y) => W.some(w => inPoly(x, y, w.points));
+  const W = poolWater(e, SPECIES_BY_ID[h.sp]), r = h.r || 1, S = SPRITES[h.sp] || {}, mx = r * Math.max(.35, 1.25 * (S.rsize || S.size || 1) * .72);
+  const rocks = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat).map(f => footBox(f, e));   // a sea stack stands out of the water: swim round it
+  const wet = (x, y) => W.some(w => inPoly(x, y, w.points)) && !rocks.some(b => x > b[0] && x < b[2] && y > b[1] && y < b[3]);
   // the whole picture stays in the water: its width each side, a little above and well below the middle
   return [[0, 0], [-mx, 0], [mx, 0], [-mx, r * .55], [mx, r * .55], [0, r * .55], [-mx, -r * .1], [mx, -r * .1], [0, -r * .1]].every(([ox, oy]) => wet(p[0] + ox, p[1] + oy));
 }

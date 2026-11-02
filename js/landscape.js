@@ -99,7 +99,7 @@ function plantFoot(k){
   }
 }
 for(const k of Object.keys(PLANT_SPRITES)) plantFoot(k);
-for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES})){   // a pictured shelter or tray takes a square as wide as its picture
+for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES, ...LAGOON_SPRITES})){   // a pictured shelter, tray or lagoon decoration takes a square as wide as its picture
   const t = LAND[k], h = SPRITE_HIT[k]; if(t && h) t.footSide = Math.max(1, Math.round(h[3] * 2 * ROCK_MPP));
 }
 for(const t of Object.values(LAND)) if(t.flora && !t.footSide) t.footSide = FOOT.plain[t.size] || 2;
@@ -759,6 +759,8 @@ function fillLagoon(e, kind){
   const old = waterOf(e).reduce((n, w) => n + area(w.points) * waterRate(w.kind), 0);
   spend(cost, "built"); if(old) earn(waterCutRefund(old), "sold");
   e.water = [{id:uid("w-"), points:e.points.map(p => p.slice()), kind}];
+  const off = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && lagoonTakes(e, f.type));   // sea life out of fresh water and the other way round: sold back
+  if(off.length){ earn(off.reduce((n, f) => n + Math.round(LAND[f.type].price * COST.refundShare), 0), "sold"); e.land = landOf(e).filter(f => !off.includes(f)); }
   afterChange(); render();
   ui.toast(`Filled ${e.name} with ${waterLabel(kind).toLowerCase()} for ${money(cost)}.`, "good");
   return true;
@@ -1006,6 +1008,7 @@ function landFit(e, key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
+  const lw = lagoonTakes(e, key); if(lw) return lw;
   const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? biomeOf(e) : null), x, y);
   if(!rectsInside(box, e.points)) return "Keep it inside the fence.";
   if(landOf(e).some(f => f !== skip && LAND[f.type] && rectsHit(box, footRects(f, e)))) return "It overlaps something already there.";
@@ -1014,6 +1017,16 @@ function landFit(e, key, x, y, pic, biome, skip){
   if(state.buildings.some(b => b.exhibitId === e.id && rectsHitPoly(box, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && rectsDist(box, e.gate[0], e.gate[1]) < 3) return "Keep clear of the gate.";
   if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
+  return null;
+}
+// Why lagoon decoration `key` can't go in exhibit e at all (not a lagoon, no water, the wrong water), or null; anything else is fine here
+function lagoonTakes(e, key){
+  const t = LAND[key]; if(!t || !t.lagoon) return null;
+  if(!lagoonWalled(e)) return `${t.label} only goes in a lagoon.`;
+  const k = (waterOf(e)[0] || {}).kind;
+  if(!k) return "No water yet.";
+  if(t.sea && !SEA_WATER[k]) return `${t.label} needs sea water.`;
+  if(t.fresh && SEA_WATER[k]) return `${t.label} needs fresh water.`;
   return null;
 }
 // What's under the pointer: the open exhibit it's in (null out in the park), and whether the feature fits there
@@ -1045,6 +1058,7 @@ function decorProblem(key, x, y, pic, biome){
 function decorFit(key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
+  if(t.lagoon) return `${t.label} only goes in a lagoon.`;
   if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? parkBiome() : null), x, y);
   if(!box.every(b => insidePlot(boxPts(b), true))) return "Keep it inside the park boundary.";
@@ -1466,6 +1480,14 @@ function shelterSpriteSvg(f, t, S, dead, pick){
   const w = S.w * ROCK_MPP, h = S.h * ROCK_MPP, x = f.x - w / 2, y = f.y + t.r * S.b - h, n2 = v => v.toFixed(2);
   return `<image href="${spriteUrl(`sprites/shelter/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>${hitShape(f.type, x, y, ROCK_MPP, pick, dead)}`;
 }
+// A lagoon decoration from its picture (LAGOON_SPRITES, tools/pixellagoon.py): standing on the front edge of its footprint, animated if it has frames (like vivPropSvg)
+function lagoonSpriteSvg(f, t, S, dead, pick){
+  const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y + (t.footSide || 2 * t.r) / 2 - h, n2 = v => v.toFixed(2);
+  const n = S.frames || 1, dur = n / (S.fps || 3), ph = (performance.now() / 1000 + [...String(f.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) / 7) % dur;
+  let s = "";
+  for(let k = 1; k <= n; k++) s += `<image href="${spriteUrl(`sprites/lagoon/${f.type}${k > 1 ? "-" + k : ""}.png`)}" style="image-rendering:pixelated${n < 2 ? "" : `;visibility:${k > 1 ? "hidden" : "visible"};animation:frame${k}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`}" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
+  return s + hitShape(f.type, x, y, P, pick, dead);
+}
 // A food tray from its picture (TRAY_SPRITES): a flat steel dish, with the food drawn into its well as stepped rows, its area by how full it is
 function traySpriteSvg(f, t, S, dead, pick){
   const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y - h / 2, n2 = v => v.toFixed(2), [cx, cy, rx, ry] = S.well;
@@ -1493,6 +1515,7 @@ function featSvg(f, biome, pick, isDead){
   let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included
   const up = tilted() && !f.k;
   if(VIV_SPRITES[f.type]) s += vivPropSvg(f, t);
+  else if(LAGOON_SPRITES[f.type]) s += lagoonSpriteSvg(f, t, LAGOON_SPRITES[f.type], dead, pick);
   else if(SHELTER_SPRITES[f.type] && !f.k) s += shelterSpriteSvg(f, t, SHELTER_SPRITES[f.type], dead, pick);
   else if(TRAY_SPRITES[f.type] && !f.k) s += traySpriteSvg(f, t, TRAY_SPRITES[f.type], dead, pick);
   else if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
