@@ -3140,7 +3140,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.looseNeedsReach = e.animals.reduce((n, a) => n + (a.sick ? a.sick.sev : 0), 0) === before;
       // a bite can kill outright, and the death dialog names the attacker
       const vic = e.animals[0]; died.length = 0; vic.sick = {kind:"injury", name:"bite", sev:90}; hurtAnimal(e, vic, dm.name, "loose", [30, 30], 0);
-      out.attackKills = !e.animals.includes(vic) && died.length === 1 && died[0].cause === "Killed by a Dimetrodon" && died[0].exhibit === e.name;
+      out.attackKills = !e.animals.includes(vic) && died.length === 1 && died[0].cause === "Killed by the escaped Dimetrodon" && died[0].exhibit === e.name;
       // 2. fights: a stressed, crowded herd hurts itself; a calm one doesn't
       e = pen("e-at2", ["coel", "coel", "coel", "coel"]); state.exhibits = [e];
       const ctxOf = ratio => ({counts:speciesCounts(e), ratio});

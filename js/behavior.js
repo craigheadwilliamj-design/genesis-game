@@ -611,11 +611,11 @@ function hurtAnimal(e, v, by, how, range, killP, msg, who){
   if(v.sick.sev >= 100){
     v.sick.killed = true;
     animalDies(e, v);
-    events.toast(`${how === "fight" ? `A ${s.name} was killed in a fight` : `A ${by} killed a ${s.name}`} in ${e.name}.`, "bad");
+    events.toast(`${how === "fight" ? `A ${s.name} was killed in a fight` : `${how === "loose" ? `The escaped ${by}` : `A ${by}`} killed a ${s.name}`} in ${e.name}.`, "bad");
     return "killed";
   }
   v.sick.sev = Math.round(v.sick.sev);
-  if(how !== "fight") events.toast(`A ${by} attacked a ${s.name} in ${e.name}.`, "bad");
+  if(how !== "fight") events.toast(`${how === "loose" ? `The escaped ${by}` : `A ${by}`} attacked a ${s.name} in ${e.name}.`, "bad");
   else if(e.fightDay !== state.day){ e.fightDay = state.day; events.toast(msg || `Animals are fighting in ${e.name}. Stress and cramped quarters make them lash out.`, "bad"); }
   return "hurt";
 }

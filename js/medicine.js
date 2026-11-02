@@ -703,6 +703,6 @@ function animalDies(e, a){
   e.animals.splice(e.animals.indexOf(a), 1);
   state.staff.transfers = state.staff.transfers.filter(t => t.animalId !== a.id);
   state.rating = Math.max(0, state.rating - .05);
-  const hit = a.sick.hit, cause = a.sick.killed && hit ? `Killed by a ${hit.by}` : sickName(a);
+  const hit = a.sick.hit, cause = a.sick.killed && hit ? `Killed by ${hit.how === "loose" ? "the escaped" : "a"} ${hit.by}` : sickName(a);
   events.died({animal:SPECIES_BY_ID[a.sp].name, exhibit:e.name, cause});
 }
