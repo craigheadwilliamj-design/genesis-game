@@ -203,6 +203,7 @@ function overviewHtml(){
     h += `<div class="factor"><span>${p.label}</span>${meter(pct, col)}<span>${(p.score * p.max).toFixed(2)}/${p.max}</span></div>`;
   }
   if(d.pricey) h += `<div class="meta" style="color:var(--bad)">Tickets too expensive: −0.3★</div>`;
+  if(d.capped) h += `<div class="meta" style="color:var(--warn)" title="The park can't rate more than ${RATING.headroom}★ above its best animal on show.">Top attraction ${esc(d.star.name)} caps the park at ${d.starCap.toFixed(1)}★.</div>`;
   const dir = d.ratingTarget - state.rating;
   h += `<div class="meta" style="margin-top:8px">${Math.abs(dir) < .1 ? "Steady" : `${dir > 0 ? "Rising" : "Falling"} toward ${d.ratingTarget.toFixed(1)}★`}</div></section>`;
 

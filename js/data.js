@@ -741,6 +741,8 @@ const GUEST = {
   goodMood:75,         // an average leaving mood this high gets full marks for guest comfort
   badMood:30,          // and this low gets none
 };
+// Star rating: "Things to see" gets full marks at this much appeal, and the park can't rate more than headroom stars above its best animal on show
+const RATING = {see:250, headroom:1.5};
 // How guests spend time on the paths: stopping at exhibits, strolling, and acting on impulse. Times are guest minutes (divided by GUEST.pace in the park clock).
 // What a party notices while it stands watching an exhibit: one thing every so often (guest minutes between), each with its own small effect on mood
 const OBS = {gap:[2.5, 6], learn:.35, chance:{exhibit:.2}};
