@@ -7,6 +7,7 @@
 # Scenes: cambrian (mud, microbial mats, sponges, stalked animals, no fish or coral), paleozoic (crinoid gardens, horn and honeycomb corals, Ordovician to Permian),
 # mesozoic (the first stony corals, glass sponges, ammonite shells), cenozoic (kelp forest and a modern reef: sea fans, table and branching corals, starfish),
 # fresh (a river or lake bed for freshwater aquariums, any period: tea-green water, gravel, reeds, waterweed, eelgrass and sunken branches; pebbles, twigs, snails and leaves). The aquarium's water tint is laid over all of it in the game, so the colors here run a little bright.
+# The Cambrian walls are hand-painted art (sprites/vivscene/src/sea-cambrian-wall.jpg, cropped and scaled to each size); don't regenerate sea-cambrian-*-wall.png with this tool. Its floors still come from here.
 # Usage: python3 -I tools/pixelaquascene.py [outdir] [--sheet sheet.png]   (default sprites/vivscene; the sheet is a x4 view of every backdrop)
 import sys, os, math, zlib, random
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
