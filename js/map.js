@@ -1688,7 +1688,7 @@ const POOL_SWIM = {speed:1.1, rest:.25, accel:.8, near:2, hover:[.5, 2.5], dive:
 // is p in the animal's water with room for its body (a third of its dot) to the north, south, east and west?
 function poolSpot(h, e, p){
   const W = poolWater(e, SPECIES_BY_ID[h.sp]), r = h.r || 1, S = SPRITES[h.sp] || {}, mx = r * Math.max(.35, 1.25 * (S.rsize || S.size || 1) * .72);
-  const rocks = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat).map(f => footBox(f, e));   // a sea stack stands out of the water: swim round it
+  const rocks = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat && !LAND[f.type].float).map(f => footBox(f, e));   // a sea stack stands out of the water: swim round it (and under lily pads)
   const wet = (x, y) => W.some(w => inPoly(x, y, w.points)) && !rocks.some(b => x > b[0] && x < b[2] && y > b[1] && y < b[3]);
   // the whole picture stays in the water: its width each side, a little above and well below the middle
   return [[0, 0], [-mx, 0], [mx, 0], [-mx, r * .55], [mx, r * .55], [0, r * .55], [-mx, -r * .1], [mx, -r * .1], [0, -r * .1]].every(([ox, oy]) => wet(p[0] + ox, p[1] + oy));

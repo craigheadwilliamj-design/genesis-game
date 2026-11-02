@@ -3,7 +3,9 @@
 # own dark edge tinted to its material, a lit rim top and left and a shaded rim bottom and right. All stand upright with their base on the bottom row, centered.
 # They are drawn in their own clean colors: the game tints and fades the sunk ones like a diving pool animal (lagoonSpriteSvg). The sea stack stands out of the water with a ring of foam.
 #   sea water only:   lcoral Coral Head   lsponge Sponge Reef   lkelp Kelp Bed (swaying)   lcrinoid Crinoid Garden   lammo Ammonite Fossil
-#   fresh water only: llog Sunken Log     any water: lstack Sea Stack
+#   fresh water only: llog Sunken Log   ldrift Driftwood Snag   lweed Waterweed Thicket (swaying)   leel Eelgrass Meadow (swaying)   lstones River Stones
+#                     llily Lily Pads (floating on the surface, drawn over the ripples, never tinted)
+#   any water:        lstack Sea Stack
 # Usage: python3 -I tools/pixellagoon.py [outdir] [sheet.png]   (default sprites/lagoon; the optional sheet is a x6 view of every picture)
 import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -87,6 +89,59 @@ def sunkenlog():
     c.part(rect(0, H - 1, W - 1, H - 1) - body, mat(SAND["edge"], SAND["lo"], SAND["deep"], SAND["deep"]))
     return c
 
+DRIFT, WEED, EEL, PAD, PETAL, STAMEN = soft(ramp((178, 162, 134))), soft(ramp((76, 132, 62))), soft(ramp((122, 158, 74))), ramp((80, 140, 66)), soft(ramp((240, 162, 190))), ramp((248, 216, 96))
+GRAVEL = ramp((132, 116, 88))
+PEBBLES = (ROCK, ramp((160, 130, 102)), ramp((118, 124, 130)), ramp((184, 168, 134)))
+
+def driftwood():
+    c = Cv(32, 16); W, H = c.w, c.h
+    grain = lambda x, y: "deep" if (y + round(math.sin(x / 3) * 1)) % 3 == 0 and x % 5 else None   # wavy grain along the wood
+    c.part(mound(W / 2, H, 15, 3), GRAVEL)
+    c.part(curve([(2, H - 3), (11, H - 4), (21, H - 3.5), (29, H - 5)], 3.4), DRIFT, grain)   # the lying trunk
+    c.part(curve([(8, H - 4), (6, 7), (3, 2)], 2.2), DRIFT)   # limbs reaching up, worn smooth
+    c.part(curve([(17, H - 4), (19, 8), (18, 4), (20, 1)], 2.2), DRIFT)
+    c.part(curve([(25, H - 5), (27, 6)], 2), DRIFT)
+    c.part(stroke(2, H - 3, 0, H - 1, 1.6), DRIFT)   # a root stub
+    c.dot([(12, H - 4)], DRIFT["deep"])   # a knot
+    return c
+
+def waterweed(f=0, n=1):
+    c = Cv(24, 28); W, H = c.w, c.h
+    for x0, tall, ph in ((5, 22, 0), (9, 26, 1.4), (13, 20, 2.6), (17, 24, 3.7), (20, 15, 4.6)):   # stems in whorls of short leaves, swaying a beat apart
+        sw = math.sin(2 * math.pi * f / n - ph)
+        pts = [(x0 + math.sin(i / 2 + ph) * .5 + sw * 1.5 * (i / 8) ** 1.5, H - 2 - i * tall / 8) for i in range(9)]
+        m = curve(pts, 1.6)
+        for px, py in pts[1::2]: m |= stroke(px - 1.8, py + .6, px + 1.8, py - .6 + sw * .4, 1.2)
+        c.part(m, WEED, lambda x, y: "hi" if (x + y * 2) % 5 == 0 else None)
+    c.part(mound(W / 2, H, 10, 2.5), GRAVEL)
+    return c
+
+def eelgrass(f=0, n=1):
+    c = Cv(30, 22); W, H = c.w, c.h
+    for k in range(8):   # long ribbon blades in a meadow, each swaying a beat after the last, curling over at the tip
+        x0 = 3 + k * 3.4; tall = H * (.55 + .4 * math.sin(k * 2.1) ** 2); lean = (k - 4) * .4 + math.sin(k * 1.7) * 1.4; sw = math.sin(2 * math.pi * f / n - k * .7)
+        pts = [(x0 + lean * (i / 6) ** 1.4 + sw * 1.6 * (i / 6) ** 1.6, H - 2 - tall * i / 6) for i in range(7)]
+        c.part(curve(pts, 2.4), EEL, lambda x, y, k=k: "hi" if (x + k) % 3 == 0 and y % 4 < 2 else None)
+    c.part(mound(W / 2, H, 14, 2.5), GRAVEL)
+    return c
+
+def riverstones():
+    c = Cv(28, 13); W, H = c.w, c.h
+    for i, (cx, cy, rx, ry) in enumerate(((7, 7, 5, 4), (20, 7.5, 5.5, 3.6), (13.5, 6, 4.6, 4), (10, 10, 3.4, 2.4), (24.5, 10.5, 2.8, 2), (17, 10.5, 3, 2), (3, 10.6, 2.4, 1.8))):   # rounded cobbles in mixed colors, the far ones first
+        M = PEBBLES[i % 4]; tex = (lambda x, y: "hi" if (x * 3 + y * 7) % 13 == 0 else None) if i % 2 else (lambda x, y, cy=cy: "lo" if round(y - cy) % 3 == 1 else None)
+        c.part({p for p in ell(cx, cy, rx, ry) if p[1] < H}, M, tex)
+    return c
+
+def lilypads():
+    c = Cv(32, 14); W, H = c.w, c.h
+    for px, py, r in ((7, 8.5, 6.5), (21, 9, 7.5), (27, 4.5, 4.5), (13, 4, 5)):   # pads flat on the water, seen from above at a slant, each with its notch and veins
+        pad = ell(px, py, r, r * .55) - {(x, y) for x in range(round(px), round(px + r) + 1) for y in range(round(py) - abs(round((x - px) * .12)), round(py) + abs(round((x - px) * .12)) + 1)}   # a thin notch
+        c.part(pad, PAD, lambda x, y, px=px, py=py: "deep" if (round(math.degrees(math.atan2(y - py, (x - px) / 2))) % 60) < 8 else None)
+    fl = set()
+    for a in range(-170, 0, 30): fl |= stroke(16, 9, 16 + math.cos(math.radians(a)) * 3.6, 9 + math.sin(math.radians(a)) * 3.6, 2)
+    c.part(fl, PETAL, lambda x, y: "hi" if (x + y) % 3 == 0 else None); c.part(ell(16, 8, 1.4, 1), STAMEN)   # a flower
+    return c
+
 def seastack():
     c = Cv(30, 40); W, H = c.w, c.h
     strata = lambda x, y: "deep" if y % 5 == 0 and (x + y) % 7 else "hi" if (x * 3 + y) % 17 == 0 else None
@@ -100,8 +155,8 @@ def seastack():
     c.part({p for p in ell(W / 2, H - 3, 14.5, 2.6)} - {p for p in ell(W / 2, H - 3.5, 10.5, 1.6)}, FOAM, lambda x, y: "mid" if (x + y) % 3 else "hi")   # foam ring round the foot
     return c
 
-FRAMES = {"lkelp":6}
-ALL = {"lcoral":coralhead, "lsponge":spongereef, "lkelp":kelpbed, "lcrinoid":crinoids, "lammo":ammonite, "llog":sunkenlog, "lstack":seastack}
+FRAMES = {"lkelp":6, "lweed":6, "leel":6}
+ALL = {"lcoral":coralhead, "lsponge":spongereef, "lkelp":kelpbed, "lcrinoid":crinoids, "lammo":ammonite, "llog":sunkenlog, "ldrift":driftwood, "lweed":waterweed, "leel":eelgrass, "lstones":riverstones, "llily":lilypads, "lstack":seastack}
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "sprites/lagoon"

@@ -1277,7 +1277,7 @@ function ripplesSvg(e){
   const items = waterOf(e).filter(w => document.getElementById(`r-${w.kind}`)).map(w => ({w, kind:w.kind, points:w.points}));
   const sunk = landOf(e).some(f => LAND[f.type] && LAND[f.type].lagoon && LAND[f.type].flat);
   if(!items.length || !(sunk || e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool))) return "";
-  const m = waterMask(items), dry = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat && LAGOON_SPRITES[f.type]).map(f => {
+  const m = waterMask(items), dry = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat && !LAND[f.type].float && LAGOON_SPRITES[f.type]).map(f => {
     const t = LAND[f.type], S = LAGOON_SPRITES[f.type]; return spriteHitPath(f.type, f.x - S.w * ROCK_MPP / 2, f.y + (t.footSide || 2 * t.r) / 2 - S.h * ROCK_MPP, ROCK_MPP); }).join("");
   const cut = dry ? `rcut-${String(e.id).replace(/[^\w-]/g, "")}` : "";
   return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${cut ? `<defs><clipPath id="${cut}"><path clip-rule="evenodd" d="M-1e5 -1e5H1e5V1e5H-1e5Z${dry}"/></clipPath></defs><g clip-path="url(#${cut})">` : ""}${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}${cut ? "</g>" : ""}</g>`;
@@ -1519,7 +1519,7 @@ function featSvg(f, biome, pick, isDead){
   if(f.k) t = {...t, r:t.r * f.k};   // a vivarium's plants are drawn shrunk
   const dead = pick && isDead("land", f.id);
   const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
-  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included
+  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : t.float ? 2e9 + f.y : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included; floating ones over everything, ripples too
   const up = tilted() && !f.k;
   if(VIV_SPRITES[f.type]) s += vivPropSvg(f, t);
   else if(LAGOON_SPRITES[f.type]) s += lagoonSpriteSvg(f, t, LAGOON_SPRITES[f.type], dead, pick);
@@ -1602,7 +1602,7 @@ let openFence34 = new Map();   // open exhibit id -> its loose fence pieces {y, 
 function landSvg(e, pick, isDead){
   if(!tilted()) return byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
-  const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
+  const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : t && t.float ? 2e9 + f.y : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
   return `<g id="z34-${esc(e.id)}" data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}${ripplesSvg(e)}</g>`;
 }

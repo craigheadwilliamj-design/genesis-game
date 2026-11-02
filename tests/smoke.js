@@ -4201,9 +4201,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
             && /only goes in a lagoon/.test(landFit({...l2, barrier:"bars"}, "lcoral", cx, cy)) && /only goes in a lagoon/.test(decorFit("lcoral", 10, 10));
           state.exhibits.push(l2); state.money = 1e6; l2.land.push({id:"l-lc", type:"lcoral", x:cx, y:cy});
           const fs = featSvg(l2.land[0], "grassland", false, () => false), drawn = fs.includes("sprites/lagoon/lcoral") && fs.includes("feColorMatrix") && ripplesSvg(l2).includes("r-sea"), tab = aquascapeHtml(l2), ui = /Decorations/.test(tab) && tab.includes('data-key="lcoral"') && !tab.includes('data-key="llog"');
-          fillLagoon(l2, Object.keys(WATER_TEX).find(k => BIOMES[k])); const sold = !l2.land.length;
+          fillLagoon(l2, "wetland"); const sold = !l2.land.length, ft = aquascapeHtml(l2), fresh = ft.includes('data-key="llily"') && ft.includes('data-key="leel"') && !ft.includes('data-key="lcoral"') && landFit(l2, "lweed", cx, cy) === null;
+          l2.land.push({id:"l-ll", type:"llily", x:cx, y:cy}); const fresh2 = fresh && ripplesSvg(l2) === "" && !!document.getElementById("r-wetland"); l2.land.pop(); l2.land.push({id:"l-lw", type:"lweed", x:cx, y:cy}); const fresh3 = fresh2 && ripplesSvg(l2).includes("r-wetland");
           state.exhibits = state.exhibits.filter(x => x !== l2); state.money = m0;
-          out.lagoonDecor = pics && rules && drawn && ui && sold && !document.querySelector('[data-tool="land-lcoral"]'); }
+          out.lagoonDecor = pics && rules && drawn && ui && sold && fresh3 && !document.querySelector('[data-tool="land-lcoral"]'); }
         state.staff.keepers = state.staff.keepers.filter(k => k !== kk && k !== ak);
       }
       const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();
