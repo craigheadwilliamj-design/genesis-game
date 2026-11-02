@@ -1,7 +1,7 @@
 # Draws the lagoon decorations (LAND lagoon in js/data.js; LAGOON_SPRITES gives each its size and frames) in the park style like the aquarium fittings
 # (tools/pixelaqua.py, whose part painter it borrows), but at the park's own pixel, 0.13 m (ROCK_MPP), since a lagoon is an open exhibit. Each part has its
 # own dark edge tinted to its material, a lit rim top and left and a shaded rim bottom and right. All stand upright with their base on the bottom row, centered.
-# The ones under the water are pulled toward the sea's teal (SUNK), so they read as seen through it; the sea stack stands out of the water with a ring of foam.
+# They are drawn in their own clean colors: the game tints and fades the sunk ones like a diving pool animal (lagoonSpriteSvg). The sea stack stands out of the water with a ring of foam.
 #   sea water only:   lcoral Coral Head   lsponge Sponge Reef   lkelp Kelp Bed (swaying)   lcrinoid Crinoid Garden   lammo Ammonite Fossil
 #   fresh water only: llog Sunken Log     any water: lstack Sea Stack
 # Usage: python3 -I tools/pixellagoon.py [outdir] [sheet.png]   (default sprites/lagoon; the optional sheet is a x6 view of every picture)
@@ -9,12 +9,8 @@ import sys, os, math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pixelviv import Cv as VCv, mat, ramp, mix, rect, poly, ell, stroke, curve, sheet, STONE
 
-SEA = (38, 120, 140)   # what the sunk ones are pulled toward, a little darker than the shallow sea tile (#3AA6B4)
 class Cv(VCv):
     def part(s, mask, M, tex=None, rim=1): return super().part(mask, M, tex, rim) if not M.get("soft") else super().part(mask, {**M, "edge":mix(M["lo"], M["edge"], .5)}, tex, rim)
-    def sunk(s, k=.26):
-        for p, c in s.px.items(): s.px[p] = mix(c, SEA, k)
-        return s
 
 soft = lambda M: {**M, "soft":True}   # a lighter edge, for thin parts that would be all edge
 CORAL, BRAIN, FAN, SPONGE, PURP, KELP = soft(ramp((240, 124, 76))), ramp((214, 188, 104)), soft(ramp((186, 92, 166))), ramp((226, 170, 84)), ramp((156, 104, 190)), soft(ramp((176, 160, 64)))
@@ -33,7 +29,7 @@ def coralhead():
     for a in ([(18, 17), (18, 11), (17, 7)], [(18, 12), (15, 8), (14, 4)], [(18, 11), (21, 7), (22, 3)], [(19, 14), (23, 11), (25, 8)]): c.part(curve(a, 2.6), CORAL, polyps)   # branching coral
     for x, y in ((17, 7), (14, 4), (22, 3), (25, 8)): c.put(x, y - 1, (250, 206, 170))   # pale tips
     c.part({p for p in ell(10, 6, 5, 6) if p[1] <= 6} | stroke(10, 6, 10, 9, 1), FAN, lambda x, y: "deep" if (x - 10) % 2 == 0 and y < 5 else None)   # a sea fan behind
-    return c.sunk()
+    return c
 
 def spongereef():
     c = Cv(26, 20); W, H = c.w, c.h
@@ -41,7 +37,7 @@ def spongereef():
     for x0, top, w, M in ((2, 9, 5, SPONGE), (8, 2, 6, PURP), (15, 6, 5, SPONGE), (20, 11, 4, PURP)):   # barrel sponges, open at the top, rows of pores
         c.part(rect(x0, top, x0 + w - 1, H - 2), M, lambda x, y, x0=x0, top=top: "deep" if (y - top) % 3 == 2 and (x - x0) % 2 == 1 and y > top + 2 else None)
         c.part(rect(x0 + 1, top, x0 + w - 2, top), DARK(M))
-    return c.sunk()
+    return c
 
 def kelpbed(f=0, n=1):
     c = Cv(24, 34); W, H = c.w, c.h
@@ -53,7 +49,7 @@ def kelpbed(f=0, n=1):
             d = 1 if (i + int(ph)) % 2 else -1; lift = sw * d * .5
             c.part(poly([(px, py + .5), (px + d * 3, py - 1 - lift), (px + d * 4.6, py - 3.4 - lift), (px + d * 1.4, py - 3.2)]), KELP, lambda x, y: "hi" if (x + y) % 3 == 0 else None)
     c.part(mound(W / 2, H, 10, 3), ROCK)   # holdfasts on a reef stone
-    return c.sunk()
+    return c
 
 def crinoids():
     c = Cv(24, 26); W, H = c.w, c.h
@@ -65,7 +61,7 @@ def crinoids():
         for a in range(-2, 3): arms |= curve([(cx, cy), (cx + a * 1.1, cy - 2.6), (cx + a * 2, cy - 5 + abs(a) * .6)], 1.5)   # arms raised in a cup
         c.part(arms, M, lambda x, y: "hi" if (x + y) % 2 == 0 else None)
         c.part(ell(cx, cy + .5, 1.2, 1), DARK(M))
-    return c.sunk()
+    return c
 
 def ammonite():
     c = Cv(24, 20); W, H = c.w, c.h
@@ -79,7 +75,7 @@ def ammonite():
     c.part(ell(cx, cy, rx, ry), SHELL, coil)
     c.part({p for p in ell(cx, cy, rx, ry) if p[0] > cx + 6 and abs(p[1] - cy - 1) < 3}, mat(SHELL["edge"], (110, 92, 62), (70, 58, 38), (56, 46, 30)))   # the opening
     c.part(ell(cx, cy, 1, 1), DARK(SHELL))
-    return c.sunk()
+    return c
 
 def sunkenlog():
     c = Cv(32, 12); W, H = c.w, c.h
@@ -89,7 +85,7 @@ def sunkenlog():
     c.part(ell(4, H / 2, 1.5, H / 2 - 3.5), mat((20, 16, 10), (64, 50, 32), (40, 31, 20), (32, 25, 16)))   # hollow
     for mx, w in ((12, 4), (22, 3)): c.part({p for p in ell(mx, 2.5, w, 1.4) if p in body}, MOSS)
     c.part(rect(0, H - 1, W - 1, H - 1) - body, mat(SAND["edge"], SAND["lo"], SAND["deep"], SAND["deep"]))
-    return c.sunk(.38)
+    return c
 
 def seastack():
     c = Cv(30, 40); W, H = c.w, c.h

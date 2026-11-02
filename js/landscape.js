@@ -1270,13 +1270,17 @@ function watersSvg(list, biome, plain){   // plain: a lagoon, water right to the
     + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;
 }
-// A pool's ripples alone (the #r- pattern: its water's marks on clear ground), drawn over its animals so they swim under the surface. Only water kinds
+// A pool's ripples alone (the #r- pattern: its water's marks on clear ground), drawn over its animals and sunk lagoon decorations so they sit under the surface. Only water kinds
 // with an #r- pattern in index.html have one. In the 3/4 view it is the last thing in the exhibit's depth group (data-y past every feature), so place34 slots the animals under it.
+// A sea stack stands out of the water, so its picture is cut out of the ripples.
 function ripplesSvg(e){
   const items = waterOf(e).filter(w => document.getElementById(`r-${w.kind}`)).map(w => ({w, kind:w.kind, points:w.points}));
-  if(!items.length || !e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool)) return "";
-  const m = waterMask(items);
-  return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}</g>`;
+  const sunk = landOf(e).some(f => LAND[f.type] && LAND[f.type].lagoon && LAND[f.type].flat);
+  if(!items.length || !(sunk || e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool))) return "";
+  const m = waterMask(items), dry = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat && LAGOON_SPRITES[f.type]).map(f => {
+    const t = LAND[f.type], S = LAGOON_SPRITES[f.type]; return spriteHitPath(f.type, f.x - S.w * ROCK_MPP / 2, f.y + (t.footSide || 2 * t.r) / 2 - S.h * ROCK_MPP, ROCK_MPP); }).join("");
+  const cut = dry ? `rcut-${String(e.id).replace(/[^\w-]/g, "")}` : "";
+  return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${cut ? `<defs><clipPath id="${cut}"><path clip-rule="evenodd" d="M-1e5 -1e5H1e5V1e5H-1e5Z${dry}"/></clipPath></defs><g clip-path="url(#${cut})">` : ""}${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}${cut ? "</g>" : ""}</g>`;
 }
 function flatWaterSvg(w){
   const pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
@@ -1480,13 +1484,16 @@ function shelterSpriteSvg(f, t, S, dead, pick){
   const w = S.w * ROCK_MPP, h = S.h * ROCK_MPP, x = f.x - w / 2, y = f.y + t.r * S.b - h, n2 = v => v.toFixed(2);
   return `<image href="${spriteUrl(`sprites/shelter/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>${hitShape(f.type, x, y, ROCK_MPP, pick, dead)}`;
 }
-// A lagoon decoration from its picture (LAGOON_SPRITES, tools/pixellagoon.py): standing on the front edge of its footprint, animated if it has frames (like vivPropSvg)
+// A lagoon decoration from its picture (LAGOON_SPRITES, tools/pixellagoon.py): standing on the front edge of its footprint, animated if it has frames (like vivPropSvg).
+// A sunk one (flat) lies on the bottom, so it is tinted and faded like a pool animal dived as deep as the water there goes (poolTintValues, poolDepth in map.js).
 function lagoonSpriteSvg(f, t, S, dead, pick){
   const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y + (t.footSide || 2 * t.r) / 2 - h, n2 = v => v.toFixed(2);
+  const e = t.flat && state.exhibits.find(o => !o.viv && inPoly(f.x, f.y, o.points)), dive = !t.flat ? 0 : e ? poolDepth(e, f.x, f.y) : POOL_SWIM.shallow, fid = `ltf-${String(f.id).replace(/[^\w-]/g, "")}`;
   const n = S.frames || 1, dur = n / (S.fps || 3), ph = (performance.now() / 1000 + [...String(f.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) / 7) % dur;
   let s = "";
+  if(dive) s += `<defs><filter id="${fid}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${poolTintValues(dive)}"/></filter></defs><g opacity="${(1 - POOL_SWIM.fade * dive).toFixed(2)}" style="filter:url(#${fid})">`;
   for(let k = 1; k <= n; k++) s += `<image href="${spriteUrl(`sprites/lagoon/${f.type}${k > 1 ? "-" + k : ""}.png`)}" style="image-rendering:pixelated${n < 2 ? "" : `;visibility:${k > 1 ? "hidden" : "visible"};animation:frame${k}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`}" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
-  return s + hitShape(f.type, x, y, P, pick, dead);
+  return s + (dive ? "</g>" : "") + hitShape(f.type, x, y, P, pick, dead);
 }
 // A food tray from its picture (TRAY_SPRITES): a flat steel dish, with the food drawn into its well as stepped rows, its area by how full it is
 function traySpriteSvg(f, t, S, dead, pick){

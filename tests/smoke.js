@@ -4200,7 +4200,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
           const rules = lagoonTakes(l2, "lcoral") === null && /fresh water/.test(lagoonTakes(l2, "llog")) && landFit(l2, "lcoral", cx, cy) === null && landFit(l2, "rock", cx, cy) === "It's in the water."
             && /only goes in a lagoon/.test(landFit({...l2, barrier:"bars"}, "lcoral", cx, cy)) && /only goes in a lagoon/.test(decorFit("lcoral", 10, 10));
           state.exhibits.push(l2); state.money = 1e6; l2.land.push({id:"l-lc", type:"lcoral", x:cx, y:cy});
-          const drawn = featSvg(l2.land[0], "grassland", false, () => false).includes("sprites/lagoon/lcoral"), tab = aquascapeHtml(l2), ui = /Decorations/.test(tab) && tab.includes('data-key="lcoral"') && !tab.includes('data-key="llog"');
+          const fs = featSvg(l2.land[0], "grassland", false, () => false), drawn = fs.includes("sprites/lagoon/lcoral") && fs.includes("feColorMatrix") && ripplesSvg(l2).includes("r-sea"), tab = aquascapeHtml(l2), ui = /Decorations/.test(tab) && tab.includes('data-key="lcoral"') && !tab.includes('data-key="llog"');
           fillLagoon(l2, Object.keys(WATER_TEX).find(k => BIOMES[k])); const sold = !l2.land.length;
           state.exhibits = state.exhibits.filter(x => x !== l2); state.money = m0;
           out.lagoonDecor = pics && rules && drawn && ui && sold && !document.querySelector('[data-tool="land-lcoral"]'); }
