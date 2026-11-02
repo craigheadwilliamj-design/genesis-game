@@ -413,9 +413,18 @@ function biomeHtml(e){
 }
 // A vivarium's scene: an era and a biome painted on the back wall and floor, set from two selects for a flat price, and how well it suits each species
 // An aquarium's backdrop: one list of seas, and whether each animal is from that time
-// A lagoon's Aquascape tab: the water it holds. Rocks, corals and the like come later.
+// A lagoon's Aquascape tab: the decorations its water takes (LAND lagoon), each placed on the map like a rock, then the water it holds
+const LAGOON_DECOR = Object.keys(LAND).filter(k => LAND[k].lagoon);
 function aquascapeHtml(e){
   const cur = (waterOf(e)[0] || {}).kind, m2 = area(e.points);
+  const list = LAGOON_DECOR.filter(k => cur && !(LAND[k].sea && !SEA_WATER[cur]) && !(LAND[k].fresh && SEA_WATER[cur]));
+  const have = list.map(k => [LAND[k], landOf(e).filter(f => f.type === k).length]).filter(([, c]) => c);
+  const btns = list.map(k => { const t = LAND[k], why = canAfford(t.price) ? "" : `Costs ${money(t.price)}.`;
+    return `<button class="btn" data-action="landTool" data-key="${k}" style="padding:4px 9px;display:inline-flex;align-items:center;gap:6px" title="${esc(why || `${t.toy} toy point${t.toy === 1 ? "" : "s"}.`)}"${why ? " disabled" : ""}><img src="${spriteUrl(`sprites/lagoon/${k}.png`)}" alt="" style="height:30px;max-width:64px;object-fit:contain;image-rendering:pixelated"><span>${esc(t.label)}<br><small>${money(t.price)}</small></span></button>`; }).join("");
+  const decor = !cur ? "" : `<section><h3>Decorations</h3><div class="meta">${have.length ? `Here: ${have.map(([t, c]) => `${c} ${esc(t.label.toLowerCase())}${c === 1 ? "" : "s"}`).join(", ")}` : "None."}</div><div class="row" style="margin-top:8px">${btns}</div></section>`;
+  return decor + aquaWaterSec(e, cur, m2);
+}
+function aquaWaterSec(e, cur, m2){
   return `<section><h3>Water</h3><div class="need-line ${cur ? "ok" : "no"}">${cur ? `<b>${esc(SEA_WATER[cur] ? waterLabel(cur) : waterLabel(cur) + " fresh water")}</b>.` : "No water."}</div><div class="row" style="margin-top:6px">${lagoonWaters().map(k => `<button class="btn" data-action="aquaWater" data-k="${k}" style="padding:3px 9px"${k === cur ? " disabled" : ""}>${esc(SEA_WATER[k] ? waterLabel(k) : waterLabel(k) + " fresh")}, ${money(m2 * waterRate(k))}</button>`).join("")}</div></section>`;
 }
 function aquaSceneHtml(e){

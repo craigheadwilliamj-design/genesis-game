@@ -37,7 +37,7 @@ const BUILD_MENU = [
   ]},
   {id:"land", label:"Landscaping", items:[
     {label:"Water", water:true, note:"Pick a water type, then drag a box to lay it in 5 m chunks, like a path. Inside an exhibit it's for the animals. Out in the park guests enjoy it, and only wooden bridges cross it."},
-    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
+    ...Object.entries(LAND).filter(([k, t]) => !t.period && !t.statue && !t.vivToy && !t.lagoon && !HABITAT_PROPS.includes(k)).map(([k, t], i, all) => ({label:t.label, tool:"land-" + k, tech:t.tech, shapes:k === "rock" || k === "boulder" ? k : undefined, price:() => money(t.price),
       note:i === all.length - 1 ? "Inside an open exhibit, animals like water and rocks, and fish eaters need water. Out in the park, rocks dress up the paths." : undefined})),
     {label:"Paint Ground", paint:true, note:"Pick a biome and one of its three grounds, then drag a box to paint it. Every ground counts as its biome. Out in the park it is only looks. Inside an exhibit it costs the biome's grading price a m², and the biome with the most ground becomes the exhibit's biome. Paint can cover earlier paint. Tap a patch to change its biome, or use Erase."},
     {label:"Statues", statues:true, note:"Bronze on a stone plinth that matches the theme around it. Place them anywhere outside the exhibits. Guests stop to look, and learn a lot from the people's plaques. Grants unlock more."},

@@ -99,7 +99,7 @@ function plantFoot(k){
   }
 }
 for(const k of Object.keys(PLANT_SPRITES)) plantFoot(k);
-for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES})){   // a pictured shelter or tray takes a square as wide as its picture
+for(const [k, S] of Object.entries({...SHELTER_SPRITES, ...TRAY_SPRITES, ...LAGOON_SPRITES})){   // a pictured shelter, tray or lagoon decoration takes a square as wide as its picture
   const t = LAND[k], h = SPRITE_HIT[k]; if(t && h) t.footSide = Math.max(1, Math.round(h[3] * 2 * ROCK_MPP));
 }
 for(const t of Object.values(LAND)) if(t.flora && !t.footSide) t.footSide = FOOT.plain[t.size] || 2;
@@ -759,6 +759,8 @@ function fillLagoon(e, kind){
   const old = waterOf(e).reduce((n, w) => n + area(w.points) * waterRate(w.kind), 0);
   spend(cost, "built"); if(old) earn(waterCutRefund(old), "sold");
   e.water = [{id:uid("w-"), points:e.points.map(p => p.slice()), kind}];
+  const off = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && lagoonTakes(e, f.type));   // sea life out of fresh water and the other way round: sold back
+  if(off.length){ earn(off.reduce((n, f) => n + Math.round(LAND[f.type].price * COST.refundShare), 0), "sold"); e.land = landOf(e).filter(f => !off.includes(f)); }
   afterChange(); render();
   ui.toast(`Filled ${e.name} with ${waterLabel(kind).toLowerCase()} for ${money(cost)}.`, "good");
   return true;
@@ -1006,6 +1008,7 @@ function landFit(e, key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.statue) return "Statues go out in the park, where guests can see them. Place it outside the exhibits.";
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
+  const lw = lagoonTakes(e, key); if(lw) return lw;
   const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? biomeOf(e) : null), x, y);
   if(!rectsInside(box, e.points)) return "Keep it inside the fence.";
   if(landOf(e).some(f => f !== skip && LAND[f.type] && rectsHit(box, footRects(f, e)))) return "It overlaps something already there.";
@@ -1014,6 +1017,16 @@ function landFit(e, key, x, y, pic, biome, skip){
   if(state.buildings.some(b => b.exhibitId === e.id && rectsHitPoly(box, b.points))) return "It overlaps a viewing platform.";
   if(e.gate && rectsDist(box, e.gate[0], e.gate[1]) < 3) return "Keep clear of the gate.";
   if(t.screen && distToEdge(x, y, e.points) > SCREEN.fenceReach) return `A privacy screen goes within ${SCREEN.fenceReach} m of the fence, between the animals and the path.`;
+  return null;
+}
+// Why lagoon decoration `key` can't go in exhibit e at all (not a lagoon, no water, the wrong water), or null; anything else is fine here
+function lagoonTakes(e, key){
+  const t = LAND[key]; if(!t || !t.lagoon) return null;
+  if(!lagoonWalled(e)) return `${t.label} only goes in a lagoon.`;
+  const k = (waterOf(e)[0] || {}).kind;
+  if(!k) return "No water yet.";
+  if(t.sea && !SEA_WATER[k]) return `${t.label} needs sea water.`;
+  if(t.fresh && SEA_WATER[k]) return `${t.label} needs fresh water.`;
   return null;
 }
 // What's under the pointer: the open exhibit it's in (null out in the park), and whether the feature fits there
@@ -1045,6 +1058,7 @@ function decorProblem(key, x, y, pic, biome){
 function decorFit(key, x, y, pic, biome, skip){
   const t = LAND[key];
   if(t.vivToy) return `${t.label} only goes in a vivarium.`;
+  if(t.lagoon) return `${t.label} only goes in a lagoon.`;
   if(t.slots || t.tray || t.toy || t.toyFor || t.screen) return "Habitat props go inside an open exhibit.";
   const box = footRectsAt(key, pic, biome || (ROCK_TYPES.includes(key) ? parkBiome() : null), x, y);
   if(!box.every(b => insidePlot(boxPts(b), true))) return "Keep it inside the park boundary.";
@@ -1256,13 +1270,17 @@ function watersSvg(list, biome, plain){   // plain: a lagoon, water right to the
     + layer("lit", k => T[k].shore || T[k].lit) + layer("dark", k => T[k].shore || T[k].dark) + `</g>`;
   return s;
 }
-// A pool's ripples alone (the #r- pattern: its water's marks on clear ground), drawn over its animals so they swim under the surface. Only water kinds
+// A pool's ripples alone (the #r- pattern: its water's marks on clear ground), drawn over its animals and sunk lagoon decorations so they sit under the surface. Only water kinds
 // with an #r- pattern in index.html have one. In the 3/4 view it is the last thing in the exhibit's depth group (data-y past every feature), so place34 slots the animals under it.
+// A sea stack stands out of the water, so its picture is cut out of the ripples.
 function ripplesSvg(e){
   const items = waterOf(e).filter(w => document.getElementById(`r-${w.kind}`)).map(w => ({w, kind:w.kind, points:w.points}));
-  if(!items.length || !e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool)) return "";
-  const m = waterMask(items);
-  return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}</g>`;
+  const sunk = landOf(e).some(f => LAND[f.type] && LAND[f.type].lagoon && LAND[f.type].flat);
+  if(!items.length || !(sunk || e.animals.some(a => (SPECIES_BY_ID[a.sp] || {}).pool))) return "";
+  const m = waterMask(items), dry = landOf(e).filter(f => LAND[f.type] && LAND[f.type].lagoon && !LAND[f.type].flat && !LAND[f.type].float && LAGOON_SPRITES[f.type]).map(f => {
+    const t = LAND[f.type], S = LAGOON_SPRITES[f.type]; return spriteHitPath(f.type, f.x - S.w * ROCK_MPP / 2, f.y + (t.footSide || 2 * t.r) / 2 - S.h * ROCK_MPP, ROCK_MPP); }).join("");
+  const cut = dry ? `rcut-${String(e.id).replace(/[^\w-]/g, "")}` : "";
+  return `<g data-y="1e9" pointer-events="none" shape-rendering="crispEdges">${cut ? `<defs><clipPath id="${cut}"><path clip-rule="evenodd" d="M-1e5 -1e5H1e5V1e5H-1e5Z${dry}"/></clipPath></defs><g clip-path="url(#${cut})">` : ""}${m.kinds.map(k => `<path d="${m.by[k].body}" fill="${tileFill("r", k)}"/>`).join("")}${cut ? "</g>" : ""}</g>`;
 }
 function flatWaterSvg(w){
   const pts = w.points.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" ");
@@ -1466,6 +1484,17 @@ function shelterSpriteSvg(f, t, S, dead, pick){
   const w = S.w * ROCK_MPP, h = S.h * ROCK_MPP, x = f.x - w / 2, y = f.y + t.r * S.b - h, n2 = v => v.toFixed(2);
   return `<image href="${spriteUrl(`sprites/shelter/${f.type}.png`)}" style="image-rendering:pixelated" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>${hitShape(f.type, x, y, ROCK_MPP, pick, dead)}`;
 }
+// A lagoon decoration from its picture (LAGOON_SPRITES, tools/pixellagoon.py): standing on the front edge of its footprint, animated if it has frames (like vivPropSvg).
+// A sunk one (flat) lies on the bottom, so it is tinted and faded like a pool animal dived as deep as the water there goes (poolTintValues, poolDepth in map.js).
+function lagoonSpriteSvg(f, t, S, dead, pick){
+  const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y + (t.footSide || 2 * t.r) / 2 - h, n2 = v => v.toFixed(2);
+  const e = t.flat && state.exhibits.find(o => !o.viv && inPoly(f.x, f.y, o.points)), dive = !t.flat ? 0 : e ? poolDepth(e, f.x, f.y) : POOL_SWIM.shallow, fid = `ltf-${String(f.id).replace(/[^\w-]/g, "")}`;
+  const n = S.frames || 1, dur = n / (S.fps || 3), ph = (performance.now() / 1000 + [...String(f.id || "")].reduce((a, c) => a + c.charCodeAt(0), 0) / 7) % dur;
+  let s = "";
+  if(dive) s += `<defs><filter id="${fid}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${poolTintValues(dive)}"/></filter></defs><g opacity="${(1 - POOL_SWIM.fade * dive).toFixed(2)}" style="filter:url(#${fid})">`;
+  for(let k = 1; k <= n; k++) s += `<image href="${spriteUrl(`sprites/lagoon/${f.type}${k > 1 ? "-" + k : ""}.png`)}" style="image-rendering:pixelated${n < 2 ? "" : `;visibility:${k > 1 ? "hidden" : "visible"};animation:frame${k}of${n} ${dur.toFixed(3)}s step-end infinite;animation-delay:-${ph.toFixed(3)}s`}" pointer-events="none" x="${n2(x)}" y="${n2(y)}" width="${n2(w)}" height="${n2(h)}"/>`;
+  return s + (dive ? "</g>" : "") + hitShape(f.type, x, y, P, pick, dead);
+}
 // A food tray from its picture (TRAY_SPRITES): a flat steel dish, with the food drawn into its well as stepped rows, its area by how full it is
 function traySpriteSvg(f, t, S, dead, pick){
   const P = ROCK_MPP, w = S.w * P, h = S.h * P, x = f.x - w / 2, y = f.y - h / 2, n2 = v => v.toFixed(2), [cx, cy, rx, ry] = S.well;
@@ -1490,9 +1519,10 @@ function featSvg(f, biome, pick, isDead){
   if(f.k) t = {...t, r:t.r * f.k};   // a vivarium's plants are drawn shrunk
   const dead = pick && isDead("land", f.id);
   const edge = dead ? "var(--bad)" : t.flora ? "#1F3A2B" : t.slots ? "#3B3226" : t.tray ? TRAY.color : "#4E524C";
-  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included
+  let s = `<g${pickAt(pick, "land", f.id)}${tilted() ? ` data-y="${t.flat ? f.y - 1000 : t.float ? 2e9 + f.y : f.y}"` : ""}>`;   // flat things (a pool) sort under everything, animals included; floating ones over everything, ripples too
   const up = tilted() && !f.k;
   if(VIV_SPRITES[f.type]) s += vivPropSvg(f, t);
+  else if(LAGOON_SPRITES[f.type]) s += lagoonSpriteSvg(f, t, LAGOON_SPRITES[f.type], dead, pick);
   else if(SHELTER_SPRITES[f.type] && !f.k) s += shelterSpriteSvg(f, t, SHELTER_SPRITES[f.type], dead, pick);
   else if(TRAY_SPRITES[f.type] && !f.k) s += traySpriteSvg(f, t, TRAY_SPRITES[f.type], dead, pick);
   else if(t.statue) s += up ? statue34(f, t, edge, dead) : statueSvg(f, t, edge, dead);
@@ -1572,7 +1602,7 @@ let openFence34 = new Map();   // open exhibit id -> its loose fence pieces {y, 
 function landSvg(e, pick, isDead){
   if(!tilted()) return byDepth(landOf(e)).map(f => featSvg(f, biomeOf(e), pick, isDead)).join("");
   // in the 3/4 view the features and the exhibit's own loose fence go in one group, sorted by depth, where map.js slots the animals in among them (place34)
-  const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
+  const items = landOf(e).flatMap(f => { const t = LAND[f.type]; return t && t.lamp ? [{y:f.y - 1001, o:1, svg:lampLightSvg(f)}, {y:f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}] : [{y:t && t.flat ? f.y - 1000 : t && t.float ? 2e9 + f.y : f.y, o:1, svg:featSvg(f, biomeOf(e), pick, isDead)}]; }).concat((openFence34.get(e.id) || []).map(q => ({y:q.y, o:0, svg:`<g data-y="${q.y}">${q.svg}</g>`})));
   items.sort((p, q) => p.y - q.y || p.o - q.o);
   return `<g id="z34-${esc(e.id)}" data-z34="${esc(e.id)}">${items.map(it => it.svg).join("")}${ripplesSvg(e)}</g>`;
 }

@@ -1744,7 +1744,23 @@ const LAND = {
   feel:   {label:"Eelgrass Meadow",     one:"an eelgrass meadow",   price:600,  r:.9, color:"#709246", toy:2, vivToy:true, aqua:true, fresh:true, look:"feel"},
   flily:  {label:"Water Lily",          one:"a water lily",         price:1200, r:.9, color:"#EC9EBA", toy:3, vivToy:true, aqua:true, fresh:true, look:"flily"},
   fstones:{label:"River Stones",        one:"a pile of river stones", price:300, r:1, color:"#8C877A", toy:1, vivToy:true, aqua:true, fresh:true, hide:true, look:"fstones"},
+  // lagoon decorations (lagoon: only in a lagoon, laid in its water, from its Aquascape tab; sea or fresh as in an aquarium; flat ones lie on the floor under the swimmers, the sea stack stands out of the water and they swim round it)
+  lcoral: {label:"Coral Head",      one:"a coral head",      price:2400, r:1.8, color:"#E87C4C", toy:3, lagoon:true, wet:true, sea:true, flat:true},
+  lsponge:{label:"Sponge Reef",     one:"a sponge reef",     price:1800, r:1.7, color:"#9C68BE", toy:2, lagoon:true, wet:true, sea:true, flat:true},
+  lkelp:  {label:"Kelp Bed",        one:"a kelp bed",        price:2000, r:1.6, color:"#B0A040", toy:3, lagoon:true, wet:true, sea:true, flat:true},
+  lcrinoid:{label:"Crinoid Garden", one:"a crinoid garden",  price:2600, r:1.6, color:"#E06C7C", toy:3, lagoon:true, wet:true, sea:true, flat:true},
+  lammo:  {label:"Ammonite Fossil", one:"an ammonite fossil",price:3500, r:1.6, color:"#D6BA88", toy:4, lagoon:true, wet:true, sea:true, flat:true},
+  llog:   {label:"Sunken Log",      one:"a sunken log",      price:1500, r:2,   color:"#785A3A", toy:3, lagoon:true, wet:true, fresh:true, flat:true},
+  ldrift: {label:"Driftwood Snag",  one:"a driftwood snag",  price:1800, r:2,   color:"#B2A286", toy:3, lagoon:true, wet:true, fresh:true, flat:true},
+  lweed:  {label:"Waterweed Thicket", one:"a waterweed thicket", price:1600, r:1.6, color:"#4C843E", toy:2, lagoon:true, wet:true, fresh:true, flat:true},
+  leel:   {label:"Eelgrass Meadow", one:"an eelgrass meadow", price:1700, r:1.9, color:"#7A9E4A", toy:2, lagoon:true, wet:true, fresh:true, flat:true},
+  lstones:{label:"River Stones",    one:"a bed of river stones", price:900, r:1.8, color:"#8C877A", toy:1, lagoon:true, wet:true, fresh:true, flat:true},
+  // float: on the surface, drawn over the swimmers and the ripples, never tinted
+  llily:  {label:"Lily Pads",       one:"a raft of lily pads", price:1400, r:2, color:"#508C42", toy:2, lagoon:true, wet:true, fresh:true, float:true},
+  lstack: {label:"Sea Stack",       one:"a sea stack",       price:6000, r:2,   color:"#847E70", toy:2, lagoon:true, wet:true},
 };
+// Lagoon decoration pictures (sprites/lagoon/<key>.png, made by tools/pixellagoon.py): size in pixels at ROCK_MPP, standing on the front edge of the footprint; frames: an animation, <key>-2.png and on, looping at fps
+const LAGOON_SPRITES = {lcoral:{w:28, h:18}, lsponge:{w:26, h:20}, lkelp:{w:24, h:34, frames:6, fps:4}, lcrinoid:{w:24, h:26}, lammo:{w:24, h:20}, llog:{w:32, h:12}, ldrift:{w:32, h:16}, lweed:{w:24, h:28, frames:6, fps:4}, leel:{w:30, h:22, frames:6, fps:4}, lstones:{w:28, h:13}, llily:{w:32, h:14}, lstack:{w:30, h:40}};
 // Vivarium prop pictures (sprites/viv/<key>.png, made by tools/pixelviv.py): size in pixels at VIV_MPP a pixel. Upright ones stand on their spot, flat ones lie on the floor.
 // Shelter pictures (sprites/shelter/<key>.png, made by tools/pixelshelter.py): size in pixels at ROCK_MPP a pixel, and `b`, the picture's base (its bottom row) in radii below the spot.
 const SHELTER_SPRITES = {shelter:{w:48, h:40, b:.78}, barn:{w:84, h:62, b:.78}, burrow:{w:26, h:14, b:.85}, cavesm:{w:62, h:34, b:.85}, cavelg:{w:92, h:50, b:.85}, canopysm:{w:42, h:34, b:.6}, canopylg:{w:70, h:52, b:.6}};
@@ -2701,6 +2717,33 @@ const SPRITE_HIT = {
   "traylg":[46,20,19,23,"6-39,1-44,0-45,1-44,6-39"],
   "traymd":[30,14,11,15,"2-27,0-29,0-29,6-23"],
   "traysm":[18,9,7,9,"0-17,0-17,5-12"],
+  "lammo":[24,20,11,11,"5-16,2-19,2-19,2-19,1-22"],
+  "lcoral":[28,18,13,13,"5-22,5-25,4-25,2-25,1-26"],
+  "lcrinoid":[24,26,11,12,"7-16,0-16,0-23,3-20,3-19,4-19,1-22"],
+  "ldrift":[32,16,15.5,15.5,"2-20,3-27,1-30,0-30"],
+  "leel-2":[30,22,14,14,"6-28,2-28,2-28,2-27,2-27,1-28"],
+  "leel-3":[30,22,14,14,"7-27,2-27,2-27,2-27,2-27,1-28"],
+  "leel-4":[30,22,14,14.5,"6-26,0-26,0-27,1-27,1-27,1-28"],
+  "leel-5":[30,22,14,14.5,"5-27,0-27,0-27,0-27,1-27,1-28"],
+  "leel-6":[30,22,14,14.5,"4-28,0-28,0-27,0-27,1-27,1-28"],
+  "leel":[30,22,14,15,"4-29,0-29,0-28,1-27,1-27,1-28"],
+  "lkelp-2":[24,34,10.5,11.5,"5-10,5-16,1-23,2-23,5-21,1-23,2-22,4-22,2-21"],
+  "lkelp-3":[24,34,10.5,11.5,"5-12,5-17,1-23,2-23,5-21,1-23,2-22,4-22,2-21"],
+  "lkelp-4":[24,34,10.5,11.5,"3-13,3-18,1-23,2-23,4-21,2-23,2-22,4-22,2-21"],
+  "lkelp-5":[24,34,10.5,12,"2-12,2-19,0-23,1-23,4-21,1-23,2-22,4-22,2-21"],
+  "lkelp-6":[24,34,10.5,12,"2-11,2-19,0-23,1-22,4-20,1-23,2-22,4-22,2-21"],
+  "lkelp":[24,34,10.5,11.5,"3-10,3-18,1-23,2-22,4-20,2-23,2-22,4-22,2-21"],
+  "llily":[32,14,12.5,15.5,"8-30,1-30,0-26,17-24"],
+  "llog":[32,12,16,16,"2-30,1-30,0-31"],
+  "lsponge":[26,20,12,12,"8-13,8-19,2-23,2-23,1-24"],
+  "lstack":[30,40,14,14,"12-17,10-20,8-20,7-21,6-23,6-24,5-24,5-25,3-26,1-28"],
+  "lstones":[28,13,13,13,"5-16,2-25,1-26,24-24"],
+  "lweed-2":[24,28,10,11,"5-18,3-18,5-21,3-23,3-22,3-21,2-21"],
+  "lweed-3":[24,28,10,10,"5-18,3-18,5-21,3-21,3-21,3-21,2-21"],
+  "lweed-4":[24,28,10,10,"4-18,2-18,4-21,3-21,3-21,3-21,2-21"],
+  "lweed-5":[24,28,10,11,"3-18,1-20,3-21,2-22,3-21,3-21,2-21"],
+  "lweed-6":[24,28,10,11.5,"3-19,1-20,3-21,2-23,3-22,3-22,2-21"],
+  "lweed":[24,28,10,11,"4-18,2-20,4-22,3-23,3-23,3-22,2-21"],
 };
 // SPRITE_HIT:end
 // Ground footprint of a plant, rock or boulder (landscape.js footBox, footRects). A plant takes a square of whole 1 m cells, or in FOOT.rect a base width by a share of it deep; a pictured rock or boulder takes a few

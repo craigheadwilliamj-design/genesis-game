@@ -4012,7 +4012,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       out.vivSizesRender = Object.values(svgs).every(v => v.split("|").every(x => x.length > 200 && /<(polygon|path)/.test(x)));
       out.vivSizesDistinct = new Set(Object.values(svgs)).size === 3;
       // freshwater fittings: only in a freshwater aquarium, each with its picture; a case holding one can't go back to sea water
-      { const fk = Object.keys(LAND).filter(k => LAND[k].fresh), sea = {id:"e-fs", viv:"M", aqua:true, points:rectPts(0, 0, 15, 10, 0), animals:[], land:[]}, fr = {...sea, id:"e-ff", fresh:true, land:[{id:"l-ff", type:"flog", x:0, y:0}]};
+      { const fk = Object.keys(LAND).filter(k => LAND[k].fresh && LAND[k].vivToy), sea = {id:"e-fs", viv:"M", aqua:true, points:rectPts(0, 0, 15, 10, 0), animals:[], land:[]}, fr = {...sea, id:"e-ff", fresh:true, land:[{id:"l-ff", type:"flog", x:0, y:0}]};
         out.freshFittings = fk.length === 6 && fk.every(k => VIV_SPRITES[k] && SPRITE_PACK[`sprites/viv/${k}.png`] && caseTakes(fr, k) && !caseTakes(sea, k) && !caseTakes({...sea, aqua:false}, k))
           && Object.keys(LAND).filter(k => LAND[k].sea).every(k => !caseTakes(fr, k)) && /Take out the sunken log/.test(freshProblem(fr, false) || ""); }
       // animated fittings (VIV_SPRITES frames): every frame drawn on the map, one visible at a time on a CSS loop, and every frame's picture packed
@@ -4193,6 +4193,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
         // a lagoon holds pool animals only
         const dry = SPECIES.find(x => !x.viv && !x.pool);
         out.lagoonPoolOnly = lagoonWalled(lg) && !fitsHabitat(dry, lg) && crateProblem({sp:dry.id}, lg) === "Lagoons hold pool animals only." && fitsHabitat(dry, {points:[], animals:[], barrier:"bars"});
+        // lagoon decorations: only in a lagoon with the right water, laid in the water, drawn from their pictures, picked from the Aquascape tab; refilling with the other water sells them back
+        { const lp = rectPts(600, 600, 30, 30, 0), l2 = {id:"e-l2", name:"L2", points:lp, animals:[], barrier:"lagoon", water:[{id:"w-l2", points:lp.map(q => q.slice()), kind:"sea"}], land:[]}, m0 = state.money;
+          const [cx, cy] = footSnap("lcoral", null, null, 600, 600), keys = Object.keys(LAGOON_SPRITES);
+          const pics = keys.every(k => LAND[k].lagoon && LAND[k].footSide > 0 && [...Array(LAGOON_SPRITES[k].frames || 1).keys()].every(i => SPRITE_PACK[`sprites/lagoon/${k}${i ? "-" + (i + 1) : ""}.png`]));
+          const rules = lagoonTakes(l2, "lcoral") === null && /fresh water/.test(lagoonTakes(l2, "llog")) && landFit(l2, "lcoral", cx, cy) === null && landFit(l2, "rock", cx, cy) === "It's in the water."
+            && /only goes in a lagoon/.test(landFit({...l2, barrier:"bars"}, "lcoral", cx, cy)) && /only goes in a lagoon/.test(decorFit("lcoral", 10, 10));
+          state.exhibits.push(l2); state.money = 1e6; l2.land.push({id:"l-lc", type:"lcoral", x:cx, y:cy});
+          const fs = featSvg(l2.land[0], "grassland", false, () => false), drawn = fs.includes("sprites/lagoon/lcoral") && fs.includes("feColorMatrix") && ripplesSvg(l2).includes("r-sea"), tab = aquascapeHtml(l2), ui = /Decorations/.test(tab) && tab.includes('data-key="lcoral"') && !tab.includes('data-key="llog"');
+          fillLagoon(l2, "wetland"); const sold = !l2.land.length, ft = aquascapeHtml(l2), fresh = ft.includes('data-key="llily"') && ft.includes('data-key="leel"') && !ft.includes('data-key="lcoral"') && landFit(l2, "lweed", cx, cy) === null;
+          l2.land.push({id:"l-ll", type:"llily", x:cx, y:cy}); const fresh2 = fresh && ripplesSvg(l2) === "" && !!document.getElementById("r-wetland"); l2.land.pop(); l2.land.push({id:"l-lw", type:"lweed", x:cx, y:cy}); const fresh3 = fresh2 && ripplesSvg(l2).includes("r-wetland");
+          state.exhibits = state.exhibits.filter(x => x !== l2); state.money = m0;
+          out.lagoonDecor = pics && rules && drawn && ui && sold && fresh3 && !document.querySelector('[data-tool="land-lcoral"]'); }
         state.staff.keepers = state.staff.keepers.filter(k => k !== kk && k !== ak);
       }
       const kwOf = () => powerDemand(); const d0 = kwOf(); aq.land = aq.land.filter(f => !LAND[f.type].filter); const d1 = kwOf();
