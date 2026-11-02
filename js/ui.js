@@ -103,7 +103,7 @@ const ui = {
     (dlg || home).appendChild(box);
     box.appendChild(el);
     while(box.children.length > 4) box.firstChild.remove();
-    setTimeout(() => el.remove(), kind === "day" ? 9000 : 6000);
+    setTimeout(() => el.remove(), 6000);
   }
 };
 

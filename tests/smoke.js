@@ -42,8 +42,14 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       incidents = [{kind:"death", animal:"Triceratops", exhibit:"Pen", cause:"Pneumonia"}, {kind:"escape", animal:"Dimetrodon", exhibit:"Pen", danger:true}];
       showIncidents();
       out.incidentDialog = q("#dlgIncident").open && q("#incTitle").textContent === "Park incidents" && q("#incBody").querySelectorAll("h3").length === 2 && /Dangerous/.test(q("#incBody").textContent) && speed === 0 && !incidents.length;
-      incidentSpeed = 0; q("#dlgIncident").close();
+      q("#dlgIncident").close();
       window.realShowIncidents = showIncidents; showIncidents = () => { incidents = []; incidentSoon = 0; }; }
+    // dialogs to OK queue up: the first shows and pauses, the next waits for it; then they stay shut for the run (the day report would come up every night)
+    { ackSpeed = null; ackQueue.length = 0;
+      ackShow(q("#dlgDay"), () => { q("#dayTitle").textContent = "Day"; }); ackShow(q("#dlgIncident"), () => {}); ackShow(q("#dlgIncident"), () => {});
+      out.ackQueues = q("#dlgDay").open && !q("#dlgIncident").open && speed === 0 && ackQueue.length === 1 && q("#dayTitle").textContent === "Day";
+      ackQueue.length = 0; ackSpeed = null; q("#dlgDay").close();
+      window.realAckShow = ackShow; ackShow = (dlg, fill) => fill(); }
     // the bell: a message counts as new until the list is opened; the same one again the same day counts up on one entry; a row with a place jumps to it
     { const L0 = JSON.stringify(state.log);
       state.log = {items:[], seen:0, next:0}; bellRefresh();
