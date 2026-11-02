@@ -24,7 +24,7 @@ function openVivView(e){
   const bk = vvBank(e, bb, B), Ef = E - bk.h, bx = -w2 * B, bw = W * B, top = (E - H) * B, sill = (Ef - K.sill) * B;   // Ef: the floor at the back, a paludarium's bank top
   R(bx, top, bx + bw, Ef * B, vivMix34(wallCol, "#000000", .15)); R(bx, top, bx + bw, lerp(top, Ef * B, .4), vivMix34(wallCol, "#FFFFFF", .1));
   s += flush();
-  if(e.vivScene){ s += `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-wall.png`)}" x="${vvN(sn(bx))}" y="${vvN(sn(top))}" width="${vvN(sn(bx + bw) - sn(bx))}" height="${vvN(sn(sill) - sn(top))}" preserveAspectRatio="none" style="image-rendering:pixelated"/>`; R(bx, sill, bx + bw, Ef * B, vivMix34(sub, "#000000", .3)); }
+  if(e.vivScene){ s += `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-wall.png`)}" x="${vvN(sn(bx))}" y="${vvN(sn(top))}" width="${vvN(sn(bx + bw) - sn(bx))}" height="${vvN(sn(sill) - sn(top))}" preserveAspectRatio="none" style="image-rendering:${sceneRender(vivSceneKey(e.vivScene))}"/>`; R(bx, sill, bx + bw, Ef * B, vivMix34(sub, "#000000", .3)); }
   // the floor from the back pane to the front glass (a paludarium's bank top to its shore), darker toward the back in stepped bands, with rows of short dashes
   const dk = vivMix34(sub, "#000000", .22), lt = vivMix34(sub, "#FFFFFF", .15);
   let r = 0;

@@ -912,6 +912,8 @@ function relayViv(e){
   regatherViv(e);
 }
 // A vivarium's scene ({era, biome}, and a period once that period has its own pictures): what it costs, and what it gives each species, 0 to 1
+const SMOOTH_SCENES = {"sea-cambrian":1};   // painted backdrops, drawn smooth instead of pixel-sharp
+const sceneRender = k => SMOOTH_SCENES[k] ? "auto" : "pixelated";
 const vivSceneKey = sc => sc.sea ? "sea-" + sc.sea : sc.period && VIV_SCENE_PERIODS[sc.period + "-" + sc.biome] ? sc.period + "-" + sc.biome : sc.era + "-" + sc.biome;
 const sameScene = (a, b) => !a ? !b : !!b && a.sea === b.sea && a.era === b.era && a.biome === b.biome && (a.period || null) === (b.period || null);
 // half for a scene from its own era (or its own period, for a period scene), half for one of its biomes

@@ -870,7 +870,7 @@ function vivScene34(e, layer){
   if(layer === "floor" && e.palu && !e.vivScene.sea) layer = "palu";
   const bb = bbox(e.points), K = VIV34[e.viv] || VIV34.M, H = VIVARIUMS[e.viv].d * .45, n2 = v => v.toFixed(2);
   const [a, b] = layer === "wall" ? [flatSnap34([bb.x0, bb.y0 - H / TILT]), flatSnap34([bb.x1, bb.y0 - K.sill / TILT])] : [flatSnap34([bb.x0, bb.y0]), flatSnap34([bb.x1, bb.y1])];
-  return `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-${layer}.png`)}" x="${n2(a[0])}" y="${n2(a[1])}" width="${n2(b[0] - a[0])}" height="${n2(b[1] - a[1])}" preserveAspectRatio="none" style="image-rendering:pixelated" pointer-events="none"/>`;
+  return `<image href="${spriteUrl(`sprites/vivscene/${vivSceneKey(e.vivScene)}-${e.viv}-${layer}.png`)}" x="${n2(a[0])}" y="${n2(a[1])}" width="${n2(b[0] - a[0])}" height="${n2(b[1] - a[1])}" preserveAspectRatio="none" style="image-rendering:${sceneRender(vivSceneKey(e.vivScene))}" pointer-events="none"/>`;
 }
 // The case, pixel by pixel on the 0.13 m grid: "back" draws the shadow, far glass and the base's inside (before what's inside), "front" the base and the glass edges
 function viv34(e, which, hi){
