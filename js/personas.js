@@ -215,13 +215,12 @@ function ejectTick(p){
   if(state.minute - p.ejectTry >= 2 && !gcrew.some(c => c.chase === p)){ p.ejectTry = state.minute; dispatchGuard(p); }
 }
 // A guard has reached a waiting party: walk it to the gate, unhappy
-function escortOut(p, c, quiet){
+function escortOut(p, c){
   p.hold = false; p.ejecting = "escort"; p.wanted = false;
   leaveQueue(p); p.home = true; p.dest = null; p.why = null; p.lastStop = p.shopped = true;
   moodAdd(p, -PERS.ejectMood); thinks(p, "ejected");
   if(c.chase === p){ c.chase = null; c.route = []; c.job = "idle"; c.wait = 0; }
   c.escort = p;
-  if(!quiet) events.toast(`${(guardRec(c) || {}).name || "A guard"} walked the ${p.name} to the gate.`, "good");
 }
 
 /* ---------- what a party is doing, for its panel ---------- */

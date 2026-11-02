@@ -166,7 +166,6 @@ function showStart(){
     try{ if(on) localStorage.setItem("genesis-dev", "1"); else localStorage.removeItem("genesis-dev"); }catch{}
     const px = $("#pixelBtn"); if(px) px.hidden = !on;   // the pixel editor's button shows at once
     buildMenu(); refreshMenu();   // dev-only entries like the tram track come and go
-    ui.toast(on ? "Dev mode on. The pixel editor is at the bottom of the right-hand column." : "Dev mode off.");
   });
 }
 $("#startBiomes").addEventListener("click", pickBiome);
@@ -237,7 +236,6 @@ requestAnimationFrame(frame);
         if($("#dlgStart").open){ savedGame = remote; showStart(); return; }   // still on the start screen: offer it to Continue
         const wasIntro = $("#dlgIntro").open; if(wasIntro) $("#dlgIntro").close();
         startWith(remote, false);
-        ui.toast(`Welcome back to ${remote.name}.`, "good");
         return;
       }
     }

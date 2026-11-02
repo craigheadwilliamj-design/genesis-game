@@ -541,26 +541,23 @@ function geneDone(c){
 }
 // A minor illness treated where the animal stands: no dart, no trip to the PMC
 function treatDone(c){
-  const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a), v = state.staff.vets.find(x => x.id === c.id);
+  const e = c.patient && state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a);
   c.patient = null; c.job = "idle"; c.wait = 0;
   if(!a || !a.sick || !treatHere(a)) return;
-  events.toast(`${v ? v.name : "A vet"} treated a ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`, "good");
   events.changed();
 }
 
 // The dart takes hold
 function dartDone(c){
-  const v = state.staff.vets.find(x => x.id === c.id), who = v ? v.name : "A vet";
   if(c.loose){
     const l = c.loose; c.loose = null;
-    if(state.safety.loose.includes(l) && l.status === "darting"){ l.status = "sedated"; l.byVet = true; l.vet = null; events.toast(`${who} darted the escaped ${SPECIES_BY_ID[l.sp].name}. A keeper needs to carry it back.`, "good"); events.changed(); }
+    if(state.safety.loose.includes(l) && l.status === "darting"){ l.status = "sedated"; l.byVet = true; l.vet = null; events.changed(); }
   } else if(c.patient){
     const e = state.exhibits.find(x => x.id === c.patient.e), a = e && e.animals.find(x => x.id === c.patient.a), pmc = pmcBuilding();
     c.patient = null;
     if(a && pmc){
       a.darted = true;
       state.staff.transfers.push({id:uid("tr-"), animalId:a.id, sp:a.sp, from:e.id, to:pmc.id, med:true});
-      events.toast(`${who} darted a sick ${SPECIES_BY_ID[a.sp].name} in ${e.name}.`);
       events.changed();
     }
   }

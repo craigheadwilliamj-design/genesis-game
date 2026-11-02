@@ -83,6 +83,7 @@ const ui = {
     panelEl.innerHTML = h;
     panelEl.scrollTop = sc;
     if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
+    placeWhy();
     if(sel && sel.kind === "guest") guestLive(true);
     if(sel && sel.kind === "staff") staffLive(true);
     if(sel && sel.kind === "animal") animalLive(true);
@@ -104,6 +105,27 @@ const ui = {
     setTimeout(() => el.remove(), kind === "day" ? 9000 : 6000);
   }
 };
+
+// A click that can't go through says why in a red line under its button, for a few seconds.
+// The panel redraws often, so the line is put back after each redraw. el: the button or select, or nothing for the top of the panel.
+let whyNote = null;
+const whyKey = el => el.dataset.action ? JSON.stringify(el.dataset) : "#" + el.id;
+const whyFor = () => sel ? sel.kind + ":" + sel.id : "office:" + officeTab;
+function sayWhy(why, el){
+  if(!why) return;
+  if(!aside.classList.contains("open") && !document.querySelector("dialog[open]")){ ui.toast(why, "bad"); return; }   // nowhere to put it
+  const n = whyNote = {why, key:el ? whyKey(el) : null, at:whyFor()};
+  placeWhy();
+  setTimeout(() => { if(whyNote === n){ whyNote = null; placeWhy(); } }, 5000);
+}
+function placeWhy(){
+  document.querySelectorAll(".whyline").forEach(x => x.remove());
+  if(whyNote && whyNote.at !== whyFor()) whyNote = null;
+  if(!whyNote) return;
+  const el = whyNote.key && [...document.querySelectorAll("[data-action], select[id]")].find(x => whyKey(x) === whyNote.key);
+  const d = document.createElement("div"); d.className = "whyline"; d.setAttribute("role", "alert"); d.textContent = whyNote.why;
+  if(el) (el.closest(".row, .field") || el).after(d); else panelEl.prepend(d);
+}
 
 function starsSvg(rating, size){
   let s = `<span class="stars">`;
@@ -251,10 +273,9 @@ panelEl.addEventListener("change", ev => {
   if(ev.target.id !== "themeSel") return;
   const it = selItem(), key = ev.target.value; if(!it) return;
   const kind = sel.kind, why = themeProblem(kind, it, key);
-  if(why){ ui.toast(why, "bad"); ui.panel(); return; }
+  if(why){ ui.panel(); sayWhy(why, ev.target); return; }
   const fee = themeFee(kind, it, key);
   spend(fee, "built"); if(key === "genesis") delete it.theme; else it.theme = key;
-  ui.toast(`Now ${THEMES[key].label}${fee ? ` (${money(fee)})` : ""}.`, "good");
   afterChange(); render();
 });
 
@@ -678,7 +699,7 @@ function movesHtml(e){
 // A PMC patient goes to another exhibit once it's well, with the same warnings
 function sendPatient(a, to){
   const s = SPECIES_BY_ID[a.sp];
-  const go = () => { const why = movePatient(a.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${a.name || s.name} will be delivered to ${to.name} by the next free worker.`); afterChange(); };
+  const go = () => { const why = movePatient(a.id, to.id); afterChange(); sayWhy(why); };
   const mix = mixWarning(s, to);
   if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
   if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
@@ -687,7 +708,7 @@ function sendPatient(a, to){
 // Move an animal to another exhibit: queued like a lab delivery, carried by the next free worker
 function sendMove(a, to){
   const s = SPECIES_BY_ID[a.sp], from = animalHome(a.id);
-  const go = () => { if(!from || requestMove(from, a.sp, to, 1, a.id) < 1) ui.toast("It's already on its way.", "bad"); else ui.toast(`${a.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
+  const go = () => { const ok = from && requestMove(from, a.sp, to, 1, a.id) >= 1; ui.panel(); saveSoon(); if(!ok) sayWhy("It's already on its way."); };
   const mix = mixWarning(s, to);
   if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
   if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
@@ -695,7 +716,7 @@ function sendMove(a, to){
 }
 function sendSpecimen(r, to){
   const s = SPECIES_BY_ID[r.sp];
-  const go = () => { const why = deliverSpecimen(r.id, to.id); if(why) ui.toast(why, "bad"); else ui.toast(`${r.name || s.name} will be delivered to ${to.name} by the next free worker.${state.staff.keepers.length + state.staff.vets.length + state.staff.custodians.length ? "" : " Hire staff first."}`); ui.panel(); saveSoon(); };
+  const go = () => { const why = deliverSpecimen(r.id, to.id); ui.panel(); saveSoon(); sayWhy(why); };
   const mix = mixWarning(s, to);
   if(mix){ askConfirm("Predator and prey", mix, "Yes, send it", go); return; }
   if(isFlyer(s) && !to.viv && !to.aviary){ askConfirm(`${s.name} can fly`, `${to.name} has no aviary netting, so the ${s.name} will fly out almost right away. Send it there anyway?`, "Yes, send it", go); return; }
@@ -944,7 +965,6 @@ panelEl.addEventListener("click", e => {
   }
   if(a === "toggleClosed"){
     state.parkClosed = !state.parkClosed;
-    ui.toast(state.parkClosed ? "Park closed." : "Park open.", state.parkClosed ? "bad" : "good");
     ui.hud(); ui.panel(); saveSoon(); return;
   }
   if(a === "ticket"){
@@ -976,12 +996,12 @@ panelEl.addEventListener("click", e => {
   if(a === "paintTool"){ openLandList("paint"); return; }
   if(a === "landTool"){ setTool("land-" + b.dataset.key); rockBiome = b.dataset.biome || null; showRockPicker(); return; }
   if(a === "rockShape"){ rockPick[b.dataset.type] = b.dataset.pic === "" ? null : +b.dataset.pic; setTool("land-" + b.dataset.type); rockBiome = landTabs.biome; showRockPicker(); ui.panel(); return; }
-  if(a === "aquaFresh"){ const on = b.dataset.on === "1", why = freshProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setFresh(it, on); afterChange(); render(); return; }
-  if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ ui.toast(why, "bad"); return; } setPalu(it, on); afterChange(); render(); return; }
-  if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
-  if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ ui.toast(why, "bad"); return; } setVivScene(it, sc); afterChange(); render(); return; }
-  if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
-  if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ ui.toast(why, "bad"); return; } addVivToy(it, k); afterChange(); render(); return; }
+  if(a === "aquaFresh"){ const on = b.dataset.on === "1", why = freshProblem(it, on); if(why){ sayWhy(why, b); return; } setFresh(it, on); afterChange(); render(); return; }
+  if(a === "palu"){ const on = b.dataset.on === "1", why = paluProblem(it, on); if(why){ sayWhy(why, b); return; } setPalu(it, on); afterChange(); render(); return; }
+  if(a === "aquaScene"){ const k = ($("#aquaSceneSel") || {}).value, sc = k ? {sea:k} : null, why = vivSceneProblem(it, sc); if(why){ sayWhy(why, b); return; } setVivScene(it, sc); afterChange(); render(); return; }
+  if(a === "vivScene"){ const era = ($("#vivEraSel") || {}).value, sc = era ? {era, biome:($("#vivBiomeSel") || {}).value} : null, why = vivSceneProblem(it, sc); if(why){ sayWhy(why, b); return; } setVivScene(it, sc); afterChange(); render(); return; }
+  if(a === "vivFit"){ const k = ($("#vivFitSel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ sayWhy(why, b); return; } addVivToy(it, k); afterChange(); render(); return; }
+  if(a === "vivToy"){ const k = ($("#vivToySel") || {}).value, why = k ? vivToyProblem(it, k) : "Pick one first."; if(why){ sayWhy(why, b); return; } addVivToy(it, k); afterChange(); render(); return; }
   if(a === "vivPlantOff"){ const f = landOf(it).find(x => x.id === b.dataset.id); if(f){ earn(Math.round(LAND[f.type].price * COST.refundShare), "sold"); it.land.splice(it.land.indexOf(f), 1); regatherViv(it); afterChange(); render(); } return; }
   if(a === "psub"){ propsTabs.sub = b.dataset.k; ui.panel(); return; }
   if(a === "lsub"){ landTabs.sub = b.dataset.k; ui.panel(); return; }
@@ -991,31 +1011,31 @@ panelEl.addEventListener("click", e => {
   if(a === "animalSell"){ sellAnimalAsk(b.dataset.id); return; }
   if(a === "animalCrate"){ crateAnimalNow(b.dataset.id); return; }
   if(a === "crateTool"){ startUncrate(b.dataset.id); return; }
-  if(a === "crateOpen"){ const c = crates().find(x => x.id === b.dataset.id), e = c && state.exhibits.find(x => inPoly(c.x, c.y, x.points)); if(c && e){ const why = uncrate(c.id, e); if(why) ui.toast(why, "bad"); else { select(null); afterChange(); render(); ui.toast(`${c.name || SPECIES_BY_ID[c.sp].name} is out of its crate in ${e.name}.`, "good"); } } return; }
+  if(a === "crateOpen"){ const c = crates().find(x => x.id === b.dataset.id), e = c && state.exhibits.find(x => inPoly(c.x, c.y, x.points)); if(c && e){ const why = uncrate(c.id, e); if(why) sayWhy(why, b); else { select(null); afterChange(); render(); } } return; }
   if(a === "crateSell"){ const r = crates().find(x => x.id === b.dataset.id); if(r) askConfirm("Sell animal?", `Sell ${r.name || SPECIES_BY_ID[r.sp].name} for ${money(Math.round(SPECIES_BY_ID[r.sp].price * COST.animalResale))}?`, "Sell", () => { sellCrate(r.id); if(sel && sel.kind === "crate" && sel.id === r.id) sel = null; afterChange(); render(); }); return; }
   if(a === "extab"){ exTabs.tab = b.dataset.k; ui.panel(); return; }
   if(a === "lbiome"){ landTabs.biome = b.dataset.k; ui.panel(); return; }
   if(a === "lperiod"){ landTabs.period = b.dataset.k; ui.panel(); return; }
   if(a === "waterTool"){ openLandList("water"); return; }
-  if(a === "aquaWater"){ if(it && it.points && lagoonWalled(it)) fillLagoon(it, b.dataset.k); return; }
-  if(a === "hireSci"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "aquaWater"){ if(it && it.points && lagoonWalled(it)) sayWhy(fillLagoon(it, b.dataset.k), b); return; }
+  if(a === "hireSci"){ const why = hireScientist(b.dataset.k); done(); sayWhy(why, b); return; }
   if(a === "clone"){
     const sp = b.dataset.sp, ex = sel && sel.kind === "exhibit" ? sel.id : null, sex = b.dataset.sex, go = () => { if(orderClone(sp, ex, sex)) done(); };
     if(cloneQuality(sp) < 100) askConfirm("", "Clones with incomplete genomes can have genetic disorders. Continue?", "Yes", go, "No"); else go();   // a partial genome: a disorder is possible
     return;
   }
   if(a === "moveDlg" && it){ startAnimalMove(b.dataset.id); return; }
-  if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); if(why) ui.toast(why, "bad"); done(); return; }
+  if(a === "callKeeper" && it){ const why = callKeeper(it, b.dataset.kind || "keeper"); done(); sayWhy(why, b); return; }
   if(a === "cancelCall" && it){ cancelCall(it, b.dataset.kind || "keeper"); done(); return; }
   if(a === "cancelMoves" && it){ state.staff.transfers = state.staff.transfers.filter(t => t.cargo || t.med || (t.from !== it.id && t.to !== it.id)); done(); return; }
   if(a === "gene" && it){
-    if(it.geneTherapy) it.geneTherapy = false; else { const why = geneProblem(); if(why) ui.toast(why, "bad"); else it.geneTherapy = true; }
-    done(); return;
+    let why = null; if(it.geneTherapy) it.geneTherapy = false; else { why = geneProblem(); if(!why) it.geneTherapy = true; }
+    done(); sayWhy(why, b); return;
   }
   if(a === "medFeed" && it){ it.medFeed = !it.medFeed; done(); return; }
   if(a === "wardMove"){ startWardMove(b.dataset.id); return; }
-  if(a === "buyBed"){ const why = buyBed(); if(why) ui.toast(why, "bad"); ui.panel(); return; }
-  if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); ui.toast(`Bought ${u.label.toLowerCase()}. ${u.text}`, "good"); done(); } return; }
+  if(a === "buyBed"){ const why = buyBed(); ui.panel(); sayWhy(why, b); return; }
+  if(a === "upgrade"){ const u = UPGRADES.find(x => x.id === b.dataset.id); if(u && canAfford(u.price) && !hasUpgrade(u.id) && !(u.needs && !hasUpgrade(u.needs))){ spend(u.price, "built"); state.staff.upgrades.push(u.id); done(); } return; }
   if(a === "gateTool"){ setTool("gate"); return; }
   if(a === "otab2"){ officeTab = b.dataset.k; ui.panel(); return; }
   if(a === "tartab"){ tarTab = b.dataset.k; ui.panel(); return; }

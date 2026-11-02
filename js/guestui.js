@@ -55,7 +55,7 @@ function guestLive(force){
   if(!force && now - guestLiveAt < 250) return;
   guestLiveAt = now;
   const p = selItem();
-  if(!p){ const n = guestSelName; select(null); if(n) ui.toast(`The ${n} left the park.`); return; }
+  if(!p){ select(null); return; }
   const set = (id, v) => { const el = document.getElementById(id); if(el && el.dataset.v !== String(v)){ el.dataset.v = v; el.textContent = v; } };
   const mood = clamp(p.mood, 0, 100), bar = document.getElementById("gMoodBar");
   if(!bar) return;
@@ -254,18 +254,17 @@ panelEl.addEventListener("click", ev => {
   if(a === "ejectGuest" && sel && sel.kind === "guest"){
     const p = selItem(); if(!p) return;
     const why = ejectGuest(p);
-    ui.toast(why || (isHooligan(p) ? `Security is after the ${p.name}. Hooligans won't wait, so a guard has to catch them.` : `Security is on the way. The ${p.name} will wait here.`), why ? "bad" : "");
-    guestLive(true); return;
+    guestLive(true); sayWhy(why, b); return;
   }
   if(a === "roomRate" && it && isHotel(it)){ it.rate = clamp(roomRate(it) + (+b.dataset.d), 10, BUILDINGS[it.type].roomPrice * 3); ui.panel(); saveSoon(); return; }
   if(a === "eduFocus" && it && it.type === "edcenter"){ it.focus = it.focus === b.dataset.f ? null : b.dataset.f; recompute(); ui.panel(); saveSoon(); return; }
-  if(a === "modAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#modSel"), why = sel ? addMod(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }
+  if(a === "modAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#modSel"), why = sel ? addMod(it, sel.value) : null; if(!why) recompute(); ui.panel(); saveSoon(); sayWhy(why, b); return; }
   if(a === "modDrop" && it && it.type === "edcenter"){ dropMod(it, b.dataset.id); recompute(); ui.panel(); saveSoon(); return; }
-  if(a === "showAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#showSel"), why = sel ? addShow(it, sel.value) : null; if(why) ui.toast(why, "bad"); else recompute(); ui.panel(); saveSoon(); return; }
+  if(a === "showAdd" && it && it.type === "edcenter"){ const sel = panelEl.querySelector("#showSel"), why = sel ? addShow(it, sel.value) : null; if(!why) recompute(); ui.panel(); saveSoon(); sayWhy(why, b); return; }
   if(a === "showDrop" && it && it.type === "edcenter"){ dropShow(it, b.dataset.id); ui.panel(); saveSoon(); return; }
   if(a === "eduFee" && it && it.type === "edcenter"){ it.fee = clamp((it.fee || 0) + (+b.dataset.d), 0, EDU.centerFee * 4); ui.panel(); saveSoon(); return; }
   if(!it || sel.kind !== "building" || !isVendor(it)) return;
-  if(a === "menuAdd"){ const why = addToMenu(it, b.dataset.id); if(why) ui.toast(why, "bad"); }
+  if(a === "menuAdd"){ const why = addToMenu(it, b.dataset.id); if(why) sayWhy(why, b); }
   else if(a === "menuDrop") dropFromMenu(it, b.dataset.id);
   else if(a === "menuPrice"){ const m = menuItem(it, b.dataset.id); if(m) setMenuPrice(it, m.id, m.price + (+b.dataset.d)); }
   else return;

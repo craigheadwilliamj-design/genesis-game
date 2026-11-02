@@ -59,7 +59,7 @@ function staffLive(force){
   if(!force && now - staffLiveAt < 250) return;
   staffLiveAt = now;
   const s = selItem();
-  if(!s){ const n = staffSelName; select(null); if(n) ui.toast(`${n} is no longer on staff.`); return; }
+  if(!s){ select(null); return; }
   const f = staffById(s.id), c = staffCrew(s, f.t), e = energyOf(s), m = moraleOf(s), eb = document.getElementById("sEnergyBar");
   if(!eb) return;
   const set = (id, v) => { const el = document.getElementById(id); if(el && el.dataset.v !== String(v)){ el.dataset.v = v; el.textContent = v; } };
@@ -102,8 +102,8 @@ panelEl.addEventListener("click", e => {
   const a = b.dataset.action;
   if(a === "gotoStaff"){ officeTab = "staff"; select(null); return; }
   if(a === "selStaff"){ staffSelName = (staffById(b.dataset.id) || {s:{name:""}}).s.name; select("staff", b.dataset.id); return; }
-  if(a === "hireStaff"){ const why = hireStaff(b.dataset.t); if(why) ui.toast(why, "bad"); afterChange(); render(); return; }
+  if(a === "hireStaff"){ const why = hireStaff(b.dataset.t); afterChange(); render(); sayWhy(why, b); return; }
   if(a === "fireStaff"){ staffFireDialog(b.dataset.id); return; }
-  if(a === "hireSciTab"){ const why = hireScientist(b.dataset.k); if(why) ui.toast(why, "bad"); afterChange(); render(); return; }
+  if(a === "hireSciTab"){ const why = hireScientist(b.dataset.k); afterChange(); render(); sayWhy(why, b); return; }
   if(a === "fireSciAsk"){ sciFireDialog(b.dataset.k); return; }
 });

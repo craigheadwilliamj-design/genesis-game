@@ -2476,19 +2476,18 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       // bulldoze: a tap takes one chunk, a drag box takes exactly the chunks lit, the entrance walk stays
       setTool("bulldoze");
       const boxAt = (a, b) => { fdrag = {a, b, lift:true, box:true, swept:new Set(), last:{x:b[0], y:b[1]}}; };
-      const toastKeep = ui.toast; let toasted = ""; ui.toast = t => { toasted = t; };
       const c0 = nch(), mm = state.money; boxAt([227.5, 232.5], [227.5, 232.5]); endFenceDrag();
-      out.chunkBulldozeTap = nch() === c0 - 1 && !state.pathChunks["45,46"] && state.money - mm === Math.round(pathChunkCost("g") * COST.refundShare) && /Removed 1 path chunk, refunded/.test(toasted);
+      out.chunkBulldozeTap = nch() === c0 - 1 && !state.pathChunks["45,46"] && state.money - mm === Math.round(pathChunkCost("g") * COST.refundShare);
       const c1 = nch(), m1 = state.money; boxAt([236, 226], [246, 236]);
       const lit = bulldozeChunkKeys(fdrag).slice().sort(); renderOverlay();
       const litN = [...$("#overlay").innerHTML.matchAll(/<path d="([^"]*)" fill="var\(--bad\)" fill-opacity="\.45"/g)].reduce((n, m) => n + (m[1].match(/M/g) || []).length, 0);
       endFenceDrag();
-      out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare) && /Removed 3 path chunks, refunded \$/.test(toasted);
+      out.chunkBulldozeBox = lit.length === 3 && litN === 3 && nch() === c1 - 3 && lit.every(k => !state.pathChunks[k]) && !!state.pathChunks["50,46"] && !!state.pathChunks["46,46"] && state.money - m1 === Math.round(3 * pathChunkCost("g") * COST.refundShare);
       const c2 = nch(); boxAt([207.5, 303], [207.5, 303]); endFenceDrag();
       out.chunkBulldozeFixed = nch() === c2 && !!state.pathChunks["41,60"];
       boxAt([200, 300], [215, 304]); out.chunkBulldozeFixedBox = bulldozeChunkKeys(fdrag).length === 0; endFenceDrag();
       out.chunkBulldozeFixed2 = nch() === c2 && !!state.pathChunks["41,60"];
-      ui.toast = toastKeep; setTool("select");
+      setTool("select");
       // the same through real pointer events: drag the path tool, then drag a bulldoze box that lights the chunks as it grows
       {
         const r = svg.getBoundingClientRect(), scr = (wx, wy) => ({clientX:r.left + view.tx + wx * view.k, clientY:r.top + view.ty + wy * ky()});

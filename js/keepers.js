@@ -384,8 +384,6 @@ function callKeeper(e, kind = "keeper"){
   }
   if(best) call.keeper = best.c.id;
   calls.push(call);
-  const k = best && K.staff().find(x => x.id === best.c.id);
-  events.toast(k ? `${k.name} is on the way to ${callName(e)}.` : `Every ${K.word} is tied up. The next one free will go to ${callName(e)}.`, k ? "good" : "");
   return null;
 }
 function cancelCall(e, kind = "keeper"){ state.staff.calls = state.staff.calls.filter(x => !(x.ex === e.id && callKind(x) === kind)); }
@@ -667,9 +665,8 @@ function arrive(c, k){
       e.stock[c.carry.type] = (e.stock[c.carry.type] || 0) + give; c.carry.amount -= give;
       noteFlow(null, e.id, give);
       if(c.carry.amount <= 0.01) setCarry(c, null);
-      if(c.carry && startFilling(c, e)){ events.toast(`${k.name} checked ${e.name}.`, "good"); return; }
+      if(c.carry && startFilling(c, e)) return;
     }
-    events.toast(`${k.name} checked ${e.name}.`, "good");
     if((e.dirt || 0) > 2){ c.cleanId = e.id; c.cleanLow = false; c.job = "mucking"; }
     return;
   }

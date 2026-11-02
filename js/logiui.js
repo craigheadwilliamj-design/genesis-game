@@ -216,8 +216,8 @@ panelEl.addEventListener("click", ev => {
   if(a === "zoneEdit" && it && sel.kind === "zone"){ startZoneEdit(it.id); return; }
   if(a === "zoneRestyle" && it && sel.kind === "zone"){
     const key = THEMES[it.theme] ? it.theme : "genesis", why = zoneThemeProblem(it, key);
-    if(why){ ui.toast(why, "bad"); return; }
-    const r = restyleZone(it, key); ui.toast(`Restyled ${r.n} thing${r.n === 1 ? "" : "s"} as ${THEMES[key].label}${r.fee ? ` (${money(r.fee)})` : ""}.`, "good");
+    if(why){ sayWhy(why, b); return; }
+    restyleZone(it, key);
     done(); return;
   }
   if(a === "gotoZone"){ select("zone", b.dataset.id); return; }
@@ -228,7 +228,7 @@ panelEl.addEventListener("click", ev => {
   }
   if(a === "gotoLogi"){ openParkOffice("logi"); return; }
   if(a === "forecast"){ state.logi.auto = !state.logi.auto; if(forecasting()) for(const t of ORDER_GOODS) state.logi.orders[t] = forecastOrder(t); done(); return; }
-  if(a === "rush"){ const t = b.dataset.t, why = rushOrder(t); if(why) ui.toast(why, "bad"); else ui.toast(`Rush delivery of ${rushLot(t)} ${goodName(t).toLowerCase()} arrived at the dock.`); done(); return; }
+  if(a === "rush"){ const why = rushOrder(b.dataset.t); done(); sayWhy(why, b); return; }
 });
 
 // Standing order sliders: the number and price follow the drag, and the order is set when it's let go
@@ -242,7 +242,7 @@ panelEl.addEventListener("change", ev => {
   if(t.dataset.order){ setOrder(t.dataset.order, t.value); afterChange(); render(); return; }
   if(t.id === "zoneThemeSel"){
     const it = selItem(); if(!it || sel.kind !== "zone") return;
-    if(!themeHave(t.value)){ ui.toast("That theme is locked.", "bad"); ui.panel(); return; }
+    if(!themeHave(t.value)){ ui.panel(); sayWhy("That theme is locked.", t); return; }
     if(t.value === "genesis") delete it.theme; else it.theme = t.value;
     afterChange(); render(); return;
   }
