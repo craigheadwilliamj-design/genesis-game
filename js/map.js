@@ -820,7 +820,7 @@ const PARK34 = {A:"#122213", L:"#3F7C45", H:"#305E32", F:"#2B542D", C:"#1C1A10",
 const AQUA34 = {clean:"#1E6FA8", foul:"#56652A", alpha:[.38, .8], surface:.35, sand:"#C9B486", fresh:"#2C7466", gravel:"#93805E"};   // fresh, gravel: a freshwater aquarium's clean water and floor
 const aquaClean34 = e => e.fresh ? AQUA34.fresh : AQUA34.clean;
 // The waterline's height in meters: a little under the lid
-const aquaLine = e => VIVARIUMS[e.viv].d * .45 - .6;
+const aquaLine = e => { const H = VIVARIUMS[e.viv].d * .45; return H - Math.min(.6, H * .1); };   // the waterline: a tenth of the glass below its top, at most .6 m
 // A paludarium's water: its depth in meters, and the flooded part of the floor (the front of the case, from paluY)
 const paluLine = e => VIVARIUMS[e.viv].d * .45 * PALU.depth;
 const paluPoly = e => { const b = bbox(e.points), y = paluY(e); return [[b.x0, y], [b.x1, y], [b.x1, b.y1], [b.x0, b.y1]]; };
