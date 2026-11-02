@@ -37,6 +37,24 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     // buildings run on free power unless a check wires up a grid (the power checks clear state.powerFree themselves)
     window.realUpgradeSave = upgradeSave; upgradeSave = s => { s = realUpgradeSave(s); if(s.powerFree === undefined) s.powerFree = 1e9; return s; };
     state.powerFree = 1e9; recompute();
+    // incidents (deaths, escapes, guests killed): the dialog works, then stays shut for the rest of the run, since nobody clicks OK here
+    {
+      incidents = [{kind:"death", animal:"Triceratops", exhibit:"Pen", cause:"Pneumonia"}, {kind:"escape", animal:"Dimetrodon", exhibit:"Pen", danger:true}];
+      showIncidents();
+      out.incidentDialog = q("#dlgIncident").open && q("#incTitle").textContent === "Park incidents" && q("#incBody").querySelectorAll("h3").length === 2 && /Dangerous/.test(q("#incBody").textContent) && speed === 0 && !incidents.length;
+      incidentSpeed = 0; q("#dlgIncident").close();
+      window.realShowIncidents = showIncidents; showIncidents = () => { incidents = []; incidentSoon = 0; }; }
+    // the bell: a message counts as new until the list is opened; the same one again the same day counts up on one entry; a row with a place jumps to it
+    { const L0 = JSON.stringify(state.log);
+      state.log = {items:[], seen:0, next:0}; bellRefresh();
+      notify("Test one."); notify("Test two."); notify("Test two.");
+      out.bellCounts = state.log.items.length === 2 && state.log.items[0].n === 2 && logUnread() === 2 && q("#bellCount").textContent === "2" && !q("#bellCount").hidden;
+      q("#bellBtn").click();
+      out.bellOpenReads = !q("#bellPop").hidden && logUnread() === 0 && q("#bellCount").hidden && q("#bellList").querySelectorAll(".logrow.new").length === 2 && /×2/.test(q("#bellList").textContent);
+      notify("Test three."); out.bellLiveWhileOpen = q("#bellList").querySelectorAll(".logrow").length === 3 && logUnread() === 0;
+      q("#bellBtn").click(); out.bellCloses = q("#bellPop").hidden;
+      notify("Test two."); out.bellNoMergeOnceRead = state.log.items.length === 4;
+      state.log = JSON.parse(L0); bellRefresh(); }
     const sp = SPECIES.find(s => !s.viv && !s.pool);
 
     // old saves without staff/safety upgrade without throwing
@@ -212,11 +230,12 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
 
     // no doses: admitted anyway and waits; the course starts when medicine comes in, on contemporary medicine slower the older the animal; no vet on staff pauses it
     { pmcB.store = {medpal:0, medmod:0};
-      const toastKeep = events.toast, said = []; events.toast = t => said.push(t);
+      const outMed = () => state.log.items.filter(x => x.text === "The PMC is out of medicine." && x.day === state.day).reduce((n, x) => n + (x.n || 1), 0);
+      delete state.health.outDay; const m0 = outMed();
       const w = {id:"a-w", sp:"arth", sick:{kind:"infection", name:"cordyceps", sev:50}};
       admit(w, {from:"e-v"}); const wp = state.health.ward.find(p => p.a === w);
-      out.wardWaitsForDoses = !wp.dosed && patientStatus(wp) === "Waiting for doses." && said.includes("The PMC is out of medicine.");
-      wardTick(30); out.wardNoProgressUndosed = wp.done === 0 && said.filter(t => t === "The PMC is out of medicine.").length === 1;
+      out.wardWaitsForDoses = !wp.dosed && patientStatus(wp) === "Waiting for doses." && outMed() === m0 + 1;
+      wardTick(30); out.wardNoProgressUndosed = wp.done === 0 && outMed() === m0 + 1;
       state.science.tech = state.science.tech.filter(t => t !== "medpaleo"); pmcB.store = {medpal:0, medmod:MODERN.stock};
       wardTick(1); out.dockMedSlower = wp.dosed && wp.med === "modern" && Math.abs(wp.need - 50 * HEALTH.wardPerPoint * MEDICINE.dockWard.paleozoic) < 1e-9 && pmcStock(CMED) === MODERN.stock - HEALTH.dose;
       const vets = state.staff.vets; state.staff.vets = []; const d0 = wp.done; wardTick(60);
@@ -228,7 +247,6 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       const inv = viv.animals.length; pmcRemoved(pmcB);
       out.pmcRemovedPartialCredit = viv.animals.length === inv + 1 && Math.abs(w.sick.sev - sevNow / 2) < 1e-9 && !state.health.ward.length && wardBeds() === HEALTH.beds;
       viv.animals = viv.animals.filter(a => a !== w);
-      events.toast = toastKeep;
       state.science.tech.push("medpaleo"); pmcB.store = {medpal:10}; }
     // beds: start at 2, each bought one costs more and adds upkeep, at most 6
     { const m0 = state.money, p0 = bedPrice();
@@ -377,12 +395,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       state.exhibits.push(pe); recompute();
       const [h1, h2, h3, h4] = pe.animals;
       fallSick(h1, "pneumonia", null, 30); fallSick(h2, "pneumonia", null, 30); h2.darted = true; fallSick(h3, "sprain", null, 20); fallSick(h4, "pneumonia", null, 39);
-      const t0 = toasts.length; healthStep(.25);
+      healthStep(.25);
       out.stepWorsens = Math.abs(h1.sick.sev - (30 + SICK_KIND.infection.worsen * .25)) < 1e-9 && h2.sick.sev === 30;
       out.mildInjuryMends = Math.abs(h3.sick.sev - (20 - HEALTH.heal * .25)) < 1e-9;
-      out.hiddenShowsWhenBad = !h4.sick.hidden && toasts.slice(t0).some(t => /is showing signs of Pneumonia/.test(t.text));
+      out.hiddenShowsWhenBad = !h4.sick.hidden;
       pe.dirt = 90; const s3 = h3.sick.sev; healthStep(.25); out.dirtyInjuryWorsens = h3.sick.sev > s3;
-      h1.sick.sev = 74.9; healthStep(.25); out.criticalWarnsOnce = h1.sick.warned && toasts.filter(t => /is critical/.test(t.text)).length === 1 && (healthStep(.01), toasts.filter(t => /is critical/.test(t.text)).length === 1);
+      const crit = () => state.log.items.filter(x => /is critical/.test(x.text)).reduce((n, x) => n + (x.n || 1), 0), c0 = crit();
+      h1.sick.sev = 74.9; healthStep(.25); out.criticalWarnsOnce = h1.sick.warned && crit() === c0 + 1 && (healthStep(.01), crit() === c0 + 1);
       h1.sick.sev = 99.99; died.length = 0; healthStep(.25); out.deathNamesCondition = !pe.animals.includes(h1) && died.length === 1 && died[0].cause === "Pneumonia";
       // dirt is what mostly makes animals ill, and the risk says so
       pe.dirt = 0; const clean = illChance(pe, h2).p; pe.dirt = 90; const dirty = illChance(pe, h2);
@@ -929,7 +948,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     const eh = pickHaul(cr, kNear, CUSTODIAN_GOODS, 100);
     out.eveningFillsFirst = restockEvening() && eh && eh.d === kio && eh.cls === 0;
     // the day ends: a stand left short missed its restock, and the toast says whether storage ran dry
-    const said3 = [], tk3 = events.toast; events.toast = t => said3.push(t);
+    const said3 = state.dayNotes; said3.length = 0;
     kio.store = {drinks:0}; restockCheck();
     out.missedRestock = kio.missed && said3.some(t => /weren't restocked by 11/.test(t)) && !said3.some(t => /ran out/.test(t));
     said3.length = 0; wh.store = {}; restockCheck();
@@ -943,7 +962,7 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     for(const c of ccrew){ c.haul = null; setCustCarry(c, null); c.route = []; c.job = "idle"; c.wait = 0; }
     out.custCalled = !callKeeper(kio, "cust") && state.staff.calls.some(x => x.ex === kio.id && x.kind === "cust" && x.keeper === cr.id);
     out.custCallRestocks = work(600, () => !state.staff.calls.some(x => x.ex === kio.id)) && Math.round(stockOf(kio, "drinks")) === Math.round(kt * .5);
-    events.toast = tk3; state.minute = m7;
+    said3.length = 0; state.minute = m7;
     // custodians scrub dirty restrooms and sweep litter
     for(const c of ccrew){ c.haul = null; setCustCarry(c, null); c.route = []; c.job = "idle"; c.wait = 0; }
     wh.store = {}; rest.dirt = 60;

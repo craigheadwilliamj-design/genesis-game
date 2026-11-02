@@ -33,6 +33,7 @@ const ui = {
 
   // Update the numbers in the top bar. Cheap enough to call every frame.
   hud(force){
+    if(force) bellRefresh();
     const set = (id, v) => { if(force || this.hudCache[id] !== v){ this.hudCache[id] = v; $("#" + id).textContent = v; } };
     set("money", money(state.money));
     $("#roMoney").classList.toggle("neg", state.money < 0);
@@ -126,6 +127,41 @@ function placeWhy(){
   const d = document.createElement("div"); d.className = "whyline"; d.setAttribute("role", "alert"); d.textContent = whyNote.why;
   if(el) (el.closest(".row, .field") || el).after(d); else panelEl.prepend(d);
 }
+
+/* ---------- the bell: the message log (notify in sim.js) ---------- */
+const bellPop = $("#bellPop");
+let bellSince = 0;   // what had been read when the list opened: newer entries stay marked while it's open
+// The count on the bell; ring = a new message just came in. An open list redraws and counts as read.
+function bellRefresh(ring){
+  if(!bellPop.hidden){ bellList(); state.log.seen = state.log.next; }
+  const n = logUnread(), c = $("#bellCount");
+  c.hidden = !n; c.textContent = n > 99 ? "99+" : n;
+  $("#bellBtn").title = n ? `Messages: ${n} new` : "Messages";
+  if(ring && n){ const b = $("#bellBtn"); b.classList.remove("ring"); void b.offsetWidth; b.classList.add("ring"); }
+}
+function bellList(){
+  const L = state.log;
+  $("#bellList").innerHTML = L.items.length ? L.items.map(x => `<button class="logrow${x.id > bellSince ? " new" : ""}"${x.at ? ` data-at="${x.id}"` : ""}><span class="logwhen">${fmtDate(x.day)}, ${fmtClock(clockMin(x.min))}</span><span>${esc(x.text)}${x.n > 1 ? ` <b>×${x.n}</b>` : ""}</span></button>`).join("") : `<div class="meta">No messages.</div>`;
+}
+function bellOpen(open){
+  bellPop.hidden = !open; $("#bellBtn").setAttribute("aria-expanded", open);
+  if(open){
+    // beside the bell, to its left, kept on screen
+    const r = $("#bellBtn").getBoundingClientRect(), w = bellPop.offsetWidth, x = r.left - w - 8;
+    bellPop.style.left = Math.max(8, x) + "px"; bellPop.style.top = (x < 8 ? r.bottom + 6 : r.top) + "px";
+    bellSince = state.log.seen;
+  }
+  bellRefresh();
+}
+$("#bellBtn").addEventListener("click", () => bellOpen(bellPop.hidden));
+$("#bellClear").addEventListener("click", () => { state.log.items = []; bellRefresh(); saveSoon(); });
+$("#bellList").addEventListener("click", e => {
+  const r = e.target.closest("[data-at]"), x = r && state.log.items.find(i => i.id === +r.dataset.at); if(!x) return;
+  const it = findItem(x.at.kind, x.at.id); if(!it) return;
+  bellOpen(false); select(x.at.kind, x.at.id); centerOn(it);
+});
+document.addEventListener("pointerdown", e => { if(!bellPop.hidden && !bellPop.contains(e.target) && !$("#bellBtn").contains(e.target)) bellOpen(false); });
+document.addEventListener("keydown", e => { if(e.key === "Escape" && !bellPop.hidden) bellOpen(false); });
 
 function starsSvg(rating, size){
   let s = `<span class="stars">`;

@@ -211,8 +211,8 @@ function supplyLines(){
 // The supply trucks come at 7 PM, as the evening restock starts.
 function logiTick(dtMin){
   if(state.logi.truckDay !== state.day && state.minute >= minuteAtClock(LOGI.truckClock)){ state.logi.truckDay = state.day; dockDelivery(); }
-  if(state.logi.notice){ state.logi.notice = false; events.toast("Food is now a real supply. Build a Delivery Dock, a station and a Custodial Closet. Custodians stock the station, and keepers carry the food to the animals.", "bad"); }
-  if(state.logi.guestNotice){ state.logi.guestNotice = false; events.toast(`Stands and shops will soon sell from their own stock. Suppliers deliver straight to them until ${fmtDate(state.logi.guestFrom)}. Before then, build a Delivery Dock and a Custodial Closet, and hire custodians to carry stock out.`, "bad"); }
+  state.logi.notice = false;
+  state.logi.guestNotice = false;
   const share = dtMin / DAY_MIN;
   for(const b of state.buildings){
     const make = BUILDINGS[b.type].makes; if(!make || !isReachable(b) || unpowered(b)) continue;
@@ -288,9 +288,8 @@ function dockDelivery(){
   for(const t of FEED_GOODS.concat(CMED)) buy(t, orderOf(t));
   const total = GUEST_GOODS.reduce((s, t) => s + orderOf(t), 0), fit = total > 0 ? Math.min(1, room() / total) : 1;
   for(const t of GUEST_GOODS){ L.noRoom += orderOf(t) - Math.floor(orderOf(t) * fit); buy(t, Math.floor(orderOf(t) * fit)); }
-  if(units) events.toast(`The docks took in ${units} units${spent ? ` for ${money(Math.round(spent))}` : ", on the partner parks"}.`);
-  if(L.noRoom >= 1) events.toast(`${Math.round(L.noRoom)} units didn't fit at the docks.`, "bad");
-  if(L.noCash >= 1) events.toast(`${Math.round(L.noCash)} units weren't delivered. Not enough money.`, "bad");
+  if(L.noRoom >= 1){ const d = docks()[0]; notify(`Out of dock space: ${Math.round(L.noRoom)} units failed to deliver.`, d ? {kind:"building", id:d.id} : null); }
+  if(L.noCash >= 1) dayNote(`${Math.round(L.noCash)} units weren't delivered: not enough money.`);
 }
 // A rush delivery lands now, at the dock with the most room, for a steep markup
 const rushLot = t => t === CMED ? LOGI.rushDoses : LOGI.rushLot;
@@ -324,7 +323,7 @@ function spoilNight(){
   }
   const cm = cerMeds(); for(const t of MED_GOODS) if(cm[t]) cm[t] = Math.max(0, cm[t] - cm[t] * GOODS[t].spoil);
   L.lostDay = state.day;
-  if(L.lost >= 10) events.toast(`${Math.round(L.lost)} units of food spoiled overnight, worth about ${money(Math.round(L.lostCost))}.`, "bad");
+  if(L.lost >= 10) dayNote(`${Math.round(L.lost)} units of food spoiled, worth about ${money(Math.round(L.lostCost))}.`);
 }
 const MED_UNIT_VALUE = 60;
 
@@ -357,8 +356,8 @@ function restockCheck(){
     out.forEach(t => dry.add(t));
     if(out.length < short.length) missed.push(b);
   }
-  if(dry.size) events.toast(`Storage ran out of ${[...dry].map(t => goodName(t).toLowerCase()).join(" and ")} during the restock.`, "bad");
-  if(missed.length) events.toast(`${missed.length} stand${missed.length === 1 ? "" : "s"}, shop${missed.length === 1 ? "" : "s"} or hotel${missed.length === 1 ? "" : "s"} weren't restocked by ${fmtClock(ROLLOVER_CLOCK + DAY_CLOCK)}.`, "bad");
+  if(dry.size) dayNote(`Storage ran out of ${[...dry].map(t => goodName(t).toLowerCase()).join(" and ")} during the restock.`);
+  if(missed.length) dayNote(`${missed.length} stand${missed.length === 1 ? "" : "s"}, shop${missed.length === 1 ? "" : "s"} or hotel${missed.length === 1 ? "" : "s"} weren't restocked by ${fmtClock(ROLLOVER_CLOCK + DAY_CLOCK)}.`);
 }
 
 // Everything the park holds right now, for the park office

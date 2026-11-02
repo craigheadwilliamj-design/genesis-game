@@ -680,7 +680,7 @@ const trickleRate = () => GUEST.trickle * (GUEST.trickleLow + (1 - GUEST.trickle
 
 function guestsTick(m0, m1){
   const dt = m1 - m0, gdt = dt * GUEST.pace;   // guests live in slow motion: gdt is their own time
-  if(state.guestLog.notice){ state.guestLog.notice = false; events.toast("Guests now get tired and drop litter. Put trash bins and benches along your paths (Path Tools). Tap a food stand or gift shop to change what it sells and its prices.", "bad"); }
+  state.guestLog.notice = false;
   if(state.parkClosed){ for(const p of parties) if(!p.home) goHome(p); }   // closed: everyone still inside heads for the exit
   else{
     hotelGuestsArrive();

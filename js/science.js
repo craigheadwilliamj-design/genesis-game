@@ -101,7 +101,6 @@ function stopProject(p){
 function finishProject(p){
   const sc = state.science, info = projectInfo(p.kind, p.id);
   if(!hasTech(p.id)) sc.tech.push(p.id);
-  events.toast(`The Research Lab finished researching ${info ? info.label.toLowerCase() : p.id}.`, "good");
 }
 
 /* ---------- the Time Travel Lab: the timeline, sites and drones ---------- */
@@ -278,7 +277,7 @@ function tripReturns(t){
   sc.reports.unshift({id:(sc.reports.reduce((m, r) => Math.max(m, r.id), 0)) + 1, site:t.site, kind:t.kind, drone:t.bay, day:state.day, lines});
   sc.reports.length = Math.min(sc.reports.length, 8);   // newest first, so the oldest drops off
   const msg = `Drone ${t.bay + 1} is back from ${placeName(t.site)}${t.kind === "scout" ? " (scouting)" : ""}: ${lines.map(l => l[0]).join(". ")}.`;
-  logScience(msg, ok); events.toast(msg, ok ? "good" : "bad");
+  logScience(msg, ok);
   if(typeof ghostRefresh === "function" && typeof ghostU !== "undefined" && ghostU !== null) ghostRefresh();   // the open site card shows the new genome right away
 }
 function dismissReport(id){ const sc = state.science; sc.reports = sc.reports.filter(r => r.id !== id); }
@@ -297,7 +296,8 @@ const cloneQuality = sp => { const d = state.science.dna[sp]; return !d || d.gen
 const cloneFailChance = sp => { const d = state.science.dna[sp], C = CLONE_GENOME; return !d || d.genome >= 100 ? 0 : C.failMax * clamp((100 - d.genome) / (100 - C.min), 0, 1); };
 function failClone(j){
   j.failed = true; j.stop = clamp((j.fail - j.start) / Math.max(1, j.end - j.start) * 100, 0, 100);
-  events.toast(`The ${SPECIES_BY_ID[j.sp].name} clone at the Genetics Lab failed at ${Math.round(j.stop)}%. ${j.why}. Discard the specimen to free the incubator.`, "bad");
+  const lab = state.buildings.find(b => b.type === "tar");
+  notify(`The ${SPECIES_BY_ID[j.sp].name} clone failed at ${Math.round(j.stop)}%: ${j.why.charAt(0).toLowerCase() + j.why.slice(1)}.`, lab ? {kind:"building", id:lab.id} : null);
   events.changed();
 }
 function discardClone(id){
@@ -461,19 +461,18 @@ function crateStranded(){
     for(const a of e.animals.slice()){
       const s = SPECIES_BY_ID[a.sp]; if(!s || !s.pool || (lagoonWalled(e) && poolM2(e, s) > 0)) continue;
       crateAnimal(e, a); n++;
-      events.toast(`The ${s.name} in ${e.name} was crated: ${lagoonWalled(e) ? "no water" : "no lagoon wall"}.`, "bad");
+      notify(`The ${s.name} in ${e.name} was crated: ${lagoonWalled(e) ? "no water" : "no lagoon wall"}.`, {kind:"exhibit", id:e.id});
     }
   }
   return n;
 }
 function finishClone(c){
-  const sc = state.science, s = SPECIES_BY_ID[c.sp], e = state.exhibits.find(x => x.id === c.exhibitId);
+  const e = state.exhibits.find(x => x.id === c.exhibitId);
   const r = nameAnimal({id:c.id, sex:c.sex, rank:c.rank, sp:c.sp, q:c.q, gq:c.q});
   const dis = rollDisorder(c.q); if(dis) r.dis = dis;   // undiagnosed until a vet's check-up
   specimens().push(r);
   // a clone ordered for an exhibit is queued for delivery at once; any other waits at the lab
-  if(e && !deliverSpecimen(r.id, e.id)) events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It's being delivered to ${e.name}.`, "good");
-  else events.toast(`The Genetics Lab finished a ${s.name} clone (${c.q}% Accuracy). It waits for delivery.`, "good");
+  if(e) deliverSpecimen(r.id, e.id);
 }
 
 /* ---------- Botany Lab: growing plants and medicine ---------- */
@@ -515,9 +514,9 @@ function growBatch(kind, era, size){
 }
 function finishBatch(b){
   const c = state.ceres;
-  if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; events.toast(`The Botany Lab finished a batch of ${growName("plant", b.era, b.size)}.`, "good"); }
-  else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); events.toast("The Botany Lab finished a batch of Paleoflora food.", "good"); }
-  else { const g = MED_GOOD[b.era]; cerMeds()[g] = Math.min(medCap(), (cerMeds()[g] || 0) + growInfo("med", b.era).doses); events.toast(`The Botany Lab finished a batch of ${ERA_LABEL[b.era]} medicine.`, "good"); }
+  if(b.kind === "plant"){ const k = b.era + "-" + b.size; c.pots[k] = (c.pots[k] || 0) + growInfo("plant", b.era, b.size).count; }
+  else if(b.kind === "food"){ c.stock = Math.min(ceresCap(), c.stock + CERES_GROW.food.amount); }
+  else { const g = MED_GOOD[b.era]; cerMeds()[g] = Math.min(medCap(), (cerMeds()[g] || 0) + growInfo("med", b.era).doses); }
 }
 // Doses already growing, so automatic ordering doesn't overfill the store
 const pendingFood = () => growing("food") * CERES_GROW.food.amount;

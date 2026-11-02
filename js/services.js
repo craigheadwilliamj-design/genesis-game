@@ -334,7 +334,6 @@ function throwTick(p, dt){
       e.trash = (e.trash || 0) + THROWN.pieces; p.trash = 0;
       if(p.rowdy){ p.vandal = true; if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); } }
       state.today.thrown = (state.today.thrown || 0) + 1;
-      if(state.today.thrown === 1) events.toast(`A guest threw trash into ${e.name}.`, "bad");
     }
     return;
   }

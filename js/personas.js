@@ -178,7 +178,6 @@ function teaseTick(p, dt){
       p.vandal = true;
       if(onCamera(x, y)){ p.wanted = true; dispatchGuard(p); }
       state.today.teased = (state.today.teased || 0) + 1;
-      if(state.today.teased === 1) events.toast(`A guest is banging on the glass at ${e.name}. It stresses the animals. Guards nearby put them off and throw them out.`, "bad");
     }
     return;
   }
@@ -209,7 +208,6 @@ function ejectTick(p){
   if(p.ejecting !== true) return;
   if(state.minute - p.ejectAt > PERS.ejectWait){
     p.ejecting = false; p.hold = false; p.wanted = false;
-    events.toast(`Security never reached the ${p.name}. They carry on.`, "bad");
     return;
   }
   if(state.minute - p.ejectTry >= 2 && !gcrew.some(c => c.chase === p)){ p.ejectTry = state.minute; dispatchGuard(p); }

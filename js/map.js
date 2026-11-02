@@ -3596,7 +3596,7 @@ function releaseAnimals(e){
     if(SPECIES_BY_ID[a.sp]?.pool) crateAnimal(e, a);
     else { turnLoose(e, a); out++; }
   }
-  if(out) events.toast(`${out} animal${out === 1 ? "" : "s"} got out of ${e.name}.`, "bad");
+  if(out) notify(`${out} animal${out === 1 ? "" : "s"} got out of ${e.name}.`);
 }
 
 function removeItem(kind, it, opts = {}){
