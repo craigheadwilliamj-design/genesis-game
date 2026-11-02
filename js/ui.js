@@ -141,7 +141,8 @@ function bellRefresh(ring){
 }
 function bellList(){
   const L = state.log;
-  $("#bellList").innerHTML = L.items.length ? L.items.map(x => `<button class="logrow${x.id > bellSince ? " new" : ""}"${x.at ? ` data-at="${x.id}"` : ""}><span class="logwhen">${fmtDate(x.day)}, ${fmtClock(clockMin(x.min))}</span><span>${esc(x.text)}${x.n > 1 ? ` <b>×${x.n}</b>` : ""}</span></button>`).join("") : `<div class="meta">No messages.</div>`;
+  $("#bellList").innerHTML = L.items.length ? L.items.map(x => `<div class="logrow${x.id > bellSince ? " new" : ""}"><button class="logmain"${x.at ? ` data-at="${x.id}"` : ""}><span class="logwhen">${fmtDate(x.day)}, ${fmtClock(clockMin(x.min))}</span><span>${esc(x.text)}${x.n > 1 ? ` <b>×${x.n}</b>` : ""}</span></button><button class="logx" data-drop="${x.id}" title="Clear" aria-label="Clear this message">×</button></div>`).join("") : `<div class="meta">No messages.</div>`;
+  $("#bellClear").disabled = !L.items.length;
 }
 function bellOpen(open){
   bellPop.hidden = !open; $("#bellBtn").setAttribute("aria-expanded", open);
@@ -154,8 +155,10 @@ function bellOpen(open){
   bellRefresh();
 }
 $("#bellBtn").addEventListener("click", () => bellOpen(bellPop.hidden));
-$("#bellClear").addEventListener("click", () => { state.log.items = []; bellRefresh(); saveSoon(); });
+$("#bellClear").addEventListener("click", () => { state.log.items = []; bellRefresh(); bellList(); saveSoon(); });
 $("#bellList").addEventListener("click", e => {
+  const d = e.target.closest("[data-drop]");
+  if(d){ state.log.items = state.log.items.filter(i => i.id !== +d.dataset.drop); bellRefresh(); bellList(); saveSoon(); return; }
   const r = e.target.closest("[data-at]"), x = r && state.log.items.find(i => i.id === +r.dataset.at); if(!x) return;
   const it = findItem(x.at.kind, x.at.id); if(!it) return;
   bellOpen(false); select(x.at.kind, x.at.id); centerOn(it);

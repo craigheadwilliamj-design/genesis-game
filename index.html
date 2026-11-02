@@ -86,10 +86,14 @@ button:disabled{cursor:default}
 .bellpop{position:fixed;z-index:40;width:min(380px,calc(100vw - 24px));max-height:min(60vh,520px);overflow:auto;background:var(--chrome);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.3)}
 .bellhead{display:flex;align-items:center;justify-content:space-between;padding:8px 10px 8px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--chrome);font:600 15px/1.2 var(--font-head)}
 .bellhead .btn{padding:3px 10px;font-size:13px}
-.logrow{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;padding:8px 14px;border:0;border-bottom:1px solid var(--line);border-left:4px solid transparent;background:none;color:inherit;font:inherit;font-size:14px}
+.logrow{display:flex;align-items:stretch;border-bottom:1px solid var(--line);border-left:4px solid transparent}
 .logrow.new{border-left-color:var(--bad);background:var(--chrome-2)}
-.logrow[data-at]{cursor:pointer}
-.logrow[data-at]:hover{background:var(--chrome-2)}
+.logmain{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;text-align:left;padding:8px 4px 8px 10px;border:0;background:none;color:inherit;font:inherit;font-size:14px;cursor:default}
+.logmain[data-at]{cursor:pointer}
+.logmain[data-at]:hover{background:var(--chrome-2)}
+.logx{flex-shrink:0;width:36px;border:0;background:none;color:var(--ink-2);font:600 18px/1 var(--font-body);cursor:pointer}
+.logx:hover{color:var(--bad);background:var(--chrome-2)}
+#bellClear:disabled{opacity:.45}
 .logwhen{font-size:12px;color:var(--ink-2)}
 #bellList .meta{padding:12px 14px}
 @media (prefers-reduced-motion: reduce){.tbtn.bell.ring svg{animation:none}}

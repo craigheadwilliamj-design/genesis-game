@@ -58,8 +58,10 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       q("#bellBtn").click();
       out.bellOpenReads = !q("#bellPop").hidden && logUnread() === 0 && q("#bellCount").hidden && q("#bellList").querySelectorAll(".logrow.new").length === 2 && /×2/.test(q("#bellList").textContent);
       notify("Test three."); out.bellLiveWhileOpen = q("#bellList").querySelectorAll(".logrow").length === 3 && logUnread() === 0;
+      q("#bellList .logx").click(); out.bellDropOne = state.log.items.length === 2 && !state.log.items.some(x => x.text === "Test three.") && q("#bellList").querySelectorAll(".logrow").length === 2 && !q("#bellPop").hidden;
       q("#bellBtn").click(); out.bellCloses = q("#bellPop").hidden;
-      notify("Test two."); out.bellNoMergeOnceRead = state.log.items.length === 4;
+      notify("Test two."); out.bellNoMergeOnceRead = state.log.items.length === 3;
+      q("#bellBtn").click(); q("#bellClear").click(); out.bellClearAll = !state.log.items.length && /No messages/.test(q("#bellList").textContent) && q("#bellClear").disabled && q("#bellCount").hidden; q("#bellBtn").click();
       state.log = JSON.parse(L0); bellRefresh(); }
     const sp = SPECIES.find(s => !s.viv && !s.pool);
 
