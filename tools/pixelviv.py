@@ -1,7 +1,7 @@
 # Draws the vivarium props in the park style (docs/art.md, "Park style"; the browns and greens are tools/genesis_style.py PAL), at the case's fine pixel:
 # DET (3) times finer than the park's 0.13 m (0.043 m a pixel), to match the animals, which are drawn that big in a case. Each picture is built from parts;
-# a part is a mask in one material (a set of a dark edge tinted to it, a light, a mid, a shade and a deep detail tone): its own one-pixel edge all round, a
-# two-pixel lit rim along its top and left and a shaded rim along its bottom and right, then structured detail (grain, seams, rivets, grooves) in its tones.
+# a part is a mask in one material (a set of a dark edge tinted to it, a light, a mid, a shade and a deep detail tone): its corners rounded, its own one-pixel edge
+# all round, broad stepped lit and shaded faces that follow its shape (top left lit, bottom right shaded), then structured detail (grain, seams, rivets, grooves) in its tones.
 # A later part laid over an earlier one keeps its edge, so the parts read apart. Upright props have their base on the bottom row, centered; the pool and the
 # dish lie flat on the floor. VIV_SPRITES in js/data.js lists each picture's size in fine pixels (VIV_MPP a pixel).
 #   vbark   Cork Bark Hide      vbranch Climbing Branches   vdig  Dig Box            vfeed Live-Feed Dispenser   vmist Misters
@@ -33,14 +33,18 @@ class Cv:
     def __init__(s, w, h): s.w, s.h, s.px = w, h, {}
     def put(s, x, y, c):
         if 0 <= x < s.w and 0 <= y < s.h: s.px[(x, y)] = c
-    def part(s, mask, M, tex=None, rim=2):
-        # mask in material M: its edge, a lit rim top and left, a shaded rim bottom and right; tex(x, y) can then name a tone ("hi", "lo", "deep", "edge") for an inside pixel
-        mask = {p for p in mask if 0 <= p[0] < s.w and 0 <= p[1] < s.h}
+    def part(s, mask, M, tex=None, rnd=U):
+        # mask in material M, its convex corners rounded off by rnd (thin bits too narrow to round stay as drawn): its edge all round, then broad stepped
+        # shading that follows the shape, a lit face toward the top left and a shaded one toward the bottom right like the park's rocks and burrows;
+        # tex(x, y) can then name a tone ("hi", "lo", "deep", "edge") for an inside pixel
+        mask = rounded({p for p in mask if 0 <= p[0] < s.w and 0 <= p[1] < s.h}, rnd)
+        run = lambda x, y, dx, dy: next(k for k in range(1, 999) if (x + dx * k, y + dy * k) not in mask)
         for (x, y) in mask:
             if any(q not in mask for q in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1))): s.px[(x, y)] = M["edge"]; continue
-            lit = any((x - k, y) not in mask or (x, y - k) not in mask for k in range(2, rim + 2))
-            dark = any((x + k, y) not in mask or (x, y + k) not in mask for k in range(2, rim + 2))
-            tone = "hi" if lit and not dark else "lo" if dark and not lit else "mid"
+            l, r, u, d = run(x, y, -1, 0), run(x, y, 1, 0), run(x, y, 0, -1), run(x, y, 0, 1)
+            lit = .55 * r / (l + r) + .45 * d / (u + d)   # 1 at the top left, 0 at the bottom right
+            tone = "hi" if lit > .6 else "lo" if lit < .34 else "mid"
+            if tone == "lo" and (r <= 2 or d <= 2) and min(l + r, u + d) > 3 * U: tone = "deep"   # a crease of deep shade just inside a big part's shaded edge
             t = tex(x, y) if tex else None
             s.px[(x, y)] = M[t or tone]
         return mask
@@ -50,6 +54,23 @@ class Cv:
         im = Image.new("RGBA", (s.w, s.h), (0, 0, 0, 0)); p = im.load()
         for (x, y), c in s.px.items(): p[x, y] = c + (255,) if len(c) == 3 else c
         return im
+DISK = lambda r: [(dx, dy) for dy in range(-r, r + 1) for dx in range(-r, r + 1) if dx * dx + dy * dy <= r * r + r]
+def rounded(mask, r):
+    # round a mask's convex corners: open it with a disk of radius r, keeping any limb too thin to hold the disk whole
+    if r < 1: return mask
+    D = DISK(r); core = {p for p in mask if all((p[0] + a, p[1] + b) in mask for a, b in D)}
+    if not core: return mask
+    opened = {(x + a, y + b) for x, y in core for a, b in D}
+    near = {(x + a, y + b) for x, y in opened for a, b in DISK(r + 1)}
+    rest, out = {p for p in mask if p not in opened}, set(opened)
+    while rest:   # what the disk can't reach: a lone chip at a corner goes, a thin limb (any of it far from the core) stays whole
+        todo, comp = [rest.pop()], set()
+        while todo:
+            q = todo.pop(); comp.add(q)
+            for n in ((q[0] - 1, q[1]), (q[0] + 1, q[1]), (q[0], q[1] - 1), (q[0], q[1] + 1)):
+                if n in rest: rest.discard(n); todo.append(n)
+        if any(q not in near for q in comp): out |= comp
+    return out
 def rect(x0, y0, x1, y1): return {(x, y) for y in range(y0, y1 + 1) for x in range(x0, x1 + 1)}
 def poly(pts):   # a filled polygon (pixel centers inside)
     xs, ys = [p[0] for p in pts], [p[1] for p in pts]; out = set()

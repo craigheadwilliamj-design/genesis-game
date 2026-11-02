@@ -1,5 +1,5 @@
 # Draws the aquarium fittings in the park style like the vivarium props (tools/pixelviv.py, whose fine canvas, part painter and materials it borrows): each
-# part with its own dark edge tinted to its material, a lit rim top and left, a shaded rim bottom and right, and structured detail, at the case's fine pixel
+# part with its own dark edge tinted to its material, rounded corners, broad lit and shaded faces, and structured detail, at the case's fine pixel
 # (DET times finer than 0.13 m). All stand upright with their base on the bottom row, centered.
 #   afilter Canister Filter   asump Sump Filter   arock Rock Arch   aweed Seaweed Bed   abubble Bubble Curtain
 #   aboulder Boulder Pile   abrain Brain Coral   acoral Branching Coral   afan Sea Fan   asponge Sponge Cluster   akelp Kelp Stand   ashell Giant Ammonite Shell
@@ -180,7 +180,7 @@ def hornwort(f=0, n=1):
         for i, (px, py) in enumerate(pts[1:]):
             w = U * (1.5 - .6 * i / 10)
             for a in (-150, -120, -60, -30): m |= stroke(px, py, px + math.cos(math.radians(a)) * w, py + math.sin(math.radians(a)) * w * .8, 1.3)
-        c.part(m, HORN, lambda x, y: "hi" if (x + y * 2) % 7 == 0 else None, rim=1)
+        c.part(m, HORN, lambda x, y: "hi" if (x + y * 2) % 7 == 0 else None)
     c.part({p for p in ell(W / 2, H, 5 * U, 1.4 * U) if p[1] < H}, ramp((120, 104, 80)))   # the gravel it roots in
     return c
 
@@ -189,21 +189,21 @@ def eelgrass(f=0, n=1):
     for k in range(9):   # long ribbon blades from a tuft, each swaying a beat after the last, curling over at the tip
         x0 = 4 * U + k * U; tall = H * (.62 + .34 * math.sin(k * 2.1) ** 2); lean = (k - 4) * .8 * U + math.sin(k * 1.7) * 1.2 * U; sw = math.sin(2 * math.pi * f / n - k * .7)
         pts = [(x0 + lean * (i / 8) ** 1.4 + sw * 1.6 * U * (i / 8) ** 1.6 + math.sin(i / 2 + k) * .5 * U, H - U - tall * i / 8) for i in range(9)]
-        c.part(curve(pts, U * .9), EEL, lambda x, y, k=k: "hi" if (x + k) % 3 == 0 and y % 5 < 3 else None, rim=1)
+        c.part(curve(pts, U * .9), EEL, lambda x, y, k=k: "hi" if (x + k) % 3 == 0 and y % 5 < 3 else None)
     c.part({p for p in ell(W / 2, H, 5 * U, 1.4 * U) if p[1] < H}, ramp((120, 104, 80)))
     return c
 
 def lily():
     c = Cv(18 * U, 30 * U); W, H = c.w, c.h
     pads = ((4.2 * U, 4.6 * U, 3.6 * U), (13.4 * U, 3.2 * U, 4 * U), (8.6 * U, 9 * U, 3 * U))
-    for px, py, r in pads: c.part(curve([(W / 2, H - U), (W / 2 + (px - W / 2) * .4, H * .6), (px, py + U)], U * .9), STEM, rim=1)   # long stems up from the root to each pad
-    c.part(curve([(W / 2, H - U), (W / 2 + U, H * .5), (10.5 * U, 3.4 * U)], U * .9), STEM, rim=1)   # and to the flower
+    for px, py, r in pads: c.part(curve([(W / 2, H - U), (W / 2 + (px - W / 2) * .4, H * .6), (px, py + U)], U * .9), STEM)   # long stems up from the root to each pad
+    c.part(curve([(W / 2, H - U), (W / 2 + U, H * .5), (10.5 * U, 3.4 * U)], U * .9), STEM)   # and to the flower
     for px, py, r in pads:   # the pads, tipped toward us, each with its notch and veins
         pad = ell(px, py, r, r * .5) - {(x, y) for x in range(round(px), round(px + r) + 1) for y in range(round(py) - abs(round((x - px) * .25)), round(py) + abs(round((x - px) * .25)) + 1)}
         c.part(pad, PAD, lambda x, y, px=px, py=py: "deep" if (round(math.degrees(math.atan2(y - py, (x - px) / 2))) % 40) < 5 else None)
     fl = set()
     for a in range(-170, 0, 24): fl |= stroke(10.5 * U, 3.4 * U, 10.5 * U + math.cos(math.radians(a)) * 2.2 * U, 3.4 * U + math.sin(math.radians(a)) * 2.2 * U, U * 1.1)
-    c.part(fl, PETAL, lambda x, y: "hi" if (x + y) % 4 == 0 else None, rim=1); c.part(ell(10.5 * U, 3 * U, U * .8, U * .55), STAMEN, rim=1)   # the flower
+    c.part(fl, PETAL, lambda x, y: "hi" if (x + y) % 4 == 0 else None); c.part(ell(10.5 * U, 3 * U, U * .8, U * .55), STAMEN)   # the flower
     c.part({p for p in ell(W / 2, H, 3 * U, 1.2 * U) if p[1] < H}, ramp((96, 80, 52)))   # the rootstock in the mud
     return c
 
