@@ -733,7 +733,7 @@ function recompute(){
   for(const b of state.buildings){ const staff = !!BUILDINGS[b.type].dept; reach[b.id] = !!BUILDINGS[b.type].noPath || (!BUILDINGS[b.type].prop && doorNear(b, !staff)) || near(b.points, staff ? anyPaths : guestPaths, staff); }   // the door side first, then any side
 
   // How much guests want to visit
-  let appeal = 0, animals = 0, happySum = 0;
+  let appeal = 0, animals = 0, happySum = 0, star = null;   // star: the best-rated species on show
   const shown = new Set();
   for(const e of state.exhibits){
     const n = e.animals.length; if(!n) continue;
@@ -742,6 +742,7 @@ function recompute(){
     for(const [sp, c] of reports[e.id].counts){
       appeal += speciesDraw(SPECIES_BY_ID[sp]) * Math.sqrt(c) * (0.4 + 0.6 * e.happy / 100) * viewFactor(e, reach) * (1 + themeAppeal(e, themes[e.id])) * liveliness(e);
       shown.add(sp);
+      const s = SPECIES_BY_ID[sp]; if(!star || s.stars > star.stars) star = s;
     }
   }
   const fair = fairTicket();
@@ -765,26 +766,28 @@ function recompute(){
     : `Guests leave ${Math.round(mood)}% happy. ${GUEST.goodMood}% gets full marks.${gripe ? ` ${Math.round(gripe.share * 100)}% say "${gripe.text}"` : ""}`;
   const avgHappy = animals ? happySum / animals : 0;
   // Stars come from five things: happy animals, looked-after guests, variety, how much there is to see, and what guests learn.
-  // Each part is scored 0 to 1. Animals count as fully happy at 90% or more.
+  // Each part is scored 0 to 1. Animals count as fully happy at 90% or more. Things to see weighs most, and the best animal on show caps the total.
   const welfare = clamp((avgHappy - 30) / 60, 0, 1);
-  const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / 150);
+  const variety = Math.min(1, shown.size / 10), size = Math.min(1, appeal / RATING.see);
   // what guests learned: today's leavers once enough have gone home, otherwise yesterday's
   const learnt = t.eduN >= 20 ? t.eduSum / t.eduN : state.guestLog.edu, education = learnt == null ? 0 : Math.min(1, learnt / EDU.full);
   const eduNote = learnt == null ? "Nobody has left yet. Info signs by exhibits, field guides, and an Education Center teach guests."
     : `Guests leave having learned ${Math.round(learnt)} on average. ${EDU.full} gets full marks.${learnt < EDU.full ? " Put info signs by your exhibits, sell field guides, or build an Education Center." : ""}`;
   const parts = animals ? [
-    {label:"Animal happiness", score:welfare,              max:1.25, note:`${Math.round(avgHappy)}% average. 90% counts as full marks.`},
+    {label:"Animal happiness", score:welfare,              max:1, note:`${Math.round(avgHappy)}% average. 90% counts as full marks.`},
     {label:"Guest comfort",    score:comfort,              max:.75,  note:comfortNote},
-    {label:"Variety",          score:variety,              max:1.25,  note:shown.size >= 10 ? `${shown.size} species on show. Full marks.` : `${shown.size} species on show. 10 gets full marks.`},
-    {label:"Things to see",    score:size,                 max:1.25, note:"Bigger, happier groups of popular animals."},
+    {label:"Variety",          score:variety,              max:1,  note:shown.size >= 10 ? `${shown.size} species on show. Full marks.` : `${shown.size} species on show. 10 gets full marks.`},
+    {label:"Things to see",    score:size,                 max:1.75, note:"Bigger, happier groups of popular animals."},
     {label:"Education",        score:education,            max:.5,   note:eduNote},
   ] : [];
   let ratingTarget = parts.reduce((s, p) => s + p.score * p.max, 0);
   const pricey = state.ticket > fair * 1.3;
   if(pricey) ratingTarget -= 0.3;
+  const starCap = star ? star.stars + RATING.headroom : 5, capped = !!star && ratingTarget > starCap;
+  if(capped) ratingTarget = starCap;
 
   derived = {joined, joinedAll, reach, reports, themes, demand, fair, priceF, shown:shown.size, animals, appeal, variety, size, welfare, avgHappy, foodCover, restCover,
-             comfort, mood, wom, learnt, parts, pricey, ratingTarget:clamp(ratingTarget, 0, 5)};
+             comfort, mood, wom, learnt, parts, pricey, star, starCap, capped, ratingTarget:clamp(ratingTarget, 0, 5)};
   checkThemes();   // themes unlock as soon as the park qualifies, including on load
   return derived;
 }
