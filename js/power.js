@@ -117,7 +117,7 @@ function gridHitTick(){
   for(const x of list){ r -= wt(x); if(r < 0){ b = x; break; } }
   if(!b) return;
   b.cond = Math.min(condOf(b), H.cond);
-  notify(`${H.text[ev] || "The weather knocked out"} ${BUILDINGS[b.type].one}.`, {kind:"building", id:b.id});
+  notify(`${H.text[ev] || "The weather knocked out"} ${bldName(b)}.`, {kind:"building", id:b.id});
   updatePower();
 }
 // Once a step: the guest map follows tram stations' power, and the weather may hit the grid

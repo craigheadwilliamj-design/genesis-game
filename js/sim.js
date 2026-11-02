@@ -97,6 +97,14 @@ function notify(text, at){
   events.logged();
 }
 const logUnread = () => state.log.items.filter(x => x.id > state.log.seen).length;
+// A building's name for the player: "Generator 4". One-of-a-kind buildings and props go by their label alone.
+// Each other building keeps a number for its type (b.no, the lowest one free when it's first named), so names don't shift when another goes.
+const numbered = b => { const t = BUILDINGS[b.type]; return !!t && !t.unique && !t.prop; };
+function bldNo(b){
+  if(!b.no){ const used = new Set(state.buildings.filter(x => x.type === b.type && x.no).map(x => x.no)); let n = 1; while(used.has(n)) n++; b.no = n; }
+  return b.no;
+}
+function bldName(b){ const t = BUILDINGS[b.type] || {label:"Building"}; return b.name || (numbered(b) ? `${t.label} ${bldNo(b)}` : t.label); }
 // A line for tonight's day report
 function dayNote(text){ if(!state.dayNotes.includes(text)) state.dayNotes.push(text); }
 
@@ -733,6 +741,7 @@ function exhibitReport(e){
 
 // Rebuild all the worked-out numbers. Called whenever the park changes.
 function recompute(){
+  for(const b of state.buildings) if(!b.no && numbered(b)) bldNo(b);
   syncPathStrips();
   updatePower();
   const joined = connectedPathIds(true), joinedAll = connectedPathIds(false);

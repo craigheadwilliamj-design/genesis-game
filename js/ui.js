@@ -90,7 +90,7 @@ const ui = {
     if(sel && sel.kind === "animal") animalLive(true);
     { const nm = $("#sheetName"), rename = !!it && (sel.kind === "exhibit" || sel.kind === "zone");   // an exhibit or zone is renamed right in the top bar
       $("#sheetToggle").hidden = rename; nm.hidden = !rename; if(rename && document.activeElement !== nm) nm.value = it.name; }
-    $("#sheetToggle").textContent = it ? (it.name || BUILDINGS[it.type]?.label || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : officeTab === "menu" ? "Main menu" : "Park office";
+    $("#sheetToggle").textContent = it ? (it.name || (sel.kind === "building" ? bldName(it) : null) || (sel.kind === "fence" ? (BARRIERS[it.barrier] || BARRIERS.wood).label : "Path")) : officeTab === "menu" ? "Main menu" : "Park office";
   },
 
   toast(text, kind, html){
@@ -796,7 +796,7 @@ function animalCard(s, rep, mode){
 
 function deptHead(b){
   const t = BUILDINGS[b.type], ok = isReachable(b);
-  let h = `<div><h2>${t.label}</h2></div>`;
+  let h = `<div><h2>${esc(bldName(b))}</h2></div>`;
   return h + `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Running" : "Not connected"}</span><span class="meta">${money(t.upkeep + (b.type === "pmc" ? bedUpkeep() : 0))} a day</span></div>`;
 }
 // Two columns side by side when the panel is full size (aside.full), one under the other otherwise
@@ -940,7 +940,7 @@ function buildingBody(b){
   if(BUILDINGS[b.type].tram) return tramStopHtml(b) + demolishRow(b);
   if(guestBuilding(b) || BUILDINGS[b.type].prop) return guestBuildingHtml(b) + demolishRow(b);
   const t = BUILDINGS[b.type], reach = isReachable(b);
-  let h = `<h2>${t.label}</h2>`;
+  let h = `<h2>${esc(bldName(b))}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   h += `<dl class="kv"><dt>Running cost</dt><dd>${money(t.upkeep)} a day</dd></dl>`;
   return h + demolishRow(b);
@@ -957,7 +957,7 @@ function tramFareHtml(){
 function tramStopHtml(b){
   const t = BUILDINGS[b.type], foot = !!(gGraph && gGraph.anchors[b.id + ":foot"]), rail = !!(gGraph && gGraph.anchors[b.id + ":rail"]), worn = !tramWorking(b), k = knownCond(b);
   const ok = foot && rail && !worn, why = !isReachable(b) ? "No path from the entrance." : worn ? "Out of order." : !foot ? "No footpath beside it." : !rail ? "No tram track beside it." : "";
-  let h = `<h2>${t.label}</h2>`;
+  let h = `<h2>${esc(bldName(b))}</h2>`;
   h += `<div class="row"><span class="status ${ok ? "ok" : "no"}">${ok ? "Open to riders" : why}</span></div>`;
   h += `<div class="factor" style="grid-template-columns:80px 1fr 44px;margin-top:8px"><span>Condition</span>${meter(k, k >= 60 ? "var(--good)" : k >= 30 ? "var(--warn)" : "var(--bad)")}<span>${Math.round(k)}%</span></div>`;
   h += tramFareHtml();

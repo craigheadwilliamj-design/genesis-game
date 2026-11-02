@@ -63,6 +63,11 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
       notify("Test two."); out.bellNoMergeOnceRead = state.log.items.length === 3;
       q("#bellBtn").click(); q("#bellClear").click(); out.bellClearAll = !state.log.items.length && /No messages/.test(q("#bellList").textContent) && q("#bellClear").disabled && q("#bellCount").hidden; q("#bellBtn").click();
       state.log = JSON.parse(L0); bellRefresh(); }
+    // building names: a number for its type that stays put, the lowest free one for a new building; one-of-a-kind ones go by their label
+    { const keep = state.buildings, t = Object.keys(BUILDINGS).find(k => numbered({type:k})), b1 = {id:"nb1", type:t}, b2 = {id:"nb2", type:t}, b3 = {id:"nb3", type:t};
+      state.buildings = [b1, b2]; bldNo(b1); bldNo(b2); state.buildings = [b2, b3];
+      out.bldNumbers = b1.no === 1 && b2.no === 2 && bldNo(b3) === 1 && bldName(b2) === `${BUILDINGS[t].label} 2` && bldName({type:"oracle"}) === BUILDINGS.oracle.label;
+      state.buildings = keep; }
     const sp = SPECIES.find(s => !s.viv && !s.pool);
 
     // old saves without staff/safety upgrade without throwing

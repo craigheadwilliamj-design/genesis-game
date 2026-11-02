@@ -41,19 +41,19 @@ function wearTick(dtMin){
   for(const b of gridMachines()){
     const was = genOnline(b);
     b.cond = Math.max(0, condOf(b) - POWER.genWear * (BUILDINGS[b.type].wear ?? 1) * dtMin / DAY_MIN);
-    if(was && !genOnline(b)){ notify(`${BUILDINGS[b.type].one.replace(/^a/, "A")} has broken down.`, {kind:"building", id:b.id}); updatePower(); }
+    if(was && !genOnline(b)){ notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id}); updatePower(); }
   }
   // vehicle depots wear; a worn-out depot grounds its ATVs
   for(const b of depots()){
     const was = condOf(b) >= VEHICLES.offlineBelow;
     b.cond = Math.max(0, condOf(b) - VEHICLES.wear * dtMin / DAY_MIN);
-    if(was && condOf(b) < VEHICLES.offlineBelow) notify(devMode() ? "A vehicle depot has broken down. Its ATVs are grounded." : "A depot has broken down.", {kind:"building", id:b.id});
+    if(was && condOf(b) < VEHICLES.offlineBelow) notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id});
   }
   // tram stations wear too; one that gives out stops taking riders, and the guest map drops it
   for(const b of tramStations()){
     const was = tramWorking(b);
     b.cond = Math.max(0, condOf(b) - tramWear(b) * dtMin / DAY_MIN);
-    if(was && !tramWorking(b)){ notify("A tram station has broken down.", {kind:"building", id:b.id}); buildGuestGraph(); }
+    if(was && !tramWorking(b)){ notify(`${bldName(b)} has broken down.`, {kind:"building", id:b.id}); buildGuestGraph(); }
   }
 }
 

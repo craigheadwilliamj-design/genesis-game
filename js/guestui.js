@@ -84,7 +84,7 @@ function guestLive(force){
 function guestBuildingHtml(b){
   const t = BUILDINGS[b.type], reach = isReachable(b), q = queueAt(b);
   const served = b.served && b.served.day === state.day ? b.served : {n:0, money:0, items:{}};
-  let h = `<h2>${t.label}</h2>`;
+  let h = `<h2>${esc(bldName(b))}</h2>`;
   h += `<div class="row"><span class="status ${reach ? "ok" : "no"}">${reach ? "Open to guests" : "No path from the entrance"}</span></div>`;
   if(t.rooms) return h + hotelHtml(b);
   if(t.kind) h += menuHtml(b, served) + vendorStockHtml(b);
