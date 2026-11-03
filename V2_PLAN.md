@@ -1,0 +1,78 @@
+# Paleo-Park Tycoon v2.0 plan
+
+A ground-up restart: same game, smaller and cleaner. v1 stays live as the playable reference; nothing is ported wholesale, only the art, the tuning numbers and the design notes.
+
+## Decided
+- **Platform:** browser, published as a claude.ai Artifact like v1. Canvas renderer (no SVG). Godot only if the game outgrows the browser later.
+- **Code:** sim split from drawing. The sim is plain data that ticks on its own and can be tested headless; the renderer only reads it. One module per system, talking through events, not reaching into each other. One versioned save format from day one.
+- **Grid:** 16 px tiles. A tile is a game unit, not a set number of meters. People are about 2 tiles tall (24 to 32 px).
+- **Size curve:** sprite size grows slower than real size. Small animals are drawn bigger and big ones smaller, but the order never flips (a small animal never looks bigger than a bigger one). The smallest have a floor size; swarm animals (trilobites, early fish) show as a cluster. The sim still uses real size for diet, danger and who eats whom; space needs are balance numbers in tiles.
+- **Fences:** a whole tile thick (Let's Build a Zoo style), painted like paths, auto-connecting, with a top and a short front face. Whatever is fully enclosed is an exhibit (flood fill). One fence tile between two pens is a wall for both. Gates and viewing windows are fence tiles with a flag. Each tile has strength and HP; a broken tile opens the pen.
+- **Fence types (6):** hedge, log palisade, stone, concrete, electric (strong only while powered), glass viewing wall. Themes are looks, not new types.
+- **Exhibits:** you don't place an exhibit, you get one by closing a fence. It tracks its tiles, ground, water, plants, rocks and gates. Each species scores it per need (biome, space, water, plants, cover, group size) as meters.
+- **Water is ground:** shallow and deep tiles painted inside a pen. Species need a share of water (0%, 50%, 100% deep...). A tile can block walkers and let swimmers through, which also makes moats possible. A glass wall beside deep water is the aquarium. No separate vivarium or aquarium system.
+- **Plants:** about 15 to 20 iconic ones covering the whole Phanerozoic, added in over time. Each plant is tagged with food group, browse height, cover and period. Animals prefer tags, not individual plants. Planting from the right period gives a bonus; anything is allowed.
+- **Roster:** whole Phanerozoic, small at launch, growing for good. A species is one data file plus its art; behavior comes from shared systems switched on by data, never species-specific code.
+- **Art style:** keep the pixel look. Tinted outlines (dark edge in the material's color), flat fills, light from the top left. The style is set by approved golden assets, not by a written description.
+
+## Art pipeline
+| What | How |
+|---|---|
+| Animals, plants, rocks | Gemini draws it (with the golden Dimetrodon as a reference image), Paleo Snapper v2 fixes the grid and moves the colors onto our palette, you clean it up, Claude cuts it into rig parts |
+| Paths, fences, ground, water | Claude generates them by rule. Dual-grid autotiling, so about 5 tiles per terrain |
+| Buildings | Front view from Gemini, other views from Blender or shape generators (to be tested) |
+| UI, fonts, audio | Bought or free packs (Sonniss GDC bundle, a pixel font). Each pack goes into `vendor/` untouched with its license, then a conversion script restyles it |
+| Animation | v1 rig JSON (`tools/rigger/*/*-rig.json`) converted to the new format. Pivots scale up; only the part pictures get redrawn at the new size |
+
+Every asset passes an automatic check (palette, scale, transparency, parts with pivots), then a fresh judge agent compares it with the golden assets, and only then goes to you on a contact sheet for yes or no.
+
+## Phases
+
+### 0. Foundations
+- Decide where v2 lives (a new repo is recommended).
+- Scaffold: module layout, canvas renderer stub, sim tick, event bus, save format, headless smoke test.
+- Publish a hello-world to a new artifact to prove multi-file modules work there.
+- Write a v2 `CLAUDE.md` index and a `docs/` folder from the start.
+- **Done when:** an empty grid you can pan and zoom is live at its own link, and the smoke test runs.
+
+### 1. Style lock
+- Build the palette and ramps from v1 (`tools/genesis_style.py`, the ground and water sprites).
+- Paleo Snapper v2: new canvas sizes from the size curve, a palette and outline pass after the grid snap.
+- Golden assets: Dimetrodon at the new size (rigged), one plant, one fence set, ground and water tiles, one guest base.
+- The judge rubric, written for this style.
+- **Done when:** you have approved all the golden assets.
+
+### 2. Vertical slice
+- Paint ground, water and paths. One fence type with autotiling. Enclosure detection makes the exhibit.
+- One species (Dimetrodon) that wanders, gets hungry and naps.
+- One keeper who feeds it through the gate.
+- Guests who arrive, walk the paths, look at the exhibit and pay. Money.
+- Save and load.
+- **Done when:** a 10-minute loop is playable at its own link, built from golden or placeholder art, and the smoke test passes.
+
+### 3. Core systems
+- The species data format and suitability scoring. Plant tags.
+- All 6 fence types, fence strength, escapes, and power for electric.
+- Shallow and deep water, swimmers and amphibians.
+- Guest basics (food, drink, restrooms), custodians, the first buildings (testing the building pipeline).
+- The display size curve applied to the whole roster.
+- **Done when:** 3 species with different needs (land, amphibious, marine) live in one park and the scores make sense.
+
+### 4. Content ramp
+- Run the species pipeline in batches: Gemini, Snapper, cleanup, rig cut, data file, check, judge, your approval.
+- Launch roster (pick about 12). Already rigged in v1: Anomalocaris, Sacabambaspis, Dunkleosteus, Tiktaalik, Dimetrodon, Lystrosaurus, Coelophysis, Dryosaurus, Allosaurus, Tyrannosaurus, Mosasaurus, Chalicotherium. New: Arthropleura (procedural leg ripple). No sauropod, Stegosaurus or Triceratops is rigged yet.
+- Plants: about 15 iconic ones (Lepidodendron, Calamites, Glossopteris, Dicroidium, cycads, ginkgo, Araucaria, tree ferns, Williamsonia, Magnolia, Metasequoia, horsetails, ferns, Archaeopteris, Prototaxites, plus the reef pieces).
+- How you unlock animals (research, digs, cloning), simplified.
+- **Done when:** the roster and plants are in, and unlocking feels like a progression.
+
+### 5. Polish and launch
+- Audio, a UI pass, How to play, balance, performance at the largest target park size.
+- Publish v2.0. v1 keeps its own link.
+
+## Open questions
+- Where v2 lives: a new repo or a `v2/` folder.
+- Which v1 systems come back, and when: medicine and genome therapy, hotels, tram, security, staff morale, weather, themes, the museum.
+- Do hills, cliffs and moats count as terrain height, or is the ground flat?
+- The exact size-curve numbers and the largest target park size.
+- Whether buildings come from Blender or shape generators (test on the restroom).
+- Getting Gemini outputs in: you in the Gemini app for now, or an API key for batches later.
