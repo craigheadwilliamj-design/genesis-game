@@ -12,6 +12,8 @@
 let rigsOn = true;   // setRigs(false) draws the strips instead, to compare
 try{ if(localStorage.getItem("genesis-rigs") === "0") rigsOn = false; }catch{}
 const RIG_BLEND = .35;   // seconds to ease from walking to idling and back
+// level of detail: a rig drawn under `px` screen pixels wide moves its parts `fps` times a second (its bones are under a pixel apart that small), and one off screen not at all; its clips still play in time, so it picks up where it should
+const RIG_LOD = {px:48, fps:8};
 const RIG_IDLE = {chance:.35, gap:[6, 14], dyn:.12, rest:[8, 20]};   // the idle clip plays when an animal stops with this chance, and again after this many seconds (a range) of standing in one place; with a stand loop, dyn is the chance an idle clip plays instead of each loop; rest is the seconds (a range) between plays of a restidle clip while it lies down
 const RIGS = {};
 // rigs: one line a species, written by tools/rigtogame.py
@@ -112,6 +114,15 @@ function rigSvg(sp, h){
     + `<path class="wk2" d="M${(R.w*.3).toFixed(1)} ${(wl + 1).toFixed(2)}H${(R.w*.96).toFixed(1)}" stroke="${wc.dark}" stroke-width="1" stroke-opacity=".7" stroke-dasharray="3 5 7 3"/></g></g>`;
 }
 
+// whether a rig's parts get written this frame (RIG_LOD): always when picked, swimming (the waterline moves with it) or in the vivarium guest view, which copies the live picture
+function rigDue(h, R, g, dt){
+  if(h.swim || h.x === undefined || (sel && sel.kind === "animal" && h.a && sel.id === h.a.id) || vvEx) return true;
+  const S = SPRITES[h.sp], w = h.r * (h.viv ? 4 : 2.5) * (S.rsize || S.size || 1) * view.k, x = h.x * view.k + view.tx, y = h.y * ky() + view.ty;
+  if(x < -w || y < -w || x > innerWidth + w || y > innerHeight + w * 2) return false;
+  if(w >= RIG_LOD.px) return true;
+  if((g.lodT = (g.lodT || 0) + dt) < 1 / RIG_LOD.fps) return false;
+  g.lodT = 0; return true;
+}
 // one frame of motion: walking by how far it has gone, standing still it holds a calm stance and plays the idle clip once now and then, and resting plays once and holds (while one of those plays, g.lock is set and map.js leaves the animal alone until it's done); a change of mode eases over RIG_BLEND seconds
 function rigStep(h, mode){
   const R = rigOf(h.sp), g0 = h.el.querySelector(".rig"); if(!R || !g0) return;
@@ -163,6 +174,7 @@ function rigStep(h, mode){
     g.blend = Math.min(1, g.blend + dt / RIG_BLEND); const k = g.blend * g.blend * (3 - 2 * g.blend);
     for(let i = 0; i < g.cur.length; i++) g.cur[i] = g.from[i] + (g.tgt[i] - g.from[i]) * k;
   }else g.cur.set(g.tgt);
+  if(!rigDue(h, R, g, dt)) return;
   rigMatrices(R, g.cur, g.mats);
   const kids = g0.children, flip = R.swaps && vis !== g.vis; g.vis = vis;
   for(let i = 0; i < R.parts.length; i++){ kids[i].setAttribute("transform", rigTransform(R.parts[i], g.mats, i)); if(flip) kids[i].style.display = vis[i] ? "" : "none"; }

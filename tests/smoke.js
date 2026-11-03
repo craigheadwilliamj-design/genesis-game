@@ -4532,6 +4532,13 @@ catch { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
     select("building", "r-tr"); ui.panel();
     out.gridPanel = /Network/.test(document.querySelector("#panel").innerHTML) && gridSvg(1).includes("stroke-dasharray");
     select(null);
+    // a redraw parses only the world's pieces that changed: unchanged ones are the same nodes, and the result matches a whole parse of the markup (animals aside)
+    { render(); const keep = world.querySelector(`[data-id="r-gen"]`), top = keep && [...world.children].find(c => c.contains(keep));
+      B("r-wc", "restroom", 160, 100); recompute(); render();
+      const an = new Set([...herd.values()].map(h => h.el)), c = world.cloneNode(true);
+      const strip = (a, b) => { for(let i = a.childNodes.length - 1; i >= 0; i--){ if(an.has(a.childNodes[i])) b.childNodes[i].remove(); else strip(a.childNodes[i], b.childNodes[i]); } }; strip(world, c);
+      const f = document.createElementNS("http://www.w3.org/2000/svg", "g"); f.innerHTML = worldParts.map(p => p[0]).join("");
+      out.worldPatches = !!top && world.contains(top) && !!world.querySelector(`[data-id="r-wc"]`) && c.innerHTML === f.innerHTML && worldSplit("<g><rect/></g>x<path d='a>b'/>").length === 3 && worldSplit("<g>") === null; }
     return out;
   }));
 

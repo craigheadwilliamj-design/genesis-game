@@ -121,6 +121,42 @@ function queueRender(){ if(!rq) rq = requestAnimationFrame(() => { rq = 0; rende
 
 function polyStr(pts){ return pts.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join(" "); }
 
+// The world's markup in top-level pieces (an element, or the text between two), or null if it doesn't split cleanly
+function worldSplit(s){
+  const out = []; let depth = 0, start = 0, i = 0;
+  while(i < s.length){
+    if(s[i] !== "<"){ const j = s.indexOf("<", i); i = j < 0 ? s.length : j; if(!depth){ out.push(s.slice(start, i)); start = i; } continue; }
+    if(s.startsWith("<!--", i)){ const j = s.indexOf("-->", i); if(j < 0) return null; i = j + 3; }
+    else if(s[i + 1] === "/"){ const j = s.indexOf(">", i); if(j < 0 || --depth < 0) return null; i = j + 1; }
+    else { let j = i + 1, q = ""; for(; j < s.length; j++){ const c = s[j]; if(q){ if(c === q) q = ""; } else if(c === '"' || c === "'") q = c; else if(c === ">") break; }
+      if(j >= s.length) return null; if(s[j - 1] !== "/") depth++; i = j + 1; }
+    if(!depth){ out.push(s.slice(start, i)); start = i; }
+  }
+  return depth ? null : out;
+}
+// Put the world's markup in place, parsing only the pieces that changed since the last draw and keeping the rest (animals stay in the depth groups they're in; syncAnimals puts back any whose group was replaced).
+// A whole redraw of a big park is over 100 ms of parsing and styling; between two draws only a few dozen of its thousands of pieces change.
+let worldParts = [], worldScratch = null;
+function setWorld(s){
+  const parts = worldSplit(s), full = () => { world.innerHTML = s; worldParts = parts && parts.length === world.childNodes.length ? parts.map((m, i) => [m, world.childNodes[i]]) : []; };
+  if(!parts || !worldParts.length) return full();
+  const pool = new Map();
+  for(const [m, n] of worldParts){ const q = pool.get(m); if(q) q.push(n); else pool.set(m, [n]); }
+  const nodes = parts.map(m => { const q = pool.get(m); return q && q.length ? q.shift() : null; }), miss = parts.filter((m, i) => !nodes[i]);
+  if(miss.length){
+    const tmp = worldScratch ??= document.createElementNS("http://www.w3.org/2000/svg", "g");
+    tmp.innerHTML = miss.join("");
+    if(tmp.childNodes.length !== miss.length){ tmp.textContent = ""; return full(); }   // two text pieces in a row would parse as one
+    const fresh = [...tmp.childNodes]; let j = 0;
+    for(let i = 0; i < nodes.length; i++) if(!nodes[i]) nodes[i] = fresh[j++];
+  }
+  for(const q of pool.values()) for(const n of q) n.remove();
+  let cur = world.firstChild;
+  for(const n of nodes){ if(n === cur) cur = cur.nextSibling; else world.insertBefore(n, cur); }
+  while(cur){ const x = cur.nextSibling; cur.remove(); cur = x; }
+  worldParts = parts.map((m, i) => [m, nodes[i]]);
+}
+
 function render(){
   const k = view.k, inv = 1/k;
   const b = ownedBox(), rd = ownedRects().map(r => `M${r[0]} ${r[1]}H${r[2]}V${r[3]}H${r[0]}Z`).join("");
@@ -441,7 +477,7 @@ function render(){
 
   occ34 = tilt ? occluders34() : [];
   wall34 = tilt ? wallStrips34() : [];
-  world.innerHTML = s;
+  setWorld(s);
   setFenceOver34(fov);
   renderOverlay();
   syncAnimals();
@@ -1618,7 +1654,7 @@ function place34(h){
   if(h.viv){
     let next = null;
     for(const o of herd.values()) if(o !== h && o.exhibitId === h.exhibitId && o.el.parentNode === z.g && o.y > h.y && (!next || o.y < next.y)) next = o;
-    h.slot = -1; z.g.insertBefore(h.el, next ? next.el : null); return;
+    h.slot = -1; const at = next ? next.el : null; if(h.el.parentNode !== z.g || h.el.nextSibling !== at) z.g.insertBefore(h.el, at); return;   // moving it when it's already in place would redraw the case (and every copy of it) each frame
   }
   // a pool animal mid-leap is out of the water, over its ripples (the depth group's last item)
   if(h.pool && h.breachT > 0){ if(z.g.lastChild !== h.el) z.g.appendChild(h.el); h.slot = -1; return; }
@@ -3805,8 +3841,10 @@ function clampView(){
 }
 function zoomAt(mx, my, f){
   const k = clamp(view.k * f, KMIN, KMAX), wx = (mx - view.tx)/view.k, wy = (my - view.ty)/ky();
-  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); clampView(); queueRender();
+  view.k = k; view.tx = mx - wx*k; view.ty = my - wy*ky(); clampView(); applyTransform();
+  clearTimeout(zoomRender); zoomRender = setTimeout(render, ZOOM_SETTLE);   // like a pinch: the camera moves at once and the map redraws for the new zoom once the wheel stops, since a full redraw is slow in a big park
 }
+let zoomRender = 0; const ZOOM_SETTLE = 180;   // ms
 function centerOn(it){
   if(!it) return;
   const {w, h} = svgSize(), b = bbox(it.points);
