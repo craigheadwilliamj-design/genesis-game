@@ -21,7 +21,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
   - **water:** none, shallow or deep. The only ground the player paints.
   - **structure:** nothing, path, staff path, a fence (type, HP, flags for gate and window) or part of a building.
   - **object:** a plant, a rock, a shelter or a prop, with its variant.
-- The map is flat for v2.0. There is no ground paint: outside the exhibits is park grass, and inside, the ground comes from the exhibit's biome.
+- The map is flat for v2.0. There is no ground paint: outside the exhibits is **park ground**, a neutral texture of its own that belongs to no biome, and inside, the ground comes from the exhibit's biome.
 - Every edit goes through a command (`paint`, `place`, `remove`) and fires `tilesChanged(area)`. Nothing else writes to the grid.
 - **Derived layers** are rebuilt only for the area that changed, never saved:
   - **regions:** flood fill of the tiles that aren't fence. A region that doesn't reach the map edge or an open gate is an exhibit.
@@ -67,7 +67,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - **"Who's near":** a coarse bucket grid (say 8 x 8 tiles), so checks like "guests near an escaped animal" stay cheap.
 - **Commands:** the UI never edits the sim directly. It sends commands (paint, place, hire, set price), and the smoke test drives the game with the same commands.
 - **Saving:** the tile layers, the entity lists (animals, staff, guests, jobs) and the clock, with a version number. Derived data is rebuilt on load.
-- **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load; it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
+- **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load (water outside any exhibit uses a park ramp that matches the park ground); it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
 - Food: keepers fetching from a food shed (as above), or a real supply chain like v1?
