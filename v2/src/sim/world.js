@@ -14,7 +14,7 @@ const emptyBooks = () => ({ tickets: 0, shops: 0, food: 0, wages: 0, build: 0, a
 
 export function newState(seed = 12345) {
   return {
-    version: SAVE_VERSION, seed, nextId: 1, day: 1, clock: 6 * 60, money: START_MONEY, rating: 2.5, ticket: GUESTS.ticket,
+    version: SAVE_VERSION, seed, nextId: 1, day: 1, clock: 4 * 60, money: START_MONEY, rating: 2.5, ticket: GUESTS.ticket,
     grid: newGrid(MAP_W, MAP_H), exhibits: [], openPens: [], buildings: [], animals: [], staff: [], guests: [], jobs: [],
     testing: {}, power: { on: true }, bell: [], books: { today: emptyBooks(), last: null },
   };
