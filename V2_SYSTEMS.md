@@ -76,6 +76,7 @@ The Time Travel Lab and the Genetics Lab work as in v1 (`DISCOVERY_PLAN.md`), wi
 - **Time Travel Lab:** a timeline of real fossil sites. Drones scout a site to discover its animals, then fly expeditions to it to collect genome. Expeditions for an animal are locked until the park reaches its stars.
 - **Genetics Lab:** an animal can be cloned once its genome is 100%. No accuracy, no failed clones, no genetic disorders. A finished clone arrives in a crate.
 - **Flora (the Botany Lab, folded into Genetics):** flora expeditions fill a period's flora genome. A full one unlocks that period's plants for planting and its paleoflora as a premium food in the sheds. No greenhouses or production.
+- **Research Lab:** research comes in **tracks**, each a straight line of unlocks (proposed: Exhibits, Guests, Time Travel, Park Ops). You hire scientists and put each one on a track; a track goes as fast as the scientists on it. Each step down a track takes longer than the one before, so early unlocks come quickly and deep ones take a while. A few deep steps also need a star rating before they can start. Scientists can be moved at any time, and a track keeps its progress. No points, no project queue.
 - **Starter plants are modern**, available from the start, so the first pens aren't bare.
 - **Medicine** is on the back burner: no vet, illness or genome therapy in v2.0.
 
@@ -89,7 +90,7 @@ The Time Travel Lab and the Genetics Lab work as in v1 (`DISCOVERY_PLAN.md`), wi
 - **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load (water outside any exhibit uses a park ramp that matches the park ground); it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
-- Research Lab: keep v1's tech tree (drone Mk., cheaper and faster trips), trim it, or fold it in?
+- Research: the tracks and what's on each.
 - Which plants are starters: living fossils (horsetails, ferns, cycads, ginkgo, Araucaria, Metasequoia) count as modern, or only plants that look modern?
 - Which species count as dangerous (chute only).
 - Breeding and aging in v2.0, or later?
