@@ -49,9 +49,10 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - Systems never order staff around. They **post jobs**: "feed exhibit 3", "refill water", "repair fence at (40,12)", "pick up trash at (8,30)", "recapture animal 12". Each job has a role, a place, a priority and how long it takes.
 - **Staff claim jobs:** an idle staff member of the matching role takes the job with the best priority for its distance, walks there, does it, and frees it. If they can't reach it, it goes back on the board with a reason ("No keeper gate.").
 - **Zones:** each staff member can be given a painted work zone and then only takes jobs inside it; unzoned staff take anything. A heatmap view shows coverage per role.
-- **Roles:** keeper (food, water, cleaning pens), mechanic (fences, power), custodian (trash, restrooms), ranger (escapes). The slice needs only keepers.
+- **Roles:** keeper (food, water, cleaning pens), mechanic (fences, power), custodian (trash, restrooms), security guard (escapes, and rowdy guests who vandalize). The slice needs only keepers.
 - Keepers enter pens only through keeper gates, and feed carnivore pens through a feeding chute (see Food).
-- Staff energy and morale come later.
+- **Morale:** staff tire as they work and rest in a **break room**; a far-off or missing break room wears morale down, and low morale makes them slower and eventually makes them quit.
+- **Security:** unhappy, rowdy guests vandalize props and buildings; guards patrol their zone, deter it and catch vandals, and they're the ones who recapture escaped animals.
 
 ## 5. Food
 One hop, no supply chain. The only food decisions are where the sheds go and how many keepers you have; everything else runs itself.
@@ -72,6 +73,7 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Money:** ticket at the gate, spending at shops. Shops just work: always stocked, with a cost per sale. No restocking. Litter becomes custodian jobs.
 - **Rating:** satisfaction on the way out feeds the park rating, and the rating feeds arrivals.
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
+- **Museum:** one building, no modules. Its appeal grows with the events (Cambrian Explosion, Great Dying, K-Pg Impact...) recorded by Time Travel Lab expeditions to their sites.
 - **Thoughts:** short lines for the guest panel ("This T. rex is amazing.", "Too expensive.").
 
 ## 7. Getting animals and plants
