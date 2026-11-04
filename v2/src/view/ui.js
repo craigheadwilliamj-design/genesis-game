@@ -121,7 +121,10 @@ export class UI {
       if (t.dataset.speed) this.speed = Number(t.dataset.speed);
       if (t.dataset.bell !== undefined) $("bell").hidden = !$("bell").hidden;
       if (t.dataset.power !== undefined) this.world.setPower(!s.power.on);
-      if (t.dataset.new !== undefined && confirm("Start a new park?")) this.hooks.newPark();
+      if (t.dataset.new !== undefined) {   // two clicks: the viewer has no confirm() dialog
+        if (this.newArmed) { this.newArmed = false; t.textContent = "New Park"; this.hooks.newPark(); }
+        else { this.newArmed = true; t.textContent = "Start over?"; setTimeout(() => { this.newArmed = false; t.textContent = "New Park"; }, 3000); }
+      }
       this.refresh();
     };
   }

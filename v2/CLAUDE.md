@@ -24,3 +24,6 @@ The ground-up restart (design in `../V2_PLAN.md` and `../V2_SYSTEMS.md`). Browse
 
 ## Test
 `npm test` in `v2/` (or `node --test tests/sim.test.js` and `node tests/smoke.js`). `node tests/smoke.js --shot out.png` saves a screenshot. Run both after any change.
+
+## Publish
+Preview artifact: https://claude.ai/artifact/VXqpuMkhig187z6FshjGn3 (separate from v1's). Publish with `file_path: v2/index.html`, that `url`, and `files` mapping each changed `src/...` path to `v2/src/...`. `index.html` has no doctype or head (the publish adds them). The viewer has no `alert`/`confirm`/`prompt`, so confirmations live in the page.
