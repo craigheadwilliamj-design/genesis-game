@@ -45,6 +45,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 ## 4. The job board and staff
 - Systems never order staff around. They **post jobs**: "feed exhibit 3", "refill water", "repair fence at (40,12)", "pick up trash at (8,30)", "recapture animal 12". Each job has a role, a place, a priority and how long it takes.
 - **Staff claim jobs:** an idle staff member of the matching role takes the job with the best priority for its distance, walks there, does it, and frees it. If they can't reach it, it goes back on the board with a reason ("No keeper gate.").
+- **Zones:** each staff member can be given a painted work zone and then only takes jobs inside it; unzoned staff take anything. A heatmap view shows coverage per role.
 - **Roles:** keeper (food, water, cleaning pens), mechanic (fences, power), custodian (trash, restrooms), ranger (escapes). The slice needs only keepers.
 - Keepers enter pens only through keeper gates, and feed carnivore pens through a feeding chute (see Food).
 - Staff energy and morale come later.
@@ -65,7 +66,7 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Wants:** a short list of species they came to see, weighted by appeal (the headline animals).
 - **Behavior is the same utility picker:** a pressing need sends them to the nearest service. Otherwise they head to the most appealing viewing spot they haven't used yet, and they leave when they're tired, broke or done.
 - **Watching:** a guest at a viewing spot gains fun from what's actually visible (animals close to that edge, how happy they are, appeal, the fence's visibility). That's what makes where you put glass matter.
-- **Money:** ticket at the gate, spending at shops. Litter becomes custodian jobs.
+- **Money:** ticket at the gate, spending at shops. Shops just work: always stocked, with a cost per sale. No restocking. Litter becomes custodian jobs.
 - **Rating:** satisfaction on the way out feeds the park rating, and the rating feeds arrivals.
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
 - **Thoughts:** short lines for the guest panel ("This T. rex is amazing.", "Too expensive.").
@@ -80,7 +81,6 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load (water outside any exhibit uses a park ramp that matches the park ground); it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
-- Guest shops: always stocked with a cost per sale (recommended), or restocked from the sheds?
 - Which species count as dangerous (chute only).
 - Breeding and aging in v2.0, or later?
 - Guests in groups or one by one?
