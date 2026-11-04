@@ -63,7 +63,7 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 
 ### 4. Content ramp
 - Run the species pipeline in batches: Gemini, Snapper, cleanup, rig cut, data file, check, judge, your approval.
-- Launch roster (pick about 12). Already rigged in v1: Anomalocaris, Sacabambaspis, Dunkleosteus, Tiktaalik, Dimetrodon, Lystrosaurus, Coelophysis, Dryosaurus, Allosaurus, Tyrannosaurus, Mosasaurus, Chalicotherium. New: Arthropleura (procedural leg ripple). No sauropod, Stegosaurus or Triceratops is rigged yet.
+- The roster is in the Roster section below, in build order.
 - Plants: about 15 iconic ones (Lepidodendron, Calamites, Glossopteris, Dicroidium, cycads, ginkgo, Araucaria, tree ferns, Williamsonia, Magnolia, Metasequoia, horsetails, ferns, Archaeopteris, Prototaxites, plus the reef pieces).
 - Time Travel Lab and Genetics Lab from v1 (100% genome to clone; flora unlocks plants and paleoflora), see `V2_SYSTEMS.md`.
 - **Done when:** the roster and plants are in, and unlocking feels like a progression.
@@ -71,6 +71,86 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 ### 5. Polish and launch
 - Audio, a UI pass, How to play, balance, performance at the largest target park size.
 - Publish v2.0. v1 keeps its own link.
+
+## Roster
+76 species, in build order. The first 24 plus Dunkleosteus and Estemmenosuchus are rigged in v1.
+
+1. Arthropleura
+2. Cotylorhynchus
+3. Tyrannosaurus rex
+4. Anomalocaris
+5. Mosasaurus
+6. Lystrosaurus
+7. Dimetrodon
+8. Platyhystrix
+9. Scutosaurus
+10. Inostrancevia
+11. Diictodon
+12. Moschops
+13. Prionosuchus
+14. Tiktaalik
+15. Coelophysis
+16. Plateosaurus
+17. Carcharodontosaurus
+18. Spinosaurus
+19. Dryosaurus
+20. Compsognathus
+21. Allosaurus
+22. Chalicotherium
+23. Ichthyostega
+24. Sacabambaspis
+25. Stegosaurus
+26. Megalodon
+27. Basilosaurus
+28. Great Auk
+29. Eryops
+30. Estemmenosuchus
+31. Dunkleosteus
+32. Rhizodus
+33. Opabinia
+34. Hypsilophodon
+35. Oviraptor
+36. Parasaurolophus
+37. Ankylosaurus
+38. Carnotaurus
+39. Gigantopithecus
+40. Macrauchenia
+41. Megaloceros
+42. Desmatosuchus
+43. Megatherium
+44. Dire Wolf
+45. Erythrosuchus
+46. Ornitholestes
+47. Arctodus
+48. Postosuchus
+49. Paraceratherium
+50. Scelidosaurus
+51. Kentrosaurus
+52. Apatosaurus
+53. Argentinosaurus
+54. Diplodocus
+55. Therizinosaurus
+56. Jaekelopterus
+57. Nothosaurus
+58. Ichthyosaurus
+59. Elasmosaurus
+60. Ceratosaurus
+61. Doedicurus
+62. Psittacosaurus
+63. Gallimimus
+64. Pachycephalosaurus
+65. Iguanodon
+66. Trilobite
+67. Velociraptor
+68. Triceratops
+69. Ambulocetus
+70. Andrewsarchus
+71. Aepycamelus
+72. Kelenken
+73. Dodo
+74. Smilodon
+75. Elasmotherium
+76. Woolly Mammoth
 
 ## Open questions
 - Medicine (vets, illness, genome therapy) is on the back burner until after v2.0.
