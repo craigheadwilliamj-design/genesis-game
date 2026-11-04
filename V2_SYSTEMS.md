@@ -3,7 +3,7 @@
 A draft for discussion. It covers the systems and how they talk to each other; `V2_PLAN.md` has the build order and the art pipeline.
 
 ## The big loop
-The player paints tiles. Closed fences become exhibits. Animals read their exhibit and their needs, and when something runs low (food, water, a broken fence) it becomes a job on the job board. Staff take jobs. Guests walk the paths, watch the animals they can see, spend money and leave a rating. The rating brings more guests, and money pays for more animals.
+The player paints tiles. Closed fences become exhibits, and the player sets each exhibit's biome. Animals read their exhibit and their needs, and when something runs low (food, water, a broken fence) it becomes a job on the job board. Staff take jobs. Guests walk the paths, watch the animals they can see, spend money and leave a rating. The rating brings more guests, and money pays for more animals.
 
 ```
 player commands ──> grid ──> exhibits (derived) ──> animals (needs, behavior)
@@ -18,11 +18,10 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 
 ## 1. The grid
 - The map is W x H tiles of 16 px. Each tile holds a few layers, each stored as a flat typed array (fast to read, small to save):
-  - **ground:** grass, dirt, sand, mud, rock, snow...
-  - **water:** none, shallow or deep.
+  - **water:** none, shallow or deep. The only ground the player paints.
   - **structure:** nothing, path, staff path, a fence (type, HP, flags for gate and window) or part of a building.
   - **object:** a plant, a rock, a shelter or a prop, with its variant.
-- The map is flat for v2.0.
+- The map is flat for v2.0. There is no ground paint: outside the exhibits is park grass, and inside, the ground comes from the exhibit's biome.
 - Every edit goes through a command (`paint`, `place`, `remove`) and fires `tilesChanged(area)`. Nothing else writes to the grid.
 - **Derived layers** are rebuilt only for the area that changed, never saved:
   - **regions:** flood fill of the tiles that aren't fence. A region that doesn't reach the map edge or an open gate is an exhibit.
@@ -31,12 +30,13 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 
 ## 2. Exhibits
 - An exhibit is a region record, rebuilt when its tiles change. It keeps its id across edits by matching the most overlap with its old tiles, so its name and animals stay put.
-- It tallies: tile count, ground mix (%), shallow and deep water, plant tags (food by group and height, cover), shelters, keeper gates, feeders, and **viewing spots** (path tiles next to a fence a guest can see through, with how well, by fence type).
+- It has one **biome**, set by the player after it closes (bare dirt until then). Merging two exhibits keeps the bigger one's biome; splitting one keeps it on both halves. Changing it later costs money and is instant.
+- It tallies: tile count, shallow and deep water, plant tags (food by group and height, cover), shelters, keeper gates, feeders, and **viewing spots** (path tiles next to a fence a guest can see through, with how well, by fence type).
 - It never decides anything. Species read it.
 
 ## 3. Species and animals
-- **A species file:** real size (for display, diet and danger), habitat wants (ground %, water %, depth), space per animal (in tiles), group size min and max, social style (solo, herd, pack), diet (plant tags and browse height, or prey size), temperament (shy, calm, aggressive), strength (how hard it tests fences), movement kind, active hours, period, price and appeal.
-- **Habitat score:** the species compares its wants with the exhibit tallies and gets one meter per need, plus an overall score. That's the panel.
+- **A species file:** real size (for display, diet and danger), biomes it likes (preferred first, then acceptable), water wants (%, depth), space per animal (in tiles), group size min and max, social style (solo, herd, pack), diet (plant tags and browse height, or prey size), temperament (shy, calm, aggressive), strength (how hard it tests fences), movement kind, active hours, period, price and appeal.
+- **Habitat score:** the species compares its wants with the exhibit and gets one meter per need, plus an overall score. That's the panel. Biome: full marks if preferred, part if acceptable, poor otherwise.
 - **An animal:** needs (hunger, thirst, rest, social, comfort from the habitat score) that drain over time, plus health and stress.
 - **Behavior is a utility picker:** every few seconds each animal scores its possible actions by how much they'd fix its most urgent need, and does the best one: eat (a feeder, or browse a plant at its height), drink, rest (cover or a shelter), stay near its group, wander, show off. The same list serves every species; data switches extras on (herds flee together, packs move together, carnivores pace the fence).
 - **Happiness** comes from the needs and the habitat score. It drives appeal to guests, health, breeding later, and stress.
@@ -67,7 +67,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - **"Who's near":** a coarse bucket grid (say 8 x 8 tiles), so checks like "guests near an escaped animal" stay cheap.
 - **Commands:** the UI never edits the sim directly. It sends commands (paint, place, hire, set price), and the smoke test drives the game with the same commands.
 - **Saving:** the tile layers, the entity lists (animals, staff, guests, jobs) and the clock, with a version number. Derived data is rebuilt on load.
-- **Drawing:** the renderer only reads the sim. Ground, water, paths and fences come from the tile layers (autotiled); then objects, buildings, animals and people are drawn sorted by their bottom edge.
+- **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load; it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
 - Food: keepers fetching from a food shed (as above), or a real supply chain like v1?
