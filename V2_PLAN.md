@@ -13,6 +13,7 @@ A ground-up restart: same game, smaller and cleaner. v1 stays live as the playab
 - **Water is the only paintable ground:** shallow and deep tiles painted inside a pen. One water tile set, recolored to each biome's water ramp. Species need a share of water (0%, 50%, 100% deep...). A tile can block walkers and let swimmers through, which also makes moats possible. A glass wall beside deep water is the aquarium. No separate vivarium or aquarium system.
 - **Plants:** about 15 to 20 iconic ones covering the whole Phanerozoic, added in over time. Each plant is tagged with food group, browse height, cover and period. Animals prefer tags, not individual plants. Planting from the right period gives a bonus; anything is allowed.
 - **Roster:** whole Phanerozoic, small at launch, growing for good. A species is one data file plus its art; behavior comes from shared systems switched on by data, never species-specific code.
+- **No busywork systems:** if a system would end up automated to make it bearable, it's automated from the start. Keep only the decisions that are fun (where, how many, what kind). Food is one hop: sheds, a nightly delivery, keepers filling feeders, chutes for dangerous pens.
 - **Art style:** keep the pixel look. Tinted outlines (dark edge in the material's color), flat fills, light from the top left. The style is set by approved golden assets, not by a written description.
 
 ## Art pipeline

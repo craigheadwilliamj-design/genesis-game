@@ -46,10 +46,20 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - Systems never order staff around. They **post jobs**: "feed exhibit 3", "refill water", "repair fence at (40,12)", "pick up trash at (8,30)", "recapture animal 12". Each job has a role, a place, a priority and how long it takes.
 - **Staff claim jobs:** an idle staff member of the matching role takes the job with the best priority for its distance, walks there, does it, and frees it. If they can't reach it, it goes back on the board with a reason ("No keeper gate.").
 - **Roles:** keeper (food, water, cleaning pens), mechanic (fences, power), custodian (trash, restrooms), ranger (escapes). The slice needs only keepers.
-- Keepers enter pens only through keeper gates. Food in v2.0: a keeper collects it at a food shed and the cost comes out of money. No supply chain.
+- Keepers enter pens only through keeper gates, and feed carnivore pens through a feeding chute (see Food).
 - Staff energy and morale come later.
 
-## 5. Guests
+## 5. Food
+One hop, no supply chain. The only food decisions are where the sheds go and how many keepers you have; everything else runs itself.
+- **Food sheds** are buildings you place. A delivery fills them every night, sized to what the park ate the day before, and paid that night. No orders, no stock screens.
+- **Feeders** sit inside a pen. Keepers fill them from the nearest shed that has the food, so a pen far from any shed gets slower refills.
+- **Food types (4):** greens, meat, fish, bugs. A species eats one or two.
+- **Upgrades, not new chains:** paleoflora from the Botany Lab (a happiness bonus for herbivores of that period) and whole carcasses for big carnivores (costs more, counts as enrichment, guests watch).
+- **Browsing:** herbivores also eat the plants in their pen when the tags and heights match. Plants get eaten down and grow back slowly, so a well-planted pen needs fewer keeper trips.
+- **Feeding chute:** a fence tile with a flag, like a gate or a window. A keeper drops food through it from outside. Pens with dangerous animals are fed only through a chute; keepers walk in only through a keeper gate, and only into safe pens.
+- **Shortages** happen on their own: out of money, a shed out of reach, too few keepers, or a new animal the delivery hasn't caught up with yet.
+
+## 6. Guests
 - **Arrivals:** guests come in at the entrance, in small groups. How many depends on rating, ticket price and the roster's appeal.
 - **Needs:** hunger, thirst, bladder, energy, fun. Money in pocket.
 - **Wants:** a short list of species they came to see, weighted by appeal (the headline animals).
@@ -60,7 +70,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
 - **Thoughts:** short lines for the guest panel ("This T. rex is amazing.", "Too expensive.").
 
-## 6. Shared machinery
+## 7. Shared machinery
 - **The sim tick:** a fixed step in game time. Faster speeds run more steps per frame. The day clock runs on the same tick, with an end-of-day pass for the books and the day report.
 - **Events:** `tilesChanged`, `exhibitChanged`, `animalEscaped`, `jobPosted`, `guestLeft`, `dayEnded`. Systems listen to these instead of calling each other.
 - **Pathfinding:** A* over the right mask for each kind of mover, cached and thrown away on `tilesChanged`. Guests and staff route on the path network; animals wander inside their region with short hops.
@@ -70,8 +80,8 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
 - **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load (water outside any exhibit uses a park ramp that matches the park ground); it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
-- Food: keepers fetching from a food shed (as above), or a real supply chain like v1?
-- Keeper safety: can keepers walk into a pen with an awake carnivore? Feeding hatches?
+- Guest shops: always stocked with a cost per sale (recommended), or restocked from the sheds?
+- Which species count as dangerous (chute only).
 - Breeding and aging in v2.0, or later?
 - Guests in groups or one by one?
 - How long a day is, and how fast the needs drain.
