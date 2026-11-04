@@ -21,7 +21,7 @@ Escapes cut across all of it: an animal outside its exhibit scares guests and po
   - **water:** none, shallow or deep. The only ground the player paints.
   - **structure:** nothing, path, staff path, a fence (type, HP, flags for gate and window) or part of a building.
   - **object:** a plant, a rock, a shelter or a prop, with its variant.
-- The map is flat for v2.0. There is no ground paint: outside the exhibits is **park ground**, a neutral texture of its own that belongs to no biome, and inside, the ground comes from the exhibit's biome.
+- The map is flat for v2.0. There is no ground paint: outside the exhibits is **park ground**, a neutral texture of its own that belongs to no biome (mowed turf: a duller green than any biome, faint mowed stripes, packed-earth wear near paths and building fronts), and inside, the ground comes from the exhibit's biome.
 - Every edit goes through a command (`paint`, `place`, `remove`) and fires `tilesChanged(area)`. Nothing else writes to the grid.
 - **Derived layers** are rebuilt only for the area that changed, never saved:
   - **regions:** flood fill of the tiles that aren't fence. A region that doesn't reach the map edge or an open gate is an exhibit.
