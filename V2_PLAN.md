@@ -64,7 +64,7 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 - Run the species pipeline in batches: Gemini, Snapper, cleanup, rig cut, data file, check, judge, your approval.
 - Launch roster (pick about 12). Already rigged in v1: Anomalocaris, Sacabambaspis, Dunkleosteus, Tiktaalik, Dimetrodon, Lystrosaurus, Coelophysis, Dryosaurus, Allosaurus, Tyrannosaurus, Mosasaurus, Chalicotherium. New: Arthropleura (procedural leg ripple). No sauropod, Stegosaurus or Triceratops is rigged yet.
 - Plants: about 15 iconic ones (Lepidodendron, Calamites, Glossopteris, Dicroidium, cycads, ginkgo, Araucaria, tree ferns, Williamsonia, Magnolia, Metasequoia, horsetails, ferns, Archaeopteris, Prototaxites, plus the reef pieces).
-- How you unlock animals (research, digs, cloning), simplified.
+- Time Travel Lab and Genetics Lab from v1 (100% genome to clone; flora unlocks plants and paleoflora), see `V2_SYSTEMS.md`.
 - **Done when:** the roster and plants are in, and unlocking feels like a progression.
 
 ### 5. Polish and launch
@@ -72,8 +72,9 @@ Every asset passes an automatic check (palette, scale, transparency, parts with 
 - Publish v2.0. v1 keeps its own link.
 
 ## Open questions
+- Medicine (vets, illness, genome therapy) is on the back burner until after v2.0.
 - Where v2 lives: a new repo or a `v2/` folder.
-- Which v1 systems come back, and when: medicine and genome therapy, hotels, tram, security, staff morale, weather, themes, the museum.
+- Which v1 systems come back, and when: hotels, tram, security, staff morale, weather, themes, the museum.
 - Do hills, cliffs and moats count as terrain height, or is the ground flat?
 - The exact size-curve numbers and the largest target park size.
 - Whether buildings come from Blender or shape generators (test on the restroom).

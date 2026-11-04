@@ -71,7 +71,15 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Fear:** an escaped animal nearby makes guests run for the exit and drops the rating.
 - **Thoughts:** short lines for the guest panel ("This T. rex is amazing.", "Too expensive.").
 
-## 7. Shared machinery
+## 7. Getting animals and plants
+The Time Travel Lab and the Genetics Lab work as in v1 (`DISCOVERY_PLAN.md`), with the changes below. The site data (`tools/timeline/`) carries over; a site shows only when one of its animals is in the roster.
+- **Time Travel Lab:** a timeline of real fossil sites. Drones scout a site to discover its animals, then fly expeditions to it to collect genome. Expeditions for an animal are locked until the park reaches its stars.
+- **Genetics Lab:** an animal can be cloned once its genome is 100%. No accuracy, no failed clones, no genetic disorders. A finished clone arrives in a crate.
+- **Flora (the Botany Lab, folded into Genetics):** flora expeditions fill a period's flora genome. A full one unlocks that period's plants for planting and its paleoflora as a premium food in the sheds. No greenhouses or production.
+- **Starter plants are modern**, available from the start, so the first pens aren't bare.
+- **Medicine** is on the back burner: no vet, illness or genome therapy in v2.0.
+
+## 8. Shared machinery
 - **The sim tick:** a fixed step in game time. Faster speeds run more steps per frame. The day clock runs on the same tick, with an end-of-day pass for the books and the day report.
 - **Events:** `tilesChanged`, `exhibitChanged`, `animalEscaped`, `jobPosted`, `guestLeft`, `dayEnded`. Systems listen to these instead of calling each other.
 - **Pathfinding:** A* over the right mask for each kind of mover, cached and thrown away on `tilesChanged`. Guests and staff route on the path network; animals wander inside their region with short hops.
@@ -81,6 +89,8 @@ One hop, no supply chain. The only food decisions are where the sheds go and how
 - **Drawing:** the renderer only reads the sim. Each biome's ground is a base tile plus clumps of detail (dirt, tufts, pebbles, litter) picked from the tile's coordinates, so it looks varied but never changes between loads. Water is one tile set (shallow, deep, edges) recolored per biome by swapping its color ramp onto that biome's water ramp, done once at load (water outside any exhibit uses a park ramp that matches the park ground); it's never a tint, so colors stay on the palette. Paths and fences are autotiled from the tile layers; then objects, buildings, animals and people are drawn sorted by their bottom edge.
 
 ## Open questions
+- Research Lab: keep v1's tech tree (drone Mk., cheaper and faster trips), trim it, or fold it in?
+- Which plants are starters: living fossils (horsetails, ferns, cycads, ginkgo, Araucaria, Metasequoia) count as modern, or only plants that look modern?
 - Which species count as dangerous (chute only).
 - Breeding and aging in v2.0, or later?
 - Guests in groups or one by one?
